@@ -1,0 +1,193 @@
+package app.musix.net
+
+import app.musix.data.Album
+import app.musix.data.AlbumDetail
+import app.musix.data.AppJson
+import app.musix.data.AppSettings
+import app.musix.data.Artist
+import app.musix.data.ArtistDetail
+import app.musix.data.LyricLine
+import app.musix.data.Lyrics
+import app.musix.data.SearchResults
+import app.musix.data.Song
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.net.URLEncoder
+import java.security.MessageDigest
+import java.security.SecureRandom
+
+/** Navidrome through the Subsonic / OpenSubsonic API, with token authentication. */
+class SubsonicApi(
+    private val http: OkHttpClient,
+    private val settings: () -> AppSettings,
+) {
+    // One salt per app run keeps cover URLs stable, so images stay cached while scrolling.
+    private val salt: String = ByteArray(8).also { SecureRandom().nextBytes(it) }.toHex()
+    private var tokenFor: Pair<String, String>? = null
+
+    private fun token(password: String): String {
+        tokenFor?.let { if (it.first == password) return it.second }
+        val token = md5(password + salt)
+        tokenFor = password to token
+        return token
+    }
+
+    fun url(endpoint: String, params: Map<String, String?> = emptyMap()): String {
+        val s = settings()
+        val sb = StringBuilder(s.navidromeUrl)
+            .append("/rest/").append(endpoint)
+            .append("?u=").append(enc(s.navidromeUser))
+            .append("&t=").append(token(s.navidromePassword))
+            .append("&s=").append(salt)
+            .append("&v=1.16.1&c=musix&f=json")
+        for ((key, value) in params) {
+            if (value != null) sb.append('&').append(enc(key)).append('=').append(enc(value))
+        }
+        return sb.toString()
+    }
+
+    fun streamUrl(id: String): String = url("stream", mapOf("id" to id))
+
+    fun coverUrl(id: String, size: Int?): String =
+        url("getCoverArt", mapOf("id" to id, "size" to size?.toString()))
+
+    private suspend fun call(endpoint: String, params: Map<String, String?> = emptyMap()): JsonObject =
+        withContext(Dispatchers.IO) {
+            if (settings().navidromeUrl.isBlank()) throw ApiException("Navidrome isn't set up yet")
+            val request = Request.Builder().url(url(endpoint, params)).build()
+            http.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (!response.isSuccessful) throw ApiException("Navidrome answered HTTP ${response.code}")
+                val root = try {
+                    AppJson.parseToJsonElement(body).jsonObject["subsonic-response"]?.jsonObject
+                } catch (e: Exception) {
+                    null
+                } ?: throw ApiException("That address doesn't look like a Navidrome server")
+                if (root.str("status") != "ok") {
+                    throw ApiException(root.obj("error")?.str("message") ?: "Navidrome refused the request")
+                }
+                root
+            }
+        }
+
+    suspend fun ping(): String {
+        val root = call("ping")
+        val type = root.str("type") ?: "Subsonic server"
+        val version = root.str("serverVersion") ?: root.str("version") ?: ""
+        return "$type $version".trim()
+    }
+
+    /** type: alphabeticalByName, newest, frequent, recent, random, starred… */
+    suspend fun albums(type: String, size: Int, offset: Int): List<Album> =
+        call("getAlbumList2", mapOf("type" to type, "size" to "$size", "offset" to "$offset"))
+            .obj("albumList2")?.arr("album").orEmpty().map(::parseAlbum)
+
+    suspend fun album(id: String): AlbumDetail {
+        val album = call("getAlbum", mapOf("id" to id)).obj("album") ?: throw ApiException("Album not found")
+        return AlbumDetail(parseAlbum(album), album.arr("song").map(::parseSong))
+    }
+
+    suspend fun artists(): List<Artist> =
+        call("getArtists").obj("artists")?.arr("index").orEmpty()
+            .flatMap { index -> index.arr("artist").map(::parseArtist) }
+
+    suspend fun artist(id: String): ArtistDetail {
+        val artist = call("getArtist", mapOf("id" to id)).obj("artist") ?: throw ApiException("Artist not found")
+        return ArtistDetail(parseArtist(artist), artist.arr("album").map(::parseAlbum))
+    }
+
+    suspend fun song(id: String): Song {
+        val song = call("getSong", mapOf("id" to id)).obj("song") ?: throw ApiException("Song not found")
+        return parseSong(song)
+    }
+
+    suspend fun search(query: String): SearchResults {
+        val result = call(
+            "search3",
+            mapOf("query" to query, "artistCount" to "20", "albumCount" to "30", "songCount" to "60"),
+        ).obj("searchResult3")
+        return SearchResults(
+            artists = result?.arr("artist").orEmpty().map(::parseArtist),
+            albums = result?.arr("album").orEmpty().map(::parseAlbum),
+            songs = result?.arr("song").orEmpty().map(::parseSong),
+        )
+    }
+
+    /** Synced lyrics from the OpenSubsonic extension when available, plain lyrics otherwise. */
+    suspend fun lyrics(song: Song): Lyrics? {
+        val structured = runCatching { call("getLyricsBySongId", mapOf("id" to song.id)) }.getOrNull()
+        val sets = structured?.obj("lyricsList")?.arr("structuredLyrics").orEmpty()
+        val pick = sets.firstOrNull { it.bool("synced") == true } ?: sets.firstOrNull()
+        if (pick != null) {
+            val synced = pick.bool("synced") == true
+            val offset = pick.long("offset") ?: 0L
+            val lines = pick.arr("line").map { line ->
+                LyricLine(
+                    startMs = if (synced) line.long("start")?.let { it + offset } else null,
+                    text = line.str("value").orEmpty(),
+                )
+            }
+            if (lines.any { it.text.isNotBlank() }) return Lyrics(synced, lines)
+        }
+        val plain = runCatching {
+            call("getLyrics", mapOf("artist" to song.artist, "title" to song.title))
+        }.getOrNull()?.obj("lyrics")?.str("value")
+        if (plain.isNullOrBlank()) return null
+        return Lyrics(false, plain.lines().map { LyricLine(null, it) })
+    }
+
+    /** submission=false marks "now playing"; true records a finished play. */
+    suspend fun scrobble(id: String, submission: Boolean) {
+        call("scrobble", mapOf("id" to id, "submission" to submission.toString()))
+    }
+
+    private fun parseSong(o: JsonObject): Song {
+        val gain = o.obj("replayGain")
+        return Song(
+            id = o.str("id").orEmpty(),
+            title = o.str("title") ?: "Unknown title",
+            artist = o.str("artist") ?: o.str("displayArtist") ?: "",
+            artistId = o.str("artistId"),
+            album = o.str("album").orEmpty(),
+            albumId = o.str("albumId"),
+            coverArt = o.str("coverArt"),
+            durationSec = o.int("duration") ?: 0,
+            track = o.int("track"),
+            disc = o.int("discNumber"),
+            year = o.int("year"),
+            genre = o.str("genre"),
+            trackGain = gain?.flt("trackGain"),
+            albumGain = gain?.flt("albumGain"),
+            trackPeak = gain?.flt("trackPeak"),
+            albumPeak = gain?.flt("albumPeak"),
+        )
+    }
+
+    private fun parseAlbum(o: JsonObject) = Album(
+        id = o.str("id").orEmpty(),
+        name = o.str("name") ?: o.str("title") ?: "Unknown album",
+        artist = o.str("artist") ?: o.str("displayArtist") ?: "",
+        artistId = o.str("artistId"),
+        coverArt = o.str("coverArt"),
+        songCount = o.int("songCount") ?: 0,
+        year = o.int("year"),
+    )
+
+    private fun parseArtist(o: JsonObject) = Artist(
+        id = o.str("id").orEmpty(),
+        name = o.str("name") ?: "Unknown artist",
+        albumCount = o.int("albumCount") ?: 0,
+        coverArt = o.str("coverArt"),
+    )
+
+    private companion object {
+        fun enc(value: String): String = URLEncoder.encode(value, "UTF-8")
+        fun md5(value: String): String =
+            MessageDigest.getInstance("MD5").digest(value.toByteArray(Charsets.UTF_8)).toHex()
+        fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
+    }
+}

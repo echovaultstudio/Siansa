@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Sound bars rising like a sunrise -->
+    <path android:fillColor="#B9A4FF" android:pathData="M33,62a3,3 0 0,1 6,0v8a3,3 0 0,1 -6,0z" />
+    <path android:fillColor="#C9B8FF" android:pathData="M43,50a3,3 0 0,1 6,0v20a3,3 0 0,1 -6,0z" />
+    <path android:fillColor="#FFD38A" android:pathData="M53,40a3,3 0 0,1 6,0v30a3,3 0 0,1 -6,0z" />
+    <path android:fillColor="#C9B8FF" android:pathData="M63,48a3,3 0 0,1 6,0v22a3,3 0 0,1 -6,0z" />
+    <path android:fillColor="#B9A4FF" android:pathData="M73,58a3,3 0 0,1 6,0v12a3,3 0 0,1 -6,0z" />
+</vector>
