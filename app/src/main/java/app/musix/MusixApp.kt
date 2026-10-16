@@ -74,6 +74,8 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
         return ImageLoader.Builder(context)
             .components {
                 add(OkHttpNetworkFetcherFactory(callFactory = { graph.imageHttp }))
+                // Animated covers shown as stills: their first frame (Android's still decoder fails on some).
+                add(app.musix.covers.FirstFrameDecoder.Factory())
             }
             // Room for a few hundred decoded list covers, so scrolling back shows them at once.
             .memoryCache { MemoryCache.Builder().maxSizePercent(context, 0.30).build() }

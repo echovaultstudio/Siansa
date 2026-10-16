@@ -3,6 +3,12 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.17beta — 2026-10-16
+
+### Fixed
+- **Albums with an animated GIF cover showed no cover** in lists, the mini player and now playing (found by the app tour, explained by the new image log). Navidrome converts GIFs to animated WebP, and Android's still-image decoder rejects those files. Wherever a still is shown, Musix now draws the first frame through Android's animation decoder instead. This also fixes such covers already in the image cache, without downloading them again.
+- Making the still of a kept animated cover read the whole file into memory (they can be over 100 MB); it's now decoded straight from the file.
+
 ## 0.0.16beta — 2026-10-16
 
 ### Added

@@ -161,7 +161,8 @@ object CoverStore {
         val head = runCatching { response.peekBody(32).bytes() }.getOrNull() ?: return response
         val image = sniff(head) ?: return response
         if (!image.animated) return response
-        // Shrunk as asked (Navidrome's own conversion of a GIF): nothing to keep.
+        // Shrunk as asked (Navidrome's own conversion of a GIF): nothing to keep. (FirstFrameDecoder shows
+        // its first frame in lists; Android's still decoder can't read these files.)
         if (size != null && image.width in 1..(size * 5 / 4) && image.height in 1..(size * 5 / 4)) return response
 
         val length = response.body?.contentLength() ?: -1L
@@ -293,26 +294,9 @@ object CoverStore {
         }
     }
 
-    /** The first frame, shrunk to at most [STILL_PX] px, as a JPEG. */
+    /** The first frame, shrunk to at most [STILL_PX] px, as a JPEG. Reads the file, never all of it into memory. */
     private fun makeStill(original: File, still: File) {
-        val bitmap: Bitmap? = runCatching {
-            if (Build.VERSION.SDK_INT >= 28) {
-                ImageDecoder.decodeBitmap(ImageDecoder.createSource(original)) { decoder, info, _ ->
-                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                    val w = info.size.width
-                    val h = info.size.height
-                    val scale = STILL_PX.toFloat() / maxOf(w, h)
-                    if (scale < 1f) decoder.setTargetSize((w * scale).toInt().coerceAtLeast(1), (h * scale).toInt().coerceAtLeast(1))
-                }
-            } else {
-                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeFile(original.path, bounds)
-                var sample = 1
-                while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= STILL_PX) sample *= 2
-                BitmapFactory.decodeFile(original.path, BitmapFactory.Options().apply { inSampleSize = sample })
-            }
-        }.onFailure { AppLog.w("Cover", "Couldn't make a still of ${original.name}: ${it.message}") }.getOrNull()
-        if (bitmap == null) return
+        val bitmap = firstFrame(original, STILL_PX) ?: return AppLog.w("Cover", "Couldn't make a still of ${original.name}")
         try {
             val tmp = File(still.path + ".part")
             tmp.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
@@ -320,6 +304,54 @@ object CoverStore {
         } finally {
             bitmap.recycle()
         }
+    }
+
+    fun firstFrame(file: File, maxPx: Int): Bitmap? = firstFrame(
+        maxPx,
+        source = { if (Build.VERSION.SDK_INT >= 28) ImageDecoder.createSource(file) else null },
+        fallback = { opts -> BitmapFactory.decodeFile(file.path, opts) },
+    )
+
+    fun firstFrame(bytes: ByteArray, maxPx: Int): Bitmap? = firstFrame(
+        maxPx,
+        source = { if (Build.VERSION.SDK_INT >= 28) ImageDecoder.createSource(java.nio.ByteBuffer.wrap(bytes)) else null },
+        fallback = { opts -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts) },
+    )
+
+    /**
+     * The first frame of an image, at most [maxPx]. Android's still-image decoder rejects some animated
+     * WebPs (Navidrome's ffmpeg conversions of GIFs: "Failed to create image decoder"), while its animation
+     * decoder reads them, so that's the fallback: decode the animation and draw its first frame.
+     */
+    private fun firstFrame(maxPx: Int, source: () -> Any?, fallback: (BitmapFactory.Options?) -> Bitmap?): Bitmap? {
+        if (Build.VERSION.SDK_INT >= 28) {
+            val target = ImageDecoder.OnHeaderDecodedListener { decoder, info, _ ->
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                val w = info.size.width
+                val h = info.size.height
+                val scale = maxPx.toFloat() / maxOf(w, h)
+                if (scale < 1f) decoder.setTargetSize((w * scale).toInt().coerceAtLeast(1), (h * scale).toInt().coerceAtLeast(1))
+            }
+            runCatching {
+                return ImageDecoder.decodeBitmap(source() as ImageDecoder.Source, target)
+            }.onFailure { AppLog.d("Cover", "Still decoder failed (${it.message}); drawing the animation's first frame instead") }
+            runCatching {
+                val drawable = ImageDecoder.decodeDrawable(source() as ImageDecoder.Source, target)
+                val w = drawable.intrinsicWidth.coerceAtLeast(1)
+                val h = drawable.intrinsicHeight.coerceAtLeast(1)
+                val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                drawable.setBounds(0, 0, w, h)
+                drawable.draw(android.graphics.Canvas(bitmap))
+                return bitmap
+            }.onFailure { AppLog.w("Cover", "Animation decoder failed too: ${it.message}") }
+        }
+        return runCatching {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            fallback(bounds)
+            var sample = 1
+            while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxPx) sample *= 2
+            fallback(BitmapFactory.Options().apply { inSampleSize = sample })
+        }.getOrNull()
     }
 
     private fun serve(request: Request, local: Local, wantsAnimation: Boolean): Response {
