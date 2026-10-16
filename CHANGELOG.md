@@ -3,6 +3,11 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.19beta — 2026-10-16
+
+### Added
+- **Albums with several discs are split by disc**: each disc gets its own heading above its songs. Discs with a name (the "disc title" tag, as Navidrome shows it, e.g. for box sets) show that name; others show "Disc 1", "Disc 2"… Track numbers no longer carry the disc in front ("2.5" is now "5" under "Disc 2").
+
 ## 0.0.18beta — 2026-10-16
 
 ### Fixed
