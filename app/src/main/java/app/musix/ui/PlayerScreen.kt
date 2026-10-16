@@ -108,16 +108,30 @@ fun PlayerScreen(nav: NavController) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Text(
-            listOfNotNull(song?.artist, song?.album).filter { it.isNotBlank() }.joinToString(" · "),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.clickable(enabled = song?.albumId != null) {
-                song?.albumId?.let { nav.navigate("album/$it") }
-            },
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                song?.artist.orEmpty(),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false).clickable(enabled = song?.artistId != null) {
+                    song?.artistId?.let { nav.navigate("artist/$it") }
+                },
+            )
+            if (!song?.album.isNullOrBlank()) {
+                Text(
+                    " · " + song?.album.orEmpty(),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false).clickable(enabled = song?.albumId != null) {
+                        song?.albumId?.let { nav.navigate("album/$it") }
+                    },
+                )
+            }
+        }
 
         val duration = state.durationMs.coerceAtLeast(1L)
         val fraction = dragging ?: (position.toFloat() / duration).coerceIn(0f, 1f)

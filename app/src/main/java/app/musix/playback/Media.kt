@@ -1,8 +1,10 @@
 package app.musix.playback
 
 import android.net.Uri
+import android.os.Bundle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import app.musix.data.AppJson
 import app.musix.data.AppSettings
 import app.musix.data.ReplayGainMode
 import app.musix.data.Song
@@ -18,8 +20,12 @@ object SongRegistry {
     fun get(id: String): Song? = songs[id]
 }
 
+private const val SONG_EXTRA = "musix.song"
+
 fun Song.toMediaItem(api: SubsonicApi): MediaItem {
     val uri = Uri.parse(api.streamUrl(id))
+    // The whole song travels with the item, so its details survive the trip through the media session.
+    val extras = Bundle().apply { putString(SONG_EXTRA, AppJson.encodeToString(Song.serializer(), this@toMediaItem)) }
     val metadata = MediaMetadata.Builder()
         .setTitle(title)
         .setArtist(artist)
@@ -28,6 +34,7 @@ fun Song.toMediaItem(api: SubsonicApi): MediaItem {
         .setArtworkUri(coverArt?.let { Uri.parse(api.coverUrl(it, 600)) })
         .setIsPlayable(true)
         .setIsBrowsable(false)
+        .setExtras(extras)
         .build()
     return MediaItem.Builder()
         .setMediaId(id)
@@ -35,6 +42,21 @@ fun Song.toMediaItem(api: SubsonicApi): MediaItem {
         .setMediaMetadata(metadata)
         .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(uri).build())
         .build()
+}
+
+fun MediaItem.toSong(): Song {
+    SongRegistry.get(mediaId)?.let { return it }
+    val json = mediaMetadata.extras?.getString(SONG_EXTRA)
+    json?.let { text -> runCatching { AppJson.decodeFromString(Song.serializer(), text) }.getOrNull() }?.let {
+        SongRegistry.register(listOf(it))
+        return it
+    }
+    return Song(
+        id = mediaId,
+        title = mediaMetadata.title?.toString() ?: "",
+        artist = mediaMetadata.artist?.toString() ?: "",
+        album = mediaMetadata.albumTitle?.toString() ?: "",
+    )
 }
 
 /**

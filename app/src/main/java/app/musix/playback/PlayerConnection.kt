@@ -4,7 +4,6 @@ import android.content.ComponentName
 import android.content.Context
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
-import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -149,7 +148,7 @@ class PlayerConnection(
 
     private fun refresh() {
         val c = controller ?: return
-        val queue = (0 until c.mediaItemCount).map { songFor(c.getMediaItemAt(it)) }
+        val queue = (0 until c.mediaItemCount).map { c.getMediaItemAt(it).toSong() }
         val index = c.currentMediaItemIndex
         val current = queue.getOrNull(index)
         val duration = c.duration.takeIf { it != C.TIME_UNSET && it > 0 }
@@ -165,11 +164,4 @@ class PlayerConnection(
             index = index,
         )
     }
-
-    private fun songFor(item: MediaItem): Song = SongRegistry.get(item.mediaId) ?: Song(
-        id = item.mediaId,
-        title = item.mediaMetadata.title?.toString() ?: "",
-        artist = item.mediaMetadata.artist?.toString() ?: "",
-        album = item.mediaMetadata.albumTitle?.toString() ?: "",
-    )
 }

@@ -8,6 +8,9 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -33,7 +36,10 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         graph = (application as MusixApp).graph
+        // Streams go through the app's HTTP client, so a proxy login for Navidrome applies here too.
+        val dataSource = DefaultDataSource.Factory(this, OkHttpDataSource.Factory(graph.http))
         val player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -100,7 +106,7 @@ class PlaybackService : MediaSessionService() {
                 submit(previous)
             }
             currentId = mediaItem?.mediaId
-            val song = mediaItem?.mediaId?.let { SongRegistry.get(it) }
+            val song = mediaItem?.toSong()
             player.volume = replayGainVolume(song, graph.settings.current)
             if (song != null) {
                 scope.launch {

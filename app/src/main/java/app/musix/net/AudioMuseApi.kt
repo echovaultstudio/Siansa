@@ -3,6 +3,8 @@ package app.musix.net
 import app.musix.data.AppJson
 import app.musix.data.AppSettings
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -22,34 +24,91 @@ data class ClapHit(
     val similarity: Double,
 )
 
-/** AudioMuse-AI's own API: text-to-audio (CLAP) search and its concept vocabulary. */
+/**
+ * AudioMuse-AI's own API: text-to-audio (CLAP) search and its concept vocabulary.
+ * Signs in with the API token when one is set, otherwise with the AudioMuse username and password.
+ */
 class AudioMuseApi(
     private val http: OkHttpClient,
     private val settings: () -> AppSettings,
 ) {
-    private fun request(path: String): Request.Builder {
+    private val loginLock = Mutex()
+    private var session: Pair<String, String>? = null // (login used, JWT)
+
+    private suspend fun request(path: String): Request.Builder {
         val s = settings()
         if (s.audioMuseUrl.isBlank()) throw ApiException("AudioMuse isn't set up yet")
         val builder = Request.Builder().url(s.audioMuseUrl + path)
-        if (s.audioMuseToken.isNotBlank()) builder.header("Authorization", "Bearer ${s.audioMuseToken}")
+        when {
+            s.audioMuseToken.isNotBlank() -> builder.header("Authorization", "Bearer ${s.audioMuseToken}")
+            s.audioMuseUser.isNotBlank() -> builder.header("Cookie", "audiomuse_jwt=${login(s, force = false)}")
+        }
         return builder
     }
 
-    private suspend fun execute(request: Request): JsonObject = withContext(Dispatchers.IO) {
+    private suspend fun login(s: AppSettings, force: Boolean): String = loginLock.withLock {
+        val key = s.audioMuseUrl + "|" + s.audioMuseUser + "|" + s.audioMusePassword
+        session?.let { if (!force && it.first == key) return@withLock it.second }
+        val jwt = withContext(Dispatchers.IO) {
+            val payload = buildJsonObject {
+                put("user", s.audioMuseUser)
+                put("password", s.audioMusePassword)
+            }.toString()
+            val request = Request.Builder()
+                .url(s.audioMuseUrl + "/auth")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .post(payload.toRequestBody(JSON_TYPE))
+                .build()
+            http.newCall(request).execute().use { response ->
+                when (response.code) {
+                    200 -> Unit
+                    401 -> throw ApiException("AudioMuse rejected the username or password")
+                    404 -> throw ApiException("AudioMuse has no login switched on, so leave its username and password empty")
+                    else -> throw ApiException("AudioMuse login failed (HTTP ${response.code})")
+                }
+                response.headers("Set-Cookie")
+                    .firstNotNullOfOrNull { header ->
+                        header.split(';').first().trim().takeIf { it.startsWith("audiomuse_jwt=") }
+                            ?.substringAfter('=')
+                    }
+                    ?: throw ApiException("AudioMuse accepted the login but sent no session")
+            }
+        }
+        session = key to jwt
+        jwt
+    }
+
+    private suspend fun execute(build: suspend () -> Request): JsonObject {
+        val first = runCatching { send(build()) }
+        val error = first.exceptionOrNull()
+        // A session can expire: sign in again once and retry.
+        if (error is Unauthorized && settings().audioMuseToken.isBlank() && settings().audioMuseUser.isNotBlank()) {
+            login(settings(), force = true)
+            return send(build())
+        }
+        if (error is Unauthorized) {
+            throw ApiException("AudioMuse needs a login: set an API token, or its username and password, in Settings")
+        }
+        return first.getOrThrow()
+    }
+
+    private class Unauthorized : Exception("Unauthorized")
+
+    private suspend fun send(request: Request): JsonObject = withContext(Dispatchers.IO) {
         http.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
             val json = runCatching { AppJson.parseToJsonElement(body).jsonObject }.getOrNull()
+            if (response.code == 401 || response.code == 403) throw Unauthorized()
             if (!response.isSuccessful) {
                 val reason = json?.str("error") ?: json?.str("message") ?: body.take(120).ifBlank { "no details" }
                 throw ApiException(
                     when (response.code) {
-                        401, 403 -> "AudioMuse refused the token ($reason)"
                         503 -> "AudioMuse's search index isn't loaded yet ($reason)"
                         else -> "AudioMuse answered HTTP ${response.code}: $reason"
                     }
                 )
             }
-            json ?: throw ApiException("AudioMuse sent something that isn't JSON")
+            json ?: throw ApiException("AudioMuse sent something that isn't JSON. Is the address its API port?")
         }
     }
 
@@ -58,10 +117,8 @@ class AudioMuseApi(
             put("query", query)
             put("limit", limit)
         }.toString()
-        val request = request("/api/clap/search")
-            .post(payload.toRequestBody(JSON_TYPE))
-            .build()
-        return execute(request).arr("results").mapNotNull { r ->
+        val root = execute { request("/api/clap/search").post(payload.toRequestBody(JSON_TYPE)).build() }
+        return root.arr("results").mapNotNull { r ->
             val id = r.str("item_id") ?: return@mapNotNull null
             ClapHit(
                 id = id,
@@ -75,7 +132,7 @@ class AudioMuseApi(
 
     /** Sound concepts this library's search understands well, to steer the AI's wording. */
     suspend fun concepts(): List<String> {
-        val root = execute(request("/api/clap/concepts").get().build())
+        val root = execute { request("/api/clap/concepts").get().build() }
         if (root.bool("available") == false) return emptyList()
         return root.arr("categories")
             .flatMap { category -> category.arr("terms").mapNotNull { it.str("term") } }

@@ -9,6 +9,13 @@ val AppJson = Json {
     isLenient = true
 }
 
+/** Compact JSON for the large library cache: defaults and nulls are left out. */
+val CacheJson = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = false
+    explicitNulls = false
+}
+
 @Serializable
 data class Song(
     val id: String,
@@ -29,6 +36,7 @@ data class Song(
     val albumPeak: Float? = null,
 )
 
+/** An album. [ids] holds every Navidrome album id merged into it (the same album in several libraries). */
 @Serializable
 data class Album(
     val id: String,
@@ -38,7 +46,13 @@ data class Album(
     val coverArt: String? = null,
     val songCount: Int = 0,
     val year: Int? = null,
-)
+    val genre: String? = null,
+    val created: String? = null,
+    val playCount: Long = 0,
+    val ids: List<String> = emptyList(),
+) {
+    val allIds: List<String> get() = ids.ifEmpty { listOf(id) }
+}
 
 @Serializable
 data class Artist(
@@ -46,6 +60,7 @@ data class Artist(
     val name: String,
     val albumCount: Int = 0,
     val coverArt: String? = null,
+    val imageUrl: String? = null,
 )
 
 data class AlbumDetail(val album: Album, val songs: List<Song>)
@@ -54,6 +69,17 @@ data class SearchResults(val artists: List<Artist>, val albums: List<Album>, val
 
 data class LyricLine(val startMs: Long?, val text: String)
 data class Lyrics(val synced: Boolean, val lines: List<LyricLine>)
+
+data class MusicFolder(val id: String, val name: String)
+
+data class SimilarArtist(val id: String?, val name: String, val coverArt: String?, val imageUrl: String?)
+
+data class ArtistInfo(
+    val biography: String?,
+    val imageUrl: String?,
+    val lastFmUrl: String?,
+    val similar: List<SimilarArtist>,
+)
 
 /** A time-of-day recipe for a daily mix. Hours are 0–23; a window may wrap past midnight. */
 @Serializable

@@ -87,8 +87,15 @@ fun HomeScreen(nav: NavController) {
 
     val today = LocalDate.now().toString()
     val otherToday = mixes.orEmpty().filter { it.date == today && it.id != current?.id }
-    val newest by loadState("newest") { graph.subsonic.albums("newest", 20, 0) }
-    val random by loadState("random") { graph.subsonic.albums("random", 20, 0) }
+    val library by graph.library.index.collectAsStateWithLifecycle()
+    val loaded by graph.library.loaded.collectAsStateWithLifecycle()
+    // From the synced library when there is one; straight from Navidrome otherwise.
+    val newest by loadState(library to "newest") {
+        library?.sortedAlbums("newest")?.take(20) ?: graph.subsonic.albums("newest", 20, 0).distinctBy { it.name + "|" + it.artist }
+    }
+    val random by loadState(library to "random") {
+        library?.sortedAlbums("random")?.take(20) ?: graph.subsonic.albums("random", 20, 0).distinctBy { it.name + "|" + it.artist }
+    }
 
     Screen(
         title = greeting(),
@@ -125,6 +132,13 @@ fun HomeScreen(nav: NavController) {
                 item { SectionTitle("Earlier today") }
                 items(otherToday, key = { it.id }) { mix ->
                     MixRow(mix) { nav.navigate("mix/${mix.id}") }
+                }
+            }
+            if (loaded && library == null) {
+                item {
+                    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        SyncPrompt(nav)
+                    }
                 }
             }
             item { SectionTitle("Recently added") }

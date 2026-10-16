@@ -6,9 +6,12 @@ import app.musix.data.AppJson
 import app.musix.data.AppSettings
 import app.musix.data.Artist
 import app.musix.data.ArtistDetail
+import app.musix.data.ArtistInfo
 import app.musix.data.LyricLine
 import app.musix.data.Lyrics
+import app.musix.data.MusicFolder
 import app.musix.data.SearchResults
+import app.musix.data.SimilarArtist
 import app.musix.data.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -61,6 +64,9 @@ class SubsonicApi(
             val request = Request.Builder().url(url(endpoint, params)).build()
             http.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
+                if (response.code == 401 || response.code == 407) {
+                    throw ApiException("The server asked for a login (HTTP ${response.code}). Fill in the proxy login in Settings.")
+                }
                 if (!response.isSuccessful) throw ApiException("Navidrome answered HTTP ${response.code}")
                 val root = try {
                     AppJson.parseToJsonElement(body).jsonObject["subsonic-response"]?.jsonObject
@@ -81,18 +87,27 @@ class SubsonicApi(
         return "$type $version".trim()
     }
 
+    /** Navidrome's libraries. */
+    suspend fun musicFolders(): List<MusicFolder> =
+        call("getMusicFolders").obj("musicFolders")?.arr("musicFolder").orEmpty().mapNotNull { f ->
+            val id = f.str("id") ?: return@mapNotNull null
+            MusicFolder(id, f.str("name") ?: "Library $id")
+        }
+
     /** type: alphabeticalByName, newest, frequent, recent, random, starred… */
-    suspend fun albums(type: String, size: Int, offset: Int): List<Album> =
-        call("getAlbumList2", mapOf("type" to type, "size" to "$size", "offset" to "$offset"))
-            .obj("albumList2")?.arr("album").orEmpty().map(::parseAlbum)
+    suspend fun albums(type: String, size: Int, offset: Int, folderId: String? = null): List<Album> =
+        call(
+            "getAlbumList2",
+            mapOf("type" to type, "size" to "$size", "offset" to "$offset", "musicFolderId" to folderId),
+        ).obj("albumList2")?.arr("album").orEmpty().map(::parseAlbum)
 
     suspend fun album(id: String): AlbumDetail {
         val album = call("getAlbum", mapOf("id" to id)).obj("album") ?: throw ApiException("Album not found")
         return AlbumDetail(parseAlbum(album), album.arr("song").map(::parseSong))
     }
 
-    suspend fun artists(): List<Artist> =
-        call("getArtists").obj("artists")?.arr("index").orEmpty()
+    suspend fun artists(folderId: String? = null): List<Artist> =
+        call("getArtists", mapOf("musicFolderId" to folderId)).obj("artists")?.arr("index").orEmpty()
             .flatMap { index -> index.arr("artist").map(::parseArtist) }
 
     suspend fun artist(id: String): ArtistDetail {
@@ -100,10 +115,47 @@ class SubsonicApi(
         return ArtistDetail(parseArtist(artist), artist.arr("album").map(::parseAlbum))
     }
 
+    /** Biography, image and similar artists that Navidrome already has (from its agents or AudioMuse). */
+    suspend fun artistInfo(id: String): ArtistInfo {
+        val info = call("getArtistInfo2", mapOf("id" to id, "count" to "20", "includeNotPresent" to "false"))
+            .obj("artistInfo2")
+        return ArtistInfo(
+            biography = info?.str("biography")?.let(::cleanBiography)?.takeIf { it.isNotBlank() },
+            imageUrl = info?.str("largeImageUrl") ?: info?.str("mediumImageUrl"),
+            lastFmUrl = info?.str("lastFmUrl"),
+            similar = info?.arr("similarArtist").orEmpty().map { a ->
+                SimilarArtist(
+                    id = a.str("id"),
+                    name = a.str("name") ?: "",
+                    coverArt = a.str("coverArt"),
+                    imageUrl = a.str("artistImageUrl"),
+                )
+            }.filter { it.name.isNotBlank() },
+        )
+    }
+
+    suspend fun topSongs(artistName: String, count: Int = 10): List<Song> =
+        call("getTopSongs", mapOf("artist" to artistName, "count" to "$count"))
+            .obj("topSongs")?.arr("song").orEmpty().map(::parseSong)
+
     suspend fun song(id: String): Song {
         val song = call("getSong", mapOf("id" to id)).obj("song") ?: throw ApiException("Song not found")
         return parseSong(song)
     }
+
+    /** One page of every song (empty search), used by library sync. */
+    suspend fun songsPage(offset: Int, size: Int, folderId: String? = null): List<Song> =
+        call(
+            "search3",
+            mapOf(
+                "query" to "",
+                "artistCount" to "0",
+                "albumCount" to "0",
+                "songCount" to "$size",
+                "songOffset" to "$offset",
+                "musicFolderId" to folderId,
+            ),
+        ).obj("searchResult3")?.arr("song").orEmpty().map(::parseSong)
 
     suspend fun search(query: String): SearchResults {
         val result = call(
@@ -175,6 +227,9 @@ class SubsonicApi(
         coverArt = o.str("coverArt"),
         songCount = o.int("songCount") ?: 0,
         year = o.int("year"),
+        genre = o.str("genre"),
+        created = o.str("created"),
+        playCount = o.long("playCount") ?: 0,
     )
 
     private fun parseArtist(o: JsonObject) = Artist(
@@ -182,6 +237,7 @@ class SubsonicApi(
         name = o.str("name") ?: "Unknown artist",
         albumCount = o.int("albumCount") ?: 0,
         coverArt = o.str("coverArt"),
+        imageUrl = o.str("artistImageUrl"),
     )
 
     private companion object {
@@ -189,5 +245,14 @@ class SubsonicApi(
         fun md5(value: String): String =
             MessageDigest.getInstance("MD5").digest(value.toByteArray(Charsets.UTF_8)).toHex()
         fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
+
+        /** Last.fm biographies come as HTML ending in a "Read more" link. */
+        fun cleanBiography(html: String): String = html
+            .replace(Regex("<a [^>]*>.*?</a>\\.?", RegexOption.DOT_MATCHES_ALL), "")
+            .replace(Regex("<br\\s*/?>"), "\n")
+            .replace(Regex("<[^>]+>"), "")
+            .replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'")
+            .replace("&lt;", "<").replace("&gt;", ">")
+            .trim()
     }
 }
