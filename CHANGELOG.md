@@ -3,6 +3,17 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.12beta — 2026-10-16
+
+### Fixed
+- **Download all covers stopped after a few seconds** ("Job was cancelled" in the log). Android stopped the background worker, and switching the option on also started the daily run at the same moment. The download now runs inside the app, once at a time; the background worker only starts it and waits, so if Android stops the worker the download carries on while Musix is running. The daily run no longer starts straight away, and the log says why a run stopped.
+- The Storage page stuttered while covers downloaded: its progress now updates a few times a second instead of after every cover.
+- Animated covers over 100 MB (motion covers can be 160 MB) were sent on as they were instead of being kept; the limit is now 400 MB.
+
+### Changed
+- Logs: the separate **Detailed logging** switch is gone. With **Keep a log** on, everything is recorded: frames, freezes, buffering, downloads, cover downloads, phone state, errors. The log keeps up to 10 MB (two 5 MB files).
+- The log notes cover download progress every 250 covers, each cover that fails and why, whether the server sent a cover's size, and how much space animated covers take on the phone.
+
 ## 0.0.11beta — 2026-10-16
 
 ### Fixed

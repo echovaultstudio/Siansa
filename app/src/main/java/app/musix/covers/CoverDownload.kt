@@ -69,6 +69,7 @@ object CoverDownload {
     fun start(context: Context) {
         val request = OneTimeWorkRequestBuilder<CoverDownloadWorker>().setConstraints(constraints()).build()
         WorkManager.getInstance(context).enqueueUniqueWork(NOW, ExistingWorkPolicy.KEEP, request)
+        AppLog.i("Covers", "Cover download requested")
     }
 
     /** Daily runs on, or off, to match the setting. */
@@ -78,14 +79,49 @@ object CoverDownload {
             work.cancelUniqueWork(DAILY)
             return
         }
+        // The first daily run waits a day: switching it on already starts a run now.
         val request = PeriodicWorkRequestBuilder<CoverDownloadWorker>(1, TimeUnit.DAYS)
+            .setInitialDelay(1, TimeUnit.DAYS)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).setRequiresBatteryNotLow(true).build())
             .build()
         work.enqueueUniquePeriodicWork(DAILY, ExistingPeriodicWorkPolicy.KEEP, request)
     }
 
+    /** Stops a run in progress (the Stop button). */
     fun stop(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(NOW)
+        job?.let {
+            AppLog.i("Covers", "Cover download stopped from Settings")
+            it.cancel()
+        }
+    }
+
+    @Volatile private var job: kotlinx.coroutines.Job? = null
+
+    /**
+     * The download itself runs in the app's own scope, once at a time. WorkManager only starts it (on
+     * Wi-Fi, after syncs, daily) and waits for it, so if Android stops the worker early (as it did after
+     * 9 seconds on a Samsung) the download carries on while the app is running instead of being lost.
+     */
+    internal suspend fun runShared(context: Context, graph: AppGraph, why: String) {
+        val current = synchronized(this) {
+            job?.takeIf { it.isActive } ?: graph.scope.launch {
+                AppLog.i("Covers", "Cover download starting ($why)")
+                try {
+                    run(context.applicationContext, graph)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    AppLog.i("Covers", "Cover download cancelled after ${_progress.value.done} of ${_progress.value.total}")
+                    update { it.copy(running = false, note = "Stopped after ${it.done} of ${it.total}") }
+                    throw e
+                } catch (e: Exception) {
+                    AppLog.e("Covers", "Cover download failed after ${_progress.value.done} of ${_progress.value.total}", e)
+                    update { it.copy(running = false, note = "Failed: ${e.message ?: e.javaClass.simpleName}") }
+                } finally {
+                    update { it.copy(running = false) }
+                }
+            }.also { job = it }
+        }
+        current.join()
     }
 
     /** Why covers can't be downloaded on this network right now, or null when they can. */
@@ -146,6 +182,7 @@ object CoverDownload {
         val failed = AtomicInteger()
         val done = AtomicInteger()
         val permits = Semaphore(4)
+        val lastShown = java.util.concurrent.atomic.AtomicLong(0)
         var stoppedBecause: String? = null
         coroutineScope {
             for ((index, id) in ids.withIndex()) {
@@ -163,7 +200,19 @@ object CoverDownload {
                     } finally {
                         permits.release()
                         val n = done.incrementAndGet()
-                        update { it.copy(done = n, downloaded = downloaded.get(), failed = failed.get()) }
+                        // A few updates a second are enough for the progress bar; every cover made the page stutter.
+                        val now = System.currentTimeMillis()
+                        if (now - lastShown.get() > 400 || n == ids.size) {
+                            lastShown.set(now)
+                            update { it.copy(done = n, downloaded = downloaded.get(), failed = failed.get()) }
+                        }
+                        if (n % 250 == 0) {
+                            AppLog.i(
+                                "Covers",
+                                "Covers: checked $n of ${ids.size} · ${downloaded.get()} downloaded · ${failed.get()} failed · " +
+                                    "kept animated ${"%.0f".format(CoverStore.sizeBytes() / 1_048_576.0)} MB",
+                            )
+                        }
                     }
                 }
             }
@@ -207,7 +256,7 @@ object CoverDownload {
     private fun fetch(graph: AppGraph, disk: DiskCache, id: String, size: Int, key: String): Boolean? = runCatching {
         graph.imageHttp.newCall(Request.Builder().url(graph.subsonic.coverUrl(id, size)).build()).execute().use { response ->
             if (!response.isSuccessful) {
-                AppLog.d("Covers", "Cover $id ($size px): HTTP ${response.code}")
+                AppLog.w("Covers", "Cover $id ($size px): HTTP ${response.code}")
                 return@runCatching if (response.code == 404) false else null
             }
             val body = response.body ?: return@runCatching null
@@ -229,21 +278,20 @@ object CoverDownload {
             }
             true
         }
-    }.onFailure { AppLog.d("Covers", "Cover $id ($size px) failed: ${it.message}") }.getOrNull()
+    }.onFailure { AppLog.w("Covers", "Cover $id ($size px) failed: ${it.javaClass.simpleName}: ${it.message}") }.getOrNull()
 }
 
 class CoverDownloadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val graph = (applicationContext as MusixApp).graph
         return try {
-            CoverDownload.run(applicationContext, graph)
+            CoverDownload.runShared(applicationContext, graph, "on Wi-Fi, run ${runAttemptCount + 1}")
             Result.success()
-        } catch (e: Exception) {
-            AppLog.e("Covers", "Cover download failed", e)
-            CoverDownload.update { it.copy(running = false, note = "Failed: ${e.message}") }
-            Result.success()
-        } finally {
-            CoverDownload.update { it.copy(running = false) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // Android stopped the worker; the download itself keeps going while the app runs.
+            val reason = if (android.os.Build.VERSION.SDK_INT >= 31) " (reason $stopReason)" else ""
+            AppLog.i("Covers", "Android stopped the cover download worker$reason; the download carries on while Musix is running")
+            throw e
         }
     }
 }

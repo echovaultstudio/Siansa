@@ -49,7 +49,8 @@ object CoverStore {
     const val PEEK = "X-Musix-Peek"
 
     const val STILL_PX = 1000
-    private const val MAX_BYTES = 100L * 1024 * 1024
+    // Apple Music motion covers converted to WebP can be well over 100 MB.
+    private const val MAX_BYTES = 400L * 1024 * 1024
 
     private lateinit var dir: File
     private lateinit var appContext: Context
@@ -187,8 +188,9 @@ object CoverStore {
         AppLog.i(
             "Cover",
             "Kept animated cover $id (${image.kind} ${image.width}×${image.height}, ${mb(originalFile(key).length())}) " +
-                "after ${System.currentTimeMillis() - started} ms; Navidrome sends the original for every size, " +
-                "so it's downloaded once and lists use a still of it",
+                "after ${System.currentTimeMillis() - started} ms (size ${if (length > 0) "known" else "not sent by the server"}); " +
+                "Navidrome sends the original for every size, so it's downloaded once and lists use a still of it. " +
+                "Animated covers on the phone: ${mb(sizeBytes())}",
         )
         return local(key)?.let { serve(clean, it, wantsAnimation) } ?: throw IOException("Cover $id couldn't be saved")
     }

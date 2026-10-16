@@ -438,21 +438,11 @@ fun LogsScreen(nav: NavController) {
                         AppLog.setEnabled(on)
                         refresh++
                     }
-                    if (settings.logging) {
-                        SwitchRow("Detailed logging (for stutter)", settings.logDetailed) { on ->
-                            graph.settings.setLogDetailed(on)
-                            AppLog.setDetailed(on)
-                            refresh++
-                        }
-                        Hint(
-                            "Also records slow screen frames, moments the app freezes (with what it was doing), every download " +
-                                "and cache read, audio format, and phone memory, temperature and battery saver. Turn it on, " +
-                                "reproduce the stutter, then save the logs. Logs grow faster, so switch it off afterwards.",
-                        )
-                    }
                     Hint(
                         "Save logs writes a text file (choose Downloads), which you can then upload anywhere. " +
-                            "Records what the app does (server requests, sync, mixes, playback, errors and crashes) so problems can be traced. " +
+                            "While on, it records everything that can help trace a problem: server requests, sync, mixes, playback and buffering, " +
+                            "every download and cache read, cover downloads, slow screen frames and freezes (with what the app was doing), " +
+                            "audio format, phone memory, temperature and battery saver, errors and crashes. " +
                             "Passwords, tokens and API keys are removed. Nothing is recorded while this is off, and nothing leaves the phone unless you share it.",
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
