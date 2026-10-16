@@ -70,6 +70,8 @@ fun CollectionPage(
     header: @Composable ColumnScope.() -> Unit,
     numbered: Boolean = false,
     showCovers: Boolean = true,
+    // The line under each song's title; by default its artist and album.
+    subtitleOf: ((Song) -> String?)? = null,
     footer: LazyListScope.() -> Unit = {},
 ) {
     val graph = LocalGraph.current
@@ -142,6 +144,7 @@ fun CollectionPage(
                             leading = if (numbered) song.track?.let { t -> if (multiDisc && song.disc != null) "${song.disc}.$t" else "$t" } ?: "${index + 1}" else null,
                             highlighted = song.id == player.current?.id,
                             showCover = showCovers,
+                            subtitle = if (subtitleOf != null) subtitleOf(song) else artistAndAlbum(song),
                         )
                     }
                 }
