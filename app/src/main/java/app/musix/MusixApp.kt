@@ -3,6 +3,7 @@ package app.musix
 import android.app.Application
 import app.musix.log.AppLog
 import app.musix.log.Diagnostics
+import app.musix.log.ExitReasons
 import app.musix.mix.MixWorker
 import coil3.ImageLoader
 import coil3.PlatformContext
@@ -27,9 +28,13 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
         graph = AppGraph(this)
         AppLog.init(this, graph.settings.current.logging)
         Diagnostics.start(this)
+        // Each start: what the app is running on and with, then why it last closed.
+        if (AppLog.enabled) AppLog.i("Session", sessionHeader())
+        ExitReasons.logNew(this)
         if (AppLog.detailOn) AppLog.d("Phone", Diagnostics.snapshot(this))
         graph.scope.launch {
             graph.library.load()
+            graph.library.status.value?.let { AppLog.i("Session", "Library: ${it.artists} artists, ${it.albums} albums, ${it.songs} songs") }
             if (graph.settings.current.navidromeReady) {
                 runCatching { AppLog.i("Server", graph.subsonic.ping()) }
             }
@@ -99,6 +104,27 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
                 }
             })
             .build()
+    }
+
+    /** Version, phone, and the settings that change behaviour (never addresses, logins or keys). */
+    private fun sessionHeader(): String {
+        val s = graph.settings.current
+        val am = getSystemService(android.app.ActivityManager::class.java)
+        val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: "?"
+        val network = if (app.musix.playback.Streaming.isUnmetered(this)) "Wi-Fi" else "mobile data"
+        fun mb(v: Int) = if (v <= 0) "no limit" else "$v MB"
+        return listOf(
+            "Musix $version started",
+            "Android ${android.os.Build.VERSION.RELEASE} (SDK ${android.os.Build.VERSION.SDK_INT}) on ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
+            "memory class ${am?.memoryClass ?: "?"} MB",
+            network,
+            "Navidrome ${if (s.navidromeReady) "set" else "not set"}, AudioMuse ${if (s.audioMuseReady) "set" else "not set"}, AI ${if (s.aiReady) "on" else "off"}",
+            "quality Wi-Fi ${if (s.transcodeWifiKbps > 0) "Opus ${s.transcodeWifiKbps}" else "original"}, mobile ${if (s.transcodeMobileKbps > 0) "Opus ${s.transcodeMobileKbps}" else "original"}, auto-switch ${if (s.autoQuality) "on" else "off"}",
+            "ReplayGain ${s.replayGain.label}",
+            "song cache ${mb(s.songCacheMb)}, image cache ${mb(s.imageCacheMb)}",
+            "animated covers ${if (s.animatedCovers) "on" else "off"}, download all covers ${if (s.coverDownload) (if (s.coverDownloadAnyWifi) "any Wi-Fi" else "home") else "off"}",
+            "scrobbling: " + listOfNotNull("Navidrome".takeIf { s.scrobbleNavidrome }, "Last.fm".takeIf { s.lastFmReady }, "ListenBrainz/Koito".takeIf { s.listenBrainzReady }).joinToString(", ").ifEmpty { "off" },
+        ).joinToString(" · ")
     }
 
     // Android asks apps to free memory when the phone runs low; useful context for stutter.

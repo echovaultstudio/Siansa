@@ -50,6 +50,8 @@ android {
 
     // An emulator Gradle starts by itself for the device tests (a lean image made for CI).
     testOptions {
+        // Unit tests run on a plain JVM: Android calls they touch return defaults instead of failing.
+        unitTests.isReturnDefaultValues = true
         managedDevices {
             localDevices {
                 create("ciPhone") {
@@ -127,7 +129,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
-    // Tests that run on an Android emulator in CI (see .github/workflows/tests.yml).
+    // Fast tests of the app's own logic, run on the build machine on every push (app/src/test).
+    testImplementation("junit:junit:4.13.2")
+
+    // Tests that run on an Android emulator in CI (see .github/workflows/ci.yml).
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

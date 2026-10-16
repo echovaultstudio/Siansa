@@ -1,0 +1,12 @@
+# Secret scanning (see .github/workflows/ci.yml). Uses gitleaks' built-in rules for API keys, tokens and
+# passwords, with these known, intentional exceptions.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known non-secrets"
+paths = [
+  # The local test server's throwaway admin login.
+  '''scripts/test-server\.sh''',
+  '''app/src/androidTest/''',
+]
