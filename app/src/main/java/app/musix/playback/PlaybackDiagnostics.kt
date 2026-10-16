@@ -94,6 +94,32 @@ class PlaybackDiagnostics(
         AppLog.w("Load", "Loading song $id failed after ${loadEventInfo.loadDurationMs}ms: ${error.javaClass.simpleName}: ${error.message} · ${where(eventTime)}")
     }
 
+    // Why playback starts or stops: these explain a song that loads but doesn't play.
+    override fun onPlayWhenReadyChanged(eventTime: AnalyticsListener.EventTime, playWhenReady: Boolean, reason: Int) {
+        val why = when (reason) {
+            Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST -> "play/pause pressed or a new song chosen"
+            Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS -> "another app took the audio (audio focus lost)"
+            Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY -> "headphones or Bluetooth disconnected"
+            Player.PLAY_WHEN_READY_CHANGE_REASON_REMOTE -> "a remote control (notification, car, watch)"
+            Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM -> "end of song"
+            else -> "reason $reason"
+        }
+        AppLog.i("Audio", (if (playWhenReady) "Play" else "Pause") + ": $why · ${where(eventTime)}")
+    }
+
+    override fun onPlaybackSuppressionReasonChanged(eventTime: AnalyticsListener.EventTime, playbackSuppressionReason: Int) {
+        val why = when (playbackSuppressionReason) {
+            Player.PLAYBACK_SUPPRESSION_REASON_NONE -> return AppLog.i("Audio", "Playback no longer held back · ${where(eventTime)}")
+            Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS -> "another app has the audio for a moment (call, navigation, notification)"
+            else -> "reason $playbackSuppressionReason"
+        }
+        AppLog.w("Audio", "Playback held back: $why · ${where(eventTime)}")
+    }
+
+    override fun onIsPlayingChanged(eventTime: AnalyticsListener.EventTime, isPlaying: Boolean) {
+        AppLog.d("Audio", (if (isPlaying) "Sound playing" else "Sound stopped") + " · ${where(eventTime)}")
+    }
+
     override fun onBandwidthEstimate(eventTime: AnalyticsListener.EventTime, totalLoadTimeMs: Int, totalBytesLoaded: Long, bitrateEstimate: Long) {
         AppLog.d("Load", "Network estimate ${bitrateEstimate / 1000} kbit/s")
     }

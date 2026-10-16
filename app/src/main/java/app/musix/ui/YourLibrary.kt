@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import app.musix.data.cover
 import android.content.Context
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -535,7 +536,7 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
             title = m.title,
             subtitle = "Mix · ${if (isPersonal) "Made for you" else "Vibe"} · ${m.songs.size} songs",
             route = "mix/${m.id}",
-            coverArt = m.songs.firstOrNull()?.coverArt,
+            coverArt = m.songs.firstOrNull()?.cover,
             gradient = tileColors(m.selectorId),
             recentAt = m.createdAt,
             addedAt = m.createdAt,

@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import app.musix.data.cover
 import android.os.Build
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
@@ -200,7 +201,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
         ) {
             // The cover, enlarged and blurred, as the background (a darker plain version before Android 12).
             Cover(
-                song?.coverArt,
+                song?.cover,
                 300,
                 Modifier
                     .fillMaxSize()
@@ -417,7 +418,7 @@ private fun SwipeCover(song: Song?, onTap: () -> Unit) {
                     }
                 }
                 .clickable(enabled = song?.albumId != null, onClick = onTap)
-        BigCover(song?.coverArt, song?.albumId, coverModifier, RoundedCornerShape(10.dp))
+        BigCover(song?.cover, song?.albumId, coverModifier, RoundedCornerShape(10.dp))
     }
 }
 

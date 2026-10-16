@@ -78,6 +78,17 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
                     .build()
             }
             .crossfade(110)
+            // Every picture that fails to show, and why, so blank covers can be traced in the log.
+            .eventListener(object : coil3.EventListener() {
+                override fun onError(request: coil3.request.ImageRequest, result: coil3.request.ErrorResult) {
+                    val data = request.data.toString()
+                    val what = Regex("[?&]id=([^&]+)").find(data)?.groupValues?.get(1)?.let { id ->
+                        "cover $id (size ${Regex("[?&]size=(\\d+)").find(data)?.groupValues?.get(1) ?: "original"})"
+                    } ?: data.substringAfterLast('/').take(60)
+                    val e = result.throwable
+                    AppLog.w("Image", "Couldn't show $what: ${e.javaClass.simpleName}: ${e.message}")
+                }
+            })
             .build()
     }
 

@@ -258,6 +258,8 @@ class PlaybackService : MediaSessionService() {
             listenedMs = 0
             playingSince = if (player.isPlaying) SystemClock.elapsedRealtime() else null
             AppLog.i("Player", "Now playing ${song.id} \"${song.title}\"")
+            focusRescued = false
+            if (player.playWhenReady) armStartWatch()
             player.volume = replayGainVolume(song, graph.settings.current)
             graph.scrobbler.nowPlaying(song)
             scope.launch {
@@ -274,6 +276,7 @@ class PlaybackService : MediaSessionService() {
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            onIsPlayingChanged2(isPlaying)
             val now = SystemClock.elapsedRealtime()
             if (isPlaying) {
                 if (playingSince == null) playingSince = now
@@ -323,6 +326,82 @@ class PlaybackService : MediaSessionService() {
             handler.removeCallbacks(bufferingWatch)
             if (playbackState == Player.STATE_BUFFERING) handler.postDelayed(bufferingWatch, 8_000)
             if (playbackState == Player.STATE_ENDED) finishCurrent()
+        }
+
+        // ---- Start watchdog: a chosen song must actually start playing ----
+
+        private var startRequestedAt = 0L
+        private var startRescues = 0
+        private var focusRescued = false
+
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            if (playWhenReady) armStartWatch() else if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
+                // Lost the audio moments after a song was chosen: almost always the app we took over
+                // from answering late. Take it back once instead of sitting paused.
+                val sinceStart = SystemClock.elapsedRealtime() - startRequestedAt
+                if (sinceStart < 3_000 && !focusRescued) {
+                    focusRescued = true
+                    AppLog.w("Player", "Audio focus lost ${sinceStart}ms after the song was chosen; asking for it again")
+                    handler.postDelayed({ player.play() }, 300)
+                }
+            }
+        }
+
+        private fun armStartWatch() {
+            startRequestedAt = SystemClock.elapsedRealtime()
+            startRescues = 0
+            lastBuffered = -1L
+            handler.removeCallbacks(startWatch)
+            handler.postDelayed(startWatch, 2_500)
+        }
+
+        private var lastBuffered = -1L
+
+        /**
+         * 2.5 s after a song is chosen (or play is pressed) it should be audible. If it isn't:
+         * - held back by audio focus: ask for the audio again;
+         * - still waiting for data and nothing new has arrived since the last look: restart the
+         *   download from the current position (a stalled connection otherwise waits for a timeout).
+         * Checks again every 2.5 s until it plays, up to a few times, logging what it found.
+         */
+        private val startWatch = object : Runnable {
+            override fun run() {
+                if (!player.playWhenReady || player.isPlaying || player.mediaItemCount == 0) return
+                val id = player.currentMediaItem?.mediaId ?: return
+                val waited = SystemClock.elapsedRealtime() - startRequestedAt
+                val buffered = player.bufferedPosition
+                when {
+                    player.playbackState == Player.STATE_READY && player.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE -> {
+                        AppLog.w("Player", "Song $id ready but held back (reason ${player.playbackSuppressionReason}) after ${waited}ms; asking for the audio again")
+                        player.pause()
+                        player.play()
+                    }
+                    player.playbackState == Player.STATE_IDLE -> {
+                        AppLog.w("Player", "Song $id stopped before it started (${player.playerError?.errorCodeName ?: "no error"}) after ${waited}ms; preparing it again")
+                        player.prepare()
+                    }
+                    player.playbackState == Player.STATE_BUFFERING && buffered <= lastBuffered + 200 -> {
+                        AppLog.w(
+                            "Player",
+                            "Song $id waiting ${waited}ms with no new data (${buffered / 1000.0}s loaded, arriving at ${StreamStats.recentKbps()} kbit/s); restarting its download",
+                        )
+                        player.seekTo(player.currentMediaItemIndex, player.currentPosition)
+                    }
+                    else -> AppLog.i("Player", "Song $id not playing yet after ${waited}ms (state ${player.playbackState}, ${buffered / 1000.0}s loaded)")
+                }
+                lastBuffered = buffered
+                if (++startRescues < 5) handler.postDelayed(this, 2_500)
+            }
+        }
+
+        private fun onIsPlayingChanged2(isPlaying: Boolean) {
+            if (!isPlaying || startRequestedAt == 0L) return
+            val waited = SystemClock.elapsedRealtime() - startRequestedAt
+            startRequestedAt = 0L
+            lastBuffered = -1L
+            handler.removeCallbacks(startWatch)
+            if (waited > 1500) AppLog.w("Player", "Started playing ${waited}ms after it was chosen")
+            else AppLog.d("Player", "Started playing ${waited}ms after it was chosen")
         }
     }
 }

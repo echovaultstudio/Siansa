@@ -295,10 +295,14 @@ class Insights(private val graph: AppGraph) {
     private suspend fun matchSong(artist: String, title: String): Song? {
         if (!graph.library.isSynced || title.isBlank()) return null
         val a = normalizeKey(artist)
-        return runCatching { graph.library.search(title).songs }.getOrDefault(emptyList()).firstOrNull { song ->
-            normalizeKey(song.title) == normalizeKey(title) &&
-                (a.isEmpty() || normalizeKey(song.artist).contains(a) || a.contains(normalizeKey(song.artist)))
+        fun matches(song: Song) = normalizeKey(song.title) == normalizeKey(title) &&
+            (a.isEmpty() || normalizeKey(song.artist).contains(a) || a.contains(normalizeKey(song.artist)))
+        // Title and artist together first: a common title ("Ghost") alone has more hits than a search returns.
+        val queries = listOfNotNull("$title $artist".takeIf { artist.isNotBlank() }, title)
+        for (q in queries) {
+            runCatching { graph.library.search(q).songs }.getOrDefault(emptyList()).firstOrNull(::matches)?.let { return it }
         }
+        return null
     }
 
     private fun key(artist: String, title: String) = normalizeKey(artist) + "|" + normalizeKey(title)

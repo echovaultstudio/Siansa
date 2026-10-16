@@ -3,6 +3,22 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.14beta — 2026-10-16
+
+### Fixed
+- **A chosen song sometimes loaded but didn't start** until play was pressed (the log showed songs "heard 0s" while the player said it was ready). Musix now checks 2.5 seconds after a song is chosen that it's actually playing, and fixes it if not: if Android held the sound back for another app it asks for the audio again, and if the song is stuck waiting with no data arriving it restarts the download from where it is. It keeps checking for a few rounds and logs what it found and did.
+- **Missing covers** on some pages (artist Popular songs, the mini player, now playing):
+  - a song without its own picture now falls back to its album's cover;
+  - a song cover that is really the album's big animated cover is recognised by its first bytes and uses the copy already on the phone, instead of downloading 20–160 MB again (the server doesn't send a size to compare);
+  - if an animated cover's still is missing, it's made on the spot instead of sending the whole original to the list.
+- **Your listening**: songs with a common title (like "Ghost") weren't matched to your library, so they had no cover and couldn't be played. Title and artist are now searched together.
+- Downloading all covers no longer stops on a single brief Wi-Fi or name lookup hiccup; it looks again after 5 seconds.
+
+### Added
+- The log records why playback starts and stops: play and pause with their reason (pressed, another app took the audio, headphones disconnected, remote control), when Android holds playback back, when sound actually starts, and how long each chosen song took to become audible.
+- The log records every picture that fails to show, and why.
+- **App tour test**: on every push, the app is walked through on an emulator against a real Navidrome: every tab, Your Library's filters, sort, grid and search, album and artist pages, liked songs, your listening, search, vibes, now playing and every settings page. Songs are played from the album, artist and search pages and must start within 5 seconds. A screenshot of every page is saved for review.
+
 ## 0.0.13beta — 2026-10-16
 
 ### Changed

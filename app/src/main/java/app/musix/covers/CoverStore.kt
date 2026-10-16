@@ -169,7 +169,7 @@ object CoverStore {
             AppLog.w("Cover", "Animated cover $id is ${mb(length)}, too big to keep; passing it on as is")
             return response
         }
-        val key = keyFor(id, length)
+        val key = keyFor(id, response)
         local(key)?.let {
             response.close()
             return serve(clean, it, wantsAnimation)
@@ -199,18 +199,39 @@ object CoverStore {
         runCatching { future.get(3, TimeUnit.MINUTES) }
     }
 
-    /** Which key to save under. A song cover that is just its album's file is linked to the album. */
-    private fun keyFor(id: String, length: Long): String {
+    /**
+     * Which key to save under. A song without its own picture gets its album's file from Navidrome:
+     * when the first 64 KB match the album's kept file, the song is linked to it rather than downloaded
+     * again (the server often doesn't send a size to compare).
+     */
+    private fun keyFor(id: String, response: Response): String {
         val own = canonical(id)
         if (!own.startsWith("mf-")) return own
         val album = runCatching { albumCoverOfSong(id) }.getOrNull()?.let { canonical(it) } ?: return own
-        val albumFile = originalFile(aliases[album] ?: album)
-        if (albumFile.exists() && length > 0 && albumFile.length() == length) {
-            link(own, aliases[album] ?: album)
-            return aliases[album] ?: album
-        }
-        return own
+        val albumKey = aliases[album] ?: album
+        val albumFile = originalFile(albumKey)
+        if (!albumFile.exists()) return own
+        val head = runCatching { response.peekBody(64 * 1024).bytes() }.getOrNull() ?: return own
+        val length = response.body?.contentLength() ?: -1L
+        if (length > 0 && length != albumFile.length()) return own
+        if (!startsWith(albumFile, head)) return own
+        link(own, albumKey)
+        AppLog.i("Cover", "Song cover $id is its album's animated cover; using the one already on the phone")
+        return albumKey
     }
+
+    private fun startsWith(file: File, head: ByteArray): Boolean = runCatching {
+        file.inputStream().use { input ->
+            val buf = ByteArray(head.size)
+            var read = 0
+            while (read < buf.size) {
+                val n = input.read(buf, read, buf.size - read)
+                if (n < 0) break
+                read += n
+            }
+            read == head.size && buf.contentEquals(head)
+        }
+    }.getOrDefault(false)
 
     private fun link(from: String, to: String) {
         if (from == to) return
@@ -302,9 +323,17 @@ object CoverStore {
     }
 
     private fun serve(request: Request, local: Local, wantsAnimation: Boolean): Response {
-        val file = if (wantsAnimation || local.still == null) local.original else local.still
+        var still = local.still
+        if (!wantsAnimation && still == null) {
+            // Never made (or removed): make it now rather than hand a list the whole original.
+            val target = File(local.original.path.removeSuffix(".anim") + ".jpg")
+            makeStill(local.original, target)
+            still = target.takeIf { it.exists() }
+            if (still == null) AppLog.w("Cover", "No still for ${local.original.name}; sending the original")
+        }
+        val file = if (wantsAnimation || still == null) local.original else still
         val type = when {
-            file == local.still -> "image/jpeg"
+            file == still -> "image/jpeg"
             else -> sniff(file.inputStream().use { s -> ByteArray(32).also { s.read(it) } })?.mime ?: "application/octet-stream"
         }
         return Response.Builder()

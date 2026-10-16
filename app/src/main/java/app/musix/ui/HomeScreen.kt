@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import app.musix.data.cover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -187,7 +188,7 @@ fun HomeScreen(nav: NavController) {
         item {
             val quick = buildList<Triple<String, String?, () -> Unit>> {
                 add(Triple("Liked songs", null) { nav.navigate("liked") })
-                todaysMixes.take(2).forEach { m -> add(Triple(m.title, m.songs.firstOrNull()?.coverArt) { nav.navigate("mix/${m.id}") }) }
+                todaysMixes.take(2).forEach { m -> add(Triple(m.title, m.songs.firstOrNull()?.cover) { nav.navigate("mix/${m.id}") }) }
                 playlists.valueOrNull().orEmpty().take(2).forEach { p -> add(Triple(p.name, p.coverArt) { nav.navigate("playlist/${p.id}") }) }
                 recentAlbums.valueOrNull().orEmpty().take(6).forEach { a -> add(Triple(a.name, a.coverArt) { nav.navigate("album/${a.id}") }) }
             }.take(6)
@@ -469,7 +470,7 @@ private fun BuildingCard() {
 
 @Composable
 fun CoverMosaic(mix: Mix, modifier: Modifier = Modifier) {
-    val covers = mix.songs.mapNotNull { it.coverArt }.distinct().take(4)
+    val covers = mix.songs.mapNotNull { it.cover }.distinct().take(4)
     if (covers.size < 4) {
         Cover(covers.firstOrNull(), 300, modifier)
         return
