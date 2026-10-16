@@ -3,6 +3,7 @@ package app.musix.playback
 import android.content.Context
 import android.net.Uri
 import androidx.annotation.OptIn
+import androidx.core.content.ContextCompat
 import androidx.media3.cast.MediaItemConverter
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
@@ -21,11 +22,14 @@ import com.google.android.gms.cast.framework.CastState
 import com.google.android.gms.cast.framework.OptionsProvider
 import com.google.android.gms.cast.framework.SessionProvider
 import com.google.android.gms.cast.framework.media.CastMediaOptions
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.common.images.WebImage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONObject
+import java.util.concurrent.Executors
 
 /** Google's standard TV app for audio and video, so musix needs no TV app of its own. */
 private val RECEIVER_APP_ID = CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID
@@ -56,7 +60,9 @@ data class CastStatus(
 /** Google Cast for the whole app: one shared [CastContext], and whether and where we're casting. */
 object Cast {
     private var context: CastContext? = null
-    private var tried = false
+    private var started = false
+    private var unavailable = false
+    private val waiting = ArrayList<(CastContext) -> Unit>()
     private val _status = MutableStateFlow(CastStatus())
     val status: StateFlow<CastStatus> = _status.asStateFlow()
 
@@ -65,19 +71,38 @@ object Cast {
         .addControlCategory(CastMediaControlIntent.categoryForCast(RECEIVER_APP_ID))
         .build()
 
-    /** The shared Cast context, or null when this phone can't cast. Main thread only. */
-    fun context(ctx: Context): CastContext? {
-        if (!tried) {
-            tried = true
-            context = runCatching { CastContext.getSharedInstance(ctx.applicationContext) }
-                .onFailure { AppLog.w("Cast", "Casting isn't available on this phone: ${it.message}") }
-                .getOrNull()
-            context?.let { c ->
+    /**
+     * Starts Cast once, in the background, and calls [onReady] on the main thread when it's ready.
+     * Phones without Google Play services never call it (and never wait on Cast). Main thread only.
+     */
+    fun whenReady(ctx: Context, onReady: (CastContext) -> Unit) {
+        context?.let { onReady(it); return }
+        if (unavailable) return
+        waiting += onReady
+        if (started) return
+        started = true
+        val app = ctx.applicationContext
+        if (GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(app) != ConnectionResult.SUCCESS) {
+            AppLog.i("Cast", "No Google Play services on this phone, so no casting")
+            unavailable = true
+            waiting.clear()
+            return
+        }
+        val main = ContextCompat.getMainExecutor(app)
+        CastContext.getSharedInstance(app, Executors.newSingleThreadExecutor())
+            .addOnSuccessListener(main) { c ->
+                context = c
                 update(c)
                 c.addCastStateListener { update(c) }
+                val ready = waiting.toList()
+                waiting.clear()
+                ready.forEach { it(c) }
             }
-        }
-        return context
+            .addOnFailureListener(main) { e ->
+                AppLog.w("Cast", "Casting isn't available on this phone: ${e.message}")
+                unavailable = true
+                waiting.clear()
+            }
     }
 
     fun deviceName(): String? = context?.sessionManager?.currentCastSession?.castDevice?.friendlyName

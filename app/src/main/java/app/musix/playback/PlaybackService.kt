@@ -5,7 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.SystemClock
 import androidx.annotation.OptIn
-import androidx.media3.cast.CastPlayer
+import androidx.media3.cast.RemoteCastPlayer
 import androidx.media3.cast.SessionAvailabilityListener
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -49,13 +49,13 @@ private const val FALLBACK_KBPS = 320
 
 /**
  * Background playback with a media notification, lock-screen controls, ReplayGain, transcoding and scrobbling.
- * While casting, the media session drives a [CastPlayer] instead of the phone's own player.
+ * While casting, the media session drives a [RemoteCastPlayer] instead of the phone's own player.
  */
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
     private lateinit var exo: ExoPlayer
-    private var castPlayer: CastPlayer? = null
+    private var castPlayer: RemoteCastPlayer? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var graph: AppGraph
     private var events: Events? = null
@@ -110,8 +110,9 @@ class PlaybackService : MediaSessionService() {
             .build()
 
         // Casting: playback moves to the TV when a Cast session starts and back when it ends.
-        Cast.context(this)?.let { cast ->
-            val remote = CastPlayer(cast, CastItems(graph.subsonic))
+        Cast.whenReady(this) { _ ->
+            if (session == null) return@whenReady
+            val remote = RemoteCastPlayer.Builder(this).setMediaItemConverter(CastItems(graph.subsonic)).build()
             castPlayer = remote
             remote.setSessionAvailabilityListener(object : SessionAvailabilityListener {
                 override fun onCastSessionAvailable() = moveTo(remote)
