@@ -81,6 +81,8 @@ sealed interface Load<out T> {
 fun <T> Load<T>.valueOrNull(): T? = if (this is Load.Ok<T>) value else null
 
 /** Runs [block] when [key] changes and exposes loading / result / error. */
+// Lint can't see the assignment through the generic result; it's on the last line of the producer.
+@android.annotation.SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
 fun <T> loadState(key: Any?, block: suspend () -> T): State<Load<T>> =
     produceState<Load<T>>(Load.Loading, key) {
