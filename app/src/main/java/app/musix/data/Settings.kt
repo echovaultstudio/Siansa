@@ -25,8 +25,13 @@ data class AppSettings(
     val replayGain: ReplayGainMode = ReplayGainMode.TRACK,
     val preampDb: Float = 0f,
     val syncFolders: Set<String> = emptySet(),
+    /** Image cache limit in MB; 0 = no limit. */
     val imageCacheMb: Int = 500,
     val animatedCovers: Boolean = true,
+    /** Download every album, artist and playlist cover in the background. */
+    val coverDownload: Boolean = false,
+    /** ...on any Wi-Fi, rather than only on the same local network as Navidrome. */
+    val coverDownloadAnyWifi: Boolean = false,
     val autoQuality: Boolean = true,
     val logging: Boolean = false,
     val logDetailed: Boolean = false,
@@ -129,6 +134,8 @@ class SettingsRepository(context: Context) {
         syncFolders = prefs.getStringSet("sync_folders", emptySet())?.toSet() ?: emptySet(),
         imageCacheMb = prefs.getInt("image_cache_mb", 500),
         animatedCovers = prefs.getBoolean("animated_covers", true),
+        coverDownload = prefs.getBoolean("cover_download", false),
+        coverDownloadAnyWifi = prefs.getBoolean("cover_download_any_wifi", false),
         autoQuality = prefs.getBoolean("auto_quality", true),
         logging = prefs.getBoolean("logging", false),
         logDetailed = prefs.getBoolean("log_detailed", false),
@@ -213,6 +220,11 @@ class SettingsRepository(context: Context) {
     fun setAutoQuality(on: Boolean) {
         prefs.edit().putBoolean("auto_quality", on).apply()
         _state.value = _state.value.copy(autoQuality = on)
+    }
+
+    fun setCoverDownload(on: Boolean, anyWifi: Boolean = _state.value.coverDownloadAnyWifi) {
+        prefs.edit().putBoolean("cover_download", on).putBoolean("cover_download_any_wifi", anyWifi).apply()
+        _state.value = _state.value.copy(coverDownload = on, coverDownloadAnyWifi = anyWifi)
     }
 
     fun setAnimatedCovers(on: Boolean) {

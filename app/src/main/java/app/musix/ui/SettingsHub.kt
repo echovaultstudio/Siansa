@@ -36,11 +36,13 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +59,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.musix.covers.CoverDownload
+import app.musix.covers.CoverStore
 import app.musix.data.ReplayGainMode
 import app.musix.data.SyncPhase
 import app.musix.log.AppLog
@@ -113,7 +117,8 @@ fun SettingsHub(nav: NavController) {
                     "ListenBrainz/Koito".takeIf { settings.listenBrainzReady },
                 ).joinToString(" · ").ifEmpty { "Off" },
             ) { nav.navigate("settings/scrobbling") }
-            HubRow(Icons.Rounded.Storage, "Storage", "Songs up to ${formatMb(settings.songCacheMb)} · images up to ${formatMb(settings.imageCacheMb)}") {
+            HubRow(Icons.Rounded.Storage, "Storage", "Songs up to ${formatMb(settings.songCacheMb)} · images ${imageLimit(settings.imageCacheMb)}" +
+                    if (settings.coverDownload) " · all covers downloaded" else "") {
                 nav.navigate("settings/storage")
             }
             HubRow(Icons.Rounded.BugReport, "Logs", if (settings.logging) "Logging on" else "Logging off") {
@@ -147,6 +152,8 @@ private fun HubRow(icon: ImageVector, title: String, subtitle: String, onClick: 
         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
     }
 }
+
+private fun imageLimit(mb: Int): String = if (mb <= 0) "without a limit" else "up to ${formatMb(mb)}"
 
 private fun formatMb(mb: Int): String = if (mb >= 1024) "${"%.0f".format(mb / 1024.0)} GB" else "$mb MB"
 private fun formatBytes(bytes: Long): String = when {
@@ -216,7 +223,7 @@ private fun QualityRow(label: String, value: Int, onPick: (Int) -> Unit) {
     }
 }
 
-private val cacheSizes = listOf(100, 250, 500, 1024, 2048, 5120)
+private val cacheSizes = listOf(100, 250, 500, 1024, 2048, 5120, 0)
 private val songCacheSizes = listOf(512, 1024, 2048, 5120, 10240, 20480)
 
 private data class StorageUsage(val images: Long, val songs: Long, val library: Long, val logs: Long)
@@ -235,7 +242,7 @@ fun StorageScreen(nav: NavController) {
     val usage by loadState(refresh) {
         withContext(Dispatchers.IO) {
             StorageUsage(
-                images = SingletonImageLoader.get(context).diskCache?.size ?: 0L,
+                images = (SingletonImageLoader.get(context).diskCache?.size ?: 0L) + CoverStore.sizeBytes(),
                 songs = runCatching { graph.songCache.cacheSpace }.getOrDefault(0L),
                 library = context.getDatabasePath("library.db").length(),
                 logs = AppLog.sizeBytes(),
@@ -276,9 +283,13 @@ fun StorageScreen(nav: NavController) {
 
             HorizontalDivider()
             Heading("Image cache")
-            Hint("Covers and artist photos are saved as they load, so they show instantly next time and without a connection. The oldest are removed when the cache is full.")
+            Hint("Covers and artist photos are saved as they load, so they show instantly next time and without a connection. The oldest are removed when the cache is full. With no limit nothing is removed, and Android won't clear them when the phone runs low on space.")
             usage.valueOrNull()?.let { u ->
-                Text("In use: ${formatBytes(u.images)} of ${formatMb(settings.imageCacheMb)}", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    if (settings.imageCacheMb <= 0) "In use: ${formatBytes(u.images)}"
+                    else "In use: ${formatBytes(u.images)} of ${formatMb(settings.imageCacheMb)}",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
             }
             Text("Maximum size", style = MaterialTheme.typography.bodyLarge)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -286,7 +297,7 @@ fun StorageScreen(nav: NavController) {
                     FilterChip(
                         selected = settings.imageCacheMb == mb,
                         onClick = { graph.settings.setImageCacheMb(mb) },
-                        label = { Text(formatMb(mb)) },
+                        label = { Text(if (mb <= 0) "No limit" else formatMb(mb)) },
                     )
                 }
             }
@@ -296,6 +307,8 @@ fun StorageScreen(nav: NavController) {
                         val loader = SingletonImageLoader.get(context)
                         loader.memoryCache?.clear()
                         loader.diskCache?.clear()
+                        CoverStore.clear()
+                        AnimatedCovers.forget(graph)
                     }
                     AppLog.i("Storage", "Image cache cleared")
                     refresh++
@@ -303,7 +316,60 @@ fun StorageScreen(nav: NavController) {
             }) { Text("Clear image cache") }
 
             SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
-            Hint("When an album folder has an animated cover (cover.gif or cover.webp), now playing and the album page show it, in full size so it keeps moving. Uses a little more data the first time.")
+            Hint("When an album folder has an animated cover (cover.gif or cover.webp), it moves on the album page and in now playing; lists show its first frame. Navidrome can't shrink an animated WebP, so it's downloaded once in full and kept on the phone.")
+
+            HorizontalDivider()
+            Heading("Download all covers")
+            Hint("Fetches every album, artist and playlist cover in the background, so browsing never waits for one. Runs after each library sync and once a day, only on Wi-Fi, and only fetches covers that aren't on the phone yet. Choose No limit above so none are removed again.")
+            val download by CoverDownload.progress.collectAsStateWithLifecycle()
+            // Show the new space used once a download finishes.
+            var wasRunning by remember { mutableStateOf(false) }
+            LaunchedEffect(download.running) {
+                if (wasRunning && !download.running) refresh++
+                wasRunning = download.running
+            }
+            val network by loadState(refresh to settings.coverDownloadAnyWifi) {
+                withContext(Dispatchers.IO) { CoverDownload.whyNot(context, graph.settings.current) }
+            }
+            SwitchRow("Download all covers", settings.coverDownload) { on ->
+                graph.settings.setCoverDownload(on)
+                CoverDownload.schedule(context, graph.settings.current)
+                if (on) CoverDownload.start(context) else CoverDownload.stop(context)
+            }
+            SwitchRow("On any Wi-Fi, not just at home", settings.coverDownloadAnyWifi) { on ->
+                graph.settings.setCoverDownload(settings.coverDownload, anyWifi = on)
+                refresh++
+            }
+            Hint(
+                if (settings.coverDownloadAnyWifi) "Downloads on any Wi-Fi network."
+                else "Home means the phone is on the same local network as Navidrome's address. If Navidrome is reached by a domain name, this can't be told apart; use any Wi-Fi instead.",
+            )
+            Text(
+                when (val n = network) {
+                    is Load.Loading -> "Checking the network…"
+                    is Load.Ok -> n.value?.let { "Not now: $it." } ?: "Covers can be downloaded on this network now."
+                    is Load.Err -> "Couldn't check the network: ${n.message}"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (download.running) {
+                LinearProgressIndicator(
+                    progress = { if (download.total > 0) download.done.toFloat() / download.total else 0f },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    "Checked ${download.done} of ${download.total} · ${download.downloaded} downloaded" +
+                        if (download.failed > 0) " · ${download.failed} failed" else "",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                OutlinedButton(onClick = { CoverDownload.stop(context) }) { Text("Stop") }
+            } else {
+                download.note?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                OutlinedButton(onClick = {
+                    CoverDownload.start(context)
+                    refresh++
+                }) { Text("Download covers now") }
+            }
 
             if (settings.imageCacheMb != imagesAtStart || settings.songCacheMb != songsAtStart) {
                 Card(Modifier.fillMaxWidth()) {

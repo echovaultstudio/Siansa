@@ -3,6 +3,22 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.11beta — 2026-10-16
+
+### Fixed
+- **The app crashing (out of memory) and covers taking half a minute on albums with an animated WebP cover.** Navidrome only shrinks animated GIFs; an animated WebP comes back as the full original (here 1080×1080, several MB) whatever size is asked for. Musix's "300 px" cover was really the whole file, and the album page, now playing, the blurred background, the colour sampling, list tiles and the lock screen each downloaded it and decoded it as an animation of its own, which filled the 256 MB the app may use. Now:
+  - an animated cover that Navidrome sends full size is downloaded **once**, kept on the phone, and a still of its first frame is made from it. Every other request for that cover (any size, the song's cover too) is answered from the phone without the network;
+  - requests for the same cover that arrive together wait for that one download instead of each starting their own;
+  - lists, backgrounds, colours and the lock screen always get a still picture. Like Symfonium, covers only move on the album page and in now playing, and the animation is decoded at screen size (720 px) rather than the file's full size;
+  - only the last few animations are kept in memory.
+- Small animated GIFs are now also kept on the phone after the first download.
+- The lock screen and notification cover now come from Musix's image cache instead of being downloaded again in full on every song change.
+
+### Added
+- Settings → Storage → **Download all covers**: fetches every album, artist and playlist cover in the background, at the sizes the app shows, after each library sync and once a day. Only on Wi-Fi, and by default only when the phone is on the same local network as Navidrome (switch on "On any Wi-Fi" if you reach Navidrome by a domain name). Covers already on the phone are skipped, and it stops by itself when you leave home. Progress and a **Download covers now** button are on the same page.
+- Image cache size **No limit**. With no limit, images are kept in the app's own storage, so Android doesn't clear them when the phone runs low on space. Switching keeps what's already downloaded.
+- Device tests now include an album with a 1080 px animated WebP cover: it must be downloaded exactly once while the album page, now playing, background, colour and a list ask for it at the same time, lists must get a still, and the album page must still animate.
+
 ## 0.0.10beta — 2026-10-16
 
 ### Fixed

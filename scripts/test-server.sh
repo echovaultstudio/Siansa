@@ -15,14 +15,17 @@ noise() { # seconds, output
   ffmpeg -loglevel error -y -filter_complex "anoisesrc=d=$1:c=white:r=44100:a=0.5[a];anoisesrc=d=$1:c=white:r=44100:a=0.5:seed=7[b];[a][b]amerge=inputs=2" \
     -sample_fmt s16 -metadata artist="Test Artist" -metadata album="$3" -metadata title="$4" "$2"
 }
-mkdir -p "music/Big Animated" "music/Small Animated" "music/Still Album"
+mkdir -p "music/Big Animated" "music/Small Animated" "music/Still Album" "music/WebP Animated"
 noise 300 "music/Big Animated/01.flac" "Big Animated" "Long Song A"
 noise 30 "music/Small Animated/01.flac" "Small Animated" "Short Song"
 noise 300 "music/Still Album/01.flac" "Still Album" "Long Song B"
+noise 30 "music/WebP Animated/01.flac" "WebP Animated" "WebP Song"
 # A 1000×1000 animated cover like Apple Music motion art (about 13 MB as GIF), a small one, and a still one.
 ffmpeg -loglevel error -y -f lavfi -i "testsrc2=size=1000x1000:rate=24:duration=10" -vf "split[a][b];[a]palettegen[p];[b][p]paletteuse" -loop 0 "music/Big Animated/cover.gif"
 ffmpeg -loglevel error -y -f lavfi -i "testsrc=size=400x400:rate=10:duration=2" -vf "split[a][b];[a]palettegen[p];[b][p]paletteuse" -loop 0 "music/Small Animated/cover.gif"
 ffmpeg -loglevel error -y -f lavfi -i "testsrc=size=800x800" -frames:v 1 "music/Still Album/cover.jpg"
+# An animated WebP: Navidrome sends the original for every size asked for (it only shrinks GIFs).
+ffmpeg -loglevel error -y -f lavfi -i "testsrc2=size=1080x1080:rate=12:duration=5" -c:v libwebp_anim -lossless 0 -q:v 80 -loop 0 "music/WebP Animated/cover.webp"
 ls -la music/*
 fi
 [ -n "${PREPARE_ONLY:-}" ] && exit 0

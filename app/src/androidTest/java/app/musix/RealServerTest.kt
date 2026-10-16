@@ -19,6 +19,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
+import app.musix.covers.CoverStore
 import app.musix.data.Album
 import app.musix.data.Song
 import app.musix.log.AppLog
@@ -27,7 +28,10 @@ import app.musix.ui.AnimatedCovers
 import app.musix.ui.LocalGraph
 import app.musix.ui.SMALL_COVER
 import coil3.SingletonImageLoader
+import coil3.asDrawable
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
+import coil3.request.SuccessResult
 import kotlinx.coroutines.runBlocking
 import okhttp3.Call
 import okhttp3.Callback
@@ -47,7 +51,8 @@ import java.io.IOException
 /**
  * Runs against a real Navidrome (0.64.2, with ffmpeg) on the CI machine, reached through a proxy that
  * limits the connection to 4.3 Mbit/s like the phone's link (see scripts/test-server.sh). The library has
- * a 13 MB animated cover.gif album with a 5-minute FLAC, a small animated cover album, and a still album.
+ * a 13 MB animated cover.gif album with a 5-minute FLAC, a small animated cover album, a still album, and
+ * an album with a 1080 px animated cover.webp (which Navidrome sends full size for every size asked for).
  */
 @RunWith(AndroidJUnit4::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
@@ -92,20 +97,75 @@ class RealServerTest {
         val big = AnimatedCovers.kind(graph, a.getValue("Big Animated").coverArt!!)
         val small = AnimatedCovers.kind(graph, a.getValue("Small Animated").coverArt!!)
         val still = AnimatedCovers.kind(graph, a.getValue("Still Album").coverArt!!)
-        println("Kinds: big=$big small=$small still=$still")
+        val webp = AnimatedCovers.kind(graph, a.getValue("WebP Animated").coverArt!!)
+        println("Kinds: big=$big small=$small still=$still webp=$webp")
         assertEquals("13 MB GIF should use Navidrome's small animated version", AnimatedCovers.Kind.Animated(SMALL_COVER), big)
-        // Navidrome sends original covers without a size, so a small GIF also goes through the 300 px version.
-        assertTrue("Small GIF should be animated: $small", small is AnimatedCovers.Kind.Animated)
+        assertEquals("Small GIF should be kept and animated from the phone", AnimatedCovers.Kind.Local, small)
         assertEquals(AnimatedCovers.Kind.Still, still)
+        assertEquals("Animated WebP should be kept and animated from the phone", AnimatedCovers.Kind.Local, webp)
+        // Only the first bytes were read to decide: nothing downloaded yet.
+        assertTrue(!CoverStore.has(a.getValue("WebP Animated").coverArt!!))
+    }
+
+    /**
+     * The crash: an animated WebP cover that Navidrome sends full size for every request. The album page,
+     * now playing, the blurred background (the song's cover), the colour sampling and a list tile all ask
+     * for it at once. It must be downloaded once, everything but the animation must get a small still
+     * (not an animation each), and the animation must still move.
+     */
+    @Test
+    fun b0_webpCoverIsDownloadedOnceAndListsGetAStill() {
+        val album = albums().getValue("WebP Animated")
+        val detail = runBlocking { graph.subsonic.album(album.id) }
+        runBlocking { graph.library.putAlbumsAndSongs(listOf(detail.album), detail.songs, listOf(album.id), emptyList()) }
+        val cover = album.coverArt!!
+        val songCover = detail.songs.first().coverArt!!
+        val before = CoverStore.downloads.get()
+        val res = app.resources
+        val results = java.util.concurrent.ConcurrentLinkedQueue<String>()
+        val threads = listOf(
+            "tile" to { loadCoverImage(cover, SMALL_COVER, null) },
+            "album page" to { loadCoverImage(cover, 1000, null) },
+            "colour" to { loadCoverImage(cover, SMALL_COVER, 120) },
+            "background" to { loadCoverImage(songCover, SMALL_COVER, null) },
+            "song row" to { loadCoverImage(songCover, 150, null) },
+        ).map { (what, load) ->
+            Thread {
+                val image = load()
+                val d = image?.asDrawable(res)
+                results += "$what: ${d?.javaClass?.simpleName} ${d?.intrinsicWidth}×${d?.intrinsicHeight} animated=${d is Animatable}"
+            }.apply { start() }
+        }
+        threads.forEach { it.join(120_000) }
+        println("WebP loads: ${results.joinToString(" | ")}")
+        val downloads = CoverStore.downloads.get() - before
+        println("WebP downloads: $downloads, kept: ${CoverStore.local(cover)?.original?.length()} bytes, still: ${CoverStore.local(cover)?.still?.length()} bytes")
+        assertEquals("The animated WebP should be downloaded exactly once", 1, downloads)
+        assertEquals("Every request should have got a picture: $results", 5, results.count { !it.contains("null") })
+        assertTrue("Lists and backgrounds must get a still, not an animation: $results", results.none { it.endsWith("animated=true") })
+        assertTrue("A still should have been made", CoverStore.local(cover)?.still != null)
+        assertEquals("The song's cover should share the album's file", CoverStore.local(cover)?.original, CoverStore.local(songCover)?.original)
+
+        // Asking again goes nowhere near the network.
+        val again = CoverStore.downloads.get()
+        repeat(3) { loadCoverImage(cover, 1000, null, cached = false) }
+        assertEquals(again, CoverStore.downloads.get())
+
+        val kind = runBlocking { AnimatedCovers.kind(graph, cover) }
+        assertEquals(AnimatedCovers.Kind.Local, kind)
+        val d = runBlocking { AnimatedCovers.load(app, graph, cover, kind!!, 720) }
+        println("WebP animation: ${d?.javaClass?.simpleName} ${d?.intrinsicWidth}×${d?.intrinsicHeight}")
+        assertTrue("The album page / now playing should get an animation: $d", d is Animatable)
+        assertTrue("The animation should be decoded at display size: ${d?.intrinsicWidth}", (d?.intrinsicWidth ?: 0) in 1..720)
     }
 
     @Test
     fun b_animatedCoverMovesOnScreen() {
         val cover = albums().getValue("Big Animated").coverArt!!
-        val size = (runBlocking { AnimatedCovers.kind(graph, cover) } as AnimatedCovers.Kind.Animated).size
+        val kind = runBlocking { AnimatedCovers.kind(graph, cover) }!!
         compose.setContent {
             CompositionLocalProvider(LocalGraph provides graph) {
-                AnimatedCover(cover, size, Modifier.size(300.dp), RectangleShape) { }
+                AnimatedCover(cover, kind, Modifier.size(300.dp), RectangleShape) { }
             }
         }
         var found: ImageView? = null
@@ -135,7 +195,7 @@ class RealServerTest {
             // What the album page and now playing ask for now.
             runBlocking {
                 val kind = AnimatedCovers.kind(graph, big.coverArt!!)
-                if (kind is AnimatedCovers.Kind.Animated) AnimatedCovers.load(app, graph, big.coverArt!!, kind.size)
+                if (kind != null) AnimatedCovers.load(app, graph, big.coverArt!!, kind, 720)
             }
             a.values.forEach { album -> loadCover(album.coverArt!!, SMALL_COVER) }
         }
@@ -186,6 +246,17 @@ class RealServerTest {
         }
     }
 
+    /** Loads a cover the way [app.musix.ui.Cover] does (same cache keys), optionally decoded at [decodePx]. */
+    private fun loadCoverImage(id: String, size: Int, decodePx: Int?, cached: Boolean = true): coil3.Image? {
+        val px = if (size <= SMALL_COVER) SMALL_COVER else size
+        val key = "cover:$id:$px"
+        val builder = ImageRequest.Builder(app).data(graph.subsonic.coverUrl(id, px)).diskCacheKey(key).memoryCacheKey(key)
+        if (decodePx != null) builder.size(decodePx).memoryCacheKey("$key:$decodePx")
+        if (!cached) builder.diskCachePolicy(CachePolicy.DISABLED).memoryCachePolicy(CachePolicy.DISABLED)
+        val result = runBlocking { SingletonImageLoader.get(app).execute(builder.build()) }
+        return (result as? SuccessResult)?.image
+    }
+
     private fun loadCover(id: String, size: Int) {
         val request = ImageRequest.Builder(app).data(graph.subsonic.coverUrl(id, size)).build()
         runBlocking { SingletonImageLoader.get(app).execute(request) }
@@ -193,7 +264,8 @@ class RealServerTest {
 
     /** Downloads the original cover file in full, like 0.0.7–0.0.9 did. */
     private fun hog(id: String) {
-        val call = graph.imageHttp.newCall(Request.Builder().url(graph.subsonic.coverUrl(id, null)).build())
+        // The plain client: the image client now keeps animated originals and wouldn't download them again.
+        val call = graph.http.newCall(Request.Builder().url(graph.subsonic.coverUrl(id, null)).build())
         hogs += call
         call.enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) = Unit

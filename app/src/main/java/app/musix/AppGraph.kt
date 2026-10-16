@@ -1,5 +1,8 @@
 package app.musix
 
+import app.musix.covers.CoverStore
+import kotlinx.coroutines.runBlocking
+
 import android.app.Application
 import app.musix.data.Favorites
 import app.musix.data.HistoryStore
@@ -97,6 +100,8 @@ class AppGraph(val app: Application) {
     val imageHttp: OkHttpClient = http.newBuilder()
         .dispatcher(Dispatcher().apply { maxRequests = 24; maxRequestsPerHost = 6 })
         .connectionPool(ConnectionPool(6, 5, TimeUnit.MINUTES))
+        // Animated covers Navidrome can't shrink: downloaded once, then answered from the phone.
+        .addInterceptor(CoverStore.interceptor)
         .addNetworkInterceptor { chain ->
             val response = chain.proceed(chain.request())
             // Big images are worth knowing about when playback struggles.
@@ -129,6 +134,14 @@ class AppGraph(val app: Application) {
     val mixes = MixStore(app)
     val history = HistoryStore(app)
     val library = LibraryRepository(app)
+
+    init {
+        CoverStore.init(app)
+        val songAlbums = java.util.concurrent.ConcurrentHashMap<String, String>()
+        CoverStore.albumCoverOfSong = { songCover ->
+            songAlbums[songCover] ?: runBlocking { library.albumCoverOfSongCover(songCover) }?.also { songAlbums[songCover] = it }
+        }
+    }
     val sync = LibrarySync(subsonic, library, settings, scope)
 
     val lastFm = LastFmApi(http)
