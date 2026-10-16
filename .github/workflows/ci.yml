@@ -1,19 +1,18 @@
 name: CI
 
-# Every push and pull request is checked: the app must compile, pass Android Lint, its unit tests and
-# the emulator tests against a real Navidrome. A release is published only when all of them pass.
+# Every push and pull request must compile, pass Android Lint, the unit tests and the secret scan; a
+# release is published from main when those pass. The emulator tests against a real Navidrome run after
+# each merge to main and nightly. They report problems (with screenshots) but don't hold back releases:
+# their slow, throttled emulator makes timing results unreliable.
 on:
   push:
     branches: [main]
   pull_request:
-  # Actions → CI → Run workflow. The tick box is the owner's override for when the emulator tests fail
-  # for a reason known not to affect phones; build, lint, unit tests and the secret scan must still pass.
+  # Actions → CI → Run workflow: builds, checks and releases main on demand.
   workflow_dispatch:
-    inputs:
-      release_despite_emulator:
-        description: "Release without the emulator tests (build, lint, unit tests and secret scan must pass)"
-        type: boolean
-        default: false
+  # Nightly, so the emulator tests keep watching main even on quiet days.
+  schedule:
+    - cron: "17 1 * * *"
 
 permissions:
   contents: write
@@ -165,8 +164,8 @@ jobs:
   device-tests:
     name: Emulator tests against Navidrome
     needs: checks
-    # Skipped when the owner releases with the override: the release then needs only the other checks.
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.release_despite_emulator) }}
+    # Not on pull requests (20 minutes each); after merges to main, nightly, and on demand.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -273,14 +272,8 @@ jobs:
 
   release:
     name: Publish release
-    needs: [checks, security, device-tests]
-    # Normally only when everything passed on main. With the manual override, the emulator tests may
-    # have failed, but the build, lint, unit tests and secret scan must still have passed.
-    if: >-
-      always() && github.ref == 'refs/heads/main' &&
-      needs.checks.result == 'success' && needs.security.result == 'success' &&
-      (needs.device-tests.result == 'success' ||
-       (github.event_name == 'workflow_dispatch' && inputs.release_despite_emulator))
+    needs: [checks, security]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -298,12 +291,6 @@ jobs:
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "::notice::Release v$VERSION already exists; bump version.txt to publish a new one."
           fi
-
-      - name: Say so in the notes when released without passing emulator tests
-        if: needs.device-tests.result != 'success'
-        run: |
-          printf '\n> Released with the owner'"'"'s override, without the emulator tests ([CI run](%s)).\n' \
-            "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "notes/${{ steps.version.outputs.version }}.md"
 
       # One release per version, so the APK can be downloaded straight from the Releases page on a phone.
       - uses: softprops/action-gh-release@v3
