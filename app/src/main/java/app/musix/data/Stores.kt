@@ -114,6 +114,11 @@ class MixStore(context: Context) {
 }
 
 class HistoryStore(context: Context) {
+    private companion object {
+        // About two months of steady listening; used for taste, time-of-day habits and skips.
+        const val MAX_EVENTS = 3000
+    }
+
     private val json = JsonFile(
         File(context.filesDir, "history.json"),
         ListSerializer(PlayEvent.serializer()),
@@ -122,9 +127,20 @@ class HistoryStore(context: Context) {
     suspend fun add(event: PlayEvent) {
         json.update { list ->
             val withoutRepeat = if (list.firstOrNull()?.id == event.id) list.drop(1) else list
-            (listOf(event) + withoutRepeat).take(500)
+            (listOf(event) + withoutRepeat).take(MAX_EVENTS)
         }
     }
+
+    /** Records how long a song was heard; under 30 s (and under 40% of it) counts as a skip. */
+    suspend fun finish(id: String, startedAt: Long, listenedMs: Long, durationSec: Int) {
+        val skipped = listenedMs < 30_000 && (durationSec <= 0 || listenedMs < durationSec * 400L)
+        json.update { list ->
+            val index = list.indexOfFirst { it.id == id && kotlin.math.abs(it.at - startedAt) < 120_000 }
+            if (index < 0) list else list.toMutableList().also { it[index] = it[index].copy(listenedMs = listenedMs, skipped = skipped) }
+        }
+    }
+
+    suspend fun all(): List<PlayEvent> = json.read()
 
     suspend fun recent(count: Int): List<PlayEvent> = json.read().take(count)
 

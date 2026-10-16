@@ -91,15 +91,23 @@ class MixGenerator(private val graph: AppGraph) {
         if (pool.isEmpty()) throw MixException("AudioMuse found no tracks for “${plan.query}”")
 
         val dayMs = 24L * 60 * 60 * 1000
+        val taste = taste()
         val recent = graph.history.playedSince(System.currentTimeMillis() - selector.repeatDays * dayMs) +
             graph.mixes.recentSongIds(selector.id, selector.repeatDays, excludeId = id)
-        val fresh = pool.values.filter { it.id !in recent }
-        val candidates = if (fresh.size >= selector.length) fresh else pool.values.toList()
+        val skipped = taste?.skipped.orEmpty()
+        val fresh = pool.values.filter { it.id !in recent && it.id !in skipped }
+        val candidates = if (fresh.size >= selector.length) fresh else pool.values.filter { it.id !in skipped }.ifEmpty { pool.values.toList() }
 
-        // Mostly by match strength, with a little shuffle so two days never come out identical.
+        // Mostly by match strength, nudged towards artists you play (and play at this time of day),
+        // with a little shuffle so two days never come out identical.
         // Each track gets one score up front: a sort whose keys change mid-sort fails on Android.
+        val hourArtists = taste?.hourArtists.orEmpty().map { it.lowercase() }.toSet()
         val ranked = candidates
-            .map { it to it.similarity * (0.8 + Random.nextDouble() * 0.2) }
+            .map { hit ->
+                val liked = taste?.affinity(hit.artist) ?: 0.0
+                val habit = if (hit.artist.lowercase() in hourArtists) 0.12 else 0.0
+                hit to hit.similarity * (0.8 + Random.nextDouble() * 0.2) * (1 + 0.3 * liked + habit)
+            }
             .sortedByDescending { it.second }
             .map { it.first }
         val maxPerArtist = max(2, selector.length / 8)
@@ -161,6 +169,12 @@ class MixGenerator(private val graph: AppGraph) {
             appendLine("Now: $day %02d:%02d".format(now.hour, now.minute))
             appendLine("Listening on: ${describeOutput(graph.app)}")
             if (recent.isNotEmpty()) appendLine("Recently played: ${recent.joinToString("; ")}")
+            taste()?.let { t ->
+                if (t.topArtists.isNotEmpty()) appendLine("Favourite artists lately: ${t.topArtists.take(10).joinToString(", ")}")
+                if (t.hourArtists.isNotEmpty() || t.hourGenres.isNotEmpty()) {
+                    appendLine("Usually played around this time: " + (t.hourGenres + t.hourArtists.take(5)).joinToString(", "))
+                }
+            }
             if (previousTitles.isNotEmpty()) appendLine("Previous mix titles: ${previousTitles.joinToString("; ")}")
             if (concepts.isNotEmpty()) appendLine("Sound concepts the search understands well: ${concepts.joinToString(", ")}")
         }
@@ -180,6 +194,103 @@ class MixGenerator(private val graph: AppGraph) {
         if (broken.isNotEmpty()) throw MixException("The AI used a forbidden word: ${broken.first()}")
 
         return Plan(title, query, description.ifBlank { selector.guidance }, ai = true)
+    }
+
+    private suspend fun taste(): TasteProfile? =
+        runCatching { graph.taste.profile() }.onFailure { AppLog.w("Taste", "Couldn't build the taste profile: ${it.message}") }.getOrNull()
+
+    /** Mixes made from your listening rather than a time of day. */
+    enum class Personal(val id: String, val title: String) {
+        SOUND("you-sound", "Your sound"),
+        REPEAT("you-repeat", "On repeat"),
+        DISCOVER("you-discover", "Discover for you"),
+    }
+
+    /** Today's personal mix of this kind, built if it doesn't exist yet. */
+    suspend fun ensurePersonal(kind: Personal, force: Boolean = false): Mix = mutex.withLock {
+        val date = LocalDate.now().toString()
+        val id = "$date-${kind.id}"
+        if (!force) graph.mixes.get(id)?.let { return@withLock it }
+        val settings = graph.settings.current
+        if (!settings.navidromeReady) throw MixException("Set up Navidrome in Settings first")
+        val taste = taste()
+        val skipped = taste?.skipped.orEmpty()
+        val (songs, description) = when (kind) {
+            Personal.SOUND -> soundMix(skipped)
+            Personal.REPEAT -> repeatMix(taste, skipped)
+            Personal.DISCOVER -> discoverMix(taste, skipped)
+        }
+        if (songs.isEmpty()) throw MixException("Not enough listening history yet. Play some more and try again later.")
+        AppLog.i("Mix", "${kind.title}: ${songs.size} songs")
+        val mix = Mix(
+            id = id,
+            selectorId = kind.id,
+            date = date,
+            title = kind.title,
+            description = description,
+            query = "",
+            songs = songs,
+            createdAt = System.currentTimeMillis(),
+            aiNamed = false,
+        )
+        graph.mixes.save(mix)
+        mix
+    }
+
+    /** AudioMuse's sonic fingerprint: the songs closest to the sound of what you play most. */
+    private suspend fun soundMix(skipped: Set<String>): Pair<List<Song>, String> {
+        val s = graph.settings.current
+        if (!s.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
+        val recent = graph.history.playedSince(System.currentTimeMillis() - 2 * DAY_MS)
+        val hits = graph.audioMuse.sonicFingerprint(150, s.navidromeUser, s.navidromePassword)
+            .filter { it.id !in skipped && it.id !in recent }
+        val picked = capPerArtist(hits.map { it to it.similarity * (0.85 + Random.nextDouble() * 0.15) }, 3, 40)
+        return spreadArtists(resolve(picked.map { it.id })) to "The sound of what you play most, found by AudioMuse"
+    }
+
+    /** Your most-played songs lately, from Musix, Koito / ListenBrainz and Last.fm. */
+    private suspend fun repeatMix(taste: TasteProfile?, skipped: Set<String>): Pair<List<Song>, String> {
+        val ids = taste?.favouriteSongs.orEmpty().filter { it !in skipped }
+        if (ids.size < 8) return emptyList<Song>() to ""
+        val songs = resolve(ids.take(50))
+        return songs to "Your most-played songs lately"
+    }
+
+    /**
+     * New to you: songs that sound like your favourites (keeping their mood), leaning away from
+     * what you already play a lot.
+     */
+    private suspend fun discoverMix(taste: TasteProfile?, skipped: Set<String>): Pair<List<Song>, String> {
+        val s = graph.settings.current
+        if (!s.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
+        val heard = graph.history.all().map { it.id }.toSet()
+        var seeds = taste?.favouriteSongs.orEmpty().shuffled().take(8)
+        if (seeds.size < 3) {
+            seeds = runCatching { graph.audioMuse.sonicFingerprint(20, s.navidromeUser, s.navidromePassword) }
+                .getOrDefault(emptyList()).shuffled().take(8).map { it.id }
+        }
+        if (seeds.isEmpty()) return emptyList<Song>() to ""
+        val pool = LinkedHashMap<String, Pair<ClapHit, Double>>()
+        coroutineScope {
+            seeds.map { seed -> async { runCatching { graph.audioMuse.similarTracks(seed, 30, sameMood = true) }.getOrDefault(emptyList()) } }
+                .awaitAll()
+        }.flatten().forEach { hit ->
+            if (hit.id in heard || hit.id in skipped || hit.id in seeds) return@forEach
+            val familiar = taste?.affinity(hit.artist) ?: 0.0
+            val score = hit.similarity * (1 - 0.6 * familiar) * (0.8 + Random.nextDouble() * 0.2)
+            if ((pool[hit.id]?.second ?: -1.0) < score) pool[hit.id] = hit to score
+        }
+        val picked = capPerArtist(pool.values.toList(), 2, 40)
+        return spreadArtists(resolve(picked.map { it.id })) to "New to you, close to the sound of your favourites"
+    }
+
+    private fun capPerArtist(scored: List<Pair<ClapHit, Double>>, perArtist: Int, size: Int): List<ClapHit> {
+        val counts = HashMap<String, Int>()
+        return scored.sortedByDescending { it.second }.map { it.first }.filter { hit ->
+            val key = hit.artist.lowercase()
+            val n = counts[key] ?: 0
+            if (n >= perArtist) false else { counts[key] = n + 1; true }
+        }.take(size)
     }
 
     /** A playlist made on the spot from a description of how the listener feels. */
@@ -263,6 +374,7 @@ class MixGenerator(private val graph: AppGraph) {
     }
 
     private companion object {
+        const val DAY_MS = 24L * 60 * 60 * 1000
         val SYSTEM_PROMPT = """
             You plan one playlist for a personal music player. A text-to-audio search model (CLAP) will find tracks
             in the listener's own library from your search text, so describe how the music should SOUND.
@@ -273,7 +385,8 @@ class MixGenerator(private val graph: AppGraph) {
             - description: one short friendly sentence for the listener.
             Follow the time slot's guidance strictly and never use any forbidden word in the title or query.
             Use the listening device as context (a car's Bluetooth suggests driving).
-            Stay close to the listener's recent taste, but don't repeat a previous mix title.
+            Stay close to the listener's recent taste and what they usually play at this time, but don't repeat a
+            previous mix title. Favourite artists are only a hint for the sound: never name them.
         """.trimIndent()
 
         fun describeOutput(context: Context): String {

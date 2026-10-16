@@ -11,13 +11,15 @@ import androidx.work.WorkerParameters
 import app.musix.MusixApp
 import java.util.concurrent.TimeUnit
 
-/** Prepares the current time slot's mix in the background, so it's ready when the app opens. */
+/** Prepares the current time slot's mix and today's personal mixes in the background, so it's ready when the app opens. */
 class MixWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val graph = (applicationContext as MusixApp).graph
         val settings = graph.settings.current
         if (!settings.navidromeReady || !settings.audioMuseReady) return Result.success()
         runCatching { graph.generator.ensureCurrent(force = false) }
+        // Today's personal mixes too (each is made once a day; later runs find them ready).
+        MixGenerator.Personal.entries.forEach { kind -> runCatching { graph.generator.ensurePersonal(kind) } }
         return Result.success()
     }
 
