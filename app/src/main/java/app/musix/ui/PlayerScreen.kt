@@ -451,7 +451,7 @@ private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        CastButton()
+        CastButton(tint = Color.White.copy(alpha = 0.8f), keepSpace = true)
     }
 }
 

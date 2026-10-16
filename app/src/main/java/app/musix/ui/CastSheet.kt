@@ -20,6 +20,7 @@ import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -41,15 +42,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.mediarouter.media.MediaRouter
 import app.musix.playback.Cast
 
-/** The cast button: picks a TV or speaker to play on. Takes up its space even on phones that can't cast. */
+/**
+ * The cast button: picks a TV or speaker to play on. Hidden on phones that can't cast, where
+ * [keepSpace] still holds its place so a centred title stays centred.
+ */
 @Composable
-fun CastButton() {
+fun CastButton(tint: Color = LocalContentColor.current, keepSpace: Boolean = false) {
     val context = LocalContext.current
     remember { Cast.context(context) }
     val status by Cast.status.collectAsStateWithLifecycle()
     var open by remember { mutableStateOf(false) }
     if (!status.available) {
-        Spacer(Modifier.size(48.dp))
+        if (keepSpace) Spacer(Modifier.size(48.dp))
         return
     }
     IconButton(onClick = { open = true }) {
@@ -59,7 +63,7 @@ fun CastButton() {
             tint = when {
                 status.device != null -> Accent
                 status.connecting -> Accent.copy(alpha = 0.5f)
-                else -> Color.White.copy(alpha = 0.8f)
+                else -> tint
             },
         )
     }
