@@ -107,6 +107,18 @@ jobs:
                           print("::error::" + " | ".join(block)[:3000])
           PY
 
+      # The full build log on the ci-logs branch when the build fails, readable without downloading artifacts.
+      - name: Build log to the ci-logs branch
+        if: failure() && github.event_name != 'pull_request' || failure() && github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          [ -f gradle-build.txt ] || exit 0
+          mkdir -p ci-logs && cp gradle-build.txt ci-logs/ && cd ci-logs
+          git init -q && git checkout -q -b ci-logs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -q -m "Build log for ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-logs
+
       - name: APK name
         id: version
         run: |
