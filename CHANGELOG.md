@@ -3,6 +3,11 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.19beta — 2026-10-16
+
+### Added
+- **Arrange Home**: put Home's sections in the order you like. Tap the sliders button next to the greeting, then hold a row (or grab its handle) and drag it. The order is kept, and Reset puts it back.
+
 ## 0.0.18beta — 2026-10-16
 
 ### Fixed
