@@ -39,6 +39,9 @@ data class Song(
     val artists: List<ArtistRef> = emptyList(),
 )
 
+/** The song's cover, or its album's when Navidrome didn't send one with the song. */
+val Song.cover: String? get() = coverArt ?: albumId?.let { "al-$it" }
+
 @Serializable
 data class ArtistRef(val id: String, val name: String)
 

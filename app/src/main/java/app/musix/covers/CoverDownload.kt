@@ -187,7 +187,13 @@ object CoverDownload {
         coroutineScope {
             for ((index, id) in ids.withIndex()) {
                 // Left home or Wi-Fi: stop, and pick up where it left off next time.
-                if (index % 50 == 49) whyNot(context, graph.settings.current)?.let { stoppedBecause = it }
+                if (index % 50 == 49) {
+                    // A brief Wi-Fi or DNS hiccup shouldn't end the run: look again a few seconds later.
+                    stoppedBecause = whyNot(context, graph.settings.current)?.let { first ->
+                        kotlinx.coroutines.delay(5_000)
+                        whyNot(context, graph.settings.current)?.also { AppLog.i("Covers", "Network check failed twice ($first)") }
+                    }
+                }
                 if (stoppedBecause != null) break
                 permits.acquire()
                 launch {

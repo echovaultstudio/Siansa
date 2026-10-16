@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import app.musix.data.cover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -321,7 +322,7 @@ fun SongRow(
             )
         }
         if (showCover) {
-            Cover(song.coverArt, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
+            Cover(song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
             Spacer(Modifier.width(12.dp))
         }
         Column(Modifier.weight(1f)) {

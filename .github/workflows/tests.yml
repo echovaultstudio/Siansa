@@ -7,6 +7,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   emulator:
     runs-on: ubuntu-latest
@@ -56,7 +59,7 @@ jobs:
           grep -A8 "What went wrong" gradle.txt 2>/dev/null | head -12 | while IFS= read -r line; do [ -n "$line" ] && echo "::error::$line"; done || true
           grep -E "Tests? .*(passed|failed)|BUILD (SUCCESSFUL|FAILED)" gradle.txt 2>/dev/null | tail -3 | while IFS= read -r line; do echo "::notice::$line"; done || true
           find app/build/outputs -iname "logcat*.txt" -exec cat {} + > logcat.txt 2>/dev/null || true
-          grep -h "System.out" logcat.txt 2>/dev/null | grep -E "Kinds:|drawable:|setup" | sed 's/.*System.out: //' | head -8 | while IFS= read -r line; do echo "::notice::$line"; done || true
+          grep -h "System.out" logcat.txt 2>/dev/null | grep -E "Kinds:|drawable:|setup|Tour: " | sed 's/.*System.out: //' | head -40 | while IFS= read -r line; do echo "::notice::$line"; done || true
           for f in $(find app/build/outputs/androidTest-results -name "*.xml"); do
             [ -f "$f" ] || continue
             python3 - "$f" <<'PY'
@@ -71,6 +74,36 @@ jobs:
                   print(f"::notice::PASSED {name} ({case.get('time')}s)")
           PY
           done
+
+      # The app tour's screenshots (TOURSHOT lines in the log) as images on the ci-screens branch.
+      - name: Tour screenshots to the ci-screens branch
+        if: always()
+        run: |
+          [ -f logcat.txt ] || exit 0
+          python3 - <<'PY'
+          import re, base64, os, collections
+          parts, totals = collections.defaultdict(dict), {}
+          for line in open("logcat.txt", errors="ignore"):
+              m = re.search(r"TOURSHOT (\S+) (\d+)/(\d+) (\S+)", line)
+              if m:
+                  parts[m[1]][int(m[2])] = m[4]
+                  totals[m[1]] = int(m[3])
+          os.makedirs("screens", exist_ok=True)
+          for name, d in parts.items():
+              if len(d) == totals[name]:
+                  open(f"screens/{name}.jpg", "wb").write(base64.b64decode("".join(d[i] for i in sorted(d))))
+              else:
+                  print(f"{name}: only {len(d)} of {totals[name]} parts")
+          print(len(os.listdir("screens")), "screenshots")
+          PY
+          grep -h "System.out" logcat.txt | grep -E "Tour: |song starts" | sed 's/.*System.out: //' > screens/tour.txt || true
+          [ -n "$(ls screens/*.jpg 2>/dev/null)" ] || exit 0
+          cd screens
+          git init -q && git checkout -q -b ci-screens
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -q -m "Tour screenshots for ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-screens
 
       - uses: actions/upload-artifact@v4
         if: always()

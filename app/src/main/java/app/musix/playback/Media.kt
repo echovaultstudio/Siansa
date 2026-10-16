@@ -1,5 +1,6 @@
 package app.musix.playback
 
+import app.musix.data.cover
 import android.net.Uri
 import android.os.Bundle
 import androidx.media3.common.MediaItem
@@ -31,7 +32,7 @@ fun Song.toMediaItem(api: SubsonicApi): MediaItem {
         .setArtist(artist)
         .setAlbumTitle(album)
         .setGenre(genre)
-        .setArtworkUri(coverArt?.let { Uri.parse(api.coverUrl(it, app.musix.ui.SMALL_COVER)) })
+        .setArtworkUri(cover?.let { Uri.parse(api.coverUrl(it, app.musix.ui.SMALL_COVER)) })
         .setIsPlayable(true)
         .setIsBrowsable(false)
         .setExtras(extras)

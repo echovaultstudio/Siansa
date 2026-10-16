@@ -1,5 +1,7 @@
 package app.musix.ui
 
+import androidx.compose.ui.platform.testTag
+import app.musix.data.cover
 import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -260,16 +262,16 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
     val haptics = LocalHapticFeedback.current
     val song = state.current ?: return
     // Tinted with the cover's colour, like now playing, and darkened so white text stays readable.
-    val tone = rememberCoverColor(song.coverArt)
+    val tone = rememberCoverColor(song.cover)
     val background = lerp(tone, Color.Black, 0.45f)
     Box(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
       CompositionLocalProvider(LocalContentColor provides Color.White) {
         Column(Modifier.clip(RoundedCornerShape(10.dp)).background(background)) {
             Row(
-                Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 8.dp, vertical = 8.dp),
+                Modifier.fillMaxWidth().testTag("miniPlayer").clickable(onClick = onOpen).padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Cover(song.coverArt, 150, Modifier.size(44.dp), RoundedCornerShape(6.dp))
+                Cover(song.cover, 150, Modifier.size(44.dp), RoundedCornerShape(6.dp))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(song.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
