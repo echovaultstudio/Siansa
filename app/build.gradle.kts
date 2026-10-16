@@ -121,9 +121,9 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
-    implementation("io.coil-kt.coil3:coil-compose:3.0.4")
-    implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
-    implementation("io.coil-kt.coil3:coil-gif:3.0.4")
+    implementation("io.coil-kt.coil3:coil-compose:3.6.3")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
+    implementation("io.coil-kt.coil3:coil-gif:3.6.3")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
