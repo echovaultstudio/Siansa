@@ -319,7 +319,8 @@ private fun BoxScope.LibraryAlphabetBar(
     AlphabetBar(
         present = starts.keys,
         current = current,
-        onPick = { letter -> AlphabetIndex.target(letter, starts)?.let { scrollTo(it + 1) } },
+        // The first letter goes right to the top, so the sort row and pinned items stay in view.
+        onPick = { letter -> AlphabetIndex.target(letter, starts)?.let { scrollTo(if (it == starts.values.min()) 0 else it + 1) } },
         modifier = Modifier.align(Alignment.TopEnd).padding(top = 56.dp, bottom = bottomBarPadding(8.dp)),
     )
 }
