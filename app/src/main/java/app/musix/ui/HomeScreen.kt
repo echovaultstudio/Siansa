@@ -271,26 +271,6 @@ fun HomeScreen(nav: NavController) {
             Shelf("Made for you", tiles, key = { it.first }) { it.second() }
         }
 
-        // Your listening: Wrapped-style pages for this month, last month and this year.
-        item {
-            val now = LocalDate.now()
-            val month = { d: LocalDate -> d.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault()) }
-            val periods = listOf(
-                Triple("month", "Your ${month(now)}", "So far this month"),
-                Triple("last-month", "Your ${month(now.minusMonths(1))}", "Last month"),
-                Triple("year", "Your ${now.year}", "So far this year"),
-            )
-            Shelf("Your listening", periods, key = { it.first }) { (id, title, caption) ->
-                GradientTile(
-                    title = title,
-                    colors = tileColors("report-$id"),
-                    size = 140.dp,
-                    caption = caption,
-                    onClick = { nav.navigate("report/$id") },
-                )
-            }
-        }
-
         // Albums you loved a while ago but haven't played since.
         item {
             Shelf("Rediscover", lovedBefore.valueOrNull().orEmpty(), key = { it.album.id }) { r ->

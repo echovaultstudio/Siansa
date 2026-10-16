@@ -3,6 +3,19 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.13beta — 2026-10-16
+
+### Changed
+- **Your Library**, rebuilt in the style of Spotify's library in Musix's colours, and now the one place to find everything:
+  - **Filters** at the top: Playlists, Mixes, Albums, Artists and Your listening. Choosing one shows ✕ to go back and its own sub-filters: playlists by you or by others; mixes from today, made for you, vibes or earlier; albums you've played, not played yet, and by release type (Albums, EPs, Singles, Live…); artists you've played or not.
+  - **Sort** by Recents, Recently added, Alphabetical, Creator or Most played. Recents follows your listening: Musix's own play history plus Navidrome's recently played albums (from other apps too).
+  - A **list or grid** view, and **search** inside your library.
+  - Each row says what it is: "Playlist · owner", "Album · artist", "EP · artist", "Mix · Made for you · 30 songs", "Artist · 4 albums".
+  - **Pins**: Liked songs and this month's listening are pinned at the top; long-press anything to pin or unpin it.
+  - The **+** button makes a mix from a sound description or syncs the library; the round initial opens Settings.
+- **Your listening** (this month, last month, this year) moved from Home into Your Library.
+- The bottom tab is called **Your Library**.
+
 ## 0.0.12beta — 2026-10-16
 
 ### Fixed
