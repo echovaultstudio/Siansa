@@ -56,7 +56,7 @@ jobs:
           grep -A8 "What went wrong" gradle.txt 2>/dev/null | head -12 | while IFS= read -r line; do [ -n "$line" ] && echo "::error::$line"; done || true
           grep -E "Tests? .*(passed|failed)|BUILD (SUCCESSFUL|FAILED)" gradle.txt 2>/dev/null | tail -3 | while IFS= read -r line; do echo "::notice::$line"; done || true
           find app/build/outputs -iname "logcat*.txt" -exec cat {} + > logcat.txt 2>/dev/null || true
-          grep -h "System.out" logcat.txt 2>/dev/null | grep -E "Kinds:|drawable:|setup|Cover|Stream|Audio|Waited" | sed 's/.*System.out: //' | head -60 | while IFS= read -r line; do echo "::notice::$line"; done || true
+          grep -h "System.out" logcat.txt 2>/dev/null | grep -E "Kinds:|drawable:|setup" | sed 's/.*System.out: //' | head -8 | while IFS= read -r line; do echo "::notice::$line"; done || true
           for f in $(find app/build/outputs/androidTest-results -name "*.xml"); do
             [ -f "$f" ] || continue
             python3 - "$f" <<'PY'
