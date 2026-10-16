@@ -92,6 +92,10 @@ class RealServerTest {
 
     @Test
     fun a_coverKinds() = runBlocking {
+        // A clean start: the app tour may already have kept covers.
+        CoverStore.clear()
+        AnimatedCovers.forget(graph)
+        SingletonImageLoader.get(app).let { it.memoryCache?.clear(); it.diskCache?.clear() }
         val a = albums()
         val big = AnimatedCovers.kind(graph, a.getValue("Big Animated").coverArt!!)
         val small = AnimatedCovers.kind(graph, a.getValue("Small Animated").coverArt!!)

@@ -73,7 +73,7 @@ class AppTourTest {
                 shot("01-home")
             }
             step("library") {
-                tab("Your Library")
+                libraryAll()
                 waitText("Liked songs")
                 shot("02-library")
                 click("Albums")
@@ -100,13 +100,14 @@ class AppTourTest {
                 }
                 // Search inside the library
                 compose.onAllNodesWithContentDescription("Search in Your Library").onFirst().performClick()
+                compose.onAllNodes(hasSetTextAction()).onFirst().performClick()
                 compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("Still")
                 waitText("Still Album")
                 shot("07-library-search")
                 compose.onAllNodesWithContentDescription("Search in Your Library").onFirst().performClick()
             }
             step("album page and playing from it") {
-                tab("Your Library")
+                libraryAll()
                 click("Albums")
                 click("WebP Animated")
                 waitText("WebP Song")
@@ -132,7 +133,7 @@ class AppTourTest {
                 back()
             }
             step("album with a big animated GIF") {
-                tab("Your Library")
+                libraryAll()
                 click("Albums")
                 click("Big Animated")
                 waitText("Long Song A")
@@ -142,14 +143,14 @@ class AppTourTest {
                 back()
             }
             step("liked songs") {
-                tab("Your Library")
+                libraryAll()
                 click("Liked songs")
                 idle(1500)
                 shot("13-liked")
                 back()
             }
             step("your listening") {
-                tab("Your Library")
+                libraryAll()
                 click("Your listening")
                 val month = LocalDate.now().month.getDisplayName(TextStyle.FULL, Locale.getDefault())
                 click("Your $month")
@@ -161,6 +162,7 @@ class AppTourTest {
                 tab("Search")
                 idle(500)
                 shot("15-search")
+                compose.onAllNodes(hasSetTextAction()).onFirst().performClick()
                 compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("Long Song")
                 waitText("Long Song B")
                 idle(800)
@@ -207,8 +209,10 @@ class AppTourTest {
             block()
             println("Tour: OK $name")
         } catch (e: Throwable) {
-            problems += "$name: ${e.javaClass.simpleName}: ${e.message?.lineSequence()?.firstOrNull()}"
-            println("Tour: FAILED $name: $e")
+            val at = e.stackTrace.firstOrNull { it.className.startsWith("app.musix") }?.let { " at ${it.fileName}:${it.lineNumber}" }.orEmpty()
+            problems += "$name: ${e.javaClass.simpleName}: ${e.message?.lineSequence()?.firstOrNull()}$at"
+            println("Tour: FAILED $name: $e$at")
+            println("Tour: stack " + e.stackTrace.take(25).joinToString(" <- ") { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" })
             runCatching { shot("FAIL-" + name.replace(' ', '-')) }
             runCatching { back() }
         }
@@ -247,6 +251,22 @@ class AppTourTest {
         idle(500)
     }
 
+    /** Your Library with no filter, whatever it was showing before. */
+    private fun libraryAll() {
+        tab("Your Library")
+        tab("Your Library")
+        repeat(2) {
+            val clear = compose.onAllNodesWithContentDescription("Clear filter")
+            if (clear.fetchSemanticsNodes().isNotEmpty()) clear.onFirst().performClick()
+            idle(200)
+        }
+        val search = compose.onAllNodesWithContentDescription("Search in Your Library")
+        if (compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() && search.fetchSemanticsNodes().isNotEmpty()) {
+            search.onFirst().performClick()
+            idle(200)
+        }
+    }
+
     private fun back() {
         scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         idle(400)
@@ -272,9 +292,14 @@ class AppTourTest {
     /** The whole window as a small JPEG, written to the log in pieces. */
     private fun shot(name: String) {
         compose.waitForIdle()
-        // The real screen, including menus and effects.
-        val shotBitmap = instrumentation.uiAutomation.takeScreenshot() ?: return
-        val full = shotBitmap.copy(Bitmap.Config.ARGB_8888, false)
+        // The app's window drawn into a bitmap: the CI emulator image can't take real screenshots
+        // (they come back black), and drawing doesn't need a display.
+        var drawn: Bitmap? = null
+        scenario.onActivity { activity ->
+            val view = activity.window.decorView
+            drawn = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also { view.draw(android.graphics.Canvas(it)) }
+        }
+        val full = drawn ?: return
         val width = 480
         val small = Bitmap.createScaledBitmap(full, width, full.height * width / full.width, true)
         val bytes = ByteArrayOutputStream().also { small.compress(Bitmap.CompressFormat.JPEG, 72, it) }.toByteArray()
