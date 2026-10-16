@@ -216,11 +216,13 @@ fun Cover(
 ) {
     val graph = LocalGraph.current
     val context = LocalContext.current
-    val request = remember(coverId, size) {
+    // Small sizes all share one: each size of an animated cover costs Navidrome a conversion.
+    val px = size?.let { if (it <= SMALL_COVER) SMALL_COVER else it }
+    val request = remember(coverId, px) {
         coverId?.let { id ->
-            val key = "cover:$id:${size ?: "full"}"
+            val key = "cover:$id:${px ?: "full"}"
             ImageRequest.Builder(context)
-                .data(graph.subsonic.coverUrl(id, size))
+                .data(graph.subsonic.coverUrl(id, px))
                 .diskCacheKey(key)
                 .memoryCacheKey(key)
                 .build()

@@ -65,49 +65,9 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         graph = (application as MusixApp).graph
 
-        // Streams go through the app's HTTP client (so a proxy login applies), and each stream is pointed
-        // at the original file or an Opus conversion depending on the network at that moment.
-        // Song streams also report their size and arrival speed (see StreamStats) for the log and the
-        // slow-connection fallback.
-        val streamClient = graph.http.newBuilder().addNetworkInterceptor(StreamStats.interceptor).build()
-        val http = OkHttpDataSource.Factory(streamClient).setTransferListener(StreamStats.transferListener)
-        cacheFactory = CacheDataSource.Factory()
-            .setCache(graph.songCache)
-            .setUpstreamDataSourceFactory(http)
-            .setCacheKeyFactory { spec -> songCacheKey(spec.uri) }
-            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-            .setEventListener(PlaybackDiagnostics.cacheListener)
-        val switching = CachingSwitchDataSource.Factory(cacheFactory!!, http)
-        val resolving = ResolvingDataSource.Factory(switching) { spec ->
-            val key = spec.uri.getQueryParameter("id") ?: spec.uri.toString()
-            spec.withUri(Streaming.rewrite(spec.uri, kbpsFor(key)))
-        }
-        val dataSource = DefaultDataSource.Factory(this, resolving)
-
-        // Start playing after one second of audio, for a snappy start. After running dry mid-song, wait for
-        // five seconds' worth so a slow connection gives fewer, longer stretches instead of constant stops.
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(15_000, 60_000, 1_000, 5_000)
-            .build()
-
-        // The phone's own decoders first; FFmpeg for what it lacks (ALAC on most phones).
-        val renderers = DefaultRenderersFactory(this)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
-        AppLog.i("Player", "FFmpeg decoders " + if (FfmpegLibrary.isAvailable()) "ready (${FfmpegLibrary.getVersion()})" else "not available")
-
-        val player = ExoPlayer.Builder(this, renderers)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
-            .setLoadControl(loadControl)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                    .build(),
-                true,
-            )
-            .setHandleAudioBecomingNoisy(true)
-            .setWakeMode(C.WAKE_MODE_NETWORK)
-            .build()
+        val built = PlayerFactory.build(this, graph, ::kbpsFor)
+        val player = built.player
+        cacheFactory = built.cacheFactory
         events = Events(player).also { player.addListener(it) }
         player.addAnalyticsListener(PlaybackDiagnostics(player, this) { waited -> onStall(player, waited) })
         player.addAnalyticsListener(object : AnalyticsListener {
@@ -167,24 +127,42 @@ class PlaybackService : MediaSessionService() {
         val now = SystemClock.elapsedRealtime()
         stalls.addLast(now)
         while (stalls.isNotEmpty() && now - stalls.first() > 120_000) stalls.removeFirst()
+        if (stalls.size < 3) return
+        stalls.clear()
+        switchToOpus(player, "stopped 3 times in 2 minutes")
+    }
+
+    /** Started when playback begins waiting for data; switches early if the wait drags on and data is too slow. */
+    private val bufferingWatch = Runnable {
+        val player = session?.player as? ExoPlayer ?: return@Runnable
+        if (player.playbackState != Player.STATE_BUFFERING || !player.playWhenReady) return@Runnable
+        val id = player.currentMediaItem?.mediaId ?: return@Runnable
+        val arriving = StreamStats.recentKbps()
+        val needed = StreamStats.neededKbps(id) ?: return@Runnable
+        if (arriving < 0 || arriving < needed * 0.9) switchToOpus(player, "waited 8 s for the song to start or continue")
+    }
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    private fun switchToOpus(player: ExoPlayer, why: String) {
         val item = player.currentMediaItem ?: return
-        if (stalls.size < 3 || (chosenKbps[item.mediaId] ?: 0) > 0) return
+        if ((chosenKbps[item.mediaId] ?: 0) > 0) return
         if (!graph.settings.current.autoQuality) {
-            AppLog.w("Stream", "Playback keeps stopping to wait for data; the automatic switch to Opus is off in Settings → Playback")
-            stalls.clear()
+            AppLog.w("Stream", "Playback $why; the automatic switch to Opus is off in Settings → Playback")
             return
         }
+        val now = SystemClock.elapsedRealtime()
         val arriving = StreamStats.recentKbps()
         // Pick an Opus bitrate that fits comfortably in what's arriving (Opus 160 already sounds very good).
         val kbps = if (arriving <= 0) 160 else listOf(320, 256, 192, 160, 128, 96).firstOrNull { it <= arriving * 0.7 } ?: 96
         slowKbps = kbps
         slowUntil = now + 15 * 60_000
         stalls.clear()
+        handler.removeCallbacks(bufferingWatch)
         precacheWriter?.cancel()
         precacheJob?.cancel()
         AppLog.w(
             "Stream",
-            "Connection too slow for the original file (arriving at ${if (arriving > 0) "$arriving kbit/s" else "an unknown speed"}, " +
+            "Playback $why: the connection is too slow for the original file (arriving at ${if (arriving > 0) "$arriving kbit/s" else "an unknown speed"}, " +
                 "song needs ~${StreamStats.neededKbps(item.mediaId) ?: "?"} kbit/s). Switching to Opus $kbps kbit/s for 15 minutes.",
         )
         chosenKbps.clear()
@@ -236,6 +214,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacks(bufferingWatch)
         precacheWriter?.cancel()
         events?.finishCurrent()
         session?.run {
@@ -340,6 +319,8 @@ class PlaybackService : MediaSessionService() {
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
+            handler.removeCallbacks(bufferingWatch)
+            if (playbackState == Player.STATE_BUFFERING) handler.postDelayed(bufferingWatch, 8_000)
             if (playbackState == Player.STATE_ENDED) finishCurrent()
         }
     }
