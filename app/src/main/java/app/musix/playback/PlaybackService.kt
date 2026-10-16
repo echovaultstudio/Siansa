@@ -146,6 +146,9 @@ class PlaybackService : MediaSessionService() {
         val writer = CacheWriter(factory.createDataSourceForDownloading(), DataSpec(uri), null, null)
         precacheWriter = writer
         precacheJob = scope.launch {
+            // Give the song that's starting the connection to itself first; downloading the next song at
+            // the same moment slowed every start down.
+            kotlinx.coroutines.delay(20_000)
             try {
                 writer.cache()
                 AppLog.i("Cache", "Pre-cached next song ${item.mediaId}")

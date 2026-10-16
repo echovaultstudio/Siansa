@@ -2,6 +2,15 @@ package app.musix.ui
 
 import android.os.Build
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -167,7 +176,7 @@ fun PlayerScreen(nav: NavController) {
                         when (v) {
                             PlayerView.ART -> Cover(
                                 song?.coverArt,
-                                null,
+                                LARGE_COVER,
                                 Modifier
                                     .fillMaxWidth()
                                     .aspectRatio(1f)
@@ -186,9 +195,37 @@ fun PlayerScreen(nav: NavController) {
                 }
                 SeekBar(state.durationMs)
                 Controls(state)
-                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     ViewToggle(Icons.Rounded.FormatQuote, "Lyrics", view == PlayerView.LYRICS) {
                         view = if (view == PlayerView.LYRICS) PlayerView.ART else PlayerView.LYRICS
+                    }
+                    // Song radio: AudioMuse keeps adding songs that sound like this one and share its mood.
+                    val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
+                    val snack = LocalSnack.current
+                    val scope = rememberCoroutineScope()
+                    Row(
+                        Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (radioSeed != null) Accent.copy(alpha = 0.18f) else Color.Transparent)
+                            .clickable(enabled = song != null) {
+                                if (radioSeed != null) {
+                                    graph.songRadio.stop()
+                                    scope.launch { snack.showSnackbar("Song radio off") }
+                                } else song?.let { s ->
+                                    scope.launch { snack.showSnackbar("Starting song radio from ${s.title}…") }
+                                    graph.songRadio.start(s) { message -> scope.launch { snack.showSnackbar(message) } }
+                                }
+                            }
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Rounded.Radio, null, tint = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f), modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            if (radioSeed != null) "Radio on" else "Song radio",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f),
+                        )
                     }
                     ViewToggle(Icons.AutoMirrored.Rounded.QueueMusic, "Queue", queueOpen) { queueOpen = true }
                 }
@@ -282,6 +319,10 @@ private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart:
     }
 }
 
+/**
+ * A thin line with a small round thumb: amber for what's played, faint for the rest. The thumb grows
+ * while you drag, and the time shown follows your finger.
+ */
 @Composable
 private fun SeekBar(durationMs: Long) {
     val graph = LocalGraph.current
@@ -289,20 +330,38 @@ private fun SeekBar(durationMs: Long) {
     var dragging by remember { mutableStateOf<Float?>(null) }
     val duration = durationMs.coerceAtLeast(1L)
     val fraction = dragging ?: (position.toFloat() / duration).coerceIn(0f, 1f)
-    Column(Modifier.padding(top = 8.dp)) {
-        Slider(
-            value = fraction,
-            onValueChange = { dragging = it },
-            onValueChangeFinished = {
-                dragging?.let { graph.player.seekTo((it * duration).toLong()) }
-                dragging = null
-            },
-            colors = SliderDefaults.colors(
-                thumbColor = Color.White,
-                activeTrackColor = Accent,
-                inactiveTrackColor = Color.White.copy(alpha = 0.3f),
-            ),
-        )
+    val thumb by animateDpAsState(if (dragging != null) 16.dp else 11.dp, label = "thumb")
+    Column(Modifier.padding(top = 14.dp)) {
+        BoxWithConstraints(
+            Modifier
+                .fillMaxWidth()
+                .height(28.dp)
+                .pointerInput(duration) {
+                    detectTapGestures { offset -> graph.player.seekTo(((offset.x / size.width).coerceIn(0f, 1f) * duration).toLong()) }
+                }
+                .pointerInput(duration) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { offset -> dragging = (offset.x / size.width).coerceIn(0f, 1f) },
+                        onDragEnd = {
+                            dragging?.let { graph.player.seekTo((it * duration).toLong()) }
+                            dragging = null
+                        },
+                        onDragCancel = { dragging = null },
+                    ) { change, _ -> dragging = (change.position.x / size.width).coerceIn(0f, 1f) }
+                },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            val width = maxWidth
+            Box(Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.22f)))
+            Box(Modifier.width(width * fraction).height(3.dp).clip(RoundedCornerShape(2.dp)).background(Accent))
+            Box(
+                Modifier
+                    .offset(x = (width * fraction - thumb / 2).coerceIn(0.dp, width - thumb))
+                    .size(thumb)
+                    .clip(CircleShape)
+                    .background(Color.White),
+            )
+        }
         Row(Modifier.fillMaxWidth()) {
             Text(
                 formatDuration(((fraction * duration) / 1000).toLong()),
@@ -310,7 +369,7 @@ private fun SeekBar(durationMs: Long) {
                 color = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.weight(1f),
             )
-            Text(formatDuration(durationMs / 1000), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+            Text("-" + formatDuration(((duration - fraction * duration) / 1000).toLong()), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
         }
     }
 }

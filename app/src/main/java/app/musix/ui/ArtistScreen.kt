@@ -110,7 +110,7 @@ fun ArtistScreen(nav: NavController, id: String) {
             if (photo != null) {
                 AsyncImage(model = photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier)
             } else {
-                Cover(p?.artist?.coverArt, null, modifier, RectangleShape)
+                Cover(p?.artist?.coverArt, LARGE_COVER, modifier, RectangleShape)
             }
         },
     ) { cardModifier ->

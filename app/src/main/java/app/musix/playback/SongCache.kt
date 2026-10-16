@@ -36,7 +36,8 @@ class CachingSwitchDataSource(
     }
 
     override fun open(dataSpec: DataSpec): Long {
-        val source = if (dataSpec.uri.getQueryParameter("format") == null) cached else direct
+        val format = dataSpec.uri.getQueryParameter("format")
+        val source = if (format == null || format == "raw") cached else direct
         active = source
         return source.open(dataSpec)
     }

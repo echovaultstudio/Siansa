@@ -57,7 +57,8 @@ class SubsonicApi(
         return sb.toString()
     }
 
-    fun streamUrl(id: String): String = url("stream", mapOf("id" to id))
+    /** The untouched original file (format=raw), whatever Navidrome's own transcoding defaults say. */
+    fun streamUrl(id: String): String = url("stream", mapOf("id" to id, "format" to "raw"))
 
     fun coverUrl(id: String, size: Int?): String =
         url("getCoverArt", mapOf("id" to id, "size" to size?.toString()))

@@ -26,7 +26,12 @@ object Streaming {
 
     fun rewrite(uri: Uri, kbps: Int): Uri {
         if (kbps <= 0 || uri.path?.endsWith("/rest/stream") != true) return uri
-        return uri.buildUpon()
+        // Swap the "raw" (original) request for an Opus conversion.
+        val builder = uri.buildUpon().clearQuery()
+        uri.queryParameterNames.filter { it != "format" && it != "maxBitRate" }.forEach { name ->
+            uri.getQueryParameters(name).forEach { builder.appendQueryParameter(name, it) }
+        }
+        return builder
             .appendQueryParameter("format", "opus")
             .appendQueryParameter("maxBitRate", kbps.toString())
             // Lets the player know the length of the converted stream, so the seek bar works.
