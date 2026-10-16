@@ -3,6 +3,16 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.5beta — 2026-10-16
+
+### Changed
+- Snappier everywhere: now playing opens and closes faster, page changes are quick fades, the queue panel, lyrics switch, cover swipe and seek thumb respond faster, and covers fade in quicker.
+- The app is now optimised when it's built (unused code removed, the rest optimised), and ships a startup profile so Android compiles it ahead of time. Starting, scrolling and opening pages should be smoother.
+- The log's format line also names the file type (container), e.g. MP4 with ALAC inside.
+
+### Fixed
+- Text and buttons in now playing were dark and hard to read.
+
 ## 0.0.4beta — 2026-10-16
 
 ### Added

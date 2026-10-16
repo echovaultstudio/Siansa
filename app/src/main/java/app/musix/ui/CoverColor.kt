@@ -56,5 +56,5 @@ fun rememberCoverColor(coverId: String?): Color {
         }
     }
     val tone = lerp(target, Color.Black, 0.35f)
-    return animateColorAsState(tone, tween(700), label = "cover-color").value
+    return animateColorAsState(tone, tween(350), label = "cover-color").value
 }
