@@ -6,6 +6,8 @@ import app.musix.data.AddressException
 import app.musix.data.Album
 import app.musix.data.AlbumCategory
 import app.musix.data.AppSettings
+import app.musix.data.HomeSection
+import app.musix.data.moved
 import app.musix.data.ReplayGainMode
 import app.musix.data.Song
 import app.musix.data.category
@@ -165,4 +167,45 @@ class SubnetTest {
     @Test fun widerPrefix() = assertTrue(CoverDownload.sameSubnet(ip("10.0.5.1"), 16, ip("10.0.200.9")))
     @Test fun oddPrefix() = assertFalse(CoverDownload.sameSubnet(ip("192.168.1.20"), 28, ip("192.168.1.106")))
     @Test fun ipv4AgainstIpv6() = assertFalse(CoverDownload.sameSubnet(ip("192.168.1.20"), 24, ip("fe80::1")))
+}
+
+/** The order of Home's sections, as saved under Arrange Home. */
+class HomeLayoutTest {
+    @Test fun nothingSavedGivesTheDefaultOrder() {
+        assertEquals(HomeSection.default, HomeSection.parse(null))
+        assertEquals(HomeSection.default, HomeSection.parse(""))
+    }
+
+    @Test fun savedOrderRoundTrips() {
+        val order = HomeSection.default.reversed()
+        assertEquals(order, HomeSection.parse(HomeSection.format(order)))
+    }
+
+    @Test fun unknownAndRepeatedIdsAreDropped() {
+        val order = HomeSection.parse("random,gone,random," + HomeSection.format(HomeSection.default))
+        assertEquals(HomeSection.entries.size, order.size)
+        assertEquals(HomeSection.RANDOM, order.first())
+    }
+
+    @Test fun sectionsMissingFromAnOlderSaveGoBackAfterTheirNeighbour() {
+        // Saved before "Radios" existed, with Rediscover moved to the top.
+        val saved = HomeSection.default.filter { it != HomeSection.RADIOS }.let { listOf(HomeSection.REDISCOVER) + (it - HomeSection.REDISCOVER) }
+        val order = HomeSection.parse(HomeSection.format(saved))
+        assertEquals(HomeSection.REDISCOVER, order[0])
+        assertEquals(order.indexOf(HomeSection.REDISCOVER) + 1, order.indexOf(HomeSection.RADIOS))
+        assertEquals(HomeSection.entries.size, order.toSet().size)
+    }
+
+    @Test fun missingFirstSectionGoesToTheTop() {
+        val order = HomeSection.parse(HomeSection.format(HomeSection.default.drop(1)))
+        assertEquals(HomeSection.default, order)
+    }
+
+    @Test fun movingAnItem() {
+        val list = listOf("a", "b", "c", "d")
+        assertEquals(listOf("b", "c", "a", "d"), list.moved(0, 2))
+        assertEquals(listOf("d", "a", "b", "c"), list.moved(3, 0))
+        assertEquals(list, list.moved(1, 1))
+        assertEquals(list, list.moved(5, 0))
+    }
 }
