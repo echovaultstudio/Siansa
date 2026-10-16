@@ -227,7 +227,17 @@ fun coverDecodePx(size: Int?): Int? = when {
     else -> size
 }
 
-private fun coverMemoryKey(id: String, size: Int?) = "cover:$id:${coverServerPx(size) ?: "full"}@${coverDecodePx(size) ?: "full"}"
+internal fun coverMemoryKey(id: String, size: Int?) = "cover:$id:${coverServerPx(size) ?: "full"}@${coverDecodePx(size) ?: "full"}"
+
+/**
+ * The memory keys of the same cover at the other sizes the app shows it, biggest first: what can stand
+ * in while the size asked for loads. Opening now playing from a list finds the list's small cover
+ * (or the mini player's) there, so the big cover never starts as an empty grey square.
+ */
+internal fun coverFallbackKeys(id: String, size: Int?): List<String> {
+    val own = coverMemoryKey(id, size)
+    return listOf(null, LARGE_COVER, SMALL_COVER, 150).map { coverMemoryKey(id, it) }.distinct().filter { it != own }
+}
 
 /** The request [Cover] makes, so covers can be loaded ahead of time into the same cache entries. */
 fun coverRequest(context: android.content.Context, graph: app.musix.AppGraph, id: String, size: Int?): ImageRequest {
@@ -262,6 +272,11 @@ fun Cover(
     val cached = remember(coverId, size) {
         coverId?.let { loader.memoryCache?.get(MemoryCache.Key(coverMemoryKey(it, size)))?.image }
     }
+    // Not in memory at this size: show the same cover at another size that is, until this one is ready.
+    val standIn = remember(coverId, size, cached) {
+        if (cached != null || coverId == null) null
+        else coverFallbackKeys(coverId, size).firstNotNullOfOrNull { loader.memoryCache?.get(MemoryCache.Key(it))?.image }
+    }
     val request = remember(coverId, size) { coverId?.let { coverRequest(context, graph, it, size) } }
     Box(
         modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
@@ -274,12 +289,23 @@ fun Cover(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-            request != null -> AsyncImage(
-                model = request,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
+            request != null -> {
+                if (standIn != null) {
+                    Image(
+                        painter = remember(standIn) { standIn.asPainter(context) },
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                // Draws over the stand-in once loaded (and nothing until then).
+                AsyncImage(
+                    model = request,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             else -> Icon(Icons.Rounded.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
