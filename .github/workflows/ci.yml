@@ -95,7 +95,16 @@ jobs:
                               break
                           if nxt.strip():
                               block.append(nxt.strip())
-                      print("::error::" + " | ".join(block)[:3000])
+                      text = " ".join(block)
+                      # AndroidX's compatibility check: one short line per library and what it needs.
+                      issues = re.findall(r"Dependency '([^']+)' requires (.+?)(?= \d+\.\s+Dependency|\s*$)", text)
+                      if issues:
+                          for dep, need in issues[:40]:
+                              need = re.sub(r"\s+", " ", need)
+                              need = re.sub(r"libraries and applications that depend on it to ", "", need)
+                              print(f"::error::{dep}: {need[:200]}")
+                      else:
+                          print("::error::" + " | ".join(block)[:3000])
           PY
 
       - name: APK name
