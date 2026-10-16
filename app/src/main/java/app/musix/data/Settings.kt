@@ -26,6 +26,7 @@ data class AppSettings(
     val preampDb: Float = 0f,
     val syncFolders: Set<String> = emptySet(),
     val imageCacheMb: Int = 500,
+    val animatedCovers: Boolean = true,
     val logging: Boolean = false,
     val logDetailed: Boolean = false,
     val scrobbleNavidrome: Boolean = true,
@@ -126,6 +127,7 @@ class SettingsRepository(context: Context) {
         preampDb = prefs.getFloat("preamp", 0f),
         syncFolders = prefs.getStringSet("sync_folders", emptySet())?.toSet() ?: emptySet(),
         imageCacheMb = prefs.getInt("image_cache_mb", 500),
+        animatedCovers = prefs.getBoolean("animated_covers", true),
         logging = prefs.getBoolean("logging", false),
         logDetailed = prefs.getBoolean("log_detailed", false),
         scrobbleNavidrome = prefs.getBoolean("scrobble_nd", true),
@@ -204,6 +206,11 @@ class SettingsRepository(context: Context) {
     fun setImageCacheMb(mb: Int) {
         prefs.edit().putInt("image_cache_mb", mb).apply()
         _state.value = _state.value.copy(imageCacheMb = mb)
+    }
+
+    fun setAnimatedCovers(on: Boolean) {
+        prefs.edit().putBoolean("animated_covers", on).apply()
+        _state.value = _state.value.copy(animatedCovers = on)
     }
 
     fun setLogging(on: Boolean) {

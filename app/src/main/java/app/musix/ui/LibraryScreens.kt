@@ -367,7 +367,10 @@ fun AlbumScreen(nav: NavController, id: String) {
         error = (detail as? Load.Err)?.message,
         numbered = true,
         showCovers = false,
-        cover = { m -> Cover(d?.album?.coverArt, LARGE_COVER, m, RoundedCornerShape(6.dp)) },
+        cover = { m ->
+            val (coverId, size) = rememberBigCover(d?.album?.coverArt, d?.album?.coverArt ?: d?.album?.id)
+            Cover(coverId, size, m, RoundedCornerShape(6.dp))
+        },
         header = {
             if (d != null) {
                 CollectionByline(
