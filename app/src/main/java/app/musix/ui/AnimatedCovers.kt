@@ -337,6 +337,8 @@ fun AnimatedCover(coverId: String, kind: AnimatedCovers.Kind, modifier: Modifier
  * A big cover (now playing, album page) that's safe for animated albums: the 300 px cover right away,
  * then the large still once the album is known not to be animated, or the animation when it is.
  */
+// Lint doesn't follow the assignment from the nullable result; it's on the producer's last line.
+@android.annotation.SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
 fun BigCover(coverId: String?, albumId: String?, modifier: Modifier, shape: Shape) {
     val graph = LocalGraph.current
