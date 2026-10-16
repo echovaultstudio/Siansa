@@ -11,6 +11,7 @@ import app.musix.data.SettingsRepository
 import app.musix.log.AppLog
 import app.musix.mix.MixGenerator
 import app.musix.mix.Radios
+import app.musix.mix.Insights
 import app.musix.mix.SongRadio
 import app.musix.mix.Taste
 import app.musix.net.AudioMuseApi
@@ -115,6 +116,7 @@ class AppGraph(val app: Application) {
     val historyApi = HistoryApi(http)
     val taste = Taste(this)
     val generator = MixGenerator(this)
+    val insights = Insights(this)
     val radios = Radios(this)
     val player = PlayerConnection(app, subsonic)
     val songRadio = SongRadio(this)

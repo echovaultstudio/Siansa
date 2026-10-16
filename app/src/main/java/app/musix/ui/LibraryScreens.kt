@@ -369,7 +369,11 @@ fun AlbumScreen(nav: NavController, id: String) {
         showCovers = false,
         cover = { m ->
             val (coverId, size) = rememberBigCover(d?.album?.coverArt, d?.album?.coverArt ?: d?.album?.id)
-            Cover(coverId, size, m, RoundedCornerShape(6.dp))
+            if (size == null && coverId != null) {
+                AnimatedCover(coverId, m, RoundedCornerShape(6.dp)) { Cover(d?.album?.coverArt, LARGE_COVER, Modifier.fillMaxSize(), RoundedCornerShape(6.dp)) }
+            } else {
+                Cover(coverId, size, m, RoundedCornerShape(6.dp))
+            }
         },
         header = {
             if (d != null) {

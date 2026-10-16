@@ -59,6 +59,8 @@ data class Album(
     val ids: List<String> = emptyList(),
     val releaseTypes: List<String> = emptyList(),
     val isCompilation: Boolean = false,
+    // When it was last played (ISO time), from Navidrome's album lists; not stored in the library.
+    val played: String? = null,
 ) {
     val allIds: List<String> get() = ids.ifEmpty { listOf(id) }
 }

@@ -190,6 +190,7 @@ fun MusixRoot() {
                 }
                 composable("mood/{text}") { MoodScreen(nav, it.arguments?.getString("text").orEmpty()) }
                 composable("sync") { SyncScreen(nav) }
+                composable("report/{range}") { ReportScreen(nav, it.arguments?.getString("range").orEmpty()) }
                 composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("playlist/{id}") { PlaylistScreen(nav, it.arguments?.getString("id").orEmpty()) }
