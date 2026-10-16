@@ -16,7 +16,7 @@ import java.util.concurrent.Executors
  * Nothing is written while logging is off. Passwords, tokens and API keys are removed before writing.
  */
 object AppLog {
-    private const val MAX_BYTES = 1_000_000L
+    private const val MAX_BYTES = 2_000_000L
     private val writer = Executors.newSingleThreadExecutor { Thread(it, "musix-log").apply { isDaemon = true } }
     private val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.ROOT)
     private lateinit var dir: File
@@ -25,6 +25,17 @@ object AppLog {
     @Volatile
     var enabled: Boolean = false
         private set
+
+    /** Extra detail for troubleshooting stutter: frames, freezes, buffering, downloads. Only while [enabled]. */
+    @Volatile
+    var detailed: Boolean = false
+        private set
+
+    /** The screen being shown, added to stutter reports. */
+    @Volatile
+    var screen: String = "-"
+
+    val detailOn: Boolean get() = enabled && detailed
 
     val current: File get() = File(dir, "musix.log")
     private val previous: File get() = File(dir, "musix.1.log")
@@ -48,6 +59,17 @@ object AppLog {
         val was = enabled
         enabled = on
         if (on && !was) i("Log", "Logging on · $header")
+    }
+
+    fun setDetailed(on: Boolean) {
+        val was = detailed
+        detailed = on
+        if (on && !was) i("Log", "Detailed logging on")
+    }
+
+    /** Detailed entries, written only when detailed logging is on. */
+    fun d(tag: String, message: String) {
+        if (detailOn) add("D", tag, message, null)
     }
 
     fun i(tag: String, message: String) = add("I", tag, message, null)
