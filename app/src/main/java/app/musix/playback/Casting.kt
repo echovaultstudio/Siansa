@@ -143,7 +143,9 @@ class CastItems(private val api: SubsonicApi) : MediaItemConverter {
             .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
             .setMetadata(metadata)
             .apply { if (song.durationSec > 0) setStreamDuration(song.durationSec * 1000L) }
-            .setCustomData(JSONObject().put(SONG_ID, mediaItem.mediaId))
+            // The musix TV app plays the original file instead when the TV can (FLAC and so on),
+            // and falls back to the MP3 above when it can't.
+            .setCustomData(JSONObject().put(SONG_ID, mediaItem.mediaId).put(ORIGINAL_URL, api.streamUrl(mediaItem.mediaId)))
             .build()
         return MediaQueueItem.Builder(info).build()
     }
@@ -163,6 +165,7 @@ class CastItems(private val api: SubsonicApi) : MediaItemConverter {
 
     private companion object {
         const val SONG_ID = "musixSongId"
+        const val ORIGINAL_URL = "originalUrl"
         const val TV_COVER = 800
     }
 }
