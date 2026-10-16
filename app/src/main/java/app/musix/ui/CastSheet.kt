@@ -26,6 +26,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,7 +50,7 @@ import app.musix.playback.Cast
 @Composable
 fun CastButton(tint: Color = LocalContentColor.current, keepSpace: Boolean = false) {
     val context = LocalContext.current
-    remember { Cast.context(context) }
+    LaunchedEffect(Unit) { Cast.whenReady(context) { } }
     val status by Cast.status.collectAsStateWithLifecycle()
     var open by remember { mutableStateOf(false) }
     if (!status.available) {
