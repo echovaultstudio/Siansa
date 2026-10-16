@@ -115,7 +115,7 @@ fun VibesScreen(nav: NavController) {
                                 error = null
                                 try {
                                     val mix = graph.generator.ensure(selector, force = true)
-                                    nav.navigate("mix/${mix.id}")
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { nav.navigate("mix/${mix.id}") }
                                 } catch (e: CancellationException) {
                                     throw e
                                 } catch (e: Exception) {

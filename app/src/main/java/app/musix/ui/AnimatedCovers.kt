@@ -344,7 +344,8 @@ fun BigCover(coverId: String?, albumId: String?, modifier: Modifier, shape: Shap
     val albumCover = albumId?.let { if (it.startsWith("al-")) it else "al-$it" }
     val initial: AnimatedCovers.Kind? = if (albumCover == null) AnimatedCovers.Kind.Still else AnimatedCovers.knownKind(graph, albumCover)
     val kind by produceState(initial, albumCover) {
-        if (albumCover != null) AnimatedCovers.kind(graph, albumCover)?.let { value = it }
+        val found = if (albumCover != null) AnimatedCovers.kind(graph, albumCover) else null
+        this.value = found ?: this.value
     }
     val small = @Composable { Cover(coverId, SMALL_COVER, Modifier.fillMaxSize(), shape) }
     when (val k = kind) {
