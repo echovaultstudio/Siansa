@@ -314,7 +314,7 @@ class PlaybackService : MediaSessionService() {
             val now = SystemClock.elapsedRealtime()
             playingSince?.let { listenedMs += now - it }
             playingSince = null
-            handler.removeCallbacks(startWatch)
+            stopWatches()
             carriedOver = current?.id
             player = target
             target.addListener(this)
@@ -432,7 +432,7 @@ class PlaybackService : MediaSessionService() {
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
             handler.removeCallbacks(progressWatch)
             watchedPosition = -1L
-            if (playWhenReady) handler.postDelayed(progressWatch, 1_000)
+            if (playWhenReady && onPhone) handler.postDelayed(progressWatch, 1_000)
             if (playWhenReady) armStartWatch() else if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
                 // Lost the audio moments after a song was chosen: almost always the app we took over
                 // from answering late. Take it back once instead of sitting paused.
@@ -515,7 +515,7 @@ class PlaybackService : MediaSessionService() {
             watchedPosition = -1L
             stuckRescues = 0
             handler.removeCallbacks(progressWatch)
-            if (player.playWhenReady) handler.postDelayed(progressWatch, 1_000)
+            if (player.playWhenReady && onPhone) handler.postDelayed(progressWatch, 1_000)
         }
 
         /**
@@ -530,7 +530,7 @@ class PlaybackService : MediaSessionService() {
          */
         private val progressWatch = object : Runnable {
             override fun run() {
-                if (!player.playWhenReady) return
+                if (!player.playWhenReady || !onPhone) return
                 handler.postDelayed(this, 1_000)
                 val state = player.playbackState
                 val now = SystemClock.elapsedRealtime()
