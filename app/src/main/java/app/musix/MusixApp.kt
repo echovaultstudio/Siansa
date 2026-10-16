@@ -24,7 +24,11 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         graph = AppGraph(this)
         AppLog.init(this, graph.settings.current.logging)
-        graph.scope.launch { graph.library.load() }
+        graph.scope.launch {
+            graph.library.load()
+            // A quick check at every start: usually just "nothing changed", or a few albums.
+            if (graph.settings.current.navidromeReady) graph.sync.start(quiet = true)
+        }
         MixWorker.schedule(this)
     }
 

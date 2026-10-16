@@ -26,8 +26,7 @@ class Favorites(
     val changes: StateFlow<Map<String, Boolean>> = overrides.asStateFlow()
 
     fun isLiked(song: Song): Boolean {
-        overrides.value[song.id]?.let { return it }
-        return library.current?.song(song.id)?.starred ?: song.starred
+        return overrides.value[song.id] ?: song.starred
     }
 
     fun toggle(song: Song) {
@@ -42,6 +41,7 @@ class Favorites(
                 return@launch
             }
             AppLog.i("Favorites", "${if (liked) "Liked" else "Unliked"} ${song.id} ${song.title}")
+            runCatching { library.setStarred(song.id, liked) }
             val s = settings.current
             if (s.lastFmReady) {
                 runCatching { lastFm.love(LastFmApi.Keys(s.lastFmApiKey, s.lastFmSecret, s.lastFmSession), song, liked) }

@@ -1,32 +1,21 @@
 package app.musix.data
 
 import android.content.Context
+import androidx.room.withTransaction
+import app.musix.data.db.AlbumEntity
+import app.musix.data.db.ArtistEntity
+import app.musix.data.db.LibraryDatabase
+import app.musix.data.db.MetaEntity
+import app.musix.data.db.PlaylistEntity
+import app.musix.data.db.SongEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.decodeFromStream
-import kotlinx.serialization.json.encodeToStream
 import java.io.File
 import java.text.Normalizer
 import java.util.Locale
-
-/** What a sync stores on the phone. [songAliases] maps ids of dropped duplicate songs to the kept song. */
-@Serializable
-data class LibraryCache(
-    val syncedAt: Long,
-    val folderIds: List<String> = emptyList(),
-    val artists: List<Artist> = emptyList(),
-    val albums: List<Album> = emptyList(),
-    val songs: List<Song> = emptyList(),
-    val songAliases: Map<String, String> = emptyMap(),
-    val playlists: List<Playlist> = emptyList(),
-)
 
 private val MARKS = Regex("\\p{M}+")
 private val NON_WORD = Regex("[^\\p{L}\\p{N}]+")
@@ -40,145 +29,227 @@ fun normalizeKey(value: String): String =
 
 data class Genre(val name: String, val songCount: Int)
 
+/** What the phone holds after a sync; null in [LibraryRepository.status] means never synced. */
+data class LibraryStatus(val syncedAt: Long, val artists: Int, val albums: Int, val songs: Int)
+
+private const val TYPE_SEPARATOR = "\u001F"
+private const val CHUNK = 900
+
 /**
- * The synced library with every lookup, sort order and search key prepared once, off the main thread,
- * so screens only read ready-made lists.
+ * The synced library in an on-phone SQLite database. Screens ask for exactly what they show, so
+ * nothing has to be loaded at start-up. [version] changes after every sync, for screens to reload.
  */
-class LibraryIndex(val cache: LibraryCache) {
-    val albums: List<Album> = cache.albums
-    val songCount: Int get() = cache.songs.size
-    val playlists: List<Playlist> get() = cache.playlists
+class LibraryRepository(context: Context) {
+    private val db = LibraryDatabase.open(context)
+    private val dao = db.dao()
 
-    private val albumKey: Map<String, String> = cache.albums.associate { it.id to normalizeKey(it.name) }
-    private val artistKey: Map<String, String> = cache.artists.associate { it.id to normalizeKey(it.name) }
+    private val _status = MutableStateFlow<LibraryStatus?>(null)
+    val status: StateFlow<LibraryStatus?> = _status.asStateFlow()
+    private val _loaded = MutableStateFlow(false)
+    val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
+    private val _version = MutableStateFlow(0)
+    val version: StateFlow<Int> = _version.asStateFlow()
 
-    val artists: List<Artist> = cache.artists.sortedBy { artistKey[it.id] }
-    private val byName: List<Album> = cache.albums.sortedBy { albumKey[it.id] }
-    private val byNewest: List<Album> = cache.albums.sortedByDescending { it.created ?: "" }
-    private val byYear: List<Album> = cache.albums.sortedByDescending { it.year ?: 0 }
-    private val byPlays: List<Album> = cache.albums.sortedByDescending { it.playCount }
-
-    private val songsById: Map<String, Song> = cache.songs.associateBy { it.id }
-    private val albumByAnyId: Map<String, Album> = buildMap {
-        for (album in cache.albums) for (id in album.allIds) put(id, album)
+    init {
+        // The JSON library file of earlier versions is replaced by the database.
+        File(context.filesDir, "library.json").delete()
     }
-    private val artistById: Map<String, Artist> = cache.artists.associateBy { it.id }
-    private val artistByName: Map<String, Artist> = cache.artists.associateBy { artistKey[it.id] ?: "" }
-    private val songsByAlbum: Map<String, List<Song>> = cache.songs
-        .filter { it.albumId != null }
-        .groupBy { it.albumId!! }
-        .mapValues { (_, list) -> list.sortedWith(compareBy({ it.disc ?: 1 }, { it.track ?: Int.MAX_VALUE }, { it.title })) }
-    private val albumsByArtist: Map<String, List<Album>> = cache.albums
-        .filter { it.artistId != null }
-        .groupBy { it.artistId!! }
-    private val songsByArtist: Map<String, List<Song>> = cache.songs
-        .filter { it.artistId != null }
-        .groupBy { it.artistId!! }
 
-    /** Release categories present in the library, in display order, with album counts. */
-    val categories: List<Pair<AlbumCategory, Int>> = cache.albums
-        .groupingBy { it.category }.eachCount()
+    val isSynced: Boolean get() = _status.value != null
+
+    suspend fun load() = withContext(Dispatchers.IO) {
+        refreshStatus()
+        _loaded.value = true
+        bump()
+    }
+
+    suspend fun refreshStatus() {
+        val syncedAt = dao.meta(META_SYNCED_AT)?.toLongOrNull()
+        _status.value = syncedAt?.let { LibraryStatus(it, dao.artistCount(), dao.albumCount(), dao.songCount()) }
+    }
+
+    fun bump() {
+        _version.value++
+    }
+
+    // ---- Reading ----
+
+    suspend fun song(id: String): Song? = dao.song(id)?.toSong()
+
+    /** Songs by id, in the order asked for; ids the library doesn't have are left out. */
+    suspend fun songs(ids: List<String>): List<Song> {
+        if (ids.isEmpty()) return emptyList()
+        val found = ids.distinct().chunked(CHUNK).flatMap { dao.songs(it) }.associateBy { it.id }
+        return ids.mapNotNull { found[it]?.toSong() }
+    }
+
+    /** The album for any of its ids, with every id of the same album in other libraries. */
+    suspend fun album(id: String): Album? {
+        val entity = dao.album(id) ?: return null
+        val group = dao.albumGroup(entity.groupKey)
+        val primary = group.firstOrNull { it.isPrimary } ?: entity
+        return primary.toAlbum().copy(ids = group.map { it.id })
+    }
+
+    /** Songs of an album and its copies in other libraries, without duplicates, in disc and track order. */
+    suspend fun songsOf(album: Album): List<Song> {
+        val ids = album.allIds
+        val all = ids.chunked(CHUNK).flatMap { dao.songsOfAlbums(it) }
+        val order = ids.withIndex().associate { it.value to it.index }
+        return all
+            .sortedBy { order[it.albumId] ?: Int.MAX_VALUE }
+            .distinctBy { listOf(it.disc ?: 1, it.track?.toString() ?: "d${it.durationSec / 3}", normalizeKey(it.title)) }
+            .sortedWith(compareBy({ it.disc ?: 1 }, { it.track ?: Int.MAX_VALUE }, { it.title }))
+            .map { it.toSong() }
+    }
+
+    suspend fun albums(sort: String): List<Album> = when (sort) {
+        "newest" -> dao.albumsByNewest()
+        "frequent" -> dao.albumsByPlays()
+        "year" -> dao.albumsByYear()
+        "random" -> dao.albumsRandom(100_000)
+        else -> dao.albumsByName()
+    }.map { it.toAlbum() }
+
+    suspend fun randomAlbums(count: Int): List<Album> = dao.albumsRandom(count).map { it.toAlbum() }
+
+    /** Release categories present, in display order, with album counts. */
+    suspend fun categories(): List<Pair<AlbumCategory, Int>> = dao.albumTypes()
+        .map { Album(id = "", name = "", releaseTypes = splitTypes(it.releaseTypes), isCompilation = it.isCompilation).category }
+        .groupingBy { it }.eachCount()
         .toList()
         .sortedBy { it.first.ordinal }
 
-    /** Genres by number of songs, for genre tiles and radios. */
-    val genres: List<Genre> = cache.songs
-        .mapNotNull { it.genre?.trim()?.takeIf { g -> g.isNotEmpty() } }
-        .groupingBy { it }.eachCount()
-        .map { Genre(it.key, it.value) }
-        .sortedByDescending { it.songCount }
-    private val songsByGenre: Map<String, List<Song>> = cache.songs
-        .filter { !it.genre.isNullOrBlank() }
-        .groupBy { it.genre!!.trim().lowercase(Locale.ROOT) }
+    suspend fun artists(): List<Artist> = dao.artists().map { it.toArtist() }
+    suspend fun artist(id: String): Artist? = dao.artist(id)?.toArtist()
+    suspend fun artistByName(name: String): Artist? = dao.artistByKey(normalizeKey(name))?.toArtist()
 
-    // Search keys, prepared once.
-    private val artistSearch = artists.map { artistKey[it.id] ?: "" }
-    private val albumSearch = byName.map { (albumKey[it.id] ?: "") + " " + normalizeKey(it.artist) }
-    private val songSearch = cache.songs.map { normalizeKey(it.title + " " + it.artist + " " + it.album) }
+    suspend fun albumsOf(artist: Artist): List<Album> =
+        dao.albumsOfArtist(artist.id, normalizeKey(artist.name)).map { it.toAlbum() }
 
-    fun song(id: String): Song? = songsById[id] ?: cache.songAliases[id]?.let { songsById[it] }
-    fun album(id: String): Album? = albumByAnyId[id]
-    fun artist(id: String): Artist? = artistById[id]
-    fun artistByName(name: String): Artist? = artistByName[normalizeKey(name)]
-    fun songsOf(album: Album): List<Song> = songsByAlbum[album.id].orEmpty()
-    fun songsOfGenre(genre: String): List<Song> = songsByGenre[genre.trim().lowercase(Locale.ROOT)].orEmpty()
+    suspend fun songsOf(artist: Artist): List<Song> =
+        dao.songsOfArtist(artist.id, artist.name).map { it.toSong() }.distinctBy { songKey(it) }
 
-    fun albumsOf(artist: Artist): List<Album> {
-        val byId = albumsByArtist[artist.id].orEmpty()
-        if (byId.isNotEmpty()) return byId
-        val key = artistKey[artist.id] ?: normalizeKey(artist.name)
-        return albums.filter { normalizeKey(it.artist) == key }
+    suspend fun genres(limit: Int = 60): List<Genre> = dao.genres(limit).map { Genre(it.name, it.songCount) }
+
+    suspend fun songsOfGenre(genre: String, limit: Int): List<Song> =
+        dao.songsOfGenre(genre, limit).map { it.toSong() }.distinctBy { songKey(it) }
+
+    suspend fun starredSongs(): List<Song> = dao.starredSongs().map { it.toSong() }.distinctBy { songKey(it) }
+
+    suspend fun setStarred(id: String, starred: Boolean) = dao.setStarred(id, starred)
+
+    suspend fun playlists(): List<Playlist> = dao.playlists().map {
+        Playlist(it.id, it.name, it.songCount, it.durationSec, it.coverArt, it.owner, it.comment, it.changed)
     }
 
-    /** Songs the artist performs, on their own albums or elsewhere. */
-    fun songsOf(artist: Artist): List<Song> {
-        val direct = songsByArtist[artist.id].orEmpty()
-        if (direct.isNotEmpty()) return direct
-        val key = artistKey[artist.id] ?: normalizeKey(artist.name)
-        return cache.songs.filter { normalizeKey(it.artist) == key }
+    suspend fun updatePlaylists(playlists: List<Playlist>) {
+        db.withTransaction {
+            dao.deleteAllPlaylists()
+            dao.putPlaylists(playlists.mapIndexed { i, p ->
+                PlaylistEntity(p.id, p.name, p.songCount, p.durationSec, p.coverArt, p.owner, p.comment, p.changed, i)
+            })
+        }
     }
 
-    fun sortedAlbums(sort: String): List<Album> = when (sort) {
-        "newest" -> byNewest
-        "frequent" -> byPlays
-        "year" -> byYear
-        "random" -> albums.shuffled()
-        else -> byName
-    }
-
-    /** Call off the main thread for big libraries. */
-    fun search(query: String): SearchResults {
+    /** Every word must appear in the name (accents and case ignored). */
+    suspend fun search(query: String): SearchResults = withContext(Dispatchers.IO) {
         val terms = normalizeKey(query).split(' ').filter { it.isNotEmpty() }
-        if (terms.isEmpty()) return SearchResults(emptyList(), emptyList(), emptyList())
-        fun hit(key: String) = terms.all { key.contains(it) }
-        return SearchResults(
-            artists = artists.indices.filter { hit(artistSearch[it]) }.take(30).map { artists[it] },
-            albums = byName.indices.filter { hit(albumSearch[it]) }.take(40).map { byName[it] },
-            songs = cache.songs.indices.asSequence().filter { hit(songSearch[it]) }.take(100).map { cache.songs[it] }.toList(),
+        if (terms.isEmpty()) return@withContext SearchResults(emptyList(), emptyList(), emptyList())
+        val first = terms.maxBy { it.length }
+        fun all(key: String) = terms.all { key.contains(it) }
+        SearchResults(
+            artists = dao.searchArtists(first, 200).filter { all(it.sortKey) }.take(30).map { it.toArtist() },
+            albums = dao.searchAlbums(first, 400).filter { all(it.sortKey + " " + it.artistKey) }.take(40).map { it.toAlbum() },
+            songs = dao.searchSongs(first, 1500).filter { all(it.searchKey) }.map { it.toSong() }.distinctBy { songKey(it) }.take(100),
         )
     }
-}
 
-class LibraryRepository(context: Context) {
-    private val file = File(context.filesDir, "library.json")
-    private val mutex = Mutex()
-    private val _index = MutableStateFlow<LibraryIndex?>(null)
-    val index: StateFlow<LibraryIndex?> = _index.asStateFlow()
-    private val _loaded = MutableStateFlow(false)
-    val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
+    // ---- Writing (used by sync) ----
 
-    val current: LibraryIndex? get() = _index.value
+    suspend fun albumSignatures(): Map<String, String> = dao.albumSignatures().associate { it.id to it.signature }
+    suspend fun meta(key: String): String? = dao.meta(key)
+    suspend fun putMeta(key: String, value: String) = dao.putMeta(MetaEntity(key, value))
 
-    @OptIn(ExperimentalSerializationApi::class)
-    suspend fun load() = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            if (_loaded.value) return@withLock
-            _index.value = runCatching<LibraryIndex?> {
-                if (file.exists()) file.inputStream().buffered().use { LibraryIndex(CacheJson.decodeFromStream<LibraryCache>(it)) } else null
-            }.getOrNull()
-            _loaded.value = true
-        }
+    suspend fun replaceArtists(artists: List<Artist>) = db.withTransaction {
+        dao.deleteAllArtists()
+        artists.distinctBy { it.id }.chunked(CHUNK).forEach { chunk -> dao.putArtists(chunk.map { it.toEntity() }) }
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
-    suspend fun replace(cache: LibraryCache) = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            val index = LibraryIndex(cache)
-            val tmp = File(file.path + ".tmp")
-            tmp.outputStream().buffered().use { CacheJson.encodeToStream(LibraryCache.serializer(), cache, it) }
-            if (!tmp.renameTo(file)) {
-                file.delete()
-                tmp.renameTo(file)
+    /** Stores albums and their songs; [replaceSongsOf] are albums whose songs are swapped for [songs]. */
+    suspend fun putAlbumsAndSongs(albums: List<Album>, songs: List<Song>, replaceSongsOf: Collection<String>, removedAlbums: Collection<String>) =
+        db.withTransaction {
+            replaceSongsOf.toList().chunked(CHUNK).forEach { dao.deleteSongsOfAlbums(it) }
+            removedAlbums.toList().chunked(CHUNK).forEach {
+                dao.deleteSongsOfAlbums(it)
+                dao.deleteAlbums(it)
             }
-            _index.value = index
-            _loaded.value = true
+            albums.chunked(500).forEach { chunk -> dao.putAlbums(chunk.map { it.toEntity() }) }
+            songs.chunked(500).forEach { chunk -> dao.putSongs(chunk.map { it.toEntity() }) }
         }
+
+    suspend fun replaceAllSongs(songs: List<Song>) = db.withTransaction {
+        dao.deleteAllSongs()
+        songs.chunked(500).forEach { chunk -> dao.putSongs(chunk.map { it.toEntity() }) }
     }
 
-    /** Keeps the cached playlist list current after a live refresh. */
-    suspend fun updatePlaylists(playlists: List<Playlist>) {
-        val index = current ?: return
-        if (index.cache.playlists == playlists) return
-        replace(index.cache.copy(playlists = playlists))
+    /** Picks one album per name + album artist (the copy with most songs) to stand for the group in lists. */
+    suspend fun recomputePrimaries(): Int = db.withTransaction {
+        val rows = dao.albumGroups()
+        val primaries = rows.groupBy { it.groupKey }.values.map { group -> group.maxBy { it.songCount }.id }
+        dao.clearPrimary()
+        primaries.chunked(CHUNK).forEach { dao.markPrimary(it) }
+        rows.size - primaries.size
+    }
+
+    suspend fun setStarredIds(ids: Collection<String>) = db.withTransaction {
+        dao.clearStarred()
+        ids.toList().chunked(CHUNK).forEach { dao.markStarred(it) }
+    }
+
+    // ---- Mapping ----
+
+    private fun songKey(s: Song) = normalizeKey(s.title) + "|" + normalizeKey(s.artist) + "|" + normalizeKey(s.album)
+
+    private fun splitTypes(value: String): List<String> = if (value.isEmpty()) emptyList() else value.split(TYPE_SEPARATOR)
+
+    private fun SongEntity.toSong() = Song(
+        id, title, artist, artistId, album, albumId, coverArt, durationSec, track, disc, year, genre,
+        trackGain, albumGain, trackPeak, albumPeak, starred,
+    )
+
+    private fun Song.toEntity() = SongEntity(
+        id, title, artist, artistId, album, albumId, coverArt, durationSec, track, disc, year, genre,
+        trackGain, albumGain, trackPeak, albumPeak, starred,
+        searchKey = normalizeKey("$title $artist $album"),
+    )
+
+    private fun AlbumEntity.toAlbum() = Album(
+        id = id, name = name, artist = artist, artistId = artistId, coverArt = coverArt, songCount = songCount,
+        durationSec = durationSec, year = year, genre = genre, created = created, playCount = playCount,
+        releaseTypes = splitTypes(releaseTypes), isCompilation = isCompilation,
+    )
+
+    private fun Album.toEntity() = AlbumEntity(
+        id = id, name = name, artist = artist, artistId = artistId, coverArt = coverArt, songCount = songCount,
+        durationSec = durationSec, year = year, genre = genre, created = created, playCount = playCount,
+        releaseTypes = releaseTypes.joinToString(TYPE_SEPARATOR), isCompilation = isCompilation,
+        sortKey = normalizeKey(name), artistKey = normalizeKey(artist),
+        groupKey = normalizeKey(name) + "|" + normalizeKey(artist),
+        signature = signature(),
+    )
+
+    private fun ArtistEntity.toArtist() = Artist(id, name, albumCount, coverArt, imageUrl)
+    private fun Artist.toEntity() = ArtistEntity(id, name, albumCount, coverArt, imageUrl, normalizeKey(name))
+
+    companion object {
+        const val META_SYNCED_AT = "syncedAt"
+        const val META_LAST_SCAN = "lastScan"
+        const val META_FOLDERS = "folders"
+
+        /** What decides whether an album's songs need fetching again. Play counts are left out on purpose. */
+        fun Album.signature(): String =
+            listOf(name, artist, songCount, durationSec, year, created, coverArt, releaseTypes.joinToString(","), isCompilation)
+                .joinToString("|")
     }
 }

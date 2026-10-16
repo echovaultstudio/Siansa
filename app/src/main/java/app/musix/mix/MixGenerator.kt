@@ -184,11 +184,11 @@ class MixGenerator(private val graph: AppGraph) {
 
     /** Songs from the synced library where possible, otherwise fetched from Navidrome. */
     private suspend fun resolve(ids: List<String>): List<Song> = coroutineScope {
-        val library = graph.library.current
+        val local = graph.library.songs(ids).associateBy { it.id }
         val permits = Semaphore(6)
         ids.map { id ->
             async {
-                library?.song(id) ?: permits.withPermit { runCatching { graph.subsonic.song(id) }.getOrNull() }
+                local[id] ?: permits.withPermit { runCatching { graph.subsonic.song(id) }.getOrNull() }
             }
         }.awaitAll().filterNotNull().distinctBy { it.id }
     }

@@ -38,6 +38,7 @@ data class AppSettings(
     val listenBrainzToken: String = "",
     val transcodeWifiKbps: Int = 0,
     val transcodeMobileKbps: Int = 0,
+    val songCacheMb: Int = 2048,
 ) {
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
@@ -136,6 +137,7 @@ class SettingsRepository(context: Context) {
         listenBrainzToken = secret("lb_token"),
         transcodeWifiKbps = prefs.getInt("tc_wifi", 0),
         transcodeMobileKbps = prefs.getInt("tc_mobile", 0),
+        songCacheMb = prefs.getInt("song_cache_mb", 2048),
     )
 
     /**
@@ -191,6 +193,7 @@ class SettingsRepository(context: Context) {
             .putString("lb_token", SecretBox.encrypt(s.listenBrainzToken.trim()))
             .putInt("tc_wifi", s.transcodeWifiKbps)
             .putInt("tc_mobile", s.transcodeMobileKbps)
+            .putInt("song_cache_mb", s.songCacheMb)
             .apply()
         _state.value = s
     }

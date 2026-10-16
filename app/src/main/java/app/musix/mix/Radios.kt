@@ -33,7 +33,7 @@ class Radios(private val graph: AppGraph) {
 
     suspend fun genre(name: String): List<Song> {
         AppLog.i("Radio", "Genre radio $name")
-        val songs = graph.library.current?.songsOfGenre(name).orEmpty()
+        val songs = graph.library.songsOfGenre(name, 300)
         if (songs.isEmpty()) throw MixException("No synced songs in $name")
         return varied(songs.shuffled(), 80)
     }
@@ -55,14 +55,15 @@ class Radios(private val graph: AppGraph) {
             .onFailure { AppLog.w("Radio", "getSimilarSongs2 failed", it) }
             .getOrDefault(emptyList())
         if (similar.size >= 5) return varied(local(similar), 60)
-        val own = graph.library.current?.songsOf(artist).orEmpty()
+        val own = graph.library.songsOf(artist)
         if (own.isEmpty()) throw MixException("No songs found for ${artist.name}")
         return own.shuffled().take(60)
     }
 
-    private fun local(songs: List<Song>): List<Song> {
-        val index = graph.library.current ?: return songs
-        return songs.map { index.song(it.id) ?: it }
+    /** The synced copies of songs from the server, which carry hearts and ReplayGain as stored. */
+    private suspend fun local(songs: List<Song>): List<Song> {
+        val found = graph.library.songs(songs.map { it.id }).associateBy { it.id }
+        return songs.map { found[it.id] ?: it }
     }
 
     /** At most two songs per artist in a row of picks, then shuffled lightly. */
