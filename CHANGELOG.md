@@ -3,6 +3,11 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.19beta — 2026-10-16
+
+### Changed
+- **Vibes moved from the bottom bar into Settings** (#3). The bottom bar now has four tabs: Home, Search, Your Library and Settings. Vibes is a row in Settings that shows how many vibes you have, and its page now has a back arrow.
+
 ## 0.0.18beta — 2026-10-16
 
 ### Fixed
