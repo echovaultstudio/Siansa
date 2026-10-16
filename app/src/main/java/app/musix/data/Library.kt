@@ -8,6 +8,7 @@ import app.musix.data.db.LibraryDatabase
 import app.musix.data.db.MetaEntity
 import app.musix.data.db.PlaylistEntity
 import app.musix.data.db.SongEntity
+import app.musix.log.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -131,6 +132,22 @@ class LibraryRepository(context: Context) {
 
     suspend fun songsOf(artist: Artist): List<Song> =
         dao.songsOfArtist(artist.id, artist.name).map { it.toSong() }.distinctBy { songKey(it) }
+
+    /**
+     * Albums the artist appears on without being the album artist (a feature, a compilation, a split),
+     * newest first. Only from the synced library; empty before a sync.
+     */
+    suspend fun appearsOn(artist: Artist): List<Album> {
+        val ownKey = normalizeKey(artist.name)
+        val own = albumsOf(artist).map { it.id }.toSet()
+        val songs = dao.songsCrediting(artist.id, "%" + likeEscape(artist.name) + "%").map { it.toSong() }
+        val ids = appearsOnAlbumIds(songs, artist.id, artist.name) { it in own }
+        return ids.mapNotNull { album(it) }
+            .distinctBy { it.id }
+            .filterNot { it.id in own || it.artistId == artist.id || normalizeKey(it.artist) == ownKey }
+            .sortedWith(compareByDescending<Album> { it.year ?: 0 }.thenBy { normalizeKey(it.name) })
+            .also { AppLog.d("Library", "Appears on: ${it.size} albums from ${songs.size} songs checked") }
+    }
 
     suspend fun genres(limit: Int = 60): List<Genre> = dao.genres(limit).map { Genre(it.name, it.songCount) }
 
