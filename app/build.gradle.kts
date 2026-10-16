@@ -116,6 +116,9 @@ dependencies {
     implementation("androidx.media3:media3-session:1.5.1")
     implementation("androidx.media3:media3-datasource-okhttp:1.5.1")
     implementation("androidx.media3:media3-database:1.5.1")
+    // Google Cast: plays the queue on a Chromecast or Google TV (needs Google Play services on the phone).
+    implementation("androidx.media3:media3-cast:1.5.1")
+    implementation("androidx.mediarouter:mediarouter:1.7.0")
     // FFmpeg audio decoders (ALAC, and FLAC/MP3/AAC/AC-3 as backups) for formats the phone can't play itself.
     implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1")
 
