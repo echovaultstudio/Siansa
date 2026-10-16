@@ -21,6 +21,11 @@ updates:
       # Media3 must match the FFmpeg decoder build (org.jellyfin.media3); both are updated by hand.
       - dependency-name: "androidx.media3:*"
       - dependency-name: "org.jellyfin.media3:*"
+      # Newer releases need Android SDK 37 and Android Gradle Plugin 9; unblocked by that migration.
+      - dependency-name: "androidx.compose:compose-bom"
+      - dependency-name: "androidx.core:*"
+      - dependency-name: "androidx.navigation:*"
+      - dependency-name: "io.coil-kt.coil3:*"
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
