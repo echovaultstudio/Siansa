@@ -350,6 +350,10 @@ fun formatDuration(seconds: Long): String {
     else "%d:%02d".format(s / 60, s % 60)
 }
 
+/** A song's usual line under its title: "artist · album". */
+fun artistAndAlbum(song: Song): String? =
+    listOf(song.artist, song.album).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { null }
+
 /** A song row. Tap plays; the menu queues it, starts a radio from it or opens its album or artist. */
 @Composable
 fun SongRow(
@@ -358,6 +362,8 @@ fun SongRow(
     leading: String? = null,
     highlighted: Boolean = false,
     showCover: Boolean = true,
+    // The line under the title; null shows none.
+    subtitle: String? = artistAndAlbum(song),
 ) {
     val graph = LocalGraph.current
     val nav = LocalNav.current
@@ -392,13 +398,15 @@ fun SongRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                listOf(song.artist, song.album).filter { it.isNotBlank() }.joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         if (song.durationSec > 0) {
             Text(

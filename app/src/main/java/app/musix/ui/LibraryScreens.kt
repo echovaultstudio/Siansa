@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import app.musix.data.extraArtists
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.rounded.Favorite
@@ -178,6 +179,8 @@ fun AlbumScreen(nav: NavController, id: String) {
         error = (detail as? Load.Err)?.message,
         numbered = true,
         showCovers = false,
+        // Only artists beyond the album's own, as Navidrome's artist tags list them.
+        subtitleOf = d?.album?.let { album -> { song: Song -> extraArtists(song, album.artistId, album.artist) } },
         cover = { m ->
             BigCover(d?.album?.coverArt, d?.album?.coverArt ?: d?.album?.id, m, RoundedCornerShape(6.dp))
         },
