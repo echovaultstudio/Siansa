@@ -41,9 +41,12 @@ jobs:
       - name: Run tests on the emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
-          target: google_apis
+          api-level: 33
+          target: default
           arch: x86_64
+          cores: 4
+          ram-size: 4096M
+          emulator-boot-timeout: 1200
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
           script: |
@@ -51,10 +54,25 @@ jobs:
             gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.navidromeUrl=http://10.0.2.2:5533 || (adb logcat -d > logcat.txt; exit 1)
             adb logcat -d > logcat.txt
 
+      # Results as annotations, so they can be read without downloading logs.
       - name: Test output
         if: always()
         run: |
-          grep -h -E "Kinds:|Animated cover drawable|New setup|Old setup|Musix log|I/|W/|E/" logcat.txt 2>/dev/null | grep -E "System.out|Kinds|setup|drawable" | tail -150 || true
+          grep -h "System.out" logcat.txt 2>/dev/null | grep -E "Kinds:|drawable:|setup|Cover|Stream|Audio|Waited" | sed 's/.*System.out: //' | head -60 | while IFS= read -r line; do echo "::notice::$line"; done || true
+          for f in app/build/outputs/androidTest-results/connected/**/*.xml app/build/outputs/androidTest-results/connected/*.xml; do
+            [ -f "$f" ] || continue
+            python3 - "$f" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          for case in ET.parse(sys.argv[1]).getroot().iter("testcase"):
+              fail = case.find("failure")
+              name = case.get("name")
+              if fail is not None:
+                  msg = (fail.get("message") or fail.text or "").replace("\n", " ")[:400]
+                  print(f"::error::FAILED {name}: {msg}")
+              else:
+                  print(f"::notice::PASSED {name} ({case.get('time')}s)")
+          PY
+          done
 
       - uses: actions/upload-artifact@v4
         if: always()
