@@ -69,3 +69,9 @@ private val Light = lightColorScheme(
 fun MusixTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = if (isSystemInDarkTheme()) Dark else Light, content = content)
 }
+
+/** Musix's dark colours whatever the system setting, for pages with their own dark background. */
+@Composable
+fun MusixDarkTheme(content: @Composable () -> Unit) {
+    MaterialTheme(colorScheme = Dark, content = content)
+}

@@ -59,8 +59,14 @@ import app.musix.mix.ReportRange
 import java.text.NumberFormat
 
 /** "Your month": top artists, songs and albums, your listening clock and how your taste moved. */
+/** Always in dark colours: the page has its own dark background, so text must stay light in light mode too. */
 @Composable
 fun ReportScreen(nav: NavController, rangeId: String) {
+    MusixDarkTheme { ReportPage(nav, rangeId) }
+}
+
+@Composable
+private fun ReportPage(nav: NavController, rangeId: String) {
     val graph = LocalGraph.current
     var range by rememberSaveable { mutableStateOf(ReportRange.of(rangeId)) }
     val report by loadState(range) { graph.insights.report(range) }

@@ -259,6 +259,7 @@ class PlaybackService : MediaSessionService() {
             playingSince = if (player.isPlaying) SystemClock.elapsedRealtime() else null
             AppLog.i("Player", "Now playing ${song.id} \"${song.title}\"")
             focusRescued = false
+            restarted = false
             if (player.playWhenReady) armStartWatch()
             player.volume = replayGainVolume(song, graph.settings.current)
             graph.scrobbler.nowPlaying(song)
@@ -351,11 +352,14 @@ class PlaybackService : MediaSessionService() {
             startRequestedAt = SystemClock.elapsedRealtime()
             startRescues = 0
             lastBuffered = -1L
+            lastBytes = StreamStats.totalBytes()
             handler.removeCallbacks(startWatch)
             handler.postDelayed(startWatch, 2_500)
         }
 
         private var lastBuffered = -1L
+        private var lastBytes = -1L
+        private var restarted = false
 
         /**
          * 2.5 s after a song is chosen (or play is pressed) it should be audible. If it isn't:
@@ -380,16 +384,20 @@ class PlaybackService : MediaSessionService() {
                         AppLog.w("Player", "Song $id stopped before it started (${player.playerError?.errorCodeName ?: "no error"}) after ${waited}ms; preparing it again")
                         player.prepare()
                     }
-                    player.playbackState == Player.STATE_BUFFERING && buffered <= lastBuffered + 200 -> {
+                    // Only when nothing at all has arrived since the last look (a big FLAC can be arriving
+                    // for a while before the player counts any of it as buffered), and once per song.
+                    player.playbackState == Player.STATE_BUFFERING && lastBytes >= 0 && StreamStats.totalBytes() == lastBytes && !restarted -> {
+                        restarted = true
                         AppLog.w(
                             "Player",
-                            "Song $id waiting ${waited}ms with no new data (${buffered / 1000.0}s loaded, arriving at ${StreamStats.recentKbps()} kbit/s); restarting its download",
+                            "Song $id waiting ${waited}ms and no data arrived in the last 2.5 s (${buffered / 1000.0}s loaded); restarting its download",
                         )
                         player.seekTo(player.currentMediaItemIndex, player.currentPosition)
                     }
                     else -> AppLog.i("Player", "Song $id not playing yet after ${waited}ms (state ${player.playbackState}, ${buffered / 1000.0}s loaded)")
                 }
                 lastBuffered = buffered
+                lastBytes = StreamStats.totalBytes()
                 if (++startRescues < 5) handler.postDelayed(this, 2_500)
             }
         }

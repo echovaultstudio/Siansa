@@ -488,11 +488,13 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
 
     // Your listening: this month pinned in the full list; all three under their own filter.
     val month = { d: LocalDate -> d.month.getDisplayName(TextStyle.FULL, Locale.getDefault()) }
+    val short = { d: LocalDate -> d.month.getDisplayName(TextStyle.SHORT, Locale.getDefault()).trimEnd('.') }
     listOf(
-        Triple("month", "Your ${month(now)}", "This month"),
-        Triple("last-month", "Your ${month(now.minusMonths(1))}", "Last month"),
-        Triple("year", "Your ${now.year}", "This year"),
-    ).forEach { (id, title, period) ->
+        Triple("month", "Your ${month(now)}", "This month") to short(now),
+        Triple("last-month", "Your ${month(now.minusMonths(1))}", "Last month") to short(now.minusMonths(1)),
+        Triple("year", "Your ${now.year}", "This year") to now.year.toString(),
+    ).forEach { (t, tileText) ->
+        val (id, title, period) = t
         entries += Entry(
             key = "report-$id",
             kind = Kind.LISTENING,
@@ -500,7 +502,8 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
             subtitle = "Your listening · ${period.lowercase().replaceFirstChar { it.uppercase() }}",
             route = "report/$id",
             gradient = tileColors("report-$id"),
-            badge = title.removePrefix("Your "),
+            // A short word on the small tile ("Sep", "2026") so it never wraps.
+            badge = tileText,
             alwaysPinned = id == "month",
             recentAt = System.currentTimeMillis(),
             tags = setOf(period),
