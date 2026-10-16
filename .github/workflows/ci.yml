@@ -85,9 +85,17 @@ jobs:
                   if m and seen < 40:
                       seen += 1
                       print(f"::error file={m[1]},line={m[2]},col={m[3]}::{m[4][:300]}")
-              for line in open("gradle-build.txt", errors="ignore"):
-                  if "What went wrong" in line or line.startswith("> ") and seen == 0:
-                      print(f"::error::{line.strip()[:300]}")
+              # Each "What went wrong" block, joined into one annotation per failure.
+              lines = open("gradle-build.txt", errors="ignore").read().splitlines()
+              for i, line in enumerate(lines):
+                  if "What went wrong" in line:
+                      block = []
+                      for nxt in lines[i + 1:i + 40]:
+                          if nxt.startswith("* Try") or nxt.startswith("* Exception"):
+                              break
+                          if nxt.strip():
+                              block.append(nxt.strip())
+                      print("::error::" + " | ".join(block)[:3000])
           PY
 
       - name: APK name
