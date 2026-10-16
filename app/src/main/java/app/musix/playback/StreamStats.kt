@@ -33,6 +33,9 @@ object StreamStats {
 
     fun neededKbps(songId: String?): Int? = songId?.let { needed[it] }
 
+    /** Bytes received from the network by song streams since the app started. */
+    fun totalBytes(): Long = bytes.get()
+
     private val formats = ConcurrentHashMap<String, String>()
 
     /** The format last streamed for this song: "original", or e.g. "opus 160". */

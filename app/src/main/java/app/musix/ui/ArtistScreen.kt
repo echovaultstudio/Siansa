@@ -95,15 +95,24 @@ fun ArtistScreen(nav: NavController, id: String) {
         onBack = { nav.popBackStack() },
         color = rememberCoverColor(p?.artist?.coverArt ?: p?.albums?.firstOrNull()?.coverArt),
         overlay = {
-            Text(
-                p?.artist?.name.orEmpty(),
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Black,
-                color = androidx.compose.ui.graphics.Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            )
+            // A soft dark band behind the name, so it reads on any photo, and on a pale placeholder.
+            Box(
+                Modifier.fillMaxWidth().background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(androidx.compose.ui.graphics.Color.Transparent, androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.55f)),
+                    ),
+                ),
+            ) {
+                Text(
+                    p?.artist?.name.orEmpty(),
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Black,
+                    color = androidx.compose.ui.graphics.Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 12.dp),
+                )
+            }
         },
         image = { modifier ->
             val photo = artistInfo?.imageUrl ?: p?.artist?.imageUrl

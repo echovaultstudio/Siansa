@@ -200,6 +200,7 @@ jobs:
           print(len(os.listdir("screens")), "screenshots")
           PY
           grep -h "System.out" logcat.txt | grep -E "Tour: |song starts" | sed 's/.*System.out: //' > screens/tour.txt || true
+          grep -h "TOURLOG " logcat.txt | sed 's/.*TOURLOG //' > screens/tour-log.txt || true
           [ -n "$(ls screens/*.jpg 2>/dev/null)" ] || exit 0
           cd screens
           git init -q && git checkout -q -b ci-screens

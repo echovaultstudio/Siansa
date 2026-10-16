@@ -197,8 +197,8 @@ class AppTourTest {
             scenario.close()
         }
         println("Tour: song starts: ${starts.joinToString(" | ")}")
-        println("---- Musix log ----")
-        AppLog.tail(150).forEach { println(it) }
+        // The app's own log, saved next to the screenshots on the ci-screens branch (tour-log.txt).
+        AppLog.tail(1500).forEach { println("TOURLOG $it") }
         if (problems.isNotEmpty()) fail("Tour found ${problems.size} problem(s):\n" + problems.joinToString("\n"))
     }
 

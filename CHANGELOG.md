@@ -14,6 +14,10 @@ To publish a new version: add a section at the top, set the same version in `ver
 ### Fixed
 - Found by the new app tour: opening an artist from a song's menu, or opening a freshly made vibe mix, could navigate from a background thread, which can close the app. Both now always navigate on the main thread.
 - Two issues Android Lint reports as errors (screen state that might never be set). Lint errors now fail the build.
+- The start check added in 0.0.14 judged a song "stuck" by how much the player had buffered, which can stay at zero for a while on a big FLAC even as data arrives. On a slow connection it kept restarting the download, so the song never started. It now only restarts when no data at all has arrived for 2.5 seconds, and at most once per song.
+- Artist pages without a photo: the name was white on a pale header in light mode. A soft dark band behind the name keeps it readable on any photo.
+- Your listening pages in light mode: section titles were dark on the page's dark background. The page now always uses dark colours.
+- Your Library: the Your listening tiles wrapped long month names ("Septemb / er"); they show "Sep", "Oct" or the year.
 
 ## 0.0.15beta — 2026-10-16
 
