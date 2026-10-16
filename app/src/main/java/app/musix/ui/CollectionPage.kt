@@ -53,8 +53,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.musix.data.Song
 
-val Accent = Color(0xFF1ED760)
-
 /**
  * The page used for albums, playlists, mixes and radios, laid out like Spotify: the cover's colour
  * runs down from the top into the page, the cover shrinks and fades away as you scroll, and the
@@ -196,7 +194,7 @@ private fun ActionRow(songs: List<Song>) {
                 .clickable(enabled = songs.isNotEmpty()) { graph.player.play(songs) },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.PlayArrow, "Play", tint = Color.Black, modifier = Modifier.size(32.dp))
+            Icon(Icons.Rounded.PlayArrow, "Play", tint = Color(0xFF2A1700), modifier = Modifier.size(32.dp))
         }
     }
 }

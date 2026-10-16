@@ -61,6 +61,8 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -134,6 +136,8 @@ class PlayLauncher(
     private val snack: SnackbarHostState,
     private val scope: CoroutineScope,
 ) {
+    // Songs added after the start keep coming even if you leave the screen, so this part runs app-wide.
+    private val appScope: CoroutineScope get() = graph.scope
     operator fun invoke(label: String, build: suspend () -> List<Song>) {
         scope.launch {
             val note = launch { snack.showSnackbar("Starting $label…") }
@@ -164,14 +168,18 @@ class PlayLauncher(
             }
             if (firstSongs.isNotEmpty()) graph.player.play(firstSongs)
             AppLog.i("Radio", "$label started with ${firstSongs.size} songs in ${System.currentTimeMillis() - started}ms")
-            val rest = runCatching { more(firstSongs) }
-                .onFailure { AppLog.w("Radio", "$label: more songs failed: ${it.message}") }
-                .getOrDefault(emptyList())
-            AppLog.i("Radio", "$label added ${rest.size} more after ${System.currentTimeMillis() - started}ms")
-            if (firstSongs.isEmpty()) {
-                if (rest.isNotEmpty()) graph.player.play(rest) else snack.showSnackbar("Nothing found for $label")
-            } else {
-                graph.player.addAll(rest)
+            appScope.launch {
+                val rest = runCatching { more(firstSongs) }
+                    .onFailure { AppLog.w("Radio", "$label: more songs failed: ${it.message}") }
+                    .getOrDefault(emptyList())
+                AppLog.i("Radio", "$label added ${rest.size} more after ${System.currentTimeMillis() - started}ms")
+                withContext(Dispatchers.Main) {
+                    if (firstSongs.isEmpty()) {
+                        if (rest.isNotEmpty()) graph.player.play(rest)
+                    } else {
+                        graph.player.addAll(rest)
+                    }
+                }
             }
         }
     }

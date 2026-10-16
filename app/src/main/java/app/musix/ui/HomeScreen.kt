@@ -362,7 +362,7 @@ private fun HeroMix(
                 FilledIconButton(
                     onClick = onPlay,
                     modifier = Modifier.size(52.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color.Black),
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = Color(0xFF2A1700)),
                 ) {
                     Icon(Icons.Rounded.PlayArrow, "Play", Modifier.size(30.dp))
                 }

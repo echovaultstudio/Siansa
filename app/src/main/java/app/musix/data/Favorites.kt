@@ -45,7 +45,17 @@ class Favorites(
             val s = settings.current
             if (s.lastFmReady) {
                 runCatching { lastFm.love(LastFmApi.Keys(s.lastFmApiKey, s.lastFmSecret, s.lastFmSession), song, liked) }
+                    .onSuccess { AppLog.i("Favorites", "Last.fm: ${if (liked) "loved" else "unloved"} ${song.artist} – ${song.title}") }
                     .onFailure { AppLog.w("Favorites", "Last.fm love failed: ${it.message}") }
+            } else {
+                AppLog.i(
+                    "Favorites",
+                    "Not sent to Last.fm: " + when {
+                        !s.lastFmEnabled -> "Last.fm scrobbling is switched off"
+                        s.lastFmSession.isBlank() -> "not signed in to Last.fm (Settings → Scrobbling → Sign in)"
+                        else -> "API key or shared secret missing"
+                    },
+                )
             }
         }
     }
