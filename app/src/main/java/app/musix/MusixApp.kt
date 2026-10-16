@@ -3,6 +3,7 @@ package app.musix
 import android.app.Application
 import android.os.Build
 import app.musix.log.AppLog
+import app.musix.log.Diagnostics
 import app.musix.mix.MixWorker
 import coil3.ImageLoader
 import coil3.PlatformContext
@@ -24,6 +25,9 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         graph = AppGraph(this)
         AppLog.init(this, graph.settings.current.logging)
+        AppLog.setDetailed(graph.settings.current.logDetailed)
+        Diagnostics.start(this)
+        if (AppLog.detailOn) AppLog.d("Phone", Diagnostics.snapshot(this))
         graph.scope.launch {
             graph.library.load()
             // A quick check at every start: usually just "nothing changed", or a few albums.
@@ -52,6 +56,14 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
             }
             .crossfade(true)
             .build()
+    }
+
+    // Android asks apps to free memory when the phone runs low; useful context for stutter.
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_RUNNING_LOW && level < TRIM_MEMORY_UI_HIDDEN || level >= TRIM_MEMORY_BACKGROUND) {
+            AppLog.w("Phone", "Low memory signal (level $level) · ${Diagnostics.snapshot(this)}")
+        }
     }
 
     companion object {

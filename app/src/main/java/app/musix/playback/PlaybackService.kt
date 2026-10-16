@@ -67,6 +67,7 @@ class PlaybackService : MediaSessionService() {
             .setUpstreamDataSourceFactory(http)
             .setCacheKeyFactory { spec -> songCacheKey(spec.uri) }
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+            .setEventListener(PlaybackDiagnostics.cacheListener)
         val switching = CachingSwitchDataSource.Factory(cacheFactory!!, http)
         val resolving = ResolvingDataSource.Factory(switching) { spec ->
             val key = spec.uri.getQueryParameter("id") ?: spec.uri.toString()
@@ -93,6 +94,7 @@ class PlaybackService : MediaSessionService() {
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
         events = Events(player).also { player.addListener(it) }
+        player.addAnalyticsListener(PlaybackDiagnostics(player, this))
 
         val openApp = PendingIntent.getActivity(
             this,

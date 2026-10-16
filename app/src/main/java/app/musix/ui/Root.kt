@@ -79,7 +79,10 @@ fun MusixRoot() {
     var currentTab by rememberSaveable { mutableStateOf("home") }
 
     LaunchedEffect(route) {
-        if (route != null) AppLog.i("Nav", route)
+        if (route != null) {
+            AppLog.i("Nav", route)
+            AppLog.screen = route
+        }
         tabs.firstOrNull { it.route == route }?.let { currentTab = it.route }
     }
     LaunchedEffect(Unit) {

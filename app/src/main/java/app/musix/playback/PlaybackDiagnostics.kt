@@ -1,0 +1,126 @@
+package app.musix.playback
+
+import android.content.Context
+import android.os.SystemClock
+import androidx.annotation.OptIn
+import androidx.media3.common.Format
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.exoplayer.DecoderReuseEvaluation
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.source.LoadEventInfo
+import androidx.media3.exoplayer.source.MediaLoadData
+import app.musix.log.AppLog
+import java.io.IOException
+
+/**
+ * Records what the player is doing when sound stutters:
+ * - audio underruns: the sound card ran out of audio (an audible gap), with how full the buffer was;
+ * - buffering: when playback stops to wait for data, for how long, and how much was buffered;
+ * - downloads: speed and size of each stream piece, and load errors (detailed logging);
+ * - song cache: how much of a song came from the phone instead of the network (detailed logging).
+ * Underruns, waits and errors are logged whenever logging is on; the rest only with detailed logging.
+ */
+@OptIn(UnstableApi::class)
+class PlaybackDiagnostics(private val player: ExoPlayer, private val context: Context) : AnalyticsListener {
+    private var bufferingSince = 0L
+    private var underruns = 0
+
+    private fun where(eventTime: AnalyticsListener.EventTime): String {
+        val id = player.currentMediaItem?.mediaId ?: "?"
+        val pos = eventTime.currentPlaybackPositionMs / 1000
+        val ahead = (player.bufferedPosition - player.currentPosition).coerceAtLeast(0) / 1000.0
+        val net = if (Streaming.isUnmetered(context)) "wifi" else "mobile"
+        return "song $id at ${pos}s, ${"%.1f".format(ahead)}s buffered ahead, $net"
+    }
+
+    override fun onAudioUnderrun(eventTime: AnalyticsListener.EventTime, bufferSize: Int, bufferSizeMs: Long, elapsedSinceLastFeedMs: Long) {
+        underruns++
+        AppLog.w(
+            "Audio",
+            "Underrun #$underruns (sound gap): audio buffer ${bufferSizeMs}ms, ${elapsedSinceLastFeedMs}ms since last fed · ${where(eventTime)}",
+        )
+    }
+
+    override fun onPlaybackStateChanged(eventTime: AnalyticsListener.EventTime, state: Int) {
+        when (state) {
+            Player.STATE_BUFFERING -> {
+                bufferingSince = SystemClock.elapsedRealtime()
+                if (player.playWhenReady) AppLog.i("Audio", "Waiting for data · ${where(eventTime)}")
+            }
+            Player.STATE_READY -> if (bufferingSince != 0L) {
+                val waited = SystemClock.elapsedRealtime() - bufferingSince
+                bufferingSince = 0L
+                if (player.playWhenReady) {
+                    if (waited > 1500) AppLog.w("Audio", "Waited ${waited}ms for data before playing · ${where(eventTime)}")
+                    else AppLog.d("Audio", "Ready after ${waited}ms")
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    override fun onLoadCompleted(eventTime: AnalyticsListener.EventTime, loadEventInfo: LoadEventInfo, mediaLoadData: MediaLoadData) {
+        if (!AppLog.detailOn) return
+        val kb = loadEventInfo.bytesLoaded / 1024
+        val ms = loadEventInfo.loadDurationMs.coerceAtLeast(1)
+        val kbps = loadEventInfo.bytesLoaded * 8 / ms
+        val id = loadEventInfo.uri.getQueryParameter("id") ?: "?"
+        val format = loadEventInfo.uri.getQueryParameter("format") ?: "original"
+        AppLog.d("Load", "Song $id ($format): ${kb} KB in ${ms}ms = ${kbps} kbit/s")
+    }
+
+    override fun onLoadError(
+        eventTime: AnalyticsListener.EventTime,
+        loadEventInfo: LoadEventInfo,
+        mediaLoadData: MediaLoadData,
+        error: IOException,
+        wasCanceled: Boolean,
+    ) {
+        if (wasCanceled) return
+        val id = loadEventInfo.uri.getQueryParameter("id") ?: "?"
+        AppLog.w("Load", "Loading song $id failed after ${loadEventInfo.loadDurationMs}ms: ${error.javaClass.simpleName}: ${error.message} · ${where(eventTime)}")
+    }
+
+    override fun onBandwidthEstimate(eventTime: AnalyticsListener.EventTime, totalLoadTimeMs: Int, totalBytesLoaded: Long, bitrateEstimate: Long) {
+        AppLog.d("Load", "Network estimate ${bitrateEstimate / 1000} kbit/s")
+    }
+
+    override fun onAudioInputFormatChanged(eventTime: AnalyticsListener.EventTime, format: Format, decoderReuseEvaluation: DecoderReuseEvaluation?) {
+        AppLog.d(
+            "Audio",
+            "Format ${format.sampleMimeType} ${format.sampleRate} Hz ${format.channelCount} ch" +
+                (if (format.bitrate > 0) " ${format.bitrate / 1000} kbit/s" else ""),
+        )
+    }
+
+    override fun onAudioSinkError(eventTime: AnalyticsListener.EventTime, audioSinkError: Exception) {
+        AppLog.e("Audio", "Audio output error · ${where(eventTime)}", audioSinkError)
+    }
+
+    override fun onAudioCodecError(eventTime: AnalyticsListener.EventTime, audioCodecError: Exception) {
+        AppLog.e("Audio", "Audio decoder error · ${where(eventTime)}", audioCodecError)
+    }
+
+    override fun onPlayerError(eventTime: AnalyticsListener.EventTime, error: PlaybackException) {
+        AppLog.e("Audio", "Player error ${error.errorCodeName} · ${where(eventTime)}", error)
+    }
+
+    override fun onDroppedVideoFrames(eventTime: AnalyticsListener.EventTime, droppedFrames: Int, elapsedMs: Long) = Unit
+
+    companion object {
+        /** Reports how much of a song was read from the phone's song cache. */
+        val cacheListener = object : CacheDataSource.EventListener {
+            override fun onCachedBytesRead(cacheSizeBytes: Long, cachedBytesRead: Long) {
+                AppLog.d("Cache", "Read ${cachedBytesRead / 1024} KB from the song cache (cache holds ${cacheSizeBytes / (1024 * 1024)} MB)")
+            }
+
+            override fun onCacheIgnored(reason: Int) {
+                AppLog.d("Cache", "Song cache skipped (reason $reason)")
+            }
+        }
+    }
+}
