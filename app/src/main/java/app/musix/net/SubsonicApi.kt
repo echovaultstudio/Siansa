@@ -10,6 +10,8 @@ import app.musix.data.ArtistInfo
 import app.musix.data.LyricLine
 import app.musix.data.Lyrics
 import app.musix.data.MusicFolder
+import app.musix.data.Playlist
+import app.musix.data.PlaylistDetail
 import app.musix.data.SearchResults
 import app.musix.data.SimilarArtist
 import app.musix.data.Song
@@ -138,6 +140,24 @@ class SubsonicApi(
         call("getTopSongs", mapOf("artist" to artistName, "count" to "$count"))
             .obj("topSongs")?.arr("song").orEmpty().map(::parseSong)
 
+    suspend fun playlists(): List<Playlist> =
+        call("getPlaylists").obj("playlists")?.arr("playlist").orEmpty().map(::parsePlaylist)
+
+    suspend fun playlist(id: String): PlaylistDetail {
+        val p = call("getPlaylist", mapOf("id" to id)).obj("playlist") ?: throw ApiException("Playlist not found")
+        return PlaylistDetail(parsePlaylist(p), p.arr("entry").map(::parseSong))
+    }
+
+    /** Songs that sound like this one. With the AudioMuse plugin, Navidrome answers from sonic analysis. */
+    suspend fun similarSongs(songId: String, count: Int = 50): List<Song> =
+        call("getSimilarSongs", mapOf("id" to songId, "count" to "$count"))
+            .obj("similarSongs")?.arr("song").orEmpty().map(::parseSong)
+
+    /** Songs by this artist and similar artists. */
+    suspend fun artistRadio(artistId: String, count: Int = 50): List<Song> =
+        call("getSimilarSongs2", mapOf("id" to artistId, "count" to "$count"))
+            .obj("similarSongs2")?.arr("song").orEmpty().map(::parseSong)
+
     suspend fun song(id: String): Song {
         val song = call("getSong", mapOf("id" to id)).obj("song") ?: throw ApiException("Song not found")
         return parseSong(song)
@@ -230,6 +250,17 @@ class SubsonicApi(
         genre = o.str("genre"),
         created = o.str("created"),
         playCount = o.long("playCount") ?: 0,
+    )
+
+    private fun parsePlaylist(o: JsonObject) = Playlist(
+        id = o.str("id").orEmpty(),
+        name = o.str("name") ?: "Playlist",
+        songCount = o.int("songCount") ?: 0,
+        durationSec = o.int("duration") ?: 0,
+        coverArt = o.str("coverArt"),
+        owner = o.str("owner"),
+        comment = o.str("comment"),
+        changed = o.str("changed"),
     )
 
     private fun parseArtist(o: JsonObject) = Artist(

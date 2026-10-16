@@ -25,6 +25,8 @@ data class AppSettings(
     val replayGain: ReplayGainMode = ReplayGainMode.TRACK,
     val preampDb: Float = 0f,
     val syncFolders: Set<String> = emptySet(),
+    val imageCacheMb: Int = 500,
+    val logging: Boolean = false,
 ) {
     val navidromeReady: Boolean
         get() = navidromeUrl.isNotBlank() && navidromeUser.isNotBlank() && navidromePassword.isNotBlank()
@@ -107,6 +109,8 @@ class SettingsRepository(context: Context) {
             .getOrDefault(ReplayGainMode.TRACK),
         preampDb = prefs.getFloat("preamp", 0f),
         syncFolders = prefs.getStringSet("sync_folders", emptySet())?.toSet() ?: emptySet(),
+        imageCacheMb = prefs.getInt("image_cache_mb", 500),
+        logging = prefs.getBoolean("logging", false),
     )
 
     /**
@@ -149,8 +153,20 @@ class SettingsRepository(context: Context) {
             .putString("rg", s.replayGain.name)
             .putFloat("preamp", s.preampDb)
             .putStringSet("sync_folders", s.syncFolders)
+            .putInt("image_cache_mb", s.imageCacheMb)
+            .putBoolean("logging", s.logging)
             .apply()
         _state.value = s
+    }
+
+    fun setImageCacheMb(mb: Int) {
+        prefs.edit().putInt("image_cache_mb", mb).apply()
+        _state.value = _state.value.copy(imageCacheMb = mb)
+    }
+
+    fun setLogging(on: Boolean) {
+        prefs.edit().putBoolean("logging", on).apply()
+        _state.value = _state.value.copy(logging = on)
     }
 
     fun setSyncFolders(ids: Set<String>) {

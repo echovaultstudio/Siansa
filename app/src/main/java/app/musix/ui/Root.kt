@@ -30,103 +30,136 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import app.musix.log.AppLog
 import app.musix.playback.PlayerState
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
 private val tabs = listOf(
     Tab("home", "Home", Icons.Rounded.Home),
-    Tab("library", "Library", Icons.Rounded.LibraryMusic),
     Tab("search", "Search", Icons.Rounded.Search),
+    Tab("library", "Library", Icons.Rounded.LibraryMusic),
     Tab("vibes", "Vibes", Icons.Rounded.GraphicEq),
 )
+
+private val noBottomBar = setOf("player")
 
 @Composable
 fun MusixRoot() {
     val graph = LocalGraph.current
     val nav = rememberNavController()
+    val snack = remember { SnackbarHostState() }
     val player by graph.player.state.collectAsStateWithLifecycle()
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
-    val start = remember { if (graph.settings.current.navidromeReady) "home" else "settings" }
+    // The tab the user is "in", which stays lit while they browse deeper (album, artist…).
+    var currentTab by rememberSaveable { mutableStateOf("home") }
+
+    LaunchedEffect(route) {
+        if (route != null) AppLog.i("Nav", route)
+        tabs.firstOrNull { it.route == route }?.let { currentTab = it.route }
+    }
+    LaunchedEffect(Unit) {
+        if (!graph.settings.current.navidromeReady) nav.navigate("settings/connections")
+    }
 
     AskForNotifications()
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            if (route != "player") {
-                Column {
-                    if (player.hasMedia) MiniPlayer(player) { nav.navigate("player") }
-                    NavigationBar {
-                        tabs.forEach { tab ->
-                            NavigationBarItem(
-                                selected = route == tab.route,
-                                onClick = { nav.switchTab(tab.route) },
-                                icon = { Icon(tab.icon, null) },
-                                label = { Text(tab.label) },
-                            )
+    CompositionLocalProvider(LocalNav provides nav, LocalSnack provides snack) {
+        Scaffold(
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            snackbarHost = { SnackbarHost(snack) },
+            bottomBar = {
+                if (route !in noBottomBar) {
+                    Column {
+                        if (player.hasMedia) MiniPlayer(player) { nav.navigate("player") { launchSingleTop = true } }
+                        NavigationBar {
+                            tabs.forEach { tab ->
+                                NavigationBarItem(
+                                    selected = currentTab == tab.route,
+                                    onClick = {
+                                        if (currentTab == tab.route) nav.backToTabTop(tab.route) else nav.switchTab(tab.route)
+                                        currentTab = tab.route
+                                    },
+                                    icon = { Icon(tab.icon, null) },
+                                    label = { Text(tab.label) },
+                                )
+                            }
                         }
                     }
                 }
+            },
+        ) { padding ->
+            NavHost(
+                navController = nav,
+                startDestination = "home",
+                modifier = Modifier.padding(padding).consumeWindowInsets(padding),
+            ) {
+                composable("home") { HomeScreen(nav) }
+                composable("search") { SearchScreen(nav) }
+                composable("library") { LibraryScreen(nav) }
+                composable("vibes") { VibesScreen(nav) }
+                composable("settings") { SettingsHub(nav) }
+                composable("settings/connections") { ConnectionsScreen(nav) }
+                composable("settings/playback") { PlaybackSettingsScreen(nav) }
+                composable("settings/storage") { StorageScreen(nav) }
+                composable("settings/logs") { LogsScreen(nav) }
+                composable("sync") { SyncScreen(nav) }
+                composable("player") { PlayerScreen(nav) }
+                composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }
+                composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }
+                composable("playlist/{id}") { PlaylistScreen(nav, it.arguments?.getString("id").orEmpty()) }
+                composable("mix/{id}") { MixScreen(nav, it.arguments?.getString("id").orEmpty()) }
+                composable("selector/{id}") { SelectorEditor(nav, it.arguments?.getString("id").orEmpty()) }
             }
-        },
-    ) { padding ->
-        NavHost(
-            navController = nav,
-            startDestination = start,
-            modifier = Modifier.padding(padding).consumeWindowInsets(padding),
-        ) {
-            composable("home") { HomeScreen(nav) }
-            composable("library") { LibraryScreen(nav) }
-            composable("search") { SearchScreen(nav) }
-            composable("vibes") { VibesScreen(nav) }
-            composable("settings") { SettingsScreen(nav) }
-            composable("sync") { SyncScreen(nav) }
-            composable("player") { PlayerScreen(nav) }
-            composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }
-            composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }
-            composable("mix/{id}") { MixScreen(nav, it.arguments?.getString("id").orEmpty()) }
-            composable("selector/{id}") { SelectorEditor(nav, it.arguments?.getString("id").orEmpty()) }
         }
     }
 }
 
+/** Opens another tab where it was left, keeping each tab's own history. */
 fun NavHostController.switchTab(route: String) {
     navigate(route) {
-        popUpTo(graph.findStartDestination().id) { saveState = true }
+        popUpTo("home") { saveState = true }
         launchSingleTop = true
         restoreState = true
     }
+}
+
+/** Tapping the tab you're already in goes back to that tab's first screen. */
+fun NavHostController.backToTabTop(route: String) {
+    if (!popBackStack(route, inclusive = false)) switchTab(route)
 }
 
 @Composable
 private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
     val graph = LocalGraph.current
     val song = state.current ?: return
-    val position by rememberPosition()
     Surface(tonalElevation = 3.dp) {
         Column {
-            val progress = if (state.durationMs > 0) (position.toFloat() / state.durationMs).coerceIn(0f, 1f) else 0f
-            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+            MiniProgress(state.durationMs)
             Row(
                 Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -152,6 +185,16 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
             }
         }
     }
+}
+
+/** Kept separate so the twice-a-second position update only redraws the thin progress line. */
+@Composable
+private fun MiniProgress(durationMs: Long) {
+    val position by rememberPosition()
+    LinearProgressIndicator(
+        progress = { if (durationMs > 0) (position.toFloat() / durationMs).coerceIn(0f, 1f) else 0f },
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable

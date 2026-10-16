@@ -25,27 +25,45 @@ data class LibraryCache(
     val albums: List<Album> = emptyList(),
     val songs: List<Song> = emptyList(),
     val songAliases: Map<String, String> = emptyMap(),
+    val playlists: List<Playlist> = emptyList(),
 )
+
+private val MARKS = Regex("\\p{M}+")
+private val NON_WORD = Regex("[^\\p{L}\\p{N}]+")
 
 fun normalizeKey(value: String): String =
     Normalizer.normalize(value, Normalizer.Form.NFKD)
-        .replace(Regex("\\p{M}+"), "")
+        .replace(MARKS, "")
         .lowercase(Locale.ROOT)
-        .replace(Regex("[^\\p{L}\\p{N}]+"), " ")
+        .replace(NON_WORD, " ")
         .trim()
 
-/** The synced library with lookups prepared once. */
+data class Genre(val name: String, val songCount: Int)
+
+/**
+ * The synced library with every lookup, sort order and search key prepared once, off the main thread,
+ * so screens only read ready-made lists.
+ */
 class LibraryIndex(val cache: LibraryCache) {
-    val artists: List<Artist> = cache.artists.sortedBy { normalizeKey(it.name) }
     val albums: List<Album> = cache.albums
     val songCount: Int get() = cache.songs.size
+    val playlists: List<Playlist> get() = cache.playlists
+
+    private val albumKey: Map<String, String> = cache.albums.associate { it.id to normalizeKey(it.name) }
+    private val artistKey: Map<String, String> = cache.artists.associate { it.id to normalizeKey(it.name) }
+
+    val artists: List<Artist> = cache.artists.sortedBy { artistKey[it.id] }
+    private val byName: List<Album> = cache.albums.sortedBy { albumKey[it.id] }
+    private val byNewest: List<Album> = cache.albums.sortedByDescending { it.created ?: "" }
+    private val byYear: List<Album> = cache.albums.sortedByDescending { it.year ?: 0 }
+    private val byPlays: List<Album> = cache.albums.sortedByDescending { it.playCount }
 
     private val songsById: Map<String, Song> = cache.songs.associateBy { it.id }
     private val albumByAnyId: Map<String, Album> = buildMap {
         for (album in cache.albums) for (id in album.allIds) put(id, album)
     }
     private val artistById: Map<String, Artist> = cache.artists.associateBy { it.id }
-    private val artistByName: Map<String, Artist> = cache.artists.associateBy { normalizeKey(it.name) }
+    private val artistByName: Map<String, Artist> = cache.artists.associateBy { artistKey[it.id] ?: "" }
     private val songsByAlbum: Map<String, List<Song>> = cache.songs
         .filter { it.albumId != null }
         .groupBy { it.albumId!! }
@@ -53,45 +71,64 @@ class LibraryIndex(val cache: LibraryCache) {
     private val albumsByArtist: Map<String, List<Album>> = cache.albums
         .filter { it.artistId != null }
         .groupBy { it.artistId!! }
+    private val songsByArtist: Map<String, List<Song>> = cache.songs
+        .filter { it.artistId != null }
+        .groupBy { it.artistId!! }
+
+    /** Genres by number of songs, for genre tiles and radios. */
+    val genres: List<Genre> = cache.songs
+        .mapNotNull { it.genre?.trim()?.takeIf { g -> g.isNotEmpty() } }
+        .groupingBy { it }.eachCount()
+        .map { Genre(it.key, it.value) }
+        .sortedByDescending { it.songCount }
+    private val songsByGenre: Map<String, List<Song>> = cache.songs
+        .filter { !it.genre.isNullOrBlank() }
+        .groupBy { it.genre!!.trim().lowercase(Locale.ROOT) }
+
+    // Search keys, prepared once.
+    private val artistSearch = artists.map { artistKey[it.id] ?: "" }
+    private val albumSearch = byName.map { (albumKey[it.id] ?: "") + " " + normalizeKey(it.artist) }
+    private val songSearch = cache.songs.map { normalizeKey(it.title + " " + it.artist + " " + it.album) }
 
     fun song(id: String): Song? = songsById[id] ?: cache.songAliases[id]?.let { songsById[it] }
     fun album(id: String): Album? = albumByAnyId[id]
     fun artist(id: String): Artist? = artistById[id]
     fun artistByName(name: String): Artist? = artistByName[normalizeKey(name)]
     fun songsOf(album: Album): List<Song> = songsByAlbum[album.id].orEmpty()
+    fun songsOfGenre(genre: String): List<Song> = songsByGenre[genre.trim().lowercase(Locale.ROOT)].orEmpty()
 
     fun albumsOf(artist: Artist): List<Album> {
         val byId = albumsByArtist[artist.id].orEmpty()
         if (byId.isNotEmpty()) return byId
-        val key = normalizeKey(artist.name)
+        val key = artistKey[artist.id] ?: normalizeKey(artist.name)
         return albums.filter { normalizeKey(it.artist) == key }
     }
 
     /** Songs the artist performs, on their own albums or elsewhere. */
     fun songsOf(artist: Artist): List<Song> {
-        val key = normalizeKey(artist.name)
-        return cache.songs.filter { it.artistId == artist.id || normalizeKey(it.artist) == key }
+        val direct = songsByArtist[artist.id].orEmpty()
+        if (direct.isNotEmpty()) return direct
+        val key = artistKey[artist.id] ?: normalizeKey(artist.name)
+        return cache.songs.filter { normalizeKey(it.artist) == key }
     }
 
     fun sortedAlbums(sort: String): List<Album> = when (sort) {
-        "newest" -> albums.sortedByDescending { it.created ?: "" }
-        "frequent" -> albums.sortedByDescending { it.playCount }
-        "year" -> albums.sortedByDescending { it.year ?: 0 }
+        "newest" -> byNewest
+        "frequent" -> byPlays
+        "year" -> byYear
         "random" -> albums.shuffled()
-        else -> albums.sortedBy { normalizeKey(it.name) }
+        else -> byName
     }
 
+    /** Call off the main thread for big libraries. */
     fun search(query: String): SearchResults {
         val terms = normalizeKey(query).split(' ').filter { it.isNotEmpty() }
         if (terms.isEmpty()) return SearchResults(emptyList(), emptyList(), emptyList())
-        fun matches(text: String): Boolean {
-            val key = normalizeKey(text)
-            return terms.all { key.contains(it) }
-        }
+        fun hit(key: String) = terms.all { key.contains(it) }
         return SearchResults(
-            artists = artists.filter { matches(it.name) }.take(30),
-            albums = albums.filter { matches(it.name + " " + it.artist) }.take(40),
-            songs = cache.songs.filter { matches(it.title + " " + it.artist + " " + it.album) }.take(100),
+            artists = artists.indices.filter { hit(artistSearch[it]) }.take(30).map { artists[it] },
+            albums = byName.indices.filter { hit(albumSearch[it]) }.take(40).map { byName[it] },
+            songs = cache.songs.indices.asSequence().filter { hit(songSearch[it]) }.take(100).map { cache.songs[it] }.toList(),
         )
     }
 }
@@ -120,14 +157,22 @@ class LibraryRepository(context: Context) {
     @OptIn(ExperimentalSerializationApi::class)
     suspend fun replace(cache: LibraryCache) = withContext(Dispatchers.IO) {
         mutex.withLock {
+            val index = LibraryIndex(cache)
             val tmp = File(file.path + ".tmp")
             tmp.outputStream().buffered().use { CacheJson.encodeToStream(LibraryCache.serializer(), cache, it) }
             if (!tmp.renameTo(file)) {
                 file.delete()
                 tmp.renameTo(file)
             }
-            _index.value = LibraryIndex(cache)
+            _index.value = index
             _loaded.value = true
         }
+    }
+
+    /** Keeps the cached playlist list current after a live refresh. */
+    suspend fun updatePlaylists(playlists: List<Playlist>) {
+        val index = current ?: return
+        if (index.cache.playlists == playlists) return
+        replace(index.cache.copy(playlists = playlists))
     }
 }

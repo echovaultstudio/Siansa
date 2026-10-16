@@ -70,30 +70,111 @@ fun LibraryScreen(nav: NavController) {
     val graph = LocalGraph.current
     val library by graph.library.index.collectAsStateWithLifecycle()
     val loaded by graph.library.loaded.collectAsStateWithLifecycle()
-    val progress by graph.sync.progress.collectAsStateWithLifecycle()
-    var tab by rememberSaveable { mutableStateOf(0) }
-    Screen(
-        title = "Library",
-        nav = null,
-        actions = {
-            IconButton(onClick = { nav.navigate("sync") }) {
-                if (progress.running) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-                else Icon(Icons.Rounded.Sync, "Library sync")
-            }
-        },
-    ) { padding ->
+    var tab by rememberSaveable { mutableStateOf("albums") }
+    Screen(title = "Your library", nav = null) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize()) {
             val index = library
             when {
                 index != null -> {
-                    TabRow(selectedTabIndex = tab) {
-                        Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Albums") })
-                        Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Artists") })
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        listOf("playlists" to "Playlists", "albums" to "Albums", "artists" to "Artists").forEach { (key, label) ->
+                            FilterChip(selected = tab == key, onClick = { tab = key }, label = { Text(label) })
+                        }
                     }
-                    if (tab == 0) AlbumGrid(index, nav) else ArtistList(index, nav)
+                    when (tab) {
+                        "playlists" -> PlaylistList(index, nav)
+                        "artists" -> ArtistList(index, nav)
+                        else -> AlbumGrid(index, nav)
+                    }
                 }
                 !loaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 else -> SyncPrompt(nav)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaylistList(index: LibraryIndex, nav: NavController) {
+    val graph = LocalGraph.current
+    val playlists by loadState("library-playlists") {
+        runCatching { graph.subsonic.playlists() }
+            .onSuccess { graph.library.updatePlaylists(it) }
+            .getOrElse { index.playlists }
+    }
+    LoadBox(playlists) { list ->
+        if (list.isEmpty()) {
+            Text(
+                "No playlists on Navidrome yet. Playlists you import or create there show up here.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp),
+            )
+        }
+        LazyColumn(Modifier.fillMaxSize()) {
+            items(list, key = { it.id }) { playlist ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { nav.navigate("playlist/${playlist.id}") }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Cover(playlist.coverArt, 150, Modifier.size(56.dp), RoundedCornerShape(6.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(playlist.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            "Playlist · ${playlist.songCount} songs" + (playlist.owner?.let { " · $it" } ?: ""),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A Navidrome playlist, with songs matched to the synced library. */
+@Composable
+fun PlaylistScreen(nav: NavController, id: String) {
+    val graph = LocalGraph.current
+    val detail by loadState(id) {
+        val remote = graph.subsonic.playlist(id)
+        val index = graph.library.current
+        remote.copy(songs = remote.songs.map { index?.song(it.id) ?: it })
+    }
+    val title = detail.valueOrNull()?.playlist?.name ?: "Playlist"
+    Screen(title = title, nav = nav) { padding ->
+        Box(Modifier.padding(top = padding.calculateTopPadding())) {
+            LoadBox(detail) { d ->
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+                    item {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Cover(d.playlist.coverArt, null, Modifier.fillMaxWidth(0.6f).aspectRatio(1f), RoundedCornerShape(12.dp))
+                            Spacer(Modifier.height(12.dp))
+                            Text(d.playlist.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                            d.playlist.comment?.takeIf { it.isNotBlank() }?.let {
+                                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                            }
+                            Text(
+                                listOfNotNull(d.playlist.owner, "${d.songs.size} songs", formatDuration(d.songs.sumOf { it.durationSec.toLong() }))
+                                    .joinToString(" · "),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            PlayButtons(d.songs)
+                        }
+                    }
+                    itemsIndexed(d.songs, key = { i, s -> "$i-${s.id}" }) { index, song ->
+                        SongRow(song = song, onClick = { graph.player.play(d.songs, index) })
+                    }
+                }
             }
         }
     }
@@ -109,7 +190,7 @@ fun SyncPrompt(nav: NavController) {
     ) {
         Text("Your library isn't on the phone yet", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         Text(
-            "Sync it once to browse albums and artists. You choose which Navidrome libraries to include.",
+            "Sync it once to browse albums and artists. You choose which Navidrome libraries to include (Settings → Library sync).",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

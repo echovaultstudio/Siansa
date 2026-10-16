@@ -1,5 +1,6 @@
 package app.musix.data
 
+import app.musix.log.AppLog
 import app.musix.net.SubsonicApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -67,6 +68,7 @@ class LibrarySync(
                 _progress.update { it.copy(phase = SyncPhase.FAILED, error = "Sync was stopped") }
                 throw e
             } catch (e: Exception) {
+                AppLog.e("Sync", "Failed", e)
                 _progress.update { it.copy(phase = SyncPhase.FAILED, error = e.message ?: e.javaClass.simpleName) }
             }
         }
@@ -79,6 +81,7 @@ class LibrarySync(
     private suspend fun run() {
         _progress.value = SyncProgress(phase = SyncPhase.CONNECTING)
         val all = api.musicFolders()
+        AppLog.i("Sync", "Started. Libraries on server: ${all.joinToString { it.name + " (" + it.id + ")" }}; chosen: ${settings.current.syncFolders}")
         val chosen = settings.current.syncFolders
         val folders = all.filter { it.id in chosen }
         // Nothing chosen, or every library chosen: one pass without a library filter.
@@ -121,7 +124,16 @@ class LibrarySync(
         }
 
         _progress.update { it.copy(phase = SyncPhase.SAVING) }
+        val playlists = runCatching { api.playlists() }
+            .onFailure { AppLog.w("Sync", "Playlists couldn't be loaded", it) }
+            .getOrDefault(emptyList())
         val cache = merge(artists.values.toList(), albums, songs, passes.mapNotNull { it?.id })
+            .copy(playlists = playlists)
+        AppLog.i(
+            "Sync",
+            "Fetched ${artists.size} artists, ${albums.size} albums, ${songs.size} songs, ${playlists.size} playlists; " +
+                "kept ${cache.albums.size} albums and ${cache.songs.size} songs after merging",
+        )
         library.replace(cache)
         _progress.update {
             it.copy(
