@@ -146,6 +146,22 @@ class PlayerConnection(
         }
     }
 
+    /** Stops playback and empties the queue (long-press on play). */
+    fun stop() {
+        onNewQueue?.invoke()
+        withController { c ->
+            c.stop()
+            c.clearMediaItems()
+        }
+    }
+
+    /** The song before this one, even when this one has been playing for a while (cover swipe). */
+    fun previousTrack() = withController { c ->
+        if (c.hasPreviousMediaItem()) c.seekToPreviousMediaItem() else c.seekTo(0L)
+    }
+
+    fun hasNext(): Boolean = controller?.hasNextMediaItem() == true
+
     fun next() = withController { it.seekToNext() }
     fun previous() = withController { it.seekToPrevious() }
     fun seekTo(positionMs: Long) = withController { it.seekTo(positionMs) }

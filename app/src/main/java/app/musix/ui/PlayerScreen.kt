@@ -2,6 +2,29 @@ package app.musix.ui
 
 import android.os.Build
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.Velocity
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -104,8 +127,9 @@ private val PlayerColors = darkColorScheme(
  * Now playing, in the style of Spotify: the cover blurred into the background, a large cover that
  * opens its album, title and artist with a heart, and the controls below.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun PlayerScreen(nav: NavController) {
+fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     val graph = LocalGraph.current
     val state by graph.player.state.collectAsStateWithLifecycle()
     // Re-read hearts when one changes.
@@ -114,21 +138,65 @@ fun PlayerScreen(nav: NavController) {
     var queueOpen by rememberSaveable { mutableStateOf(false) }
     val song = state.current
     BackHandler(enabled = queueOpen) { queueOpen = false }
+    val scope = rememberCoroutineScope()
+    val openArtist = rememberArtistOpener(beforeOpen = onClose)
 
     fun openAlbum() {
         val albumId = song?.albumId ?: return
-        nav.popBackStack()
+        onClose()
         nav.navigate("album/$albumId")
     }
 
-    fun openArtist() {
-        val artistId = song?.artistId ?: return
-        nav.popBackStack()
-        nav.navigate("artist/$artistId")
-    }
+    // Dragging down moves the whole player with the finger; let go far or fast enough and it closes.
+    var dismissY by remember { mutableFloatStateOf(0f) }
+    var upDrag by remember { mutableFloatStateOf(0f) }
+    var heightPx by remember { mutableFloatStateOf(1f) }
+    val velocity = remember { VelocityTracker() }
 
     MaterialTheme(colorScheme = PlayerColors, typography = MaterialTheme.typography) {
-        Box(Modifier.fillMaxSize().background(Color.Black)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .onSizeChanged { heightPx = it.height.toFloat().coerceAtLeast(1f) }
+                .graphicsLayer { translationY = dismissY }
+                .background(Color.Black)
+                .pointerInput(Unit) {
+                    var total = 0f
+                    detectVerticalDragGestures(
+                        onDragStart = {
+                            total = 0f
+                            upDrag = 0f
+                            velocity.resetTracking()
+                        },
+                        onDragEnd = {
+                            val speed = velocity.calculateVelocity().y
+                            val close = dismissY > heightPx * 0.22f || (dismissY > 40f && speed > 1400f)
+                            when {
+                                close -> onClose()
+                                dismissY > 0f -> {
+                                    val from = dismissY
+                                    scope.launch { animate(from, 0f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { v, _ -> dismissY = v } }
+                                }
+                                upDrag < -120f -> queueOpen = true
+                            }
+                            upDrag = 0f
+                        },
+                        onDragCancel = {
+                            val from = dismissY
+                            scope.launch { animate(from, 0f) { v, _ -> dismissY = v } }
+                            upDrag = 0f
+                        },
+                    ) { change, dy ->
+                        total += dy
+                        velocity.addPosition(change.uptimeMillis, Offset(0f, total))
+                        if (dismissY > 0f || (dy > 0f && upDrag >= 0f)) {
+                            dismissY = (dismissY + dy).coerceAtLeast(0f)
+                        } else {
+                            upDrag += dy
+                        }
+                    }
+                },
+        ) {
             // The cover, enlarged and blurred, as the background (a darker plain version before Android 12).
             Cover(
                 song?.coverArt,
@@ -150,47 +218,25 @@ fun PlayerScreen(nav: NavController) {
             )
 
             // Swipe up anywhere to open the queue; swipe down to close the player.
-            var drag by remember { mutableStateOf(0f) }
             Column(
                 Modifier
                     .fillMaxSize()
                     .systemBarsPadding()
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures(
-                            onDragEnd = {
-                                when {
-                                    drag < -120f -> queueOpen = true
-                                    drag > 180f -> nav.popBackStack()
-                                }
-                                drag = 0f
-                            },
-                            onDragCancel = { drag = 0f },
-                        ) { _, dy -> drag += dy }
-                    }
                     .padding(horizontal = 24.dp),
             ) {
-                TopRow(song, onClose = { nav.popBackStack() }, onAlbum = ::openAlbum)
+                TopRow(song, onClose = onClose, onAlbum = ::openAlbum)
 
                 Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
                     AnimatedContent(targetState = view, label = "player-view") { v ->
                         when (v) {
-                            PlayerView.ART -> Cover(
-                                song?.coverArt,
-                                LARGE_COVER,
-                                Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(1f)
-                                    .shadow(24.dp, RoundedCornerShape(10.dp))
-                                    .clickable(enabled = song?.albumId != null) { openAlbum() },
-                                RoundedCornerShape(10.dp),
-                            )
+                            PlayerView.ART -> SwipeCover(song, onTap = ::openAlbum)
                             PlayerView.LYRICS -> LyricsView(song)
                             PlayerView.QUEUE -> Box(Modifier.fillMaxSize())
                         }
                     }
                 }
 
-                TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = ::openArtist) {
+                TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
                     song?.let { graph.favorites.toggle(it) }
                 }
                 SeekBar(state.durationMs)
@@ -202,7 +248,6 @@ fun PlayerScreen(nav: NavController) {
                     // Song radio: AudioMuse keeps adding songs that sound like this one and share its mood.
                     val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
                     val snack = LocalSnack.current
-                    val scope = rememberCoroutineScope()
                     Row(
                         Modifier
                             .clip(RoundedCornerShape(20.dp))
@@ -238,25 +283,73 @@ fun PlayerScreen(nav: NavController) {
                 enter = slideInVertically { it } + fadeIn(),
                 exit = slideOutVertically { it } + fadeOut(),
             ) {
-                var down by remember { mutableStateOf(0f) }
+                // Swipe down anywhere on the queue to close it: the list scrolls back to the top first,
+                // then the panel follows the finger down.
+                var queueY by remember { mutableFloatStateOf(0f) }
+                var panelHeight by remember { mutableFloatStateOf(1f) }
+                fun settle(speed: Float) {
+                    if (queueY > panelHeight * 0.2f || (queueY > 30f && speed > 1200f)) {
+                        queueOpen = false
+                    } else if (queueY > 0f) {
+                        val from = queueY
+                        scope.launch { animate(from, 0f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { v, _ -> queueY = v } }
+                    }
+                }
+                val connection = remember {
+                    object : NestedScrollConnection {
+                        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                            if (queueY > 0f && available.y < 0f) {
+                                val used = max(available.y, -queueY)
+                                queueY += used
+                                return Offset(0f, used)
+                            }
+                            return Offset.Zero
+                        }
+
+                        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                            if (available.y > 0f && source == NestedScrollSource.UserInput) {
+                                queueY += available.y
+                                return Offset(0f, available.y)
+                            }
+                            return Offset.Zero
+                        }
+
+                        override suspend fun onPreFling(available: Velocity): Velocity {
+                            if (queueY > 0f) {
+                                settle(available.y)
+                                return available
+                            }
+                            return Velocity.Zero
+                        }
+                    }
+                }
                 Column(
                     Modifier
                         .fillMaxSize()
+                        .onSizeChanged { panelHeight = it.height.toFloat().coerceAtLeast(1f) }
+                        .graphicsLayer { translationY = queueY }
                         .background(Color(0xF2121212))
+                        .nestedScroll(connection)
+                        .pointerInput(Unit) {
+                            // Drags on the parts that don't scroll (the handle and the heading).
+                            val tracker = VelocityTracker()
+                            var total = 0f
+                            detectVerticalDragGestures(
+                                onDragStart = { total = 0f; tracker.resetTracking() },
+                                onDragEnd = { settle(tracker.calculateVelocity().y) },
+                                onDragCancel = { settle(0f) },
+                            ) { change, dy ->
+                                total += dy
+                                tracker.addPosition(change.uptimeMillis, Offset(0f, total))
+                                queueY = (queueY + dy).coerceAtLeast(0f)
+                            }
+                        }
                         .systemBarsPadding(),
                 ) {
+                    LaunchedEffect(Unit) { queueY = 0f }
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .pointerInput(Unit) {
-                                detectVerticalDragGestures(
-                                    onDragEnd = {
-                                        if (down > 100f) queueOpen = false
-                                        down = 0f
-                                    },
-                                    onDragCancel = { down = 0f },
-                                ) { _, dy -> down += dy }
-                            }
                             .clickable { queueOpen = false }
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center,
@@ -267,6 +360,63 @@ fun PlayerScreen(nav: NavController) {
                 }
             }
         }
+    }
+}
+
+/**
+ * The big cover. Swipe it left for the next song and right for the previous one: it follows the finger,
+ * slides out, and the new cover slides in from the other side. Tap opens the album.
+ */
+@Composable
+private fun SwipeCover(song: Song?, onTap: () -> Unit) {
+    val graph = LocalGraph.current
+    val scope = rememberCoroutineScope()
+    val offset = remember { Animatable(0f) }
+    val currentId by rememberUpdatedState(song?.id)
+    BoxWithConstraints(Modifier.fillMaxWidth().aspectRatio(1f)) {
+        val width = constraints.maxWidth.toFloat().coerceAtLeast(1f)
+
+        suspend fun change(forward: Boolean) {
+            val before = currentId
+            offset.animateTo(if (forward) -width * 1.15f else width * 1.15f, tween(170, easing = FastOutLinearInEasing))
+            if (forward) graph.player.next() else graph.player.previousTrack()
+            // Wait for the new song before bringing a cover back in, so the old one doesn't flash.
+            withTimeoutOrNull(600) { snapshotFlow { currentId }.first { it != before } }
+            offset.snapTo(if (forward) width * 1.15f else -width * 1.15f)
+            offset.animateTo(0f, tween(300, easing = FastOutSlowInEasing))
+        }
+
+        Cover(
+            song?.coverArt,
+            LARGE_COVER,
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    translationX = offset.value
+                    alpha = 1f - (kotlin.math.abs(offset.value) / width).coerceIn(0f, 1f) * 0.5f
+                }
+                .shadow(24.dp, RoundedCornerShape(10.dp))
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            scope.launch {
+                                val v = offset.value
+                                when {
+                                    v < -width * 0.25f && graph.player.hasNext() -> change(forward = true)
+                                    v > width * 0.25f -> change(forward = false)
+                                    else -> offset.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                                }
+                            }
+                        },
+                        onDragCancel = { scope.launch { offset.animateTo(0f) } },
+                    ) { change, dx ->
+                        change.consume()
+                        scope.launch { offset.snapTo(offset.value + dx) }
+                    }
+                }
+                .clickable(enabled = song?.albumId != null, onClick = onTap),
+            RoundedCornerShape(10.dp),
+        )
     }
 }
 
@@ -305,7 +455,7 @@ private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart:
                 color = Color.White.copy(alpha = 0.75f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.clickable(enabled = song?.artistId != null, onClick = onArtist),
+                modifier = Modifier.clickable(enabled = song?.artistId != null || song?.artists?.isNotEmpty() == true, onClick = onArtist),
             )
         }
         IconButton(onClick = onHeart, enabled = song != null) {
@@ -374,6 +524,7 @@ private fun SeekBar(durationMs: Long) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun Controls(state: PlayerState) {
     val graph = LocalGraph.current
@@ -388,8 +539,20 @@ private fun Controls(state: PlayerState) {
         IconButton(onClick = { graph.player.previous() }, modifier = Modifier.size(56.dp)) {
             Icon(Icons.Rounded.SkipPrevious, "Previous", Modifier.size(40.dp))
         }
+        // Tap to play or pause; press and hold to stop and clear the queue.
+        val haptics = LocalHapticFeedback.current
         Box(
-            Modifier.size(68.dp).clip(CircleShape).background(Accent).clickable { graph.player.togglePlay() },
+            Modifier
+                .size(68.dp)
+                .clip(CircleShape)
+                .background(Accent)
+                .combinedClickable(
+                    onClick = { graph.player.togglePlay() },
+                    onLongClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        graph.player.stop()
+                    },
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
