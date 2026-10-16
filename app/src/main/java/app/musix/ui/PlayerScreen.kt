@@ -109,6 +109,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.musix.playback.Cast
 import androidx.media3.common.Player
 import androidx.navigation.NavController
 import app.musix.data.Song
@@ -433,8 +434,15 @@ private fun SwipeCover(song: Song?, onTap: () -> Unit) {
 private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onClose) { Icon(Icons.Rounded.KeyboardArrowDown, "Close", Modifier.size(32.dp)) }
+        val castTo = Cast.status.collectAsStateWithLifecycle().value.device
         Column(Modifier.weight(1f).clickable(enabled = song?.albumId != null, onClick = onAlbum), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("PLAYING FROM ALBUM", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+            Text(
+                if (castTo != null) "PLAYING ON ${castTo.uppercase()}" else "PLAYING FROM ALBUM",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (castTo != null) Accent else Color.White.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Text(
                 song?.album.orEmpty(),
                 style = MaterialTheme.typography.labelLarge,
@@ -443,7 +451,7 @@ private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(Modifier.size(48.dp))
+        CastButton()
     }
 }
 

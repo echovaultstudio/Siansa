@@ -40,6 +40,11 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Google Cast setup: which TV app plays the music (Google's standard one). -->
+        <meta-data
+            android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
+            android:value="app.musix.playback.CastSetup" />
+
         <service
             android:name=".playback.PlaybackService"
             android:exported="true"

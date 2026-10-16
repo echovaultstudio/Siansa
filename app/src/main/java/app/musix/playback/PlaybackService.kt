@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.SystemClock
 import androidx.annotation.OptIn
+import androidx.media3.cast.CastPlayer
+import androidx.media3.cast.SessionAvailabilityListener
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -45,10 +47,15 @@ import java.util.Collections
 
 private const val FALLBACK_KBPS = 320
 
-/** Background playback with a media notification, lock-screen controls, ReplayGain, transcoding and scrobbling. */
+/**
+ * Background playback with a media notification, lock-screen controls, ReplayGain, transcoding and scrobbling.
+ * While casting, the media session drives a [CastPlayer] instead of the phone's own player.
+ */
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
+    private lateinit var exo: ExoPlayer
+    private var castPlayer: CastPlayer? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var graph: AppGraph
     private var events: Events? = null
@@ -67,6 +74,7 @@ class PlaybackService : MediaSessionService() {
 
         val built = PlayerFactory.build(this, graph, ::kbpsFor)
         val player = built.player
+        exo = player
         cacheFactory = built.cacheFactory
         events = Events(player).also { player.addListener(it) }
         player.addAnalyticsListener(PlaybackDiagnostics(player, this) { waited -> onStall(player, waited) })
@@ -100,6 +108,17 @@ class PlaybackService : MediaSessionService() {
                 }
             })
             .build()
+
+        // Casting: playback moves to the TV when a Cast session starts and back when it ends.
+        Cast.context(this)?.let { cast ->
+            val remote = CastPlayer(cast, CastItems(graph.subsonic))
+            castPlayer = remote
+            remote.setSessionAvailabilityListener(object : SessionAvailabilityListener {
+                override fun onCastSessionAvailable() = moveTo(remote)
+                override fun onCastSessionUnavailable() = moveTo(exo)
+            })
+            if (remote.isCastSessionAvailable) moveTo(remote)
+        }
 
         // Send any listens that were waiting from an earlier session.
         scope.launch { runCatching { graph.scrobbler.flush() } }
@@ -207,6 +226,59 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    /**
+     * Moves the queue, song and position between the phone and a Cast device. Music moving to a TV
+     * keeps playing; music coming back to the phone waits paused, rather than suddenly playing out loud.
+     */
+    private fun moveTo(target: Player) {
+        val session = session ?: return
+        val from = session.player
+        if (from === target) return
+        val toCast = target !== exo
+        val (items, index) = queueInPlayOrder(from)
+        val position = from.currentPosition.coerceAtLeast(0L)
+        val play = toCast && from.playWhenReady
+        AppLog.i(
+            "Cast",
+            (if (toCast) "Playing on ${Cast.deviceName() ?: "a Cast device"}" else "Cast ended; music back on the phone, paused") +
+                " (${items.size} songs, song ${index + 1} at ${position / 1000}s)",
+        )
+        handler.removeCallbacks(bufferingWatch)
+        precacheWriter?.cancel()
+        precacheJob?.cancel()
+        events?.let { from.removeListener(it) }
+        from.stop()
+        if (from === exo) exo.clearMediaItems()
+        target.repeatMode = from.repeatMode
+        if (items.isNotEmpty()) {
+            target.setMediaItems(items, index, position)
+            target.playWhenReady = play
+            target.prepare()
+        }
+        events?.attach(target)
+        session.player = target
+    }
+
+    /**
+     * The queue in the order it will play. Cast devices can't shuffle, so a shuffled queue moves over
+     * already in its shuffled order.
+     */
+    private fun queueInPlayOrder(player: Player): Pair<List<MediaItem>, Int> {
+        val count = player.mediaItemCount
+        if (count == 0) return emptyList<MediaItem>() to 0
+        val current = player.currentMediaItemIndex.coerceIn(0, count - 1)
+        if (!player.shuffleModeEnabled) return List(count) { player.getMediaItemAt(it) } to current
+        val timeline = player.currentTimeline
+        val order = ArrayList<Int>(count)
+        var i = timeline.getFirstWindowIndex(true)
+        while (i != C.INDEX_UNSET && order.size < count) {
+            order += i
+            i = timeline.getNextWindowIndex(i, Player.REPEAT_MODE_OFF, true)
+        }
+        if (order.size != count) return List(count) { player.getMediaItemAt(it) } to current
+        return order.map { player.getMediaItemAt(it) } to order.indexOf(current).coerceAtLeast(0)
+    }
+
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -219,18 +291,34 @@ class PlaybackService : MediaSessionService() {
         events?.stopWatches()
         precacheWriter?.cancel()
         events?.finishCurrent()
-        session?.run {
-            player.release()
-            release()
-        }
+        castPlayer?.setSessionAvailabilityListener(null)
+        castPlayer?.release()
+        exo.release()
+        session?.release()
         session = null
         scope.cancel()
         super.onDestroy()
     }
 
-    /** Tracks how long each song is actually heard, for scrobbling, and applies ReplayGain. */
-    private inner class Events(private val player: ExoPlayer) : Player.Listener {
+    /**
+     * Tracks how long each song is actually heard, for scrobbling, and applies ReplayGain. Follows playback
+     * to a Cast device and back; the phone-only parts (ReplayGain, pre-caching, watchdogs) rest meanwhile.
+     */
+    private inner class Events(private var player: Player) : Player.Listener {
         private var current: Song? = null
+        // The song playing when playback moved between phone and TV: still the same listen.
+        private var carriedOver: String? = null
+        private val onPhone get() = player === exo
+
+        fun attach(target: Player) {
+            val now = SystemClock.elapsedRealtime()
+            playingSince?.let { listenedMs += now - it }
+            playingSince = null
+            handler.removeCallbacks(startWatch)
+            carriedOver = current?.id
+            player = target
+            target.addListener(this)
+        }
         private var startedAtMs = 0L
         private var listenedMs = 0L
         private var playingSince: Long? = null
@@ -249,6 +337,9 @@ class PlaybackService : MediaSessionService() {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             // The same song swapped for another quality or format: keep counting it as one listen.
             if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED && mediaItem?.mediaId != null && mediaItem.mediaId == current?.id) return
+            val moved = carriedOver
+            carriedOver = null
+            if (moved != null && mediaItem?.mediaId == moved) return
             precacheWriter?.cancel()
             precacheJob?.cancel()
             precachedFor = null
@@ -263,7 +354,7 @@ class PlaybackService : MediaSessionService() {
             restarted = false
             resetProgressWatch()
             if (player.playWhenReady) armStartWatch()
-            player.volume = replayGainVolume(song, graph.settings.current)
+            if (onPhone) player.volume = replayGainVolume(song, graph.settings.current)
             graph.scrobbler.nowPlaying(song)
             scope.launch {
                 runCatching { graph.history.add(PlayEvent(song.id, song.title, song.artist, song.genre, System.currentTimeMillis())) }
@@ -272,7 +363,7 @@ class PlaybackService : MediaSessionService() {
 
         // The current song is fully downloaded: now the next one can be fetched without slowing it down.
         override fun onIsLoadingChanged(isLoading: Boolean) {
-            if (isLoading) return
+            if (isLoading || !onPhone) return
             val id = player.currentMediaItem?.mediaId ?: return
             val duration = player.duration
             if (precachedFor != id && duration > 0 && player.bufferedPosition >= duration - 1000) precacheNext(player)
@@ -298,6 +389,7 @@ class PlaybackService : MediaSessionService() {
          * silently skipping through them, the song is played again as Opus converted by Navidrome.
          */
         override fun onTracksChanged(tracks: Tracks) {
+            if (!onPhone) return
             val item = player.currentMediaItem ?: return
             val audio = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
             if (audio.isEmpty()) return
@@ -354,6 +446,7 @@ class PlaybackService : MediaSessionService() {
         }
 
         private fun armStartWatch() {
+            if (!onPhone) return
             startRequestedAt = SystemClock.elapsedRealtime()
             startRescues = 0
             lastBuffered = -1L
