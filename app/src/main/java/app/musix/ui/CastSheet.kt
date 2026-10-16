@@ -80,7 +80,7 @@ private fun CastSheet(onDismiss: () -> Unit) {
     DisposableEffect(router) {
         fun refresh() {
             targets = router.routes
-                .filter { !it.isDefaultOrBluetooth && it.isEnabled && it.matchesSelector(Cast.selector) }
+                .filter { !it.isDefault && !it.isBluetooth && it.isEnabled && it.matchesSelector(Cast.selector) }
                 .map { route ->
                     CastTarget(
                         route = route,
