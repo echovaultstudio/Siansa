@@ -15,6 +15,12 @@ Source: `app/src/main/java/app/musix/`. Unit tests: `app/src/test/`. Emulator te
 - UI text: short, plain English, no jargon. Follow the existing Musix theme (`ui/Theme.kt`); test light and dark.
 - Navigate and change screen state only on the main thread.
 
+## Automatic issues
+
+Issues labelled `claude` are picked up by an hourly scheduled task in the owner's Claude workspace, which
+implements them and opens a pull request. Labels show where each one is: `claude: working`, `claude: done`
+(pull request open), `claude: needs info` (a question is in the issue's comments).
+
 ## Pull requests
 
 - One issue per pull request; reference it with `Fixes #N`.
