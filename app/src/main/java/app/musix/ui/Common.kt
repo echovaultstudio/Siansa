@@ -1,5 +1,10 @@
 package app.musix.ui
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.Image
+import coil3.compose.asPainter
+import coil3.memory.MemoryCache
+import coil3.SingletonImageLoader
 import app.musix.data.cover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -208,20 +213,41 @@ fun rememberPlayLauncher(): PlayLauncher {
  */
 const val LARGE_COVER = 1000
 
+/** What Navidrome is asked for: small sizes all share one, since each size of an animated cover costs it a conversion. */
+fun coverServerPx(size: Int?): Int? = size?.let { if (it <= SMALL_COVER) SMALL_COVER else it }
+
+/**
+ * The size a cover is decoded at on the phone. List rows (48–56 dp) need about 192 px, not the 300 px
+ * file: a quarter of the memory per cover, so several hundred stay in memory and scrolling back is instant.
+ */
+fun coverDecodePx(size: Int?): Int? = when {
+    size == null -> null
+    size <= 150 -> 192
+    size <= SMALL_COVER -> SMALL_COVER
+    else -> size
+}
+
+private fun coverMemoryKey(id: String, size: Int?) = "cover:$id:${coverServerPx(size) ?: "full"}@${coverDecodePx(size) ?: "full"}"
+
 /** The request [Cover] makes, so covers can be loaded ahead of time into the same cache entries. */
-fun coverRequest(context: android.content.Context, graph: app.musix.AppGraph, id: String, px: Int?): ImageRequest {
-    val key = "cover:$id:${px ?: "full"}"
-    return ImageRequest.Builder(context)
+fun coverRequest(context: android.content.Context, graph: app.musix.AppGraph, id: String, size: Int?): ImageRequest {
+    val px = coverServerPx(size)
+    val builder = ImageRequest.Builder(context)
         .data(graph.subsonic.coverUrl(id, px))
-        .diskCacheKey(key)
-        .memoryCacheKey(key)
-        .build()
+        .diskCacheKey("cover:$id:${px ?: "full"}")
+        .memoryCacheKey(coverMemoryKey(id, size))
+    // A fixed size lets the load start straight away instead of waiting for the layout.
+    coverDecodePx(size)?.let { builder.size(it) }
+    return builder.build()
 }
 
 /**
  * Album art from Navidrome. size = null would ask for the original file; screens use [LARGE_COVER] instead.
  * The cache key leaves out the per-session login token, so covers are reused from disk across app starts.
  * Always a still picture (the first frame of an animated cover); [BigCover] shows animations.
+ *
+ * A cover already in memory is drawn in the same frame, with no placeholder: Coil on its own only looks
+ * at its memory cache after the first layout, so even cached covers flashed the placeholder for a frame.
  */
 @Composable
 fun Cover(
@@ -232,21 +258,50 @@ fun Cover(
 ) {
     val graph = LocalGraph.current
     val context = LocalContext.current
-    // Small sizes all share one: each size of an animated cover costs Navidrome a conversion.
-    val px = size?.let { if (it <= SMALL_COVER) SMALL_COVER else it }
-    val request = remember(coverId, px) { coverId?.let { coverRequest(context, graph, it, px) } }
+    val loader = SingletonImageLoader.get(context)
+    val cached = remember(coverId, size) {
+        coverId?.let { loader.memoryCache?.get(MemoryCache.Key(coverMemoryKey(it, size)))?.image }
+    }
+    val request = remember(coverId, size) { coverId?.let { coverRequest(context, graph, it, size) } }
     Box(
         modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Rounded.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (request != null) {
-            AsyncImage(
+        when {
+            cached != null -> Image(
+                painter = remember(cached) { cached.asPainter(context) },
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            request != null -> AsyncImage(
                 model = request,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
+            else -> Icon(Icons.Rounded.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/**
+ * Loads the covers just beyond what's on screen into memory while a list scrolls, so they're ready
+ * (drawn in the same frame) when they come into view, as Symfonium and Glide-based apps do.
+ */
+@Composable
+fun PrefetchCovers(firstVisible: Int, visibleCount: Int, covers: List<String?>, size: Int, ahead: Int = 24) {
+    val graph = LocalGraph.current
+    val context = LocalContext.current
+    LaunchedEffect(firstVisible / 4, covers.size) {
+        val loader = SingletonImageLoader.get(context)
+        val from = (firstVisible + visibleCount).coerceAtLeast(0)
+        val to = (from + ahead).coerceAtMost(covers.size)
+        val behind = (firstVisible - 8).coerceAtLeast(0) until firstVisible.coerceAtMost(covers.size)
+        (from until to).plus(behind).mapNotNull { covers.getOrNull(it) }.distinct().forEach { id ->
+            if (loader.memoryCache?.get(MemoryCache.Key(coverMemoryKey(id, size))) == null) {
+                loader.enqueue(coverRequest(context.applicationContext, graph, id, size))
+            }
         }
     }
 }

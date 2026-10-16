@@ -228,9 +228,13 @@ fun YourLibraryScreen(nav: NavController) {
                 val sortBar: @Composable () -> Unit = {
                     SortBar(selectedSort, grid, onSort = { sort = it.name }, onGrid = { grid = !grid })
                 }
+                val covers = remember(shown) { shown.map { it.coverArt } }
                 if (grid) {
+                    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+                    PrefetchCovers(gridState.firstVisibleItemIndex, gridState.layoutInfo.visibleItemsInfo.size, covers, 300)
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(110.dp),
+                        state = gridState,
                         contentPadding = PaddingValues(start = 10.dp, end = 10.dp, bottom = bottomBarPadding(16.dp)),
                         modifier = Modifier.fillMaxSize(),
                     ) {
@@ -240,7 +244,9 @@ fun YourLibraryScreen(nav: NavController) {
                         }
                     }
                 } else {
-                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(16.dp))) {
+                    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+                    PrefetchCovers(listState.firstVisibleItemIndex, listState.layoutInfo.visibleItemsInfo.size, covers, 150)
+                    LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = bottomBarPadding(16.dp))) {
                         item { sortBar() }
                         items(shown, key = { it.key }) { e ->
                             RowEntry(e, pinned = e.alwaysPinned || e.key in pinned, held = held == e.key, onClick = { open(e) }, onHold = { held = e.key }, onTogglePin = { togglePin(e) })
@@ -389,7 +395,7 @@ private fun EntryCover(e: Entry, modifier: Modifier, big: Boolean) {
         Box(modifier.clip(shape).background(Brush.linearGradient(listOf(g.first, g.second))), contentAlignment = Alignment.Center) {
             when {
                 e.heart -> Icon(Icons.Rounded.Favorite, null, tint = Color.White, modifier = Modifier.size(if (big) 44.dp else 26.dp))
-                e.coverArt != null -> Cover(e.coverArt, 300, Modifier.fillMaxSize(0.62f), RoundedCornerShape(4.dp))
+                e.coverArt != null -> Cover(e.coverArt, if (big) 300 else 150, Modifier.fillMaxSize(0.62f), RoundedCornerShape(4.dp))
                 e.badge != null -> Text(
                     e.badge,
                     color = Color.White,
@@ -403,7 +409,7 @@ private fun EntryCover(e: Entry, modifier: Modifier, big: Boolean) {
             }
         }
     } else {
-        Cover(e.coverArt, 300, modifier, shape)
+        Cover(e.coverArt, if (big) 300 else 150, modifier, shape)
     }
 }
 
