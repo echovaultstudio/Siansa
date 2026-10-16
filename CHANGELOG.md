@@ -3,6 +3,11 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.19beta — 2026-10-16
+
+### Changed
+- **Lyrics blend into now playing** instead of sitting in a dark box with visible edges. The box is gone; the lyrics fade out softly at the top and bottom into the blurred cover, and a light shadow keeps them readable on bright covers.
+
 ## 0.0.18beta — 2026-10-16
 
 ### Fixed
