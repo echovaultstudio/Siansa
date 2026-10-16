@@ -3,6 +3,14 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.16beta — 2026-10-16
+
+### Added
+- **Quality checks on every change**, in one pipeline: the app must compile, pass Android Lint (likely crashes, wrong API use, security issues), pass new unit tests of its core logic, pass a secret scan of the whole history, and pass the emulator tests against a real Navidrome, including a tour of every page that plays songs and checks they start within 5 seconds. **A release is only published when all checks pass.** Dependabot now proposes library updates weekly and warns about known vulnerabilities.
+- The log now starts each session with the app version, phone and the settings that change behaviour (never addresses, logins or keys), the library size, and **why the app last closed**: crashed, froze (with what it was doing), killed by Android for memory, swiped away… (Android 11 and newer). Crashes that happened too fast for the app to log itself now leave a trace.
+- Errors in background work (syncing, mixes, covers) are logged with where they happened instead of being able to close the app.
+- Settings → Logs → **Problems** shows only warnings and errors, with their counts, so issues stand out.
+
 ## 0.0.15beta — 2026-10-16
 
 ### Fixed

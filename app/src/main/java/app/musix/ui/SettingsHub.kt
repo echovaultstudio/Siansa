@@ -390,6 +390,31 @@ fun StorageScreen(nav: NavController) {
     }
 }
 
+private class LogEntry(val level: String, val lines: List<String>) {
+    val problem get() = level == "E" || level == "W"
+}
+
+private val entryStart = Regex("""^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} ([A-Z])/""")
+
+/** Groups log lines into entries: a timestamped line plus the lines that continue it (stack traces). */
+private fun logEntries(lines: List<String>): List<LogEntry> {
+    val out = ArrayList<LogEntry>()
+    var level = "I"
+    var current = ArrayList<String>()
+    for (line in lines) {
+        val m = entryStart.find(line)
+        if (m != null) {
+            if (current.isNotEmpty()) out += LogEntry(level, current)
+            current = arrayListOf(line)
+            level = m.groupValues[1]
+        } else {
+            current += line
+        }
+    }
+    if (current.isNotEmpty()) out += LogEntry(level, current)
+    return out
+}
+
 private fun restartApp(context: Context) {
     val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
     val component = launch.component ?: return
@@ -404,7 +429,12 @@ fun LogsScreen(nav: NavController) {
     val context = LocalContext.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     var refresh by remember { mutableIntStateOf(0) }
-    val lines by loadState(refresh to settings.logging) { withContext(Dispatchers.IO) { AppLog.tail(400).reversed() } }
+    var problemsOnly by remember { mutableStateOf(false) }
+    // Whole entries (an error and its stack trace stay together), newest first.
+    val entries by loadState(refresh to settings.logging) { withContext(Dispatchers.IO) { logEntries(AppLog.tail(3000)) } }
+    val lines = entries.valueOrNull()?.let { all ->
+        (if (problemsOnly) all.filter { it.problem } else all.takeLast(400)).reversed().flatMap { it.lines.reversed() }
+    }
     val scope = rememberCoroutineScope()
     val snack = LocalSnack.current
     // Lets you pick where to save (e.g. Downloads), then writes the log there.
@@ -464,10 +494,21 @@ fun LogsScreen(nav: NavController) {
                             refresh++
                         }) { Text("Clear") }
                     }
+                    val all = entries.valueOrNull().orEmpty()
+                    val errors = all.count { it.level == "E" }
+                    val warnings = all.count { it.level == "W" }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = !problemsOnly, onClick = { problemsOnly = false }, label = { Text("Everything") })
+                        FilterChip(
+                            selected = problemsOnly,
+                            onClick = { problemsOnly = true },
+                            label = { Text("Problems ($errors errors, $warnings warnings)") },
+                        )
+                    }
                     Text("Newest first · ${formatBytes(AppLog.sizeBytes())}", style = MaterialTheme.typography.labelMedium)
                 }
             }
-            val list = lines.valueOrNull().orEmpty()
+            val list = lines.orEmpty()
             if (list.isEmpty()) {
                 item { Hint(if (settings.logging) "Nothing logged yet." else "Logging is off.") }
             }

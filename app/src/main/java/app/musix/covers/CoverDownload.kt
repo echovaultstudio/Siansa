@@ -144,7 +144,7 @@ object CoverDownload {
         return if (home) null else "Not on the same network as Navidrome ($host)"
     }
 
-    private fun sameSubnet(mine: InetAddress, prefix: Int, other: InetAddress): Boolean {
+    internal fun sameSubnet(mine: InetAddress, prefix: Int, other: InetAddress): Boolean {
         if ((mine is Inet4Address) != (other is Inet4Address)) return false
         val a = mine.address
         val b = other.address

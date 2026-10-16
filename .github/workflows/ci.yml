@@ -1,0 +1,263 @@
+name: CI
+
+# Every push and pull request is checked: the app must compile, pass Android Lint, its unit tests and
+# the emulator tests against a real Navidrome. A release is published only when all of them pass.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Build, lint and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      # Every version needs its section in CHANGELOG.md; it becomes the release notes.
+      - name: Release notes from CHANGELOG.md
+        run: |
+          VERSION=$(tr -d '[:space:]' < version.txt)
+          mkdir -p notes
+          awk '/^## /{ v=$2; f="notes/" v ".md"; next } v { print > f }' CHANGELOG.md
+          if [ ! -s "notes/$VERSION.md" ]; then
+            echo "::error::CHANGELOG.md has no section '## $VERSION'. Add one before publishing."
+            exit 1
+          fi
+
+      # Compiling catches syntax and type errors; unit tests check the app's own logic; Android Lint
+      # finds likely crashes, wrong API use and security issues.
+      - name: Unit tests, lint and release build
+        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --continue --stacktrace
+
+      - name: Test and lint results
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          for f in glob.glob("app/build/test-results/testDebugUnitTest/*.xml"):
+              for case in ET.parse(f).getroot().iter("testcase"):
+                  fail = case.find("failure")
+                  if fail is not None:
+                      msg = (fail.get("message") or fail.text or "").replace("\n", " ")[:300]
+                      print(f"::error::Unit test {case.get('classname').split('.')[-1]}.{case.get('name')} failed: {msg}")
+          errors = warnings = 0
+          for f in glob.glob("app/build/reports/lint-results-debug.xml"):
+              for issue in ET.parse(f).getroot().iter("issue"):
+                  sev = issue.get("severity")
+                  loc = issue.find("location")
+                  where = ""
+                  if loc is not None:
+                      path = loc.get("file", "").split("/musix/")[-1]
+                      where = f" file={path},line={loc.get('line', '1')}"
+                  if sev in ("Error", "Fatal"):
+                      errors += 1
+                      print(f"::error{where}::Lint {issue.get('id')}: {issue.get('message')}")
+                  else:
+                      warnings += 1
+          print(f"::notice::Lint: {errors} errors, {warnings} warnings")
+          PY
+
+      - name: APK name
+        id: version
+        run: |
+          VERSION=$(tr -d '[:space:]' < version.txt)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          mv app/build/outputs/apk/release/app-release.apk musix-$VERSION.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: |
+            musix-*.apk
+            notes/
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
+
+  security:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Fails if a password, token or API key is committed (the whole history is checked).
+      - name: Gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.21.2 detect --source=/repo --config=/repo/.gitleaks.toml --redact --verbose --no-banner
+
+  device-tests:
+    name: Emulator tests against Navidrome
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      # The emulator needs ~7.5 GB for its storage; the runner image leaves too little free.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /usr/share/swift /opt/hostedtoolcache/CodeQL /usr/local/lib/node_modules || true
+          echo "::notice::Free disk: $(df -h / | awk 'NR==2{print $4}')"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+
+      - name: Start Navidrome with the test library
+        run: scripts/test-server.sh
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run tests on a managed emulator
+        run: |
+          set -o pipefail
+          gradle :app:ciPhoneDebugAndroidTest \
+            -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
+            -Pandroid.experimental.testOptions.managedDevices.setupTimeoutMinutes=20 \
+            -Pandroid.testInstrumentationRunnerArguments.navidromeUrl=http://10.0.2.2:5533 2>&1 | tee gradle.txt
+          
+      # Results as annotations, so they can be read without downloading logs.
+      - name: Test output
+        if: always()
+        run: |
+          grep -A8 "What went wrong" gradle.txt 2>/dev/null | head -12 | while IFS= read -r line; do [ -n "$line" ] && echo "::error::$line"; done || true
+          grep -E "Tests? .*(passed|failed)|BUILD (SUCCESSFUL|FAILED)" gradle.txt 2>/dev/null | tail -3 | while IFS= read -r line; do echo "::notice::$line"; done || true
+          find app/build/outputs -iname "logcat*.txt" -exec cat {} + > logcat.txt 2>/dev/null || true
+          grep -h "System.out" logcat.txt 2>/dev/null | grep -E "Kinds:|drawable:|setup|Tour: " | sed 's/.*System.out: //' | head -40 | while IFS= read -r line; do echo "::notice::$line"; done || true
+          for f in $(find app/build/outputs/androidTest-results -name "*.xml"); do
+            [ -f "$f" ] || continue
+            python3 - "$f" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          for case in ET.parse(sys.argv[1]).getroot().iter("testcase"):
+              fail = case.find("failure")
+              name = case.get("name")
+              if fail is not None:
+                  msg = (fail.get("message") or fail.text or "").replace("\n", " ")[:400]
+                  print(f"::error::FAILED {name}: {msg}")
+              else:
+                  print(f"::notice::PASSED {name} ({case.get('time')}s)")
+          PY
+          done
+
+      # The app tour's screenshots (TOURSHOT lines in the log) as images on the ci-screens branch.
+      - name: Tour screenshots to the ci-screens branch
+        if: always()
+        run: |
+          [ -f logcat.txt ] || exit 0
+          python3 - <<'PY'
+          import re, base64, os, collections
+          parts, totals = collections.defaultdict(dict), {}
+          for line in open("logcat.txt", errors="ignore"):
+              m = re.search(r"TOURSHOT (\S+) (\d+)/(\d+) (\S+)", line)
+              if m:
+                  parts[m[1]][int(m[2])] = m[4]
+                  totals[m[1]] = int(m[3])
+          os.makedirs("screens", exist_ok=True)
+          for name, d in parts.items():
+              if len(d) == totals[name]:
+                  open(f"screens/{name}.jpg", "wb").write(base64.b64decode("".join(d[i] for i in sorted(d))))
+              else:
+                  print(f"{name}: only {len(d)} of {totals[name]} parts")
+          print(len(os.listdir("screens")), "screenshots")
+          PY
+          grep -h "System.out" logcat.txt | grep -E "Tour: |song starts" | sed 's/.*System.out: //' > screens/tour.txt || true
+          [ -n "$(ls screens/*.jpg 2>/dev/null)" ] || exit 0
+          cd screens
+          git init -q && git checkout -q -b ci-screens
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -q -m "Tour screenshots for ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-screens
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: device-test-results
+          path: |
+            app/build/reports/
+            app/build/outputs/androidTest-results/
+            logcat.txt
+            ${{ runner.temp }}/navidrome-test/*.log
+
+  release:
+    name: Publish release
+    needs: [checks, security, device-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+
+      - name: Version
+        id: version
+        run: |
+          VERSION=$(tr -d '[:space:]' < version.txt)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Release v$VERSION already exists; bump version.txt to publish a new one."
+          fi
+
+      # One release per version, so the APK can be downloaded straight from the Releases page on a phone.
+      - uses: softprops/action-gh-release@v2
+        if: steps.version.outputs.exists != 'true'
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Musix ${{ steps.version.outputs.version }}
+          body_path: notes/${{ steps.version.outputs.version }}.md
+          files: musix-*.apk
+          make_latest: true
+
+      # Keeps the notes of every published version matching CHANGELOG.md, so fixes to the text show up too.
+      - name: Sync release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for f in notes/*.md; do
+            v=$(basename "$f" .md)
+            if gh release view "v$v" > /dev/null 2>&1; then
+              gh release edit "v$v" --notes-file "$f"
+            fi
+          done

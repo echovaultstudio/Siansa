@@ -46,7 +46,15 @@ import java.util.concurrent.TimeUnit
 /** Everything the app shares, created once in [MusixApp]. */
 @OptIn(UnstableApi::class)
 class AppGraph(val app: Application) {
-    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /**
+     * Background work. An error in one job is logged (with where it happened) instead of closing the
+     * app, and the other jobs carry on.
+     */
+    val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + kotlinx.coroutines.CoroutineExceptionHandler { context, error ->
+            AppLog.e("Background", "Background job failed (${context[kotlinx.coroutines.CoroutineName]?.name ?: "unnamed"})", error)
+        },
+    )
     val settings = SettingsRepository(app)
 
     /**

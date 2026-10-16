@@ -29,8 +29,25 @@ Outside your home network the phone needs to reach both servers, for example ove
 
 Passwords, tokens and the API key are stored encrypted with a key from the Android Keystore and are excluded from backups.
 
+## Quality checks
+
+Every push to `main` and every pull request runs `.github/workflows/ci.yml`:
+
+| Check | What it catches |
+|---|---|
+| **Build** (`assembleRelease`) | Syntax and type errors; the release APK must compile and shrink with R8. |
+| **Unit tests** (`app/src/test`) | Mistakes in the app's own logic: server addresses, cover detection, ReplayGain, release types, name matching, the home-network check. Run in seconds, no phone needed. |
+| **Android Lint** | Likely crashes, wrong Android API use for older versions, and security issues. Errors appear as annotations on the commit. |
+| **Secret scan** (gitleaks, `.gitleaks.toml`) | Passwords, tokens or API keys committed anywhere in the history. |
+| **Emulator tests** (`app/src/androidTest`) | The app on an Android emulator against a real Navidrome behind a phone-speed link: animated covers downloaded once and shown as stills in lists, smooth playback while covers load, and a tour of every page that plays songs from several of them and must start each within 5 seconds. Screenshots of every page go to the `ci-screens` branch. |
+| **Dependabot** (`.github/dependabot.yml`) | Weekly pull requests for outdated libraries and alerts for known vulnerabilities in them. |
+
+A release is published only when all of these pass. A failing check shows a red cross on the commit, and its details are in the run's annotations.
+
+Inside the app, with **Settings → Logs → Keep a log** on, the log records each start (version, phone, settings that change behaviour), why the app last closed (crash, freeze, killed for memory, swiped away; Android 11+), every error in background work, playback decisions, downloads and covers. **Problems** on the Logs page shows only warnings and errors.
+
 ## Building
 
-GitHub Actions builds a signed APK on every push to `main`. The version comes from `version.txt` (e.g. `0.0.3beta`). To publish a new release, add a section `## <version>` at the top of `CHANGELOG.md` with what was added, changed and fixed, set the same version in `version.txt`, and push: the release `v<version>` gets `musix-<version>.apk` and that changelog section as its notes. Edits to older changelog sections are copied to their releases too. The signing key is in `app/musix.keystore`, so each new build installs over the previous one. Keep this repository private.
+GitHub Actions builds a signed APK on every push to `main` and publishes it once all quality checks pass. The version comes from `version.txt` (e.g. `0.0.3beta`). To publish a new release, add a section `## <version>` at the top of `CHANGELOG.md` with what was added, changed and fixed, set the same version in `version.txt`, and push: the release `v<version>` gets `musix-<version>.apk` and that changelog section as its notes. Edits to older changelog sections are copied to their releases too. The signing key is in `app/musix.keystore`, so each new build installs over the previous one. Keep this repository private.
 
 To build locally: `gradle :app:assembleRelease` with Gradle 8.11+, JDK 17 and the Android SDK (platform 35).
