@@ -45,6 +45,8 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -99,8 +101,8 @@ class PlayerSheet {
 
 val LocalPlayerSheet = staticCompositionLocalOf { PlayerSheet() }
 
-private val SheetEnter = tween<IntOffset>(340, easing = FastOutSlowInEasing)
-private val SheetExit = tween<IntOffset>(260, easing = FastOutLinearInEasing)
+private val SheetEnter = tween<IntOffset>(250, easing = FastOutSlowInEasing)
+private val SheetExit = tween<IntOffset>(190, easing = FastOutLinearInEasing)
 
 @Composable
 fun MusixRoot() {
@@ -167,10 +169,10 @@ fun MusixRoot() {
                 startDestination = "home",
                 modifier = Modifier.padding(padding).consumeWindowInsets(padding),
                 // Quick cross-fades between pages instead of the default slow ones.
-                enterTransition = { fadeIn(tween(220)) },
-                exitTransition = { fadeOut(tween(160)) },
-                popEnterTransition = { fadeIn(tween(220)) },
-                popExitTransition = { fadeOut(tween(160)) },
+                enterTransition = { fadeIn(tween(140)) },
+                exitTransition = { fadeOut(tween(90)) },
+                popEnterTransition = { fadeIn(tween(140)) },
+                popExitTransition = { fadeOut(tween(90)) },
             ) {
                 composable("home") { HomeScreen(nav) }
                 composable("search") { SearchScreen(nav) }
@@ -202,7 +204,9 @@ fun MusixRoot() {
             enter = slideInVertically(SheetEnter) { it },
             exit = slideOutVertically(SheetExit) { it },
         ) {
-            PlayerScreen(nav, onClose = { sheet.close() })
+            CompositionLocalProvider(LocalContentColor provides Color.White) {
+                PlayerScreen(nav, onClose = { sheet.close() })
+            }
         }
       }
     }

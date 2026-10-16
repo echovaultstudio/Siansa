@@ -1,0 +1,5 @@
+# Startup profile: Android compiles these ahead of time when the app is installed, so first screens,
+# scrolling and playback don't wait for the just-in-time compiler. Library profiles (Compose, Media3,
+# Coil…) are added automatically.
+HSPLapp/musix/**->**(**)**
+Lapp/musix/**;

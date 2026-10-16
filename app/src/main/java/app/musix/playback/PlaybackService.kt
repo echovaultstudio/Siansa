@@ -250,6 +250,7 @@ class PlaybackService : MediaSessionService() {
             if (audio.isEmpty()) return
             val format = audio.first().getTrackFormat(0)
             val desc = listOfNotNull(
+                format.containerMimeType,
                 format.sampleMimeType,
                 format.codecs,
                 format.sampleRate.takeIf { it > 0 }?.let { "$it Hz" },

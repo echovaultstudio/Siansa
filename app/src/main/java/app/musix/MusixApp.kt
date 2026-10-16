@@ -54,7 +54,7 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
                     .maxSizeBytes(megabytes * 1024L * 1024L)
                     .build()
             }
-            .crossfade(true)
+            .crossfade(110)
             .build()
     }
 

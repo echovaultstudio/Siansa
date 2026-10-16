@@ -2,6 +2,7 @@ package app.musix.ui
 
 import android.os.Build
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -227,7 +228,11 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 TopRow(song, onClose = onClose, onAlbum = ::openAlbum)
 
                 Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
-                    AnimatedContent(targetState = view, label = "player-view") { v ->
+                    AnimatedContent(
+                        targetState = view,
+                        transitionSpec = { fadeIn(tween(140)) togetherWith fadeOut(tween(90)) },
+                        label = "player-view",
+                    ) { v ->
                         when (v) {
                             PlayerView.ART -> SwipeCover(song, onTap = ::openAlbum)
                             PlayerView.LYRICS -> LyricsView(song)
@@ -280,8 +285,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
             // The queue slides up over the player.
             AnimatedVisibility(
                 visible = queueOpen,
-                enter = slideInVertically { it } + fadeIn(),
-                exit = slideOutVertically { it } + fadeOut(),
+                enter = slideInVertically(tween(230, easing = FastOutSlowInEasing)) { it },
+                exit = slideOutVertically(tween(180, easing = FastOutLinearInEasing)) { it },
             ) {
                 // Swipe down anywhere on the queue to close it: the list scrolls back to the top first,
                 // then the panel follows the finger down.
@@ -378,12 +383,12 @@ private fun SwipeCover(song: Song?, onTap: () -> Unit) {
 
         suspend fun change(forward: Boolean) {
             val before = currentId
-            offset.animateTo(if (forward) -width * 1.15f else width * 1.15f, tween(170, easing = FastOutLinearInEasing))
+            offset.animateTo(if (forward) -width * 1.15f else width * 1.15f, tween(130, easing = FastOutLinearInEasing))
             if (forward) graph.player.next() else graph.player.previousTrack()
             // Wait for the new song before bringing a cover back in, so the old one doesn't flash.
             withTimeoutOrNull(600) { snapshotFlow { currentId }.first { it != before } }
             offset.snapTo(if (forward) width * 1.15f else -width * 1.15f)
-            offset.animateTo(0f, tween(300, easing = FastOutSlowInEasing))
+            offset.animateTo(0f, tween(220, easing = FastOutSlowInEasing))
         }
 
         Cover(
@@ -480,7 +485,7 @@ private fun SeekBar(durationMs: Long) {
     var dragging by remember { mutableStateOf<Float?>(null) }
     val duration = durationMs.coerceAtLeast(1L)
     val fraction = dragging ?: (position.toFloat() / duration).coerceIn(0f, 1f)
-    val thumb by animateDpAsState(if (dragging != null) 16.dp else 11.dp, label = "thumb")
+    val thumb by animateDpAsState(if (dragging != null) 16.dp else 11.dp, tween(100), label = "thumb")
     Column(Modifier.padding(top = 14.dp)) {
         BoxWithConstraints(
             Modifier
