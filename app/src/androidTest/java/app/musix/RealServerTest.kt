@@ -72,7 +72,6 @@ class RealServerTest {
         graph.settings.save(graph.settings.current.copy(navidromeUrl = url, navidromeUser = "admin", navidromePassword = "admin"))
         graph.settings.setLogging(true)
         AppLog.init(app, true)
-        AppLog.setDetailed(true)
         // Nothing from earlier tests in the song cache.
         graph.songCache.keys.toList().forEach { graph.songCache.removeResource(it) }
     }

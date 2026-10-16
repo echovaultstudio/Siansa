@@ -26,7 +26,6 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         graph = AppGraph(this)
         AppLog.init(this, graph.settings.current.logging)
-        AppLog.setDetailed(graph.settings.current.logDetailed)
         Diagnostics.start(this)
         if (AppLog.detailOn) AppLog.d("Phone", Diagnostics.snapshot(this))
         graph.scope.launch {

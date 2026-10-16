@@ -34,7 +34,6 @@ data class AppSettings(
     val coverDownloadAnyWifi: Boolean = false,
     val autoQuality: Boolean = true,
     val logging: Boolean = false,
-    val logDetailed: Boolean = false,
     val scrobbleNavidrome: Boolean = true,
     val lastFmEnabled: Boolean = false,
     val lastFmApiKey: String = "",
@@ -138,7 +137,6 @@ class SettingsRepository(context: Context) {
         coverDownloadAnyWifi = prefs.getBoolean("cover_download_any_wifi", false),
         autoQuality = prefs.getBoolean("auto_quality", true),
         logging = prefs.getBoolean("logging", false),
-        logDetailed = prefs.getBoolean("log_detailed", false),
         scrobbleNavidrome = prefs.getBoolean("scrobble_nd", true),
         lastFmEnabled = prefs.getBoolean("lfm_on", false),
         lastFmApiKey = prefs.getString("lfm_key", "") ?: "",
@@ -195,7 +193,6 @@ class SettingsRepository(context: Context) {
             .putStringSet("sync_folders", s.syncFolders)
             .putInt("image_cache_mb", s.imageCacheMb)
             .putBoolean("logging", s.logging)
-            .putBoolean("log_detailed", s.logDetailed)
             .putBoolean("scrobble_nd", s.scrobbleNavidrome)
             .putBoolean("lfm_on", s.lastFmEnabled)
             .putString("lfm_key", s.lastFmApiKey.trim())
@@ -235,11 +232,6 @@ class SettingsRepository(context: Context) {
     fun setLogging(on: Boolean) {
         prefs.edit().putBoolean("logging", on).apply()
         _state.value = _state.value.copy(logging = on)
-    }
-
-    fun setLogDetailed(on: Boolean) {
-        prefs.edit().putBoolean("log_detailed", on).apply()
-        _state.value = _state.value.copy(logDetailed = on)
     }
 
     fun setSyncFolders(ids: Set<String>) {
