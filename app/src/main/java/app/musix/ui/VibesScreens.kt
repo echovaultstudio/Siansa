@@ -75,7 +75,7 @@ fun VibesScreen(nav: NavController) {
 
     Screen(
         title = "Vibes",
-        nav = null,
+        nav = nav,
         actions = {
             IconButton(onClick = { nav.navigate("selector/new") }) { Icon(Icons.Rounded.Add, "Add vibe") }
             Box {
