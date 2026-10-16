@@ -6,7 +6,14 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Actions → CI → Run workflow. The tick box is the owner's override for when the emulator tests fail
+  # for a reason known not to affect phones; build, lint, unit tests and the secret scan must still pass.
   workflow_dispatch:
+    inputs:
+      release_despite_emulator:
+        description: "Release even if the emulator tests fail (build, lint, unit tests and secret scan must pass)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -265,7 +272,13 @@ jobs:
   release:
     name: Publish release
     needs: [checks, security, device-tests]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Normally only when everything passed on main. With the manual override, the emulator tests may
+    # have failed, but the build, lint, unit tests and secret scan must still have passed.
+    if: >-
+      always() && github.ref == 'refs/heads/main' &&
+      needs.checks.result == 'success' && needs.security.result == 'success' &&
+      (needs.device-tests.result == 'success' ||
+       (github.event_name == 'workflow_dispatch' && inputs.release_despite_emulator))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -283,6 +296,12 @@ jobs:
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "::notice::Release v$VERSION already exists; bump version.txt to publish a new one."
           fi
+
+      - name: Say so in the notes when released despite failed emulator tests
+        if: needs.device-tests.result != 'success'
+        run: |
+          printf '\n> Released with the owner'"'"'s override although the emulator tests failed ([CI run](%s)).\n' \
+            "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "notes/${{ steps.version.outputs.version }}.md"
 
       # One release per version, so the APK can be downloaded straight from the Releases page on a phone.
       - uses: softprops/action-gh-release@v3
