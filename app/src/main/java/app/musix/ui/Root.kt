@@ -89,7 +89,7 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 private val tabs = listOf(
     Tab("home", "Home", Icons.Rounded.Home),
     Tab("search", "Search", Icons.Rounded.Search),
-    Tab("library", "Library", Icons.Rounded.LibraryMusic),
+    Tab("library", "Your Library", Icons.Rounded.LibraryMusic),
     Tab("vibes", "Vibes", Icons.Rounded.GraphicEq),
     Tab("settings", "Settings", Icons.Rounded.Settings),
 )
@@ -178,7 +178,7 @@ fun MusixRoot() {
                                         currentTab = tab.route
                                     },
                                     icon = { Icon(tab.icon, null) },
-                                    label = { Text(tab.label) },
+                                    label = { Text(tab.label, maxLines = 1, softWrap = false) },
                                 )
                             }
                         }
@@ -201,7 +201,7 @@ fun MusixRoot() {
             ) {
                 composable("home") { HomeScreen(nav) }
                 composable("search") { SearchScreen(nav) }
-                composable("library") { LibraryScreen(nav) }
+                composable("library") { YourLibraryScreen(nav) }
                 composable("vibes") { VibesScreen(nav) }
                 composable("settings") { SettingsHub(nav) }
                 composable("settings/connections") { ConnectionsScreen(nav) }
