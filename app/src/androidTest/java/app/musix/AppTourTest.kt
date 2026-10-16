@@ -289,17 +289,33 @@ class AppTourTest {
         if (!ok || ms > 5_000) problems += "Song from $where took ${if (ok) "$ms ms" else "over 15 s"} to start"
     }
 
-    /** The whole window as a small JPEG, written to the log in pieces. */
+    /** The whole window as a small JPEG, written to the log in pieces. Never fails the tour. */
     private fun shot(name: String) {
+        runCatching { shotNow(name) }.onFailure { println("Tour: screenshot $name failed: $it") }
+    }
+
+    private fun shotNow(name: String) {
         compose.waitForIdle()
-        // The app's window drawn into a bitmap: the CI emulator image can't take real screenshots
-        // (they come back black), and drawing doesn't need a display.
-        var drawn: Bitmap? = null
+        // PixelCopy reads the window's real pixels, hardware images included. (The CI emulator image
+        // returns black system screenshots, and drawing the views can't handle hardware bitmaps.)
+        var bitmap: Bitmap? = null
+        var outcome = -1
+        val done = java.util.concurrent.CountDownLatch(1)
         scenario.onActivity { activity ->
             val view = activity.window.decorView
-            drawn = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also { view.draw(android.graphics.Canvas(it)) }
+            val target = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            bitmap = target
+            android.view.PixelCopy.request(activity.window, target, { result ->
+                outcome = result
+                done.countDown()
+            }, android.os.Handler(android.os.Looper.getMainLooper()))
         }
-        val full = drawn ?: return
+        done.await(5, java.util.concurrent.TimeUnit.SECONDS)
+        val full = bitmap ?: return
+        if (outcome != android.view.PixelCopy.SUCCESS) {
+            println("Tour: screenshot $name: PixelCopy result $outcome")
+            return
+        }
         val width = 480
         val small = Bitmap.createScaledBitmap(full, width, full.height * width / full.width, true)
         val bytes = ByteArrayOutputStream().also { small.compress(Bitmap.CompressFormat.JPEG, 72, it) }.toByteArray()
