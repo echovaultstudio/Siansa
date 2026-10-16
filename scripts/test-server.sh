@@ -7,7 +7,7 @@ ND_VERSION="${ND_VERSION:-0.64.2}"
 DIR="${RUNNER_TEMP:-/tmp}/navidrome-test"
 mkdir -p "$DIR" && cd "$DIR"
 
-if [ -z "${PREPARE_ONLY:-}" ] && [ -x navidrome ] && [ -d music ]; then echo "Library ready"; else
+if [ -x navidrome ] && [ -d music ]; then echo "Library ready"; else
 curl -sSL -o nd.tgz "https://github.com/navidrome/navidrome/releases/download/v${ND_VERSION}/navidrome_${ND_VERSION}_linux_amd64.tar.gz"
 tar xzf nd.tgz navidrome
 
