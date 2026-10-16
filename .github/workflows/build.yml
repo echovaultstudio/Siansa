@@ -47,6 +47,18 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
+      # Every version needs its section in CHANGELOG.md; it becomes the release notes.
+      - name: Release notes from CHANGELOG.md
+        if: steps.project.outputs.found == 'true'
+        run: |
+          VERSION=$(tr -d '[:space:]' < version.txt)
+          mkdir -p notes
+          awk '/^## /{ v=$2; f="notes/" v ".md"; next } v { print > f }' CHANGELOG.md
+          if [ ! -s "notes/$VERSION.md" ]; then
+            echo "::error::CHANGELOG.md has no section '## $VERSION'. Add one before publishing."
+            exit 1
+          fi
+
       - name: Build
         if: steps.project.outputs.found == 'true'
         run: gradle :app:assembleRelease --stacktrace
@@ -78,6 +90,32 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: Musix ${{ steps.version.outputs.version }}
-          body: Built from ${{ github.sha }}
+          body_path: notes/${{ steps.version.outputs.version }}.md
           files: musix-*.apk
           make_latest: true
+
+      # Keeps the notes of every published version matching CHANGELOG.md, so fixes to the text show up too.
+      - name: Sync release notes
+        if: steps.project.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for f in notes/*.md; do
+            v=$(basename "$f" .md)
+            if gh release view "v$v" > /dev/null 2>&1; then
+              gh release edit "v$v" --notes-file "$f"
+            fi
+          done
+
+      # Removes the old numbered builds (build-1, build-2, ...) from before versions were used.
+      - name: Remove old build releases
+        if: steps.project.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 100 --json tagName -q '.[].tagName' | grep '^build-' | while read -r tag; do
+            gh release delete "$tag" --cleanup-tag --yes && echo "Deleted $tag"
+          done
+          git ls-remote --tags origin 'refs/tags/build-*' | awk '{print $2}' | sed 's#refs/tags/##' | while read -r tag; do
+            git push origin ":refs/tags/$tag" && echo "Deleted tag $tag"
+          done
