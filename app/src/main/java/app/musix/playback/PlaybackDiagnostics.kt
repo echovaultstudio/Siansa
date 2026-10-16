@@ -25,7 +25,12 @@ import java.io.IOException
  * Underruns, waits and errors are logged whenever logging is on; the rest only with detailed logging.
  */
 @OptIn(UnstableApi::class)
-class PlaybackDiagnostics(private val player: ExoPlayer, private val context: Context) : AnalyticsListener {
+class PlaybackDiagnostics(
+    private val player: ExoPlayer,
+    private val context: Context,
+    /** Called after playback had to stop and wait for data, with how long it waited. */
+    private val onStall: (waitedMs: Long) -> Unit = {},
+) : AnalyticsListener {
     private var bufferingSince = 0L
     private var underruns = 0
 
@@ -34,7 +39,10 @@ class PlaybackDiagnostics(private val player: ExoPlayer, private val context: Co
         val pos = eventTime.currentPlaybackPositionMs / 1000
         val ahead = (player.bufferedPosition - player.currentPosition).coerceAtLeast(0) / 1000.0
         val net = if (Streaming.isUnmetered(context)) "wifi" else "mobile"
-        return "song $id at ${pos}s, ${"%.1f".format(ahead)}s buffered ahead, $net"
+        val speed = StreamStats.recentKbps().takeIf { it >= 0 }?.let { ", arriving at $it kbit/s" }.orEmpty()
+        val needs = StreamStats.neededKbps(id)?.let { ", song needs ~$it kbit/s" }.orEmpty()
+        val format = StreamStats.formatOf(id) ?: "original"
+        return "song $id ($format) at ${pos}s, ${"%.1f".format(ahead)}s buffered ahead, $net$speed$needs"
     }
 
     override fun onAudioUnderrun(eventTime: AnalyticsListener.EventTime, bufferSize: Int, bufferSizeMs: Long, elapsedSinceLastFeedMs: Long) {
@@ -57,6 +65,7 @@ class PlaybackDiagnostics(private val player: ExoPlayer, private val context: Co
                 if (player.playWhenReady) {
                     if (waited > 1500) AppLog.w("Audio", "Waited ${waited}ms for data before playing · ${where(eventTime)}")
                     else AppLog.d("Audio", "Ready after ${waited}ms")
+                    onStall(waited)
                 }
             }
             else -> Unit

@@ -44,6 +44,11 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.ui.graphics.Color
@@ -86,7 +91,15 @@ private val tabs = listOf(
     Tab("search", "Search", Icons.Rounded.Search),
     Tab("library", "Library", Icons.Rounded.LibraryMusic),
     Tab("vibes", "Vibes", Icons.Rounded.GraphicEq),
+    Tab("settings", "Settings", Icons.Rounded.Settings),
 )
+
+/** Height of the see-through bottom bar (mini player + tabs), so scrolling pages can end above it. */
+val LocalBottomBarPadding = compositionLocalOf { 0.dp }
+
+/** Bottom padding for a scrolling page: clear of the bottom bar, plus [extra]. */
+@Composable
+fun bottomBarPadding(extra: Dp = 24.dp): Dp = LocalBottomBarPadding.current + extra
 
 /**
  * Now playing is a sheet over the current page rather than a page of its own, so it slides up and down
@@ -145,9 +158,18 @@ fun MusixRoot() {
             snackbarHost = { SnackbarHost(snack) },
             bottomBar = {
                 run {
-                    Column {
+                    // See-through: the page shows through the top of the bar and fades out behind the tabs.
+                    Column(
+                        Modifier.background(
+                            Brush.verticalGradient(
+                                0f to Color.Transparent,
+                                0.3f to Brand.Plum.copy(alpha = 0.78f),
+                                1f to Brand.Plum.copy(alpha = 0.96f),
+                            )
+                        )
+                    ) {
                         if (player.hasMedia) MiniPlayer(player) { sheet.open() }
-                        NavigationBar {
+                        NavigationBar(containerColor = Color.Transparent, tonalElevation = 0.dp) {
                             tabs.forEach { tab ->
                                 NavigationBarItem(
                                     selected = currentTab == tab.route,
@@ -164,10 +186,13 @@ fun MusixRoot() {
                 }
             },
         ) { padding ->
+          CompositionLocalProvider(LocalBottomBarPadding provides padding.calculateBottomPadding()) {
             NavHost(
                 navController = nav,
                 startDestination = "home",
-                modifier = Modifier.padding(padding).consumeWindowInsets(padding),
+                // The page runs on under the see-through bottom bar; scrolling pages pad their end with
+                // LocalBottomBarPadding so nothing is stuck behind it.
+                modifier = Modifier.consumeWindowInsets(padding),
                 // Quick cross-fades between pages instead of the default slow ones.
                 enterTransition = { fadeIn(tween(140)) },
                 exitTransition = { fadeOut(tween(90)) },
@@ -197,6 +222,7 @@ fun MusixRoot() {
                 composable("mix/{id}") { MixScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("selector/{id}") { SelectorEditor(nav, it.arguments?.getString("id").orEmpty()) }
             }
+          }
         }
 
         BackHandler(enabled = sheet.isOpen) { sheet.close() }
@@ -233,11 +259,14 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
     val graph = LocalGraph.current
     val haptics = LocalHapticFeedback.current
     val song = state.current ?: return
-    Surface(tonalElevation = 3.dp) {
-        Column {
-            MiniProgress(state.durationMs)
+    // Tinted with the cover's colour, like now playing, and darkened so white text stays readable.
+    val tone = rememberCoverColor(song.coverArt)
+    val background = lerp(tone, Color.Black, 0.45f)
+    Box(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+      CompositionLocalProvider(LocalContentColor provides Color.White) {
+        Column(Modifier.clip(RoundedCornerShape(10.dp)).background(background)) {
             Row(
-                Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 12.dp, vertical = 8.dp),
+                Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Cover(song.coverArt, 150, Modifier.size(44.dp), RoundedCornerShape(6.dp))
@@ -247,7 +276,7 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
                     Text(
                         song.artist,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = Color.White.copy(alpha = 0.75f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -272,7 +301,9 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
                     Icon(Icons.Rounded.SkipNext, "Next")
                 }
             }
+            MiniProgress(state.durationMs)
         }
+      }
     }
 }
 
@@ -281,8 +312,8 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
 private fun MiniProgress(durationMs: Long) {
     val position by rememberPosition()
     val fraction = if (durationMs > 0) (position.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
-    androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(2.dp).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))) {
-        androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth(fraction).height(2.dp).background(Accent))
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(2.dp).clip(RoundedCornerShape(1.dp)).background(Color.White.copy(alpha = 0.2f))) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth(fraction).height(2.dp).background(Color.White))
     }
 }
 

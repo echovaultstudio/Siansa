@@ -264,8 +264,10 @@ fun Screen(
                 actions = { actions() },
             )
         },
-        content = content,
-    )
+    ) { padding ->
+        // Settings-style pages end above the see-through bottom bar.
+        Box(Modifier.padding(bottom = LocalBottomBarPadding.current)) { content(padding) }
+    }
 }
 
 @Composable

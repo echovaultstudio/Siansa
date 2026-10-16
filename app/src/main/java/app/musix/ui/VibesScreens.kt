@@ -91,7 +91,7 @@ fun VibesScreen(nav: NavController) {
     ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = 24.dp),
+            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = bottomBarPadding(24.dp)),
         ) {
             item {
                 Text(

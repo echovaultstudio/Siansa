@@ -27,6 +27,7 @@ data class AppSettings(
     val syncFolders: Set<String> = emptySet(),
     val imageCacheMb: Int = 500,
     val animatedCovers: Boolean = true,
+    val autoQuality: Boolean = true,
     val logging: Boolean = false,
     val logDetailed: Boolean = false,
     val scrobbleNavidrome: Boolean = true,
@@ -128,6 +129,7 @@ class SettingsRepository(context: Context) {
         syncFolders = prefs.getStringSet("sync_folders", emptySet())?.toSet() ?: emptySet(),
         imageCacheMb = prefs.getInt("image_cache_mb", 500),
         animatedCovers = prefs.getBoolean("animated_covers", true),
+        autoQuality = prefs.getBoolean("auto_quality", true),
         logging = prefs.getBoolean("logging", false),
         logDetailed = prefs.getBoolean("log_detailed", false),
         scrobbleNavidrome = prefs.getBoolean("scrobble_nd", true),
@@ -206,6 +208,11 @@ class SettingsRepository(context: Context) {
     fun setImageCacheMb(mb: Int) {
         prefs.edit().putInt("image_cache_mb", mb).apply()
         _state.value = _state.value.copy(imageCacheMb = mb)
+    }
+
+    fun setAutoQuality(on: Boolean) {
+        prefs.edit().putBoolean("auto_quality", on).apply()
+        _state.value = _state.value.copy(autoQuality = on)
     }
 
     fun setAnimatedCovers(on: Boolean) {

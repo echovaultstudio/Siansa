@@ -85,7 +85,7 @@ fun CollectionPage(
     val surface = MaterialTheme.colorScheme.surface
 
     Box(Modifier.fillMaxSize().background(surface)) {
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(32.dp))) {
             item {
                 Column(
                     Modifier
