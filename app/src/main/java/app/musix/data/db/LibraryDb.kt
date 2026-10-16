@@ -117,6 +117,10 @@ interface LibraryDao {
     @Query("SELECT * FROM songs WHERE artistId = :artistId OR (artistId IS NULL AND artist = :name COLLATE NOCASE)")
     suspend fun songsOfArtist(artistId: String, name: String): List<SongEntity>
 
+    /** Songs whose artist is [artistId] or whose artist text contains [namePattern] (a LIKE pattern, escaped with '\\'). */
+    @Query("SELECT * FROM songs WHERE artistId = :artistId OR artist LIKE :namePattern ESCAPE '\\'")
+    suspend fun songsCrediting(artistId: String, namePattern: String): List<SongEntity>
+
     @Query("SELECT * FROM songs WHERE genre = :genre COLLATE NOCASE ORDER BY RANDOM() LIMIT :limit")
     suspend fun songsOfGenre(genre: String, limit: Int): List<SongEntity>
 
