@@ -94,7 +94,8 @@ class RealServerTest {
         val still = AnimatedCovers.kind(graph, a.getValue("Still Album").coverArt!!)
         println("Kinds: big=$big small=$small still=$still")
         assertEquals("13 MB GIF should use Navidrome's small animated version", AnimatedCovers.Kind.Animated(SMALL_COVER), big)
-        assertEquals("Small GIF should be used as it is", AnimatedCovers.Kind.Animated(0), small)
+        // Navidrome sends original covers without a size, so a small GIF also goes through the 300 px version.
+        assertTrue("Small GIF should be animated: $small", small is AnimatedCovers.Kind.Animated)
         assertEquals(AnimatedCovers.Kind.Still, still)
     }
 
