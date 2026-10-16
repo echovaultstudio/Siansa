@@ -75,6 +75,12 @@ class LibraryIndex(val cache: LibraryCache) {
         .filter { it.artistId != null }
         .groupBy { it.artistId!! }
 
+    /** Release categories present in the library, in display order, with album counts. */
+    val categories: List<Pair<AlbumCategory, Int>> = cache.albums
+        .groupingBy { it.category }.eachCount()
+        .toList()
+        .sortedBy { it.first.ordinal }
+
     /** Genres by number of songs, for genre tiles and radios. */
     val genres: List<Genre> = cache.songs
         .mapNotNull { it.genre?.trim()?.takeIf { g -> g.isNotEmpty() } }

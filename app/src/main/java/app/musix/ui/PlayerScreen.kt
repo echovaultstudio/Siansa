@@ -1,6 +1,9 @@
 package app.musix.ui
 
+import android.os.Build
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,12 +22,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FormatQuote
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
@@ -32,13 +38,13 @@ import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +54,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,80 +74,158 @@ import kotlin.math.max
 
 private enum class PlayerView { ART, LYRICS, QUEUE }
 
+private val PlayerColors = darkColorScheme(
+    primary = Color.White,
+    onPrimary = Color.Black,
+    surface = Color.Transparent,
+    onSurface = Color.White,
+    onSurfaceVariant = Color.White.copy(alpha = 0.7f),
+)
+
+/**
+ * Now playing, in the style of Spotify: the cover blurred into the background, a large cover that
+ * opens its album, title and artist with a heart, and the controls below.
+ */
 @Composable
 fun PlayerScreen(nav: NavController) {
     val graph = LocalGraph.current
     val state by graph.player.state.collectAsStateWithLifecycle()
-    val position by rememberPosition()
+    // Re-read hearts when one changes.
+    val heartChanges by graph.favorites.changes.collectAsStateWithLifecycle()
     var view by rememberSaveable { mutableStateOf(PlayerView.ART) }
-    var dragging by remember { mutableStateOf<Float?>(null) }
     val song = state.current
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-            .systemBarsPadding()
-            .padding(horizontal = 20.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.Rounded.KeyboardArrowDown, "Close") }
-            Text(
-                "Now playing",
-                style = MaterialTheme.typography.titleSmall,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.size(48.dp))
-        }
+    fun openAlbum() {
+        val albumId = song?.albumId ?: return
+        nav.popBackStack()
+        nav.navigate("album/$albumId")
+    }
 
-        Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
-            when (view) {
-                PlayerView.ART -> Cover(
-                    song?.coverArt,
-                    null,
-                    Modifier.fillMaxWidth().aspectRatio(1f),
-                    RoundedCornerShape(16.dp),
+    fun openArtist() {
+        val artistId = song?.artistId ?: return
+        nav.popBackStack()
+        nav.navigate("artist/$artistId")
+    }
+
+    MaterialTheme(colorScheme = PlayerColors, typography = MaterialTheme.typography) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            // The cover, enlarged and blurred, as the background (a darker plain version before Android 12).
+            Cover(
+                song?.coverArt,
+                300,
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { scaleX = 1.4f; scaleY = 1.4f; alpha = if (Build.VERSION.SDK_INT >= 31) 0.85f else 0.45f }
+                    .then(if (Build.VERSION.SDK_INT >= 31) Modifier.blur(70.dp) else Modifier),
+                RectangleShape,
+            )
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.25f),
+                        0.55f to Color.Black.copy(alpha = 0.45f),
+                        1f to Color.Black.copy(alpha = 0.9f),
+                    )
                 )
-                PlayerView.LYRICS -> LyricsView(song, position)
-                PlayerView.QUEUE -> QueueView(state)
+            )
+
+            Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 24.dp)) {
+                TopRow(song, onClose = { nav.popBackStack() }, onAlbum = ::openAlbum)
+
+                Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                    AnimatedContent(targetState = view, label = "player-view") { v ->
+                        when (v) {
+                            PlayerView.ART -> Cover(
+                                song?.coverArt,
+                                null,
+                                Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(1f)
+                                    .shadow(24.dp, RoundedCornerShape(10.dp))
+                                    .clickable(enabled = song?.albumId != null) { openAlbum() },
+                                RoundedCornerShape(10.dp),
+                            )
+                            PlayerView.LYRICS -> LyricsView(song)
+                            PlayerView.QUEUE -> QueueView(state)
+                        }
+                    }
+                }
+
+                TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = ::openArtist) {
+                    song?.let { graph.favorites.toggle(it) }
+                }
+                SeekBar(state.durationMs)
+                Controls(state)
+                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    ViewToggle(Icons.Rounded.FormatQuote, "Lyrics", view == PlayerView.LYRICS) {
+                        view = if (view == PlayerView.LYRICS) PlayerView.ART else PlayerView.LYRICS
+                    }
+                    ViewToggle(Icons.AutoMirrored.Rounded.QueueMusic, "Queue", view == PlayerView.QUEUE) {
+                        view = if (view == PlayerView.QUEUE) PlayerView.ART else PlayerView.QUEUE
+                    }
+                }
             }
         }
+    }
+}
 
-        Text(
-            song?.title ?: "Nothing playing",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
+@Composable
+private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = onClose) { Icon(Icons.Rounded.KeyboardArrowDown, "Close", Modifier.size(32.dp)) }
+        Column(Modifier.weight(1f).clickable(enabled = song?.albumId != null, onClick = onAlbum), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("PLAYING FROM ALBUM", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+            Text(
+                song?.album.orEmpty(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.size(48.dp))
+    }
+}
+
+@Composable
+private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                song?.title ?: "Nothing playing",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                modifier = Modifier.basicMarquee(),
+            )
             Text(
                 song?.artist.orEmpty(),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.primary,
+                color = Color.White.copy(alpha = 0.75f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false).clickable(enabled = song?.artistId != null) {
-                    song?.artistId?.let { nav.navigate("artist/$it") }
-                },
+                modifier = Modifier.clickable(enabled = song?.artistId != null, onClick = onArtist),
             )
-            if (!song?.album.isNullOrBlank()) {
-                Text(
-                    " · " + song?.album.orEmpty(),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false).clickable(enabled = song?.albumId != null) {
-                        song?.albumId?.let { nav.navigate("album/$it") }
-                    },
-                )
-            }
         }
+        IconButton(onClick = onHeart, enabled = song != null) {
+            Icon(
+                if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                if (liked) "Remove from liked songs" else "Like",
+                tint = if (liked) Color(0xFF1ED760) else Color.White,
+                modifier = Modifier.size(28.dp),
+            )
+        }
+    }
+}
 
-        val duration = state.durationMs.coerceAtLeast(1L)
-        val fraction = dragging ?: (position.toFloat() / duration).coerceIn(0f, 1f)
+@Composable
+private fun SeekBar(durationMs: Long) {
+    val graph = LocalGraph.current
+    val position by rememberPosition()
+    var dragging by remember { mutableStateOf<Float?>(null) }
+    val duration = durationMs.coerceAtLeast(1L)
+    val fraction = dragging ?: (position.toFloat() / duration).coerceIn(0f, 1f)
+    Column(Modifier.padding(top = 8.dp)) {
         Slider(
             value = fraction,
             onValueChange = { dragging = it },
@@ -142,122 +233,112 @@ fun PlayerScreen(nav: NavController) {
                 dragging?.let { graph.player.seekTo((it * duration).toLong()) }
                 dragging = null
             },
-            modifier = Modifier.padding(top = 8.dp),
+            colors = SliderDefaults.colors(
+                thumbColor = Color.White,
+                activeTrackColor = Color.White,
+                inactiveTrackColor = Color.White.copy(alpha = 0.3f),
+            ),
         )
         Row(Modifier.fillMaxWidth()) {
             Text(
                 formatDuration(((fraction * duration) / 1000).toLong()),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.weight(1f),
             )
-            Text(formatDuration(state.durationMs / 1000), style = MaterialTheme.typography.bodySmall)
-        }
-
-        Row(
-            Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconToggleButton(checked = state.shuffle, onCheckedChange = { graph.player.toggleShuffle() }) {
-                Icon(
-                    Icons.Rounded.Shuffle,
-                    "Shuffle",
-                    tint = if (state.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            IconButton(onClick = { graph.player.previous() }, modifier = Modifier.size(56.dp)) {
-                Icon(Icons.Rounded.SkipPrevious, "Previous", Modifier.size(36.dp))
-            }
-            FilledIconButton(onClick = { graph.player.togglePlay() }, modifier = Modifier.size(72.dp)) {
-                Icon(
-                    if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    "Play or pause",
-                    Modifier.size(40.dp),
-                )
-            }
-            IconButton(onClick = { graph.player.next() }, modifier = Modifier.size(56.dp)) {
-                Icon(Icons.Rounded.SkipNext, "Next", Modifier.size(36.dp))
-            }
-            IconToggleButton(
-                checked = state.repeatMode != Player.REPEAT_MODE_OFF,
-                onCheckedChange = { graph.player.cycleRepeat() },
-            ) {
-                Icon(
-                    if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
-                    "Repeat",
-                    tint = if (state.repeatMode != Player.REPEAT_MODE_OFF) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
-        }
-
-        Row(
-            Modifier.fillMaxWidth().padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            IconToggleButton(
-                checked = view == PlayerView.LYRICS,
-                onCheckedChange = { view = if (it) PlayerView.LYRICS else PlayerView.ART },
-            ) {
-                Icon(
-                    Icons.Rounded.FormatQuote,
-                    "Lyrics",
-                    tint = if (view == PlayerView.LYRICS) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            IconToggleButton(
-                checked = view == PlayerView.QUEUE,
-                onCheckedChange = { view = if (it) PlayerView.QUEUE else PlayerView.ART },
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.QueueMusic,
-                    "Queue",
-                    tint = if (view == PlayerView.QUEUE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Text(formatDuration(durationMs / 1000), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
         }
     }
 }
 
 @Composable
-private fun LyricsView(song: Song?, positionMs: Long) {
+private fun Controls(state: PlayerState) {
     val graph = LocalGraph.current
-    val lyrics by loadState(song?.id) { song?.let { graph.subsonic.lyrics(it) } }
-    LoadBox(lyrics) { loaded ->
-        if (loaded == null || loaded.lines.isEmpty()) {
-            Text("No lyrics for this song", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            return@LoadBox
+    val green = Color(0xFF1ED760)
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = { graph.player.toggleShuffle() }) {
+            Icon(Icons.Rounded.Shuffle, "Shuffle", tint = if (state.shuffle) green else Color.White)
         }
-        if (!loaded.synced) {
-            Text(
-                loaded.lines.joinToString("\n") { it.text },
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        IconButton(onClick = { graph.player.previous() }, modifier = Modifier.size(56.dp)) {
+            Icon(Icons.Rounded.SkipPrevious, "Previous", Modifier.size(40.dp))
+        }
+        Box(
+            Modifier.size(68.dp).clip(CircleShape).background(Color.White).clickable { graph.player.togglePlay() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                "Play or pause",
+                tint = Color.Black,
+                modifier = Modifier.size(38.dp),
             )
-            return@LoadBox
         }
-        val listState = rememberLazyListState()
-        val current = loaded.lines.indexOfLast { (it.startMs ?: Long.MAX_VALUE) <= positionMs }
-        LaunchedEffect(current) {
-            if (current >= 0) listState.animateScrollToItem(max(0, current - 2))
+        IconButton(onClick = { graph.player.next() }, modifier = Modifier.size(56.dp)) {
+            Icon(Icons.Rounded.SkipNext, "Next", Modifier.size(40.dp))
         }
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 24.dp)) {
-            itemsIndexed(loaded.lines) { index, line ->
-                val active = index == current
+        IconButton(onClick = { graph.player.cycleRepeat() }) {
+            Icon(
+                if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
+                "Repeat",
+                tint = if (state.repeatMode != Player.REPEAT_MODE_OFF) green else Color.White,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ViewToggle(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, active: Boolean, onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(icon, label, tint = if (active) Color(0xFF1ED760) else Color.White.copy(alpha = 0.8f))
+    }
+}
+
+@Composable
+private fun LyricsView(song: Song?) {
+    val graph = LocalGraph.current
+    val position by rememberPosition()
+    val lyrics by loadState(song?.id) { song?.let { graph.subsonic.lyrics(it) } }
+    Box(
+        Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.3f)).padding(16.dp),
+    ) {
+        LoadBox(lyrics) { loaded ->
+            if (loaded == null || loaded.lines.isEmpty()) {
+                Text("No lyrics for this song", color = Color.White.copy(alpha = 0.7f), modifier = Modifier.align(Alignment.Center))
+                return@LoadBox
+            }
+            if (!loaded.synced) {
                 Text(
-                    line.text.ifBlank { "♪" },
-                    style = if (active) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
-                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                    color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { line.startMs?.let { graph.player.seekTo(it) } }
-                        .padding(vertical = 6.dp),
+                    loaded.lines.joinToString("\n") { it.text },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                 )
+                return@LoadBox
+            }
+            val listState = rememberLazyListState()
+            val current = loaded.lines.indexOfLast { (it.startMs ?: Long.MAX_VALUE) <= position }
+            LaunchedEffect(current) {
+                if (current >= 0) listState.animateScrollToItem(max(0, current - 2))
+            }
+            LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 24.dp)) {
+                itemsIndexed(loaded.lines) { index, line ->
+                    val active = index == current
+                    Text(
+                        line.text.ifBlank { "♪" },
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (active) Color.White else Color.White.copy(alpha = if (index < current) 0.55f else 0.35f),
+                        textAlign = TextAlign.Start,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { line.startMs?.let { graph.player.seekTo(it) } }
+                            .padding(vertical = 6.dp),
+                    )
+                }
             }
         }
     }
@@ -268,23 +349,20 @@ private fun QueueView(state: PlayerState) {
     val graph = LocalGraph.current
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = max(0, state.index - 1))
     if (state.queue.isEmpty()) {
-        Text("The queue is empty", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("The queue is empty", color = Color.White.copy(alpha = 0.7f))
         return
     }
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.3f))) {
         Text(
-            "Queue · ${state.queue.size} tracks",
+            "Up next · ${state.queue.size - state.index - 1} of ${state.queue.size}",
             style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(bottom = 8.dp),
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(16.dp),
         )
         Spacer(Modifier.height(4.dp))
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             itemsIndexed(state.queue, key = { i, s -> "$i-${s.id}" }) { index, song ->
-                SongRow(
-                    song = song,
-                    onClick = { graph.player.skipTo(index) },
-                    highlighted = index == state.index,
-                )
+                SongRow(song = song, onClick = { graph.player.skipTo(index) }, highlighted = index == state.index)
             }
         }
     }

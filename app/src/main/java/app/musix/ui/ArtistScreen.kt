@@ -9,12 +9,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -23,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -33,6 +33,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,8 +41,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -51,20 +50,23 @@ import androidx.navigation.NavController
 import app.musix.AppGraph
 import app.musix.data.Album
 import app.musix.data.Artist
-import app.musix.data.ArtistInfo
 import app.musix.data.SimilarArtist
 import app.musix.data.Song
+import app.musix.data.category
 import coil3.compose.AsyncImage
 
 private data class ArtistPage(val artist: Artist, val albums: List<Album>, val songs: List<Song>)
 
+private val HERO = 380.dp
+
 /**
- * An artist with what Navidrome knows about them: photo, biography, top songs and similar artists
- * (from Navidrome's agents, or AudioMuse when its plugin is installed), plus their albums.
+ * An artist with what Navidrome knows about them: photo, biography, top songs, discography grouped by
+ * release type and similar artists. The photo fills the top and blends away behind the page as it scrolls.
  */
 @Composable
 fun ArtistScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
+    val launch = rememberPlayLauncher()
     val page by loadState(id) {
         val index = graph.library.current
         val local = index?.artist(id)
@@ -76,48 +78,92 @@ fun ArtistScreen(nav: NavController, id: String) {
         }
     }
     val info by loadState("info-$id") { graph.subsonic.artistInfo(id) }
-    val title = page.valueOrNull()?.artist?.name ?: "Artist"
+    val gridState = rememberLazyGridState()
+    val scrolled by remember {
+        derivedStateOf { if (gridState.firstVisibleItemIndex == 0) gridState.firstVisibleItemScrollOffset.toFloat() else 100_000f }
+    }
+    val p = page.valueOrNull()
+    val artistInfo = info.valueOrNull()
 
-    Screen(title = title, nav = nav) { padding ->
-        Box(Modifier.padding(top = padding.calculateTopPadding())) {
-            LoadBox(page) { p ->
-                val artistInfo = info.valueOrNull()
-                val top by loadState("top-$id") { loadTopSongs(graph, p) }
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(150.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    full { Header(p, artistInfo) }
-                    artistInfo?.biography?.let { bio -> full { Biography(bio) } }
+    HeroPage(
+        title = p?.artist?.name ?: "Artist",
+        heroHeight = HERO,
+        scrolledPx = scrolled,
+        onBack = { nav.popBackStack() },
+        image = { modifier ->
+            val photo = artistInfo?.imageUrl ?: p?.artist?.imageUrl
+            if (photo != null) {
+                AsyncImage(model = photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier)
+            } else {
+                Cover(p?.artist?.coverArt, null, modifier, RectangleShape)
+            }
+        },
+    ) { cardModifier ->
+        if (p == null) {
+            Box(Modifier.statusBarsPadding().padding(top = HERO)) { LoadBox(page) { } }
+            return@HeroPage
+        }
+        val top by loadState("top-$id") { loadTopSongs(graph, p) }
+        val groups = p.albums.groupBy { it.category }.toList().sortedBy { it.first.ordinal }
 
-                    val topSongs = top.valueOrNull().orEmpty()
-                    if (topSongs.isNotEmpty()) {
-                        full { SectionTitle("Top songs") }
-                        itemsIndexed(topSongs, key = { i, s -> "top-$i-${s.id}" }, span = { _, _ -> GridItemSpan(maxLineSpan) }) { index, song ->
-                            SongRow(song = song, onClick = { graph.player.play(topSongs, index) })
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Adaptive(150.dp),
+            contentPadding = PaddingValues(bottom = 24.dp),
+            modifier = Modifier.fillMaxSize().then(cardModifier),
+        ) {
+            full { HeroSpacer(HERO) }
+            full {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Text(p.artist.name, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Black)
+                    Text(
+                        listOfNotNull(
+                            "${p.albums.size} ${if (p.albums.size == 1) "release" else "releases"}",
+                            if (p.songs.isNotEmpty()) "${p.songs.size} songs" else null,
+                        ).joinToString(" · "),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (p.songs.isNotEmpty()) PlayButtons(p.songs)
+                        OutlinedButton(onClick = { launch("${p.artist.name} radio") { graph.radios.artist(p.artist) } }) {
+                            Icon(Icons.Rounded.Radio, null)
+                            Spacer(Modifier.width(4.dp))
+                            Text("Radio")
                         }
-                    }
-
-                    if (p.albums.isNotEmpty()) {
-                        full { SectionTitle(if (p.albums.size == 1) "Album" else "Albums") }
-                        items(p.albums, key = { "album-${it.id}" }) { album ->
-                            AlbumTile(
-                                name = album.name,
-                                subtitle = album.year?.toString() ?: "",
-                                coverArt = album.coverArt,
-                                onClick = { nav.navigate("album/${album.id}") },
-                                modifier = Modifier.padding(horizontal = 4.dp),
-                            )
-                        }
-                    }
-
-                    val similar = artistInfo?.similar.orEmpty()
-                    if (similar.isNotEmpty()) {
-                        full { SectionTitle("Similar artists") }
-                        full { SimilarRow(similar, nav) }
                     }
                 }
+            }
+
+            val topSongs = top.valueOrNull().orEmpty()
+            if (topSongs.isNotEmpty()) {
+                full { SectionTitle("Popular") }
+                itemsIndexed(topSongs.take(5), key = { i, s -> "top-$i-${s.id}" }, span = { _, _ -> GridItemSpan(maxLineSpan) }) { index, song ->
+                    SongRow(song = song, onClick = { graph.player.play(topSongs, index) }, leading = "${index + 1}")
+                }
+            }
+
+            // Discography by release type: Albums, EPs, Singles, Live, Compilations, DJ-mixes…
+            groups.forEach { (category, albums) ->
+                full { SectionTitle(if (albums.size == 1) category.single else category.plural) }
+                items(albums, key = { "album-${it.id}" }) { album ->
+                    AlbumTile(
+                        name = album.name,
+                        subtitle = album.year?.toString() ?: "",
+                        coverArt = album.coverArt,
+                        onClick = { nav.navigate("album/${album.id}") },
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                    )
+                }
+            }
+
+            artistInfo?.biography?.let { bio -> full { Biography(bio) } }
+
+            val similar = artistInfo?.similar.orEmpty()
+            if (similar.isNotEmpty()) {
+                full { SectionTitle("Fans also like") }
+                full { SimilarRow(similar, nav) }
             }
         }
     }
@@ -136,70 +182,14 @@ private suspend fun loadTopSongs(graph: AppGraph, page: ArtistPage): List<Song> 
 }
 
 @Composable
-private fun Header(page: ArtistPage, info: ArtistInfo?) {
-    val graph = LocalGraph.current
-    Column {
-        Box(Modifier.fillMaxWidth().aspectRatio(1.4f)) {
-            val photo = info?.imageUrl ?: page.artist.imageUrl
-            if (photo != null) {
-                AsyncImage(
-                    model = photo,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Cover(page.artist.coverArt, null, Modifier.fillMaxSize(), RectangleShape)
-            }
-            Box(
-                Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.surface), startY = 200f)
-                )
-            )
-            Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
-                Text(page.artist.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                val songs = page.songs.size
-                Text(
-                    listOfNotNull(
-                        "${page.albums.size} ${if (page.albums.size == 1) "album" else "albums"}",
-                        if (songs > 0) "$songs songs" else null,
-                    ).joinToString(" · "),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        val launch = rememberPlayLauncher()
-        if (page.songs.isNotEmpty()) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PlayButtons(page.songs)
-                OutlinedButton(onClick = { launch("${page.artist.name} radio") { graph.radios.artist(page.artist) } }) {
-                    Icon(Icons.Rounded.Radio, null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Radio")
-                }
-            }
-        } else if (page.albums.isNotEmpty()) {
-            // Before a sync, the artist's songs are loaded album by album when Play is pressed.
-            Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                val loaded by loadState("songs-${page.artist.id}") {
-                    page.albums.flatMap { runCatching { graph.subsonic.album(it.id).songs }.getOrDefault(emptyList()) }
-                }
-                PlayButtons(loaded.valueOrNull().orEmpty())
-            }
-        }
-    }
-}
-
-@Composable
 private fun Biography(text: String) {
     var expanded by remember { mutableStateOf(false) }
     Column(Modifier.padding(horizontal = 16.dp).animateContentSize()) {
         Text(
             "About",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = 24.dp, bottom = 10.dp),
         )
         Text(
             text,
@@ -226,7 +216,7 @@ private fun SimilarRow(similar: List<SimilarArtist>, nav: NavController) {
             val target = local?.id ?: artist.id
             Column(
                 Modifier
-                    .width(100.dp)
+                    .width(110.dp)
                     .clickable(enabled = target != null) { target?.let { nav.navigate("artist/$it") } }
                     .padding(4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -237,18 +227,13 @@ private fun SimilarRow(similar: List<SimilarArtist>, nav: NavController) {
                         model = photo,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(84.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),
+                        modifier = Modifier.size(96.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),
                     )
                 } else {
-                    Cover(artist.coverArt ?: local?.coverArt, 150, Modifier.size(84.dp), CircleShape)
+                    Cover(artist.coverArt ?: local?.coverArt, 150, Modifier.size(96.dp), CircleShape)
                 }
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    artist.name,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Text(artist.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

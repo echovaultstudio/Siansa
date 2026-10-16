@@ -299,6 +299,11 @@ fun SongRow(
                     menu = false
                     graph.player.addToQueue(song)
                 })
+                val liked = graph.favorites.isLiked(song)
+                DropdownMenuItem(text = { Text(if (liked) "Remove from liked songs" else "Add to liked songs") }, onClick = {
+                    menu = false
+                    graph.favorites.toggle(song)
+                })
                 DropdownMenuItem(text = { Text("Start song radio") }, onClick = {
                     menu = false
                     launch("song radio") { graph.radios.song(song) }
