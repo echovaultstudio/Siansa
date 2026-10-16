@@ -391,9 +391,10 @@ private fun SwipeCover(song: Song?, onTap: () -> Unit) {
             offset.animateTo(0f, tween(220, easing = FastOutSlowInEasing))
         }
 
+        val (coverId, coverSize) = rememberBigCover(song?.coverArt, song?.albumId)
         Cover(
-            song?.coverArt,
-            LARGE_COVER,
+            coverId,
+            coverSize,
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {

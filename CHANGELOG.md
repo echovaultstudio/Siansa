@@ -3,6 +3,14 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.7beta — 2026-10-16
+
+### Fixed
+- Animated covers didn't move. Now playing asked Navidrome for the song's own picture, which is always the still image embedded in the file; the animated cover.gif / cover.webp in the album folder is only used for the album. Musix now checks whether the album has an animated cover and, if so, shows it in now playing and on the album page, at full size so older Navidrome versions don't flatten it. Albums without one keep each song's own cover.
+
+### Added
+- Settings → Storage → **Animated covers** switch (on by default).
+
 ## 0.0.6beta — 2026-10-16
 
 ### Added

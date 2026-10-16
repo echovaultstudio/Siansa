@@ -300,6 +300,9 @@ fun StorageScreen(nav: NavController) {
                 }
             }) { Text("Clear image cache") }
 
+            SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
+            Hint("When an album folder has an animated cover (cover.gif or cover.webp), now playing and the album page show it, in full size so it keeps moving. Uses a little more data the first time.")
+
             if (settings.imageCacheMb != imagesAtStart || settings.songCacheMb != songsAtStart) {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
