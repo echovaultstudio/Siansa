@@ -50,9 +50,12 @@ object PlayerFactory {
             .setBufferDurationsMs(15_000, 60_000, 1_000, 5_000)
             .build()
 
-        // The phone's own decoders first; FFmpeg for what it lacks (ALAC on most phones).
+        // FFmpeg first, the phone's own decoders for what it lacks (Opus still goes to the phone's).
+        // Media3 finds FLAC frames by their headers alone, so audio bytes that happen to look like a
+        // header split a real frame in two. FFmpeg drops the two broken pieces (one frame, ~0.1 s) and
+        // plays on; Android's FLAC decoder stops producing sound for good (#7, Skinty Fia at 0:59.8).
         val renderers = DefaultRenderersFactory(context)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
         AppLog.i("Player", "FFmpeg decoders " + if (FfmpegLibrary.isAvailable()) "ready (${FfmpegLibrary.getVersion()})" else "not available")
 
         val player = ExoPlayer.Builder(context, renderers)
