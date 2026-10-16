@@ -241,7 +241,7 @@ jobs:
           fi
 
       # One release per version, so the APK can be downloaded straight from the Releases page on a phone.
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         if: steps.version.outputs.exists != 'true'
         with:
           tag_name: v${{ steps.version.outputs.version }}
