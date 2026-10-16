@@ -3,7 +3,7 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
-## 0.0.21beta — 2026-10-16
+## 0.0.23beta — 2026-10-16
 
 ### Added
 - **This time last year** in Your listening: the same month a year ago, with your top artists, songs and albums from then. It has its own tile in Your Library and a button on the Your listening page.
