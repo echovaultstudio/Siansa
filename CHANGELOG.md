@@ -11,7 +11,6 @@ To publish a new version: add a section at the top, set the same version in `ver
   - requests for the same cover that arrive together wait for that one download instead of each starting their own;
   - lists, backgrounds, colours and the lock screen always get a still picture. Like Symfonium, covers only move on the album page and in now playing, and the animation is decoded at screen size (720 px) rather than the file's full size;
   - only the last few animations are kept in memory.
-- Small animated GIFs are now also kept on the phone after the first download.
 - The lock screen and notification cover now come from Musix's image cache instead of being downloaded again in full on every song change.
 
 ### Added

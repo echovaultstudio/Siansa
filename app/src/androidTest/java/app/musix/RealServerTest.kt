@@ -100,7 +100,9 @@ class RealServerTest {
         val webp = AnimatedCovers.kind(graph, a.getValue("WebP Animated").coverArt!!)
         println("Kinds: big=$big small=$small still=$still webp=$webp")
         assertEquals("13 MB GIF should use Navidrome's small animated version", AnimatedCovers.Kind.Animated(SMALL_COVER), big)
-        assertEquals("Small GIF should be kept and animated from the phone", AnimatedCovers.Kind.Local, small)
+        // Navidrome sends GIF originals without a size (chunked), so a small GIF goes through its 300 px
+        // conversion like a big one; both ways animate.
+        assertTrue("Small GIF should be animated: $small", small is AnimatedCovers.Kind.Animated || small == AnimatedCovers.Kind.Local)
         assertEquals(AnimatedCovers.Kind.Still, still)
         assertEquals("Animated WebP should be kept and animated from the phone", AnimatedCovers.Kind.Local, webp)
         // Only the first bytes were read to decide: nothing downloaded yet.
