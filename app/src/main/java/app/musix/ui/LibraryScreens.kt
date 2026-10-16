@@ -124,7 +124,7 @@ private fun PlaylistList(nav: NavController) {
                 modifier = Modifier.padding(16.dp),
             )
         }
-        LazyColumn(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(16.dp))) {
             item {
                 Row(
                     Modifier.fillMaxWidth().clickable { nav.navigate("liked") }.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -270,7 +270,7 @@ private fun AlbumGrid(nav: NavController) {
 
     LazyVerticalGrid(
         columns = GridCells.Adaptive(150.dp),
-        contentPadding = PaddingValues(8.dp),
+        contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = bottomBarPadding(8.dp)),
         modifier = Modifier.fillMaxSize(),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
@@ -321,7 +321,7 @@ private fun ArtistList(nav: NavController) {
     val graph = LocalGraph.current
     val version by graph.library.version.collectAsStateWithLifecycle()
     val artists by loadState(version to "artists") { graph.library.artists() }
-    LazyColumn(Modifier.fillMaxSize()) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(16.dp))) {
         items(artists.valueOrNull().orEmpty(), key = { it.id }) { artist ->
             Row(
                 Modifier

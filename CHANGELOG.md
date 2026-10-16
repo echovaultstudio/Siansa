@@ -3,6 +3,23 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.9beta — 2026-10-16
+
+### Fixed
+- Songs started slowly and then played a few seconds, stopped, and started again. The log showed the connection to Navidrome delivering only about 250–335 kbit/s while the FLAC files need roughly 900–1,400 kbit/s, and Musix made it worse by downloading the next song at the same time. Now:
+  - the next song is only pre-cached once the current one has fully downloaded, so they never share the connection;
+  - after running dry mid-song, playback waits for 5 seconds of audio instead of 2, so there are fewer, longer stretches;
+  - if the original still stops three times in two minutes, Musix carries on in Opus at a bitrate the connection can manage, from the same spot, and tries the original again after 15 minutes. This can be switched off under Settings → Playback.
+- Personal and vibe mixes were cancelled half-way when you left Home while they were being made.
+
+### Added
+- The log now shows each stream's size and the bitrate it needs, how fast data is actually arriving (every few seconds with detailed logging), the format being streamed, and when the next song starts pre-caching. Every "Waited … for data" line includes arriving vs needed speed.
+- **Settings** is now a tab on the far right of the bottom bar (and no longer a cog on Home).
+
+### Changed
+- The bottom bar is see-through: pages scroll on underneath it and fade out behind the tabs.
+- The mini player is a floating card tinted with the playing song's cover colour, with a white progress line, matching now playing.
+
 ## 0.0.8beta — 2026-10-16
 
 ### Added

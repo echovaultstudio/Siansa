@@ -66,7 +66,7 @@ fun ReportScreen(nav: NavController, rangeId: String) {
     val report by loadState(range) { graph.insights.report(range) }
 
     Box(Modifier.fillMaxSize().background(Brand.Plum)) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(32.dp))) {
             item {
                 Column(
                     Modifier

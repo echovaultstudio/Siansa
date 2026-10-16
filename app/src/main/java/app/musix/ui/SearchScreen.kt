@@ -157,7 +157,7 @@ private fun SoundResults(songs: List<Song>?) {
         )
         return
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp))) {
         item {
             Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { PlayButtons(songs) }
         }
@@ -175,7 +175,7 @@ private fun LibraryResults(results: SearchResults?, nav: NavController) {
         Text("Nothing found", modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp))) {
         if (results.artists.isNotEmpty()) {
             item { SectionTitle("Artists") }
             item {
@@ -228,7 +228,7 @@ private fun BrowseGrid(nav: NavController) {
     val genres = genreList.valueOrNull().orEmpty()
     LazyVerticalGrid(
         columns = GridCells.Adaptive(160.dp),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = bottomBarPadding(24.dp)),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxSize(),

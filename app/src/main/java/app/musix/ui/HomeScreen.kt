@@ -61,6 +61,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.produceState
 import app.musix.mix.MixGenerator
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.LocalTime
@@ -82,7 +83,8 @@ fun HomeScreen(nav: NavController) {
 
     fun build(selector: Selector?, force: Boolean, open: Boolean) {
         if (busySelector != null) return
-        scope.launch {
+        // In the app's own scope, so leaving Home doesn't cancel a mix half-way.
+        graph.scope.launch(Dispatchers.Main) {
             busySelector = selector?.id ?: "current"
             error = null
             try {
@@ -112,7 +114,7 @@ fun HomeScreen(nav: NavController) {
 
     fun buildPersonal(kind: MixGenerator.Personal, open: Boolean, quiet: Boolean = false) {
         if (personalBusy != null) return
-        scope.launch {
+        graph.scope.launch(Dispatchers.Main) {
             personalBusy = kind.id
             try {
                 val mix = graph.generator.ensurePersonal(kind)
@@ -171,14 +173,13 @@ fun HomeScreen(nav: NavController) {
     }
     val genres by loadState(version to "genres") { if (graph.library.isSynced) graph.library.genres(12) else emptyList() }
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp))) {
         item {
             Row(
                 Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(greeting(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                IconButton(onClick = { nav.navigate("settings") }) { Icon(Icons.Rounded.Settings, "Settings") }
             }
         }
 

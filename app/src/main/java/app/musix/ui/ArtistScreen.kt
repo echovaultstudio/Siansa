@@ -124,7 +124,7 @@ fun ArtistScreen(nav: NavController, id: String) {
         LazyVerticalGrid(
             state = gridState,
             columns = GridCells.Adaptive(150.dp),
-            contentPadding = PaddingValues(bottom = 24.dp),
+            contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp)),
             modifier = Modifier.fillMaxSize().then(cardModifier),
         ) {
             full { HeroSpacer(HERO) }
