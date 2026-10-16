@@ -7,6 +7,7 @@ ND_VERSION="${ND_VERSION:-0.64.2}"
 DIR="${RUNNER_TEMP:-/tmp}/navidrome-test"
 mkdir -p "$DIR" && cd "$DIR"
 
+if [ -z "${PREPARE_ONLY:-}" ] && [ -x navidrome ] && [ -d music ]; then echo "Library ready"; else
 curl -sSL -o nd.tgz "https://github.com/navidrome/navidrome/releases/download/v${ND_VERSION}/navidrome_${ND_VERSION}_linux_amd64.tar.gz"
 tar xzf nd.tgz navidrome
 
@@ -23,6 +24,8 @@ ffmpeg -loglevel error -y -f lavfi -i "testsrc2=size=1000x1000:rate=24:duration=
 ffmpeg -loglevel error -y -f lavfi -i "testsrc=size=400x400:rate=10:duration=2" -vf "split[a][b];[a]palettegen[p];[b][p]paletteuse" -loop 0 "music/Small Animated/cover.gif"
 ffmpeg -loglevel error -y -f lavfi -i "testsrc=size=800x800" -frames:v 1 "music/Still Album/cover.jpg"
 ls -la music/*
+fi
+[ -n "${PREPARE_ONLY:-}" ] && exit 0
 
 ND_MUSICFOLDER="$DIR/music" ND_DATAFOLDER="$DIR/data" ND_PORT=4533 ND_ADDRESS=127.0.0.1 ND_SCANNER_SCHEDULE=0 \
   ND_ENABLEEXTERNALSERVICES=false ND_LOGLEVEL=info nohup ./navidrome > "$DIR/navidrome.log" 2>&1 &

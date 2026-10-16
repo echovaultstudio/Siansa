@@ -26,8 +26,8 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
 
-      - name: Start Navidrome with the test library
-        run: scripts/test-server.sh
+      - name: Prepare the test library (Navidrome starts once the emulator is up)
+        run: PREPARE_ONLY=1 scripts/test-server.sh
 
       - name: Enable KVM
         run: |
@@ -52,6 +52,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           script: |
+            scripts/test-server.sh
             adb logcat -c
             gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.navidromeUrl=http://10.0.2.2:5533 || (adb logcat -d > logcat.txt; exit 1)
             adb logcat -d > logcat.txt
