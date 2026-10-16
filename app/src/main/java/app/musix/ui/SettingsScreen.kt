@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,7 +12,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
@@ -24,6 +27,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,15 +41,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.musix.data.AppSettings
 import app.musix.data.ReplayGainMode
-import app.musix.data.normalizeUrl
 import app.musix.net.AudioMuseApi
 import app.musix.net.OpenRouterApi
 import app.musix.net.SubsonicApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.util.Date
 import kotlin.math.roundToInt
 
 @Composable
@@ -53,27 +59,21 @@ fun SettingsScreen(nav: NavController) {
     val graph = LocalGraph.current
     val scope = rememberCoroutineScope()
     val firstRun = !graph.settings.current.navidromeReady
+    val library by graph.library.index.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf(graph.settings.current) }
+    var showProxy by remember { mutableStateOf(graph.settings.current.proxyUser.isNotBlank()) }
+    var problem by remember { mutableStateOf<String?>(null) }
     var navidromeTest by remember { mutableStateOf<String?>(null) }
     var audioMuseTest by remember { mutableStateOf<String?>(null) }
     var openRouterTest by remember { mutableStateOf<String?>(null) }
 
     // Tests use what's typed, before it's saved.
-    fun tested(): AppSettings = draft.copy(
-        navidromeUrl = normalizeUrl(draft.navidromeUrl),
-        audioMuseUrl = normalizeUrl(draft.audioMuseUrl),
-        navidromeUser = draft.navidromeUser.trim(),
-        audioMuseToken = draft.audioMuseToken.trim(),
-        openRouterKey = draft.openRouterKey.trim(),
-        openRouterModel = draft.openRouterModel.trim(),
-    )
-
     fun runTest(set: (String) -> Unit, block: suspend (AppSettings) -> String) {
         set("Testing…")
         scope.launch {
             set(
                 try {
-                    "✓ " + block(tested())
+                    "✓ " + block(graph.settings.clean(draft))
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -84,11 +84,22 @@ fun SettingsScreen(nav: NavController) {
     }
 
     fun save() {
-        graph.settings.save(draft)
-        if (firstRun && graph.settings.current.navidromeReady) {
-            nav.navigate("home") { popUpTo("settings") { inclusive = true } }
-        } else {
-            nav.popBackStack()
+        try {
+            graph.settings.save(draft)
+        } catch (e: Exception) {
+            problem = e.message
+            return
+        }
+        problem = null
+        val ready = graph.settings.current.navidromeReady
+        when {
+            firstRun && ready -> {
+                // First setup: start the library sync and show its progress, with Home underneath.
+                graph.sync.start()
+                nav.navigate("home") { popUpTo("settings") { inclusive = true } }
+                nav.navigate("sync")
+            }
+            !firstRun -> nav.popBackStack()
         }
     }
 
@@ -114,17 +125,45 @@ fun SettingsScreen(nav: NavController) {
             }
 
             Heading("Navidrome")
-            Field("Server address", draft.navidromeUrl, "http://192.168.1.10:4533") { draft = draft.copy(navidromeUrl = it) }
-            Field("Username", draft.navidromeUser) { draft = draft.copy(navidromeUser = it) }
+            Field("Server address", draft.navidromeUrl, "192.168.1.10:4533") { draft = draft.copy(navidromeUrl = it) }
+            Field("Username", draft.navidromeUser, keyboard = KeyboardType.Text) { draft = draft.copy(navidromeUser = it) }
             SecretField("Password", draft.navidromePassword) { draft = draft.copy(navidromePassword = it) }
+            if (showProxy) {
+                Hint("Only for a reverse proxy that asks for its own login before Navidrome.")
+                Field("Proxy username", draft.proxyUser, keyboard = KeyboardType.Text) { draft = draft.copy(proxyUser = it) }
+                SecretField("Proxy password", draft.proxyPassword) { draft = draft.copy(proxyPassword = it) }
+            } else {
+                TextButton(onClick = { showProxy = true }) { Text("Server behind a login page? Add a proxy login") }
+            }
             TestRow(navidromeTest) {
                 runTest({ navidromeTest = it }) { s -> "Connected to " + SubsonicApi(graph.http) { s }.ping() }
+            }
+            if (!firstRun) {
+                Row(
+                    Modifier.fillMaxWidth().clickable { nav.navigate("sync") }.padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Rounded.Sync, null)
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text("Library sync", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            library?.let { "Last synced " + DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it.cache.syncedAt)) }
+                                ?: "Not synced yet",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
+                }
             }
 
             HorizontalDivider()
             Heading("AudioMuse-AI")
-            Field("Server address", draft.audioMuseUrl, "http://192.168.1.10:8000") { draft = draft.copy(audioMuseUrl = it) }
-            SecretField("API token (if authentication is on)", draft.audioMuseToken) { draft = draft.copy(audioMuseToken = it) }
+            Field("Server address", draft.audioMuseUrl, "192.168.1.10:8000") { draft = draft.copy(audioMuseUrl = it) }
+            Hint("If AudioMuse has a login, use either an API token or its username and password.")
+            SecretField("API token", draft.audioMuseToken) { draft = draft.copy(audioMuseToken = it) }
+            Field("Username", draft.audioMuseUser, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseUser = it) }
+            SecretField("Password", draft.audioMusePassword) { draft = draft.copy(audioMusePassword = it) }
             TestRow(audioMuseTest) {
                 runTest({ audioMuseTest = it }) { s ->
                     val hits = AudioMuseApi(graph.http) { s }.textSearch("calm piano", 3)
@@ -136,7 +175,9 @@ fun SettingsScreen(nav: NavController) {
             Heading("OpenRouter (optional)")
             Hint("Writes the mix titles and sound searches. Only the vibe's guidance, the time and your last 20 plays are sent.")
             SecretField("API key", draft.openRouterKey) { draft = draft.copy(openRouterKey = it) }
-            Field("Model", draft.openRouterModel, AppSettings.DEFAULT_MODEL) { draft = draft.copy(openRouterModel = it) }
+            Field("Model", draft.openRouterModel, AppSettings.DEFAULT_MODEL, keyboard = KeyboardType.Text) {
+                draft = draft.copy(openRouterModel = it)
+            }
             SwitchRow("AI titles and sound searches", draft.aiTitles) { draft = draft.copy(aiTitles = it) }
             TestRow(openRouterTest) {
                 runTest({ openRouterTest = it }) { s ->
@@ -166,6 +207,7 @@ fun SettingsScreen(nav: NavController) {
             )
             Hint("Tracks can only be turned down, so raise the pre-amp only if quiet tracks still sound too quiet.")
 
+            problem?.let { ErrorText(it, Modifier) }
             Button(onClick = { save() }, modifier = Modifier.fillMaxWidth()) { Text("Save") }
         }
     }
@@ -177,14 +219,20 @@ private fun Heading(text: String) {
 }
 
 @Composable
-private fun Field(label: String, value: String, placeholder: String? = null, onChange: (String) -> Unit) {
+private fun Field(
+    label: String,
+    value: String,
+    placeholder: String? = null,
+    keyboard: KeyboardType = KeyboardType.Uri,
+    onChange: (String) -> Unit,
+) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
         label = { Text(label) },
         placeholder = { if (placeholder != null) Text(placeholder) },
         singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+        keyboardOptions = KeyboardOptions(keyboardType = keyboard, autoCorrectEnabled = false),
         modifier = Modifier.fillMaxWidth(),
     )
 }

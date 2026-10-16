@@ -100,6 +100,7 @@ fun MusixRoot() {
             composable("search") { SearchScreen(nav) }
             composable("vibes") { VibesScreen(nav) }
             composable("settings") { SettingsScreen(nav) }
+            composable("sync") { SyncScreen(nav) }
             composable("player") { PlayerScreen(nav) }
             composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }
             composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }

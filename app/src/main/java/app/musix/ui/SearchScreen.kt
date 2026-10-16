@@ -71,7 +71,7 @@ fun SearchScreen(nav: NavController) {
         busy = true
         error = null
         try {
-            results = graph.subsonic.search(q)
+            results = graph.library.current?.search(q) ?: graph.subsonic.search(q)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

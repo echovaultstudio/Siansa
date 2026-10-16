@@ -4,6 +4,8 @@ import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import java.net.URLDecoder
 
 enum class ReplayGainMode(val label: String) { TRACK("Track"), ALBUM("Album"), OFF("Off") }
 
@@ -11,13 +13,18 @@ data class AppSettings(
     val navidromeUrl: String = "",
     val navidromeUser: String = "",
     val navidromePassword: String = "",
+    val proxyUser: String = "",
+    val proxyPassword: String = "",
     val audioMuseUrl: String = "",
     val audioMuseToken: String = "",
+    val audioMuseUser: String = "",
+    val audioMusePassword: String = "",
     val openRouterKey: String = "",
     val openRouterModel: String = DEFAULT_MODEL,
     val aiTitles: Boolean = true,
     val replayGain: ReplayGainMode = ReplayGainMode.TRACK,
     val preampDb: Float = 0f,
+    val syncFolders: Set<String> = emptySet(),
 ) {
     val navidromeReady: Boolean
         get() = navidromeUrl.isNotBlank() && navidromeUser.isNotBlank() && navidromePassword.isNotBlank()
@@ -31,12 +38,49 @@ data class AppSettings(
     }
 }
 
-/** Adds http:// when no scheme was typed and drops trailing slashes. */
-fun normalizeUrl(raw: String): String {
-    val trimmed = raw.trim().trimEnd('/')
-    if (trimmed.isEmpty()) return ""
-    return if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) trimmed else "http://$trimmed"
+/** A server address split into a clean base URL and any login written into it (user:pass@host). */
+data class ServerAddress(val url: String, val user: String?, val password: String?)
+
+class AddressException(message: String) : Exception(message)
+
+/**
+ * Accepts what people paste: no scheme, a login in the address, a trailing slash,
+ * or Navidrome's web address (…/app/#/album/…). Throws [AddressException] with a readable reason.
+ */
+fun parseAddress(raw: String): ServerAddress {
+    var text = raw.trim()
+    if (text.isEmpty()) return ServerAddress("", null, null)
+    if (!text.startsWith("http://", true) && !text.startsWith("https://", true)) text = "http://$text"
+    val schemeEnd = text.indexOf("://") + 3
+    val scheme = text.substring(0, schemeEnd).lowercase()
+    var rest = text.substring(schemeEnd).substringBefore('#').substringBefore('?')
+
+    // A login sits before the last '@' of the host part, so passwords may contain ':' '/' or '@'.
+    var user: String? = null
+    var password: String? = null
+    val at = rest.lastIndexOf('@')
+    if (at >= 0) {
+        val credentials = rest.substring(0, at)
+        rest = rest.substring(at + 1)
+        val colon = credentials.indexOf(':')
+        user = decode(if (colon >= 0) credentials.substring(0, colon) else credentials)
+        password = if (colon >= 0) decode(credentials.substring(colon + 1)) else ""
+    }
+
+    var path = rest.substringAfter('/', "").trimEnd('/')
+    val host = rest.substringBefore('/')
+    if (path == "app" || path.endsWith("/app")) path = path.removeSuffix("app").trimEnd('/')
+    val url = scheme + host + if (path.isNotEmpty()) "/$path" else ""
+
+    val parsed = url.toHttpUrlOrNull()
+        ?: throw AddressException(
+            "\"$host\" isn't a valid server address. Use the form 192.168.1.10:4533, with the port as a number."
+        )
+    if (parsed.host.isBlank()) throw AddressException("The address is missing a server name or IP")
+    return ServerAddress(url, user?.takeIf { it.isNotEmpty() }, password)
 }
+
+private fun decode(value: String): String = runCatching { URLDecoder.decode(value, "UTF-8") }.getOrDefault(value)
 
 class SettingsRepository(context: Context) {
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -44,41 +88,73 @@ class SettingsRepository(context: Context) {
     val state: StateFlow<AppSettings> = _state.asStateFlow()
     val current: AppSettings get() = _state.value
 
+    private fun secret(key: String) = SecretBox.decrypt(prefs.getString(key, "") ?: "")
+
     private fun load(): AppSettings = AppSettings(
         navidromeUrl = prefs.getString("nd_url", "") ?: "",
         navidromeUser = prefs.getString("nd_user", "") ?: "",
-        navidromePassword = SecretBox.decrypt(prefs.getString("nd_pass", "") ?: ""),
+        navidromePassword = secret("nd_pass"),
+        proxyUser = prefs.getString("proxy_user", "") ?: "",
+        proxyPassword = secret("proxy_pass"),
         audioMuseUrl = prefs.getString("am_url", "") ?: "",
-        audioMuseToken = SecretBox.decrypt(prefs.getString("am_token", "") ?: ""),
-        openRouterKey = SecretBox.decrypt(prefs.getString("or_key", "") ?: ""),
+        audioMuseToken = secret("am_token"),
+        audioMuseUser = prefs.getString("am_user", "") ?: "",
+        audioMusePassword = secret("am_pass"),
+        openRouterKey = secret("or_key"),
         openRouterModel = prefs.getString("or_model", AppSettings.DEFAULT_MODEL) ?: AppSettings.DEFAULT_MODEL,
         aiTitles = prefs.getBoolean("ai_titles", true),
         replayGain = runCatching { ReplayGainMode.valueOf(prefs.getString("rg", "TRACK") ?: "TRACK") }
             .getOrDefault(ReplayGainMode.TRACK),
         preampDb = prefs.getFloat("preamp", 0f),
+        syncFolders = prefs.getStringSet("sync_folders", emptySet())?.toSet() ?: emptySet(),
     )
 
-    fun save(input: AppSettings) {
-        val s = input.copy(
-            navidromeUrl = normalizeUrl(input.navidromeUrl),
+    /**
+     * Cleans addresses and moves a login typed into an address into its own fields:
+     * Navidrome's goes to the proxy login, AudioMuse's to the AudioMuse login.
+     * Throws [AddressException] when an address can't be used.
+     */
+    fun clean(input: AppSettings): AppSettings {
+        val nd = parseAddress(input.navidromeUrl)
+        val am = parseAddress(input.audioMuseUrl)
+        return input.copy(
+            navidromeUrl = nd.url,
             navidromeUser = input.navidromeUser.trim(),
-            audioMuseUrl = normalizeUrl(input.audioMuseUrl),
+            proxyUser = nd.user ?: input.proxyUser.trim(),
+            proxyPassword = nd.password ?: input.proxyPassword,
+            audioMuseUrl = am.url,
             audioMuseToken = input.audioMuseToken.trim(),
+            audioMuseUser = am.user ?: input.audioMuseUser.trim(),
+            audioMusePassword = am.password ?: input.audioMusePassword,
             openRouterKey = input.openRouterKey.trim(),
             openRouterModel = input.openRouterModel.trim(),
         )
+    }
+
+    fun save(input: AppSettings) {
+        val s = clean(input)
         prefs.edit()
             .putString("nd_url", s.navidromeUrl)
             .putString("nd_user", s.navidromeUser)
             .putString("nd_pass", SecretBox.encrypt(s.navidromePassword))
+            .putString("proxy_user", s.proxyUser)
+            .putString("proxy_pass", SecretBox.encrypt(s.proxyPassword))
             .putString("am_url", s.audioMuseUrl)
             .putString("am_token", SecretBox.encrypt(s.audioMuseToken))
+            .putString("am_user", s.audioMuseUser)
+            .putString("am_pass", SecretBox.encrypt(s.audioMusePassword))
             .putString("or_key", SecretBox.encrypt(s.openRouterKey))
             .putString("or_model", s.openRouterModel)
             .putBoolean("ai_titles", s.aiTitles)
             .putString("rg", s.replayGain.name)
             .putFloat("preamp", s.preampDb)
+            .putStringSet("sync_folders", s.syncFolders)
             .apply()
         _state.value = s
+    }
+
+    fun setSyncFolders(ids: Set<String>) {
+        prefs.edit().putStringSet("sync_folders", ids).apply()
+        _state.value = _state.value.copy(syncFolders = ids)
     }
 }

@@ -93,7 +93,11 @@ class MixGenerator(private val graph: AppGraph) {
         val candidates = if (fresh.size >= selector.length) fresh else pool.values.toList()
 
         // Mostly by match strength, with a little shuffle so two days never come out identical.
-        val ranked = candidates.sortedByDescending { it.similarity * (0.8 + Random.nextDouble() * 0.2) }
+        // Each track gets one score up front: a sort whose keys change mid-sort fails on Android.
+        val ranked = candidates
+            .map { it to it.similarity * (0.8 + Random.nextDouble() * 0.2) }
+            .sortedByDescending { it.second }
+            .map { it.first }
         val maxPerArtist = max(2, selector.length / 8)
         val perArtist = HashMap<String, Int>()
         val picked = ArrayList<ClapHit>()
@@ -173,11 +177,15 @@ class MixGenerator(private val graph: AppGraph) {
         return Plan(title, query, description.ifBlank { selector.guidance }, ai = true)
     }
 
+    /** Songs from the synced library where possible, otherwise fetched from Navidrome. */
     private suspend fun resolve(ids: List<String>): List<Song> = coroutineScope {
+        val library = graph.library.current
         val permits = Semaphore(6)
         ids.map { id ->
-            async { permits.withPermit { runCatching { graph.subsonic.song(id) }.getOrNull() } }
-        }.awaitAll().filterNotNull()
+            async {
+                library?.song(id) ?: permits.withPermit { runCatching { graph.subsonic.song(id) }.getOrNull() }
+            }
+        }.awaitAll().filterNotNull().distinctBy { it.id }
     }
 
     /** Keeps the same artist from playing twice in a row where possible. */
