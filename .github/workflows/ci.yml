@@ -21,16 +21,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: "8.11.1"
+          gradle-version: "8.14.3"
 
       # Every version needs its section in CHANGELOG.md; it becomes the release notes.
       - name: Release notes from CHANGELOG.md
@@ -46,7 +46,9 @@ jobs:
       # Compiling catches syntax and type errors; unit tests check the app's own logic; Android Lint
       # finds likely crashes, wrong API use and security issues.
       - name: Unit tests, lint and release build
-        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --continue --stacktrace
+        run: |
+          set -o pipefail
+          gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --continue --stacktrace 2>&1 | tee gradle-build.txt
 
       - name: Test and lint results
         if: always()
@@ -74,7 +76,48 @@ jobs:
                   else:
                       warnings += 1
           print(f"::notice::Lint: {errors} errors, {warnings} warnings")
+          # Kotlin compile errors ("e: file:///…/X.kt:12:5 message") as annotations on the file and line.
+          import os, re
+          if os.path.exists("gradle-build.txt"):
+              seen = 0
+              for line in open("gradle-build.txt", errors="ignore"):
+                  m = re.match(r"e: file://\S*?/musix/(\S+?):(\d+):(\d+) (.*)", line.strip())
+                  if m and seen < 40:
+                      seen += 1
+                      print(f"::error file={m[1]},line={m[2]},col={m[3]}::{m[4][:300]}")
+              # Each "What went wrong" block, joined into one annotation per failure.
+              lines = open("gradle-build.txt", errors="ignore").read().splitlines()
+              for i, line in enumerate(lines):
+                  if "What went wrong" in line:
+                      block = []
+                      for nxt in lines[i + 1:i + 40]:
+                          if nxt.startswith("* Try") or nxt.startswith("* Exception"):
+                              break
+                          if nxt.strip():
+                              block.append(nxt.strip())
+                      text = " ".join(block)
+                      # AndroidX's compatibility check: one short line per library and what it needs.
+                      issues = re.findall(r"Dependency '([^']+)' requires (.+?)(?= \d+\.\s+Dependency|\s*$)", text)
+                      if issues:
+                          for dep, need in issues[:40]:
+                              need = re.sub(r"\s+", " ", need)
+                              need = re.sub(r"libraries and applications that depend on it to ", "", need)
+                              print(f"::error::{dep}: {need[:200]}")
+                      else:
+                          print("::error::" + " | ".join(block)[:3000])
           PY
+
+      # The full build log on the ci-logs branch when the build fails, readable without downloading artifacts.
+      - name: Build log to the ci-logs branch
+        if: failure() && github.event_name != 'pull_request' || failure() && github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          [ -f gradle-build.txt ] || exit 0
+          mkdir -p ci-logs && cp gradle-build.txt ci-logs/ && cd ci-logs
+          git init -q && git checkout -q -b ci-logs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -q -m "Build log for ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-logs
 
       - name: APK name
         id: version
@@ -83,7 +126,7 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           mv app/build/outputs/apk/release/app-release.apk musix-$VERSION.apk
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: apk
           path: |
@@ -91,7 +134,7 @@ jobs:
             notes/
           retention-days: 30
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: reports
@@ -104,7 +147,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       # Fails if a password, token or API key is committed (the whole history is checked).
@@ -124,16 +167,16 @@ jobs:
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /usr/share/swift /opt/hostedtoolcache/CodeQL /usr/local/lib/node_modules || true
           echo "::notice::Free disk: $(df -h / | awk 'NR==2{print $4}')"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: "8.11.1"
+          gradle-version: "8.14.3"
 
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
@@ -209,7 +252,7 @@ jobs:
           git add -A && git commit -q -m "Tour screenshots for ${GITHUB_SHA::7}"
           git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-screens
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: device-test-results
@@ -225,9 +268,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: apk
 
@@ -242,7 +285,7 @@ jobs:
           fi
 
       # One release per version, so the APK can be downloaded straight from the Releases page on a phone.
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         if: steps.version.outputs.exists != 'true'
         with:
           tag_name: v${{ steps.version.outputs.version }}
