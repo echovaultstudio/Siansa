@@ -30,6 +30,9 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
         if (AppLog.detailOn) AppLog.d("Phone", Diagnostics.snapshot(this))
         graph.scope.launch {
             graph.library.load()
+            if (graph.settings.current.navidromeReady) {
+                runCatching { AppLog.i("Server", graph.subsonic.ping()) }
+            }
             // A quick check at every start: usually just "nothing changed", or a few albums.
             if (graph.settings.current.navidromeReady) graph.sync.start(quiet = true)
         }
@@ -44,7 +47,7 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
         val megabytes = graph.settings.current.imageCacheMb.coerceAtLeast(50)
         return ImageLoader.Builder(context)
             .components {
-                add(OkHttpNetworkFetcherFactory(callFactory = { graph.http }))
+                add(OkHttpNetworkFetcherFactory(callFactory = { graph.imageHttp }))
                 if (Build.VERSION.SDK_INT >= 28) add(AnimatedImageDecoder.Factory()) else add(GifDecoder.Factory())
             }
             .memoryCache { MemoryCache.Builder().maxSizePercent(context, 0.20).build() }

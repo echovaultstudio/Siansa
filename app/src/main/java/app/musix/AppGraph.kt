@@ -32,7 +32,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import okhttp3.Credentials
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import app.musix.playback.StreamStats
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -83,6 +87,38 @@ class AppGraph(val app: Application) {
                 throw e
             }
         }
+        .build()
+
+    /**
+     * Covers and artist photos: their own download queue and connections. OkHttp lets each queue run
+     * at most a few downloads per server at once, so when covers and songs shared one, a few big covers
+     * kept the song waiting in line and starved it of bandwidth.
+     */
+    val imageHttp: OkHttpClient = http.newBuilder()
+        .dispatcher(Dispatcher().apply { maxRequests = 24; maxRequestsPerHost = 6 })
+        .connectionPool(ConnectionPool(6, 5, TimeUnit.MINUTES))
+        .addNetworkInterceptor { chain ->
+            val response = chain.proceed(chain.request())
+            // Big images are worth knowing about when playback struggles.
+            val length = response.header("Content-Length")?.toLongOrNull() ?: -1
+            if (length > 1_000_000) {
+                val url = chain.request().url
+                val what = url.queryParameter("id")?.let { "cover $it (size ${url.queryParameter("size") ?: "original"})" } ?: url.encodedPath.take(24)
+                AppLog.i("Http", "Image $what is ${"%.1f".format(length / 1_048_576.0)} MB")
+            }
+            response
+        }
+        .build()
+
+    /**
+     * Song streams (and pre-caching): a queue and connections of their own, over HTTP/1.1 so every stream
+     * gets its own TCP connection instead of sharing one with covers and API calls.
+     */
+    val streamHttp: OkHttpClient = http.newBuilder()
+        .dispatcher(Dispatcher().apply { maxRequests = 8; maxRequestsPerHost = 4 })
+        .connectionPool(ConnectionPool(4, 5, TimeUnit.MINUTES))
+        .protocols(listOf(Protocol.HTTP_1_1))
+        .addNetworkInterceptor(StreamStats.interceptor)
         .build()
 
     val subsonic = SubsonicApi(http) { settings.current }

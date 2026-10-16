@@ -24,6 +24,8 @@ data class PlayerState(
     val repeatMode: Int = Player.REPEAT_MODE_OFF,
     val queue: List<Song> = emptyList(),
     val index: Int = 0,
+    /** Waiting for data before it can play on. */
+    val buffering: Boolean = false,
 )
 
 /** The app's side of playback: a MediaController talking to [PlaybackService]. */
@@ -199,6 +201,7 @@ class PlayerConnection(
             repeatMode = c.repeatMode,
             queue = queue,
             index = index,
+            buffering = c.playbackState == Player.STATE_BUFFERING,
         )
     }
 }

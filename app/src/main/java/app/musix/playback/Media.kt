@@ -31,7 +31,7 @@ fun Song.toMediaItem(api: SubsonicApi): MediaItem {
         .setArtist(artist)
         .setAlbumTitle(album)
         .setGenre(genre)
-        .setArtworkUri(coverArt?.let { Uri.parse(api.coverUrl(it, 600)) })
+        .setArtworkUri(coverArt?.let { Uri.parse(api.coverUrl(it, app.musix.ui.SMALL_COVER)) })
         .setIsPlayable(true)
         .setIsBrowsable(false)
         .setExtras(extras)
