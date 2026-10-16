@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import app.musix.data.cover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -85,6 +86,10 @@ fun CollectionPage(
     val surface = MaterialTheme.colorScheme.surface
 
     Box(Modifier.fillMaxSize().background(surface)) {
+        if (showCovers && songs != null) {
+            val covers = remember(songs) { songs.map { it.cover } }
+            PrefetchCovers(listState.firstVisibleItemIndex, listState.layoutInfo.visibleItemsInfo.size, covers, 150)
+        }
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(32.dp))) {
             item {
                 Column(
