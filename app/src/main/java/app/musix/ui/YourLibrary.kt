@@ -566,13 +566,14 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
         tags = setOf("By you"),
     )
 
-    // Your listening: this month pinned in the full list; all three under their own filter.
+    // Your listening: this month pinned in the full list; all of them under their own filter.
     val month = { d: LocalDate -> d.month.getDisplayName(TextStyle.FULL, Locale.getDefault()) }
     val short = { d: LocalDate -> d.month.getDisplayName(TextStyle.SHORT, Locale.getDefault()).trimEnd('.') }
     listOf(
         Triple("month", "Your ${month(now)}", "This month") to short(now),
         Triple("last-month", "Your ${month(now.minusMonths(1))}", "Last month") to short(now.minusMonths(1)),
         Triple("year", "Your ${now.year}", "This year") to now.year.toString(),
+        Triple("year-ago", "This time last year", "This time last year") to "${short(now.minusYears(1))} ${now.year - 1}",
     ).forEach { (t, tileText) ->
         val (id, title, period) = t
         entries += Entry(
@@ -681,7 +682,7 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
         Kind.MIX to present(Kind.MIX, listOf("Today", "Made for you", "Vibes", "Earlier")),
         Kind.ALBUM to present(Kind.ALBUM, albumOrder),
         Kind.ARTIST to present(Kind.ARTIST, listOf("Played", "Not played yet")),
-        Kind.LISTENING to present(Kind.LISTENING, listOf("This month", "Last month", "This year")),
+        Kind.LISTENING to present(Kind.LISTENING, listOf("This month", "Last month", "This year", "This time last year")),
     )
     return LibraryData(entries, subFilters)
 }
