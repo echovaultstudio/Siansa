@@ -91,7 +91,7 @@ fun HomeScreen(nav: NavController) {
             try {
                 val mix = if (selector == null) graph.generator.ensureCurrent(force) else graph.generator.ensure(selector, force)
                 if (selector == null || selector.id == current?.selectorId) current = mix
-                if (mix == null) error = "No vibe covers this hour. Add one under Vibes."
+                if (mix == null) error = "No vibe covers this hour. Add one in Settings, under Vibes."
                 if (open && mix != null) nav.navigate("mix/${mix.id}")
             } catch (e: CancellationException) {
                 throw e
