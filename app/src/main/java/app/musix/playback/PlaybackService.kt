@@ -53,6 +53,7 @@ class PlaybackService : MediaSessionService() {
     private lateinit var graph: AppGraph
     private var events: Events? = null
     private var cacheFactory: CacheDataSource.Factory? = null
+    private var gain: SmoothGain? = null
     private var precacheJob: Job? = null
     private var precacheWriter: CacheWriter? = null
 
@@ -68,6 +69,7 @@ class PlaybackService : MediaSessionService() {
         val built = PlayerFactory.build(this, graph, ::kbpsFor)
         val player = built.player
         cacheFactory = built.cacheFactory
+        gain = built.gain
         events = Events(player).also { player.addListener(it) }
         player.addAnalyticsListener(PlaybackDiagnostics(player, this) { waited -> onStall(player, waited) })
         player.addAnalyticsListener(object : AnalyticsListener {
@@ -260,7 +262,7 @@ class PlaybackService : MediaSessionService() {
             AppLog.i("Player", "Now playing ${song.id} \"${song.title}\"")
             focusRescued = false
             if (player.playWhenReady) armStartWatch()
-            player.volume = replayGainVolume(song, graph.settings.current)
+            gain?.target = replayGainVolume(song, graph.settings.current)
             graph.scrobbler.nowPlaying(song)
             scope.launch {
                 runCatching { graph.history.add(PlayEvent(song.id, song.title, song.artist, song.genre, System.currentTimeMillis())) }

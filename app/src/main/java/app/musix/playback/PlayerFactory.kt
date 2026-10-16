@@ -13,6 +13,8 @@ import androidx.media3.decoder.ffmpeg.FfmpegLibrary
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import app.musix.AppGraph
 import app.musix.log.AppLog
@@ -23,7 +25,7 @@ import app.musix.log.AppLog
  */
 @OptIn(UnstableApi::class)
 object PlayerFactory {
-    class Built(val player: ExoPlayer, val cacheFactory: CacheDataSource.Factory)
+    class Built(val player: ExoPlayer, val cacheFactory: CacheDataSource.Factory, val gain: SmoothGain)
 
     /** [kbpsFor] picks, per song id, Opus kbit/s or 0 for the original file. */
     fun build(context: Context, graph: AppGraph, kbpsFor: (String) -> Int, handleAudioFocus: Boolean = true): Built {
@@ -50,9 +52,17 @@ object PlayerFactory {
             .setBufferDurationsMs(15_000, 60_000, 1_000, 5_000)
             .build()
 
-        // The phone's own decoders first; FFmpeg for what it lacks (ALAC on most phones).
-        val renderers = DefaultRenderersFactory(context)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+        // The phone's own decoders first; FFmpeg for what it lacks (ALAC on most phones). ReplayGain runs in
+        // the audio pipeline (SmoothGain) so level changes and song starts glide instead of clicking.
+        val gain = SmoothGain()
+        val renderers = object : DefaultRenderersFactory(context) {
+            override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
+                DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioProcessors(arrayOf(gain))
+                    .build()
+        }.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
         AppLog.i("Player", "FFmpeg decoders " + if (FfmpegLibrary.isAvailable()) "ready (${FfmpegLibrary.getVersion()})" else "not available")
 
         val player = ExoPlayer.Builder(context, renderers)
@@ -68,6 +78,6 @@ object PlayerFactory {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
-        return Built(player, cacheFactory)
+        return Built(player, cacheFactory, gain)
     }
 }
