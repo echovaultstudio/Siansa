@@ -26,43 +26,32 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
 
-      - name: Prepare the test library (Navidrome starts once the emulator is up)
-        run: PREPARE_ONLY=1 scripts/test-server.sh
+      - name: Start Navidrome with the test library
+        run: scripts/test-server.sh
 
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-          ls -l /dev/kvm && echo "::notice::KVM $(ls -l /dev/kvm)" || echo "::warning::No /dev/kvm"
-          echo "::notice::CPU $(nproc) cores, $(free -g | awk '/Mem/{print $2}') GB RAM"
 
-      - name: Build test APKs
-        run: gradle :app:assembleDebug :app:assembleDebugAndroidTest
-
-      - name: Run tests on the emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 29
-          target: default
-          arch: x86_64
-          cores: 2
-          ram-size: 3072M
-          emulator-boot-timeout: 900
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
-          script: |
-            scripts/test-server.sh
-            adb logcat -c
-            gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.navidromeUrl=http://10.0.2.2:5533 || (adb logcat -d > logcat.txt; exit 1)
-            adb logcat -d > logcat.txt
-
+      - name: Run tests on a managed emulator
+        run: |
+          set -o pipefail
+          gradle :app:ciPhoneDebugAndroidTest \
+            -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
+            -Pandroid.experimental.testOptions.managedDevices.setupTimeoutMinutes=20 \
+            -Pandroid.testInstrumentationRunnerArguments.navidromeUrl=http://10.0.2.2:5533 2>&1 | tee gradle.txt
+          
       # Results as annotations, so they can be read without downloading logs.
       - name: Test output
         if: always()
         run: |
+          grep -A8 "What went wrong" gradle.txt 2>/dev/null | head -12 | while IFS= read -r line; do [ -n "$line" ] && echo "::error::$line"; done || true
+          grep -E "Tests? .*(passed|failed)|BUILD (SUCCESSFUL|FAILED)" gradle.txt 2>/dev/null | tail -3 | while IFS= read -r line; do echo "::notice::$line"; done || true
+          find app/build/outputs -iname "logcat*.txt" -exec cat {} + > logcat.txt 2>/dev/null || true
           grep -h "System.out" logcat.txt 2>/dev/null | grep -E "Kinds:|drawable:|setup|Cover|Stream|Audio|Waited" | sed 's/.*System.out: //' | head -60 | while IFS= read -r line; do echo "::notice::$line"; done || true
-          for f in app/build/outputs/androidTest-results/connected/**/*.xml app/build/outputs/androidTest-results/connected/*.xml; do
+          for f in $(find app/build/outputs/androidTest-results -name "*.xml"); do
             [ -f "$f" ] || continue
             python3 - "$f" <<'PY'
           import sys, xml.etree.ElementTree as ET
@@ -82,7 +71,7 @@ jobs:
         with:
           name: device-test-results
           path: |
-            app/build/reports/androidTests/
+            app/build/reports/
             app/build/outputs/androidTest-results/
             logcat.txt
             ${{ runner.temp }}/navidrome-test/*.log

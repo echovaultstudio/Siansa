@@ -48,6 +48,19 @@ android {
         }
     }
 
+    // An emulator Gradle starts by itself for the device tests (a lean image made for CI).
+    testOptions {
+        managedDevices {
+            localDevices {
+                create("ciPhone") {
+                    device = "Pixel 6"
+                    apiLevel = 33
+                    systemImageSource = "aosp-atd"
+                }
+            }
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
