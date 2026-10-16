@@ -59,6 +59,9 @@ import app.musix.log.AppLog
 import app.musix.mix.moodRadios
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.produceState
+import app.musix.mix.MixGenerator
+import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -98,14 +101,58 @@ fun HomeScreen(nav: NavController) {
         }
     }
 
-    LaunchedEffect(Unit) {
+    // The hour, checked every minute, so the page moves on to the next vibe while it's open.
+    val hour by produceState(LocalTime.now().hour) {
+        while (true) {
+            delay(60_000)
+            value = LocalTime.now().hour
+        }
+    }
+    var personalBusy by remember { mutableStateOf<String?>(null) }
+
+    fun buildPersonal(kind: MixGenerator.Personal, open: Boolean, quiet: Boolean = false) {
+        if (personalBusy != null) return
+        scope.launch {
+            personalBusy = kind.id
+            try {
+                val mix = graph.generator.ensurePersonal(kind)
+                if (open) nav.navigate("mix/${mix.id}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("Home", "${kind.title} failed: ${e.message}")
+                if (!quiet) launch.notify(e.message ?: "Couldn't make ${kind.title}")
+            } finally {
+                personalBusy = null
+            }
+        }
+    }
+
+    LaunchedEffect(hour) {
         graph.mixes.all()
         graph.selectors.all()
+        current = null
         build(null, force = false, open = false)
+    }
+    // Today's personal mixes are made quietly in the background once the page is up.
+    LaunchedEffect(Unit) {
+        delay(1500)
+        val today = LocalDate.now().toString()
+        for (kind in MixGenerator.Personal.entries) {
+            if (graph.mixes.get("$today-${kind.id}") != null) continue
+            while (busySelector != null || personalBusy != null) delay(500)
+            buildPersonal(kind, open = false, quiet = true)
+            delay(300)
+        }
     }
 
     val today = LocalDate.now().toString()
-    val todaysMixes = mixes.orEmpty().filter { it.date == today }
+    val personalIds = MixGenerator.Personal.entries.map { it.id }.toSet()
+    // Only what fits now: the vibe for this hour and the personal mixes, not this morning's mix in the evening.
+    val applicable = selectors.orEmpty().filter { it.enabled && it.covers(hour) }
+    val todaysMixes = mixes.orEmpty().filter { m ->
+        m.date == today && (m.selectorId in personalIds || applicable.any { it.id == m.selectorId })
+    }
     val playlists by loadState("playlists") {
         runCatching { graph.subsonic.playlists() }
             .onSuccess { graph.library.updatePlaylists(it) }
@@ -187,21 +234,39 @@ fun HomeScreen(nav: NavController) {
             item { Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { SyncPrompt(nav) } }
         }
 
-        // One tile per vibe, like "Made for you".
+        // Made for you: the vibe for this hour, then mixes from your own listening.
         item {
-            val vibes = selectors.orEmpty().filter { it.enabled }
-            Shelf("Made for you", vibes, key = { it.id }) { selector ->
-                val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
-                GradientTile(
-                    title = mix?.title ?: "${selector.name} mix",
-                    colors = tileColors(selector.id),
-                    coverArt = mix?.songs?.firstOrNull()?.coverArt,
-                    subtitle = selector.name,
-                    caption = if (mix != null) "${mix.songs.size} tracks · ${selector.hoursLabel}" else "Tap to make today's mix",
-                    busy = busySelector == selector.id,
-                    onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) },
-                )
+            val tiles: List<Pair<String, @Composable () -> Unit>> = buildList {
+                applicable.forEach { selector ->
+                    add(selector.id to @Composable {
+                        val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
+                        GradientTile(
+                            title = mix?.title ?: "${selector.name} mix",
+                            colors = tileColors(selector.id),
+                            coverArt = mix?.songs?.firstOrNull()?.coverArt,
+                            subtitle = selector.name,
+                            caption = if (mix != null) "${mix.songs.size} tracks · until %02d:00".format(selector.endHour) else "Tap to make today's mix",
+                            busy = busySelector == selector.id,
+                            onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) },
+                        )
+                    })
+                }
+                MixGenerator.Personal.entries.forEach { kind ->
+                    add(kind.id to @Composable {
+                        val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
+                        GradientTile(
+                            title = kind.title,
+                            colors = tileColors(kind.id),
+                            coverArt = mix?.songs?.firstOrNull()?.coverArt,
+                            subtitle = "For you",
+                            caption = if (mix != null) "${mix.songs.size} tracks · ${mix.description}" else "Tap to make it",
+                            busy = personalBusy == kind.id,
+                            onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) },
+                        )
+                    })
+                }
             }
+            Shelf("Made for you", tiles, key = { it.first }) { it.second() }
         }
 
         item {

@@ -149,4 +149,7 @@ data class PlayEvent(
     val artist: String,
     val genre: String? = null,
     val at: Long,
+    // Filled in when the song ends: how long it was heard, and whether it was skipped early.
+    val listenedMs: Long? = null,
+    val skipped: Boolean = false,
 )

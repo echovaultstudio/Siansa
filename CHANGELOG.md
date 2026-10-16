@@ -3,6 +3,21 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.6beta — 2026-10-16
+
+### Added
+- **Personal mixes** under Made for you, made fresh each day:
+  - **Your sound**: AudioMuse's sonic fingerprint of what you play most in Navidrome.
+  - **On repeat**: your most-played songs lately, from Musix's history and your Koito / ListenBrainz / Last.fm top tracks.
+  - **Discover for you**: songs you haven't played that sound like your favourites, leaning away from artists you already play a lot.
+- **Taste profile** built on the phone from Musix's own history, Koito or ListenBrainz and Last.fm top artists this month, and Navidrome's most-played albums. Only a few artist names ever go to the AI, never your history.
+- Musix now notices skips (under 30 seconds). Songs skipped twice in a month, or once in the last few days, are left out of mixes.
+
+### Changed
+- Vibe mixes lean towards artists you play, and those you usually play at this time of day. The AI also gets your favourite artists and time-of-day habits as hints.
+- Home only shows what fits now: the vibe for this hour and your personal mixes. This morning's mix no longer shows up in the evening, and the page moves on to the next vibe by itself when the hour changes.
+- Background mix preparation also makes the personal mixes, so they're ready when you open the app.
+
 ## 0.0.5beta — 2026-10-16
 
 ### Changed

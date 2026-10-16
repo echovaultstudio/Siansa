@@ -207,6 +207,9 @@ class PlaybackService : MediaSessionService() {
             playingSince?.let { listenedMs += SystemClock.elapsedRealtime() - it }
             playingSince = null
             graph.scrobbler.finished(song, startedAtMs, listenedMs)
+            val started = startedAtMs
+            val heard = listenedMs
+            scope.launch { runCatching { graph.history.finish(song.id, started, heard, song.durationSec) } }
             current = null
         }
 

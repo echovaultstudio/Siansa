@@ -159,6 +159,25 @@ class AudioMuseApi(
         }
     }
 
+    /**
+     * "Your sound": AudioMuse averages the sound of your most-played songs in Navidrome and returns
+     * [count] tracks closest to it. The Navidrome login tells it whose play counts to use.
+     */
+    suspend fun sonicFingerprint(count: Int, navidromeUser: String, navidromePassword: String): List<ClapHit> {
+        val payload = buildJsonObject {
+            put("n", count)
+            if (navidromeUser.isNotBlank()) put("navidrome_user", navidromeUser)
+            if (navidromePassword.isNotBlank()) put("navidrome_password", navidromePassword)
+        }.toString()
+        val root = executeElement { request("/api/sonic_fingerprint/generate").post(payload.toRequestBody(JSON_TYPE)).build() }
+        val rows = (root as? JsonArray) ?: JsonArray(emptyList())
+        return rows.mapNotNull { element ->
+            val r = element as? JsonObject ?: return@mapNotNull null
+            val id = r.str("item_id") ?: return@mapNotNull null
+            ClapHit(id, r.str("title").orEmpty(), r.str("author").orEmpty(), r.str("album"), r.dbl("distance")?.let { 1 - it } ?: 1.0)
+        }
+    }
+
     /** Sound concepts this library's search understands well, to steer the AI's wording. */
     suspend fun concepts(): List<String> {
         val root = execute { request("/api/clap/concepts").get().build() }
