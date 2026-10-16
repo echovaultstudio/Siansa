@@ -25,7 +25,11 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -165,8 +169,16 @@ private fun Header(page: ArtistPage, info: ArtistInfo?) {
                 )
             }
         }
+        val launch = rememberPlayLauncher()
         if (page.songs.isNotEmpty()) {
-            Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) { PlayButtons(page.songs) }
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PlayButtons(page.songs)
+                OutlinedButton(onClick = { launch("${page.artist.name} radio") { graph.radios.artist(page.artist) } }) {
+                    Icon(Icons.Rounded.Radio, null)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Radio")
+                }
+            }
         } else if (page.albums.isNotEmpty()) {
             // Before a sync, the artist's songs are loaded album by album when Play is pressed.
             Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {

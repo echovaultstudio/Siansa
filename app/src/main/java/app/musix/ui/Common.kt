@@ -11,9 +11,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -26,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -34,24 +38,35 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import app.musix.AppGraph
 import app.musix.data.Song
+import app.musix.log.AppLog
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 val LocalGraph = staticCompositionLocalOf<AppGraph> { error("AppGraph not provided") }
+val LocalNav = staticCompositionLocalOf<NavController> { error("NavController not provided") }
+val LocalSnack = staticCompositionLocalOf<SnackbarHostState> { error("Snackbar not provided") }
 
 sealed interface Load<out T> {
     data object Loading : Load<Nothing>
@@ -70,6 +85,7 @@ fun <T> loadState(key: Any?, block: suspend () -> T): State<Load<T>> =
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            AppLog.w("Ui", "Loading failed: ${e.message}")
             Load.Err(e.message ?: e.javaClass.simpleName)
         }
     }
@@ -107,7 +123,39 @@ fun rememberPosition(): State<Long> {
     }
 }
 
-/** Album art from Navidrome. size = null asks for the original file, which keeps animated covers moving. */
+/**
+ * Starts playback of a list that takes a moment to build (a radio), with a short note while it loads
+ * and a readable message if it fails.
+ */
+@Composable
+fun rememberPlayLauncher(): (label: String, build: suspend () -> List<Song>) -> Unit {
+    val graph = LocalGraph.current
+    val snack = LocalSnack.current
+    val scope = rememberCoroutineScope()
+    return remember(graph, snack, scope) {
+        { label, build ->
+            scope.launch {
+                val note = launch { snack.showSnackbar("Starting $label…") }
+                try {
+                    val songs = build()
+                    note.cancel()
+                    graph.player.play(songs)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    note.cancel()
+                    AppLog.w("Radio", "$label failed: ${e.message}")
+                    snack.showSnackbar(e.message ?: "Couldn't start $label")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Album art from Navidrome. size = null asks for the original file, which keeps animated covers moving.
+ * The cache key leaves out the per-session login token, so covers are reused from disk across app starts.
+ */
 @Composable
 fun Cover(
     coverId: String?,
@@ -116,15 +164,25 @@ fun Cover(
     shape: Shape = RoundedCornerShape(8.dp),
 ) {
     val graph = LocalGraph.current
-    val url = remember(coverId, size) { coverId?.let { graph.subsonic.coverUrl(it, size) } }
+    val context = LocalContext.current
+    val request = remember(coverId, size) {
+        coverId?.let { id ->
+            val key = "cover:$id:${size ?: "full"}"
+            ImageRequest.Builder(context)
+                .data(graph.subsonic.coverUrl(id, size))
+                .diskCacheKey(key)
+                .memoryCacheKey(key)
+                .build()
+        }
+    }
     Box(
         modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
         Icon(Icons.Rounded.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (url != null) {
+        if (request != null) {
             AsyncImage(
-                model = url,
+                model = request,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
@@ -163,9 +221,9 @@ fun Screen(
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        modifier = modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp),
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Bold,
+        modifier = modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 10.dp),
     )
 }
 
@@ -175,7 +233,7 @@ fun formatDuration(seconds: Long): String {
     else "%d:%02d".format(s / 60, s % 60)
 }
 
-/** A song row. Tap plays; the menu adds it to the queue. */
+/** A song row. Tap plays; the menu queues it, starts a radio from it or opens its album or artist. */
 @Composable
 fun SongRow(
     song: Song,
@@ -185,6 +243,8 @@ fun SongRow(
     showCover: Boolean = true,
 ) {
     val graph = LocalGraph.current
+    val nav = LocalNav.current
+    val launch = rememberPlayLauncher()
     var menu by remember { mutableStateOf(false) }
     Row(
         Modifier
@@ -232,18 +292,35 @@ fun SongRow(
             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(text = { Text("Play next") }, onClick = {
-                    graph.player.playNext(song)
                     menu = false
+                    graph.player.playNext(song)
                 })
                 DropdownMenuItem(text = { Text("Add to queue") }, onClick = {
-                    graph.player.addToQueue(song)
                     menu = false
+                    graph.player.addToQueue(song)
                 })
+                DropdownMenuItem(text = { Text("Start song radio") }, onClick = {
+                    menu = false
+                    launch("song radio") { graph.radios.song(song) }
+                })
+                song.albumId?.let { albumId ->
+                    DropdownMenuItem(text = { Text("Go to album") }, onClick = {
+                        menu = false
+                        nav.navigate("album/$albumId")
+                    })
+                }
+                song.artistId?.let { artistId ->
+                    DropdownMenuItem(text = { Text("Go to artist") }, onClick = {
+                        menu = false
+                        nav.navigate("artist/$artistId")
+                    })
+                }
             }
         }
     }
 }
 
+/** A square cover with a title and subtitle under it, as in a streaming app's shelves. */
 @Composable
 fun AlbumTile(
     name: String,
@@ -251,16 +328,143 @@ fun AlbumTile(
     coverArt: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    round: Boolean = false,
 ) {
     Column(modifier.clickable(onClick = onClick).padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Cover(coverArt, 300, Modifier.fillMaxWidth().aspectRatio(1f))
-        Text(name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(
-            subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Cover(
+            coverArt,
+            300,
+            Modifier.fillMaxWidth().aspectRatio(1f),
+            if (round) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(8.dp),
         )
+        Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (subtitle.isNotBlank()) {
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** Two colours picked from a name, so generated tiles keep the same look every day. */
+fun tileColors(seed: String): Pair<Color, Color> {
+    val palette = listOf(
+        0xFF2E8B9A to 0xFF143A52, 0xFFE8572A to 0xFF7A1530, 0xFF4B5FD6 to 0xFF1C1F55,
+        0xFFF2B33D to 0xFFD9542B, 0xFFD6338A to 0xFF4A1470, 0xFF5D6B8A to 0xFF1E2433,
+        0xFF3A9A5B to 0xFF0F3B2A, 0xFF8E44AD to 0xFF2C0F3D, 0xFFC2416B to 0xFF4D0F2A,
+        0xFF00897B to 0xFF0B2E3A,
+    )
+    val (a, b) = palette[abs(seed.hashCode()) % palette.size]
+    return Color(a) to Color(b)
+}
+
+/**
+ * A generated tile in the style of "Made for you" and radio tiles: a colour gradient with a bold
+ * title, an optional cover peeking in the corner, and a label underneath.
+ */
+@Composable
+fun GradientTile(
+    title: String,
+    colors: Pair<Color, Color>,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    caption: String? = null,
+    coverArt: String? = null,
+    size: Dp = 160.dp,
+    busy: Boolean = false,
+) {
+    Column(modifier.width(size).clickable(onClick = onClick)) {
+        Box(
+            Modifier
+                .size(size)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Brush.linearGradient(listOf(colors.first, colors.second))),
+        ) {
+            if (coverArt != null) {
+                Cover(
+                    coverArt,
+                    300,
+                    Modifier.size(size * 0.45f).align(Alignment.BottomEnd).padding(10.dp),
+                    RoundedCornerShape(6.dp),
+                )
+            }
+            Text(
+                title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
+            )
+            if (busy) {
+                CircularProgressIndicator(
+                    Modifier.size(22.dp).align(Alignment.BottomStart).padding(2.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp,
+                )
+            }
+        }
+        if (subtitle != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (caption != null) {
+            Text(
+                caption,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** A compact "quick access" tile: small cover on the left, name on the right. */
+@Composable
+fun QuickTile(title: String, coverArt: String?, colors: Pair<Color, Color>?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .height(56.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (coverArt != null) {
+            Cover(coverArt, 150, Modifier.size(56.dp), RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
+        } else {
+            Box(
+                Modifier.size(56.dp).background(
+                    Brush.linearGradient(listOf(colors?.first ?: Color.Gray, colors?.second ?: Color.DarkGray))
+                )
+            )
+        }
+        Text(
+            title,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 10.dp),
+        )
+    }
+}
+
+/** A horizontal shelf of tiles under a section title. */
+@Composable
+fun <T> Shelf(title: String, items: List<T>, key: (T) -> Any, content: @Composable (T) -> Unit) {
+    if (items.isEmpty()) return
+    Column {
+        SectionTitle(title)
+        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(items, key = key) { content(it) }
+        }
     }
 }

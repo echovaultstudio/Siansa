@@ -2,12 +2,16 @@ package app.musix
 
 import android.app.Application
 import android.os.Build
+import app.musix.log.AppLog
 import app.musix.mix.MixWorker
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import coil3.disk.DiskCache
+import coil3.disk.directory
 import coil3.gif.AnimatedImageDecoder
 import coil3.gif.GifDecoder
+import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import kotlinx.coroutines.launch
@@ -19,17 +23,34 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         graph = AppGraph(this)
+        AppLog.init(this, graph.settings.current.logging)
         graph.scope.launch { graph.library.load() }
         MixWorker.schedule(this)
     }
 
-    // Animated GIF and WebP covers play when Navidrome serves the original file.
-    override fun newImageLoader(context: PlatformContext): ImageLoader =
-        ImageLoader.Builder(context)
+    /**
+     * Covers are kept on disk as they load, up to the size chosen in Settings → Storage, so scrolling
+     * back is instant and works offline. Animated GIF/WebP covers play when Navidrome serves the original.
+     */
+    override fun newImageLoader(context: PlatformContext): ImageLoader {
+        val megabytes = graph.settings.current.imageCacheMb.coerceAtLeast(50)
+        return ImageLoader.Builder(context)
             .components {
                 add(OkHttpNetworkFetcherFactory(callFactory = { graph.http }))
                 if (Build.VERSION.SDK_INT >= 28) add(AnimatedImageDecoder.Factory()) else add(GifDecoder.Factory())
             }
+            .memoryCache { MemoryCache.Builder().maxSizePercent(context, 0.20).build() }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(context.cacheDir.resolve(IMAGE_CACHE_DIR))
+                    .maxSizeBytes(megabytes * 1024L * 1024L)
+                    .build()
+            }
             .crossfade(true)
             .build()
+    }
+
+    companion object {
+        const val IMAGE_CACHE_DIR = "image_cache"
+    }
 }

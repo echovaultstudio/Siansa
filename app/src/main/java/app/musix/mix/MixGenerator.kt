@@ -8,6 +8,7 @@ import app.musix.data.AppJson
 import app.musix.data.Mix
 import app.musix.data.Selector
 import app.musix.data.Song
+import app.musix.log.AppLog
 import app.musix.net.ClapHit
 import app.musix.net.str
 import kotlinx.coroutines.async
@@ -72,10 +73,13 @@ class MixGenerator(private val graph: AppGraph) {
         if (!settings.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
 
         val plan = if (selector.useAi && settings.aiReady) {
-            runCatching { aiPlan(selector) }.getOrNull() ?: fallbackPlan(selector)
+            runCatching { aiPlan(selector) }
+                .onFailure { AppLog.w("Mix", "AI plan rejected, using the vibe's own search: ${it.message}") }
+                .getOrNull() ?: fallbackPlan(selector)
         } else {
             fallbackPlan(selector)
         }
+        AppLog.i("Mix", "${selector.name}: \"${plan.title}\" · search \"${plan.query}\" · ai=${plan.ai}")
 
         val pool = LinkedHashMap<String, ClapHit>()
         graph.audioMuse.textSearch(plan.query, selector.length * 5).forEach { pool.putIfAbsent(it.id, it) }
@@ -117,6 +121,7 @@ class MixGenerator(private val graph: AppGraph) {
         }
 
         val songs = resolve(picked.map { it.id })
+        AppLog.i("Mix", "${pool.size} matches, ${fresh.size} not played recently, picked ${picked.size}, resolved ${songs.size}")
         if (songs.isEmpty()) {
             throw MixException("Navidrome didn't recognise AudioMuse's tracks. Check both use the same library.")
         }

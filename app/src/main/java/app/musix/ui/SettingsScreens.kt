@@ -55,11 +55,10 @@ import java.util.Date
 import kotlin.math.roundToInt
 
 @Composable
-fun SettingsScreen(nav: NavController) {
+fun ConnectionsScreen(nav: NavController) {
     val graph = LocalGraph.current
     val scope = rememberCoroutineScope()
     val firstRun = !graph.settings.current.navidromeReady
-    val library by graph.library.index.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf(graph.settings.current) }
     var showProxy by remember { mutableStateOf(graph.settings.current.proxyUser.isNotBlank()) }
     var problem by remember { mutableStateOf<String?>(null) }
@@ -85,7 +84,17 @@ fun SettingsScreen(nav: NavController) {
 
     fun save() {
         try {
-            graph.settings.save(draft)
+            // Only the connection fields come from this page; everything else keeps its current value.
+            val d = draft
+            graph.settings.save(
+                graph.settings.current.copy(
+                    navidromeUrl = d.navidromeUrl, navidromeUser = d.navidromeUser, navidromePassword = d.navidromePassword,
+                    proxyUser = d.proxyUser, proxyPassword = d.proxyPassword,
+                    audioMuseUrl = d.audioMuseUrl, audioMuseToken = d.audioMuseToken,
+                    audioMuseUser = d.audioMuseUser, audioMusePassword = d.audioMusePassword,
+                    openRouterKey = d.openRouterKey, openRouterModel = d.openRouterModel, aiTitles = d.aiTitles,
+                )
+            )
         } catch (e: Exception) {
             problem = e.message
             return
@@ -96,15 +105,14 @@ fun SettingsScreen(nav: NavController) {
             firstRun && ready -> {
                 // First setup: start the library sync and show its progress, with Home underneath.
                 graph.sync.start()
-                nav.navigate("home") { popUpTo("settings") { inclusive = true } }
-                nav.navigate("sync")
+                nav.navigate("sync") { popUpTo("home") }
             }
             !firstRun -> nav.popBackStack()
         }
     }
 
     Screen(
-        title = "Settings",
+        title = if (firstRun) "Connect your servers" else "Connections",
         nav = if (firstRun) null else nav,
         actions = { IconButton(onClick = { save() }) { Icon(Icons.Rounded.Check, "Save") } },
     ) { padding ->
@@ -138,25 +146,6 @@ fun SettingsScreen(nav: NavController) {
             TestRow(navidromeTest) {
                 runTest({ navidromeTest = it }) { s -> "Connected to " + SubsonicApi(graph.http) { s }.ping() }
             }
-            if (!firstRun) {
-                Row(
-                    Modifier.fillMaxWidth().clickable { nav.navigate("sync") }.padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Rounded.Sync, null)
-                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                        Text("Library sync", style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            library?.let { "Last synced " + DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it.cache.syncedAt)) }
-                                ?: "Not synced yet",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
-                }
-            }
-
             HorizontalDivider()
             Heading("AudioMuse-AI")
             Field("Server address", draft.audioMuseUrl, "192.168.1.10:8000") { draft = draft.copy(audioMuseUrl = it) }
@@ -186,27 +175,6 @@ fun SettingsScreen(nav: NavController) {
                 }
             }
 
-            HorizontalDivider()
-            Heading("Playback")
-            Text("ReplayGain", style = MaterialTheme.typography.bodyLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ReplayGainMode.entries.forEach { mode ->
-                    FilterChip(
-                        selected = draft.replayGain == mode,
-                        onClick = { draft = draft.copy(replayGain = mode) },
-                        label = { Text(mode.label) },
-                    )
-                }
-            }
-            Text("Pre-amp: ${"%+.0f".format(draft.preampDb)} dB", style = MaterialTheme.typography.bodyLarge)
-            Slider(
-                value = draft.preampDb,
-                onValueChange = { draft = draft.copy(preampDb = it.roundToInt().toFloat()) },
-                valueRange = -12f..6f,
-                steps = 17,
-            )
-            Hint("Tracks can only be turned down, so raise the pre-amp only if quiet tracks still sound too quiet.")
-
             problem?.let { ErrorText(it, Modifier) }
             Button(onClick = { save() }, modifier = Modifier.fillMaxWidth()) { Text("Save") }
         }
@@ -214,7 +182,7 @@ fun SettingsScreen(nav: NavController) {
 }
 
 @Composable
-private fun Heading(text: String) {
+internal fun Heading(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
 }
 

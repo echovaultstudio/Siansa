@@ -1,6 +1,21 @@
 package app.musix.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.musix.mix.moodRadios
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -71,7 +86,8 @@ fun SearchScreen(nav: NavController) {
         busy = true
         error = null
         try {
-            results = graph.library.current?.search(q) ?: graph.subsonic.search(q)
+            val index = graph.library.current
+            results = if (index != null) withContext(Dispatchers.Default) { index.search(q) } else graph.subsonic.search(q)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -121,10 +137,10 @@ fun SearchScreen(nav: NavController) {
                 Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             }
             error?.let { ErrorText(it) }
-            if (soundMode) {
-                SoundResults(soundSongs)
-            } else {
-                LibraryResults(results, nav)
+            when {
+                soundMode -> SoundResults(soundSongs)
+                query.trim().length < 2 -> BrowseGrid()
+                else -> LibraryResults(results, nav)
             }
         }
     }
@@ -201,5 +217,55 @@ private fun LibraryResults(results: SearchResults?, nav: NavController) {
             }
         }
         item { Spacer(Modifier.size(8.dp)) }
+    }
+}
+
+/** With an empty search box: radios and genres to browse, like a streaming app's Browse page. */
+@Composable
+private fun BrowseGrid() {
+    val graph = LocalGraph.current
+    val launch = rememberPlayLauncher()
+    val library by graph.library.index.collectAsStateWithLifecycle()
+    val genres = library?.genres.orEmpty().take(30)
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(160.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Text("Radios", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+        }
+        items(moodRadios, key = { "mood-" + it.id }) { radio ->
+            BrowseTile(radio.name, Color(radio.colors.first) to Color(radio.colors.second)) {
+                launch("${radio.name} radio") { graph.radios.mood(radio) }
+            }
+        }
+        if (genres.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Text("Genres", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+            }
+            items(genres, key = { "genre-" + it.name }) { genre ->
+                BrowseTile(genre.name, tileColors(genre.name)) {
+                    launch("${genre.name} radio") { graph.radios.genre(genre.name) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowseTile(title: String, colors: Pair<Color, Color>, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(96.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Brush.linearGradient(listOf(colors.first, colors.second)))
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+    ) {
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 2)
     }
 }

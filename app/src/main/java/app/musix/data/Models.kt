@@ -63,6 +63,20 @@ data class Artist(
     val imageUrl: String? = null,
 )
 
+@Serializable
+data class Playlist(
+    val id: String,
+    val name: String,
+    val songCount: Int = 0,
+    val durationSec: Int = 0,
+    val coverArt: String? = null,
+    val owner: String? = null,
+    val comment: String? = null,
+    val changed: String? = null,
+)
+
+data class PlaylistDetail(val playlist: Playlist, val songs: List<Song>)
+
 data class AlbumDetail(val album: Album, val songs: List<Song>)
 data class ArtistDetail(val artist: Artist, val albums: List<Album>)
 data class SearchResults(val artists: List<Artist>, val albums: List<Album>, val songs: List<Song>)

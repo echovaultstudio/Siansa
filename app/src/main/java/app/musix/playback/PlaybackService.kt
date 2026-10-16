@@ -6,6 +6,7 @@ import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
@@ -18,6 +19,7 @@ import app.musix.AppGraph
 import app.musix.MainActivity
 import app.musix.MusixApp
 import app.musix.data.PlayEvent
+import app.musix.log.AppLog
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
@@ -106,6 +108,7 @@ class PlaybackService : MediaSessionService() {
                 submit(previous)
             }
             currentId = mediaItem?.mediaId
+            if (mediaItem != null) AppLog.i("Player", "Now playing ${mediaItem.mediaId} \"${mediaItem.mediaMetadata.title}\"")
             val song = mediaItem?.toSong()
             player.volume = replayGainVolume(song, graph.settings.current)
             if (song != null) {
@@ -116,6 +119,10 @@ class PlaybackService : MediaSessionService() {
                     }
                 }
             }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            AppLog.e("Player", "Playback error ${error.errorCodeName} on ${currentId ?: "?"}", error)
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {

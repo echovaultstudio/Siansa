@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,10 +13,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
@@ -23,13 +23,12 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shuffle
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -42,12 +41,22 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.musix.AppGraph
+import app.musix.data.Album
+import app.musix.data.Artist
 import app.musix.data.Mix
+import app.musix.data.Playlist
+import app.musix.data.Selector
+import app.musix.log.AppLog
+import app.musix.mix.moodRadios
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -57,96 +66,213 @@ import java.time.LocalTime
 fun HomeScreen(nav: NavController) {
     val graph = LocalGraph.current
     val scope = rememberCoroutineScope()
+    val launch = rememberPlayLauncher()
     val mixes by graph.mixes.state.collectAsStateWithLifecycle()
+    val selectors by graph.selectors.state.collectAsStateWithLifecycle()
+    val library by graph.library.index.collectAsStateWithLifecycle()
+    val loaded by graph.library.loaded.collectAsStateWithLifecycle()
     var current by remember { mutableStateOf<Mix?>(null) }
-    var busy by remember { mutableStateOf(false) }
+    var busySelector by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    fun build(force: Boolean) {
-        if (busy) return
+    fun build(selector: Selector?, force: Boolean, open: Boolean) {
+        if (busySelector != null) return
         scope.launch {
-            busy = true
+            busySelector = selector?.id ?: "current"
             error = null
             try {
-                current = graph.generator.ensureCurrent(force)
-                if (current == null) error = "No vibe covers this hour. Add one under Vibes."
+                val mix = if (selector == null) graph.generator.ensureCurrent(force) else graph.generator.ensure(selector, force)
+                if (selector == null || selector.id == current?.selectorId) current = mix
+                if (mix == null) error = "No vibe covers this hour. Add one under Vibes."
+                if (open && mix != null) nav.navigate("mix/${mix.id}")
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                AppLog.w("Home", "Mix failed: ${e.message}")
                 error = e.message ?: "Couldn't build the mix"
             } finally {
-                busy = false
+                busySelector = null
             }
         }
     }
 
     LaunchedEffect(Unit) {
         graph.mixes.all()
-        build(force = false)
+        graph.selectors.all()
+        build(null, force = false, open = false)
     }
 
     val today = LocalDate.now().toString()
-    val otherToday = mixes.orEmpty().filter { it.date == today && it.id != current?.id }
-    val library by graph.library.index.collectAsStateWithLifecycle()
-    val loaded by graph.library.loaded.collectAsStateWithLifecycle()
-    // From the synced library when there is one; straight from Navidrome otherwise.
+    val todaysMixes = mixes.orEmpty().filter { it.date == today }
+    val playlists by loadState("playlists") {
+        runCatching { graph.subsonic.playlists() }
+            .onSuccess { graph.library.updatePlaylists(it) }
+            .getOrElse { graph.library.current?.playlists ?: throw it }
+    }
+    val recentAlbums by loadState(library) { recentlyPlayedAlbums(graph) }
+    val recentArtists by loadState(library to "artists") { recentlyPlayedArtists(graph) }
     val newest by loadState(library to "newest") {
         library?.sortedAlbums("newest")?.take(20) ?: graph.subsonic.albums("newest", 20, 0).distinctBy { it.name + "|" + it.artist }
     }
-    val random by loadState(library to "random") {
+    val rediscover by loadState(library to "random") {
         library?.sortedAlbums("random")?.take(20) ?: graph.subsonic.albums("random", 20, 0).distinctBy { it.name + "|" + it.artist }
     }
 
-    Screen(
-        title = greeting(),
-        nav = null,
-        actions = {
-            IconButton(onClick = { nav.navigate("settings") }) { Icon(Icons.Rounded.Settings, "Settings") }
-        },
-    ) { padding ->
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = 24.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        item {
+            Row(
+                Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(greeting(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                IconButton(onClick = { nav.navigate("settings") }) { Icon(Icons.Rounded.Settings, "Settings") }
+            }
+        }
+
+        // Quick access, like the top grid in Spotify: today's mixes, playlists and recent albums.
+        item {
+            val quick = buildList<Triple<String, String?, () -> Unit>> {
+                todaysMixes.take(2).forEach { m -> add(Triple(m.title, m.songs.firstOrNull()?.coverArt) { nav.navigate("mix/${m.id}") }) }
+                playlists.valueOrNull().orEmpty().take(2).forEach { p -> add(Triple(p.name, p.coverArt) { nav.navigate("playlist/${p.id}") }) }
+                recentAlbums.valueOrNull().orEmpty().take(6).forEach { a -> add(Triple(a.name, a.coverArt) { nav.navigate("album/${a.id}") }) }
+            }.take(6)
+            if (quick.isNotEmpty()) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    quick.chunked(2).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            row.forEach { (title, cover, open) ->
+                                QuickTile(title, cover, tileColors(title), open, Modifier.weight(1f))
+                            }
+                            if (row.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            val mix = current
+            when {
+                mix != null -> HeroMix(
+                    mix = mix,
+                    busy = busySelector == "current",
+                    onOpen = { nav.navigate("mix/${mix.id}") },
+                    onPlay = { graph.player.play(mix.songs) },
+                    onShuffle = { graph.player.play(mix.songs, shuffle = true) },
+                    onRegenerate = { build(null, force = true, open = false) },
+                )
+                busySelector == "current" -> BuildingCard()
+                else -> Unit
+            }
+        }
+        error?.let { message ->
             item {
-                val mix = current
-                when {
-                    mix != null -> HeroMix(
-                        mix = mix,
-                        busy = busy,
-                        onOpen = { nav.navigate("mix/${mix.id}") },
-                        onPlay = { graph.player.play(mix.songs) },
-                        onShuffle = { graph.player.play(mix.songs, shuffle = true) },
-                        onRegenerate = { build(force = true) },
-                    )
-                    busy -> BuildingCard()
-                    else -> Unit
+                Column(Modifier.padding(horizontal = 16.dp)) {
+                    ErrorText(message, Modifier)
+                    TextButton(onClick = { build(null, force = false, open = false) }) { Text("Try again") }
                 }
             }
-            error?.let { message ->
-                item {
-                    Column(Modifier.padding(horizontal = 16.dp)) {
-                        ErrorText(message, Modifier)
-                        TextButton(onClick = { build(force = false) }) { Text("Try again") }
-                    }
-                }
+        }
+
+        if (loaded && library == null) {
+            item { Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { SyncPrompt(nav) } }
+        }
+
+        // One tile per vibe, like "Made for you".
+        item {
+            val vibes = selectors.orEmpty().filter { it.enabled }
+            Shelf("Made for you", vibes, key = { it.id }) { selector ->
+                val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
+                GradientTile(
+                    title = mix?.title ?: "${selector.name} mix",
+                    colors = tileColors(selector.id),
+                    coverArt = mix?.songs?.firstOrNull()?.coverArt,
+                    subtitle = selector.name,
+                    caption = if (mix != null) "${mix.songs.size} tracks · ${selector.hoursLabel}" else "Tap to make today's mix",
+                    busy = busySelector == selector.id,
+                    onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) },
+                )
             }
-            if (otherToday.isNotEmpty()) {
-                item { SectionTitle("Earlier today") }
-                items(otherToday, key = { it.id }) { mix ->
-                    MixRow(mix) { nav.navigate("mix/${mix.id}") }
-                }
+        }
+
+        item {
+            Shelf("Radios", moodRadios, key = { it.id }) { radio ->
+                GradientTile(
+                    title = radio.name,
+                    colors = Color(radio.colors.first) to Color(radio.colors.second),
+                    size = 140.dp,
+                    caption = "Sound radio",
+                    onClick = { launch("${radio.name} radio") { graph.radios.mood(radio) } },
+                )
             }
-            if (loaded && library == null) {
-                item {
-                    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        SyncPrompt(nav)
-                    }
-                }
+        }
+
+        item {
+            Shelf("Your playlists", playlists.valueOrNull().orEmpty(), key = { it.id }) { playlist ->
+                PlaylistTile(playlist) { nav.navigate("playlist/${playlist.id}") }
             }
-            item { SectionTitle("Recently added") }
-            item { AlbumStrip(newest, nav) }
-            item { SectionTitle("Rediscover") }
-            item { AlbumStrip(random, nav) }
+        }
+
+        item {
+            Shelf("Recently played", recentAlbums.valueOrNull().orEmpty(), key = { it.id }) { album ->
+                AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
+            }
+        }
+
+        item {
+            Shelf("Artist radios", recentArtists.valueOrNull().orEmpty(), key = { it.id }) { artist ->
+                AlbumTile(
+                    name = "${artist.name} radio",
+                    subtitle = "With similar artists",
+                    coverArt = artist.coverArt,
+                    onClick = { launch("${artist.name} radio") { graph.radios.artist(artist) } },
+                    modifier = Modifier.width(140.dp),
+                    round = true,
+                )
+            }
+        }
+
+        item {
+            Shelf("Recently added", newest.valueOrNull().orEmpty(), key = { it.id }) { album ->
+                AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
+            }
+        }
+
+        item {
+            val genres = library?.genres.orEmpty().take(12)
+            Shelf("Your genres", genres, key = { it.name }) { genre ->
+                GradientTile(
+                    title = genre.name,
+                    colors = tileColors(genre.name),
+                    size = 130.dp,
+                    caption = "${genre.songCount} songs",
+                    onClick = { launch("${genre.name} radio") { graph.radios.genre(genre.name) } },
+                )
+            }
+        }
+
+        item {
+            Shelf("Rediscover", rediscover.valueOrNull().orEmpty(), key = { it.id }) { album ->
+                AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
+            }
         }
     }
+}
+
+private suspend fun recentlyPlayedAlbums(graph: AppGraph): List<Album> {
+    val index = graph.library.current ?: return emptyList()
+    return graph.history.recent(300)
+        .mapNotNull { index.song(it.id)?.albumId?.let(index::album) }
+        .distinctBy { it.id }
+        .take(15)
+}
+
+private suspend fun recentlyPlayedArtists(graph: AppGraph): List<Artist> {
+    val index = graph.library.current ?: return emptyList()
+    return graph.history.recent(300)
+        .mapNotNull { play -> index.song(play.id)?.let { s -> s.artistId?.let(index::artist) ?: index.artistByName(s.artist) } }
+        .distinctBy { it.id }
+        .take(10)
 }
 
 private fun greeting(): String {
@@ -160,6 +286,17 @@ private fun greeting(): String {
 }
 
 @Composable
+fun PlaylistTile(playlist: Playlist, onClick: () -> Unit) {
+    AlbumTile(
+        name = playlist.name,
+        subtitle = "${playlist.songCount} songs" + (playlist.owner?.let { " · $it" } ?: ""),
+        coverArt = playlist.coverArt,
+        onClick = onClick,
+        modifier = Modifier.width(150.dp),
+    )
+}
+
+@Composable
 private fun HeroMix(
     mix: Mix,
     busy: Boolean,
@@ -168,60 +305,57 @@ private fun HeroMix(
     onShuffle: () -> Unit,
     onRegenerate: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clickable(onClick = onOpen),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    val colors = tileColors(mix.selectorId)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Brush.linearGradient(listOf(colors.first, colors.second)))
+            .clickable(onClick = onOpen),
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CoverMosaic(mix, Modifier.size(96.dp))
+                CoverMosaic(mix, Modifier.size(104.dp))
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
-                    if (mix.aiNamed) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Rounded.AutoAwesome,
-                                null,
-                                Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (mix.aiNamed) {
+                            Icon(Icons.Rounded.AutoAwesome, null, Modifier.size(14.dp), tint = Color.White)
                             Spacer(Modifier.width(4.dp))
-                            Text("Today's mix", style = MaterialTheme.typography.labelMedium)
                         }
-                    } else {
-                        Text("Today's mix", style = MaterialTheme.typography.labelMedium)
+                        Text("Today's mix", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.85f))
                     }
                     Text(
                         mix.title,
                         style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text("${mix.songs.size} tracks", style = MaterialTheme.typography.bodySmall)
+                    Text("${mix.songs.size} tracks", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f))
                 }
             }
             if (mix.description.isNotBlank()) {
                 Spacer(Modifier.height(10.dp))
-                Text(mix.description, style = MaterialTheme.typography.bodyMedium)
+                Text(mix.description, style = MaterialTheme.typography.bodyMedium, color = Color.White)
             }
             Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = onPlay) {
-                    Icon(Icons.Rounded.PlayArrow, null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Play")
-                }
-                FilledTonalButton(onClick = onShuffle) {
-                    Icon(Icons.Rounded.Shuffle, null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Shuffle")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (busy) {
+                    CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    IconButton(onClick = onRegenerate) { Icon(Icons.Rounded.Refresh, "Make a new mix", tint = Color.White) }
                 }
                 Spacer(Modifier.weight(1f))
-                if (busy) {
-                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                } else {
-                    IconButton(onClick = onRegenerate) { Icon(Icons.Rounded.Refresh, "Make a new mix") }
+                IconButton(onClick = onShuffle) { Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Color.White) }
+                FilledIconButton(
+                    onClick = onPlay,
+                    modifier = Modifier.size(52.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color.Black),
+                ) {
+                    Icon(Icons.Rounded.PlayArrow, "Play", Modifier.size(30.dp))
                 }
             }
         }
@@ -278,24 +412,6 @@ fun MixRow(mix: Mix, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-    }
-}
-
-@Composable
-private fun AlbumStrip(load: Load<List<app.musix.data.Album>>, nav: NavController) {
-    LoadBox(load) { albums ->
-        LazyRow(contentPadding = PaddingValues(horizontal = 8.dp)) {
-            items(albums, key = { it.id }) { album ->
-                Box(Modifier.width(150.dp)) {
-                    AlbumTile(
-                        name = album.name,
-                        subtitle = album.artist,
-                        coverArt = album.coverArt,
-                        onClick = { nav.navigate("album/${album.id}") },
-                    )
-                }
-            }
         }
     }
 }

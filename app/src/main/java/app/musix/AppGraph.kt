@@ -7,7 +7,9 @@ import app.musix.data.LibrarySync
 import app.musix.data.MixStore
 import app.musix.data.SelectorStore
 import app.musix.data.SettingsRepository
+import app.musix.log.AppLog
 import app.musix.mix.MixGenerator
+import app.musix.mix.Radios
 import app.musix.net.AudioMuseApi
 import app.musix.net.OpenRouterApi
 import app.musix.net.SubsonicApi
@@ -49,6 +51,23 @@ class AppGraph(val app: Application) {
                 chain.proceed(request)
             }
         }
+        // Request log (only while logging is on). Cover images are left out to keep the log readable.
+        .addInterceptor { chain ->
+            val request = chain.request()
+            if (!AppLog.enabled || request.url.encodedPath.endsWith("/getCoverArt")) return@addInterceptor chain.proceed(request)
+            val started = System.nanoTime()
+            val where = request.url.host + request.url.encodedPath
+            try {
+                val response = chain.proceed(request)
+                val ms = (System.nanoTime() - started) / 1_000_000
+                if (response.isSuccessful) AppLog.i("Http", "${request.method} $where → ${response.code} in ${ms}ms")
+                else AppLog.w("Http", "${request.method} ${AppLog.redact(request.url.toString())} → ${response.code} in ${ms}ms")
+                response
+            } catch (e: Exception) {
+                AppLog.w("Http", "${request.method} $where failed: ${e.javaClass.simpleName}: ${e.message}")
+                throw e
+            }
+        }
         .build()
 
     val subsonic = SubsonicApi(http) { settings.current }
@@ -62,5 +81,6 @@ class AppGraph(val app: Application) {
     val sync = LibrarySync(subsonic, library, settings, scope)
 
     val generator = MixGenerator(this)
+    val radios = Radios(this)
     val player = PlayerConnection(app, subsonic)
 }
