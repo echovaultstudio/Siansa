@@ -1,5 +1,10 @@
 package app.musix.ui
 
+import android.os.SystemClock
+import androidx.compose.runtime.withFrameMillis
+import app.musix.log.AppLog
+import app.musix.playback.SeekTracker
+import kotlinx.coroutines.delay
 import app.musix.data.cover
 import android.os.Build
 import androidx.compose.animation.AnimatedContent
@@ -252,7 +257,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
                     song?.let { graph.favorites.toggle(it) }
                 }
-                SeekBar(state.durationMs)
+                SeekBar()
                 Controls(state)
                 Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     ViewToggle(Icons.Rounded.FormatQuote, "Lyrics", view == PlayerView.LYRICS) {
@@ -483,12 +488,33 @@ private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart:
  * while you drag, and the time shown follows your finger.
  */
 @Composable
-private fun SeekBar(durationMs: Long) {
+private fun SeekBar() {
     val graph = LocalGraph.current
-    val position by rememberPosition()
+    val tracker = remember { SeekTracker() }
+    var shown by remember { mutableStateOf(graph.player.progress().let { SeekTracker.Shown(it.positionMs, it.durationMs) }) }
+    // Read the player every frame (its position is estimated locally, so this is cheap) for smooth movement.
+    LaunchedEffect(tracker) {
+        var lastTrack: String? = null
+        while (true) {
+            val p = graph.player.progress()
+            shown = tracker.update(p.mediaId, p.positionMs, p.durationMs, p.playing, SystemClock.elapsedRealtime())
+            if (p.mediaId != lastTrack) {
+                AppLog.d("Player", "Seek bar: new song, starts at ${p.positionMs} ms of ${p.durationMs} ms")
+                lastTrack = p.mediaId
+            }
+            if (p.playing) withFrameMillis { } else delay(200)
+        }
+    }
     var dragging by remember { mutableStateOf<Float?>(null) }
-    val duration = durationMs.coerceAtLeast(1L)
-    val fraction = dragging ?: (position.toFloat() / duration).coerceIn(0f, 1f)
+    val duration = shown.durationMs.coerceAtLeast(1L)
+    val fraction = dragging ?: shown.fraction
+    fun seek(to: Float) {
+        val ms = (to * duration).toLong()
+        tracker.seekTo(ms, SystemClock.elapsedRealtime())
+        shown = SeekTracker.Shown(ms, shown.durationMs)
+        AppLog.d("Player", "Seek to $ms ms of $duration ms")
+        graph.player.seekTo(ms)
+    }
     val thumb by animateDpAsState(if (dragging != null) 16.dp else 11.dp, tween(100), label = "thumb")
     Column(Modifier.padding(top = 14.dp)) {
         BoxWithConstraints(
@@ -496,13 +522,13 @@ private fun SeekBar(durationMs: Long) {
                 .fillMaxWidth()
                 .height(28.dp)
                 .pointerInput(duration) {
-                    detectTapGestures { offset -> graph.player.seekTo(((offset.x / size.width).coerceIn(0f, 1f) * duration).toLong()) }
+                    detectTapGestures { offset -> seek((offset.x / size.width).coerceIn(0f, 1f)) }
                 }
                 .pointerInput(duration) {
                     detectHorizontalDragGestures(
                         onDragStart = { offset -> dragging = (offset.x / size.width).coerceIn(0f, 1f) },
                         onDragEnd = {
-                            dragging?.let { graph.player.seekTo((it * duration).toLong()) }
+                            dragging?.let { seek(it) }
                             dragging = null
                         },
                         onDragCancel = { dragging = null },

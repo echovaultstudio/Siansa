@@ -185,6 +185,17 @@ class PlayerConnection(
 
     fun positionMs(): Long = controller?.currentPosition ?: 0L
 
+    /** The current song, where it is and how long it is, read together so they always belong to the same song. */
+    data class Progress(val mediaId: String?, val positionMs: Long, val durationMs: Long, val playing: Boolean)
+
+    fun progress(): Progress {
+        val c = controller ?: return Progress(null, 0, 0, false)
+        val item = c.currentMediaItem
+        val duration = c.duration.takeIf { it != C.TIME_UNSET && it > 0 }
+            ?: ((item?.toSong()?.durationSec ?: 0) * 1000L)
+        return Progress(item?.mediaId, c.currentPosition, duration, c.isPlaying)
+    }
+
     private fun refresh() {
         val c = controller ?: return
         val queue = (0 until c.mediaItemCount).map { c.getMediaItemAt(it).toSong() }
