@@ -68,10 +68,9 @@ fun ArtistScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
     val launch = rememberPlayLauncher()
     val page by loadState(id) {
-        val index = graph.library.current
-        val local = index?.artist(id)
-        if (index != null && local != null) {
-            ArtistPage(local, index.albumsOf(local).sortedByDescending { it.year ?: 0 }, index.songsOf(local))
+        val local = graph.library.artist(id)
+        if (local != null) {
+            ArtistPage(local, graph.library.albumsOf(local), graph.library.songsOf(local))
         } else {
             val remote = graph.subsonic.artist(id)
             ArtistPage(remote.artist, remote.albums.sortedByDescending { it.year ?: 0 }, emptyList())
@@ -175,9 +174,11 @@ private fun LazyGridScope.full(content: @Composable () -> Unit) {
 
 /** Navidrome's top songs, matched to the synced library; the artist's own songs when Navidrome has none. */
 private suspend fun loadTopSongs(graph: AppGraph, page: ArtistPage): List<Song> {
-    val index = graph.library.current
     val remote = runCatching { graph.subsonic.topSongs(page.artist.name, 10) }.getOrDefault(emptyList())
-    if (remote.isNotEmpty()) return remote.map { index?.song(it.id) ?: it }
+    if (remote.isNotEmpty()) {
+        val local = graph.library.songs(remote.map { it.id }).associateBy { it.id }
+        return remote.map { local[it.id] ?: it }
+    }
     return page.songs.shuffled().take(10)
 }
 
@@ -207,12 +208,12 @@ private fun Biography(text: String) {
 @Composable
 private fun SimilarRow(similar: List<SimilarArtist>, nav: NavController) {
     val graph = LocalGraph.current
+    // Prefer the artist as synced on the phone; Navidrome only lists artists you have.
+    val matched by loadState(similar) {
+        similar.map { a -> a to (a.id?.let { graph.library.artist(it) } ?: graph.library.artistByName(a.name)) }
+    }
     LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        items(similar, key = { it.id ?: it.name }) { artist ->
-            // Prefer the artist as synced on the phone; Navidrome only lists artists you have.
-            val local = graph.library.current?.let { index ->
-                artist.id?.let { index.artist(it) } ?: index.artistByName(artist.name)
-            }
+        items(matched.valueOrNull() ?: similar.map { it to null }, key = { it.first.id ?: it.first.name }) { (artist, local) ->
             val target = local?.id ?: artist.id
             Column(
                 Modifier

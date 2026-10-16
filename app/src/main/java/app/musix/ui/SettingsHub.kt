@@ -71,7 +71,7 @@ import kotlin.math.roundToInt
 fun SettingsHub(nav: NavController) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    val libraryState by graph.library.index.collectAsStateWithLifecycle()
+    val libraryState by graph.library.status.collectAsStateWithLifecycle()
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
     val library = libraryState
     Screen(title = "Settings", nav = nav) { padding ->
@@ -92,7 +92,7 @@ fun SettingsHub(nav: NavController) {
                     progress.running -> "Syncing… " + progress.phase.label
                     progress.phase == SyncPhase.FAILED -> "Last sync failed"
                     library != null -> "Last synced " + DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-                        .format(Date(library.cache.syncedAt))
+                        .format(Date(library.syncedAt))
                     else -> "Not synced yet"
                 },
             ) { nav.navigate("sync") }
@@ -110,7 +110,7 @@ fun SettingsHub(nav: NavController) {
                     "ListenBrainz/Koito".takeIf { settings.listenBrainzReady },
                 ).joinToString(" · ").ifEmpty { "Off" },
             ) { nav.navigate("settings/scrobbling") }
-            HubRow(Icons.Rounded.Storage, "Storage", "Image cache up to ${formatMb(settings.imageCacheMb)}") {
+            HubRow(Icons.Rounded.Storage, "Storage", "Songs up to ${formatMb(settings.songCacheMb)} · images up to ${formatMb(settings.imageCacheMb)}") {
                 nav.navigate("settings/storage")
             }
             HubRow(Icons.Rounded.BugReport, "Logs", if (settings.logging) "Logging on" else "Logging off") {
@@ -202,23 +202,28 @@ private fun QualityRow(label: String, value: Int, onPick: (Int) -> Unit) {
 }
 
 private val cacheSizes = listOf(100, 250, 500, 1024, 2048, 5120)
+private val songCacheSizes = listOf(512, 1024, 2048, 5120, 10240, 20480)
 
-/** Image cache size and usage, and what else the app keeps on the phone. */
+private data class StorageUsage(val images: Long, val songs: Long, val library: Long, val logs: Long)
+
+/** Image and song cache sizes and usage, and what else the app keeps on the phone. */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun StorageScreen(nav: NavController) {
     val graph = LocalGraph.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    val chosenAtStart = remember { settings.imageCacheMb }
+    val imagesAtStart = remember { settings.imageCacheMb }
+    val songsAtStart = remember { settings.songCacheMb }
     var refresh by remember { mutableIntStateOf(0) }
     val usage by loadState(refresh) {
         withContext(Dispatchers.IO) {
-            val loader = SingletonImageLoader.get(context)
-            Triple(
-                loader.diskCache?.size ?: 0L,
-                File(context.filesDir, "library.json").length(),
-                AppLog.sizeBytes(),
+            StorageUsage(
+                images = SingletonImageLoader.get(context).diskCache?.size ?: 0L,
+                songs = runCatching { graph.songCache.cacheSpace }.getOrDefault(0L),
+                library = context.getDatabasePath("library.db").length(),
+                logs = AppLog.sizeBytes(),
             )
         }
     }
@@ -228,10 +233,37 @@ fun StorageScreen(nav: NavController) {
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            Heading("Song cache")
+            Hint("Songs are kept on the phone as they play, and the next song in the queue is fetched ahead, so replays and skips start at once and survive a bad connection. Only original-quality streams are cached.")
+            usage.valueOrNull()?.let { u ->
+                Text("In use: ${formatBytes(u.songs)} of ${formatMb(settings.songCacheMb)}", style = MaterialTheme.typography.bodyLarge)
+            }
+            Text("Maximum size", style = MaterialTheme.typography.bodyLarge)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                songCacheSizes.forEach { mb ->
+                    FilterChip(
+                        selected = settings.songCacheMb == mb,
+                        onClick = { graph.settings.save(graph.settings.current.copy(songCacheMb = mb)) },
+                        label = { Text(formatMb(mb)) },
+                    )
+                }
+            }
+            OutlinedButton(onClick = {
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        val cache = graph.songCache
+                        cache.keys.toList().forEach { key -> runCatching { cache.removeResource(key) } }
+                    }
+                    AppLog.i("Storage", "Song cache cleared")
+                    refresh++
+                }
+            }) { Text("Clear song cache") }
+
+            HorizontalDivider()
             Heading("Image cache")
             Hint("Covers and artist photos are saved as they load, so they show instantly next time and without a connection. The oldest are removed when the cache is full.")
             usage.valueOrNull()?.let { u ->
-                Text("In use: ${formatBytes(u.first)} of ${formatMb(settings.imageCacheMb)}", style = MaterialTheme.typography.bodyLarge)
+                Text("In use: ${formatBytes(u.images)} of ${formatMb(settings.imageCacheMb)}", style = MaterialTheme.typography.bodyLarge)
             }
             Text("Maximum size", style = MaterialTheme.typography.bodyLarge)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -241,14 +273,6 @@ fun StorageScreen(nav: NavController) {
                         onClick = { graph.settings.setImageCacheMb(mb) },
                         label = { Text(formatMb(mb)) },
                     )
-                }
-            }
-            if (settings.imageCacheMb != chosenAtStart) {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("The new size applies after the app restarts.", style = MaterialTheme.typography.bodyMedium)
-                        Button(onClick = { restartApp(context) }) { Text("Restart now") }
-                    }
                 }
             }
             OutlinedButton(onClick = {
@@ -263,11 +287,20 @@ fun StorageScreen(nav: NavController) {
                 }
             }) { Text("Clear image cache") }
 
+            if (settings.imageCacheMb != imagesAtStart || settings.songCacheMb != songsAtStart) {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("New cache sizes apply after the app restarts.", style = MaterialTheme.typography.bodyMedium)
+                        Button(onClick = { restartApp(context) }) { Text("Restart now") }
+                    }
+                }
+            }
+
             HorizontalDivider()
             Heading("Other data on this phone")
             usage.valueOrNull()?.let { u ->
-                Text("Synced library: ${formatBytes(u.second)}", style = MaterialTheme.typography.bodyMedium)
-                Text("Logs: ${formatBytes(u.third)}", style = MaterialTheme.typography.bodyMedium)
+                Text("Library database: ${formatBytes(u.library)}", style = MaterialTheme.typography.bodyMedium)
+                Text("Logs: ${formatBytes(u.logs)}", style = MaterialTheme.typography.bodyMedium)
             }
         }
     }

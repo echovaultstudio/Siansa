@@ -12,7 +12,10 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.ResolvingDataSource
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.CacheWriter
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
@@ -29,9 +32,11 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import java.io.InterruptedIOException
 import java.util.Collections
 
 /** Background playback with a media notification, lock-screen controls, ReplayGain, transcoding and scrobbling. */
@@ -41,6 +46,9 @@ class PlaybackService : MediaSessionService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var graph: AppGraph
     private var events: Events? = null
+    private var cacheFactory: CacheDataSource.Factory? = null
+    private var precacheJob: Job? = null
+    private var precacheWriter: CacheWriter? = null
 
     // The quality chosen when a song's stream first opens, so a network change can't switch format mid-song.
     private val chosenKbps: MutableMap<String, Int> = Collections.synchronizedMap(object : LinkedHashMap<String, Int>(64, 0.75f, true) {
@@ -54,14 +62,15 @@ class PlaybackService : MediaSessionService() {
         // Streams go through the app's HTTP client (so a proxy login applies), and each stream is pointed
         // at the original file or an Opus conversion depending on the network at that moment.
         val http = OkHttpDataSource.Factory(graph.http)
-        val resolving = ResolvingDataSource.Factory(http) { spec ->
+        cacheFactory = CacheDataSource.Factory()
+            .setCache(graph.songCache)
+            .setUpstreamDataSourceFactory(http)
+            .setCacheKeyFactory { spec -> songCacheKey(spec.uri) }
+            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+        val switching = CachingSwitchDataSource.Factory(cacheFactory!!, http)
+        val resolving = ResolvingDataSource.Factory(switching) { spec ->
             val key = spec.uri.getQueryParameter("id") ?: spec.uri.toString()
-            val kbps = chosenKbps.getOrPut(key) {
-                Streaming.bitrate(this, graph.settings.current).also {
-                    AppLog.i("Stream", "Song $key: " + if (it > 0) "Opus $it kbit/s" else "original")
-                }
-            }
-            spec.withUri(Streaming.rewrite(spec.uri, kbps))
+            spec.withUri(Streaming.rewrite(spec.uri, kbpsFor(key)))
         }
         val dataSource = DefaultDataSource.Factory(this, resolving)
 
@@ -113,6 +122,39 @@ class PlaybackService : MediaSessionService() {
         scope.launch { runCatching { graph.scrobbler.flush() } }
     }
 
+    private fun kbpsFor(songId: String): Int = chosenKbps.getOrPut(songId) {
+        Streaming.bitrate(this, graph.settings.current).also {
+            AppLog.i("Stream", "Song $songId: " + if (it > 0) "Opus $it kbit/s" else "original")
+        }
+    }
+
+    /**
+     * Downloads the next song in the queue into the song cache while this one plays, so the change
+     * is instant and survives a dropped connection. Only originals are cached.
+     */
+    private fun precacheNext(player: Player) {
+        precacheWriter?.cancel()
+        precacheJob?.cancel()
+        val index = player.nextMediaItemIndex
+        if (index == C.INDEX_UNSET) return
+        val item = player.getMediaItemAt(index)
+        val uri = item.localConfiguration?.uri ?: return
+        if (kbpsFor(item.mediaId) > 0) return
+        val factory = cacheFactory ?: return
+        val writer = CacheWriter(factory.createDataSourceForDownloading(), DataSpec(uri), null, null)
+        precacheWriter = writer
+        precacheJob = scope.launch {
+            try {
+                writer.cache()
+                AppLog.i("Cache", "Pre-cached next song ${item.mediaId}")
+            } catch (e: InterruptedIOException) {
+                // Cancelled because the queue moved on.
+            } catch (e: Exception) {
+                AppLog.w("Cache", "Pre-caching ${item.mediaId} failed: ${e.message}")
+            }
+        }
+    }
+
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -121,6 +163,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        precacheWriter?.cancel()
         events?.finishCurrent()
         session?.run {
             player.release()
@@ -156,6 +199,7 @@ class PlaybackService : MediaSessionService() {
             AppLog.i("Player", "Now playing ${song.id} \"${song.title}\"")
             player.volume = replayGainVolume(song, graph.settings.current)
             graph.scrobbler.nowPlaying(song)
+            precacheNext(player)
             scope.launch {
                 runCatching { graph.history.add(PlayEvent(song.id, song.title, song.artist, song.genre, System.currentTimeMillis())) }
             }

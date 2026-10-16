@@ -46,6 +46,7 @@ data class Album(
     val artistId: String? = null,
     val coverArt: String? = null,
     val songCount: Int = 0,
+    val durationSec: Int = 0,
     val year: Int? = null,
     val genre: String? = null,
     val created: String? = null,

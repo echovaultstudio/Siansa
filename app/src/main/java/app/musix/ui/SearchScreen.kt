@@ -86,8 +86,7 @@ fun SearchScreen(nav: NavController) {
         busy = true
         error = null
         try {
-            val index = graph.library.current
-            results = if (index != null) withContext(Dispatchers.Default) { index.search(q) } else graph.subsonic.search(q)
+            results = if (graph.library.isSynced) graph.library.search(q) else graph.subsonic.search(q)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -225,8 +224,9 @@ private fun LibraryResults(results: SearchResults?, nav: NavController) {
 private fun BrowseGrid() {
     val graph = LocalGraph.current
     val launch = rememberPlayLauncher()
-    val library by graph.library.index.collectAsStateWithLifecycle()
-    val genres = library?.genres.orEmpty().take(30)
+    val version by graph.library.version.collectAsStateWithLifecycle()
+    val genreList by loadState(version to "browse-genres") { if (graph.library.isSynced) graph.library.genres(30) else emptyList() }
+    val genres = genreList.valueOrNull().orEmpty()
     LazyVerticalGrid(
         columns = GridCells.Adaptive(160.dp),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),

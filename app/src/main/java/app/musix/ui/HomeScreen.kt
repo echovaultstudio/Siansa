@@ -69,8 +69,10 @@ fun HomeScreen(nav: NavController) {
     val launch = rememberPlayLauncher()
     val mixes by graph.mixes.state.collectAsStateWithLifecycle()
     val selectors by graph.selectors.state.collectAsStateWithLifecycle()
-    val library by graph.library.index.collectAsStateWithLifecycle()
+    val status by graph.library.status.collectAsStateWithLifecycle()
     val loaded by graph.library.loaded.collectAsStateWithLifecycle()
+    val version by graph.library.version.collectAsStateWithLifecycle()
+    val synced = status != null
     var current by remember { mutableStateOf<Mix?>(null) }
     var busySelector by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -107,16 +109,19 @@ fun HomeScreen(nav: NavController) {
     val playlists by loadState("playlists") {
         runCatching { graph.subsonic.playlists() }
             .onSuccess { graph.library.updatePlaylists(it) }
-            .getOrElse { graph.library.current?.playlists ?: throw it }
+            .getOrElse { if (graph.library.isSynced) graph.library.playlists() else throw it }
     }
-    val recentAlbums by loadState(library) { recentlyPlayedAlbums(graph) }
-    val recentArtists by loadState(library to "artists") { recentlyPlayedArtists(graph) }
-    val newest by loadState(library to "newest") {
-        library?.sortedAlbums("newest")?.take(20) ?: graph.subsonic.albums("newest", 20, 0).distinctBy { it.name + "|" + it.artist }
+    val recentAlbums by loadState(version to "recent") { recentlyPlayedAlbums(graph) }
+    val recentArtists by loadState(version to "artists") { recentlyPlayedArtists(graph) }
+    val newest by loadState(version to "newest") {
+        if (graph.library.isSynced) graph.library.albums("newest").take(20)
+        else graph.subsonic.albums("newest", 20, 0).distinctBy { it.name + "|" + it.artist }
     }
-    val rediscover by loadState(library to "random") {
-        library?.sortedAlbums("random")?.take(20) ?: graph.subsonic.albums("random", 20, 0).distinctBy { it.name + "|" + it.artist }
+    val rediscover by loadState(version to "random") {
+        if (graph.library.isSynced) graph.library.randomAlbums(20)
+        else graph.subsonic.albums("random", 20, 0).distinctBy { it.name + "|" + it.artist }
     }
+    val genres by loadState(version to "genres") { if (graph.library.isSynced) graph.library.genres(12) else emptyList() }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
@@ -176,7 +181,7 @@ fun HomeScreen(nav: NavController) {
             }
         }
 
-        if (loaded && library == null) {
+        if (loaded && !synced) {
             item { Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { SyncPrompt(nav) } }
         }
 
@@ -241,8 +246,7 @@ fun HomeScreen(nav: NavController) {
         }
 
         item {
-            val genres = library?.genres.orEmpty().take(12)
-            Shelf("Your genres", genres, key = { it.name }) { genre ->
+            Shelf("Your genres", genres.valueOrNull().orEmpty(), key = { it.name }) { genre ->
                 GradientTile(
                     title = genre.name,
                     colors = tileColors(genre.name),
@@ -262,19 +266,18 @@ fun HomeScreen(nav: NavController) {
 }
 
 private suspend fun recentlyPlayedAlbums(graph: AppGraph): List<Album> {
-    val index = graph.library.current ?: return emptyList()
-    return graph.history.recent(300)
-        .mapNotNull { index.song(it.id)?.albumId?.let(index::album) }
-        .distinctBy { it.id }
-        .take(15)
+    if (!graph.library.isSynced) return emptyList()
+    val songs = graph.library.songs(graph.history.recent(300).map { it.id }.distinct())
+    val albumIds = songs.mapNotNull { it.albumId }.distinct().take(15)
+    return albumIds.mapNotNull { graph.library.album(it) }.distinctBy { it.id }
 }
 
 private suspend fun recentlyPlayedArtists(graph: AppGraph): List<Artist> {
-    val index = graph.library.current ?: return emptyList()
-    return graph.history.recent(300)
-        .mapNotNull { play -> index.song(play.id)?.let { s -> s.artistId?.let(index::artist) ?: index.artistByName(s.artist) } }
-        .distinctBy { it.id }
-        .take(10)
+    if (!graph.library.isSynced) return emptyList()
+    val songs = graph.library.songs(graph.history.recent(300).map { it.id }.distinct())
+    return songs.distinctBy { it.artistId ?: it.artist }.take(10).mapNotNull { s ->
+        s.artistId?.let { graph.library.artist(it) } ?: graph.library.artistByName(s.artist)
+    }.distinctBy { it.id }
 }
 
 private fun greeting(): String {

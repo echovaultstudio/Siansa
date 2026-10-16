@@ -1,15 +1,22 @@
 package app.musix.data
 
+import app.musix.data.LibraryRepository.Companion.signature
 import app.musix.log.AppLog
 import app.musix.net.SubsonicApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import java.util.concurrent.atomic.AtomicInteger
 
 enum class SyncPhase(val label: String) {
     IDLE("Not running"),
@@ -32,6 +39,9 @@ data class SyncProgress(
     val songs: Int = 0,
     val songsExpected: Int = 0,
     val merged: Int = 0,
+    val changedAlbums: Int = -1,
+    val upToDate: Boolean = false,
+    val quiet: Boolean = false,
     val error: String? = null,
 ) {
     val running: Boolean get() = phase in setOf(SyncPhase.CONNECTING, SyncPhase.ARTISTS, SyncPhase.ALBUMS, SyncPhase.SONGS, SyncPhase.SAVING)
@@ -46,8 +56,10 @@ data class SyncProgress(
 }
 
 /**
- * Copies the Navidrome library to the phone, like Symfonium: artists, albums and every song of the
- * chosen libraries, page by page. Albums that exist in more than one library are merged into one.
+ * Keeps the phone's library in step with Navidrome, like Symfonium:
+ * - nothing to do when Navidrome hasn't scanned since the last sync (only hearts, play counts and playlists refresh);
+ * - otherwise the album list is compared and only new or changed albums have their songs fetched;
+ * - a full sync, or a first one, fetches every song page by page.
  */
 class LibrarySync(
     private val api: SubsonicApi,
@@ -59,17 +71,21 @@ class LibrarySync(
     val progress: StateFlow<SyncProgress> = _progress.asStateFlow()
     private var job: Job? = null
 
-    fun start() {
+    /** [full] fetches everything again; [quiet] is the automatic check at app start. */
+    fun start(full: Boolean = false, quiet: Boolean = false) {
         if (job?.isActive == true) return
         job = scope.launch {
             try {
-                run()
+                run(full, quiet)
             } catch (e: CancellationException) {
                 _progress.update { it.copy(phase = SyncPhase.FAILED, error = "Sync was stopped") }
                 throw e
             } catch (e: Exception) {
                 AppLog.e("Sync", "Failed", e)
                 _progress.update { it.copy(phase = SyncPhase.FAILED, error = e.message ?: e.javaClass.simpleName) }
+            } finally {
+                library.refreshStatus()
+                library.bump()
             }
         }
     }
@@ -78,140 +94,129 @@ class LibrarySync(
         job?.cancel()
     }
 
-    private suspend fun run() {
-        _progress.value = SyncProgress(phase = SyncPhase.CONNECTING)
+    private suspend fun run(forceFull: Boolean, quiet: Boolean) {
+        _progress.value = SyncProgress(phase = SyncPhase.CONNECTING, quiet = quiet)
         val all = api.musicFolders()
-        AppLog.i("Sync", "Started. Libraries on server: ${all.joinToString { it.name + " (" + it.id + ")" }}; chosen: ${settings.current.syncFolders}")
         val chosen = settings.current.syncFolders
         val folders = all.filter { it.id in chosen }
         // Nothing chosen, or every library chosen: one pass without a library filter.
         val passes: List<MusicFolder?> = if (folders.isEmpty() || folders.size == all.size) listOf(null) else folders
+        val folderKey = passes.joinToString(",") { it?.id ?: "*" }
+
+        val synced = library.meta(LibraryRepository.META_SYNCED_AT) != null
+        val sameFolders = library.meta(LibraryRepository.META_FOLDERS) == folderKey
+        val lastScan = runCatching { api.lastScan() }.getOrNull()
+        AppLog.i("Sync", "Start full=$forceFull quiet=$quiet lastScan=$lastScan folders=$folderKey")
+
+        if (!forceFull && synced && sameFolders && lastScan != null && lastScan != "scanning" &&
+            lastScan == library.meta(LibraryRepository.META_LAST_SCAN)
+        ) {
+            // Navidrome hasn't scanned since: the music is the same. Refresh what changes without a scan.
+            refreshExtras()
+            library.putMeta(LibraryRepository.META_SYNCED_AT, System.currentTimeMillis().toString())
+            AppLog.i("Sync", "No scan since last sync, library unchanged")
+            _progress.update { it.copy(phase = SyncPhase.DONE, upToDate = true, changedAlbums = 0) }
+            return
+        }
 
         val artists = LinkedHashMap<String, Artist>()
-        val albums = ArrayList<Album>()
-        val songs = ArrayList<Song>()
-
+        val albums = LinkedHashMap<String, Album>()
         passes.forEachIndexed { index, folder ->
             val name = folder?.name ?: if (all.size > 1) "All libraries" else all.firstOrNull()?.name
             _progress.update {
                 it.copy(phase = SyncPhase.ARTISTS, libraryName = name, libraryIndex = index + 1, libraryCount = passes.size)
             }
             api.artists(folder?.id).forEach { artists.putIfAbsent(it.id, it) }
-            _progress.update { it.copy(artists = artists.size) }
-
-            _progress.update { it.copy(phase = SyncPhase.ALBUMS) }
+            _progress.update { it.copy(artists = artists.size, phase = SyncPhase.ALBUMS) }
             var offset = 0
-            val passAlbums = ArrayList<Album>()
             while (true) {
                 val page = api.albums("alphabeticalByName", PAGE, offset, folder?.id)
-                passAlbums += page
-                _progress.update { it.copy(albums = albums.size + passAlbums.size) }
-                if (page.size < PAGE) break
-                offset += PAGE
-            }
-            albums += passAlbums
-
-            val expected = passAlbums.sumOf { it.songCount }
-            _progress.update { it.copy(phase = SyncPhase.SONGS, songsExpected = it.songs + expected) }
-            offset = 0
-            while (true) {
-                val page = api.songsPage(offset, PAGE, folder?.id)
-                songs += page
-                _progress.update { it.copy(songs = songs.size, songsExpected = maxOf(it.songsExpected, songs.size)) }
+                page.forEach { albums.putIfAbsent(it.id, it) }
+                _progress.update { it.copy(albums = albums.size) }
                 if (page.size < PAGE) break
                 offset += PAGE
             }
         }
+        library.replaceArtists(artists.values.toList())
 
-        _progress.update { it.copy(phase = SyncPhase.SAVING) }
-        val playlists = runCatching { api.playlists() }
-            .onFailure { AppLog.w("Sync", "Playlists couldn't be loaded", it) }
-            .getOrDefault(emptyList())
-        val cache = merge(artists.values.toList(), albums, songs, passes.mapNotNull { it?.id })
-            .copy(playlists = playlists)
-        AppLog.i(
-            "Sync",
-            "Fetched ${artists.size} artists, ${albums.size} albums, ${songs.size} songs, ${playlists.size} playlists; " +
-                "kept ${cache.albums.size} albums and ${cache.songs.size} songs after merging",
-        )
-        library.replace(cache)
+        val stored = library.albumSignatures()
+        val known = if (sameFolders) stored else emptyMap()
+        val changed = albums.values.filter { known[it.id] != it.signature() }
+        val removed = stored.keys - albums.keys
+        val full = forceFull || !synced || !sameFolders || changed.size > maxOf(300, albums.size / 3)
+        AppLog.i("Sync", "${albums.size} albums on server, ${changed.size} new or changed, ${removed.size} removed, full=$full")
+
+        if (full) {
+            val expected = albums.values.sumOf { it.songCount }
+            _progress.update { it.copy(phase = SyncPhase.SONGS, songs = 0, songsExpected = expected, changedAlbums = albums.size) }
+            val songs = ArrayList<Song>(expected)
+            for (folder in passes) {
+                var offset = 0
+                while (true) {
+                    val page = api.songsPage(offset, PAGE, folder?.id)
+                    songs += page
+                    _progress.update { it.copy(songs = songs.size, songsExpected = maxOf(it.songsExpected, songs.size)) }
+                    if (page.size < PAGE) break
+                    offset += PAGE
+                }
+            }
+            _progress.update { it.copy(phase = SyncPhase.SAVING) }
+            library.replaceAllSongs(songs.distinctBy { it.id })
+            library.putAlbumsAndSongs(albums.values.toList(), emptyList(), emptyList(), removed)
+        } else {
+            // Only the albums that changed: their songs are fetched album by album, a few at a time.
+            val expected = changed.sumOf { it.songCount }
+            _progress.update { it.copy(phase = SyncPhase.SONGS, songs = 0, songsExpected = expected, changedAlbums = changed.size) }
+            val done = AtomicInteger(0)
+            val permits = Semaphore(6)
+            val songs = coroutineScope {
+                changed.map { album ->
+                    async {
+                        permits.withPermit {
+                            api.album(album.id).songs.also { list ->
+                                val n = done.addAndGet(list.size)
+                                _progress.update { it.copy(songs = n) }
+                            }
+                        }
+                    }
+                }.awaitAll().flatten()
+            }
+            _progress.update { it.copy(phase = SyncPhase.SAVING) }
+            // Every album is stored again (cheap), which also refreshes play counts for "Most played".
+            library.putAlbumsAndSongs(albums.values.toList(), songs, changed.map { it.id }, removed)
+        }
+
+        val merged = library.recomputePrimaries()
+        refreshExtras()
+        lastScan?.takeIf { it != "scanning" }?.let { library.putMeta(LibraryRepository.META_LAST_SCAN, it) }
+        library.putMeta(LibraryRepository.META_FOLDERS, folderKey)
+        library.putMeta(LibraryRepository.META_SYNCED_AT, System.currentTimeMillis().toString())
+        library.refreshStatus()
+        val status = library.status.value
+        AppLog.i("Sync", "Done: ${status?.artists} artists, ${status?.albums} albums, ${status?.songs} songs, $merged merged")
         _progress.update {
             it.copy(
                 phase = SyncPhase.DONE,
-                artists = cache.artists.size,
-                albums = cache.albums.size,
-                songs = cache.songs.size,
-                songsExpected = cache.songs.size,
-                merged = albums.size - cache.albums.size,
+                artists = status?.artists ?: it.artists,
+                albums = status?.albums ?: it.albums,
+                songs = status?.songs ?: it.songs,
+                songsExpected = status?.songs ?: it.songsExpected,
+                merged = merged,
             )
         }
     }
 
-    companion object {
-        private const val PAGE = 500
+    /** Hearts and playlists change without a Navidrome scan, so they're refreshed on every sync. */
+    private suspend fun refreshExtras() {
+        runCatching { api.starredSongs().map { it.id } }
+            .onSuccess { library.setStarredIds(it) }
+            .onFailure { AppLog.w("Sync", "Liked songs couldn't be loaded: ${it.message}") }
+        runCatching { api.playlists() }
+            .onSuccess { library.updatePlaylists(it) }
+            .onFailure { AppLog.w("Sync", "Playlists couldn't be loaded: ${it.message}") }
+    }
 
-        /** Merges albums with the same name and album artist, and the duplicate songs inside them. */
-        fun merge(artists: List<Artist>, albums: List<Album>, songs: List<Song>, folderIds: List<String>): LibraryCache {
-            val groups = albums
-                .distinctBy { it.id }
-                .groupBy { normalizeKey(it.name) + "|" + normalizeKey(it.artist) }
-            val primaryOf = HashMap<String, String>()
-            val mergedAlbums = groups.values.map { group ->
-                val primary = group.maxByOrNull { it.songCount } ?: group.first()
-                group.forEach { primaryOf[it.id] = primary.id }
-                if (group.size == 1) {
-                    primary
-                } else {
-                    primary.copy(
-                        ids = listOf(primary.id) + group.map { it.id }.filter { it != primary.id },
-                        playCount = group.sumOf { it.playCount },
-                        created = group.mapNotNull { it.created }.maxOrNull(),
-                        year = primary.year ?: group.firstNotNullOfOrNull { it.year },
-                        coverArt = primary.coverArt ?: group.firstNotNullOfOrNull { it.coverArt },
-                    )
-                }
-            }
-
-            val aliases = HashMap<String, String>()
-            val kept = LinkedHashMap<String, Song>()
-            val seen = HashMap<String, String>()
-            for (song in songs) {
-                if (song.id in kept || song.id in aliases) continue
-                val albumId = song.albumId?.let { primaryOf[it] ?: it }
-                val moved = if (albumId != song.albumId) song.copy(albumId = albumId) else song
-                val key = listOf(
-                    albumId ?: "",
-                    (song.disc ?: 1).toString(),
-                    song.track?.toString() ?: "d${song.durationSec / 3}",
-                    normalizeKey(song.title),
-                ).joinToString("|")
-                val existing = seen[key]
-                if (existing != null && albumId != null) {
-                    aliases[song.id] = existing
-                } else {
-                    seen[key] = song.id
-                    kept[song.id] = moved
-                }
-            }
-
-            val counts = kept.values.groupingBy { it.albumId }.eachCount()
-            val finalAlbums = mergedAlbums.map { album ->
-                val count = counts[album.id] ?: 0
-                if (count > 0 && count != album.songCount) album.copy(songCount = count) else album
-            }
-            val mergedArtists = artists
-                .distinctBy { it.id }
-                .groupBy { normalizeKey(it.name) }
-                .values.map { group -> group.maxByOrNull { it.albumCount } ?: group.first() }
-
-            return LibraryCache(
-                syncedAt = System.currentTimeMillis(),
-                folderIds = folderIds,
-                artists = mergedArtists,
-                albums = finalAlbums,
-                songs = kept.values.toList(),
-                songAliases = aliases,
-            )
-        }
+    private companion object {
+        const val PAGE = 500
     }
 }

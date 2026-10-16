@@ -65,7 +65,6 @@ import androidx.navigation.NavController
 import app.musix.data.AlbumCategory
 import app.musix.data.AlbumDetail
 import app.musix.data.category
-import app.musix.data.LibraryIndex
 import app.musix.data.Song
 
 private val albumSorts = listOf(
@@ -79,14 +78,13 @@ private val albumSorts = listOf(
 @Composable
 fun LibraryScreen(nav: NavController) {
     val graph = LocalGraph.current
-    val library by graph.library.index.collectAsStateWithLifecycle()
+    val status by graph.library.status.collectAsStateWithLifecycle()
     val loaded by graph.library.loaded.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf("albums") }
     Screen(title = "Your library", nav = null) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize()) {
-            val index = library
             when {
-                index != null -> {
+                status != null -> {
                     Row(
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -96,9 +94,9 @@ fun LibraryScreen(nav: NavController) {
                         }
                     }
                     when (tab) {
-                        "playlists" -> PlaylistList(index, nav)
-                        "artists" -> ArtistList(index, nav)
-                        else -> AlbumGrid(index, nav)
+                        "playlists" -> PlaylistList(nav)
+                        "artists" -> ArtistList(nav)
+                        else -> AlbumGrid(nav)
                     }
                 }
                 !loaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -109,12 +107,12 @@ fun LibraryScreen(nav: NavController) {
 }
 
 @Composable
-private fun PlaylistList(index: LibraryIndex, nav: NavController) {
+private fun PlaylistList(nav: NavController) {
     val graph = LocalGraph.current
     val playlists by loadState("library-playlists") {
         runCatching { graph.subsonic.playlists() }
             .onSuccess { graph.library.updatePlaylists(it) }
-            .getOrElse { index.playlists }
+            .getOrElse { graph.library.playlists() }
     }
     LoadBox(playlists) { list ->
         if (list.isEmpty()) {
@@ -173,10 +171,12 @@ fun LikedScreen(nav: NavController) {
     val graph = LocalGraph.current
     val changes by graph.favorites.changes.collectAsStateWithLifecycle()
     val songs by loadState(changes) {
-        val index = graph.library.current
         runCatching { graph.subsonic.starredSongs() }
-            .map { list -> list.map { index?.song(it.id) ?: it } }
-            .getOrElse { index?.cache?.songs?.filter { it.starred } ?: throw it }
+            .map { list ->
+                val local = graph.library.songs(list.map { it.id }).associateBy { it.id }
+                list.map { local[it.id] ?: it }
+            }
+            .getOrElse { if (graph.library.isSynced) graph.library.starredSongs() else throw it }
             .filter { graph.favorites.isLiked(it) }
     }
     Screen(title = "Liked songs", nav = nav) { padding ->
@@ -205,8 +205,8 @@ fun PlaylistScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
     val detail by loadState(id) {
         val remote = graph.subsonic.playlist(id)
-        val index = graph.library.current
-        remote.copy(songs = remote.songs.map { index?.song(it.id) ?: it })
+        val local = graph.library.songs(remote.songs.map { it.id }).associateBy { it.id }
+        remote.copy(songs = remote.songs.map { local[it.id] ?: it })
     }
     val title = detail.valueOrNull()?.playlist?.name ?: "Playlist"
     Screen(title = title, nav = nav) { padding ->
@@ -267,13 +267,18 @@ fun SyncPrompt(nav: NavController) {
 }
 
 @Composable
-private fun AlbumGrid(index: LibraryIndex, nav: NavController) {
+private fun AlbumGrid(nav: NavController) {
+    val graph = LocalGraph.current
+    val version by graph.library.version.collectAsStateWithLifecycle()
     var sort by rememberSaveable { mutableStateOf("alphabeticalByName") }
     var type by rememberSaveable { mutableStateOf<String?>(null) }
-    val albums = remember(index, sort, type) {
-        val sorted = index.sortedAlbums(sort)
+    val loadedAlbums by loadState(Triple(version, sort, type)) {
+        val sorted = graph.library.albums(sort)
         if (type == null) sorted else sorted.filter { it.category.name == type }
     }
+    val categories by loadState(version to "categories") { graph.library.categories() }
+    val albums = loadedAlbums.valueOrNull().orEmpty()
+    val typeList: List<Pair<AlbumCategory, Int>> = categories.valueOrNull().orEmpty()
 
     LazyVerticalGrid(
         columns = GridCells.Adaptive(150.dp),
@@ -291,13 +296,13 @@ private fun AlbumGrid(index: LibraryIndex, nav: NavController) {
                     }
                 }
                 // Release types from the albums' tags: Album, EP, Single, Live, Compilation, DJ-mix…
-                if (index.categories.size > 1) {
+                if (typeList.size > 1) {
                     Row(
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         FilterChip(selected = type == null, onClick = { type = null }, label = { Text("All types") })
-                        index.categories.forEach { (category, count) ->
+                        typeList.forEach { (category, count) ->
                             FilterChip(
                                 selected = type == category.name,
                                 onClick = { type = if (type == category.name) null else category.name },
@@ -324,9 +329,12 @@ private fun AlbumGrid(index: LibraryIndex, nav: NavController) {
 }
 
 @Composable
-private fun ArtistList(index: LibraryIndex, nav: NavController) {
+private fun ArtistList(nav: NavController) {
+    val graph = LocalGraph.current
+    val version by graph.library.version.collectAsStateWithLifecycle()
+    val artists by loadState(version to "artists") { graph.library.artists() }
     LazyColumn(Modifier.fillMaxSize()) {
-        items(index.artists, key = { it.id }) { artist ->
+        items(artists.valueOrNull().orEmpty(), key = { it.id }) { artist ->
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -357,13 +365,9 @@ private fun ArtistList(index: LibraryIndex, nav: NavController) {
 fun AlbumScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
     val detail by loadState(id) {
-        val index = graph.library.current
-        val album = index?.album(id)
-        if (index != null && album != null && index.songsOf(album).isNotEmpty()) {
-            AlbumDetail(album, index.songsOf(album))
-        } else {
-            graph.subsonic.album(id)
-        }
+        val album = graph.library.album(id)
+        val songs = album?.let { graph.library.songsOf(it) }.orEmpty()
+        if (album != null && songs.isNotEmpty()) AlbumDetail(album, songs) else graph.subsonic.album(id)
     }
     val listState = rememberLazyListState()
     val scrolled by remember {

@@ -84,6 +84,13 @@ class SubsonicApi(
             }
         }
 
+    /** When Navidrome last scanned the music folders (Navidrome's lastScan), to skip syncs with no changes. */
+    suspend fun lastScan(): String? {
+        val status = call("getScanStatus").obj("scanStatus") ?: return null
+        if (status.bool("scanning") == true) return "scanning"
+        return status.str("lastScan")
+    }
+
     suspend fun ping(): String {
         val root = call("ping")
         val type = root.str("type") ?: "Subsonic server"
@@ -261,6 +268,7 @@ class SubsonicApi(
         artistId = o.str("artistId"),
         coverArt = o.str("coverArt"),
         songCount = o.int("songCount") ?: 0,
+        durationSec = o.int("duration") ?: 0,
         year = o.int("year"),
         genre = o.str("genre"),
         created = o.str("created"),

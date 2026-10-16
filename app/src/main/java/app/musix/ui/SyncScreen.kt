@@ -50,7 +50,7 @@ fun SyncScreen(nav: NavController) {
     val graph = LocalGraph.current
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    val library by graph.library.index.collectAsStateWithLifecycle()
+    val library by graph.library.status.collectAsStateWithLifecycle()
     val folders by loadState("folders") { graph.subsonic.musicFolders() }
 
     Screen(title = "Library sync", nav = nav) { padding ->
@@ -64,7 +64,7 @@ fun SyncScreen(nav: NavController) {
         ) {
             Text(
                 "Musix keeps a copy of your library on the phone, so browsing and search are instant and mixes build quickly. " +
-                    "Sync again after adding music to Navidrome.",
+                    "It checks for changes each time the app starts and only fetches albums that are new or changed.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -116,7 +116,12 @@ fun SyncScreen(nav: NavController) {
                 Button(onClick = { graph.sync.start() }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Rounded.Sync, null)
                     Spacer(Modifier.width(8.dp))
-                    Text(if (library == null) "Sync now" else "Sync again")
+                    Text(if (library == null) "Sync now" else "Check for changes")
+                }
+                if (library != null) {
+                    OutlinedButton(onClick = { graph.sync.start(full = true) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Full sync (fetch everything again)")
+                    }
                 }
             }
 
@@ -124,12 +129,12 @@ fun SyncScreen(nav: NavController) {
                 SectionLabel("On this phone")
                 val n = NumberFormat.getIntegerInstance()
                 Text(
-                    "${n.format(index.artists.size)} artists · ${n.format(index.albums.size)} albums · ${n.format(index.songCount)} songs",
+                    "${n.format(index.artists)} artists · ${n.format(index.albums)} albums · ${n.format(index.songs)} songs",
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
                     "Last synced " + DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-                        .format(Date(index.cache.syncedAt)),
+                        .format(Date(index.syncedAt)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -157,7 +162,12 @@ private fun ProgressCard(p: SyncProgress) {
                 Spacer(Modifier.width(10.dp))
                 Text(
                     when (p.phase) {
-                        SyncPhase.DONE -> "Sync finished"
+                        SyncPhase.DONE -> when {
+                            p.upToDate -> "Up to date: Navidrome hasn't scanned since the last sync"
+                            p.changedAlbums in 1 until p.albums -> "Updated ${p.changedAlbums} new or changed albums"
+                            p.changedAlbums == 0 -> "Up to date: no albums changed"
+                            else -> "Sync finished"
+                        }
                         SyncPhase.FAILED -> "Sync failed"
                         SyncPhase.CONNECTING -> "Connecting to Navidrome…"
                         SyncPhase.SAVING -> "Saving to the phone…"

@@ -18,15 +18,22 @@ import app.musix.net.OpenRouterApi
 import app.musix.net.SubsonicApi
 import app.musix.playback.PlayerConnection
 import app.musix.scrobble.Scrobbler
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.database.StandaloneDatabaseProvider
+import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import okhttp3.Credentials
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /** Everything the app shares, created once in [MusixApp]. */
+@OptIn(UnstableApi::class)
 class AppGraph(val app: Application) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val settings = SettingsRepository(app)
@@ -88,6 +95,19 @@ class AppGraph(val app: Application) {
     val listenBrainz = ListenBrainzApi(http)
     val scrobbler = Scrobbler(app, settings, subsonic, lastFm, listenBrainz, scope)
     val favorites = Favorites(subsonic, lastFm, settings, library, scope)
+
+    /**
+     * Songs kept on the phone as they play (and the next one in the queue), so replays start at once
+     * and survive a bad connection. The oldest are removed when the chosen size is reached.
+     */
+    val songCache: SimpleCache by lazy {
+        val megabytes = settings.current.songCacheMb.coerceAtLeast(100)
+        SimpleCache(
+            File(app.cacheDir, "song_cache"),
+            LeastRecentlyUsedCacheEvictor(megabytes * 1024L * 1024L),
+            StandaloneDatabaseProvider(app),
+        )
+    }
 
     val generator = MixGenerator(this)
     val radios = Radios(this)
