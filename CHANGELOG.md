@@ -3,6 +3,11 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.20beta — 2026-10-16
+
+### Changed
+- **Now playing sits a little lower**: "Playing from album" was pressed against the top of the screen. It now has a gap above it that suits the phone's height (more on tall phones, less on small ones), so the whole screen looks more even.
+
 ## 0.0.18beta — 2026-10-16
 
 ### Fixed
