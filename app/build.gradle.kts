@@ -13,7 +13,7 @@ val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 
 android {
     namespace = "app.musix"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "app.musix"
@@ -68,15 +68,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs += listOf(
-            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
-            "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi",
-        )
-    }
-
     buildFeatures {
         compose = true
     }
@@ -96,40 +87,42 @@ android {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
+    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
+    // The icon set is no longer updated or in the Compose BOM; 1.7.8 is its last version.
+    implementation("androidx.compose.material:material-icons-extended:1.7.8")
 
-    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.core:core-ktx:1.19.1")
     // Installs the startup profile (baseline-prof.txt) so Android compiles the app ahead of time.
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    implementation("androidx.navigation:navigation-compose:2.8.5")
-    implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation("androidx.navigation:navigation-compose:2.10.2")
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
     implementation("androidx.palette:palette-ktx:1.0.0")
 
-    implementation("androidx.media3:media3-exoplayer:1.5.1")
-    implementation("androidx.media3:media3-session:1.5.1")
-    implementation("androidx.media3:media3-datasource-okhttp:1.5.1")
-    implementation("androidx.media3:media3-database:1.5.1")
+    // Media3 stays on the version the FFmpeg decoder below is built for (Jellyfin's build); update both together.
+    implementation("androidx.media3:media3-exoplayer:1.9.0")
+    implementation("androidx.media3:media3-session:1.9.0")
+    implementation("androidx.media3:media3-datasource-okhttp:1.9.0")
+    implementation("androidx.media3:media3-database:1.9.0")
     // FFmpeg audio decoders (ALAC, and FLAC/MP3/AAC/AC-3 as backups) for formats the phone can't play itself.
-    implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1")
+    implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.9.0+1")
 
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
+    implementation("androidx.room:room-runtime:2.8.5")
+    implementation("androidx.room:room-ktx:2.8.5")
+    ksp("androidx.room:room-compiler:2.8.5")
 
-    implementation("io.coil-kt.coil3:coil-compose:3.0.4")
-    implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
-    implementation("io.coil-kt.coil3:coil-gif:3.0.4")
+    implementation("io.coil-kt.coil3:coil-compose:3.6.3")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
+    implementation("io.coil-kt.coil3:coil-gif:3.6.3")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // Fast tests of the app's own logic, run on the build machine on every push (app/src/test).
     testImplementation("junit:junit:4.13.2")
@@ -141,4 +134,15 @@ dependencies {
     androidTestImplementation(composeBom)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        freeCompilerArgs.addAll(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+            "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi",
+        )
+    }
 }
