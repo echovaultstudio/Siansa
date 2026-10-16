@@ -3,6 +3,12 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.15beta — 2026-10-16
+
+### Fixed
+- Covers already on the phone faded in over a moment when scrolling, as if they were loading. Only covers that just came over the network fade in now; ones from the phone's own cache appear straight away.
+- More decoded covers are kept in memory (30% of the app's memory instead of 20%), so scrolling back through a list doesn't read them again.
+
 ## 0.0.14beta — 2026-10-16
 
 ### Fixed

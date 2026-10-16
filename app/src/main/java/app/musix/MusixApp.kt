@@ -11,7 +11,7 @@ import coil3.disk.DiskCache
 import coil3.disk.directory
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
-import coil3.request.crossfade
+import coil3.request.transitionFactory
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -70,14 +70,23 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
             .components {
                 add(OkHttpNetworkFetcherFactory(callFactory = { graph.imageHttp }))
             }
-            .memoryCache { MemoryCache.Builder().maxSizePercent(context, 0.20).build() }
+            // Room for a few hundred decoded list covers, so scrolling back shows them at once.
+            .memoryCache { MemoryCache.Builder().maxSizePercent(context, 0.30).build() }
             .diskCache {
                 DiskCache.Builder()
                     .directory(directory)
                     .maxSizeBytes(bytes)
                     .build()
             }
-            .crossfade(110)
+            // Fade in only covers that just came over the network. One read from the phone's own cache
+            // appears straight away, as it would if it were still in memory.
+            .transitionFactory { target, result ->
+                if (result is coil3.request.SuccessResult && result.dataSource == coil3.decode.DataSource.NETWORK) {
+                    coil3.transition.CrossfadeTransition(target, result, 110)
+                } else {
+                    coil3.transition.Transition.Factory.NONE.create(target, result)
+                }
+            }
             // Every picture that fails to show, and why, so blank covers can be traced in the log.
             .eventListener(object : coil3.EventListener() {
                 override fun onError(request: coil3.request.ImageRequest, result: coil3.request.ErrorResult) {
