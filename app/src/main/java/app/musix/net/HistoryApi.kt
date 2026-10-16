@@ -50,6 +50,54 @@ class HistoryApi(private val http: OkHttpClient) {
         return artists to tracks
     }
 
+    /** True when the listen server is Koito (which has the richer web API below). */
+    fun isKoito(listenBrainzUrl: String): Boolean = !ListenBrainzApi.apiRoot(listenBrainzUrl).contains("api.listenbrainz.org")
+
+    private fun koitoWeb(listenBrainzUrl: String) =
+        ListenBrainzApi.apiRoot(listenBrainzUrl).substringBefore("/apis/listenbrainz") + "/apis/web/v1"
+
+    /** Totals for a time range from Koito's summary. */
+    data class Totals(val minutes: Int, val plays: Int, val artists: Int, val tracks: Int, val albums: Int, val newArtists: Int, val newTracks: Int)
+
+    suspend fun koitoTotals(url: String, token: String, fromSec: Long, toSec: Long): Totals {
+        val o = get("${koitoWeb(url)}/summary?from=$fromSec&to=$toSec", token)
+        return Totals(
+            minutes = o.int("minutes_listened") ?: 0,
+            plays = o.int("plays") ?: 0,
+            artists = o.int("unique_artists") ?: 0,
+            tracks = o.int("unique_tracks") ?: 0,
+            albums = o.int("unique_albums") ?: 0,
+            newArtists = o.int("new_artists") ?: 0,
+            newTracks = o.int("new_tracks") ?: 0,
+        )
+    }
+
+    /** Koito's top artists / tracks / albums ([kind] = "artists", "tracks" or "albums") in a time range. */
+    suspend fun koitoTop(url: String, token: String, kind: String, fromSec: Long, toSec: Long, limit: Int): List<Played> =
+        get("${koitoWeb(url)}/top/$kind?from=$fromSec&to=$toSec&limit=$limit", token).arr("items").mapNotNull { row ->
+            val item = row.obj("item") ?: return@mapNotNull null
+            val count = item.long("listen_count") ?: 0
+            when (kind) {
+                "artists" -> Played(item.str("name") ?: return@mapNotNull null, null, count)
+                else -> Played(item.arr("artists").firstOrNull()?.str("name").orEmpty(), item.str("title") ?: return@mapNotNull null, count)
+            }
+        }
+
+    /** When each listen in a time range happened (epoch seconds), up to [max] listens. */
+    suspend fun koitoListenTimes(url: String, token: String, fromSec: Long, toSec: Long, max: Int = 5000): List<Long> {
+        val times = ArrayList<Long>()
+        var page = 1
+        while (times.size < max) {
+            val o = get("${koitoWeb(url)}/listens?from=$fromSec&to=$toSec&limit=500&page=$page", token)
+            o.arr("items").forEach { row ->
+                row.str("time")?.let { t -> runCatching { java.time.OffsetDateTime.parse(t).toEpochSecond() }.getOrNull() }?.let(times::add)
+            }
+            if (o.bool("has_next_page") != true) break
+            page++
+        }
+        return times
+    }
+
     /** Top artists and tracks on Last.fm for the last month (public data, only the API key is needed). */
     suspend fun lastFmTop(apiKey: String, user: String): Pair<List<Played>, List<Played>> {
         fun url(method: String) = "https://ws.audioscrobbler.com/2.0/".toHttpUrl().newBuilder()

@@ -164,6 +164,7 @@ fun HomeScreen(nav: NavController) {
         if (graph.library.isSynced) graph.library.albums("newest").take(20)
         else graph.subsonic.albums("newest", 20, 0).distinctBy { it.name + "|" + it.artist }
     }
+    val lovedBefore by loadState(today) { graph.insights.rediscover() }
     val rediscover by loadState(version to "random") {
         if (graph.library.isSynced) graph.library.randomAlbums(20)
         else graph.subsonic.albums("random", 20, 0).distinctBy { it.name + "|" + it.artist }
@@ -269,6 +270,44 @@ fun HomeScreen(nav: NavController) {
             Shelf("Made for you", tiles, key = { it.first }) { it.second() }
         }
 
+        // Your listening: Wrapped-style pages for this month, last month and this year.
+        item {
+            val now = LocalDate.now()
+            val month = { d: LocalDate -> d.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault()) }
+            val periods = listOf(
+                Triple("month", "Your ${month(now)}", "So far this month"),
+                Triple("last-month", "Your ${month(now.minusMonths(1))}", "Last month"),
+                Triple("year", "Your ${now.year}", "So far this year"),
+            )
+            Shelf("Your listening", periods, key = { it.first }) { (id, title, caption) ->
+                GradientTile(
+                    title = title,
+                    colors = tileColors("report-$id"),
+                    size = 140.dp,
+                    caption = caption,
+                    onClick = { nav.navigate("report/$id") },
+                )
+            }
+        }
+
+        // Albums you loved a while ago but haven't played since.
+        item {
+            Shelf("Rediscover", lovedBefore.valueOrNull().orEmpty(), key = { it.album.id }) { r ->
+                val ago = r.lastPlayed?.let { java.time.temporal.ChronoUnit.MONTHS.between(it, LocalDate.now()) }
+                AlbumTile(
+                    name = r.album.name,
+                    subtitle = when {
+                        ago != null && ago >= 12 -> "Last played ${ago / 12} year${if (ago >= 24) "s" else ""} ago"
+                        ago != null -> "Last played $ago months ago"
+                        else -> r.album.artist
+                    },
+                    coverArt = r.album.coverArt,
+                    onClick = { nav.navigate("album/${r.album.id}") },
+                    modifier = Modifier.width(150.dp),
+                )
+            }
+        }
+
         item {
             Shelf("Radios", moodRadios, key = { it.id }) { radio ->
                 GradientTile(
@@ -327,7 +366,7 @@ fun HomeScreen(nav: NavController) {
         }
 
         item {
-            Shelf("Rediscover", rediscover.valueOrNull().orEmpty(), key = { it.id }) { album ->
+            Shelf("Random picks", rediscover.valueOrNull().orEmpty(), key = { it.id }) { album ->
                 AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
             }
         }

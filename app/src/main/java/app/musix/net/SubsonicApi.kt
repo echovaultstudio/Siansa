@@ -281,6 +281,7 @@ class SubsonicApi(
         playCount = o.long("playCount") ?: 0,
         releaseTypes = (o["releaseTypes"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content } ?: emptyList(),
         isCompilation = o.bool("isCompilation") == true,
+        played = o.str("played"),
     )
 
     private fun parsePlaylist(o: JsonObject) = Playlist(

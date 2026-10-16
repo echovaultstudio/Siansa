@@ -392,10 +392,7 @@ private fun SwipeCover(song: Song?, onTap: () -> Unit) {
         }
 
         val (coverId, coverSize) = rememberBigCover(song?.coverArt, song?.albumId)
-        Cover(
-            coverId,
-            coverSize,
-            Modifier
+        val coverModifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
                     translationX = offset.value
@@ -420,9 +417,14 @@ private fun SwipeCover(song: Song?, onTap: () -> Unit) {
                         scope.launch { offset.snapTo(offset.value + dx) }
                     }
                 }
-                .clickable(enabled = song?.albumId != null, onClick = onTap),
-            RoundedCornerShape(10.dp),
-        )
+                .clickable(enabled = song?.albumId != null, onClick = onTap)
+        if (coverSize == null && coverId != null) {
+            AnimatedCover(coverId, coverModifier, RoundedCornerShape(10.dp)) {
+                Cover(song?.coverArt, LARGE_COVER, Modifier.fillMaxSize(), RectangleShape)
+            }
+        } else {
+            Cover(coverId, coverSize, coverModifier, RoundedCornerShape(10.dp))
+        }
     }
 }
 

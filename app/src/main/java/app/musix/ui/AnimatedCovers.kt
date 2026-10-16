@@ -1,9 +1,29 @@
 package app.musix.ui
 
+import android.graphics.drawable.Animatable
+import android.graphics.drawable.Drawable
+import android.widget.ImageView
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.SingletonImageLoader
+import coil3.asDrawable
+import coil3.request.ImageRequest
+import coil3.request.SuccessResult
 import app.musix.AppGraph
 import app.musix.log.AppLog
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +75,54 @@ object AnimatedCovers {
             return (b[20].toInt() and 0x02) != 0
         }
         return false
+    }
+}
+
+/**
+ * An animated cover, drawn by Android's own ImageView with its animation started explicitly. Falls
+ * back to [still] until the animation has loaded. The log notes what was decoded, so a cover that
+ * arrives as a single frame is easy to spot.
+ */
+@Composable
+fun AnimatedCover(coverId: String, modifier: Modifier, shape: Shape, still: @Composable () -> Unit) {
+    val graph = LocalGraph.current
+    val context = LocalContext.current
+    var drawable by remember(coverId) { mutableStateOf<Drawable?>(null) }
+    androidx.compose.runtime.LaunchedEffect(coverId) {
+        val key = "cover:$coverId:full"
+        val request = ImageRequest.Builder(context)
+            .data(graph.subsonic.coverUrl(coverId, null))
+            .diskCacheKey(key)
+            .memoryCacheKey("$key:animated")
+            .build()
+        val result = SingletonImageLoader.get(context).execute(request)
+        if (result is SuccessResult) {
+            val d = result.image.asDrawable(context.resources)
+            AppLog.i(
+                "Cover",
+                "$coverId decoded as ${d.javaClass.simpleName} ${d.intrinsicWidth}×${d.intrinsicHeight}, " +
+                    if (d is Animatable) "animated" else "a still image",
+            )
+            drawable = d
+        } else {
+            AppLog.w("Cover", "Couldn't load the animated cover $coverId")
+        }
+    }
+    Box(modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceVariant)) {
+        val d = drawable
+        if (d == null) {
+            still()
+        } else {
+            AndroidView(
+                factory = { ImageView(it).apply { scaleType = ImageView.ScaleType.CENTER_CROP } },
+                update = { view ->
+                    if (view.drawable !== d) view.setImageDrawable(d)
+                    (d as? Animatable)?.start()
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+            DisposableEffect(d) { onDispose { (d as? Animatable)?.stop() } }
+        }
     }
 }
 

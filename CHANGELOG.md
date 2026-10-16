@@ -3,6 +3,15 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.8beta — 2026-10-16
+
+### Added
+- **Your listening**: Wrapped-style pages for this month, last month and this year. They show minutes and plays, top artists, songs (playable) and albums, your listening clock by hour (early bird, night owl…), and how your taste moved: artists new in your rotation, ones that dropped out, and genres you played more or less. Built from Koito when you scrobble there, otherwise from Musix's own history.
+- **Rediscover** on Home: albums you played a lot but not for at least five months, from Navidrome's play counts and your Koito favourites from 6 to 24 months ago. Each shows when you last played it. The old random shelf is now called **Random picks**.
+
+### Fixed
+- Animated covers were found (the log said so) but still didn't move. They're now drawn by Android's own image view with the animation started explicitly, and the log notes whether each animated cover arrived animated or as a still frame.
+
 ## 0.0.7beta — 2026-10-16
 
 ### Fixed
