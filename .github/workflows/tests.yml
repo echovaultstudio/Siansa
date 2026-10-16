@@ -39,6 +39,7 @@ jobs:
         continue-on-error: true
         run: |
           SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          export ANDROID_AVD_HOME="$HOME/.android/avd"; mkdir -p "$ANDROID_AVD_HOME"
           echo "::notice::SDK $SDK, emulator $($SDK/emulator/emulator -version 2>&1 | head -1)"
           yes | $SDK/cmdline-tools/latest/bin/sdkmanager "system-images;android-33;aosp_atd;x86_64" > /dev/null
           echo no | $SDK/cmdline-tools/latest/bin/avdmanager create avd -n diag -k "system-images;android-33;aosp_atd;x86_64" -d pixel_6 --force 2>&1 | tail -3 | while IFS= read -r line; do echo "::notice::avd: $line"; done
