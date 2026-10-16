@@ -17,7 +17,9 @@ import app.musix.data.SimilarArtist
 import app.musix.data.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -212,10 +214,22 @@ class SubsonicApi(
         return Lyrics(false, plain.lines().map { LyricLine(null, it) })
     }
 
-    /** submission=false marks "now playing"; true records a finished play. */
-    suspend fun scrobble(id: String, submission: Boolean) {
-        call("scrobble", mapOf("id" to id, "submission" to submission.toString()))
+    /** submission=false marks "now playing"; true records a finished play, at [timeMs] when given. */
+    suspend fun scrobble(id: String, submission: Boolean, timeMs: Long? = null) {
+        call("scrobble", mapOf("id" to id, "submission" to submission.toString(), "time" to timeMs?.toString()))
     }
+
+    suspend fun star(id: String) {
+        call("star", mapOf("id" to id))
+    }
+
+    suspend fun unstar(id: String) {
+        call("unstar", mapOf("id" to id))
+    }
+
+    /** Liked (starred) songs. */
+    suspend fun starredSongs(): List<Song> =
+        call("getStarred2").obj("starred2")?.arr("song").orEmpty().map(::parseSong)
 
     private fun parseSong(o: JsonObject): Song {
         val gain = o.obj("replayGain")
@@ -236,6 +250,7 @@ class SubsonicApi(
             albumGain = gain?.flt("albumGain"),
             trackPeak = gain?.flt("trackPeak"),
             albumPeak = gain?.flt("albumPeak"),
+            starred = o.str("starred") != null,
         )
     }
 
@@ -250,6 +265,8 @@ class SubsonicApi(
         genre = o.str("genre"),
         created = o.str("created"),
         playCount = o.long("playCount") ?: 0,
+        releaseTypes = (o["releaseTypes"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content } ?: emptyList(),
+        isCompilation = o.bool("isCompilation") == true,
     )
 
     private fun parsePlaylist(o: JsonObject) = Playlist(

@@ -1,6 +1,7 @@
 package app.musix
 
 import android.app.Application
+import app.musix.data.Favorites
 import app.musix.data.HistoryStore
 import app.musix.data.LibraryRepository
 import app.musix.data.LibrarySync
@@ -11,9 +12,12 @@ import app.musix.log.AppLog
 import app.musix.mix.MixGenerator
 import app.musix.mix.Radios
 import app.musix.net.AudioMuseApi
+import app.musix.net.LastFmApi
+import app.musix.net.ListenBrainzApi
 import app.musix.net.OpenRouterApi
 import app.musix.net.SubsonicApi
 import app.musix.playback.PlayerConnection
+import app.musix.scrobble.Scrobbler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -79,6 +83,11 @@ class AppGraph(val app: Application) {
     val history = HistoryStore(app)
     val library = LibraryRepository(app)
     val sync = LibrarySync(subsonic, library, settings, scope)
+
+    val lastFm = LastFmApi(http)
+    val listenBrainz = ListenBrainzApi(http)
+    val scrobbler = Scrobbler(app, settings, subsonic, lastFm, listenBrainz, scope)
+    val favorites = Favorites(subsonic, lastFm, settings, library, scope)
 
     val generator = MixGenerator(this)
     val radios = Radios(this)

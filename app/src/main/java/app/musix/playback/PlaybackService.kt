@@ -2,6 +2,8 @@ package app.musix.playback
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.net.Uri
+import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -10,15 +12,18 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import app.musix.AppGraph
 import app.musix.MainActivity
 import app.musix.MusixApp
 import app.musix.data.PlayEvent
+import app.musix.data.Song
 import app.musix.log.AppLog
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -27,21 +32,47 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import java.util.Collections
 
-/** Background playback with a media notification, lock-screen controls, ReplayGain and scrobbling. */
+/** Background playback with a media notification, lock-screen controls, ReplayGain, transcoding and scrobbling. */
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var graph: AppGraph
+    private var events: Events? = null
+
+    // The quality chosen when a song's stream first opens, so a network change can't switch format mid-song.
+    private val chosenKbps: MutableMap<String, Int> = Collections.synchronizedMap(object : LinkedHashMap<String, Int>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Int>?) = size > 200
+    })
 
     override fun onCreate() {
         super.onCreate()
         graph = (application as MusixApp).graph
-        // Streams go through the app's HTTP client, so a proxy login for Navidrome applies here too.
-        val dataSource = DefaultDataSource.Factory(this, OkHttpDataSource.Factory(graph.http))
+
+        // Streams go through the app's HTTP client (so a proxy login applies), and each stream is pointed
+        // at the original file or an Opus conversion depending on the network at that moment.
+        val http = OkHttpDataSource.Factory(graph.http)
+        val resolving = ResolvingDataSource.Factory(http) { spec ->
+            val key = spec.uri.getQueryParameter("id") ?: spec.uri.toString()
+            val kbps = chosenKbps.getOrPut(key) {
+                Streaming.bitrate(this, graph.settings.current).also {
+                    AppLog.i("Stream", "Song $key: " + if (it > 0) "Opus $it kbit/s" else "original")
+                }
+            }
+            spec.withUri(Streaming.rewrite(spec.uri, kbps))
+        }
+        val dataSource = DefaultDataSource.Factory(this, resolving)
+
+        // Start playing after one second of audio instead of the default 2.5, for a snappier start.
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(15_000, 60_000, 1_000, 2_000)
+            .build()
+
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
+            .setLoadControl(loadControl)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -52,7 +83,7 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
-        player.addListener(Events(player))
+        events = Events(player).also { player.addListener(it) }
 
         val openApp = PendingIntent.getActivity(
             this,
@@ -70,14 +101,16 @@ class PlaybackService : MediaSessionService() {
                     mediaItems: MutableList<MediaItem>,
                 ): ListenableFuture<MutableList<MediaItem>> {
                     val resolved = mediaItems.map { item ->
-                        val uri = item.requestMetadata.mediaUri
-                            ?: android.net.Uri.parse(graph.subsonic.streamUrl(item.mediaId))
+                        val uri = item.requestMetadata.mediaUri ?: Uri.parse(graph.subsonic.streamUrl(item.mediaId))
                         item.buildUpon().setUri(uri).build()
                     }.toMutableList()
                     return Futures.immediateFuture(resolved)
                 }
             })
             .build()
+
+        // Send any listens that were waiting from an earlier session.
+        scope.launch { runCatching { graph.scrobbler.flush() } }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
@@ -88,6 +121,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        events?.finishCurrent()
         session?.run {
             player.release()
             release()
@@ -97,40 +131,52 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 
+    /** Tracks how long each song is actually heard, for scrobbling, and applies ReplayGain. */
     private inner class Events(private val player: ExoPlayer) : Player.Listener {
-        private var currentId: String? = null
+        private var current: Song? = null
+        private var startedAtMs = 0L
+        private var listenedMs = 0L
+        private var playingSince: Long? = null
+
+        fun finishCurrent() {
+            val song = current ?: return
+            playingSince?.let { listenedMs += SystemClock.elapsedRealtime() - it }
+            playingSince = null
+            graph.scrobbler.finished(song, startedAtMs, listenedMs)
+            current = null
+        }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            val previous = currentId
-            if (previous != null && (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
-                    reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT)
-            ) {
-                submit(previous)
-            }
-            currentId = mediaItem?.mediaId
-            if (mediaItem != null) AppLog.i("Player", "Now playing ${mediaItem.mediaId} \"${mediaItem.mediaMetadata.title}\"")
-            val song = mediaItem?.toSong()
+            finishCurrent()
+            val song = mediaItem?.toSong() ?: return
+            current = song
+            startedAtMs = System.currentTimeMillis()
+            listenedMs = 0
+            playingSince = if (player.isPlaying) SystemClock.elapsedRealtime() else null
+            AppLog.i("Player", "Now playing ${song.id} \"${song.title}\"")
             player.volume = replayGainVolume(song, graph.settings.current)
-            if (song != null) {
-                scope.launch {
-                    runCatching { graph.subsonic.scrobble(song.id, submission = false) }
-                    runCatching {
-                        graph.history.add(PlayEvent(song.id, song.title, song.artist, song.genre, System.currentTimeMillis()))
-                    }
-                }
+            graph.scrobbler.nowPlaying(song)
+            scope.launch {
+                runCatching { graph.history.add(PlayEvent(song.id, song.title, song.artist, song.genre, System.currentTimeMillis())) }
+            }
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            val now = SystemClock.elapsedRealtime()
+            if (isPlaying) {
+                if (playingSince == null) playingSince = now
+            } else {
+                playingSince?.let { listenedMs += now - it }
+                playingSince = null
             }
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            AppLog.e("Player", "Playback error ${error.errorCodeName} on ${currentId ?: "?"}", error)
+            AppLog.e("Player", "Playback error ${error.errorCodeName} on ${current?.id ?: "?"}", error)
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            if (playbackState == Player.STATE_ENDED) currentId?.let { submit(it) }
-        }
-
-        private fun submit(id: String) {
-            scope.launch { runCatching { graph.subsonic.scrobble(id, submission = true) } }
+            if (playbackState == Player.STATE_ENDED) finishCurrent()
         }
     }
 }

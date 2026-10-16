@@ -34,6 +34,7 @@ data class Song(
     val albumGain: Float? = null,
     val trackPeak: Float? = null,
     val albumPeak: Float? = null,
+    val starred: Boolean = false,
 )
 
 /** An album. [ids] holds every Navidrome album id merged into it (the same album in several libraries). */
@@ -50,6 +51,8 @@ data class Album(
     val created: String? = null,
     val playCount: Long = 0,
     val ids: List<String> = emptyList(),
+    val releaseTypes: List<String> = emptyList(),
+    val isCompilation: Boolean = false,
 ) {
     val allIds: List<String> get() = ids.ifEmpty { listOf(id) }
 }

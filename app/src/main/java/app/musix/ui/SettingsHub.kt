@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Equalizer
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Storage
@@ -98,8 +99,17 @@ fun SettingsHub(nav: NavController) {
             HubRow(
                 Icons.Rounded.Equalizer,
                 "Playback",
-                "ReplayGain ${settings.replayGain.label.lowercase()}" + if (settings.preampDb != 0f) ", pre-amp ${"%+.0f".format(settings.preampDb)} dB" else "",
+                "ReplayGain ${settings.replayGain.label.lowercase()} · Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}",
             ) { nav.navigate("settings/playback") }
+            HubRow(
+                Icons.Rounded.GraphicEq,
+                "Scrobbling",
+                listOfNotNull(
+                    "Navidrome".takeIf { settings.scrobbleNavidrome },
+                    "Last.fm".takeIf { settings.lastFmReady },
+                    "ListenBrainz/Koito".takeIf { settings.listenBrainzReady },
+                ).joinToString(" · ").ifEmpty { "Off" },
+            ) { nav.navigate("settings/scrobbling") }
             HubRow(Icons.Rounded.Storage, "Storage", "Image cache up to ${formatMb(settings.imageCacheMb)}") {
                 nav.navigate("settings/storage")
             }
@@ -138,7 +148,7 @@ fun PlaybackSettingsScreen(nav: NavController) {
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     Screen(title = "Playback", nav = nav) { padding ->
         Column(
-            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().padding(16.dp),
+            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Heading("ReplayGain")
@@ -162,6 +172,31 @@ fun PlaybackSettingsScreen(nav: NavController) {
                 steps = 17,
             )
             Hint("Tracks can only be turned down, so raise the pre-amp only if quiet tracks still sound too quiet. Applies from the next song.")
+
+            HorizontalDivider()
+            Heading("Streaming quality")
+            Hint("Opus is converted by Navidrome with its own \"opus\" transcoding profile. It saves data on mobile; the original file is best on Wi-Fi. Applies from the next song.")
+            QualityRow("On Wi-Fi", settings.transcodeWifiKbps) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
+            QualityRow("On mobile data", settings.transcodeMobileKbps) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
+            Hint("Seeking inside an Opus song can take a moment, since Navidrome converts it as it streams.")
+        }
+    }
+}
+
+private val qualities = listOf(0, 96, 128, 160, 192, 256, 320)
+
+private fun qualityLabel(kbps: Int) = if (kbps <= 0) "original" else "Opus $kbps"
+
+@Composable
+private fun QualityRow(label: String, value: Int, onPick: (Int) -> Unit) {
+    Text(label, style = MaterialTheme.typography.bodyLarge)
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        qualities.forEach { kbps ->
+            FilterChip(
+                selected = value == kbps,
+                onClick = { onPick(kbps) },
+                label = { Text(if (kbps == 0) "Original" else "Opus $kbps") },
+            )
         }
     }
 }

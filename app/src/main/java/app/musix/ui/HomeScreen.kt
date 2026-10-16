@@ -132,6 +132,7 @@ fun HomeScreen(nav: NavController) {
         // Quick access, like the top grid in Spotify: today's mixes, playlists and recent albums.
         item {
             val quick = buildList<Triple<String, String?, () -> Unit>> {
+                add(Triple("Liked songs", null) { nav.navigate("liked") })
                 todaysMixes.take(2).forEach { m -> add(Triple(m.title, m.songs.firstOrNull()?.coverArt) { nav.navigate("mix/${m.id}") }) }
                 playlists.valueOrNull().orEmpty().take(2).forEach { p -> add(Triple(p.name, p.coverArt) { nav.navigate("playlist/${p.id}") }) }
                 recentAlbums.valueOrNull().orEmpty().take(6).forEach { a -> add(Triple(a.name, a.coverArt) { nav.navigate("album/${a.id}") }) }
@@ -141,7 +142,8 @@ fun HomeScreen(nav: NavController) {
                     quick.chunked(2).forEach { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             row.forEach { (title, cover, open) ->
-                                QuickTile(title, cover, tileColors(title), open, Modifier.weight(1f))
+                                val colors = if (title == "Liked songs") Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(title)
+                                QuickTile(title, cover, colors, open, Modifier.weight(1f))
                             }
                             if (row.size == 1) Spacer(Modifier.weight(1f))
                         }

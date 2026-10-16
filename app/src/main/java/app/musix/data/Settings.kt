@@ -27,7 +27,21 @@ data class AppSettings(
     val syncFolders: Set<String> = emptySet(),
     val imageCacheMb: Int = 500,
     val logging: Boolean = false,
+    val scrobbleNavidrome: Boolean = true,
+    val lastFmEnabled: Boolean = false,
+    val lastFmApiKey: String = "",
+    val lastFmSecret: String = "",
+    val lastFmUser: String = "",
+    val lastFmSession: String = "",
+    val listenBrainzEnabled: Boolean = false,
+    val listenBrainzUrl: String = "",
+    val listenBrainzToken: String = "",
+    val transcodeWifiKbps: Int = 0,
+    val transcodeMobileKbps: Int = 0,
 ) {
+    val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
+    val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
+
     val navidromeReady: Boolean
         get() = navidromeUrl.isNotBlank() && navidromeUser.isNotBlank() && navidromePassword.isNotBlank()
     val audioMuseReady: Boolean
@@ -111,6 +125,17 @@ class SettingsRepository(context: Context) {
         syncFolders = prefs.getStringSet("sync_folders", emptySet())?.toSet() ?: emptySet(),
         imageCacheMb = prefs.getInt("image_cache_mb", 500),
         logging = prefs.getBoolean("logging", false),
+        scrobbleNavidrome = prefs.getBoolean("scrobble_nd", true),
+        lastFmEnabled = prefs.getBoolean("lfm_on", false),
+        lastFmApiKey = prefs.getString("lfm_key", "") ?: "",
+        lastFmSecret = secret("lfm_secret"),
+        lastFmUser = prefs.getString("lfm_user", "") ?: "",
+        lastFmSession = secret("lfm_session"),
+        listenBrainzEnabled = prefs.getBoolean("lb_on", false),
+        listenBrainzUrl = prefs.getString("lb_url", "") ?: "",
+        listenBrainzToken = secret("lb_token"),
+        transcodeWifiKbps = prefs.getInt("tc_wifi", 0),
+        transcodeMobileKbps = prefs.getInt("tc_mobile", 0),
     )
 
     /**
@@ -155,6 +180,17 @@ class SettingsRepository(context: Context) {
             .putStringSet("sync_folders", s.syncFolders)
             .putInt("image_cache_mb", s.imageCacheMb)
             .putBoolean("logging", s.logging)
+            .putBoolean("scrobble_nd", s.scrobbleNavidrome)
+            .putBoolean("lfm_on", s.lastFmEnabled)
+            .putString("lfm_key", s.lastFmApiKey.trim())
+            .putString("lfm_secret", SecretBox.encrypt(s.lastFmSecret.trim()))
+            .putString("lfm_user", s.lastFmUser.trim())
+            .putString("lfm_session", SecretBox.encrypt(s.lastFmSession))
+            .putBoolean("lb_on", s.listenBrainzEnabled)
+            .putString("lb_url", s.listenBrainzUrl.trim())
+            .putString("lb_token", SecretBox.encrypt(s.listenBrainzToken.trim()))
+            .putInt("tc_wifi", s.transcodeWifiKbps)
+            .putInt("tc_mobile", s.transcodeMobileKbps)
             .apply()
         _state.value = s
     }
