@@ -198,7 +198,13 @@ class AppTourTest {
         }
         println("Tour: song starts: ${starts.joinToString(" | ")}")
         // The app's own log, saved next to the screenshots on the ci-screens branch (tour-log.txt).
-        AppLog.tail(1500).forEach { println("TOURLOG $it") }
+        val log = AppLog.tail(1500)
+        log.forEach { println("TOURLOG $it") }
+        // Every cover on every page must show: any picture the app couldn't show is a problem.
+        val blank = log.filter { it.contains("W/Image: Couldn't show") }
+        if (blank.isNotEmpty()) problems += "${blank.size} picture(s) couldn't be shown, e.g. ${blank.first().substringAfter("Couldn't show ")}"
+        // And no errors in the app's log during the tour.
+        log.filter { Regex("""^\S+ \S+ E/""").containsMatchIn(it) }.take(3).forEach { problems += "Error in the log: ${it.take(200)}" }
         if (problems.isNotEmpty()) fail("Tour found ${problems.size} problem(s):\n" + problems.joinToString("\n"))
     }
 
