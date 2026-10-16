@@ -25,7 +25,8 @@ implements them and opens a pull request. Labels show where each one is: `claude
 
 - One issue per pull request; reference it with `Fixes #N`.
 - Describe before and after, and how it was tested.
-- Don't merge: the owner reviews, and CI (`.github/workflows/ci.yml`) must pass.
+- Don't merge: the owner reviews, and CI (`.github/workflows/ci.yml`) must pass. Pull requests run the build,
+  Lint, unit tests and secret scan; emulator tests run after merging to main.
 
 ## Don'ts
 
