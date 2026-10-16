@@ -78,8 +78,12 @@ class PlayerConnection(
         connect()
     }
 
+    /** Called when a new list starts playing (anything other than a radio topping itself up). */
+    var onNewQueue: (() -> Unit)? = null
+
     fun play(songs: List<Song>, startIndex: Int = 0, shuffle: Boolean = false) {
         if (songs.isEmpty()) return
+        onNewQueue?.invoke()
         SongRegistry.register(songs)
         val items = songs.map { it.toMediaItem(api) }
         val start = if (shuffle) Random.nextInt(songs.size) else startIndex.coerceIn(0, songs.size - 1)
@@ -112,6 +116,17 @@ class PlayerConnection(
                 c.prepare()
                 c.play()
             }
+        }
+    }
+
+    /** Keeps the current song playing and swaps everything after it for [songs]. */
+    fun replaceUpcoming(songs: List<Song>) {
+        SongRegistry.register(songs)
+        withController { c ->
+            val keep = c.currentMediaItemIndex + 1
+            if (c.mediaItemCount > keep) c.removeMediaItems(keep, c.mediaItemCount)
+            c.shuffleModeEnabled = false
+            c.addMediaItems(songs.map { it.toMediaItem(api) })
         }
     }
 

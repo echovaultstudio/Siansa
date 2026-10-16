@@ -6,10 +6,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -78,7 +81,10 @@ class AudioMuseApi(
         jwt
     }
 
-    private suspend fun execute(build: suspend () -> Request): JsonObject {
+    private suspend fun execute(build: suspend () -> Request): JsonObject =
+        executeElement(build) as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
+
+    private suspend fun executeElement(build: suspend () -> Request): JsonElement {
         val first = runCatching { send(build()) }
         val error = first.exceptionOrNull()
         // A session can expire: sign in again once and retry.
@@ -94,10 +100,11 @@ class AudioMuseApi(
 
     private class Unauthorized : Exception("Unauthorized")
 
-    private suspend fun send(request: Request): JsonObject = withContext(Dispatchers.IO) {
+    private suspend fun send(request: Request): JsonElement = withContext(Dispatchers.IO) {
         http.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
-            val json = runCatching { AppJson.parseToJsonElement(body).jsonObject }.getOrNull()
+            val element = runCatching { AppJson.parseToJsonElement(body) }.getOrNull()
+            val json = element as? JsonObject
             if (response.code == 401 || response.code == 403) throw Unauthorized()
             if (!response.isSuccessful) {
                 val reason = json?.str("error") ?: json?.str("message") ?: body.take(120).ifBlank { "no details" }
@@ -108,7 +115,7 @@ class AudioMuseApi(
                     }
                 )
             }
-            json ?: throw ApiException("AudioMuse sent something that isn't JSON. Is the address its API port?")
+            element ?: throw ApiException("AudioMuse sent something that isn't JSON. Is the address its API port?")
         }
     }
 
@@ -127,6 +134,28 @@ class AudioMuseApi(
                 album = r.str("album"),
                 similarity = r.dbl("similarity") ?: 0.0,
             )
+        }
+    }
+
+    /**
+     * Tracks that sound like [itemId] (for a single server, the Navidrome song id). With
+     * [sameMood] AudioMuse also keeps the mood (danceable, relaxed, sad…) close, so a radio keeps the vibe.
+     */
+    suspend fun similarTracks(itemId: String, count: Int, sameMood: Boolean = true): List<ClapHit> {
+        val s = settings()
+        val url = s.audioMuseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/similar_tracks")
+            .addQueryParameter("item_id", itemId)
+            .addQueryParameter("n", count.toString())
+            .addQueryParameter("eliminate_duplicates", "true")
+            .addQueryParameter("mood_similarity", sameMood.toString())
+            .build()
+        val root = executeElement { request("").url(url).get().build() }
+        val rows = (root as? JsonArray) ?: (root as? JsonObject)?.let { it["results"] as? JsonArray } ?: JsonArray(emptyList())
+        return rows.mapNotNull { element ->
+            val r = element as? JsonObject ?: return@mapNotNull null
+            val id = r.str("item_id") ?: return@mapNotNull null
+            ClapHit(id, r.str("title").orEmpty(), r.str("author").orEmpty(), r.str("album"), r.dbl("distance")?.let { 1 - it } ?: 0.0)
         }
     }
 

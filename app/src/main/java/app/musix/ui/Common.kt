@@ -138,6 +138,10 @@ class PlayLauncher(
 ) {
     // Songs added after the start keep coming even if you leave the screen, so this part runs app-wide.
     private val appScope: CoroutineScope get() = graph.scope
+    fun notify(message: String) {
+        scope.launch { snack.showSnackbar(message) }
+    }
+
     operator fun invoke(label: String, build: suspend () -> List<Song>) {
         scope.launch {
             val note = launch { snack.showSnackbar("Starting $label…") }
@@ -194,7 +198,13 @@ fun rememberPlayLauncher(): PlayLauncher {
 }
 
 /**
- * Album art from Navidrome. size = null asks for the original file, which keeps animated covers moving.
+ * Pixel size for big covers and photos. Navidrome resizes and compresses them (at its cover quality
+ * setting) and keeps animated covers animated, so there's no need to download multi-megabyte originals.
+ */
+const val LARGE_COVER = 1000
+
+/**
+ * Album art from Navidrome. size = null would ask for the original file; screens use [LARGE_COVER] instead.
  * The cache key leaves out the per-session login token, so covers are reused from disk across app starts.
  */
 @Composable
@@ -347,7 +357,7 @@ fun SongRow(
                 })
                 DropdownMenuItem(text = { Text("Start song radio") }, onClick = {
                     menu = false
-                    launch.progressive("song radio", { listOf(song) }) { graph.radios.songMore(song) }
+                    graph.songRadio.start(song) { message -> launch.notify(message) }
                 })
                 song.albumId?.let { albumId ->
                     DropdownMenuItem(text = { Text("Go to album") }, onClick = {

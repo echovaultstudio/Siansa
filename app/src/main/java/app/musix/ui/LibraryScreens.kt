@@ -212,7 +212,7 @@ fun PlaylistScreen(nav: NavController, id: String) {
         color = rememberCoverColor(d?.playlist?.coverArt),
         songs = d?.songs,
         error = (detail as? Load.Err)?.message,
-        cover = { m -> Cover(d?.playlist?.coverArt, null, m, RoundedCornerShape(6.dp)) },
+        cover = { m -> Cover(d?.playlist?.coverArt, LARGE_COVER, m, RoundedCornerShape(6.dp)) },
         header = {
             d?.playlist?.comment?.takeIf { it.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
@@ -367,7 +367,7 @@ fun AlbumScreen(nav: NavController, id: String) {
         error = (detail as? Load.Err)?.message,
         numbered = true,
         showCovers = false,
-        cover = { m -> Cover(d?.album?.coverArt, null, m, RoundedCornerShape(6.dp)) },
+        cover = { m -> Cover(d?.album?.coverArt, LARGE_COVER, m, RoundedCornerShape(6.dp)) },
         header = {
             if (d != null) {
                 CollectionByline(

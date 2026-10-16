@@ -236,6 +236,9 @@ class MixGenerator(private val graph: AppGraph) {
         return Plan(title, query, description.ifBlank { "Made from your mood" }, ai = true)
     }
 
+    /** Songs for AudioMuse ids, from the synced library where possible. */
+    suspend fun resolveSongs(ids: List<String>): List<Song> = resolve(ids)
+
     /** Songs from the synced library where possible, otherwise fetched from Navidrome. */
     private suspend fun resolve(ids: List<String>): List<Song> = coroutineScope {
         val local = graph.library.songs(ids).associateBy { it.id }
