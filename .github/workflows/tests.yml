@@ -34,6 +34,8 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm && echo "::notice::KVM $(ls -l /dev/kvm)" || echo "::warning::No /dev/kvm"
+          echo "::notice::CPU $(nproc) cores, $(free -g | awk '/Mem/{print $2}') GB RAM"
 
       - name: Build test APKs
         run: gradle :app:assembleDebug :app:assembleDebugAndroidTest
@@ -41,11 +43,11 @@ jobs:
       - name: Run tests on the emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 33
+          api-level: 29
           target: default
           arch: x86_64
-          cores: 4
-          ram-size: 4096M
+          cores: 2
+          ram-size: 3072M
           emulator-boot-timeout: 900
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
