@@ -39,6 +39,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.InterruptedIOException
 import java.util.Collections
@@ -69,6 +72,22 @@ class PlaybackService : MediaSessionService() {
         val player = built.player
         cacheFactory = built.cacheFactory
         events = Events(player).also { player.addListener(it) }
+        // "Play hi-res files at 48 kHz" applies straight away: restart the player where it was so the
+        // current song's audio is set up again with the new choice.
+        scope.launch(Dispatchers.Main) {
+            graph.settings.state.map { it.hiResAt48k }.distinctUntilChanged().drop(1).collect { on ->
+                built.hiRes.enabled = on
+                AppLog.i("Audio", "Hi-res at 48 kHz " + if (on) "on" else "off")
+                if (player.mediaItemCount == 0) return@collect
+                val index = player.currentMediaItemIndex
+                val position = player.currentPosition
+                val play = player.playWhenReady
+                player.stop()
+                player.prepare()
+                player.seekTo(index, position)
+                player.playWhenReady = play
+            }
+        }
         player.addAnalyticsListener(PlaybackDiagnostics(player, this) { waited -> onStall(player, waited) })
         player.addAnalyticsListener(object : AnalyticsListener {
             override fun onAudioDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {

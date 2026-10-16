@@ -33,6 +33,8 @@ data class AppSettings(
     /** ...on any Wi-Fi, rather than only on the same local network as Navidrome. */
     val coverDownloadAnyWifi: Boolean = false,
     val autoQuality: Boolean = true,
+    /** Convert files above 48 kHz to 48 kHz inside the app instead of handing them to Android as they are. */
+    val hiResAt48k: Boolean = true,
     val logging: Boolean = false,
     val scrobbleNavidrome: Boolean = true,
     val lastFmEnabled: Boolean = false,
@@ -136,6 +138,7 @@ class SettingsRepository(context: Context) {
         coverDownload = prefs.getBoolean("cover_download", false),
         coverDownloadAnyWifi = prefs.getBoolean("cover_download_any_wifi", false),
         autoQuality = prefs.getBoolean("auto_quality", true),
+        hiResAt48k = prefs.getBoolean("hires_48k", true),
         logging = prefs.getBoolean("logging", false),
         scrobbleNavidrome = prefs.getBoolean("scrobble_nd", true),
         lastFmEnabled = prefs.getBoolean("lfm_on", false),
@@ -217,6 +220,11 @@ class SettingsRepository(context: Context) {
     fun setAutoQuality(on: Boolean) {
         prefs.edit().putBoolean("auto_quality", on).apply()
         _state.value = _state.value.copy(autoQuality = on)
+    }
+
+    fun setHiResAt48k(on: Boolean) {
+        prefs.edit().putBoolean("hires_48k", on).apply()
+        _state.value = _state.value.copy(hiResAt48k = on)
     }
 
     fun setCoverDownload(on: Boolean, anyWifi: Boolean = _state.value.coverDownloadAnyWifi) {

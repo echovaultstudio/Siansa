@@ -13,6 +13,8 @@ import androidx.media3.decoder.ffmpeg.FfmpegLibrary
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import app.musix.AppGraph
 import app.musix.log.AppLog
@@ -23,7 +25,7 @@ import app.musix.log.AppLog
  */
 @OptIn(UnstableApi::class)
 object PlayerFactory {
-    class Built(val player: ExoPlayer, val cacheFactory: CacheDataSource.Factory)
+    class Built(val player: ExoPlayer, val cacheFactory: CacheDataSource.Factory, val hiRes: HiResTo48k)
 
     /** [kbpsFor] picks, per song id, Opus kbit/s or 0 for the original file. */
     fun build(context: Context, graph: AppGraph, kbpsFor: (String) -> Int, handleAudioFocus: Boolean = true): Built {
@@ -55,8 +57,18 @@ object PlayerFactory {
         // so audio that happens to look like a header splits a real frame in two (Skinty Fia at 0:59).
         // The phone's FLAC decoder then outputs only silence and the song freezes; FFmpeg skips the
         // broken pieces (about 85 ms) and plays on.
-        val renderers = DefaultRenderersFactory(context)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+        // Hi-res files are converted to 48 kHz in the app (HiResTo48k), and gaps in the decoded audio are logged.
+        val hiRes = HiResTo48k().apply { enabled = graph.settings.current.hiResAt48k }
+        val renderers = object : DefaultRenderersFactory(context) {
+            override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
+                GapLoggingAudioSink(
+                    DefaultAudioSink.Builder(context)
+                        .setEnableFloatOutput(enableFloatOutput)
+                        .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                        .setAudioProcessors(arrayOf(hiRes))
+                        .build()
+                )
+        }.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
         AppLog.i("Player", "FFmpeg decoders " + if (FfmpegLibrary.isAvailable()) "ready (${FfmpegLibrary.getVersion()})" else "not available")
 
         val player = ExoPlayer.Builder(context, renderers)
@@ -72,6 +84,6 @@ object PlayerFactory {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
-        return Built(player, cacheFactory)
+        return Built(player, cacheFactory, hiRes)
     }
 }

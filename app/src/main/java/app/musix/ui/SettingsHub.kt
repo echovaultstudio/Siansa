@@ -201,6 +201,8 @@ fun PlaybackSettingsScreen(nav: NavController) {
             Hint("Seeking inside an Opus song can take a moment, since Navidrome converts it as it streams.")
             SwitchRow("Switch to Opus when the connection is too slow", settings.autoQuality) { graph.settings.setAutoQuality(it) }
             Hint("If the original keeps stopping to wait for data (three times in two minutes), Musix carries on in Opus at a bitrate the connection can manage, picking up where you were, and tries the original again after 15 minutes.")
+            SwitchRow("Play hi-res files at 48 kHz", settings.hiResAt48k) { graph.settings.setHiResAt48k(it) }
+            Hint("Files recorded above 48 kHz (88.2, 96 or 192 kHz) are converted to 48 kHz inside Musix, which is what most phones play at anyway. Turn off to hand them to Android as they are. Applies straight away.")
         }
     }
 }
