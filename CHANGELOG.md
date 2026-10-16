@@ -3,6 +3,15 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.18beta — 2026-10-16
+
+### Fixed
+- **Placeholders flashing in lists** even for covers already on the phone:
+  - covers already in memory are now drawn in the same frame, with no placeholder (the image library only looked at its memory after laying out the row, so even cached covers showed a placeholder for a frame);
+  - list rows decode covers at the size they're shown (about 192 px instead of 300), a quarter of the memory each, so several hundred stay in memory and scrolling back is instant;
+  - Your Library, album, playlist and mix pages load the next two dozen covers ahead of where you're scrolling, so they're ready before they come into view;
+  - covers start loading straight away instead of waiting for the row to be laid out.
+
 ## 0.0.17beta — 2026-10-16
 
 ### Fixed
