@@ -53,7 +53,8 @@ import java.io.IOException
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class RealServerTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
-    @get:Rule val notifications: GrantPermissionRule = GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS)
+    @get:Rule val notifications: GrantPermissionRule =
+        if (android.os.Build.VERSION.SDK_INT >= 33) GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS) else GrantPermissionRule.grant()
 
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val app = instrumentation.targetContext.applicationContext as MusixApp
