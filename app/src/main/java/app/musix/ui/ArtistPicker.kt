@@ -85,9 +85,12 @@ fun rememberArtistOpener(beforeOpen: () -> Unit = {}): (Song) -> Unit {
     return { song: Song ->
         scope.launch {
             val artists = artistsOf(graph, song)
-            when {
-                artists.size > 1 -> choices = artists
-                artists.size == 1 -> go(artists.first())
+            // Navigation and screen state only on the main thread, whatever thread the lookup ended on.
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                when {
+                    artists.size > 1 -> choices = artists
+                    artists.size == 1 -> go(artists.first())
+                }
             }
         }
     }

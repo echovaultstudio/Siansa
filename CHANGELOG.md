@@ -11,6 +11,10 @@ To publish a new version: add a section at the top, set the same version in `ver
 - Errors in background work (syncing, mixes, covers) are logged with where they happened instead of being able to close the app.
 - Settings → Logs → **Problems** shows only warnings and errors, with their counts, so issues stand out.
 
+### Fixed
+- Found by the new app tour: opening an artist from a song's menu, or opening a freshly made vibe mix, could navigate from a background thread, which can close the app. Both now always navigate on the main thread.
+- Two issues Android Lint reports as errors (screen state that might never be set). Lint errors now fail the build.
+
 ## 0.0.15beta — 2026-10-16
 
 ### Fixed

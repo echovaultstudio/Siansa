@@ -48,7 +48,7 @@ android {
         }
     }
 
-    // An emulator Gradle starts by itself for the device tests (a lean image made for CI).
+    // An emulator Gradle starts by itself for the device tests (the standard image, so the app tour can take screenshots).
     testOptions {
         // Unit tests run on a plain JVM: Android calls they touch return defaults instead of failing.
         unitTests.isReturnDefaultValues = true
@@ -57,7 +57,7 @@ android {
                 create("ciPhone") {
                     device = "Pixel 6"
                     apiLevel = 33
-                    systemImageSource = "aosp-atd"
+                    systemImageSource = "aosp"
                 }
             }
         }
@@ -81,8 +81,10 @@ android {
         compose = true
     }
 
+    // Lint errors fail the build (CI shows each with its file and line); warnings are reported only.
     lint {
-        abortOnError = false
+        abortOnError = true
+        warningsAsErrors = false
         checkReleaseBuilds = false
     }
 

@@ -84,7 +84,7 @@ fun <T> Load<T>.valueOrNull(): T? = if (this is Load.Ok<T>) value else null
 @Composable
 fun <T> loadState(key: Any?, block: suspend () -> T): State<Load<T>> =
     produceState<Load<T>>(Load.Loading, key) {
-        value = try {
+        val result: Load<T> = try {
             Load.Ok(block())
         } catch (e: CancellationException) {
             throw e
@@ -92,6 +92,7 @@ fun <T> loadState(key: Any?, block: suspend () -> T): State<Load<T>> =
             AppLog.w("Ui", "Loading failed: ${e.message}")
             Load.Err(e.message ?: e.javaClass.simpleName)
         }
+        this.value = result
     }
 
 @Composable
