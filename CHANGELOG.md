@@ -3,7 +3,7 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
-## 0.0.20beta — 2026-10-16
+## 0.0.22beta — 2026-10-16
 
 ### Changed
 - **Album pages no longer repeat the album's artist and name under every song.** A song only shows a second line when other artists are on it (a "feat." or a duet), and then only those artists. Musix reads this from the song's artist tags as Navidrome reports them.
