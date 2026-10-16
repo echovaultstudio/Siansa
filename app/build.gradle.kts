@@ -6,6 +6,9 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// The version people see comes from version.txt (e.g. 0.0.1beta). The hidden versionCode only has to
+// grow with every build so a new APK installs over the old one.
+val appVersion = rootProject.file("version.txt").readText().trim()
 val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 
 android {
@@ -17,7 +20,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = buildNumber
-        versionName = "0.1.$buildNumber"
+        versionName = appVersion
     }
 
     // A fixed key kept in this private repo, so every new APK installs over the last one.

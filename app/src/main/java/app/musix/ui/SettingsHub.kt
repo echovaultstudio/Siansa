@@ -119,6 +119,16 @@ fun SettingsHub(nav: NavController) {
             HubRow(Icons.Rounded.BugReport, "Logs", if (settings.logging) "Logging on" else "Logging off") {
                 nav.navigate("settings/logs")
             }
+            val context = LocalContext.current
+            val version = remember {
+                runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: ""
+            }
+            Text(
+                "Musix $version",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp),
+            )
         }
     }
 }

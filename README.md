@@ -30,6 +30,6 @@ Passwords, tokens and the API key are stored encrypted with a key from the Andro
 
 ## Building
 
-GitHub Actions builds a signed APK on every push to `main` and publishes it as a release (`build-N`). The signing key is in `app/musix.keystore`, so each new build installs over the previous one. Keep this repository private.
+GitHub Actions builds a signed APK on every push to `main`. The version comes from `version.txt` (e.g. `0.0.1beta`); each new version is published as a release `v<version>` with `musix-<version>.apk`. Bump `version.txt` to publish a new release. The signing key is in `app/musix.keystore`, so each new build installs over the previous one. Keep this repository private.
 
 To build locally: `gradle :app:assembleRelease` with Gradle 8.11+, JDK 17 and the Android SDK (platform 35).

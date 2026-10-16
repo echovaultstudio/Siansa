@@ -51,22 +51,33 @@ jobs:
         if: steps.project.outputs.found == 'true'
         run: gradle :app:assembleRelease --stacktrace
 
+      - name: Read version
+        if: steps.project.outputs.found == 'true'
+        id: version
+        run: |
+          VERSION=$(tr -d '[:space:]' < version.txt)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release v$VERSION already exists; bump version.txt to publish a new one."
+          fi
+
       - name: Rename APK
         if: steps.project.outputs.found == 'true'
-        run: mv app/build/outputs/apk/release/app-release.apk musix-${{ github.run_number }}.apk
+        run: mv app/build/outputs/apk/release/app-release.apk musix-${{ steps.version.outputs.version }}.apk
 
       - uses: actions/upload-artifact@v4
         if: steps.project.outputs.found == 'true'
         with:
-          name: musix-${{ github.run_number }}
+          name: musix-${{ steps.version.outputs.version }}
           path: musix-*.apk
 
-      # A release per build, so the APK can be downloaded straight from the Releases page on a phone.
+      # One release per version, so the APK can be downloaded straight from the Releases page on a phone.
       - uses: softprops/action-gh-release@v2
-        if: steps.project.outputs.found == 'true'
+        if: steps.project.outputs.found == 'true' && steps.version.outputs.exists != 'true'
         with:
-          tag_name: build-${{ github.run_number }}
-          name: Musix build ${{ github.run_number }}
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Musix ${{ steps.version.outputs.version }}
           body: Built from ${{ github.sha }}
           files: musix-*.apk
           make_latest: true
