@@ -54,6 +54,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,7 +65,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -147,6 +152,8 @@ fun YourLibraryScreen(nav: NavController) {
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var pinVersion by remember { mutableStateOf(0) }
+    // The item being held: highlighted with its pin button showing. One at a time.
+    var held by remember { mutableStateOf<String?>(null) }
     val pinned = remember(pinVersion) { pins(context).getStringSet("keys", emptySet()).orEmpty() }
 
     val data by loadState(Triple(version, mixes?.size, settings.navidromeUser)) { buildLibrary(graph, settings.navidromeUser) }
@@ -177,6 +184,7 @@ fun YourLibraryScreen(nav: NavController) {
         if (!set.add(e.key)) set.remove(e.key)
         pins(context).edit().putStringSet("keys", set).apply()
         pinVersion++
+        held = null
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -215,7 +223,8 @@ fun YourLibraryScreen(nav: NavController) {
             status == null && loaded -> SyncPrompt(nav)
             all == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             else -> {
-                val open = { e: Entry -> nav.navigate(e.route) }
+                // While an item is held, a tap anywhere on a row only puts it back.
+                val open = { e: Entry -> if (held != null) held = null else nav.navigate(e.route) }
                 val sortBar: @Composable () -> Unit = {
                     SortBar(selectedSort, grid, onSort = { sort = it.name }, onGrid = { grid = !grid })
                 }
@@ -227,14 +236,14 @@ fun YourLibraryScreen(nav: NavController) {
                     ) {
                         item(span = { GridItemSpan(maxLineSpan) }) { sortBar() }
                         items(shown, key = { it.key }) { e ->
-                            GridEntry(e, pinned = e.alwaysPinned || e.key in pinned, onClick = { open(e) }, onLongClick = { togglePin(e) })
+                            GridEntry(e, pinned = e.alwaysPinned || e.key in pinned, held = held == e.key, onClick = { open(e) }, onHold = { held = e.key }, onTogglePin = { togglePin(e) })
                         }
                     }
                 } else {
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(16.dp))) {
                         item { sortBar() }
                         items(shown, key = { it.key }) { e ->
-                            RowEntry(e, pinned = e.alwaysPinned || e.key in pinned, onClick = { open(e) }, onLongClick = { togglePin(e) })
+                            RowEntry(e, pinned = e.alwaysPinned || e.key in pinned, held = held == e.key, onClick = { open(e) }, onHold = { held = e.key }, onTogglePin = { togglePin(e) })
                         }
                         if (shown.isEmpty()) {
                             item {
@@ -417,32 +426,97 @@ private fun Subtitle(e: Entry, pinned: Boolean, modifier: Modifier = Modifier) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun RowEntry(e: Entry, pinned: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun RowEntry(e: Entry, pinned: Boolean, held: Boolean, onClick: () -> Unit, onHold: () -> Unit, onTogglePin: () -> Unit) = LongerHold {
     Row(
-        Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick).padding(horizontal = 16.dp, vertical = 6.dp),
+        Modifier
+            .fillMaxWidth()
+            .background(if (held) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
+            .holdToReveal(e, onClick, onHold)
+            .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         EntryCover(e, Modifier.size(64.dp), big = false)
         Spacer(Modifier.width(14.dp))
+        // Takes what's left, so a long title shortens to make room for the pin button.
         Column(Modifier.weight(1f)) {
             Text(e.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(2.dp))
             Subtitle(e, pinned)
+        }
+        if (held) {
+            Spacer(Modifier.width(8.dp))
+            PinButton(pinned, onTogglePin)
         }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun GridEntry(e: Entry, pinned: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun GridEntry(e: Entry, pinned: Boolean, held: Boolean, onClick: () -> Unit, onHold: () -> Unit, onTogglePin: () -> Unit) = LongerHold {
     Column(
-        Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick).padding(6.dp),
+        Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (held) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
+            .holdToReveal(e, onClick, onHold)
+            .padding(6.dp),
         horizontalAlignment = if (e.round) Alignment.CenterHorizontally else Alignment.Start,
     ) {
-        EntryCover(e, Modifier.fillMaxWidth().aspectRatio(1f), big = true)
+        Box {
+            EntryCover(e, Modifier.fillMaxWidth().aspectRatio(1f), big = true)
+            if (held) PinButton(pinned, onTogglePin, Modifier.align(Alignment.TopEnd).padding(4.dp))
+        }
         Spacer(Modifier.height(6.dp))
         Text(e.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Subtitle(e, pinned)
+    }
+}
+
+/**
+ * Tap opens; press and hold highlights the item and shows a pin button on it, so a slow tap never
+ * changes the library by itself. Liked songs and your listening are always pinned, so holding them
+ * does nothing.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Modifier.holdToReveal(e: Entry, onClick: () -> Unit, onHold: () -> Unit): Modifier {
+    val haptics = LocalHapticFeedback.current
+    return combinedClickable(
+        onClick = onClick,
+        onLongClick = if (e.alwaysPinned) null else {
+            {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onHold()
+            }
+        },
+    )
+}
+
+/** A hold here takes 0.8 s instead of Android's usual 0.4 s, so a slow tap stays a tap. */
+@Composable
+private fun LongerHold(content: @Composable () -> Unit) {
+    val base = LocalViewConfiguration.current
+    val slower = remember(base) {
+        object : ViewConfiguration by base {
+            override val longPressTimeoutMillis = 800L
+        }
+    }
+    CompositionLocalProvider(LocalViewConfiguration provides slower, content = content)
+}
+
+@Composable
+private fun PinButton(pinned: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = if (pinned) MaterialTheme.colorScheme.surface else Accent,
+        contentColor = if (pinned) MaterialTheme.colorScheme.onSurface else Color(0xFF2A1700),
+        modifier = modifier,
+    ) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.PushPin, null, Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(if (pinned) "Unpin" else "Pin", style = MaterialTheme.typography.labelLarge)
+        }
     }
 }
 
