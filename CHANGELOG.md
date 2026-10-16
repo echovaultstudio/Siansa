@@ -3,6 +3,23 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.10beta — 2026-10-16
+
+### Fixed
+- **Playback stopping and starting, and blank covers, on albums with animated covers.** Found by running a real Navidrome 0.64.2 behind a link limited to 4.3 Mbit/s (what the phone measured):
+  - Musix downloaded the album's original animated cover.gif (often over 10 MB), sometimes several copies at once (album page, now playing, the animation check). That took most of the connection: the song got about 1,100 kbit/s while FLAC needs about 1,370, so it kept stopping.
+  - For every cover size requested, Navidrome converts an animated GIF with ffmpeg. 300 px worked (about 5 s), but 600 and 1000 px failed and returned no image, which is why big covers were blank, and each new request started the conversion again.
+- Now Musix reads only the first bytes of an album's cover to see if it's animated, then shows the original only when it's small, otherwise Navidrome's 300 px animated version, which is converted once and kept. Big sizes are never asked for on animated albums, the result is remembered across app starts, and lists use one cover size so each album is converted only once.
+- Animated covers now move on the album page and in now playing.
+
+### Changed
+- Songs, covers and API calls each use their own connections, so cover downloads can't hold up a song.
+- If a song waits 8 seconds for data that's arriving slower than it needs, Musix switches to Opus straight away instead of after three stops.
+- The log shows the Navidrome version, large cover downloads, how long Navidrome took to prepare an animated cover, and what each animated cover was shown as.
+
+### Added
+- Automated device tests: on every push, the app runs on an Android emulator against a real Navidrome with a test library (a 13 MB animated cover, a small one, a still one, and 5-minute FLACs) behind a 4.3 Mbit/s link. They check that animated covers are detected and animate on screen, and that a song starts within seconds and plays without stopping while an animated album is open. A control test confirms the old behaviour does stall.
+
 ## 0.0.9beta — 2026-10-16
 
 ### Fixed
