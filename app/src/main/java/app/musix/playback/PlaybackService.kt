@@ -216,6 +216,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         handler.removeCallbacks(bufferingWatch)
+        events?.stopWatches()
         precacheWriter?.cancel()
         events?.finishCurrent()
         session?.run {
@@ -259,6 +260,7 @@ class PlaybackService : MediaSessionService() {
             playingSince = if (player.isPlaying) SystemClock.elapsedRealtime() else null
             AppLog.i("Player", "Now playing ${song.id} \"${song.title}\"")
             focusRescued = false
+            resetProgressWatch()
             if (player.playWhenReady) armStartWatch()
             player.volume = replayGainVolume(song, graph.settings.current)
             graph.scrobbler.nowPlaying(song)
@@ -335,6 +337,9 @@ class PlaybackService : MediaSessionService() {
         private var focusRescued = false
 
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            handler.removeCallbacks(progressWatch)
+            watchedPosition = -1L
+            if (playWhenReady) handler.postDelayed(progressWatch, 1_000)
             if (playWhenReady) armStartWatch() else if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
                 // Lost the audio moments after a song was chosen: almost always the app we took over
                 // from answering late. Take it back once instead of sitting paused.
@@ -391,6 +396,80 @@ class PlaybackService : MediaSessionService() {
                 }
                 lastBuffered = buffered
                 if (++startRescues < 5) handler.postDelayed(this, 2_500)
+            }
+        }
+
+        // ---- Progress watchdog: a song whose data is already here must keep moving ----
+
+        private var watchedPosition = -1L
+        private var stuckSince = 0L
+        private var stuckRescues = 0
+
+        fun stopWatches() {
+            handler.removeCallbacks(startWatch)
+            handler.removeCallbacks(progressWatch)
+        }
+
+        private fun resetProgressWatch() {
+            watchedPosition = -1L
+            stuckRescues = 0
+            handler.removeCallbacks(progressWatch)
+            if (player.playWhenReady) handler.postDelayed(progressWatch, 1_000)
+        }
+
+        /**
+         * Checks every second while play is on that the position moves. If it hasn't moved for 5 s
+         * although the next seconds of the song are already loaded, the audio decoder has stopped
+         * producing sound (seen with FLAC: it only returns empty buffers and the player flips between
+         * playing and waiting forever). Nothing downloads more slowly here, so the slow-connection
+         * rescues never act. Instead the rest of the song is played as Opus from Navidrome, like a
+         * song the phone can't decode at all (restarting the FLAC decoder at the same spot didn't
+         * help when tested). If it's already Opus, or sticks again, the decoder is restarted once by
+         * seeking to where the song is, and then it's left alone, logging why.
+         */
+        private val progressWatch = object : Runnable {
+            override fun run() {
+                if (!player.playWhenReady) return
+                handler.postDelayed(this, 1_000)
+                val state = player.playbackState
+                val now = SystemClock.elapsedRealtime()
+                val position = player.currentPosition
+                val buffered = player.bufferedPosition
+                val duration = player.duration
+                val dataHere = buffered - position >= 3_000 || (duration > 0 && buffered >= duration - 500 && position < duration - 2_000)
+                val shouldMove = (state == Player.STATE_READY || state == Player.STATE_BUFFERING) &&
+                    player.playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_NONE && dataHere
+                if (!shouldMove || watchedPosition < 0 || position > watchedPosition + 300 || position < watchedPosition) {
+                    watchedPosition = position
+                    stuckSince = now
+                    return
+                }
+                if (now - stuckSince < 5_000) return
+                watchedPosition = -1L
+                val item = player.currentMediaItem ?: return
+                val id = item.mediaId
+                val where = "at ${position / 1000}s, ${(buffered - position) / 1000.0}s loaded ahead, state $state"
+                val alreadyOpus = (chosenKbps[id] ?: 0) > 0
+                when {
+                    !alreadyOpus -> {
+                        AppLog.w("Player", "Song $id stuck for 5 s with its data loaded ($where); playing the rest as Opus $FALLBACK_KBPS kbit/s from Navidrome")
+                        chosenKbps[id] = FALLBACK_KBPS
+                        val uri = item.localConfiguration?.uri ?: return
+                        val index = player.currentMediaItemIndex
+                        player.replaceMediaItem(index, item.buildUpon().setUri(Streaming.rewrite(uri, FALLBACK_KBPS)).build())
+                        player.seekTo(index, position)
+                    }
+                    stuckRescues < 2 -> {
+                        AppLog.w("Player", "Song $id stuck for 5 s with its data loaded ($where); restarting the decoder")
+                        player.seekTo(player.currentMediaItemIndex, position)
+                    }
+                    else -> {
+                        AppLog.e("Player", "Song $id still stuck after ${stuckRescues} rescues ($where); giving up on it")
+                        handler.removeCallbacks(this)
+                        return
+                    }
+                }
+                stuckRescues++
             }
         }
 
