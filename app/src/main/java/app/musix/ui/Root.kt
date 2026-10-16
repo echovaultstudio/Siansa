@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.background
@@ -85,6 +86,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import app.musix.log.AppLog
+import kotlinx.coroutines.CancellationException
 import app.musix.playback.PlayerState
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
@@ -151,6 +153,18 @@ fun MusixRoot() {
     }
     // Nothing left to show (playback stopped): close now playing.
     LaunchedEffect(player.hasMedia) { if (!player.hasMedia) sheet.close() }
+    // Get the playing song's big cover ready as soon as it starts, so opening now playing shows it at once.
+    val appContext = LocalContext.current.applicationContext
+    LaunchedEffect(player.current?.id) {
+        val song = player.current ?: return@LaunchedEffect
+        try {
+            AnimatedCovers.preload(appContext, graph, song)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.w("Cover", "Preloading the playing song's cover failed: ${e.message}")
+        }
+    }
 
     AskForNotifications()
 
