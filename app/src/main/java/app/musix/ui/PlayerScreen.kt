@@ -84,8 +84,8 @@ import kotlin.math.max
 private enum class PlayerView { ART, LYRICS, QUEUE }
 
 private val PlayerColors = darkColorScheme(
-    primary = Color.White,
-    onPrimary = Color.Black,
+    primary = Accent,
+    onPrimary = Color(0xFF2A1700),
     surface = Color.Transparent,
     onSurface = Color.White,
     onSurfaceVariant = Color.White.copy(alpha = 0.7f),
@@ -275,7 +275,7 @@ private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart:
             Icon(
                 if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                 if (liked) "Remove from liked songs" else "Like",
-                tint = if (liked) Color(0xFF1ED760) else Color.White,
+                tint = if (liked) Accent else Color.White,
                 modifier = Modifier.size(28.dp),
             )
         }
@@ -299,7 +299,7 @@ private fun SeekBar(durationMs: Long) {
             },
             colors = SliderDefaults.colors(
                 thumbColor = Color.White,
-                activeTrackColor = Color.White,
+                activeTrackColor = Accent,
                 inactiveTrackColor = Color.White.copy(alpha = 0.3f),
             ),
         )
@@ -318,26 +318,25 @@ private fun SeekBar(durationMs: Long) {
 @Composable
 private fun Controls(state: PlayerState) {
     val graph = LocalGraph.current
-    val green = Color(0xFF1ED760)
     Row(
         Modifier.fillMaxWidth().padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = { graph.player.toggleShuffle() }) {
-            Icon(Icons.Rounded.Shuffle, "Shuffle", tint = if (state.shuffle) green else Color.White)
+            Icon(Icons.Rounded.Shuffle, "Shuffle", tint = if (state.shuffle) Accent else Color.White)
         }
         IconButton(onClick = { graph.player.previous() }, modifier = Modifier.size(56.dp)) {
             Icon(Icons.Rounded.SkipPrevious, "Previous", Modifier.size(40.dp))
         }
         Box(
-            Modifier.size(68.dp).clip(CircleShape).background(Color.White).clickable { graph.player.togglePlay() },
+            Modifier.size(68.dp).clip(CircleShape).background(Accent).clickable { graph.player.togglePlay() },
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                 "Play or pause",
-                tint = Color.Black,
+                tint = Color(0xFF2A1700),
                 modifier = Modifier.size(38.dp),
             )
         }
@@ -348,7 +347,7 @@ private fun Controls(state: PlayerState) {
             Icon(
                 if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
                 "Repeat",
-                tint = if (state.repeatMode != Player.REPEAT_MODE_OFF) green else Color.White,
+                tint = if (state.repeatMode != Player.REPEAT_MODE_OFF) Accent else Color.White,
             )
         }
     }
@@ -357,7 +356,7 @@ private fun Controls(state: PlayerState) {
 @Composable
 private fun ViewToggle(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, active: Boolean, onClick: () -> Unit) {
     IconButton(onClick = onClick) {
-        Icon(icon, label, tint = if (active) Color(0xFF1ED760) else Color.White.copy(alpha = 0.8f))
+        Icon(icon, label, tint = if (active) Accent else Color.White.copy(alpha = 0.8f))
     }
 }
 
