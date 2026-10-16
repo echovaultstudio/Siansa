@@ -8,6 +8,8 @@ To publish a new version: add a section at the top, set the same version in `ver
 ### Fixed
 - Covers already on the phone faded in over a moment when scrolling, as if they were loading. Only covers that just came over the network fade in now; ones from the phone's own cache appear straight away.
 - More decoded covers are kept in memory (30% of the app's memory instead of 20%), so scrolling back through a list doesn't read them again.
+- Now playing: swiping to the next or previous song showed a small cover first and then swapped it for the big one (or the animation). The covers either side of the current song, and their animations, are now loaded ahead of time, and whether an album's cover is animated is remembered from the start, so the right cover is there when it slides in.
+- The **Your Library** tab label was cut off on narrower phones; tab labels are a little smaller so it fits.
 
 ## 0.0.14beta — 2026-10-16
 

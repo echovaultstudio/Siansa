@@ -205,6 +205,16 @@ fun rememberPlayLauncher(): PlayLauncher {
  */
 const val LARGE_COVER = 1000
 
+/** The request [Cover] makes, so covers can be loaded ahead of time into the same cache entries. */
+fun coverRequest(context: android.content.Context, graph: app.musix.AppGraph, id: String, px: Int?): ImageRequest {
+    val key = "cover:$id:${px ?: "full"}"
+    return ImageRequest.Builder(context)
+        .data(graph.subsonic.coverUrl(id, px))
+        .diskCacheKey(key)
+        .memoryCacheKey(key)
+        .build()
+}
+
 /**
  * Album art from Navidrome. size = null would ask for the original file; screens use [LARGE_COVER] instead.
  * The cache key leaves out the per-session login token, so covers are reused from disk across app starts.
@@ -221,16 +231,7 @@ fun Cover(
     val context = LocalContext.current
     // Small sizes all share one: each size of an animated cover costs Navidrome a conversion.
     val px = size?.let { if (it <= SMALL_COVER) SMALL_COVER else it }
-    val request = remember(coverId, px) {
-        coverId?.let { id ->
-            val key = "cover:$id:${px ?: "full"}"
-            ImageRequest.Builder(context)
-                .data(graph.subsonic.coverUrl(id, px))
-                .diskCacheKey(key)
-                .memoryCacheKey(key)
-                .build()
-        }
-    }
+    val request = remember(coverId, px) { coverId?.let { coverRequest(context, graph, it, px) } }
     Box(
         modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,

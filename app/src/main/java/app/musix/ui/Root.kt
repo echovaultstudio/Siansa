@@ -77,6 +77,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -180,7 +181,7 @@ fun MusixRoot() {
                                         currentTab = tab.route
                                     },
                                     icon = { Icon(tab.icon, null) },
-                                    label = { Text(tab.label, maxLines = 1, softWrap = false) },
+                                    label = { Text(tab.label, maxLines = 1, softWrap = false, fontSize = 11.sp, letterSpacing = (-0.2).sp) },
                                 )
                             }
                         }

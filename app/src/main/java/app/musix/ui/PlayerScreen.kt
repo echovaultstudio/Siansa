@@ -134,6 +134,13 @@ private val PlayerColors = darkColorScheme(
 fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     val graph = LocalGraph.current
     val state by graph.player.state.collectAsStateWithLifecycle()
+    // The covers either side, ready before a swipe brings them in.
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    LaunchedEffect(state.index, state.queue.size) {
+        listOf(state.index + 1, state.index - 1).mapNotNull { state.queue.getOrNull(it) }.forEach { neighbour ->
+            runCatching { AnimatedCovers.preload(appContext, graph, neighbour) }
+        }
+    }
     // Re-read hearts when one changes.
     val heartChanges by graph.favorites.changes.collectAsStateWithLifecycle()
     var view by rememberSaveable { mutableStateOf(PlayerView.ART) }

@@ -128,6 +128,32 @@ object AnimatedCovers {
         }
     }
 
+    /** Like [knownKind], reading what earlier app starts found first. */
+    fun knownKind(graph: AppGraph, albumCoverId: String): Kind? {
+        loadSaved(graph)
+        return knownKind(albumCoverId)
+    }
+
+    /**
+     * Gets a song's big cover ready before it's shown (the songs either side in now playing), so
+     * swiping to it shows the cover, or its animation, straight away.
+     */
+    suspend fun preload(context: Context, graph: AppGraph, song: app.musix.data.Song) {
+        val cover = song.coverArt ?: song.albumId?.let { "al-$it" } ?: return
+        val album = song.albumId?.let { if (it.startsWith("al-")) it else "al-$it" }
+        val kind = if (album == null) Kind.Still else kind(graph, album) ?: return
+        val loader = SingletonImageLoader.get(context.applicationContext)
+        // The small one is shown first while anything else loads.
+        loader.enqueue(coverRequest(context.applicationContext, graph, cover, SMALL_COVER))
+        when (kind) {
+            Kind.Still -> loader.enqueue(coverRequest(context.applicationContext, graph, cover, LARGE_COVER))
+            Kind.Local, is Kind.Animated ->
+                if (graph.settings.current.animatedCovers && album != null) load(context, graph, album, kind, ANIMATION_PX)
+                else if (kind == Kind.Local) loader.enqueue(coverRequest(context.applicationContext, graph, cover, LARGE_COVER))
+            Kind.StillOnlySmall -> Unit
+        }
+    }
+
     /** Synchronous peek at what's already known, for places that can't wait. */
     fun knownKind(albumCoverId: String): Kind? {
         val key = CoverStore.canonical(albumCoverId)
@@ -272,7 +298,7 @@ object AnimatedCovers {
 }
 
 /** Pixels the animation is decoded at: enough for a phone's now playing, far less memory than 1000+ px frames. */
-private const val ANIMATION_PX = 720
+internal const val ANIMATION_PX = 720
 
 /**
  * An animated cover, drawn by Android's own ImageView with its animation started explicitly. Shows
@@ -316,7 +342,7 @@ fun BigCover(coverId: String?, albumId: String?, modifier: Modifier, shape: Shap
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val albumCover = albumId?.let { if (it.startsWith("al-")) it else "al-$it" }
-    val initial: AnimatedCovers.Kind? = if (albumCover == null) AnimatedCovers.Kind.Still else AnimatedCovers.knownKind(albumCover)
+    val initial: AnimatedCovers.Kind? = if (albumCover == null) AnimatedCovers.Kind.Still else AnimatedCovers.knownKind(graph, albumCover)
     val kind by produceState(initial, albumCover) {
         if (albumCover != null) AnimatedCovers.kind(graph, albumCover)?.let { value = it }
     }
