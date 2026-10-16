@@ -76,6 +76,8 @@ class LibraryRepository(context: Context) {
 
     suspend fun song(id: String): Song? = dao.song(id)?.toSong()
 
+    suspend fun albumCoverOfSongCover(songCover: String): String? = dao.albumCoverOfSongCover(songCover)
+
     /** Songs by id, in the order asked for; ids the library doesn't have are left out. */
     suspend fun songs(ids: List<String>): List<Song> {
         if (ids.isEmpty()) return emptyList()

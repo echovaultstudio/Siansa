@@ -199,13 +199,15 @@ fun rememberPlayLauncher(): PlayLauncher {
 
 /**
  * Pixel size for big covers and photos. Navidrome resizes and compresses them (at its cover quality
- * setting) and keeps animated covers animated, so there's no need to download multi-megabyte originals.
+ * setting), so there's no need to download multi-megabyte originals. The exception is an animated WebP,
+ * which Navidrome always sends whole; CoverStore keeps that once and answers with a still of it.
  */
 const val LARGE_COVER = 1000
 
 /**
  * Album art from Navidrome. size = null would ask for the original file; screens use [LARGE_COVER] instead.
  * The cache key leaves out the per-session login token, so covers are reused from disk across app starts.
+ * Always a still picture (the first frame of an animated cover); [BigCover] shows animations.
  */
 @Composable
 fun Cover(

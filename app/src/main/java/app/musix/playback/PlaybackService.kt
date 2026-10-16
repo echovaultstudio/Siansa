@@ -84,6 +84,7 @@ class PlaybackService : MediaSessionService() {
         )
         session = MediaSession.Builder(this, player)
             .setSessionActivity(openApp)
+            .setBitmapLoader(CoverBitmapLoader(this, graph.scope))
             .setCallback(object : MediaSession.Callback {
                 // Items arrive from the app's controller without their URI, so it's restored here.
                 override fun onAddMediaItems(

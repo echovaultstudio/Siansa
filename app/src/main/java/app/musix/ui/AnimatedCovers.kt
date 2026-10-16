@@ -24,12 +24,20 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.musix.AppGraph
 import app.musix.log.AppLog
+import android.os.Build
+import app.musix.covers.CoverStore
 import coil3.SingletonImageLoader
 import coil3.asDrawable
+import coil3.decode.Decoder
+import coil3.gif.AnimatedImageDecoder
+import coil3.gif.GifDecoder
+import coil3.network.NetworkHeaders
+import coil3.network.httpHeaders
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
-import coil3.request.ImageResult
 import coil3.request.SuccessResult
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -44,14 +52,17 @@ const val SMALL_COVER = 300
 /**
  * Album covers that may be animated (a cover.gif or animated cover.webp in the album folder).
  *
- * Tested against Navidrome 0.64: for an animated GIF it runs ffmpeg for every requested size. A 1000×1000
- * GIF took ~5 s of CPU at 300 px and failed (error, no image) at 600 and 1000 px, and failed conversions
- * are retried on every request. The original file is sent untouched but can be tens of MB, which on a
- * phone's connection crowds out the song stream. So, per album, Musix:
- * - reads only the first bytes of the original to see if it's animated (cheap, no conversion);
- * - animated and small (≤ 3 MB): shows the original;
- * - animated and big: asks once for the 300 px version, which Navidrome can convert (an animated WebP);
- * - never asks for big sizes of an animated cover, and remembers the outcome across app starts.
+ * Tested against Navidrome 0.64:
+ * - An animated GIF is converted with ffmpeg for every requested size. 300 px works (~5 s); 600 and
+ *   1000 px failed and returned no image, and failed conversions are retried on every request.
+ * - An animated WebP isn't resized at all: every size returns the original file.
+ *
+ * So, per album, Musix reads only the first bytes of the original to see what it is (no conversion), and:
+ * - animated WebP, or a small GIF (≤ 3 MB): keeps the original once on the phone ([CoverStore]) and
+ *   animates that; everything else uses a still made from its first frame;
+ * - big GIF: animates Navidrome's 300 px version, which it can convert, and never asks for bigger sizes;
+ * - remembers the outcome across app starts.
+ * Like Symfonium, covers only move on the album page and in now playing; lists show still frames.
  */
 object AnimatedCovers {
     private const val MAX_ORIGINAL_BYTES = 3L * 1024 * 1024
@@ -59,15 +70,20 @@ object AnimatedCovers {
     sealed interface Kind {
         /** A normal picture: fine to load at any size. */
         data object Still : Kind
-        /** Animated: load at [size] (0 = the original file). */
+        /** Animated, kept on the phone by [CoverStore]: animate the original, use its still elsewhere. */
+        data object Local : Kind
+        /** Animated, and Navidrome can shrink it: animate its [size] px version. */
         data class Animated(val size: Int) : Kind
         /** Animated, but only the 300 px still is safe to load. */
         data object StillOnlySmall : Kind
     }
 
     private val known = ConcurrentHashMap<String, Kind>()
-    private val loads = ConcurrentHashMap<String, Deferred<ImageResult>>()
-    private val checking = Mutex()
+    /** The last few animations, so going back and forth doesn't decode them again; older ones are let go. */
+    private val loads = object : LinkedHashMap<String, Deferred<Drawable?>>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Deferred<Drawable?>>) = size > 4
+    }
+    private val locks = ConcurrentHashMap<String, Mutex>()
     @Volatile private var loaded = false
 
     private fun prefs(graph: AppGraph) = graph.app.getSharedPreferences("animated_covers", Context.MODE_PRIVATE)
@@ -80,6 +96,8 @@ object AnimatedCovers {
             known[id] = when {
                 text == "still" -> Kind.Still
                 text == "small" -> Kind.StillOnlySmall
+                text == "local" -> Kind.Local
+                text == "anim:0" -> Kind.Local
                 text.startsWith("anim:") -> Kind.Animated(text.removePrefix("anim:").toIntOrNull() ?: return@forEach)
                 else -> return@forEach
             }
@@ -91,7 +109,8 @@ object AnimatedCovers {
         val text = when (kind) {
             Kind.Still -> "still"
             Kind.StillOnlySmall -> "small"
-            is Kind.Animated -> "anim:${kind.size}"
+            Kind.Local -> "local"
+            is Kind.Animated -> if (kind.size == 0) "local" else "anim:${kind.size}"
         }
         prefs(graph).edit().putString(id, text).apply()
     }
@@ -99,48 +118,72 @@ object AnimatedCovers {
     /** What kind of cover this album has, or null when it couldn't be checked (try again later). */
     suspend fun kind(graph: AppGraph, albumCoverId: String): Kind? {
         loadSaved(graph)
-        known[albumCoverId]?.let { return it }
-        return checking.withLock {
-            known[albumCoverId]?.let { return@withLock it }
-            decide(graph, albumCoverId)?.also { remember(graph, albumCoverId, it) }
+        val key = CoverStore.canonical(albumCoverId)
+        known[key]?.let { return it }
+        if (CoverStore.has(key)) return Kind.Local.also { remember(graph, key, it) }
+        val lock = locks.getOrPut(key) { Mutex() }
+        return lock.withLock {
+            known[key]?.let { return@withLock it }
+            decide(graph, albumCoverId)?.also { remember(graph, key, it) }
         }
     }
 
     /** Synchronous peek at what's already known, for places that can't wait. */
-    fun knownKind(albumCoverId: String): Kind? = known[albumCoverId]
+    fun knownKind(albumCoverId: String): Kind? {
+        val key = CoverStore.canonical(albumCoverId)
+        return known[key] ?: if (CoverStore.has(key)) Kind.Local else null
+    }
+
+    /** Forgets everything (the image cache was cleared). */
+    fun forget(graph: AppGraph) {
+        known.clear()
+        prefs(graph).edit().clear().apply()
+    }
 
     private suspend fun decide(graph: AppGraph, id: String): Kind? {
         val original = peek(graph, id, null) ?: return null
         if (!original.animated) return Kind.Still
-        if (original.bytes in 1..MAX_ORIGINAL_BYTES) {
-            AppLog.i("Cover", "Animated cover for $id: the original (${original.kind}, ${mb(original.bytes)})")
-            return Kind.Animated(0)
-        }
-        val small = peek(graph, id, SMALL_COVER)
-        return if (small != null && small.animated) {
+        if (original.kind == "animated WebP" || original.bytes in 1..MAX_ORIGINAL_BYTES) {
             AppLog.i(
                 "Cover",
-                "Animated cover for $id: original is ${mb(original.bytes)} (${original.kind}), too big for streaming; " +
-                    "using Navidrome's $SMALL_COVER px version (${small.kind}, ${mb(small.bytes)}, ready in ${small.ms} ms)",
+                "Animated cover for $id: ${original.kind} ${original.size}, ${mb(original.bytes)}. " +
+                    if (original.kind == "animated WebP") "Navidrome sends it full size for every request, so it's kept once on the phone"
+                    else "Small enough to keep the original",
             )
-            Kind.Animated(SMALL_COVER)
-        } else {
-            AppLog.w(
-                "Cover",
-                "Animated cover for $id is ${mb(original.bytes)} (${original.kind}) and Navidrome couldn't send a small animated " +
-                    "version (${small?.kind ?: "no answer"}). Showing it still, at $SMALL_COVER px.",
-            )
-            Kind.StillOnlySmall
+            return Kind.Local
+        }
+        val small = peek(graph, id, SMALL_COVER)
+        return when {
+            small != null && small.animated && small.shrunk -> {
+                AppLog.i(
+                    "Cover",
+                    "Animated cover for $id: original is ${mb(original.bytes)} (${original.kind}), too big for streaming; " +
+                        "using Navidrome's $SMALL_COVER px version (${small.kind}, ${mb(small.bytes)}, ready in ${small.ms} ms)",
+                )
+                Kind.Animated(SMALL_COVER)
+            }
+            small != null && small.animated -> {
+                AppLog.i("Cover", "Animated cover for $id: Navidrome doesn't shrink it (${original.kind}, ${mb(original.bytes)}); kept once on the phone")
+                Kind.Local
+            }
+            else -> {
+                AppLog.w(
+                    "Cover",
+                    "Animated cover for $id is ${mb(original.bytes)} (${original.kind}) and Navidrome couldn't send a small animated " +
+                        "version (${small?.kind ?: "no answer"}). Showing it still, at $SMALL_COVER px.",
+                )
+                Kind.StillOnlySmall
+            }
         }
     }
 
-    private class Peek(val animated: Boolean, val kind: String, val bytes: Long, val ms: Long)
+    private class Peek(val animated: Boolean, val kind: String, val bytes: Long, val ms: Long, val size: String = "", val shrunk: Boolean = false)
 
     /** Reads only the first bytes of the cover (then drops the connection) to see what kind of image it is. */
     private suspend fun peek(graph: AppGraph, id: String, size: Int?): Peek? = withContext(Dispatchers.IO) {
         val started = System.currentTimeMillis()
         val client = graph.imageHttp.newBuilder().callTimeout(40, TimeUnit.SECONDS).build()
-        val call = client.newCall(Request.Builder().url(graph.subsonic.coverUrl(id, size)).build())
+        val call = client.newCall(Request.Builder().url(graph.subsonic.coverUrl(id, size)).header(CoverStore.PEEK, "1").build())
         runCatching {
             call.execute().use { response ->
                 val ms = System.currentTimeMillis() - started
@@ -155,43 +198,61 @@ object AnimatedCovers {
                     read += n
                 }
                 call.cancel() // don't let OkHttp download the rest
-                val kind = kindOf(head, read)
-                Peek(kind == "animated GIF" || kind == "animated WebP", kind, length, ms)
+                val image = CoverStore.sniff(head.copyOf(read))
+                if (image == null) {
+                    val kind = if (read > 0 && head[0] == '{'.code.toByte()) "an error message" else "unknown"
+                    return@use Peek(false, kind, length, ms)
+                }
+                val shrunk = size != null && image.width in 1..(size * 5 / 4) && image.height in 1..(size * 5 / 4)
+                Peek(image.animated, image.kind, length, ms, "${image.width}×${image.height}", shrunk)
             }
         }.onFailure { AppLog.w("Cover", "Couldn't check cover $id (size ${size ?: "original"}): ${it.message}") }.getOrNull()
     }
 
-    private fun kindOf(b: ByteArray, length: Int): String {
-        fun text(from: Int, value: String) = length >= from + value.length &&
-            value.indices.all { b[from + it] == value[it].code.toByte() }
-        return when {
-            text(0, "GIF8") -> "animated GIF"
-            text(0, "RIFF") && text(8, "WEBP") && text(12, "VP8X") && length > 20 && (b[20].toInt() and 0x02) != 0 -> "animated WebP"
-            text(0, "RIFF") && text(8, "WEBP") -> "still WebP"
-            length > 2 && b[0] == 0xFF.toByte() && b[1] == 0xD8.toByte() -> "JPEG"
-            text(1, "PNG") -> "PNG"
-            text(0, "{") -> "an error message"
-            else -> "unknown"
+    /**
+     * Loads the animation (once per session) at about [px] pixels: decoding at display size rather than
+     * the file's own keeps memory down. The download runs in the app's scope, so leaving the page doesn't
+     * throw away a half-finished one. Only the album page and now playing call this.
+     */
+    suspend fun load(context: Context, graph: AppGraph, coverId: String, kind: Kind, px: Int): Drawable? {
+        val key = "${CoverStore.canonical(coverId)}:$kind:$px"
+        val job = synchronized(loads) {
+            loads.getOrPut(key) { graph.scope.async { loadNow(context.applicationContext, graph, coverId, kind, px) } }
         }
+        val d = job.await()
+        if (d == null) synchronized(loads) { loads.remove(key) }
+        return d
     }
 
-    /**
-     * Loads (once per session, through the image cache) and returns the cover as a drawable. The download
-     * runs in the image loader's own scope, so leaving the page doesn't throw away a half-finished download.
-     */
-    suspend fun load(context: Context, graph: AppGraph, coverId: String, size: Int): Drawable? {
-        val key = "cover:$coverId:${if (size == 0) "full" else size}"
-        val job = loads.getOrPut(key) {
-            val request = ImageRequest.Builder(context.applicationContext)
-                .data(graph.subsonic.coverUrl(coverId, size.takeIf { it > 0 }))
-                .diskCacheKey(key)
-                .memoryCacheKey("$key:animated")
-                .build()
-            SingletonImageLoader.get(context.applicationContext).enqueue(request).job
+    private suspend fun loadNow(context: Context, graph: AppGraph, coverId: String, kind: Kind, px: Int): Drawable? {
+        val builder = ImageRequest.Builder(context)
+            .decoderFactory(animatedDecoder())
+            .size(px)
+            .memoryCacheKey("anim:${CoverStore.canonical(coverId)}:$px")
+        when (kind) {
+            Kind.Local -> {
+                val file = CoverStore.local(coverId)?.original ?: run {
+                    // Not kept yet: one request for the original saves it (the interceptor does the work).
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            graph.imageHttp.newCall(
+                                Request.Builder().url(graph.subsonic.coverUrl(coverId, null)).header(CoverStore.WANT_ANIMATION, "1").build()
+                            ).execute().close()
+                        }.onFailure { AppLog.w("Cover", "Couldn't download the animated cover $coverId: ${it.message}") }
+                    }
+                    CoverStore.local(coverId)?.original
+                } ?: return null
+                builder.data(file).diskCachePolicy(CachePolicy.DISABLED)
+            }
+            is Kind.Animated -> {
+                val key = "cover:$coverId:${kind.size}"
+                builder.data(graph.subsonic.coverUrl(coverId, kind.size)).diskCacheKey(key)
+                    .httpHeaders(NetworkHeaders.Builder().set(CoverStore.WANT_ANIMATION, "1").build())
+            }
+            else -> return null
         }
-        val result = job.await()
+        val result = SingletonImageLoader.get(context).execute(builder.build())
         if (result !is SuccessResult) {
-            loads.remove(key)
             AppLog.w("Cover", "Couldn't load the animated cover $coverId")
             return null
         }
@@ -204,19 +265,25 @@ object AnimatedCovers {
         return d
     }
 
+    private fun animatedDecoder(): Decoder.Factory =
+        if (Build.VERSION.SDK_INT >= 28) AnimatedImageDecoder.Factory() else GifDecoder.Factory()
+
     private fun mb(bytes: Long) = if (bytes <= 0) "size unknown" else "%.1f MB".format(bytes / 1_048_576.0)
 }
+
+/** Pixels the animation is decoded at: enough for a phone's now playing, far less memory than 1000+ px frames. */
+private const val ANIMATION_PX = 720
 
 /**
  * An animated cover, drawn by Android's own ImageView with its animation started explicitly. Shows
  * [still] until the animation has loaded.
  */
 @Composable
-fun AnimatedCover(coverId: String, size: Int, modifier: Modifier, shape: Shape, still: @Composable () -> Unit) {
+fun AnimatedCover(coverId: String, kind: AnimatedCovers.Kind, modifier: Modifier, shape: Shape, still: @Composable () -> Unit) {
     val graph = LocalGraph.current
     val context = LocalContext.current
-    var drawable by remember(coverId, size) { mutableStateOf<Drawable?>(null) }
-    LaunchedEffect(coverId, size) { drawable = AnimatedCovers.load(context, graph, coverId, size) }
+    var drawable by remember(coverId, kind) { mutableStateOf<Drawable?>(null) }
+    LaunchedEffect(coverId, kind) { drawable = AnimatedCovers.load(context, graph, coverId, kind, ANIMATION_PX) }
     Box(modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceVariant)) {
         val d = drawable
         if (d == null) {
@@ -225,7 +292,12 @@ fun AnimatedCover(coverId: String, size: Int, modifier: Modifier, shape: Shape, 
             AndroidView(
                 factory = { ImageView(it).apply { scaleType = ImageView.ScaleType.CENTER_CROP } },
                 update = { view ->
-                    if (view.drawable !== d) view.setImageDrawable(d)
+                    // The same animation can be shown on the album page and in now playing; it only
+                    // moves in the view that was last given it, so take it back when recomposed.
+                    if (view.drawable !== d || d.callback !== view) {
+                        view.setImageDrawable(null)
+                        view.setImageDrawable(d)
+                    }
                     (d as? Animatable)?.start()
                 },
                 modifier = Modifier.fillMaxSize(),
@@ -250,8 +322,10 @@ fun BigCover(coverId: String?, albumId: String?, modifier: Modifier, shape: Shap
     }
     val small = @Composable { Cover(coverId, SMALL_COVER, Modifier.fillMaxSize(), shape) }
     when (val k = kind) {
-        is AnimatedCovers.Kind.Animated ->
-            if (settings.animatedCovers && albumCover != null) AnimatedCover(albumCover, k.size, modifier, shape, small)
+        is AnimatedCovers.Kind.Animated, AnimatedCovers.Kind.Local ->
+            if (settings.animatedCovers && albumCover != null) AnimatedCover(albumCover, k, modifier, shape, small)
+            // Kept on the phone: its still is already there at full size.
+            else if (k == AnimatedCovers.Kind.Local) Cover(coverId, LARGE_COVER, modifier, shape)
             else Box(modifier) { small() }
         AnimatedCovers.Kind.Still -> Cover(coverId, LARGE_COVER, modifier, shape)
         // Not checked yet, can't be checked, or animated without a usable version: the small one is always safe.
