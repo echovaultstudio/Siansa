@@ -35,7 +35,12 @@ data class Song(
     val trackPeak: Float? = null,
     val albumPeak: Float? = null,
     val starred: Boolean = false,
+    // Every artist on the song (Navidrome's OpenSubsonic "artists"), e.g. both sides of a "feat.".
+    val artists: List<ArtistRef> = emptyList(),
 )
+
+@Serializable
+data class ArtistRef(val id: String, val name: String)
 
 /** An album. [ids] holds every Navidrome album id merged into it (the same album in several libraries). */
 @Serializable

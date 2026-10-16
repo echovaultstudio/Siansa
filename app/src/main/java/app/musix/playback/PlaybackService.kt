@@ -17,7 +17,11 @@ import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.CacheWriter
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.common.Tracks
+import androidx.media3.decoder.ffmpeg.FfmpegLibrary
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
@@ -38,6 +42,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.InterruptedIOException
 import java.util.Collections
+
+private const val FALLBACK_KBPS = 320
 
 /** Background playback with a media notification, lock-screen controls, ReplayGain, transcoding and scrobbling. */
 @OptIn(UnstableApi::class)
@@ -80,7 +86,12 @@ class PlaybackService : MediaSessionService() {
             .setBufferDurationsMs(15_000, 60_000, 1_000, 2_000)
             .build()
 
-        val player = ExoPlayer.Builder(this)
+        // The phone's own decoders first; FFmpeg for what it lacks (ALAC on most phones).
+        val renderers = DefaultRenderersFactory(this)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+        AppLog.i("Player", "FFmpeg decoders " + if (FfmpegLibrary.isAvailable()) "ready (${FfmpegLibrary.getVersion()})" else "not available")
+
+        val player = ExoPlayer.Builder(this, renderers)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
             .setLoadControl(loadControl)
             .setAudioAttributes(
@@ -95,6 +106,11 @@ class PlaybackService : MediaSessionService() {
             .build()
         events = Events(player).also { player.addListener(it) }
         player.addAnalyticsListener(PlaybackDiagnostics(player, this))
+        player.addAnalyticsListener(object : AnalyticsListener {
+            override fun onAudioDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
+                AppLog.i("Audio", "Decoder $decoderName")
+            }
+        })
 
         val openApp = PendingIntent.getActivity(
             this,
@@ -222,6 +238,37 @@ class PlaybackService : MediaSessionService() {
 
         override fun onPlayerError(error: PlaybackException) {
             AppLog.e("Player", "Playback error ${error.errorCodeName} on ${current?.id ?: "?"}", error)
+        }
+
+        /**
+         * Logs each song's format, and rescues songs whose audio the phone can't decode: instead of
+         * silently skipping through them, the song is played again as Opus converted by Navidrome.
+         */
+        override fun onTracksChanged(tracks: Tracks) {
+            val item = player.currentMediaItem ?: return
+            val audio = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
+            if (audio.isEmpty()) return
+            val format = audio.first().getTrackFormat(0)
+            val desc = listOfNotNull(
+                format.sampleMimeType,
+                format.codecs,
+                format.sampleRate.takeIf { it > 0 }?.let { "$it Hz" },
+                format.channelCount.takeIf { it > 0 }?.let { "$it ch" },
+                format.bitrate.takeIf { it > 0 }?.let { "${it / 1000} kbit/s" },
+            ).joinToString(" · ")
+            val playable = audio.any { g -> (0 until g.length).any { g.isTrackSupported(it) } }
+            if (playable) {
+                AppLog.i("Audio", "Format of ${item.mediaId}: $desc")
+                return
+            }
+            if (chosenKbps[item.mediaId] == FALLBACK_KBPS) {
+                AppLog.e("Audio", "Can't play ${item.mediaId} even as Opus: $desc")
+                return
+            }
+            AppLog.w("Audio", "This phone can't decode ${item.mediaId} ($desc); playing it as Opus $FALLBACK_KBPS kbit/s from Navidrome")
+            chosenKbps[item.mediaId] = FALLBACK_KBPS
+            val uri = item.localConfiguration?.uri ?: return
+            player.replaceMediaItem(player.currentMediaItemIndex, item.buildUpon().setUri(Streaming.rewrite(uri, FALLBACK_KBPS)).build())
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {

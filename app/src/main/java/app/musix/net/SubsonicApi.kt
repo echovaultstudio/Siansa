@@ -7,6 +7,7 @@ import app.musix.data.AppSettings
 import app.musix.data.Artist
 import app.musix.data.ArtistDetail
 import app.musix.data.ArtistInfo
+import app.musix.data.ArtistRef
 import app.musix.data.LyricLine
 import app.musix.data.Lyrics
 import app.musix.data.MusicFolder
@@ -259,6 +260,10 @@ class SubsonicApi(
             trackPeak = gain?.flt("trackPeak"),
             albumPeak = gain?.flt("albumPeak"),
             starred = o.str("starred") != null,
+            artists = o.arr("artists").mapNotNull { a ->
+                val artistId = a.str("id") ?: return@mapNotNull null
+                ArtistRef(artistId, a.str("name").orEmpty())
+            },
         )
     }
 

@@ -4,6 +4,25 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.height
@@ -67,13 +86,28 @@ private val tabs = listOf(
     Tab("vibes", "Vibes", Icons.Rounded.GraphicEq),
 )
 
-private val noBottomBar = setOf("player")
+/**
+ * Now playing is a sheet over the current page rather than a page of its own, so it slides up and down
+ * (and follows the finger when dragged down) with the page underneath still there.
+ */
+class PlayerSheet {
+    var isOpen by mutableStateOf(false)
+        private set
+    fun open() { isOpen = true }
+    fun close() { isOpen = false }
+}
+
+val LocalPlayerSheet = staticCompositionLocalOf { PlayerSheet() }
+
+private val SheetEnter = tween<IntOffset>(340, easing = FastOutSlowInEasing)
+private val SheetExit = tween<IntOffset>(260, easing = FastOutLinearInEasing)
 
 @Composable
 fun MusixRoot() {
     val graph = LocalGraph.current
     val nav = rememberNavController()
     val snack = remember { SnackbarHostState() }
+    val sheet = remember { PlayerSheet() }
     val player by graph.player.state.collectAsStateWithLifecycle()
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
@@ -90,17 +124,27 @@ fun MusixRoot() {
     LaunchedEffect(Unit) {
         if (!graph.settings.current.navidromeReady) nav.navigate("settings/connections")
     }
+    LaunchedEffect(sheet.isOpen) {
+        val screen = if (sheet.isOpen) "player" else route
+        if (screen != null) {
+            if (sheet.isOpen) AppLog.i("Nav", "player")
+            AppLog.screen = screen
+        }
+    }
+    // Nothing left to show (playback stopped): close now playing.
+    LaunchedEffect(player.hasMedia) { if (!player.hasMedia) sheet.close() }
 
     AskForNotifications()
 
-    CompositionLocalProvider(LocalNav provides nav, LocalSnack provides snack) {
+    CompositionLocalProvider(LocalNav provides nav, LocalSnack provides snack, LocalPlayerSheet provides sheet) {
+      Box(Modifier.fillMaxSize()) {
         Scaffold(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             snackbarHost = { SnackbarHost(snack) },
             bottomBar = {
-                if (route !in noBottomBar) {
+                run {
                     Column {
-                        if (player.hasMedia) MiniPlayer(player) { nav.navigate("player") { launchSingleTop = true } }
+                        if (player.hasMedia) MiniPlayer(player) { sheet.open() }
                         NavigationBar {
                             tabs.forEach { tab ->
                                 NavigationBarItem(
@@ -122,6 +166,11 @@ fun MusixRoot() {
                 navController = nav,
                 startDestination = "home",
                 modifier = Modifier.padding(padding).consumeWindowInsets(padding),
+                // Quick cross-fades between pages instead of the default slow ones.
+                enterTransition = { fadeIn(tween(220)) },
+                exitTransition = { fadeOut(tween(160)) },
+                popEnterTransition = { fadeIn(tween(220)) },
+                popExitTransition = { fadeOut(tween(160)) },
             ) {
                 composable("home") { HomeScreen(nav) }
                 composable("search") { SearchScreen(nav) }
@@ -139,7 +188,6 @@ fun MusixRoot() {
                 }
                 composable("mood/{text}") { MoodScreen(nav, it.arguments?.getString("text").orEmpty()) }
                 composable("sync") { SyncScreen(nav) }
-                composable("player") { PlayerScreen(nav) }
                 composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("playlist/{id}") { PlaylistScreen(nav, it.arguments?.getString("id").orEmpty()) }
@@ -147,6 +195,16 @@ fun MusixRoot() {
                 composable("selector/{id}") { SelectorEditor(nav, it.arguments?.getString("id").orEmpty()) }
             }
         }
+
+        BackHandler(enabled = sheet.isOpen) { sheet.close() }
+        AnimatedVisibility(
+            visible = sheet.isOpen,
+            enter = slideInVertically(SheetEnter) { it },
+            exit = slideOutVertically(SheetExit) { it },
+        ) {
+            PlayerScreen(nav, onClose = { sheet.close() })
+        }
+      }
     }
 }
 
@@ -164,9 +222,11 @@ fun NavHostController.backToTabTop(route: String) {
     if (!popBackStack(route, inclusive = false)) switchTab(route)
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
     val graph = LocalGraph.current
+    val haptics = LocalHapticFeedback.current
     val song = state.current ?: return
     Surface(tonalElevation = 3.dp) {
         Column {
@@ -187,7 +247,20 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                IconButton(onClick = { graph.player.togglePlay() }) {
+                // Tap to play or pause; press and hold to stop and clear the queue.
+                Box(
+                    Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .combinedClickable(
+                            onClick = { graph.player.togglePlay() },
+                            onLongClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                graph.player.stop()
+                            },
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Icon(if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, "Play or pause")
                 }
                 IconButton(onClick = { graph.player.next() }) {

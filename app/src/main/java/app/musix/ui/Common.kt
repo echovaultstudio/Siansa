@@ -295,6 +295,8 @@ fun SongRow(
 ) {
     val graph = LocalGraph.current
     val nav = LocalNav.current
+    val sheet = LocalPlayerSheet.current
+    val openArtist = rememberArtistOpener(beforeOpen = { sheet.close() })
     val launch = rememberPlayLauncher()
     var menu by remember { mutableStateOf(false) }
     Row(
@@ -362,13 +364,14 @@ fun SongRow(
                 song.albumId?.let { albumId ->
                     DropdownMenuItem(text = { Text("Go to album") }, onClick = {
                         menu = false
+                        sheet.close()
                         nav.navigate("album/$albumId")
                     })
                 }
-                song.artistId?.let { artistId ->
+                if (song.artistId != null || song.artists.isNotEmpty()) {
                     DropdownMenuItem(text = { Text("Go to artist") }, onClick = {
                         menu = false
-                        nav.navigate("artist/$artistId")
+                        openArtist(song)
                     })
                 }
             }

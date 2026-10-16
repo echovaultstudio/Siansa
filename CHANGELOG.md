@@ -3,6 +3,24 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
 
+## 0.0.4beta — 2026-10-16
+
+### Added
+- **ALAC playback**: Apple Lossless songs now play, through FFmpeg decoders built into the app, for formats the phone can't decode itself. They still play lossless and untouched.
+- If a song's format still can't be decoded, it's played as Opus 320 kbit/s converted by Navidrome instead of skipping silently, and the log says which format it was.
+- Swipe the cover in now playing left for the next song and right for the previous one.
+- Press and hold play (in now playing or the mini player) to stop and clear the queue.
+- Songs with several artists ("feat.", "&", …) ask which artist to open, with each artist's photo in a small circle. Works from now playing and from "Go to artist" in song menus.
+- The log records each song's format and which decoder plays it.
+
+### Changed
+- Now playing slides up over the page you were on and slides back down to it. Dragging down moves the player with your finger; let go part-way or flick to close it.
+- The queue closes by swiping down anywhere on it: the list scrolls back to the top first, then the panel follows your finger down.
+- Faster, smoother cross-fades between pages.
+
+### Fixed
+- Some songs (ALAC) didn't play: the player found no decoder for them and loaded the next songs in the queue one after another in the background.
+
 ## 0.0.3beta — 2026-10-16
 
 ### Added
