@@ -2,6 +2,15 @@ package app.musix.ui
 
 import android.os.Build
 import androidx.compose.animation.AnimatedContent
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -93,7 +102,9 @@ fun PlayerScreen(nav: NavController) {
     // Re-read hearts when one changes.
     val heartChanges by graph.favorites.changes.collectAsStateWithLifecycle()
     var view by rememberSaveable { mutableStateOf(PlayerView.ART) }
+    var queueOpen by rememberSaveable { mutableStateOf(false) }
     val song = state.current
+    BackHandler(enabled = queueOpen) { queueOpen = false }
 
     fun openAlbum() {
         val albumId = song?.albumId ?: return
@@ -129,7 +140,26 @@ fun PlayerScreen(nav: NavController) {
                 )
             )
 
-            Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 24.dp)) {
+            // Swipe up anywhere to open the queue; swipe down to close the player.
+            var drag by remember { mutableStateOf(0f) }
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .systemBarsPadding()
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onDragEnd = {
+                                when {
+                                    drag < -120f -> queueOpen = true
+                                    drag > 180f -> nav.popBackStack()
+                                }
+                                drag = 0f
+                            },
+                            onDragCancel = { drag = 0f },
+                        ) { _, dy -> drag += dy }
+                    }
+                    .padding(horizontal = 24.dp),
+            ) {
                 TopRow(song, onClose = { nav.popBackStack() }, onAlbum = ::openAlbum)
 
                 Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
@@ -146,7 +176,7 @@ fun PlayerScreen(nav: NavController) {
                                 RoundedCornerShape(10.dp),
                             )
                             PlayerView.LYRICS -> LyricsView(song)
-                            PlayerView.QUEUE -> QueueView(state)
+                            PlayerView.QUEUE -> Box(Modifier.fillMaxSize())
                         }
                     }
                 }
@@ -160,9 +190,43 @@ fun PlayerScreen(nav: NavController) {
                     ViewToggle(Icons.Rounded.FormatQuote, "Lyrics", view == PlayerView.LYRICS) {
                         view = if (view == PlayerView.LYRICS) PlayerView.ART else PlayerView.LYRICS
                     }
-                    ViewToggle(Icons.AutoMirrored.Rounded.QueueMusic, "Queue", view == PlayerView.QUEUE) {
-                        view = if (view == PlayerView.QUEUE) PlayerView.ART else PlayerView.QUEUE
+                    ViewToggle(Icons.AutoMirrored.Rounded.QueueMusic, "Queue", queueOpen) { queueOpen = true }
+                }
+                UpNextHandle(state) { queueOpen = true }
+            }
+
+            // The queue slides up over the player.
+            AnimatedVisibility(
+                visible = queueOpen,
+                enter = slideInVertically { it } + fadeIn(),
+                exit = slideOutVertically { it } + fadeOut(),
+            ) {
+                var down by remember { mutableStateOf(0f) }
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color(0xF2121212))
+                        .systemBarsPadding(),
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .pointerInput(Unit) {
+                                detectVerticalDragGestures(
+                                    onDragEnd = {
+                                        if (down > 100f) queueOpen = false
+                                        down = 0f
+                                    },
+                                    onDragCancel = { down = 0f },
+                                ) { _, dy -> down += dy }
+                            }
+                            .clickable { queueOpen = false }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(Modifier.size(width = 40.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.5f)))
                     }
+                    QueueView(state)
                 }
             }
         }
@@ -352,7 +416,7 @@ private fun QueueView(state: PlayerState) {
         Text("The queue is empty", color = Color.White.copy(alpha = 0.7f))
         return
     }
-    Column(Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.3f))) {
+    Column(Modifier.fillMaxSize()) {
         Text(
             "Up next · ${state.queue.size - state.index - 1} of ${state.queue.size}",
             style = MaterialTheme.typography.titleSmall,
@@ -365,5 +429,29 @@ private fun QueueView(state: PlayerState) {
                 SongRow(song = song, onClick = { graph.player.skipTo(index) }, highlighted = index == state.index)
             }
         }
+    }
+}
+
+/** "Up next" line at the bottom of the player: tap or swipe up to see the whole queue. */
+@Composable
+private fun UpNextHandle(state: PlayerState, onOpen: () -> Unit) {
+    val next = state.queue.getOrNull(state.index + 1)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onOpen)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Icon(Icons.Rounded.KeyboardArrowUp, null, tint = Color.White.copy(alpha = 0.7f))
+        Text(
+            if (next != null) "Up next: ${next.title} · ${next.artist}" else "Queue",
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.7f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }

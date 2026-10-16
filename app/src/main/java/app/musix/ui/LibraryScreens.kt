@@ -6,6 +6,7 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -179,24 +180,20 @@ fun LikedScreen(nav: NavController) {
             .getOrElse { if (graph.library.isSynced) graph.library.starredSongs() else throw it }
             .filter { graph.favorites.isLiked(it) }
     }
-    Screen(title = "Liked songs", nav = nav) { padding ->
-        Box(Modifier.padding(top = padding.calculateTopPadding())) {
-            LoadBox(songs) { list ->
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-                    item {
-                        Column(Modifier.padding(16.dp)) {
-                            Text("${list.size} songs", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.height(8.dp))
-                            PlayButtons(list)
-                        }
-                    }
-                    itemsIndexed(list, key = { i, s -> "$i-${s.id}" }) { index, song ->
-                        SongRow(song = song, onClick = { graph.player.play(list, index) })
-                    }
-                }
+    val heart = Color(0xFF4B2BD6) to Color(0xFF8FD3C8)
+    CollectionPage(
+        nav = nav,
+        title = "Liked songs",
+        color = lerp(heart.first, Color.Black, 0.2f),
+        songs = songs.valueOrNull(),
+        error = (songs as? Load.Err)?.message,
+        cover = { m ->
+            Box(m.clip(RoundedCornerShape(6.dp)).background(Brush.linearGradient(listOf(heart.first, heart.second))), contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.Favorite, null, tint = Color.White, modifier = Modifier.size(72.dp))
             }
-        }
-    }
+        },
+        header = { CollectionByline(null, null, null, "${songs.valueOrNull()?.size ?: 0} songs") },
+    )
 }
 
 /** A Navidrome playlist, with songs matched to the synced library. */
@@ -208,36 +205,27 @@ fun PlaylistScreen(nav: NavController, id: String) {
         val local = graph.library.songs(remote.songs.map { it.id }).associateBy { it.id }
         remote.copy(songs = remote.songs.map { local[it.id] ?: it })
     }
-    val title = detail.valueOrNull()?.playlist?.name ?: "Playlist"
-    Screen(title = title, nav = nav) { padding ->
-        Box(Modifier.padding(top = padding.calculateTopPadding())) {
-            LoadBox(detail) { d ->
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-                    item {
-                        Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Cover(d.playlist.coverArt, null, Modifier.fillMaxWidth(0.6f).aspectRatio(1f), RoundedCornerShape(12.dp))
-                            Spacer(Modifier.height(12.dp))
-                            Text(d.playlist.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                            d.playlist.comment?.takeIf { it.isNotBlank() }?.let {
-                                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-                            }
-                            Text(
-                                listOfNotNull(d.playlist.owner, "${d.songs.size} songs", formatDuration(d.songs.sumOf { it.durationSec.toLong() }))
-                                    .joinToString(" · "),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            PlayButtons(d.songs)
-                        }
-                    }
-                    itemsIndexed(d.songs, key = { i, s -> "$i-${s.id}" }) { index, song ->
-                        SongRow(song = song, onClick = { graph.player.play(d.songs, index) })
-                    }
-                }
+    val d = detail.valueOrNull()
+    CollectionPage(
+        nav = nav,
+        title = d?.playlist?.name ?: "Playlist",
+        color = rememberCoverColor(d?.playlist?.coverArt),
+        songs = d?.songs,
+        error = (detail as? Load.Err)?.message,
+        cover = { m -> Cover(d?.playlist?.coverArt, null, m, RoundedCornerShape(6.dp)) },
+        header = {
+            d?.playlist?.comment?.takeIf { it.isNotBlank() }?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(6.dp))
             }
-        }
-    }
+            CollectionByline(
+                d?.playlist?.owner,
+                null,
+                null,
+                if (d == null) "" else "Playlist · ${d.songs.size} songs · ${formatDuration(d.songs.sumOf { it.durationSec.toLong() })}",
+            )
+        },
+    )
 }
 
 @Composable
@@ -359,7 +347,7 @@ private fun ArtistList(nav: NavController) {
 
 /**
  * An album from the synced library (all merged copies together), or straight from Navidrome before a
- * sync. The cover fills the top of the screen and blends away behind the track list as it scrolls.
+ * sync, in the Spotify layout with the cover's colour behind the header.
  */
 @Composable
 fun AlbumScreen(nav: NavController, id: String) {
@@ -369,66 +357,34 @@ fun AlbumScreen(nav: NavController, id: String) {
         val songs = album?.let { graph.library.songsOf(it) }.orEmpty()
         if (album != null && songs.isNotEmpty()) AlbumDetail(album, songs) else graph.subsonic.album(id)
     }
-    val listState = rememberLazyListState()
-    val scrolled by remember {
-        derivedStateOf { if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 100_000f }
-    }
-    val hero = LocalConfiguration.current.screenWidthDp.dp.coerceAtMost(440.dp)
     val d = detail.valueOrNull()
-
-    HeroPage(
+    val artistCover by loadState(d?.album?.artistId) { d?.album?.artistId?.let { graph.library.artist(it)?.coverArt } }
+    CollectionPage(
+        nav = nav,
         title = d?.album?.name ?: "Album",
-        heroHeight = hero,
-        scrolledPx = scrolled,
-        onBack = { nav.popBackStack() },
-        image = { modifier -> Cover(d?.album?.coverArt, null, modifier, RectangleShape) },
-    ) { cardModifier ->
-        if (d == null) {
-            Box(Modifier.padding(top = hero)) { LoadBox(detail) { } }
-            return@HeroPage
-        }
-        val multiDisc = d.songs.mapNotNull { it.disc }.distinct().size > 1
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize().then(cardModifier), contentPadding = PaddingValues(bottom = 24.dp)) {
-            item { HeroSpacer(hero) }
-            item {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    Text(d.album.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        d.album.artist,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.clickable(enabled = d.album.artistId != null) {
-                            d.album.artistId?.let { nav.navigate("artist/$it") }
-                        },
-                    )
-                    val total = d.songs.sumOf { it.durationSec.toLong() }
-                    Text(
-                        listOfNotNull(
-                            d.album.category.single,
-                            d.album.year?.toString(),
-                            d.album.genre,
-                            "${d.songs.size} tracks",
-                            formatDuration(total),
-                        ).joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    PlayButtons(d.songs)
-                }
-            }
-            itemsIndexed(d.songs, key = { i, s -> "$i-${s.id}" }) { index, song ->
-                val number = song.track?.let { t -> if (multiDisc && song.disc != null) "${song.disc}.$t" else "$t" }
-                SongRow(
-                    song = song,
-                    onClick = { graph.player.play(d.songs, index) },
-                    leading = number ?: "${index + 1}",
-                    showCover = false,
+        color = rememberCoverColor(d?.album?.coverArt),
+        songs = d?.songs,
+        error = (detail as? Load.Err)?.message,
+        numbered = true,
+        showCovers = false,
+        cover = { m -> Cover(d?.album?.coverArt, null, m, RoundedCornerShape(6.dp)) },
+        header = {
+            if (d != null) {
+                CollectionByline(
+                    d.album.artist,
+                    artistCover.valueOrNull(),
+                    d.album.artistId?.let { artistId -> { nav.navigate("artist/$artistId") } },
+                    listOfNotNull(
+                        d.album.category.single,
+                        d.album.year?.toString(),
+                        d.album.genre,
+                        "${d.songs.size} songs",
+                        formatDuration(d.songs.sumOf { it.durationSec.toLong() }),
+                    ).joinToString(" · "),
                 )
             }
-        }
-    }
+        },
+    )
 }
 
 @Composable
@@ -452,32 +408,22 @@ fun PlayButtons(songs: List<Song>) {
 fun MixScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
     val mix by loadState(id) { graph.mixes.get(id) ?: throw IllegalStateException("This mix is no longer saved") }
-    val title = mix.valueOrNull()?.title ?: "Mix"
-    Screen(title = title, nav = nav) { padding ->
-        Box(Modifier.padding(top = padding.calculateTopPadding())) {
-            LoadBox(mix) { m ->
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-                    item {
-                        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                            CoverMosaic(m, Modifier.size(160.dp).align(Alignment.CenterHorizontally))
-                            Spacer(Modifier.height(12.dp))
-                            Text(m.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                            if (m.description.isNotBlank()) Text(m.description, style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                "Sound search: ${m.query}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 6.dp),
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            PlayButtons(m.songs)
-                        }
-                    }
-                    itemsIndexed(m.songs, key = { i, s -> "$i-${s.id}" }) { index, song ->
-                        SongRow(song = song, onClick = { graph.player.play(m.songs, index) })
-                    }
+    val m = mix.valueOrNull()
+    CollectionPage(
+        nav = nav,
+        title = m?.title ?: "Mix",
+        color = lerp(tileColors(m?.selectorId ?: "mix").first, Color.Black, 0.25f),
+        songs = m?.songs,
+        error = (mix as? Load.Err)?.message,
+        cover = { mod -> if (m != null) CoverMosaic(m, mod) else Box(mod) },
+        header = {
+            if (m != null) {
+                if (m.description.isNotBlank()) {
+                    Text(m.description, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(6.dp))
                 }
+                CollectionByline(null, null, null, "Made for you · ${m.songs.size} songs · sound search: ${m.query}")
             }
-        }
-    }
+        },
+    )
 }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,7 +27,10 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -89,6 +93,18 @@ fun ArtistScreen(nav: NavController, id: String) {
         heroHeight = HERO,
         scrolledPx = scrolled,
         onBack = { nav.popBackStack() },
+        color = rememberCoverColor(p?.artist?.coverArt ?: p?.albums?.firstOrNull()?.coverArt),
+        overlay = {
+            Text(
+                p?.artist?.name.orEmpty(),
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Black,
+                color = androidx.compose.ui.graphics.Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            )
+        },
         image = { modifier ->
             val photo = artistInfo?.imageUrl ?: p?.artist?.imageUrl
             if (photo != null) {
@@ -114,7 +130,6 @@ fun ArtistScreen(nav: NavController, id: String) {
             full { HeroSpacer(HERO) }
             full {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    Text(p.artist.name, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Black)
                     Text(
                         listOfNotNull(
                             "${p.albums.size} ${if (p.albums.size == 1) "release" else "releases"}",
@@ -124,12 +139,28 @@ fun ArtistScreen(nav: NavController, id: String) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        if (p.songs.isNotEmpty()) PlayButtons(p.songs)
-                        OutlinedButton(onClick = { launch("${p.artist.name} radio") { graph.radios.artist(p.artist) } }) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(onClick = {
+                            launch.progressive("${p.artist.name} radio", { graph.radios.artistStart(p.artist) }) {
+                                graph.radios.artistMore(p.artist, it)
+                            }
+                        }) {
                             Icon(Icons.Rounded.Radio, null)
                             Spacer(Modifier.width(4.dp))
                             Text("Radio")
+                        }
+                        Spacer(Modifier.weight(1f))
+                        if (p.songs.isNotEmpty()) {
+                            IconButton(onClick = { graph.player.play(p.songs, shuffle = true) }) {
+                                Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Box(
+                                Modifier.size(56.dp).clip(CircleShape).background(Accent).clickable { graph.player.play(p.songs) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(Icons.Rounded.PlayArrow, "Play", tint = androidx.compose.ui.graphics.Color.Black, modifier = Modifier.size(32.dp))
+                            }
                         }
                     }
                 }

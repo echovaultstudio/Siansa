@@ -182,6 +182,60 @@ class MixGenerator(private val graph: AppGraph) {
         return Plan(title, query, description.ifBlank { selector.guidance }, ai = true)
     }
 
+    /** A playlist made on the spot from a description of how the listener feels. */
+    data class MoodResult(val title: String, val description: String, val query: String, val songs: List<Song>, val ai: Boolean)
+
+    suspend fun moodPlaylist(mood: String, size: Int = 50): MoodResult {
+        val text = mood.trim()
+        if (text.length < 3) throw MixException("Describe your mood in a few words")
+        if (!graph.settings.current.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
+        var plan = Plan(text.replaceFirstChar { it.uppercase() }, text, "From your description", ai = false)
+        if (graph.settings.current.aiReady) {
+            runCatching { aiMoodPlan(text) }
+                .onSuccess { plan = it }
+                .onFailure { AppLog.w("Mood", "AI couldn't interpret the mood, searching the words directly: ${it.message}") }
+        }
+        AppLog.i("Mood", "\"$text\" → \"${plan.title}\" · search \"${plan.query}\" · ai=${plan.ai}")
+        val hits = graph.audioMuse.textSearch(plan.query, size * 3)
+        if (hits.isEmpty()) throw MixException("AudioMuse found nothing for that mood")
+        val ranked = hits
+            .map { it to it.similarity * (0.85 + Random.nextDouble() * 0.15) }
+            .sortedByDescending { it.second }
+            .map { it.first }
+        val perArtist = HashMap<String, Int>()
+        val picked = ranked.filter { hit ->
+            val n = perArtist[hit.artist.lowercase()] ?: 0
+            if (n >= 3) false else { perArtist[hit.artist.lowercase()] = n + 1; true }
+        }.take(size)
+        val songs = spreadArtists(resolve(picked.map { it.id }))
+        return MoodResult(plan.title, plan.description, plan.query, songs, plan.ai)
+    }
+
+    private suspend fun aiMoodPlan(mood: String): Plan {
+        val now = LocalDateTime.now()
+        val concepts = runCatching { graph.audioMuse.concepts() }.getOrDefault(emptyList()).take(80)
+        val recent = graph.history.recent(15).map { "${it.artist} – ${it.title}" }
+        val day = now.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
+        val user = buildString {
+            appendLine("The listener describes their mood or wish: \"$mood\"")
+            appendLine("Make a playlist that fits it. Title it from their words.")
+            appendLine("Now: $day %02d:%02d".format(now.hour, now.minute))
+            appendLine("Listening on: ${describeOutput(graph.app)}")
+            if (recent.isNotEmpty()) appendLine("Recently played: ${recent.joinToString("; ")}")
+            if (concepts.isNotEmpty()) appendLine("Sound concepts the search understands well: ${concepts.joinToString(", ")}")
+        }
+        val raw = graph.openRouter.complete(SYSTEM_PROMPT, user)
+        val start = raw.indexOf('{')
+        val end = raw.lastIndexOf('}')
+        if (start < 0 || end <= start) throw MixException("The AI didn't answer with JSON")
+        val obj = AppJson.parseToJsonElement(raw.substring(start, end + 1)).jsonObject
+        val title = obj.str("title")?.trim()?.trim('"')?.take(60).orEmpty()
+        val query = obj.str("query")?.trim()?.take(300).orEmpty()
+        val description = obj.str("description")?.trim()?.take(200).orEmpty()
+        if (title.isEmpty() || query.length < 3) throw MixException("The AI's answer was incomplete")
+        return Plan(title, query, description.ifBlank { "Made from your mood" }, ai = true)
+    }
+
     /** Songs from the synced library where possible, otherwise fetched from Navidrome. */
     private suspend fun resolve(ids: List<String>): List<Song> = coroutineScope {
         val local = graph.library.songs(ids).associateBy { it.id }

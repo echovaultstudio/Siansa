@@ -2,6 +2,8 @@ package app.musix.ui
 
 import android.content.Context
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Refresh
@@ -321,6 +324,21 @@ fun LogsScreen(nav: NavController) {
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     var refresh by remember { mutableIntStateOf(0) }
     val lines by loadState(refresh to settings.logging) { withContext(Dispatchers.IO) { AppLog.tail(400).reversed() } }
+    val scope = rememberCoroutineScope()
+    val snack = LocalSnack.current
+    // Lets you pick where to save (e.g. Downloads), then writes the log there.
+    val saver = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    val file = AppLog.export(File(context.cacheDir, "logs/musix-logs.txt"))
+                    context.contentResolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } }
+                }.isSuccess
+            }
+            snack.showSnackbar(if (ok) "Logs saved" else "Couldn't save the logs")
+        }
+    }
 
     Screen(
         title = "Logs",
@@ -340,14 +358,23 @@ fun LogsScreen(nav: NavController) {
                         refresh++
                     }
                     Hint(
-                        "Records what the app does (server requests, sync, mixes, playback, errors and crashes) so problems can be traced. " +
+                        "Save logs writes a text file (choose Downloads), which you can then upload anywhere. " +
+                            "Records what the app does (server requests, sync, mixes, playback, errors and crashes) so problems can be traced. " +
                             "Passwords, tokens and API keys are removed. Nothing is recorded while this is off, and nothing leaves the phone unless you share it.",
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { shareLogs(context) }) {
+                        Button(onClick = {
+                            val stamp = java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.ROOT).format(Date())
+                            saver.launch("musix-logs-$stamp.txt")
+                        }) {
+                            Icon(Icons.Rounded.Download, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Save logs")
+                        }
+                        OutlinedButton(onClick = { shareLogs(context) }) {
                             Icon(Icons.Rounded.Share, null)
                             Spacer(Modifier.width(6.dp))
-                            Text("Share logs")
+                            Text("Share")
                         }
                         OutlinedButton(onClick = {
                             AppLog.clear()
