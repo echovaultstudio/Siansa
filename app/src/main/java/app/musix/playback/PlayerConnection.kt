@@ -115,6 +115,12 @@ class PlayerConnection(
         }
     }
 
+    fun addAll(songs: List<Song>) {
+        if (songs.isEmpty()) return
+        SongRegistry.register(songs)
+        withController { c -> c.addMediaItems(songs.map { it.toMediaItem(api) }) }
+    }
+
     fun togglePlay() = withController { c ->
         if (c.isPlaying) {
             c.pause()

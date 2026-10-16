@@ -1,6 +1,5 @@
 package app.musix.ui
 
-import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -22,10 +21,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -39,13 +36,12 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.min
 
 /**
- * A page whose picture fills the top of the screen, up behind the status bar. As the page scrolls,
- * the content card slides up over the picture while the picture drifts, fades and blurs behind it,
- * and a title bar fades in once the picture is mostly covered.
+ * A page whose picture fills the top of the screen, up behind the status bar, as on a Spotify
+ * artist page. Scrolling slides the page up while the picture drifts at half speed, zooms gently
+ * and fades out smoothly into [color]; the title bar fills with [color] once the picture is gone.
  *
- * [scrolledPx] is how far the first item has scrolled (from the list or grid state);
- * [content] gets a modifier that draws the card behind the scrolling content and must start with a
- * [heroHeight] - [overlap] spacer item.
+ * [scrolledPx] is how far the first item has scrolled; the list or grid must start with [HeroSpacer]
+ * and use the given modifier, which paints the page behind its items.
  */
 @Composable
 fun HeroPage(
@@ -53,74 +49,74 @@ fun HeroPage(
     heroHeight: Dp,
     scrolledPx: Float,
     onBack: () -> Unit,
+    color: Color,
     image: @Composable BoxScope.(Modifier) -> Unit,
-    overlap: Dp = 28.dp,
-    content: @Composable (cardModifier: Modifier) -> Unit,
+    overlay: @Composable BoxScope.() -> Unit = {},
+    content: @Composable (pageModifier: Modifier) -> Unit,
 ) {
     val density = LocalDensity.current
     val heroPx = with(density) { heroHeight.toPx() }
-    val cardTopPx = with(density) { (heroHeight - overlap).toPx() }
-    val radiusPx = with(density) { overlap.toPx() }
-    val progress = (scrolledPx / cardTopPx).coerceIn(0f, 1f)
+    val progress = (scrolledPx / heroPx).coerceIn(0f, 1f)
     val surface = MaterialTheme.colorScheme.surface
 
     Box(Modifier.fillMaxSize().background(surface)) {
-        // The picture: drifts up at half speed, fades and blurs as the card covers it.
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(heroHeight)
+                .background(color)
                 .graphicsLayer {
                     translationY = -min(scrolledPx, heroPx) * 0.5f
-                    alpha = 1f - progress * 0.7f
-                    val scale = 1f + progress * 0.08f
+                    // Eased fade: holds while you start scrolling, then melts away.
+                    alpha = 1f - progress * progress * (3f - 2f * progress)
+                    val scale = 1f + progress * 0.06f
                     scaleX = scale
                     scaleY = scale
-                }
-                .then(if (Build.VERSION.SDK_INT >= 31 && progress > 0.02f) Modifier.blur((progress * 24).dp) else Modifier),
+                },
         ) {
             image(Modifier.fillMaxSize())
-            // Darkens the bottom edge so the card's rounded top reads clearly.
+            // A long, soft fade from the picture into the page colour.
             Box(
                 Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(0.55f to Color.Transparent, 1f to surface.copy(alpha = 0.85f))
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.25f),
+                        0.35f to Color.Transparent,
+                        0.65f to color.copy(alpha = 0.35f),
+                        1f to surface,
+                    )
                 )
             )
+            Box(Modifier.align(Alignment.BottomStart)) { overlay() }
         }
 
-        // The card behind the scrolling content, drawn once so items sit on one continuous surface.
-        val cardModifier = Modifier.drawBehind {
-            val top = (cardTopPx - scrolledPx).coerceAtLeast(0f)
-            val r = if (top > 0f) radiusPx else 0f
-            drawRoundRect(surface, topLeft = Offset(0f, top), size = Size(size.width, size.height - top + radiusPx), cornerRadius = CornerRadius(r, r))
+        // Paints the page behind the scrolling content, starting where the picture ends.
+        val pageModifier = Modifier.drawBehind {
+            val top = (heroPx - scrolledPx).coerceAtLeast(0f)
+            drawRect(surface, topLeft = Offset(0f, top), size = Size(size.width, size.height - top))
         }
-        content(cardModifier)
+        content(pageModifier)
 
-        // Title bar: transparent over the picture, solid once the picture is covered.
-        val barAlpha = ((scrolledPx - cardTopPx * 0.6f) / (cardTopPx * 0.4f)).coerceIn(0f, 1f)
+        val barAlpha = ((scrolledPx - heroPx * 0.65f) / (heroPx * 0.25f)).coerceIn(0f, 1f)
         Row(
             Modifier
                 .fillMaxWidth()
-                .background(surface.copy(alpha = barAlpha))
+                .background(color.copy(alpha = barAlpha))
                 .statusBarsPadding()
                 .padding(horizontal = 4.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(
                 onClick = onBack,
-                modifier = Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.35f * (1f - barAlpha))),
+                modifier = Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.3f * (1f - barAlpha))),
             ) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.ArrowBack,
-                    "Back",
-                    tint = if (barAlpha > 0.5f) MaterialTheme.colorScheme.onSurface else Color.White,
-                )
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White)
             }
             Spacer(Modifier.width(8.dp))
             Text(
                 title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.graphicsLayer { alpha = barAlpha },
@@ -131,6 +127,6 @@ fun HeroPage(
 
 /** The spacer every hero page's list or grid starts with. */
 @Composable
-fun HeroSpacer(heroHeight: Dp, overlap: Dp = 28.dp) {
-    Spacer(Modifier.fillMaxWidth().height(heroHeight - overlap))
+fun HeroSpacer(heroHeight: Dp) {
+    Spacer(Modifier.fillMaxWidth().height(heroHeight))
 }

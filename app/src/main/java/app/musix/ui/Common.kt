@@ -60,6 +60,7 @@ import app.musix.log.AppLog
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -125,31 +126,63 @@ fun rememberPosition(): State<Long> {
 
 /**
  * Starts playback of a list that takes a moment to build (a radio), with a short note while it loads
- * and a readable message if it fails.
+ * and a readable message if it fails. [PlayLauncher.progressive] starts at once with a quick list
+ * and adds the rest to the queue when it arrives.
  */
-@Composable
-fun rememberPlayLauncher(): (label: String, build: suspend () -> List<Song>) -> Unit {
-    val graph = LocalGraph.current
-    val snack = LocalSnack.current
-    val scope = rememberCoroutineScope()
-    return remember(graph, snack, scope) {
-        { label, build ->
-            scope.launch {
-                val note = launch { snack.showSnackbar("Starting $label…") }
-                try {
-                    val songs = build()
-                    note.cancel()
-                    graph.player.play(songs)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    note.cancel()
-                    AppLog.w("Radio", "$label failed: ${e.message}")
-                    snack.showSnackbar(e.message ?: "Couldn't start $label")
-                }
+class PlayLauncher(
+    private val graph: AppGraph,
+    private val snack: SnackbarHostState,
+    private val scope: CoroutineScope,
+) {
+    operator fun invoke(label: String, build: suspend () -> List<Song>) {
+        scope.launch {
+            val note = launch { snack.showSnackbar("Starting $label…") }
+            try {
+                val songs = build()
+                note.cancel()
+                graph.player.play(songs)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                note.cancel()
+                AppLog.w("Radio", "$label failed: ${e.message}")
+                snack.showSnackbar(e.message ?: "Couldn't start $label")
             }
         }
     }
+
+    fun progressive(label: String, first: suspend () -> List<Song>, more: suspend (List<Song>) -> List<Song>) {
+        scope.launch {
+            val started = System.currentTimeMillis()
+            val firstSongs = try {
+                first()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                snack.showSnackbar(e.message ?: "Couldn't start $label")
+                return@launch
+            }
+            if (firstSongs.isNotEmpty()) graph.player.play(firstSongs)
+            AppLog.i("Radio", "$label started with ${firstSongs.size} songs in ${System.currentTimeMillis() - started}ms")
+            val rest = runCatching { more(firstSongs) }
+                .onFailure { AppLog.w("Radio", "$label: more songs failed: ${it.message}") }
+                .getOrDefault(emptyList())
+            AppLog.i("Radio", "$label added ${rest.size} more after ${System.currentTimeMillis() - started}ms")
+            if (firstSongs.isEmpty()) {
+                if (rest.isNotEmpty()) graph.player.play(rest) else snack.showSnackbar("Nothing found for $label")
+            } else {
+                graph.player.addAll(rest)
+            }
+        }
+    }
+}
+
+@Composable
+fun rememberPlayLauncher(): PlayLauncher {
+    val graph = LocalGraph.current
+    val snack = LocalSnack.current
+    val scope = rememberCoroutineScope()
+    return remember(graph, snack, scope) { PlayLauncher(graph, snack, scope) }
 }
 
 /**
@@ -306,7 +339,7 @@ fun SongRow(
                 })
                 DropdownMenuItem(text = { Text("Start song radio") }, onClick = {
                     menu = false
-                    launch("song radio") { graph.radios.song(song) }
+                    launch.progressive("song radio", { listOf(song) }) { graph.radios.songMore(song) }
                 })
                 song.albumId?.let { albumId ->
                     DropdownMenuItem(text = { Text("Go to album") }, onClick = {

@@ -39,25 +39,24 @@ class Radios(private val graph: AppGraph) {
     }
 
     /** Songs similar to [song], from Navidrome (sonic matches when the AudioMuse plugin is installed). */
-    suspend fun song(song: Song): List<Song> {
+    suspend fun songMore(song: Song): List<Song> {
         AppLog.i("Radio", "Song radio ${song.id} ${song.title}")
-        val similar = runCatching { graph.subsonic.similarSongs(song.id, 60) }
-            .onFailure { AppLog.w("Radio", "getSimilarSongs failed", it) }
-            .getOrDefault(emptyList())
-        val list = listOf(song) + local(similar).filter { it.id != song.id }
-        if (list.size < 2) throw MixException("Navidrome has no similar songs for this one")
-        return list
+        val similar = graph.subsonic.similarSongs(song.id, 60)
+        return local(similar).filter { it.id != song.id }
     }
 
-    suspend fun artist(artist: Artist): List<Song> {
+    /** A few of the artist's own songs, from the phone, so the radio starts at once. */
+    suspend fun artistStart(artist: Artist): List<Song> = graph.library.songsOf(artist).shuffled().take(6)
+
+    /** Songs by the artist and similar artists from Navidrome, added after the start. */
+    suspend fun artistMore(artist: Artist, already: List<Song>): List<Song> {
         AppLog.i("Radio", "Artist radio ${artist.id} ${artist.name}")
+        val have = already.map { it.id }.toSet()
         val similar = runCatching { graph.subsonic.artistRadio(artist.id, 60) }
             .onFailure { AppLog.w("Radio", "getSimilarSongs2 failed", it) }
             .getOrDefault(emptyList())
-        if (similar.size >= 5) return varied(local(similar), 60)
-        val own = graph.library.songsOf(artist)
-        if (own.isEmpty()) throw MixException("No songs found for ${artist.name}")
-        return own.shuffled().take(60)
+        if (similar.isNotEmpty()) return varied(local(similar), 60).filter { it.id !in have }
+        return graph.library.songsOf(artist).shuffled().filter { it.id !in have }.take(60)
     }
 
     /** The synced copies of songs from the server, which carry hearts and ReplayGain as stored. */

@@ -181,6 +181,8 @@ fun HomeScreen(nav: NavController) {
             }
         }
 
+        item { MoodBox(nav, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+
         if (loaded && !synced) {
             item { Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { SyncPrompt(nav) } }
         }
@@ -209,7 +211,7 @@ fun HomeScreen(nav: NavController) {
                     colors = Color(radio.colors.first) to Color(radio.colors.second),
                     size = 140.dp,
                     caption = "Sound radio",
-                    onClick = { launch("${radio.name} radio") { graph.radios.mood(radio) } },
+                    onClick = { nav.openMoodRadio(radio.id) },
                 )
             }
         }
@@ -232,7 +234,9 @@ fun HomeScreen(nav: NavController) {
                     name = "${artist.name} radio",
                     subtitle = "With similar artists",
                     coverArt = artist.coverArt,
-                    onClick = { launch("${artist.name} radio") { graph.radios.artist(artist) } },
+                    onClick = {
+                        launch.progressive("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
+                    },
                     modifier = Modifier.width(140.dp),
                     round = true,
                 )
@@ -252,7 +256,7 @@ fun HomeScreen(nav: NavController) {
                     colors = tileColors(genre.name),
                     size = 130.dp,
                     caption = "${genre.songCount} songs",
-                    onClick = { launch("${genre.name} radio") { graph.radios.genre(genre.name) } },
+                    onClick = { nav.openGenreRadio(genre.name) },
                 )
             }
         }

@@ -129,6 +129,10 @@ fun MusixRoot() {
                 composable("settings/logs") { LogsScreen(nav) }
                 composable("settings/scrobbling") { ScrobblingScreen(nav) }
                 composable("liked") { LikedScreen(nav) }
+                composable("radio/{kind}/{key}") {
+                    RadioScreen(nav, it.arguments?.getString("kind").orEmpty(), it.arguments?.getString("key").orEmpty())
+                }
+                composable("mood/{text}") { MoodScreen(nav, it.arguments?.getString("text").orEmpty()) }
                 composable("sync") { SyncScreen(nav) }
                 composable("player") { PlayerScreen(nav) }
                 composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }

@@ -138,7 +138,7 @@ fun SearchScreen(nav: NavController) {
             error?.let { ErrorText(it) }
             when {
                 soundMode -> SoundResults(soundSongs)
-                query.trim().length < 2 -> BrowseGrid()
+                query.trim().length < 2 -> BrowseGrid(nav)
                 else -> LibraryResults(results, nav)
             }
         }
@@ -221,9 +221,8 @@ private fun LibraryResults(results: SearchResults?, nav: NavController) {
 
 /** With an empty search box: radios and genres to browse, like a streaming app's Browse page. */
 @Composable
-private fun BrowseGrid() {
+private fun BrowseGrid(nav: NavController) {
     val graph = LocalGraph.current
-    val launch = rememberPlayLauncher()
     val version by graph.library.version.collectAsStateWithLifecycle()
     val genreList by loadState(version to "browse-genres") { if (graph.library.isSynced) graph.library.genres(30) else emptyList() }
     val genres = genreList.valueOrNull().orEmpty()
@@ -234,22 +233,19 @@ private fun BrowseGrid() {
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
+        item(span = { GridItemSpan(maxLineSpan) }) { MoodBox(nav, Modifier.padding(top = 4.dp)) }
         item(span = { GridItemSpan(maxLineSpan) }) {
             Text("Radios", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
         }
         items(moodRadios, key = { "mood-" + it.id }) { radio ->
-            BrowseTile(radio.name, Color(radio.colors.first) to Color(radio.colors.second)) {
-                launch("${radio.name} radio") { graph.radios.mood(radio) }
-            }
+            BrowseTile(radio.name, Color(radio.colors.first) to Color(radio.colors.second)) { nav.openMoodRadio(radio.id) }
         }
         if (genres.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Text("Genres", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
             }
             items(genres, key = { "genre-" + it.name }) { genre ->
-                BrowseTile(genre.name, tileColors(genre.name)) {
-                    launch("${genre.name} radio") { graph.radios.genre(genre.name) }
-                }
+                BrowseTile(genre.name, tileColors(genre.name)) { nav.openGenreRadio(genre.name) }
             }
         }
     }
