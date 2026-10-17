@@ -10,6 +10,8 @@ import app.musix.data.ArtistInfo
 import app.musix.data.ArtistRef
 import app.musix.data.LyricLine
 import app.musix.data.Lyrics
+import app.musix.log.AppLog
+import app.musix.data.LyricsFormats
 import app.musix.data.MusicFolder
 import app.musix.data.Playlist
 import app.musix.data.PlaylistDetail
@@ -224,25 +226,35 @@ class SubsonicApi(
 
     /** Synced lyrics from the OpenSubsonic extension when available, plain lyrics otherwise. */
     suspend fun lyrics(song: Song): Lyrics? {
+        // Navidrome reads lyrics from the file's tags and from .lrc / .txt files next to it, sometimes several
+        // (languages, or both synced and plain). Each is read in whatever format it's in (LRC, enhanced LRC
+        // with word times, TTML, SRT…), and the most detailed one is used.
         val structured = runCatching { call("getLyricsBySongId", mapOf("id" to song.id)) }.getOrNull()
         val sets = structured?.obj("lyricsList")?.arr("structuredLyrics").orEmpty()
-        val pick = sets.firstOrNull { it.bool("synced") == true } ?: sets.firstOrNull()
-        if (pick != null) {
-            val synced = pick.bool("synced") == true
-            val offset = pick.long("offset") ?: 0L
-            val lines = pick.arr("line").map { line ->
+        val options = sets.map { set ->
+            val synced = set.bool("synced") == true
+            val offset = set.long("offset") ?: 0L
+            val lines = set.arr("line").map { line ->
                 LyricLine(
                     startMs = if (synced) line.long("start")?.let { it + offset } else null,
                     text = line.str("value").orEmpty(),
                 )
             }
-            if (lines.any { it.text.isNotBlank() }) return Lyrics(synced, lines)
+            set.str("lang") to LyricsFormats.normalize(Lyrics(synced, lines))
+        }
+        LyricsFormats.best(options, java.util.Locale.getDefault().language)?.let { picked ->
+            AppLog.d("Lyrics", "Song ${song.id}: ${options.size} lyrics, using " + when {
+                picked.wordTimed -> "word-timed"
+                picked.synced -> "synced"
+                else -> "plain"
+            })
+            return picked
         }
         val plain = runCatching {
             call("getLyrics", mapOf("artist" to song.artist, "title" to song.title))
         }.getOrNull()?.obj("lyrics")?.str("value")
         if (plain.isNullOrBlank()) return null
-        return Lyrics(false, plain.lines().map { LyricLine(null, it) })
+        return LyricsFormats.normalize(Lyrics(false, plain.lines().map { LyricLine(null, it) }))
     }
 
     /** submission=false marks "now playing"; true records a finished play, at [timeMs] when given. */
