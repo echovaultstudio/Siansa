@@ -50,6 +50,8 @@ data class AppSettings(
     val downloadWifiOnly: Boolean = true,
     /** Most space downloads may use, in MB; 0 = no limit. */
     val downloadLimitMb: Int = 0,
+    /** Opus kbit/s for downloads, or 0 for the original file. */
+    val downloadKbps: Int = 0,
     val homeOrder: List<HomeSection> = HomeSection.default,
     val homeHidden: Set<HomeSection> = emptySet(),
 ) {
@@ -157,6 +159,7 @@ class SettingsRepository(context: Context) {
         songCacheMb = prefs.getInt("song_cache_mb", 2048),
         downloadWifiOnly = prefs.getBoolean("download_wifi_only", true),
         downloadLimitMb = prefs.getInt("download_limit_mb", 0),
+        downloadKbps = prefs.getInt("download_kbps", 0),
         homeOrder = HomeSection.parse(prefs.getString("home_order", null)),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
     )
@@ -234,9 +237,13 @@ class SettingsRepository(context: Context) {
         _state.value = _state.value.copy(coverDownload = on, coverDownloadAnyWifi = anyWifi)
     }
 
-    fun setDownloads(wifiOnly: Boolean = _state.value.downloadWifiOnly, limitMb: Int = _state.value.downloadLimitMb) {
-        prefs.edit().putBoolean("download_wifi_only", wifiOnly).putInt("download_limit_mb", limitMb).apply()
-        _state.value = _state.value.copy(downloadWifiOnly = wifiOnly, downloadLimitMb = limitMb)
+    fun setDownloads(
+        wifiOnly: Boolean = _state.value.downloadWifiOnly,
+        limitMb: Int = _state.value.downloadLimitMb,
+        kbps: Int = _state.value.downloadKbps,
+    ) {
+        prefs.edit().putBoolean("download_wifi_only", wifiOnly).putInt("download_limit_mb", limitMb).putInt("download_kbps", kbps).apply()
+        _state.value = _state.value.copy(downloadWifiOnly = wifiOnly, downloadLimitMb = limitMb, downloadKbps = kbps)
     }
 
     fun setAnimatedCovers(on: Boolean) {
