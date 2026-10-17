@@ -3,6 +3,20 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.0.28beta — 2026-10-17
+
+### Fixed
+- **Mixes, mood playlists, sound search and radios played songs from libraries you had unchecked.** When you
+  sync only some Navidrome libraries (Settings → Library sync), these now only use songs from those libraries.
+- **Your listening showed songs you don't have.** Top songs and top albums now only list music that's in your library, so plays from other apps and services (counted by Koito) no longer appear there. The list still shows up to 10 by filling in from further down.
+- **The Liked songs tile at the top of Home was blank.** It now shows the heart, like in Your library.
+
+### Added
+- **Song path.** Choose "Song path…" in any song's menu, pick a second song and a length (10, 20 or 30 songs), and Musix builds a queue that moves smoothly from the sound of one song to the other. Swap to make the chosen song the end instead of the start. Play it straight away or save it as a playlist on Navidrome. Needs AudioMuse.
+
+### Changed
+- **Disc names are easier to spot.** On albums with several discs, each disc's name now sits on a band in the album's colour (darker in dark mode, a soft tint in light mode), so it stands out in long track lists.
+
 ## 0.0.27beta — 2026-10-17
 
 ### Fixed
