@@ -94,6 +94,25 @@ fun reportWindow(range: ReportRange, today: LocalDate): ReportWindow {
     }
 }
 
+/** How many top songs and albums are asked from Koito, to still have 10 after leaving out ones not in the library. */
+private const val TOP_FETCH = 40
+
+/**
+ * The first [limit] of [items] (in order) that [find] matches in the library, each with its match.
+ * Stops searching once it has enough. Items with no match are left out and logged as a count.
+ */
+internal suspend fun <T, R : Any> keepInLibrary(items: List<T>, limit: Int, find: suspend (T) -> R?): List<Pair<T, R>> {
+    val kept = ArrayList<Pair<T, R>>(limit)
+    var skipped = 0
+    for (item in items) {
+        if (kept.size >= limit) break
+        val match = find(item)
+        if (match != null) kept += item to match else skipped++
+    }
+    if (skipped > 0) AppLog.d("Report", "Left out $skipped not in the library")
+    return kept
+}
+
 class Insights(private val graph: AppGraph) {
     private val zone: ZoneId get() = ZoneId.systemDefault()
 
@@ -196,8 +215,11 @@ class Insights(private val graph: AppGraph) {
                 artistCount = remote.totals.artists, trackCount = remote.totals.tracks,
                 newArtists = remote.totals.newArtists,
                 topArtists = remote.artists.take(10).map { RankedArtist(it.artist, it.count, findArtist(it.artist)) },
-                topTracks = remote.tracks.take(10).map { RankedTrack(it.title.orEmpty(), it.artist, it.count, matchSong(it.artist, it.title.orEmpty())) },
-                topAlbums = remote.albums.take(10).map { RankedAlbum(it.title.orEmpty(), it.artist, it.count, matchAlbum(it.artist, it.title.orEmpty())) },
+                // Koito also counts plays from other apps and services: only songs and albums in your library are shown.
+                topTracks = keepInLibrary(remote.tracks, 10) { matchSong(it.artist, it.title.orEmpty()) }
+                    .map { (p, song) -> RankedTrack(p.title.orEmpty(), p.artist, p.count, song) },
+                topAlbums = keepInLibrary(remote.albums, 10) { matchAlbum(it.artist, it.title.orEmpty()) }
+                    .map { (p, album) -> RankedAlbum(p.title.orEmpty(), p.artist, p.count, album) },
                 byHour = hours(remote.times.map { it * 1000 }),
                 rising = rising(remote.artists, remote.previous).map { RankedArtist(it.artist, it.count, findArtist(it.artist)) },
                 fading = fading(remote.artists, remote.previous),
@@ -224,8 +246,9 @@ class Insights(private val graph: AppGraph) {
         val api = graph.historyApi
         val totals = async { api.koitoTotals(url, token, from, to) }
         val artists = async { api.koitoTop(url, token, "artists", from, to, 40) }
-        val tracks = async { api.koitoTop(url, token, "tracks", from, to, 10) }
-        val albums = async { api.koitoTop(url, token, "albums", from, to, 10) }
+        // More than the 10 shown, as the ones not in your library are left out.
+        val tracks = async { api.koitoTop(url, token, "tracks", from, to, TOP_FETCH) }
+        val albums = async { api.koitoTop(url, token, "albums", from, to, TOP_FETCH) }
         val previous = async { api.koitoTop(url, token, "artists", prev, from, 40) }
         val times = async { api.koitoListenTimes(url, token, from, to) }
         KoitoData(totals.await(), artists.await(), tracks.await(), albums.await(), previous.await(), times.await())
@@ -241,7 +264,8 @@ class Insights(private val graph: AppGraph) {
             .map { (_, list) -> Played(list.first().artist, null, list.size.toLong()) }.sortedByDescending { it.count }
         val prevArtists = before.groupBy { normalizeKey(it.artist) }
             .map { (_, list) -> Played(list.first().artist, null, list.size.toLong()) }.sortedByDescending { it.count }
-        val tracks = plays.groupBy { it.id }.entries.sortedByDescending { it.value.size }.take(10)
+        // Songs since removed from the library are left out.
+        val tracks = plays.groupBy { it.id }.entries.filter { songs[it.key] != null }.sortedByDescending { it.value.size }.take(10)
         val albums = plays.mapNotNull { p -> songs[p.id]?.albumId }.groupingBy { it }.eachCount()
             .entries.sortedByDescending { it.value }.take(10)
         val minutes = plays.sumOf { p -> p.listenedMs ?: ((songs[p.id]?.durationSec ?: 210) * 1000L) } / 60_000
