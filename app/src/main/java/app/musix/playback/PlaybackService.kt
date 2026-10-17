@@ -8,6 +8,9 @@ import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.cast.RemoteCastPlayer
 import androidx.media3.cast.SessionAvailabilityListener
+import app.musix.playback.dlna.Dlna
+import app.musix.playback.dlna.DlnaDevice
+import app.musix.playback.dlna.DlnaPlayer
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -61,6 +64,7 @@ class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
     private lateinit var exo: ExoPlayer
     private var castPlayer: RemoteCastPlayer? = null
+    private var dlnaPlayer: DlnaPlayer? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var graph: AppGraph
     private var events: Events? = null
@@ -120,10 +124,21 @@ class PlaybackService : MediaSessionService() {
             val remote = RemoteCastPlayer.Builder(this).setMediaItemConverter(CastItems(graph.subsonic)).build()
             castPlayer = remote
             remote.setSessionAvailabilityListener(object : SessionAvailabilityListener {
-                override fun onCastSessionAvailable() = moveTo(remote)
-                override fun onCastSessionUnavailable() = moveTo(exo)
+                override fun onCastSessionAvailable() {
+                    moveTo(remote)
+                    // Only one place plays at a time: a TV picked through DLNA lets go.
+                    Dlna.select(null)
+                }
+                override fun onCastSessionUnavailable() {
+                    if (session?.player === remote) moveTo(exo)
+                }
             })
             if (remote.isCastSessionAvailable) moveTo(remote)
+        }
+
+        // DLNA (TVs and speakers without Chromecast): follows the device picked in the app.
+        scope.launch(Dispatchers.Main) {
+            Dlna.selected.collect { device -> onDlnaDevice(device) }
         }
 
         // A new quality in Settings → Playback applies straight away: the current song is loaded again at it.
@@ -308,6 +323,24 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    /** Moves the music to the DLNA [device] picked in the app, or back to the phone when it's null. */
+    private fun onDlnaDevice(device: DlnaDevice?) {
+        val session = session ?: return
+        val old = dlnaPlayer
+        if (device != null) {
+            if (old?.deviceId == device.id && session.player === old) return
+            // Casting to a Chromecast stops first; its music comes here instead.
+            if (session.player === castPlayer) Cast.disconnect()
+            val player = DlnaPlayer(device, graph.subsonic)
+            dlnaPlayer = player
+            moveTo(player)
+        } else {
+            dlnaPlayer = null
+            if (old != null && session.player === old) moveTo(exo)
+        }
+        if (old != null && old !== dlnaPlayer) old.release()
+    }
+
     /**
      * Moves the queue, song and position between the phone and a Cast device. Music moving to a TV
      * keeps playing; music coming back to the phone waits paused, rather than suddenly playing out loud.
@@ -322,7 +355,7 @@ class PlaybackService : MediaSessionService() {
         val play = toCast && from.playWhenReady
         AppLog.i(
             "Cast",
-            (if (toCast) "Playing on ${Cast.deviceName() ?: "a Cast device"}" else "Cast ended; music back on the phone, paused") +
+            (if (toCast) "Playing on ${(target as? DlnaPlayer)?.name ?: Cast.deviceName() ?: "a Cast device"}" else "Cast ended; music back on the phone, paused") +
                 " (${items.size} songs, song ${index + 1} at ${position / 1000}s)",
         )
         handler.removeCallbacks(bufferingWatch)
@@ -375,6 +408,8 @@ class PlaybackService : MediaSessionService() {
         events?.finishCurrent()
         castPlayer?.setSessionAvailabilityListener(null)
         castPlayer?.release()
+        dlnaPlayer?.release()
+        dlnaPlayer = null
         exo.release()
         session?.release()
         session = null
