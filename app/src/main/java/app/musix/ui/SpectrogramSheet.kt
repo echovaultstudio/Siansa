@@ -35,6 +35,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import app.musix.log.AppLog
 import app.musix.playback.PlayerState
 import app.musix.playback.Spectrogram
@@ -56,28 +59,36 @@ fun SpectrogramSheet(state: PlayerState, onDismiss: () -> Unit) {
     val bitmap = remember { Bitmap.createBitmap(300, 200, Bitmap.Config.ARGB_8888).apply { eraseColor(Spectrogram.BLACK) } }
 
     DisposableEffect(Unit) {
-        SpectrumFeed.clear()
-        SpectrumFeed.listening = true
         onDispose { SpectrumFeed.listening = false }
     }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(state.current?.id) {
         SpectrumFeed.clear()
         spectrogram = null
         bitmap.eraseColor(Spectrogram.BLACK)
         drawn++
-        while (isActive) {
-            delay(50)
-            val samples = SpectrumFeed.take()
-            val rate = SpectrumFeed.sampleRate
-            if (samples.isEmpty() || rate <= 0) continue
-            val current = spectrogram?.takeIf { it.sampleRate == rate }
-                ?: Spectrogram(rate, bitmap.width, bitmap.height).also {
-                    spectrogram = it
-                    AppLog.d("Spectrogram", "Started at $rate Hz")
+        // Only while musix is on screen: with the screen off or the app in the background it rests.
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            SpectrumFeed.clear()
+            SpectrumFeed.listening = true
+            try {
+                while (isActive) {
+                    delay(50)
+                    val samples = SpectrumFeed.take()
+                    val rate = SpectrumFeed.sampleRate
+                    if (samples.isEmpty() || rate <= 0) continue
+                    val current = spectrogram?.takeIf { it.sampleRate == rate }
+                        ?: Spectrogram(rate, bitmap.width, bitmap.height).also {
+                            spectrogram = it
+                            AppLog.d("Spectrogram", "Started at $rate Hz")
+                        }
+                    withContext(Dispatchers.Default) { current.add(samples) }
+                    bitmap.setPixels(current.pixels, 0, current.width, 0, 0, current.width, current.height)
+                    drawn++
                 }
-            withContext(Dispatchers.Default) { current.add(samples) }
-            bitmap.setPixels(current.pixels, 0, current.width, 0, 0, current.width, current.height)
-            drawn++
+            } finally {
+                SpectrumFeed.listening = false
+            }
         }
     }
 
