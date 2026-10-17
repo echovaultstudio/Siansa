@@ -136,7 +136,7 @@ private fun NavController.goToTab(route: String) = navigate(route) {
     restoreState = true
 }
 
-private fun pins(context: Context) = context.getSharedPreferences("library_pins", Context.MODE_PRIVATE)
+private fun pins(context: Context) = context.getSharedPreferences(app.musix.data.Users.scoped("library_pins"), Context.MODE_PRIVATE)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -605,7 +605,7 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
         artistRecent.merge(artistKey, ev.at) { a, b -> maxOf(a, b) }
         if (!ev.skipped) artistPlays.merge(artistKey, 1L) { a, b -> a + b }
     }
-    runCatching { graph.subsonic.albums("recent", 100, 0) }.getOrDefault(emptyList()).forEach { a ->
+    graph.library.keepSyncedAlbums(runCatching { graph.subsonic.albums("recent", 100, 0) }.getOrDefault(emptyList()), "Recently played").forEach { a ->
         val at = parseTime(a.played)
         if (at > 0) a.allIds.forEach { id -> albumRecent.merge(id, at) { x, y -> maxOf(x, y) } }
     }
@@ -657,7 +657,7 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
             key = "playlist-${p.id}",
             kind = Kind.PLAYLIST,
             title = p.name,
-            subtitle = "Playlist · ${p.owner ?: "Navidrome"}",
+            subtitle = playlistSubtitle(p, fallbackOwner = "Navidrome"),
             route = "playlist/${p.id}",
             coverArt = p.coverArt,
             recentAt = parseTime(p.changed),

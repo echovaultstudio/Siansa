@@ -35,6 +35,20 @@ enum class HomeSection(val id: String, val label: String) {
         }
 
         fun format(order: List<HomeSection>): String = order.joinToString(",") { it.id }
+
+        /**
+         * Reads the saved hidden sections ("radios,genres"), kept apart from the order so older saves still
+         * load. Unknown ids are dropped; sections added in a later version aren't in it, so they show.
+         */
+        fun parseHidden(saved: String?): Set<HomeSection> {
+            if (saved.isNullOrBlank()) return emptySet()
+            return saved.split(',').mapNotNull { id -> entries.firstOrNull { it.id == id.trim() } }.toSet()
+        }
+
+        fun formatHidden(hidden: Set<HomeSection>): String = entries.filter { it in hidden }.joinToString(",") { it.id }
+
+        /** The sections Home shows: [order] without the [hidden] ones. */
+        fun visible(order: List<HomeSection>, hidden: Set<HomeSection>): List<HomeSection> = order.filter { it !in hidden }
     }
 }
 

@@ -18,3 +18,23 @@ class PlayerSpacingTest {
         assertEquals(28f, playerTopGapDp(1400), 0.001f)
     }
 }
+
+/** The rounded top corners of now playing while it is dragged down. */
+class PlayerCardCornerTest {
+    @Test fun squareWhenOpen() {
+        assertEquals(0f, playerCardCornerPx(0f, 70f), 0.001f)
+    }
+
+    @Test fun roundsAsItIsDragged() {
+        assertEquals(30f, playerCardCornerPx(30f, 70f), 0.001f)
+    }
+
+    @Test fun stopsAtTheLargestRadius() {
+        assertEquals(70f, playerCardCornerPx(900f, 70f), 0.001f)
+    }
+
+    @Test fun neverNegative() {
+        assertEquals(0f, playerCardCornerPx(-20f, 70f), 0.001f)
+        assertEquals(0f, playerCardCornerPx(50f, -5f), 0.001f)
+    }
+}

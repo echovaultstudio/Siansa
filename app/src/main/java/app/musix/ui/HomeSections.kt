@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -82,6 +84,13 @@ fun HomeSectionScreen(nav: NavController, id: String) {
             LoadBox(items) { list ->
                 if (list.isEmpty()) {
                     Text("Nothing here yet.", Modifier.padding(16.dp))
+                } else if (section == HomeSection.Playlists) {
+                    // Playlists read as a list, like Spotify, not as big album tiles.
+                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)) {
+                        items(list.filterIsInstance<SectionItem.PlaylistItem>(), key = { it.key }) { item ->
+                            PlaylistRow(item.playlist, onClick = { nav.navigate("playlist/${item.playlist.id}") })
+                        }
+                    }
                 } else {
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(150.dp),
@@ -140,7 +149,7 @@ private fun SectionTile(item: SectionItem, nav: NavController, launch: PlayLaunc
             val p = item.playlist
             AlbumTile(
                 name = p.name,
-                subtitle = "${p.songCount} songs" + (p.owner?.let { " · $it" } ?: ""),
+                subtitle = playlistSubtitle(p),
                 coverArt = p.coverArt,
                 onClick = { nav.navigate("playlist/${p.id}") },
                 modifier = fill,

@@ -20,7 +20,9 @@ object AppLog {
     private val writer = Executors.newSingleThreadExecutor { Thread(it, "musix-log").apply { isDaemon = true } }
     private val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.ROOT)
     private lateinit var dir: File
-    private var header = ""
+    /** App version, Android version and phone model, at the top of shared logs. */
+    var header = ""
+        private set
 
     @Volatile
     var enabled: Boolean = false
@@ -98,6 +100,11 @@ object AppLog {
     /** The recent part of the log for showing on screen. */
     fun tail(maxLines: Int): List<String> = runCatching {
         if (!current.exists()) emptyList() else current.readLines().takeLast(maxLines)
+    }.getOrDefault(emptyList())
+
+    /** Both log parts' lines, oldest first. */
+    fun allLines(): List<String> = runCatching {
+        listOf(previous, current).filter { it.exists() }.flatMap { it.readLines() }
     }.getOrDefault(emptyList())
 
     /** One file with both log parts, for sharing. */

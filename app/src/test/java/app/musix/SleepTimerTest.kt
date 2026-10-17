@@ -6,6 +6,7 @@ import app.musix.playback.SleepTimerState
 import app.musix.playback.isTimeUp
 import app.musix.playback.leftMs
 import app.musix.playback.sleepFade
+import app.musix.playback.sleepPauseNow
 import app.musix.playback.sleepTimeLabel
 import app.musix.playback.sleepTimeShort
 import app.musix.playback.windDownFrom
@@ -103,5 +104,23 @@ class SleepTimerTest {
         assertEquals("45m", sleepTimeShort(45 * min))
         assertEquals("1h05", sleepTimeShort(65 * min))
         assertEquals("<1m", sleepTimeShort(30_000))
+    }
+
+    @Test
+    fun pausesAtTheRightMomentOnPhoneAndTv() {
+        val running = SleepTimerState(endsAt = 1_000, totalMs = 1_000)
+        val finishing = running.copy(finishing = true)
+        val cutShort = finishing.copy(cutAt = 5_000)
+        // Not finishing yet: never pause.
+        assertFalse(sleepPauseNow(onPhone = true, state = running, leftMs = 0))
+        assertFalse(sleepPauseNow(onPhone = false, state = running, leftMs = 0))
+        // Phone: the player pauses itself at the song's end; only a cut-short song is paused here.
+        assertFalse(sleepPauseNow(onPhone = true, state = finishing, leftMs = 0))
+        assertFalse(sleepPauseNow(onPhone = true, state = cutShort, leftMs = 100))
+        assertTrue(sleepPauseNow(onPhone = true, state = cutShort, leftMs = 0))
+        // TV or speaker: pause just before the song ends, and not while its length is unknown.
+        assertFalse(sleepPauseNow(onPhone = false, state = finishing, leftMs = 5_000))
+        assertTrue(sleepPauseNow(onPhone = false, state = finishing, leftMs = 400))
+        assertFalse(sleepPauseNow(onPhone = false, state = finishing, leftMs = -1))
     }
 }

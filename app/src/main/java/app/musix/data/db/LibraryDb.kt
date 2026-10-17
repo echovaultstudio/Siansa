@@ -161,6 +161,9 @@ interface LibraryDao {
     @Query("SELECT * FROM albums WHERE id = :id")
     suspend fun album(id: String): AlbumEntity?
 
+    @Query("SELECT id FROM albums WHERE id IN (:ids)")
+    suspend fun knownAlbumIds(ids: List<String>): List<String>
+
     @Query("SELECT * FROM albums WHERE groupKey = :groupKey ORDER BY isPrimary DESC")
     suspend fun albumGroup(groupKey: String): List<AlbumEntity>
 
@@ -259,7 +262,7 @@ abstract class LibraryDatabase : RoomDatabase() {
 
     companion object {
         fun open(context: Context): LibraryDatabase =
-            Room.databaseBuilder(context, LibraryDatabase::class.java, "library.db")
+            Room.databaseBuilder(context, LibraryDatabase::class.java, app.musix.data.Users.scoped(app.musix.data.UserFiles.DATABASE))
                 // The library can always be synced again, so a schema change simply starts fresh.
                 .fallbackToDestructiveMigration()
                 .build()

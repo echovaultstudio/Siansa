@@ -10,10 +10,13 @@ Source: `app/src/main/java/app/musix/`. Unit tests: `app/src/test/`. Emulator te
 - Add or update unit tests in `app/src/test/` for any logic you change.
 - Add a note file in `changelog.d/` (e.g. `changelog.d/issue-42.md`, see its README) with `### Fixed` /
   `### Added` / `### Changed`, written for the app's user in plain words. Don't edit `CHANGELOG.md` or
-  `version.txt`: the release does that, so pull requests never conflict over them.
+  `version.txt`: the release does that, so pull requests never conflict over them. Use `### Added` only for
+  something new to the user: it makes the release a new feature version (0.1.x → 0.2.0).
 - Log what matters for tracing problems with `AppLog` (`i`, `w`, `e`; `d` for detail). Never log addresses,
   passwords, tokens or API keys.
 - UI text: short, plain English, no jargon. Follow the existing Musix theme (`ui/Theme.kt`); test light and dark.
+- Visual changes: keep spacing even (the same gap above and below a row of chips, buttons or a badge) and add
+  a check for it to `app/src/androidTest/java/app/musix/SpacingTest.kt`.
 - Navigate and change screen state only on the main thread.
 
 ## Automatic issues

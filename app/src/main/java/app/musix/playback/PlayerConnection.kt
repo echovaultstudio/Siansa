@@ -2,9 +2,11 @@ package app.musix.playback
 
 import android.content.ComponentName
 import android.content.Context
+import android.os.Bundle
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import app.musix.data.Song
@@ -26,9 +28,14 @@ data class PlayerState(
     val index: Int = 0,
     /** Waiting for data before it can play on. */
     val buffering: Boolean = false,
+    /** The format of what's playing ("FLAC", "MP3", "OPUS"...), or null until the player knows. */
+    val codec: String? = null,
+    /** Opus kbit/s while Navidrome converts the current song, or 0 when the original file plays. */
+    val transcodeKbps: Int = 0,
 )
 
 /** The app's side of playback: a MediaController talking to [PlaybackService]. */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlayerConnection(
     private val context: Context,
     private val api: SubsonicApi,
@@ -47,7 +54,12 @@ class PlayerConnection(
     fun connect() {
         if (future != null) return
         val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
-        val f = MediaController.Builder(context, token).buildAsync()
+        val f = MediaController.Builder(context, token)
+            .setListener(object : MediaController.Listener {
+                // The service says here whether the current song is converted to Opus.
+                override fun onExtrasChanged(controller: MediaController, extras: Bundle) = refresh()
+            })
+            .buildAsync()
         future = f
         f.addListener({
             val c = runCatching { f.get() }.getOrNull()
@@ -213,6 +225,19 @@ class PlayerConnection(
             queue = queue,
             index = index,
             buffering = c.playbackState == Player.STATE_BUFFERING,
+            codec = audioCodec(c.currentTracks),
+            transcodeKbps = c.sessionExtras
+                .takeIf { it.getString(StreamQuality.EXTRA_SONG_ID) == current?.id }
+                ?.getInt(StreamQuality.EXTRA_KBPS, 0) ?: 0,
         )
+    }
+
+    private fun audioCodec(tracks: Tracks): String? {
+        val group = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }
+            ?: tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_AUDIO }
+            ?: return null
+        val index = (0 until group.length).firstOrNull { group.isTrackSelected(it) } ?: 0
+        val format = group.getTrackFormat(index)
+        return StreamQuality.codecName(format.sampleMimeType, format.containerMimeType)
     }
 }

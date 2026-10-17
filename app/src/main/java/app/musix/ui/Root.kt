@@ -220,10 +220,13 @@ fun MusixRoot() {
                 composable("vibes") { VibesScreen(nav) }
                 composable("settings") { SettingsHub(nav) }
                 composable("settings/connections") { ConnectionsScreen(nav) }
+                composable("settings/users") { UsersScreen(nav) }
                 composable("settings/playback") { PlaybackSettingsScreen(nav) }
                 composable("settings/storage") { StorageScreen(nav) }
                 composable("settings/logs") { LogsScreen(nav) }
+                composable("settings/backup") { BackupScreen(nav) }
                 composable("settings/scrobbling") { ScrobblingScreen(nav) }
+                composable("settings/whatsnew") { WhatsNewScreen(nav) }
                 composable("home/{section}") { HomeSectionScreen(nav, it.arguments?.getString("section").orEmpty()) }
                 composable("liked") { LikedScreen(nav) }
                 composable("radio/{kind}/{key}") {
@@ -242,6 +245,7 @@ fun MusixRoot() {
                 }
                 composable("sync") { SyncScreen(nav) }
                 composable("report/{range}") { ReportScreen(nav, it.arguments?.getString("range").orEmpty()) }
+                composable("song/{id}/details") { SongDetailsScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("artist/{id}/appears-on") { AppearsOnScreen(nav, it.arguments?.getString("id").orEmpty()) }
@@ -324,6 +328,7 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
                 ) {
                     Icon(if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, "Play or pause")
                 }
+                CastButton()
                 IconButton(onClick = { graph.player.next() }) {
                     Icon(Icons.Rounded.SkipNext, "Next")
                 }

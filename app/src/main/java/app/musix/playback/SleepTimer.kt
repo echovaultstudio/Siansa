@@ -105,6 +105,20 @@ fun sleepFade(leftMs: Long, fadeMs: Long = SLEEP_FADE_MS): Float = when {
     else -> leftMs.toFloat() / fadeMs
 }
 
+/** On a TV or speaker the sleep timer pauses this close to the song's end, before the next one starts. */
+const val SLEEP_REMOTE_EARLY_MS = 500L
+
+/**
+ * Whether the finishing timer should pause now, with [leftMs] to go (negative when unknown). On the phone
+ * the player pauses itself at the song's end, so only a cut-short song is paused here; on a TV or speaker
+ * the pause comes just before the song ends.
+ */
+fun sleepPauseNow(onPhone: Boolean, state: SleepTimerState, leftMs: Long): Boolean = when {
+    !state.finishing -> false
+    onPhone -> state.cutAt != null && leftMs <= 0
+    else -> leftMs in 0..SLEEP_REMOTE_EARLY_MS
+}
+
 /** Time left in the sheet: "45 min", "1 h 5 min", "40 s". */
 fun sleepTimeLabel(ms: Long): String {
     if (ms < 60_000) return "${ceil(ms.coerceAtLeast(0) / 1000.0).toInt()} s"

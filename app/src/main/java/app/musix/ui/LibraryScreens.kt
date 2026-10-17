@@ -81,7 +81,7 @@ fun LikedScreen(nav: NavController) {
         runCatching { graph.subsonic.starredSongs() }
             .map { list ->
                 val local = graph.library.songs(list.map { it.id }).associateBy { it.id }
-                list.map { local[it.id] ?: it }
+                graph.library.keepSyncedSongs(list.map { local[it.id] ?: it }, "Liked songs")
             }
             .getOrElse { if (graph.library.isSynced) graph.library.starredSongs() else throw it }
             .filter { graph.favorites.isLiked(it) }
