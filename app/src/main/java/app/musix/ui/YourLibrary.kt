@@ -657,7 +657,7 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
             key = "playlist-${p.id}",
             kind = Kind.PLAYLIST,
             title = p.name,
-            subtitle = "Playlist · ${p.owner ?: "Navidrome"}",
+            subtitle = playlistSubtitle(p, fallbackOwner = "Navidrome"),
             route = "playlist/${p.id}",
             coverArt = p.coverArt,
             recentAt = parseTime(p.changed),
