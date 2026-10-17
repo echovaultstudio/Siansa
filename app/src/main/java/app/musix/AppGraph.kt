@@ -28,6 +28,7 @@ import app.musix.net.LastFmApi
 import app.musix.net.ListenBrainzApi
 import app.musix.net.OpenRouterApi
 import app.musix.net.SubsonicApi
+import app.musix.offline.Downloads
 import app.musix.playback.PlayerConnection
 import app.musix.scrobble.Scrobbler
 import androidx.annotation.OptIn
@@ -177,6 +178,9 @@ class AppGraph(val app: Application) {
             StandaloneDatabaseProvider(app),
         )
     }
+
+    /** Albums, playlists and songs kept on the phone for listening without a connection. */
+    val downloads = Downloads(app, subsonic, library, streamHttp, settings, scope)
 
     val historyApi = HistoryApi(http)
     val taste = Taste(this)

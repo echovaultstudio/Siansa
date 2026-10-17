@@ -323,6 +323,7 @@ class PlaybackService : MediaSessionService() {
         val item = player.getMediaItemAt(index)
         val uri = item.localConfiguration?.uri ?: return
         if (kbpsFor(item.mediaId) > 0) return
+        if (graph.downloads.fileFor(item.mediaId) != null) return
         val factory = cacheFactory ?: return
         val writer = CacheWriter(factory.createDataSourceForDownloading(), DataSpec(uri), null, null)
         precacheWriter = writer

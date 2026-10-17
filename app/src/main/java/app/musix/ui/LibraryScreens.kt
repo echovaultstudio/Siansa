@@ -69,7 +69,13 @@ import app.musix.AppGraph
 import app.musix.data.AlbumCategory
 import app.musix.data.AlbumDetail
 import app.musix.data.category
+import app.musix.data.Playlist
+import app.musix.data.PlaylistDetail
 import app.musix.data.Song
+import app.musix.offline.OfflineItem
+import app.musix.offline.OfflineKind
+import app.musix.offline.likedOfflineItem
+import app.musix.offline.offlineItem
 import app.musix.log.AppLog
 import kotlinx.coroutines.CancellationException
 
@@ -100,6 +106,7 @@ fun LikedScreen(nav: NavController) {
             }
         },
         header = { CollectionByline(null, null, null, "${songs.valueOrNull()?.size ?: 0} songs") },
+        offline = remember { likedOfflineItem() },
     )
 }
 
@@ -108,7 +115,14 @@ fun LikedScreen(nav: NavController) {
 fun PlaylistScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
     val detail by loadState(id) {
-        val remote = graph.subsonic.playlist(id)
+        val remote = try {
+            graph.subsonic.playlist(id)
+        } catch (e: Exception) {
+            // Without a connection, a downloaded playlist still opens with its songs on the phone.
+            val key = OfflineItem.key(OfflineKind.PLAYLIST, id)
+            val item = graph.downloads.list.value.items.firstOrNull { it.key == key } ?: throw e
+            PlaylistDetail(Playlist(id, item.name, coverArt = item.cover, owner = item.subtitle), graph.downloads.songsOf(key).orEmpty())
+        }
         val local = graph.library.songs(remote.songs.map { it.id }).associateBy { it.id }
         remote.copy(songs = remote.songs.map { local[it.id] ?: it })
     }
@@ -132,6 +146,7 @@ fun PlaylistScreen(nav: NavController, id: String) {
                 if (d == null) "" else "Playlist · ${d.songs.size} songs · ${formatDuration(d.songs.sumOf { it.durationSec.toLong() })}",
             )
         },
+        offline = d?.playlist?.offlineItem(),
     )
 }
 
@@ -214,6 +229,7 @@ fun AlbumScreen(nav: NavController, id: String) {
                 )
             }
         },
+        offline = d?.album?.offlineItem(),
     )
 }
 

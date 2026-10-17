@@ -241,6 +241,9 @@ fun MusixRoot() {
                 composable("settings/playback") { PlaybackSettingsScreen(nav) }
                 composable("settings/equaliser") { EqualiserScreen(nav) }
                 composable("settings/storage") { StorageScreen(nav) }
+                composable("downloads") { DownloadsScreen(nav) }
+                composable("downloads/add") { DownloadPickerScreen(nav) }
+                composable("downloads/songs") { DownloadedSongsScreen(nav) }
                 composable("settings/logs") { LogsScreen(nav) }
                 composable("settings/backup") { BackupScreen(nav) }
                 composable("settings/scrobbling") { ScrobblingScreen(nav) }

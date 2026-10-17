@@ -49,6 +49,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -215,6 +216,7 @@ fun YourLibraryScreen(nav: NavController) {
             onSearch = { searching = !searching; if (!searching) query = "" },
             onSync = { nav.navigate("sync") },
             onSoundSearch = { nav.goToTab("search") },
+            onDownloads = { nav.navigate("downloads") },
         )
         if (searching) {
             TextField(
@@ -333,6 +335,7 @@ private fun LibraryHeader(
     onSearch: () -> Unit,
     onSync: () -> Unit,
     onSoundSearch: () -> Unit,
+    onDownloads: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(
@@ -352,6 +355,7 @@ private fun LibraryHeader(
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f),
         )
+        IconButton(onClick = onDownloads) { Icon(Icons.Outlined.ArrowCircleDown, "Downloads") }
         IconButton(onClick = onSearch) { Icon(if (searching) Icons.Rounded.Close else Icons.Rounded.Search, "Search in Your Library") }
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.Add, "More") }

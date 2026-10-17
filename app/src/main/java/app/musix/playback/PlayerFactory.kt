@@ -45,7 +45,11 @@ object PlayerFactory {
             val key = uri.getQueryParameter("id") ?: uri.toString()
             spec.withUri(Streaming.rewrite(uri, kbpsFor(key)))
         }
-        val dataSource = DefaultDataSource.Factory(context, resolving)
+        // Songs downloaded for offline listening play from their file, with no network at all.
+        val dataSource = ResolvingDataSource.Factory(DefaultDataSource.Factory(context, resolving)) { spec ->
+            val id = if (spec.uri.scheme == "http" || spec.uri.scheme == "https") spec.uri.getQueryParameter("id") else null
+            id?.let { graph.downloads.fileFor(it) }?.let { spec.withUri(android.net.Uri.fromFile(it)) } ?: spec
+        }
 
         // Start playing after one second of audio, for a snappy start. After running dry mid-song, wait for
         // five seconds' worth so a slow connection gives fewer, longer stretches instead of constant stops.
