@@ -116,8 +116,16 @@ class SubsonicApi(
 
     suspend fun album(id: String): AlbumDetail {
         val album = call("getAlbum", mapOf("id" to id)).obj("album") ?: throw ApiException("Album not found")
-        return AlbumDetail(parseAlbum(album), album.arr("song").map(::parseSong))
+        return AlbumDetail(parseAlbum(album), album.arr("song").map(::parseSong), parseDiscTitles(album))
     }
+
+    /** OpenSubsonic "discTitles": [{"disc": 1, "title": "…"}], which Navidrome fills from the disctitle tag. */
+    private fun parseDiscTitles(album: JsonObject): Map<Int, String> =
+        album.arr("discTitles").mapNotNull { d ->
+            val disc = d.int("disc") ?: return@mapNotNull null
+            val title = d.str("title")?.trim()
+            if (title.isNullOrEmpty()) null else disc to title
+        }.toMap()
 
     suspend fun artists(folderId: String? = null): List<Artist> =
         call("getArtists", mapOf("musicFolderId" to folderId)).obj("artists")?.arr("index").orEmpty()

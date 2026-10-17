@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import app.musix.data.extraArtists
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.rounded.Favorite
@@ -63,10 +64,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.musix.AppGraph
 import app.musix.data.AlbumCategory
 import app.musix.data.AlbumDetail
 import app.musix.data.category
 import app.musix.data.Song
+import app.musix.log.AppLog
+import kotlinx.coroutines.CancellationException
 
 /** Songs with a heart, newest first as Navidrome lists them. */
 @Composable
@@ -170,6 +174,9 @@ fun AlbumScreen(nav: NavController, id: String) {
     }
     val d = detail.valueOrNull()
     val artistCover by loadState(d?.album?.artistId) { d?.album?.artistId?.let { graph.library.artist(it)?.coverArt } }
+    // Disc titles aren't kept in the synced library: for an album with several discs, ask Navidrome.
+    // Without them (offline, older server) the discs are simply headed "Disc 1", "Disc 2"…
+    val discTitles by loadState(d) { d?.let { discTitlesOf(graph, it) }.orEmpty() }
     CollectionPage(
         nav = nav,
         title = d?.album?.name ?: "Album",
@@ -177,7 +184,10 @@ fun AlbumScreen(nav: NavController, id: String) {
         songs = d?.songs,
         error = (detail as? Load.Err)?.message,
         numbered = true,
+        discTitles = discTitles.valueOrNull() ?: d?.discTitles.orEmpty(),
         showCovers = false,
+        // Only artists beyond the album's own, as Navidrome's artist tags list them.
+        subtitleOf = d?.album?.let { album -> { song: Song -> extraArtists(song, album.artistId, album.artist) } },
         cover = { m ->
             BigCover(d?.album?.coverArt, d?.album?.coverArt ?: d?.album?.id, m, RoundedCornerShape(6.dp))
         },
@@ -198,6 +208,26 @@ fun AlbumScreen(nav: NavController, id: String) {
             }
         },
     )
+}
+
+private suspend fun discTitlesOf(graph: AppGraph, detail: AlbumDetail): Map<Int, String> {
+    if (detail.discTitles.isNotEmpty()) return detail.discTitles
+    if (detail.songs.map { it.disc ?: 1 }.distinct().size < 2) return emptyMap()
+    for (id in detail.album.allIds) {
+        val titles = try {
+            graph.subsonic.album(id).discTitles
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.w("Album", "Disc titles not loaded: ${e.message}")
+            return emptyMap()
+        }
+        if (titles.isNotEmpty()) {
+            AppLog.d("Album", "${titles.size} disc titles")
+            return titles
+        }
+    }
+    return emptyMap()
 }
 
 @Composable
