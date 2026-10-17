@@ -462,6 +462,13 @@ fun SongRow(
                     menu = false
                     graph.songRadio.start(song) { message -> launch.notify(message) }
                 })
+                if (graph.settings.current.audioMuseReady) {
+                    DropdownMenuItem(text = { Text("Song path…") }, onClick = {
+                        menu = false
+                        sheet.close()
+                        nav.openSongPath(song.id)
+                    })
+                }
                 song.albumId?.let { albumId ->
                     DropdownMenuItem(text = { Text("Go to album") }, onClick = {
                         menu = false
