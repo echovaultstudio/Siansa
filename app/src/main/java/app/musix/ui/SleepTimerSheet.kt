@@ -55,7 +55,7 @@ private val SheetSubtle = Color(0xFFB9B0CC)
 
 /** The current time on the sleep timer's clock, updated every second while [running]. */
 @Composable
-private fun rememberTimerNow(running: Boolean): Long {
+internal fun rememberTimerNow(running: Boolean): Long {
     val graph = LocalGraph.current
     var now by remember { mutableLongStateOf(graph.sleepTimer.now()) }
     LaunchedEffect(running) {
