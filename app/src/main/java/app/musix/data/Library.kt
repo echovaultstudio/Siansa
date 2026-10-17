@@ -8,6 +8,9 @@ import app.musix.data.db.LibraryDatabase
 import app.musix.data.db.MetaEntity
 import app.musix.data.db.PlaylistEntity
 import app.musix.data.db.SongEntity
+import app.musix.data.db.SourceEntity
+import app.musix.offline.OfflineShelf
+import app.musix.offline.OnlyDownloaded
 import app.musix.log.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,6 +61,21 @@ class LibraryRepository(context: Context) {
 
     val isSynced: Boolean get() = _status.value != null
 
+    /**
+     * What's on the phone while "Only downloaded music" is on (issue #141), else null. Every list this
+     * gives out is then narrowed to it; looking up one song, album or artist by id still works.
+     */
+    @Volatile var downloadedOnly: () -> OfflineShelf? = { null }
+    @Volatile private var onlyCache: OnlyDownloaded? = null
+
+    /** The filter for "Only downloaded music", or null when it's off. */
+    suspend fun onlyDownloaded(): OnlyDownloaded? {
+        val shelf = downloadedOnly() ?: return null
+        onlyCache?.let { if (it.shelf === shelf) return it }
+        val albums = shelf.albums.toList().chunked(CHUNK).flatMap { dao.albumGroupIds(it) }.toSet() + shelf.albums
+        return OnlyDownloaded(shelf, albums).also { onlyCache = it }
+    }
+
     suspend fun load() = withContext(Dispatchers.IO) {
         refreshStatus()
         _loaded.value = true
@@ -97,6 +115,7 @@ class LibraryRepository(context: Context) {
      * using the phone's copy of each. Unchanged when every library is synced.
      */
     suspend fun keepSyncedSongs(songs: List<Song>, why: String): List<Song> {
+        onlyDownloaded()?.let { return it.songs(songs) }
         if (songs.isEmpty() || !leavesOutLibraries()) return songs
         val kept = keepKnown(songs, songs(songs.map { it.id }).associateBy { it.id })
         if (kept.size < songs.size) AppLog.i("Library", "$why: left out ${songs.size - kept.size} of ${songs.size} songs from unchecked libraries")
@@ -105,6 +124,7 @@ class LibraryRepository(context: Context) {
 
     /** [albums] from Navidrome without those from unchecked libraries. Unchanged when every library is synced. */
     suspend fun keepSyncedAlbums(albums: List<Album>, why: String): List<Album> {
+        onlyDownloaded()?.let { return it.albums(albums) }
         if (albums.isEmpty() || !leavesOutLibraries()) return albums
         val known = albums.map { it.id }.distinct().chunked(CHUNK).flatMap { dao.knownAlbumIds(it) }.toSet()
         val kept = albums.filter { it.id in known }
@@ -130,6 +150,7 @@ class LibraryRepository(context: Context) {
             .distinctBy { listOf(it.disc ?: 1, it.track?.toString() ?: "d${it.durationSec / 3}", normalizeKey(it.title)) }
             .sortedWith(compareBy({ it.disc ?: 1 }, { it.track ?: Int.MAX_VALUE }, { it.title }))
             .map { it.toSong() }
+            .let { songs -> onlyDownloaded()?.songs(songs) ?: songs }
     }
 
     suspend fun albums(sort: String): List<Album> = when (sort) {
@@ -138,26 +159,34 @@ class LibraryRepository(context: Context) {
         "year" -> dao.albumsByYear()
         "random" -> dao.albumsRandom(100_000)
         else -> dao.albumsByName()
-    }.map { it.toAlbum() }
+    }.map { it.toAlbum() }.onlyDownloadedAlbums()
 
-    suspend fun randomAlbums(count: Int): List<Album> = dao.albumsRandom(count).map { it.toAlbum() }
+    suspend fun randomAlbums(count: Int): List<Album> {
+        val only = onlyDownloaded() ?: return dao.albumsRandom(count).map { it.toAlbum() }
+        return only.albums(dao.albumsRandom(100_000).map { it.toAlbum() }).take(count)
+    }
+
+    private suspend fun List<Album>.onlyDownloadedAlbums(): List<Album> = onlyDownloaded()?.albums(this) ?: this
 
     /** Release categories present, in display order, with album counts. */
-    suspend fun categories(): List<Pair<AlbumCategory, Int>> = dao.albumTypes()
-        .map { Album(id = "", name = "", releaseTypes = splitTypes(it.releaseTypes), isCompilation = it.isCompilation).category }
+    suspend fun categories(): List<Pair<AlbumCategory, Int>> = (onlyDownloaded()?.let { only -> only.albums(dao.primaryAlbums().map { it.toAlbum() }) }
+        ?: dao.albumTypes().map { Album(id = "", name = "", releaseTypes = splitTypes(it.releaseTypes), isCompilation = it.isCompilation) })
+        .map { it.category }
         .groupingBy { it }.eachCount()
         .toList()
         .sortedBy { it.first.ordinal }
 
-    suspend fun artists(): List<Artist> = dao.artists().map { it.toArtist() }
+    suspend fun artists(): List<Artist> = dao.artists().map { it.toArtist() }.let { list -> onlyDownloaded()?.artists(list) ?: list }
     suspend fun artist(id: String): Artist? = dao.artist(id)?.toArtist()
     suspend fun artistByName(name: String): Artist? = dao.artistByKey(normalizeKey(name))?.toArtist()
 
     suspend fun albumsOf(artist: Artist): List<Album> =
-        dao.albumsOfArtist(artist.id, normalizeKey(artist.name)).map { it.toAlbum() }
+        dao.albumsOfArtist(artist.id, normalizeKey(artist.name)).map { it.toAlbum() }.onlyDownloadedAlbums()
 
     suspend fun songsOf(artist: Artist): List<Song> =
-        dao.songsOfArtist(artist.id, artist.name).map { it.toSong() }.distinctBy { songKey(it) }
+        dao.songsOfArtist(artist.id, artist.name).map { it.toSong() }.distinctBy { songKey(it) }.onlyDownloadedSongs()
+
+    private suspend fun List<Song>.onlyDownloadedSongs(): List<Song> = onlyDownloaded()?.songs(this) ?: this
 
     /**
      * Albums the artist appears on without being the album artist (a feature, a compilation, a split),
@@ -172,25 +201,45 @@ class LibraryRepository(context: Context) {
             .distinctBy { it.id }
             .filterNot { it.id in own || it.artistId == artist.id || normalizeKey(it.artist) == ownKey }
             .sortedWith(compareByDescending<Album> { it.year ?: 0 }.thenBy { normalizeKey(it.name) })
+            .onlyDownloadedAlbums()
             .also { AppLog.d("Library", "Appears on: ${it.size} albums from ${songs.size} songs checked") }
     }
 
-    suspend fun genres(limit: Int = 60): List<Genre> = dao.genres(limit).map { Genre(it.name, it.songCount) }
+    suspend fun genres(limit: Int = 60): List<Genre> {
+        val only = onlyDownloaded() ?: return dao.genres(limit).map { Genre(it.name, it.songCount) }
+        val songs = only.shelf.songs.toList().chunked(CHUNK).flatMap { dao.songsWithGenre(it) }.map { it.toSong() }
+        return OnlyDownloaded.genres(songs, limit)
+    }
 
-    suspend fun songsOfGenre(genre: String, limit: Int): List<Song> =
-        dao.songsOfGenre(genre, limit).map { it.toSong() }.distinctBy { songKey(it) }
+    suspend fun songsOfGenre(genre: String, limit: Int): List<Song> {
+        val only = onlyDownloaded()
+        return dao.songsOfGenre(genre, if (only != null) 100_000 else limit).map { it.toSong() }.distinctBy { songKey(it) }
+            .let { list -> only?.songs(list)?.take(limit) ?: list }
+    }
 
-    suspend fun starredSongs(): List<Song> = dao.starredSongs().map { it.toSong() }.distinctBy { songKey(it) }
+    suspend fun starredSongs(): List<Song> = dao.starredSongs().map { it.toSong() }.distinctBy { songKey(it) }.onlyDownloadedSongs()
 
     suspend fun setStarred(id: String, starred: Boolean) = dao.setStarred(id, starred)
 
     suspend fun playlists(): List<Playlist> = dao.playlists().map {
         Playlist(it.id, it.name, it.songCount, it.durationSec, it.coverArt, it.owner, it.comment, it.changed)
+    }.let { list -> onlyDownloaded()?.playlists(list) ?: list }
+
+    /**
+     * Playlists fresh from Navidrome ([fetch], the user in use's) stored and returned together with other
+     * shown users' playlists. When Navidrome can't be reached, the stored ones; before a first sync, the error.
+     */
+    suspend fun refreshPlaylists(fetch: suspend () -> List<Playlist>): List<Playlist> {
+        runCatching { fetch() }
+            .onSuccess { updatePlaylists(it) }
+            .onFailure { if (!isSynced) throw it }
+        return playlists()
     }
 
     suspend fun updatePlaylists(playlists: List<Playlist>) {
         db.withTransaction {
             dao.deleteAllPlaylists()
+            playlists.chunked(CHUNK).forEach { chunk -> dao.forgetSources(chunk.map { it.id }) }
             dao.putPlaylists(playlists.mapIndexed { i, p ->
                 PlaylistEntity(p.id, p.name, p.songCount, p.durationSec, p.coverArt, p.owner, p.comment, p.changed, i)
             })
@@ -203,10 +252,14 @@ class LibraryRepository(context: Context) {
         if (terms.isEmpty()) return@withContext SearchResults(emptyList(), emptyList(), emptyList())
         val first = terms.maxBy { it.length }
         fun all(key: String) = terms.all { key.contains(it) }
+        val only = onlyDownloaded()
+        val artists = dao.searchArtists(first, 200).filter { all(it.sortKey) }.map { it.toArtist() }
+        val albums = dao.searchAlbums(first, 400).filter { all(it.sortKey + " " + it.artistKey) }.map { it.toAlbum() }
+        val songs = dao.searchSongs(first, 1500).filter { all(it.searchKey) }.map { it.toSong() }.distinctBy { songKey(it) }
         SearchResults(
-            artists = dao.searchArtists(first, 200).filter { all(it.sortKey) }.take(30).map { it.toArtist() },
-            albums = dao.searchAlbums(first, 400).filter { all(it.sortKey + " " + it.artistKey) }.take(40).map { it.toAlbum() },
-            songs = dao.searchSongs(first, 1500).filter { all(it.searchKey) }.map { it.toSong() }.distinctBy { songKey(it) }.take(100),
+            artists = (only?.artists(artists) ?: artists).take(30),
+            albums = (only?.albums(albums) ?: albums).take(40),
+            songs = (only?.songs(songs) ?: songs).take(100),
         )
     }
 
@@ -218,7 +271,10 @@ class LibraryRepository(context: Context) {
 
     suspend fun replaceArtists(artists: List<Artist>) = db.withTransaction {
         dao.deleteAllArtists()
-        artists.distinctBy { it.id }.chunked(CHUNK).forEach { chunk -> dao.putArtists(chunk.map { it.toEntity() }) }
+        artists.distinctBy { it.id }.chunked(CHUNK).forEach { chunk ->
+            dao.forgetSources(chunk.map { it.id })
+            dao.putArtists(chunk.map { it.toEntity() })
+        }
     }
 
     /** Stores albums and their songs; [replaceSongsOf] are albums whose songs are swapped for [songs]. */
@@ -229,13 +285,77 @@ class LibraryRepository(context: Context) {
                 dao.deleteSongsOfAlbums(it)
                 dao.deleteAlbums(it)
             }
-            albums.chunked(500).forEach { chunk -> dao.putAlbums(chunk.map { it.toEntity() }) }
-            songs.chunked(500).forEach { chunk -> dao.putSongs(chunk.map { it.toEntity() }) }
+            albums.chunked(500).forEach { chunk ->
+                dao.forgetSources(chunk.map { it.id })
+                dao.putAlbums(chunk.map { it.toEntity() })
+            }
+            songs.chunked(500).forEach { chunk ->
+                dao.forgetSources(chunk.map { it.id })
+                dao.putSongs(chunk.map { it.toEntity() })
+            }
         }
 
     suspend fun replaceAllSongs(songs: List<Song>) = db.withTransaction {
         dao.deleteAllSongs()
-        songs.chunked(500).forEach { chunk -> dao.putSongs(chunk.map { it.toEntity() }) }
+        songs.chunked(500).forEach { chunk ->
+            dao.forgetSources(chunk.map { it.id })
+            dao.putSongs(chunk.map { it.toEntity() })
+        }
+    }
+
+    // ---- Other users' music (issue #141) ----
+
+    /** Which items come from which other user, for sending their requests with that user's login. */
+    suspend fun sources(): Map<String, Int> = dao.sources().associate { it.id to it.source }
+
+    /** Users whose music is in the library besides the user in use's. */
+    suspend fun sourceUsers(): List<Int> = dao.sourceUsers()
+
+    /** Removes everything that came from [user]. */
+    suspend fun removeSource(user: Int) {
+        db.withTransaction {
+            dao.deleteSongsOfSource(user)
+            dao.deleteAlbumsOfSource(user)
+            dao.deleteArtistsOfSource(user)
+            dao.deletePlaylistsOfSource(user)
+            dao.deleteSource(user)
+        }
+        recomputePrimaries()
+    }
+
+    /**
+     * Replaces [user]'s music with [music]. Items the library already has from someone else (the same
+     * server, so the same song) are left as they are; the rest are stored and listed as [user]'s.
+     * Returns how many songs were added.
+     */
+    suspend fun putSource(user: Int, music: GuestMusic): Int {
+        val added = db.withTransaction {
+            dao.deleteSongsOfSource(user)
+            dao.deleteAlbumsOfSource(user)
+            dao.deleteArtistsOfSource(user)
+            dao.deletePlaylistsOfSource(user)
+            dao.deleteSource(user)
+            suspend fun known(ids: List<String>, query: suspend (List<String>) -> List<String>) =
+                ids.distinct().chunked(CHUNK).flatMap { query(it) }.toSet()
+            val plan = GuestMusic.plan(
+                music,
+                knownSongs = known(music.songs.map { it.id }) { dao.knownSongIds(it) },
+                knownAlbums = known(music.albums.map { it.id }) { dao.knownAlbumIds(it) },
+                knownArtists = known(music.artists.map { it.id }) { dao.knownArtistIds(it) },
+                knownPlaylists = known(music.playlists.map { it.id }) { dao.knownPlaylistIds(it) },
+            )
+            plan.artists.chunked(CHUNK).forEach { chunk -> dao.putArtists(chunk.map { it.toEntity() }) }
+            plan.albums.chunked(500).forEach { chunk -> dao.putAlbums(chunk.map { it.toEntity() }) }
+            plan.songs.chunked(500).forEach { chunk -> dao.putSongs(chunk.map { it.toEntity() }) }
+            // After the user in use's own playlists.
+            dao.putPlaylists(plan.playlists.mapIndexed { i, p ->
+                PlaylistEntity(p.id, p.name, p.songCount, p.durationSec, p.coverArt, p.owner, p.comment, p.changed, GUEST_POSITION + user * 10_000 + i)
+            })
+            plan.ids.chunked(500).forEach { chunk -> dao.putSources(chunk.map { SourceEntity(it, user) }) }
+            plan.songs.size
+        }
+        recomputePrimaries()
+        return added
     }
 
     /** Picks one album per name + album artist (the copy with most songs) to stand for the group in lists. */
@@ -291,6 +411,7 @@ class LibraryRepository(context: Context) {
         const val META_SYNCED_AT = "syncedAt"
         const val META_LAST_SCAN = "lastScan"
         const val META_FOLDERS = "folders"
+        private const val GUEST_POSITION = 1_000_000
 
         /** What decides whether an album's songs need fetching again. Play counts are left out on purpose. */
         fun Album.signature(): String =

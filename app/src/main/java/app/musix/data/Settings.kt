@@ -54,6 +54,8 @@ data class AppSettings(
     val downloadKbps: Int = 0,
     val homeOrder: List<HomeSection> = HomeSection.default,
     val homeHidden: Set<HomeSection> = emptySet(),
+    /** Show only music on the phone, across the whole app (issue #141). */
+    val downloadedOnly: Boolean = false,
 ) {
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
@@ -114,8 +116,9 @@ fun parseAddress(raw: String): ServerAddress {
 
 private fun decode(value: String): String = runCatching { URLDecoder.decode(value, "UTF-8") }.getOrDefault(value)
 
-class SettingsRepository(context: Context) {
-    private val prefs = context.getSharedPreferences(Users.scoped("settings"), Context.MODE_PRIVATE)
+/** One user's settings: by default the user in use, or another user's (to show their music too). */
+class SettingsRepository(context: Context, user: Int = Users.active) {
+    private val prefs = context.getSharedPreferences(UserFiles.scoped("settings", user), Context.MODE_PRIVATE)
     private val _state = MutableStateFlow(load())
     val state: StateFlow<AppSettings> = _state.asStateFlow()
     val current: AppSettings get() = _state.value
@@ -162,6 +165,7 @@ class SettingsRepository(context: Context) {
         downloadKbps = prefs.getInt("download_kbps", 0),
         homeOrder = HomeSection.parse(prefs.getString("home_order", null)),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
+        downloadedOnly = prefs.getBoolean("downloaded_only", false),
     )
 
     /**
@@ -269,5 +273,10 @@ class SettingsRepository(context: Context) {
     fun setSyncFolders(ids: Set<String>) {
         prefs.edit().putStringSet("sync_folders", ids).apply()
         _state.value = _state.value.copy(syncFolders = ids)
+    }
+
+    fun setDownloadedOnly(on: Boolean) {
+        prefs.edit().putBoolean("downloaded_only", on).apply()
+        _state.value = _state.value.copy(downloadedOnly = on)
     }
 }

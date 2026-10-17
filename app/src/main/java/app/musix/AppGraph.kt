@@ -6,12 +6,14 @@ import kotlinx.coroutines.runBlocking
 import android.app.Application
 import app.musix.data.EqualiserRepository
 import app.musix.data.Favorites
+import app.musix.data.Guests
 import app.musix.data.HistoryStore
 import app.musix.data.LibraryRepository
 import app.musix.data.LibrarySync
 import app.musix.data.MixStore
 import app.musix.data.SelectorStore
 import app.musix.data.SettingsRepository
+import app.musix.data.SyncPhase
 import app.musix.data.TopSongs
 import app.musix.log.AppLog
 import app.musix.mix.MixGenerator
@@ -39,7 +41,13 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import okhttp3.Credentials
@@ -85,10 +93,12 @@ class AppGraph(val app: Application) {
         .readTimeout(90, TimeUnit.SECONDS)
         .addInterceptor { chain ->
             val request = chain.request()
-            val s = settings.current
-            val navidrome = s.navidromeUrl.toHttpUrlOrNull()
-            val proxied = s.proxyUser.isNotBlank() && navidrome != null &&
-                request.url.host == navidrome.host && request.url.port == navidrome.port &&
+            val own = settings.current
+            val navidrome = own.navidromeUrl.toHttpUrlOrNull()
+            val ownServer = navidrome != null && request.url.host == navidrome.host && request.url.port == navidrome.port
+            // Another shown user's server can sit behind a proxy of its own.
+            val s = if (ownServer) own else guests.proxyFor(request.url.host, request.url.port) ?: own
+            val proxied = s.proxyUser.isNotBlank() && (ownServer || s !== own) &&
                 request.header("Authorization") == null
             if (proxied) {
                 chain.proceed(
@@ -153,12 +163,14 @@ class AppGraph(val app: Application) {
         .addNetworkInterceptor(StreamStats.interceptor)
         .build()
 
-    val subsonic = SubsonicApi(http) { settings.current }
+    val subsonic = SubsonicApi(http) { settings.current }.apply { loginFor = { id -> guests.loginFor(id) } }
     val audioMuse = AudioMuseApi(http) { settings.current }
     val openRouter = OpenRouterApi(http) { settings.current }
     val deezer = DeezerApi(http)
 
     val selectors = SelectorStore(app)
+    /** Other users' music shown alongside the user in use's (issue #141). */
+    val guests: Guests by lazy { Guests(app, http, library, scope) }
     val mixes = MixStore(app)
     val history = HistoryStore(app)
     val library = LibraryRepository(app)
@@ -192,7 +204,21 @@ class AppGraph(val app: Application) {
     }
 
     /** Albums, playlists and songs kept on the phone for listening without a connection. */
-    val downloads = Downloads(app, subsonic, library, streamHttp, settings, scope)
+    val downloads = Downloads(app, subsonic, library, streamHttp, settings, scope).also { d ->
+        // "Only downloaded music": every list in the app shows only what's on the phone.
+        library.downloadedOnly = { if (settings.current.downloadedOnly) d.shelf.value else null }
+        scope.launch(CoroutineName("downloaded-only")) {
+            combine(settings.state.map { it.downloadedOnly }.distinctUntilChanged(), d.shelf) { on, shelf -> if (on) shelf else null }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { library.bump() }
+        }
+        // Other users' music is checked for changes after each library sync.
+        scope.launch(CoroutineName("guest-sync")) {
+            sync.progress.map { it.phase }.distinctUntilChanged().collect { if (it == SyncPhase.DONE) guests.syncAll() }
+        }
+        guests.start()
+    }
 
     val historyApi = HistoryApi(http)
     val taste = Taste(this)
@@ -204,6 +230,7 @@ class AppGraph(val app: Application) {
     val connection = Connection(app, http, { settings.current }, scope)
     val player = PlayerConnection(app, subsonic).apply {
         isOffline = { connection.current.offline }
+        onlyDownloads = { settings.current.downloadedOnly }
         isDownloaded = { downloads.isDownloaded(it) }
     }
     val songRadio = SongRadio(this)

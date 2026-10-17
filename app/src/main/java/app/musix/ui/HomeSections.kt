@@ -121,8 +121,7 @@ private suspend fun loadSection(graph: AppGraph, section: HomeSection): List<Sec
     val list: List<SectionItem> = when (section) {
         HomeSection.Rediscover -> graph.insights.rediscover().map { SectionItem.AlbumItem(it.album, rediscoverSubtitle(it)) }
         HomeSection.Radios -> moodRadios.map { SectionItem.Radio(it) }
-        HomeSection.Playlists -> runCatching { graph.subsonic.playlists() }
-            .getOrElse { if (synced) graph.library.playlists() else throw it }
+        HomeSection.Playlists -> graph.library.refreshPlaylists { graph.subsonic.playlists() }
             .map { SectionItem.PlaylistItem(it) }
         HomeSection.RecentlyPlayed -> recentlyPlayedAlbums(graph, 100).map { SectionItem.AlbumItem(it, it.artist) }
         HomeSection.ArtistRadios -> recentlyPlayedArtists(graph, 60).map { SectionItem.ArtistItem(it) }
