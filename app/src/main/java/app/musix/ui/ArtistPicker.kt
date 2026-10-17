@@ -31,12 +31,12 @@ import androidx.compose.ui.window.Dialog
 import app.musix.AppGraph
 import app.musix.data.Artist
 import app.musix.data.Song
+import app.musix.data.normalizeKey
+import app.musix.data.splitArtists
 import app.musix.log.AppLog
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 
-// How artist names are joined in a tag, e.g. "A feat. B", "A & B", "A; B", "A / B", "A x B".
-private val separators = Regex("""\s*(?:,|;|/|\s&\s|\sx\s|\sand\s|\bfeat\.?|\bft\.?|\bfeaturing\b|\bvs\.?|\bwith\b)\s*""", RegexOption.IGNORE_CASE)
 
 /**
  * Opening "the artist" of a song. A song with several artists shows a small chooser with each artist's
@@ -115,17 +115,21 @@ fun ArtistCircle(artist: Artist, modifier: Modifier) {
 /** Every artist on the song, as artists in the library where possible. */
 private suspend fun artistsOf(graph: AppGraph, song: Song): List<Artist> {
     var refs = song.artists
-    // Songs from the phone's library don't carry the list; Navidrome has it when the name looks shared.
-    if (refs.isEmpty() && separators.containsMatchIn(song.artist)) {
+    // Songs from the phone's library don't carry the list, so Navidrome is asked: its list has every
+    // artist tag, also when the name shown is only the main artist ("Fred again.." on a song with Skrillex).
+    if (refs.isEmpty()) {
         refs = runCatching { graph.subsonic.song(song.id).artists }
             .onFailure { AppLog.w("Artist", "Couldn't load the artists of ${song.id}: ${it.message}") }
             .getOrDefault(emptyList())
     }
     val found = refs.map { ref -> graph.library.artist(ref.id) ?: Artist(ref.id, ref.name) }
+    AppLog.d("Artist", "Song ${song.id}: ${found.size} artists from Navidrome's list")
     if (found.isNotEmpty()) return found.distinctBy { it.id }
 
-    // No list from Navidrome (older servers): split the name and look each part up.
-    val byName = song.artist.split(separators).map { it.trim() }.filter { it.isNotEmpty() }
+    // No list from Navidrome (older servers, offline): split the name, keeping library artists whose
+    // name has a join in it ("Chase & Status") whole, and look each part up.
+    val known = graph.library.artists().map { normalizeKey(it.name) }.toSet()
+    val byName = splitArtists(song.artist) { normalizeKey(it) in known }
         .mapNotNull { graph.library.artistByName(it) }
         .distinctBy { it.id }
     if (byName.size > 1) return byName
