@@ -3,6 +3,51 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.4.0beta — 2026-10-17
+
+### Fixed
+- **Music stopped when you switched from the TV back to the phone.** It now comes back to the phone at the same song and position, paused.
+- **The equaliser's pre-amp crackled on loud songs.** Peaks that would go past full volume are now turned
+  down smoothly instead of being cut off.
+- **The keyboard covered the "How are you feeling?" box on Home.** The box now moves up above the keyboard when you tap it. The same goes for the text boxes in Settings, Scrobbling and Vibes.
+
+### Added
+- **Add to playlist.** From the ⋮ menu in now playing, add the song to one of your own playlists on Navidrome.
+- **Swipe a song to the left to queue it.** Drag any song in a list from right to left and let go: it's added to
+  the queue, with an amber "Add to queue" strip behind it while you drag and a little buzz when it's added.
+- **Download music for listening offline.** Tap the download button on an album, playlist or Liked songs, or pick
+  albums, playlists and artists in the new Downloads menu (Settings → Downloads, or the arrow at the top of
+  Your Library). Downloaded songs play from the phone with no connection, show a small arrow next to them, and
+  stay until you remove them from the same menu. Downloads wait for Wi-Fi unless you change that, and you can
+  set a storage limit. Downloads can be the original file or a smaller Opus version (Downloads → Download quality). Playlists, artists and liked songs pick up songs added later.
+- **Download everything at once.** In Downloads → Add music, "Download all" downloads every album, playlist or
+  artist in the list you're looking at (or the ones you searched for), and "Remove all" takes them off again.
+- **Downloaded songs**, under Settings → Downloads (and Settings → Storage): every song on the phone with its size
+  and quality. Tick songs, or Select all, and remove them together. Songs you remove aren't downloaded again
+  when a playlist gets new songs; download the album or playlist again to bring them back.
+- **Sleep timer.** In the player's ⋮ menu, choose Sleep timer to stop the music after 15, 30, 45 or 60 minutes, at the end of this song, or after a time you choose. While it runs, a moon with the time left shows at the top of the player; tap it to change the timer or turn it off.
+- When the time is up, the song playing finishes and fades out over its last seconds before the music pauses, instead of stopping mid-song. Your volume and ReplayGain are back to normal when you press play again.
+- **Wind down** (needs AudioMuse): near the end of the timer, the songs coming up are swapped for calm, slow ones, so the music gets quieter as you fall asleep.
+- The sleep timer also works while you're playing on a TV or speaker: the music there pauses at the end of the song.
+- **Equaliser.** Settings › Playback › Equaliser has ten bands, presets (Bass boost, Vocal, Treble boost,
+  Rock and more), your own Custom setting and a pre-amp. It works the same on every phone and is remembered
+  between restarts. It isn't used while casting.
+
+### Changed
+- **New now playing, like Spotify.**
+  - Where the music plays (this phone, headphones, a TV or speaker) sits at the bottom left, and the queue
+    button at the bottom right: tap it, or swipe up from it, to see the queue.
+  - Scroll down for cards: a lyrics preview in the cover's colours, about the artist (photo, how much of
+    them is in your library, their story) and about the song (format, sample rate, bit rate, plays).
+  - Once you scroll, a small bar at the top keeps the song, the heart and play/pause at hand.
+- **⋮ menu in now playing**, top right: like or unlike, add to a playlist, add to the queue, go to the
+  album or artists, start song radio, song path, lyrics, song details, sleep timer.
+- **Lyrics open full screen** on the cover's colour: the line playing now is white, the ones to come
+  darker, and the seek bar and controls stay at the bottom. Tap a line to jump there.
+- Song radio moved from the player into the ⋮ menu.
+- **Add to queue works like Spotify.** A queued song now plays right after the current one, and after any songs you
+  queued before it (in the order you added them), instead of at the very end of the album or playlist.
+
 ## 0.3.0beta — 2026-10-17
 
 ### Fixed
