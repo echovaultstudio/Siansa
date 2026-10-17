@@ -72,7 +72,8 @@ class SpacingTest {
             }
         }
         val heading = compose.onNodeWithTag("heading").getBoundsInRoot()
-        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Flat"))).getBoundsInRoot()
+        // The chip's label can sit in the unmerged tree only, depending on how the chip merges it.
+        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Flat")), useUnmergedTree = true).getBoundsInRoot()
         val divider = compose.onNodeWithTag("divider").getBoundsInRoot()
         assertEven("Equaliser preset chips", chip.top - heading.bottom, divider.top - chip.bottom)
     }
