@@ -17,7 +17,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DragIndicator
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -32,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -46,11 +50,18 @@ import app.musix.data.moved
 /**
  * A short list of Home's sections to drag into a new order: hold a row, or grab its handle, and move it.
  * Only the row being dragged follows the finger; the others slide out of the way. The order is saved
- * when a row is let go.
+ * when a row is let go. The eye on each row hides the section from Home, or shows it again.
  */
 @Composable
-fun ArrangeHomeSheet(order: List<HomeSection>, onChange: (List<HomeSection>) -> Unit, onDismiss: () -> Unit) {
+fun ArrangeHomeSheet(
+    order: List<HomeSection>,
+    hidden: Set<HomeSection>,
+    onChange: (List<HomeSection>) -> Unit,
+    onHiddenChange: (Set<HomeSection>) -> Unit,
+    onDismiss: () -> Unit,
+) {
     var items by remember { mutableStateOf(order) }
+    var hiddenItems by remember { mutableStateOf(hidden) }
     var dragging by remember { mutableStateOf<HomeSection?>(null) }
     var offset by remember { mutableFloatStateOf(0f) }
     val list = rememberLazyListState()
@@ -88,23 +99,30 @@ fun ArrangeHomeSheet(order: List<HomeSection>, onChange: (List<HomeSection>) -> 
                 Column(Modifier.weight(1f)) {
                     Text("Arrange Home", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
-                        "Hold a row and drag it",
+                        "Hold a row and drag it. Tap the eye to hide it.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 TextButton(
                     onClick = {
-                        items = HomeSection.default
-                        onChange(items)
+                        if (items != HomeSection.default) {
+                            items = HomeSection.default
+                            onChange(items)
+                        }
+                        if (hiddenItems.isNotEmpty()) {
+                            hiddenItems = emptySet()
+                            onHiddenChange(hiddenItems)
+                        }
                     },
-                    enabled = items != HomeSection.default,
+                    enabled = items != HomeSection.default || hiddenItems.isNotEmpty(),
                 ) { Text("Reset") }
             }
             Spacer(Modifier.height(8.dp))
             LazyColumn(state = list, userScrollEnabled = dragging == null) {
                 items(items, key = { it.id }) { section ->
                     val lifted = section == dragging
+                    val isHidden = section in hiddenItems
                     Surface(
                         color = if (lifted) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerLow,
                         shape = RoundedCornerShape(12.dp),
@@ -128,7 +146,23 @@ fun ArrangeHomeSheet(order: List<HomeSection>, onChange: (List<HomeSection>) -> 
                             },
                     ) {
                         Row(Modifier.height(52.dp).padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(section.label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                            // Hidden rows stay in the list, dimmed, so they keep their place and can come back.
+                            Text(
+                                section.label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f).alpha(if (isHidden) 0.6f else 1f),
+                            )
+                            IconButton(onClick = {
+                                hiddenItems = if (isHidden) hiddenItems - section else hiddenItems + section
+                                onHiddenChange(hiddenItems)
+                            }) {
+                                Icon(
+                                    if (isHidden) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                                    contentDescription = if (isHidden) "Show ${section.label}" else "Hide ${section.label}",
+                                    tint = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                             // The handle moves straight away, without the hold.
                             Icon(
                                 Icons.Rounded.DragIndicator,
