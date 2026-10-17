@@ -131,7 +131,7 @@ import app.musix.playback.Cast
 import app.musix.playback.PlayerState
 import kotlin.math.max
 
-private enum class PlayerView { ART, LYRICS, QUEUE }
+private enum class PlayerView { ART, LYRICS, QUEUE, SOUND }
 
 private val PlayerColors = darkColorScheme(
     primary = Accent,
@@ -162,6 +162,9 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     var view by rememberSaveable { mutableStateOf(PlayerView.ART) }
     var queueOpen by rememberSaveable { mutableStateOf(false) }
     val song = state.current
+    // Sending the music to a TV or speaker: the spectrogram has nothing to listen to then.
+    val castingNow = Cast.status.collectAsStateWithLifecycle().value.device != null ||
+        app.musix.playback.dlna.Dlna.selected.collectAsStateWithLifecycle().value != null
     BackHandler(enabled = queueOpen) { queueOpen = false }
     val scope = rememberCoroutineScope()
     val openArtist = rememberArtistOpener(beforeOpen = onClose)
@@ -271,6 +274,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         when (v) {
                             PlayerView.ART -> SwipeCover(song, onTap = ::openAlbum)
                             PlayerView.LYRICS -> LyricsView(song)
+                            PlayerView.SOUND -> SpectrogramView(state, casting = castingNow)
                             PlayerView.QUEUE -> Box(Modifier.fillMaxSize())
                         }
                     }
@@ -279,7 +283,9 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
                     song?.let { graph.favorites.toggle(it) }
                 }
-                SeekBar(state)
+                SeekBar(state, soundOn = view == PlayerView.SOUND) {
+                    view = if (view == PlayerView.SOUND) PlayerView.ART else PlayerView.SOUND
+                }
                 Controls(state)
                 // Like Spotify: where the music plays on the left (with the TV, speaker or headphones' name),
                 // song radio in the middle, lyrics and the queue on the right.
@@ -531,7 +537,7 @@ private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart:
  * while you drag, and the time shown follows your finger.
  */
 @Composable
-private fun SeekBar(state: PlayerState) {
+private fun SeekBar(state: PlayerState, soundOn: Boolean, onToggleSound: () -> Unit) {
     val graph = LocalGraph.current
     val tracker = remember { SeekTracker() }
     var shown by remember { mutableStateOf(graph.player.progress().let { SeekTracker.Shown(it.positionMs, it.durationMs) }) }
@@ -597,7 +603,7 @@ private fun SeekBar(state: PlayerState) {
                 color = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.weight(1f),
             )
-            QualityBadge(state)
+            QualityBadge(state, soundOn, onToggleSound)
             Text(
                 "-" + formatDuration(((duration - fraction * duration) / 1000).toLong()),
                 style = MaterialTheme.typography.labelSmall,
@@ -614,12 +620,15 @@ private fun SeekBar(state: PlayerState) {
  * Navidrome converts it. Only shows what plays; the quality is set in Settings → Playback.
  */
 @Composable
-private fun QualityBadge(state: PlayerState) {
+private fun QualityBadge(state: PlayerState, soundOn: Boolean, onToggleSound: () -> Unit) {
     val label = StreamQuality.label(state.codec, state.transcodeKbps) ?: return
-    // Tap it for the spectrogram, to check whether the sound really is lossless.
-    var soundCheck by rememberSaveable { mutableStateOf(false) }
-    StreamBadge(label, converted = state.transcodeKbps > 0, modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { soundCheck = true })
-    if (soundCheck) SpectrogramSheet(state, onDismiss = { soundCheck = false })
+    // Tap it to swap the cover for the spectrogram (to check the sound really is lossless), and back.
+    StreamBadge(
+        label,
+        converted = state.transcodeKbps > 0,
+        highlighted = soundOn,
+        modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable(onClickLabel = "Sound check", onClick = onToggleSound),
+    )
 }
 
 /**
@@ -627,9 +636,9 @@ private fun QualityBadge(state: PlayerState) {
  * keeps the same height and the badge sits centred between them.
  */
 @Composable
-internal fun StreamBadge(label: String, converted: Boolean, modifier: Modifier = Modifier) {
+internal fun StreamBadge(label: String, converted: Boolean, modifier: Modifier = Modifier, highlighted: Boolean = false) {
     // Quiet, like the times beside it: only a faint outline and a slightly lighter shade when converted.
-    val color = Color.White.copy(alpha = if (converted) 0.5f else 0.6f)
+    val color = if (highlighted) Accent else Color.White.copy(alpha = if (converted) 0.5f else 0.6f)
     val shape = RoundedCornerShape(4.dp)
     Text(
         label,
@@ -638,7 +647,7 @@ internal fun StreamBadge(label: String, converted: Boolean, modifier: Modifier =
         color = color,
         maxLines = 1,
         modifier = modifier
-            .border(0.5.dp, Color.White.copy(alpha = 0.18f), shape)
+            .border(0.5.dp, if (highlighted) Accent.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.18f), shape)
             .padding(horizontal = 6.dp, vertical = 2.dp),
     )
 }
