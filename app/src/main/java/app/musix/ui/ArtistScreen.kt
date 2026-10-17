@@ -154,6 +154,12 @@ fun ArtistScreen(nav: NavController, id: String) {
         val others by loadState("appears-$id") { graph.library.appearsOn(p.artist) }
         val groups = p.albums.groupBy { it.category }.toList().sortedBy { it.first.ordinal }
 
+        // Release-type chips (Albums, Singles, DJ-mixes…): one type at a time, only while the page is open.
+        var typeName by rememberReleaseTypeFilter()
+        val types = releaseTypeChoices(p.albums)
+        val type = chosenReleaseType(typeName, types)
+        val shownGroups = onlyReleaseType(groups, type)
+
         LazyVerticalGrid(
             state = gridState,
             columns = GridCells.Adaptive(150.dp),
@@ -211,8 +217,12 @@ fun ArtistScreen(nav: NavController, id: String) {
                 }
             }
 
+            if (types.isNotEmpty()) {
+                full { ReleaseTypeRow(types, type) { typeName = it?.name } }
+            }
+
             // Discography by release type: Albums, EPs, Singles, Live, Compilations, DJ-mixes…
-            groups.forEach { (category, albums) ->
+            shownGroups.forEach { (category, albums) ->
                 full { SectionTitle(if (albums.size == 1) category.single else category.plural) }
                 items(albums, key = { "album-${it.id}" }) { album ->
                     AlbumTile(
