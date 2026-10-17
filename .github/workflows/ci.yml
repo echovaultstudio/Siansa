@@ -301,8 +301,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
           python3 scripts/release_notes.py apply notes/fragments.txt
-          if [ -n "$(git status --porcelain)" ]; then
-            git add -A CHANGELOG.md version.txt changelog.d
+          git add -A CHANGELOG.md version.txt changelog.d
+          # Only the notes' files count (the downloaded APK and notes/ aren't part of the repository).
+          if ! git diff --cached --quiet; then
             git commit -q -m "Release ${{ steps.version.outputs.version }} [skip ci]"
             for i in 1 2 3; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 5; done
           fi
