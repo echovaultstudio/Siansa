@@ -80,6 +80,11 @@ data class DownloadList(
     val items: List<OfflineItem> = emptyList(),
     val done: List<DownloadedSong> = emptyList(),
     val waiting: List<Song> = emptyList(),
+    /**
+     * Songs you removed one by one from Downloaded songs: a playlist, artist or Liked songs checked
+     * again doesn't download them back. Choosing the item (or the song) again brings them back.
+     */
+    val skipped: Set<String> = emptySet(),
 )
 
 /** How much of an album or playlist is on the phone, for its download button. */
@@ -87,13 +92,32 @@ enum class OfflineState { NONE, WAITING, PARTLY, ALL }
 
 /** The download list's decisions, kept apart from files and the network so they can be tested. */
 object OfflinePlan {
-    /** [list] with [item] chosen (or its songs updated), and its songs that aren't on the phone yet waiting. */
-    fun choose(list: DownloadList, item: OfflineItem, songs: List<Song>): DownloadList {
-        val updated = item.copy(songIds = songs.map { it.id }.distinct())
+    /**
+     * [list] with [item] chosen (or its songs updated), and its songs that aren't on the phone yet waiting.
+     * [explicit] is true when you chose it (it brings back songs you removed by hand); false when a
+     * playlist, artist or Liked songs is only checked again, which leaves those songs out.
+     */
+    fun choose(list: DownloadList, item: OfflineItem, songs: List<Song>, explicit: Boolean = true): DownloadList {
+        val skipped = if (explicit) list.skipped - songs.mapTo(HashSet()) { it.id } else list.skipped
+        val kept = songs.filter { it.id !in skipped }
+        val updated = item.copy(songIds = kept.map { it.id }.distinct())
         val items = if (list.items.any { it.key == item.key }) list.items.map { if (it.key == item.key) updated.copy(addedAt = it.addedAt) else it }
         else list.items + updated
         // Songs that dropped out of a playlist (or were unliked) go, unless something else still wants them.
-        return prune(enqueue(list.copy(items = items), songs))
+        return prune(enqueue(list.copy(items = items, skipped = skipped), kept))
+    }
+
+    /**
+     * [list] without the songs [ids], removed by hand from Downloaded songs: they're taken out of every
+     * album, playlist and artist that had them (one left with no songs goes too) and aren't downloaded again
+     * when a playlist is checked for new songs.
+     */
+    fun removeSongs(list: DownloadList, ids: Set<String>): DownloadList {
+        if (ids.isEmpty()) return list
+        val items = list.items
+            .map { it.copy(songIds = it.songIds.filterNot { id -> id in ids }) }
+            .filter { it.songIds.isNotEmpty() }
+        return remove(list.copy(items = items, skipped = list.skipped + ids), ids)
     }
 
     /** [list] without the item [key], and without songs no other item still wants. */
@@ -232,16 +256,20 @@ class Downloads(
 
     /** Looks up the songs of [item] and keeps it on the phone. */
     fun choose(item: OfflineItem) {
-        scope.launch {
-            val songs = runCatching { songsOf(item) }
-                .onFailure { AppLog.w("Downloads", "Couldn't get the songs of ${item.key}: ${it.message}") }
-                .getOrNull()
-            if (songs.isNullOrEmpty()) {
-                _progress.value = Progress(note = "Couldn't get the songs of ${item.name}")
-                return@launch
-            }
-            choose(item, songs)
+        scope.launch { chooseNow(item) }
+    }
+
+    private suspend fun chooseNow(item: OfflineItem) {
+        val songs = runCatching { songsOf(item) }
+            .onFailure { AppLog.w("Downloads", "Couldn't get the songs of ${item.key}: ${it.message}") }
+            .getOrNull()
+        if (songs.isNullOrEmpty()) {
+            _progress.value = Progress(note = "Couldn't get the songs of ${item.name}")
+            return
         }
+        change { OfflinePlan.choose(it, item.copy(addedAt = System.currentTimeMillis()), songs) }
+        AppLog.i("Downloads", "Chose ${item.kind.name.lowercase()} ${item.id} (${songs.size} songs), ${_list.value.waiting.size} waiting")
+        start("chosen")
     }
 
     /** Stops keeping the item [key]; its songs are deleted unless another item still wants them. */
@@ -249,6 +277,30 @@ class Downloads(
         scope.launch {
             change { OfflinePlan.drop(it, key) }
             AppLog.i("Downloads", "Removed $key from downloads")
+        }
+    }
+
+    /** Removes the songs [ids] (chosen in Downloaded songs) from the phone, wherever they came from. */
+    fun removeSongs(ids: Set<String>) {
+        if (ids.isEmpty()) return
+        scope.launch {
+            change { OfflinePlan.removeSongs(it, ids) }
+            AppLog.i("Downloads", "Removed ${ids.size} downloaded songs by hand")
+        }
+    }
+
+    /** Downloads [items] (e.g. every playlist), one after the other. */
+    fun chooseAll(items: List<OfflineItem>) {
+        AppLog.i("Downloads", "Chose ${items.size} items at once")
+        scope.launch { items.forEach { chooseNow(it) } }
+    }
+
+    /** Stops keeping [keys] (e.g. every playlist) at once. */
+    fun dropAll(keys: List<String>) {
+        val set = keys.toSet()
+        scope.launch {
+            change { list -> set.fold(list) { l, key -> OfflinePlan.drop(l, key) } }
+            AppLog.i("Downloads", "Removed ${set.size} items from downloads")
         }
     }
 
@@ -270,9 +322,11 @@ class Downloads(
         scope.launch {
             for (item in _list.value.items.filter { it.kind == OfflineKind.PLAYLIST || it.kind == OfflineKind.ARTIST || it.kind == OfflineKind.LIKED }) {
                 val songs = runCatching { songsOf(item) }.getOrNull() ?: continue
-                if (songs.map { it.id }.toSet() == item.songIds.toSet()) continue
+                // Songs removed by hand stay out; they don't count as a change either.
+                val skipped = _list.value.skipped
+                if (songs.filter { it.id !in skipped }.map { it.id }.toSet() == item.songIds.toSet()) continue
                 AppLog.i("Downloads", "${item.key} changed: ${item.songIds.size} → ${songs.size} songs")
-                change { OfflinePlan.choose(it, item, songs) }
+                change { OfflinePlan.choose(it, item, songs, explicit = false) }
             }
             if (_list.value.waiting.isNotEmpty()) start("refreshed")
         }

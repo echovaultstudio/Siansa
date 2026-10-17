@@ -291,7 +291,10 @@ fun StorageScreen(nav: NavController) {
             Heading("Downloads")
             Hint("Music you chose to keep on the phone isn't part of the song cache and is never removed by itself.")
             usage.valueOrNull()?.let { u -> Text("In use: ${formatBytes(u.downloads)}", style = MaterialTheme.typography.bodyLarge) }
-            OutlinedButton(onClick = { nav.navigate("downloads") }) { Text("Manage downloads") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { nav.navigate("downloads") }) { Text("Manage downloads") }
+                OutlinedButton(onClick = { nav.navigate("downloads/songs") }) { Text("Downloaded songs") }
+            }
 
             HorizontalDivider()
             Heading("Song cache")
