@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BluetoothAudio
 import androidx.compose.material.icons.rounded.Cast
 import androidx.compose.material.icons.rounded.CastConnected
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Speaker
 import androidx.compose.material.icons.rounded.Tv
@@ -44,7 +46,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.mediarouter.media.MediaRouter
 import app.musix.playback.Cast
+import app.musix.playback.AudioOutput
 import app.musix.playback.CastStatus
+import app.musix.playback.OutputDevice
 
 /**
  * The cast button: picks a TV or speaker to play on. Hidden on phones that can't cast, where
@@ -76,44 +80,54 @@ fun CastButton(tint: Color = LocalContentColor.current, keepSpace: Boolean = fal
 
 /**
  * The text next to the device button in now playing: the TV or speaker's name while casting,
- * "Connecting…" while it connects, and nothing while the music plays on this phone.
+ * "Connecting…" while it connects, the Bluetooth or wired headphones the phone plays through,
+ * and nothing on the phone's own speaker.
  */
-fun castDeviceLabel(status: CastStatus): String? = when {
+fun castDeviceLabel(status: CastStatus, output: OutputDevice? = null): String? = when {
     status.device != null -> status.device
     status.connecting -> "Connecting…"
+    output != null -> output.name
     else -> null
 }
 
 /**
- * Now playing's device button, bottom left as in Spotify: the cast icon, followed by the name of the TV
- * or speaker while the music plays there. Tapping it picks where to play. Hidden on phones that can't cast.
+ * Now playing's device button, bottom left as in Spotify: an icon for where the music plays, followed by
+ * the device's name when it isn't this phone's speaker ("Living Room TV", "Sony Headphones"). Tapping it
+ * picks a TV or speaker to cast to, on phones that can cast.
  */
 @Composable
 fun CastDeviceButton(tint: Color, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    LaunchedEffect(Unit) { Cast.whenReady(context) { } }
+    LaunchedEffect(Unit) {
+        Cast.whenReady(context) { }
+        AudioOutput.start(context)
+    }
     val status by Cast.status.collectAsStateWithLifecycle()
+    val output by AudioOutput.device.collectAsStateWithLifecycle()
     var open by remember { mutableStateOf(false) }
-    if (!status.available) return
-    val label = castDeviceLabel(status)
+    if (!status.available && output == null) return
+    val label = castDeviceLabel(status, output)
     val color = when {
         status.device != null -> Accent
         status.connecting -> Accent.copy(alpha = 0.6f)
+        output != null -> Accent
         else -> tint
+    }
+    val icon = when {
+        status.device != null -> Icons.Rounded.CastConnected
+        status.connecting -> Icons.Rounded.Cast
+        output?.bluetooth == true -> Icons.Rounded.BluetoothAudio
+        output != null -> Icons.Rounded.Headphones
+        else -> Icons.Rounded.Cast
     }
     Row(
         modifier
             .clip(RoundedCornerShape(20.dp))
-            .clickable(onClickLabel = "Choose where to play") { open = true }
+            .clickable(enabled = status.available, onClickLabel = "Choose where to play") { open = true }
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            if (status.device != null) Icons.Rounded.CastConnected else Icons.Rounded.Cast,
-            if (label == null) "Play on a TV or speaker" else null,
-            tint = color,
-            modifier = Modifier.size(22.dp),
-        )
+        Icon(icon, if (label == null) "Play on a TV or speaker" else null, tint = color, modifier = Modifier.size(22.dp))
         if (label != null) {
             Spacer(Modifier.width(8.dp))
             Text(

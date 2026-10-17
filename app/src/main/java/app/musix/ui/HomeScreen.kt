@@ -196,7 +196,6 @@ fun HomeScreen(nav: NavController) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(greeting(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                CastButton()
                 IconButton(onClick = { arranging = true }) { Icon(Icons.Rounded.Tune, "Arrange Home") }
             }
         }
