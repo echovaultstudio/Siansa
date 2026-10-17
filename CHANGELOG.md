@@ -3,6 +3,25 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.2.0beta — 2026-10-17
+
+### Fixed
+- **Release type chips on artist pages were squeezed against Popular.** The chips now have the same space
+  above them as below them, so they sit evenly between the popular songs and the albums.
+- **Changing the quality in Settings didn't change the song that was playing.** When you change the Wi-Fi or
+  mobile data quality in Settings → Playback, the song that's playing now loads again at the new quality and
+  carries on from the same spot, instead of staying at the old quality (or going silent).
+
+### Added
+- **Copy errors.** On Settings → Logs, "Copy errors" puts every error in the log, with its details, on the
+  clipboard, ready to paste into a message or an issue. The app version and phone model are at the top.
+- **Several Navidrome users.** Add more logins (on the same server or different ones) in Settings → Users and switch between them with one tap. Each user has their own library, history, mixes and settings, including AudioMuse, which can be left empty for a user without it. Musix restarts when you switch.
+
+### Changed
+- **The format under the seek bar is just a label now.** Tapping it no longer opens a quality menu (switching
+  there didn't work); set the quality in Settings → Playback. The label is smaller, sits evenly between the
+  two times and no longer makes the row taller.
+
 ## 0.1.0beta — 2026-10-17
 
 ### Fixed
