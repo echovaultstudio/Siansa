@@ -616,7 +616,10 @@ private fun SeekBar(state: PlayerState) {
 @Composable
 private fun QualityBadge(state: PlayerState) {
     val label = StreamQuality.label(state.codec, state.transcodeKbps) ?: return
-    StreamBadge(label, converted = state.transcodeKbps > 0)
+    // Tap it for the spectrogram, to check whether the sound really is lossless.
+    var soundCheck by rememberSaveable { mutableStateOf(false) }
+    StreamBadge(label, converted = state.transcodeKbps > 0, modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { soundCheck = true })
+    if (soundCheck) SpectrogramSheet(state, onDismiss = { soundCheck = false })
 }
 
 /**
