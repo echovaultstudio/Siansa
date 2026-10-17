@@ -15,6 +15,8 @@ Source: `app/src/main/java/app/musix/`. Unit tests: `app/src/test/`. Emulator te
 - Log what matters for tracing problems with `AppLog` (`i`, `w`, `e`; `d` for detail). Never log addresses,
   passwords, tokens or API keys.
 - UI text: short, plain English, no jargon. Follow the existing Musix theme (`ui/Theme.kt`); test light and dark.
+- Visual changes: keep spacing even (the same gap above and below a row of chips, buttons or a badge) and add
+  a check for it to `app/src/androidTest/java/app/musix/SpacingTest.kt`.
 - Navigate and change screen state only on the main thread.
 
 ## Automatic issues

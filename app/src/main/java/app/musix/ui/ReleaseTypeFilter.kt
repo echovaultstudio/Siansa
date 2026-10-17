@@ -45,6 +45,9 @@ fun chosenReleaseType(saved: String?, choices: List<AlbumCategory>): AlbumCatego
 fun <T> onlyReleaseType(groups: List<Pair<AlbumCategory, T>>, type: AlbumCategory?): List<Pair<AlbumCategory, T>> =
     if (type == null) groups else groups.filter { it.first == type }
 
+/** The space above and below the release-type chips, so they sit evenly between Popular and the discography. */
+val CHIPS_GAP = 20.dp
+
 /** The chosen release type's name, kept while the page is open (also across rotation), never saved for good. */
 @Composable
 fun rememberReleaseTypeFilter(): MutableState<String?> = rememberSaveable { mutableStateOf<String?>(null) }
@@ -54,13 +57,20 @@ fun rememberReleaseTypeFilter(): MutableState<String?> = rememberSaveable { muta
  * chosen type or ✕ shows everything again.
  */
 @Composable
-fun ReleaseTypeRow(choices: List<AlbumCategory>, selected: AlbumCategory?, onSelect: (AlbumCategory?) -> Unit) {
+fun ReleaseTypeRow(
+    choices: List<AlbumCategory>,
+    selected: AlbumCategory?,
+    modifier: Modifier = Modifier,
+    onSelect: (AlbumCategory?) -> Unit,
+) {
     val pick: (AlbumCategory?) -> Unit = { type ->
         AppLog.d("Artist", "Release type filter: ${type?.name ?: "all"}")
         onSelect(type)
     }
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 6.dp),
+        // The same space above the chips (after Popular) as below them (before the first heading). The
+        // song row above already has 6 dp of its own below its cover, so less is added here.
+        modifier.fillMaxWidth().padding(top = CHIPS_GAP - 6.dp).horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
