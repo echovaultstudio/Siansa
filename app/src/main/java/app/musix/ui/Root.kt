@@ -223,6 +223,7 @@ fun MusixRoot() {
                 composable("settings/playback") { PlaybackSettingsScreen(nav) }
                 composable("settings/storage") { StorageScreen(nav) }
                 composable("settings/logs") { LogsScreen(nav) }
+                composable("settings/backup") { BackupScreen(nav) }
                 composable("settings/scrobbling") { ScrobblingScreen(nav) }
                 composable("home/{section}") { HomeSectionScreen(nav, it.arguments?.getString("section").orEmpty()) }
                 composable("liked") { LikedScreen(nav) }
