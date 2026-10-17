@@ -90,8 +90,7 @@ class AppTourTest {
                     SettingsRepository(app, second).save(graph.settings.current)
                 }
                 try {
-                    back()
-                    idle(500)
+                    closeSheet()
                     graph.guests.setShown(second, true)
                     val end = SystemClock.elapsedRealtime() + 60_000
                     while (SystemClock.elapsedRealtime() < end && graph.guests.state.value[second]?.let { !it.running && (it.songs != null || it.error != null) } != true) SystemClock.sleep(300)
@@ -106,8 +105,8 @@ class AppTourTest {
                     click("Only downloaded music")
                     idle(800)
                     shot("01e-only-downloaded-on", popups = true)
-                    back()
-                    idle(1500)
+                    closeSheet()
+                    idle(1000)
                     shot("01f-home-only-downloaded")
                     libraryAll()
                     idle(1000)
@@ -315,6 +314,12 @@ class AppTourTest {
             runCatching { shot("FAIL-" + name.replace(' ', '-')) }
             runCatching { back() }
         }
+    }
+
+    /** Closes an open sheet: a real back key goes to the sheet's own window, not the app behind it. */
+    private fun closeSheet() {
+        instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        idle(800)
     }
 
     private fun pausePlayback() {
