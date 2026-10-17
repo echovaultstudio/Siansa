@@ -100,7 +100,12 @@ private fun ReportPage(nav: NavController, rangeId: String) {
                         Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        listOf(ReportRange.THIS_MONTH to "This month", ReportRange.LAST_MONTH to "Last month", ReportRange.THIS_YEAR to "This year")
+                        listOf(
+                            ReportRange.THIS_MONTH to "This month",
+                            ReportRange.LAST_MONTH to "Last month",
+                            ReportRange.THIS_YEAR to "This year",
+                            ReportRange.YEAR_AGO to "This time last year",
+                        )
                             .forEach { (value, label) ->
                                 FilterChip(selected = range == value, onClick = { range = value }, label = { Text(label) })
                             }
@@ -119,7 +124,7 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
     val graph = LocalGraph.current
     if (r.plays == 0) {
         Text(
-            "Nothing played in this period yet.",
+            "Nothing played in this period.",
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(20.dp),
         )

@@ -20,13 +20,13 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,6 +44,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -53,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.musix.data.Song
+import app.musix.data.discHeaders
 
 /**
  * The page used for albums, playlists, mixes and radios, laid out like Spotify: the cover's colour
@@ -69,7 +72,10 @@ fun CollectionPage(
     cover: @Composable (Modifier) -> Unit,
     header: @Composable ColumnScope.() -> Unit,
     numbered: Boolean = false,
+    discTitles: Map<Int, String> = emptyMap(),
     showCovers: Boolean = true,
+    // The line under each song's title; by default its artist and album.
+    subtitleOf: ((Song) -> String?)? = null,
     footer: LazyListScope.() -> Unit = {},
 ) {
     val graph = LocalGraph.current
@@ -134,15 +140,22 @@ fun CollectionPage(
                 }
                 error != null -> item { ErrorText(error) }
                 songs != null -> {
-                    val multiDisc = numbered && songs.mapNotNull { it.disc }.distinct().size > 1
-                    itemsIndexed(songs, key = { i, s -> "$i-${s.id}" }) { index, song ->
-                        SongRow(
-                            song = song,
-                            onClick = { graph.player.play(songs, index) },
-                            leading = if (numbered) song.track?.let { t -> if (multiDisc && song.disc != null) "${song.disc}.$t" else "$t" } ?: "${index + 1}" else null,
-                            highlighted = song.id == player.current?.id,
-                            showCover = showCovers,
-                        )
+                    // Albums with several discs get a heading above each disc (its title, or "Disc 2").
+                    val discs = if (numbered) discHeaders(songs, discTitles) else emptyMap()
+                    songs.forEachIndexed { index, song ->
+                        discs[index]?.let { header ->
+                            item(key = "disc-$index-${header.disc}", contentType = "disc") { DiscHeading(header.label, color) }
+                        }
+                        item(key = "$index-${song.id}", contentType = "song") {
+                            SongRow(
+                                song = song,
+                                onClick = { graph.player.play(songs, index) },
+                                leading = if (numbered) song.track?.toString() ?: "${index + 1}" else null,
+                                highlighted = song.id == player.current?.id,
+                                showCover = showCovers,
+                                subtitle = if (subtitleOf != null) subtitleOf(song) else artistAndAlbum(song),
+                            )
+                        }
                     }
                 }
             }
@@ -175,6 +188,46 @@ fun CollectionPage(
                 modifier = Modifier.weight(1f).graphicsLayer { alpha = barAlpha },
             )
         }
+    }
+}
+
+/** The colours of a disc heading's band: [start] on the left, fading out to the right, with [text] on it. */
+internal data class DiscBand(val start: Color, val text: Color)
+
+/**
+ * A band in the album's own colour behind each disc heading, so it stands out in a long track list:
+ * the cover colour darkened in dark mode, a soft tint of it in light mode. The text is white or near
+ * black, whichever reads better on the band.
+ */
+internal fun discBand(cover: Color, dark: Boolean): DiscBand {
+    val start = if (dark) lerp(cover, Color.Black, 0.6f) else lerp(cover, Color.White, 0.75f)
+    val text = if (start.luminance() > 0.3f) Color(0xFF1A1426) else Color.White
+    return DiscBand(start.copy(alpha = 1f), text)
+}
+
+/** The heading above each disc of a multi-disc album. */
+@Composable
+private fun DiscHeading(label: String, cover: Color) {
+    val band = discBand(cover, dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 8.dp, end = 8.dp, top = 16.dp, bottom = 4.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Brush.horizontalGradient(0f to band.start, 0.6f to band.start.copy(alpha = 0.75f), 1f to band.start.copy(alpha = 0f)))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Rounded.Album, null, tint = band.text.copy(alpha = 0.85f), modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(10.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = band.text,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

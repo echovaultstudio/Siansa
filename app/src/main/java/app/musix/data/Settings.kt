@@ -46,6 +46,7 @@ data class AppSettings(
     val transcodeWifiKbps: Int = 0,
     val transcodeMobileKbps: Int = 0,
     val songCacheMb: Int = 2048,
+    val homeOrder: List<HomeSection> = HomeSection.default,
 ) {
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
@@ -149,6 +150,7 @@ class SettingsRepository(context: Context) {
         transcodeWifiKbps = prefs.getInt("tc_wifi", 0),
         transcodeMobileKbps = prefs.getInt("tc_mobile", 0),
         songCacheMb = prefs.getInt("song_cache_mb", 2048),
+        homeOrder = HomeSection.parse(prefs.getString("home_order", null)),
     )
 
     /**
@@ -232,6 +234,11 @@ class SettingsRepository(context: Context) {
     fun setLogging(on: Boolean) {
         prefs.edit().putBoolean("logging", on).apply()
         _state.value = _state.value.copy(logging = on)
+    }
+
+    fun setHomeOrder(order: List<HomeSection>) {
+        prefs.edit().putString("home_order", HomeSection.format(order)).apply()
+        _state.value = _state.value.copy(homeOrder = order)
     }
 
     fun setSyncFolders(ids: Set<String>) {

@@ -1,7 +1,59 @@
 # Changelog
 
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
-To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
+Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
+
+## 0.0.28beta — 2026-10-17
+
+### Fixed
+- **Mixes, mood playlists, sound search and radios played songs from libraries you had unchecked.** When you
+  sync only some Navidrome libraries (Settings → Library sync), these now only use songs from those libraries.
+- **Your listening showed songs you don't have.** Top songs and top albums now only list music that's in your library, so plays from other apps and services (counted by Koito) no longer appear there. The list still shows up to 10 by filling in from further down.
+- **The Liked songs tile at the top of Home was blank.** It now shows the heart, like in Your library.
+
+### Added
+- **Song path.** Choose "Song path…" in any song's menu, pick a second song and a length (10, 20 or 30 songs), and Musix builds a queue that moves smoothly from the sound of one song to the other. Swap to make the chosen song the end instead of the start. Play it straight away or save it as a playlist on Navidrome. Needs AudioMuse.
+
+### Changed
+- **Disc names are easier to spot.** On albums with several discs, each disc's name now sits on a band in the album's colour (darker in dark mode, a soft tint in light mode), so it stands out in long track lists.
+
+## 0.0.27beta — 2026-10-17
+
+### Fixed
+- **App icon looked off centre.** The sound bars now sit in the middle of the icon instead of leaning right and low.
+
+### Added
+- **Artists you might like** on Home: artists you don't have yet that are similar to the ones you play most, each with a photo. Tap one to see how many albums and fans it has, which of your artists it's like, and open it in Deezer to listen. The list is made once a day. Similar artists come from your Navidrome server (through Last.fm) and from Deezer; to find them and their photos, Musix sends Deezer only artist names. Like every Home row, you can move it under Arrange Home.
+
+### Changed
+- **App icon has more depth.** The bars have a soft shine and a gentle glow behind them, so the icon looks less flat. The themed (one-colour) icon stays plain.
+
+## 0.0.26beta — 2026-10-17
+
+### Fixed
+- **The bar on now playing jumped around.** After you let go of it, it flew back to the old spot for a moment before moving to where you dropped it, and on a new song it could slide off in either direction. It now stays where you let go, starts each song from that song's own time and length, and moves smoothly instead of in half-second steps.
+- **Grey square before the cover in now playing**, when opening it right after playing a song from a list. Two things changed:
+  - the cover of the song that's playing is now loaded at full size as soon as it starts, so it's ready before you open now playing;
+  - any cover that isn't ready at the size it's shown at now shows the same cover at a size that is (the one from the list or the mini player) until the sharper one is ready, instead of an empty grey square. This also applies to the blurred background in now playing, album pages and everywhere else covers are shown.
+
+### Added
+- **A to Z bar in Your Library.** When the library is sorted Alphabetical or by Creator and the list is long, a bar of letters runs down the right edge. Tap a letter, or drag along the bar, to jump there; a big letter shows next to your finger while you drag. Letters with nothing in them are dimmed, and names starting with a number or symbol are under #.
+- **Arrange Home**: put Home's sections in the order you like. Tap the sliders button next to the greeting, then hold a row (or grab its handle) and drag it. The order is kept, and Reset puts it back.
+- **This time last year** in Your listening: the same month a year ago, with your top artists, songs and albums from then. It has its own tile in Your Library and a button on the Your listening page.
+- **Albums with several discs are split by disc**: each disc gets its own heading above its songs. Discs with a name (the "disc title" tag, as Navidrome shows it, e.g. for box sets) show that name; others show "Disc 1", "Disc 2"… Track numbers no longer carry the disc in front ("2.5" is now "5" under "Disc 2").
+- **Appears on** on artist pages: a row of albums by other artists that this artist is on, such as features ("feat."), compilations and splits. Tap the "Appears on" heading to see all of them on one page. It uses your synced library, so it shows after a sync.
+
+### Changed
+- Alphabetical and Creator sorting now put names with accents with their letter (Ångström with the A's), and names starting with a number or symbol first.
+- **Lyrics blend into now playing** instead of sitting in a dark box with visible edges. The box is gone; the lyrics fade out softly at the top and bottom into the blurred cover, and a light shadow keeps them readable on bright covers.
+- **Now playing sits a little lower**: "Playing from album" was pressed against the top of the screen. It now has a gap above it that suits the phone's height (more on tall phones, less on small ones), so the whole screen looks more even.
+- **Album pages no longer repeat the album's artist and name under every song.** A song only shows a second line when other artists are on it (a "feat." or a duet), and then only those artists. Musix reads this from the song's artist tags as Navidrome reports them.
+- **Vibes moved from the bottom bar into Settings** (#3). The bottom bar now has four tabs: Home, Search, Your Library and Settings. Vibes is a row in Settings that shows how many vibes you have, and its page now has a back arrow.
+
+## 0.0.25beta — 2026-10-16
+
+### Added
+- **See everything in a Home row.** Rows with more than four items (Rediscover, Radios, Your playlists, Recently played, Artist radios, Recently added, Your genres, Random picks) now have an arrow next to their title. Tap the title to open a page with all of them in a grid, including ones Home has no room for: every radio, every playlist and genre, and longer lists of recently played and recently added albums.
 
 ## 0.0.18beta — 2026-10-16
 
