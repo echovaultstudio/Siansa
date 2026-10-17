@@ -21,6 +21,9 @@ val moodRadios = listOf(
     MoodRadio("romance", "Romance", "romantic smooth soulful love songs, warm vocals", 0xFFC2416B to 0xFF4D0F2A),
 )
 
+/** The sound search behind the sleep timer's wind down: like Chill, but slower and quieter. */
+const val WIND_DOWN_QUERY = "calm slow quiet soft gentle peaceful relaxing sleep music, ambient, soft piano, mellow acoustic"
+
 /** Builds radio queues. Every function returns songs ready to play, or throws with a readable reason. */
 class Radios(private val graph: AppGraph) {
 
@@ -29,6 +32,14 @@ class Radios(private val graph: AppGraph) {
         val songs = graph.generator.soundSearch(radio.query, 120)
         if (songs.isEmpty()) throw MixException("AudioMuse found nothing for ${radio.name}")
         return varied(songs, 60)
+    }
+
+    /** Calm, slow songs for the sleep timer's wind down. */
+    suspend fun windDown(): List<Song> {
+        AppLog.i("Radio", "Wind down")
+        val songs = graph.generator.soundSearch(WIND_DOWN_QUERY, 80)
+        if (songs.isEmpty()) throw MixException("AudioMuse found no calm songs")
+        return varied(songs, 30)
     }
 
     suspend fun genre(name: String): List<Song> {

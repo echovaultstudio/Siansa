@@ -20,6 +20,7 @@ import app.musix.mix.Insights
 import app.musix.mix.ArtistSuggestions
 import app.musix.mix.SongPath
 import app.musix.mix.SongRadio
+import app.musix.mix.WindDown
 import app.musix.mix.Taste
 import app.musix.net.AudioMuseApi
 import app.musix.net.DeezerApi
@@ -30,6 +31,7 @@ import app.musix.net.OpenRouterApi
 import app.musix.net.SubsonicApi
 import app.musix.offline.Downloads
 import app.musix.playback.PlayerConnection
+import app.musix.playback.SleepTimer
 import app.musix.scrobble.Scrobbler
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
@@ -191,4 +193,6 @@ class AppGraph(val app: Application) {
     val player = PlayerConnection(app, subsonic)
     val songRadio = SongRadio(this)
     val songPath = SongPath(this)
+    val sleepTimer = SleepTimer()
+    val windDown = WindDown(this)
 }

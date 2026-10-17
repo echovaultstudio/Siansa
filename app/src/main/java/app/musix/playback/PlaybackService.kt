@@ -75,6 +75,7 @@ class PlaybackService : MediaSessionService() {
     private var cacheFactory: CacheDataSource.Factory? = null
     private var precacheJob: Job? = null
     private var precacheWriter: CacheWriter? = null
+    private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     // The quality chosen when a song's stream first opens, so a network change can't switch format mid-song.
     private val chosenKbps: MutableMap<String, Int> = Collections.synchronizedMap(object : LinkedHashMap<String, Int>(64, 0.75f, true) {
@@ -121,6 +122,14 @@ class PlaybackService : MediaSessionService() {
                 }
             })
             .build()
+
+        // The sleep timer: check it while it runs, and put everything back when it's turned off.
+        mainScope.launch {
+            graph.sleepTimer.state.collect { timer ->
+                handler.removeCallbacks(sleepTick)
+                if (timer == null) endSleepFade(player) else handler.post(sleepTick)
+            }
+        }
 
         // Casting: playback moves to the TV when a Cast session starts and back when it ends.
         Cast.whenReady(this) { cast ->
@@ -341,6 +350,71 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    // ---- Sleep timer: finish the song, fade out over its last seconds, then pause ----
+
+    /** The ReplayGain volume of the current song, and how far the sleep timer has faded it (1 = not at all). */
+    private var baseVolume = 1f
+    private var sleepLevel = 1f
+
+    private fun applyVolume(player: Player) {
+        player.volume = baseVolume * sleepLevel
+    }
+
+    /** Time left in the current song, or -1 when its length isn't known yet. */
+    private fun songLeftMs(player: Player): Long {
+        val duration = player.duration
+        if (duration == C.TIME_UNSET || duration <= 0) return -1
+        return (duration - player.currentPosition).coerceAtLeast(0)
+    }
+
+    /** Puts the volume back and lets the queue play on, after the timer has paused or been turned off. */
+    private fun endSleepFade(player: ExoPlayer) {
+        if (player.pauseAtEndOfMediaItems) player.pauseAtEndOfMediaItems = false
+        if (sleepLevel != 1f) {
+            sleepLevel = 1f
+            applyVolume(player)
+        }
+    }
+
+    /** Every second while the timer runs, ten times a second while the last song fades out. */
+    private val sleepTick = object : Runnable {
+        override fun run() {
+            val player = session?.player ?: return
+            // On a TV or speaker the phone can't fade its volume or stop it at the song's end: it pauses it instead.
+            val onPhone = player === exo
+            val timer = graph.sleepTimer
+            val now = timer.now()
+            if (timer.state.value?.isTimeUp(now) == true) {
+                if (!player.playWhenReady) {
+                    AppLog.i("Sleep", "Time is up while nothing is playing; timer off")
+                    timer.done()
+                    return
+                }
+                timer.timeUp(songLeftMs(player))
+            }
+            val state = timer.state.value ?: return
+            if (state.finishing) {
+                // The player itself pauses at the song's end, so the next song never starts.
+                if (onPhone && state.cutAt == null && !exo.pauseAtEndOfMediaItems) exo.pauseAtEndOfMediaItems = true
+                val left = state.cutAt?.let { it - now } ?: songLeftMs(player)
+                if (onPhone) {
+                    val level = sleepFade(left)
+                    if (level != sleepLevel) {
+                        sleepLevel = level
+                        applyVolume(player)
+                    }
+                }
+                if (sleepPauseNow(onPhone, state, left)) {
+                    if (!onPhone) AppLog.i("Sleep", "Pausing the TV or speaker")
+                    player.pause()
+                    timer.done()
+                    return
+                }
+            }
+            handler.postDelayed(this, if (state.finishing) 100 else 1_000)
+        }
+    }
+
     /** Moves the music to the DLNA [device] picked in the app, or back to the phone when it's null. */
     private fun onDlnaDevice(device: DlnaDevice?) {
         val session = session ?: return
@@ -451,6 +525,9 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         handler.removeCallbacks(bufferingWatch)
+        handler.removeCallbacks(sleepTick)
+        mainScope.cancel()
+        graph.sleepTimer.cancel()
         events?.stopWatches()
         precacheWriter?.cancel()
         events?.finishCurrent()
@@ -519,7 +596,8 @@ class PlaybackService : MediaSessionService() {
             restarted = false
             resetProgressWatch()
             if (player.playWhenReady) armStartWatch()
-            if (onPhone) player.volume = replayGainVolume(song, graph.settings.current)
+            baseVolume = replayGainVolume(song, graph.settings.current)
+            if (onPhone) applyVolume(player)
             graph.scrobbler.nowPlaying(song)
             scope.launch {
                 runCatching { graph.history.add(PlayEvent(song.id, song.title, song.artist, song.genre, System.currentTimeMillis())) }
@@ -586,7 +664,11 @@ class PlaybackService : MediaSessionService() {
         override fun onPlaybackStateChanged(playbackState: Int) {
             handler.removeCallbacks(bufferingWatch)
             if (playbackState == Player.STATE_BUFFERING) handler.postDelayed(bufferingWatch, 8_000)
-            if (playbackState == Player.STATE_ENDED) finishCurrent()
+            if (playbackState == Player.STATE_ENDED) {
+                finishCurrent()
+                // The queue ran out while the sleep timer was finishing its song.
+                if (graph.sleepTimer.state.value?.finishing == true) graph.sleepTimer.done()
+            }
         }
 
         // ---- Start watchdog: a chosen song must actually start playing ----
@@ -599,6 +681,12 @@ class PlaybackService : MediaSessionService() {
             handler.removeCallbacks(progressWatch)
             watchedPosition = -1L
             if (playWhenReady && onPhone) handler.postDelayed(progressWatch, 1_000)
+            // Paused at the end of the last song (or by hand while it fades out): the sleep timer is done.
+            if (!playWhenReady && graph.sleepTimer.state.value?.finishing == true &&
+                (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM || reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
+            ) {
+                graph.sleepTimer.done()
+            }
             if (playWhenReady) armStartWatch() else if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
                 // Lost the audio moments after a song was chosen: almost always the app we took over
                 // from answering late. Take it back once instead of sitting paused.
