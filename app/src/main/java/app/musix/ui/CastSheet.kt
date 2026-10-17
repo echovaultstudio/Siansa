@@ -49,28 +49,29 @@ import app.musix.playback.Cast
 import app.musix.playback.AudioOutput
 import app.musix.playback.CastStatus
 import app.musix.playback.OutputDevice
+import app.musix.playback.dlna.Dlna
 
 /**
- * The cast button: picks a TV or speaker to play on. Hidden on phones that can't cast, where
- * [keepSpace] still holds its place so a centred title stays centred.
+ * The cast button: picks a TV or speaker to play on (Chromecast, or DLNA, which needs no Google Play services).
  */
 @Composable
-fun CastButton(tint: Color = LocalContentColor.current, keepSpace: Boolean = false) {
+fun CastButton(tint: Color = LocalContentColor.current) {
     val context = LocalContext.current
     LaunchedEffect(Unit) { Cast.whenReady(context) { } }
     val status by Cast.status.collectAsStateWithLifecycle()
+    val dlna by Dlna.selected.collectAsStateWithLifecycle()
+    val dlnaConnecting by Dlna.connecting.collectAsStateWithLifecycle()
     var open by remember { mutableStateOf(false) }
-    if (!status.available) {
-        if (keepSpace) Spacer(Modifier.size(48.dp))
-        return
-    }
+    // DLNA works without Google Play services, so the button is always there.
+    val device = dlna?.name ?: status.device
+    val connecting = dlnaConnecting || status.connecting
     IconButton(onClick = { open = true }) {
         Icon(
-            if (status.device != null) Icons.Rounded.CastConnected else Icons.Rounded.Cast,
-            if (status.device != null) "Playing on ${status.device}" else "Play on a TV or speaker",
+            if (device != null) Icons.Rounded.CastConnected else Icons.Rounded.Cast,
+            if (device != null) "Playing on $device" else "Play on a TV or speaker",
             tint = when {
-                status.device != null -> Accent
-                status.connecting -> Accent.copy(alpha = 0.5f)
+                connecting -> Accent.copy(alpha = 0.5f)
+                device != null -> Accent
                 else -> tint
             },
         )
@@ -83,7 +84,9 @@ fun CastButton(tint: Color = LocalContentColor.current, keepSpace: Boolean = fal
  * "Connecting…" while it connects, the Bluetooth or wired headphones the phone plays through,
  * and nothing on the phone's own speaker.
  */
-fun castDeviceLabel(status: CastStatus, output: OutputDevice? = null): String? = when {
+fun castDeviceLabel(status: CastStatus, output: OutputDevice? = null, dlna: String? = null, dlnaConnecting: Boolean = false): String? = when {
+    dlnaConnecting -> "Connecting…"
+    dlna != null -> dlna
     status.device != null -> status.device
     status.connecting -> "Connecting…"
     output != null -> output.name
@@ -104,18 +107,21 @@ fun CastDeviceButton(tint: Color, modifier: Modifier = Modifier) {
     }
     val status by Cast.status.collectAsStateWithLifecycle()
     val output by AudioOutput.device.collectAsStateWithLifecycle()
+    val dlna by Dlna.selected.collectAsStateWithLifecycle()
+    val dlnaConnecting by Dlna.connecting.collectAsStateWithLifecycle()
     var open by remember { mutableStateOf(false) }
-    if (!status.available && output == null) return
-    val label = castDeviceLabel(status, output)
+    val label = castDeviceLabel(status, output, dlna?.name, dlnaConnecting)
+    val remote = dlna != null || status.device != null
+    val connecting = dlnaConnecting || status.connecting
     val color = when {
-        status.device != null -> Accent
-        status.connecting -> Accent.copy(alpha = 0.6f)
+        connecting -> Accent.copy(alpha = 0.6f)
+        remote -> Accent
         output != null -> Accent
         else -> tint
     }
     val icon = when {
-        status.device != null -> Icons.Rounded.CastConnected
-        status.connecting -> Icons.Rounded.Cast
+        connecting -> Icons.Rounded.Cast
+        remote -> Icons.Rounded.CastConnected
         output?.bluetooth == true -> Icons.Rounded.BluetoothAudio
         output != null -> Icons.Rounded.Headphones
         else -> Icons.Rounded.Cast
@@ -123,7 +129,7 @@ fun CastDeviceButton(tint: Color, modifier: Modifier = Modifier) {
     Row(
         modifier
             .clip(RoundedCornerShape(20.dp))
-            .clickable(enabled = status.available, onClickLabel = "Choose where to play") { open = true }
+            .clickable(onClickLabel = "Choose where to play") { open = true }
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -145,13 +151,25 @@ fun CastDeviceButton(tint: Color, modifier: Modifier = Modifier) {
 
 private class CastTarget(val route: MediaRouter.RouteInfo, val name: String, val detail: String?, val selected: Boolean, val icon: ImageVector)
 
-/** Lists the phone and every Cast device on the Wi-Fi; tapping one moves the music there. */
+/**
+ * Lists the phone, every Cast device and every DLNA TV or speaker on the Wi-Fi; tapping one moves the
+ * music there.
+ */
 @Composable
 private fun CastSheet(onDismiss: () -> Unit) {
     val context = LocalContext.current
     val router = remember { MediaRouter.getInstance(context) }
     val status by Cast.status.collectAsStateWithLifecycle()
     var targets by remember { mutableStateOf(emptyList<CastTarget>()) }
+    val dlnaDevices by Dlna.devices.collectAsStateWithLifecycle()
+    val dlna by Dlna.selected.collectAsStateWithLifecycle()
+    val dlnaConnecting by Dlna.connecting.collectAsStateWithLifecycle()
+
+    // DLNA devices are searched for only while the sheet is open.
+    DisposableEffect(Unit) {
+        Dlna.startSearch(context)
+        onDispose { Dlna.stopSearch() }
+    }
 
     // Searches for devices only while the sheet is open.
     DisposableEffect(router) {
@@ -188,18 +206,37 @@ private fun CastSheet(onDismiss: () -> Unit) {
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
             )
-            TargetRow(Icons.Rounded.PhoneAndroid, "This phone", null, selected = status.device == null && !status.connecting) {
+            val onPhone = status.device == null && !status.connecting && dlna == null
+            TargetRow(Icons.Rounded.PhoneAndroid, "This phone", null, selected = onPhone) {
                 if (status.device != null || status.connecting) Cast.disconnect()
+                Dlna.select(null)
                 onDismiss()
             }
             targets.forEach { target ->
                 val connecting = status.connecting && target.selected
-                TargetRow(target.icon, target.name, if (connecting) "Connecting…" else target.detail, selected = target.selected && !connecting) {
+                TargetRow(target.icon, target.name, if (connecting) "Connecting…" else target.detail ?: "Chromecast", selected = target.selected && !connecting && dlna == null) {
                     if (!target.selected) target.route.select()
                     onDismiss()
                 }
             }
-            if (targets.isEmpty()) {
+            // DLNA names can repeat a Chromecast's (a TV with both): those show once, as Chromecast.
+            val castNames = targets.map { it.name.lowercase() }.toSet()
+            dlnaDevices.filter { it.name.lowercase() !in castNames }.forEach { device ->
+                val selected = dlna?.id == device.id
+                TargetRow(
+                    Icons.Rounded.Speaker,
+                    device.name,
+                    if (selected && dlnaConnecting) "Connecting…" else listOfNotNull("DLNA", device.model).joinToString(" · "),
+                    selected = selected && !dlnaConnecting,
+                ) {
+                    if (!selected) {
+                        if (status.device != null || status.connecting) Cast.disconnect()
+                        Dlna.select(device)
+                    }
+                    onDismiss()
+                }
+            }
+            if (targets.isEmpty() && dlnaDevices.isEmpty()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(16.dp))
@@ -207,7 +244,7 @@ private fun CastSheet(onDismiss: () -> Unit) {
                 }
             }
             Text(
-                "Cast devices show up when they're on the same Wi-Fi as this phone. The TV plays straight from your Navidrome server, as MP3 320 kbit/s.",
+                "TVs and speakers show up when they're on the same Wi-Fi as this phone: Chromecast and Google TV, and DLNA ones (most smart TVs, Sonos, AV receivers). They play straight from your Navidrome server, as MP3 320 kbit/s.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),

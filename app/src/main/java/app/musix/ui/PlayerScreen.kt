@@ -284,7 +284,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 // song radio in the middle, lyrics and the queue on the right.
                 val castStatus by Cast.status.collectAsStateWithLifecycle()
                 val output by AudioOutput.device.collectAsStateWithLifecycle()
-                val casting = castDeviceLabel(castStatus, output) != null
+                val dlnaDevice by app.musix.playback.dlna.Dlna.selected.collectAsStateWithLifecycle()
+                val casting = castDeviceLabel(castStatus, output, dlnaDevice?.name) != null
                 Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                         CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))

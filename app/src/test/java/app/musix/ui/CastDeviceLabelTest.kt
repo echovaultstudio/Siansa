@@ -38,4 +38,11 @@ class CastDeviceLabelTest {
         assertEquals(OutputDevice("Headphones", false), AudioOutput.pick(listOf(speaker to "Pixel", wired to "USB-C")))
         assertEquals(OutputDevice("Bluetooth", true), AudioOutput.pick(listOf(a2dp to " ")))
     }
+
+    @Test fun showsTheDlnaDevice() {
+        assertEquals("Sonos Kitchen", castDeviceLabel(CastStatus(), null, dlna = "Sonos Kitchen"))
+        assertEquals("Connecting…", castDeviceLabel(CastStatus(), null, dlna = "Sonos Kitchen", dlnaConnecting = true))
+        // Playing on a DLNA speaker, not in the headphones.
+        assertEquals("Sonos Kitchen", castDeviceLabel(CastStatus(), OutputDevice("Sony Headphones", true), dlna = "Sonos Kitchen"))
+    }
 }
