@@ -223,6 +223,8 @@ fun MusixRoot() {
                 composable("settings/users") { UsersScreen(nav) }
                 composable("settings/playback") { PlaybackSettingsScreen(nav) }
                 composable("settings/storage") { StorageScreen(nav) }
+                composable("downloads") { DownloadsScreen(nav) }
+                composable("downloads/add") { DownloadPickerScreen(nav) }
                 composable("settings/logs") { LogsScreen(nav) }
                 composable("settings/backup") { BackupScreen(nav) }
                 composable("settings/scrobbling") { ScrobblingScreen(nav) }
