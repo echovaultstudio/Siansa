@@ -168,9 +168,9 @@ fun HomeScreen(nav: NavController) {
     val personalIds = MixGenerator.Personal.entries.map { it.id }.toSet()
     // Only what fits now: the vibe for this hour and the personal mixes, not this morning's mix in the evening.
     val applicable = selectors.orEmpty().filter { it.enabled && it.covers(hour) }
-    val todaysMixes = source.mixes(mixes.orEmpty().filter { m ->
+    val todaysMixes = mixes.orEmpty().filter { m ->
         m.date == today && (m.selectorId in personalIds || applicable.any { it.id == m.selectorId })
-    })
+    }
     val playlists by loadState("playlists") {
         runCatching { graph.subsonic.playlists() }
             .onSuccess { graph.library.updatePlaylists(it) }
@@ -217,13 +217,13 @@ fun HomeScreen(nav: NavController) {
         }
 
         // The rest in the order chosen under Arrange Home, without the hidden ones.
-        for (section in HomeSection.visible(homeOrder, homeHidden).filter(source::shows)) {
+        for (section in HomeSection.visible(homeOrder, homeHidden)) {
             when (section) {
                 HomeSection.QUICK -> {
                     // Quick access, like the top grid in Spotify: today's mixes, playlists and recent albums.
                     item(key = "quick") {
                         val quick = buildList<Triple<String, String?, () -> Unit>> {
-                            if (source.likedShown) add(Triple("Liked songs", null) { nav.navigate("liked") })
+                            add(Triple("Liked songs", null) { nav.navigate("liked") })
                             todaysMixes.take(2).forEach { m -> add(Triple(m.title, m.songs.firstOrNull()?.cover) { nav.navigate("mix/${m.id}") }) }
                             source.playlists(playlists.valueOrNull().orEmpty()).take(2).forEach { p -> add(Triple(p.name, p.coverArt) { nav.navigate("playlist/${p.id}") }) }
                             source.albums(recentAlbums.valueOrNull().orEmpty()).take(6).forEach { a -> add(Triple(a.name, a.coverArt) { nav.navigate("album/${a.id}") }) }

@@ -2,13 +2,13 @@ package app.musix.offline
 
 import app.musix.data.Album
 import app.musix.data.Artist
-import app.musix.data.HomeSection
-import app.musix.data.Mix
 import app.musix.data.Playlist
 
 /**
  * Home's source filter (issue #56): only what's downloaded, and without the playlists of the Navidrome
  * users you've hidden. Libraries are chosen with the sync setting, so they're left out before this.
+ * Home keeps all its rows and buttons (Liked songs, mixes, radios); only the albums, artists and
+ * playlists in them are narrowed down.
  */
 data class SourceFilter(
     val downloadedOnly: Boolean = false,
@@ -27,21 +27,7 @@ data class SourceFilter(
     fun artists(list: List<Artist>): List<Artist> =
         if (!downloadedOnly) list else list.filter { it.id in shelf.artists }
 
-    /** A mix only plays offline when all of it is here. */
-    fun mixes(list: List<Mix>): List<Mix> =
-        if (!downloadedOnly) list else list.filter { m -> shelf.hasAll(m.songs.map { it.id }) }
-
-    val likedShown: Boolean get() = !downloadedOnly || shelf.liked
-
-    /** Rows that need the server (making mixes, radios, genres) are hidden while only downloads show. */
-    fun shows(section: HomeSection): Boolean = !downloadedOnly || section !in NEEDS_SERVER
-
     companion object {
-        val NEEDS_SERVER = setOf(
-            HomeSection.TODAY, HomeSection.MOOD, HomeSection.MADE_FOR_YOU, HomeSection.RADIOS,
-            HomeSection.ARTIST_RADIOS, HomeSection.SUGGESTED_ARTISTS, HomeSection.GENRES,
-        )
-
         /** Everyone who owns one of [playlists], you first, then by name. */
         fun owners(playlists: List<Playlist>, me: String): List<String> {
             val all = playlists.mapNotNull { it.owner?.takeIf(String::isNotBlank) }.distinctBy { it.lowercase() }
