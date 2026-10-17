@@ -142,6 +142,8 @@ fun MusixRoot() {
     val graph = LocalGraph.current
     val nav = rememberNavController()
     val snack = remember { SnackbarHostState() }
+    // Messages from the player, e.g. a song that can't play while offline.
+    LaunchedEffect(Unit) { graph.player.notices.collect { snack.showSnackbar(it) } }
     val sheet = remember { PlayerSheet() }
     val player by graph.player.state.collectAsStateWithLifecycle()
     val entry by nav.currentBackStackEntryAsState()

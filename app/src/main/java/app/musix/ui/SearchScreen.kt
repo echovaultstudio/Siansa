@@ -96,9 +96,11 @@ fun SearchScreen(nav: NavController) {
         }
     }
 
+    val aiProblem = rememberAiProblem()
+
     fun runSound() {
         val q = query.trim()
-        if (q.length < 3) return
+        if (q.length < 3 || aiProblem != null) return
         scope.launch {
             busy = true
             error = null
@@ -137,6 +139,7 @@ fun SearchScreen(nav: NavController) {
             }
             error?.let { ErrorText(it) }
             when {
+                soundMode && aiProblem != null -> AiUnavailable(aiProblem, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                 soundMode -> SoundResults(soundSongs)
                 query.trim().length < 2 -> BrowseGrid(nav)
                 else -> LibraryResults(results, nav)

@@ -61,6 +61,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material.icons.rounded.SentimentDissatisfied
+import androidx.compose.ui.draw.alpha
 import android.os.VibratorManager
 import android.os.Vibrator
 import android.os.VibrationEffect
@@ -417,11 +420,15 @@ fun SongRow(
     val openArtist = rememberArtistOpener(beforeOpen = { sheet.close() })
     val launch = rememberPlayLauncher()
     var menu by remember { mutableStateOf(false) }
+    // Offline, songs that aren't downloaded are dimmed: they can't play until the connection is back.
+    val connection by graph.connection.state.collectAsStateWithLifecycle()
+    val unavailable = connection.offline && !graph.downloads.isDownloaded(song.id)
     SwipeToQueue(song, enabled = swipeToQueue, onQueued = { launch.notify("Added to the queue") }) { rowBackground ->
         Row(
             Modifier
                 .fillMaxWidth()
                 .then(rowBackground)
+                .alpha(if (unavailable) 0.38f else 1f)
                 .clickable(onClick = onClick)
                 .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -482,7 +489,8 @@ fun SongRow(
                     })
                     DropdownMenuItem(text = { Text("Start song radio") }, onClick = {
                         menu = false
-                        graph.songRadio.start(song) { message -> launch.notify(message) }
+                        if (graph.connection.current.offline) launch.notify("You're offline: song radio needs the server")
+                        else graph.songRadio.start(song) { message -> launch.notify(message) }
                     })
                     if (graph.settings.current.audioMuseReady) {
                         DropdownMenuItem(text = { Text("Song path…") }, onClick = {
@@ -809,3 +817,31 @@ object QueueHaptics {
 
 /** How far a song row has to be dragged (part of its width) to be added to the queue. */
 const val SWIPE_TO_QUEUE_FRACTION = 0.35f
+
+/**
+ * Shown instead of an AI tool (mixes, mood playlists, sound search) while AudioMuse can't be used: a sad
+ * face, "AI backend is currently not available :(" and why ("You're offline."). Null [problem] shows nothing.
+ */
+@Composable
+fun AiUnavailable(problem: String?, modifier: Modifier = Modifier, onDark: Boolean = false) {
+    if (problem == null) return
+    val text = if (onDark) Color.White else MaterialTheme.colorScheme.onSurface
+    val subtle = if (onDark) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Rounded.SentimentDissatisfied, null, tint = subtle, modifier = Modifier.size(28.dp))
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text("AI backend is currently not available :(", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = text)
+            Text(problem, style = MaterialTheme.typography.bodySmall, color = subtle)
+        }
+    }
+}
+
+/** Why the AI tools can't be used right now, or null when they can; follows the connection as it changes. */
+@Composable
+fun rememberAiProblem(): String? {
+    val graph = LocalGraph.current
+    val connection by graph.connection.state.collectAsStateWithLifecycle()
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    return connection.aiProblem(settings)
+}
