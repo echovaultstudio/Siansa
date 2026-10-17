@@ -3,6 +3,14 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.0.29beta — 2026-10-17
+
+### Added
+- **Backup.** Settings → Backup saves your settings, vibes, mixes, play history and Home and library layout to a
+  file, and restores them, for example on a new phone. Automatic backup saves one a day to a folder you choose
+  (also a NAS folder through an SMB, Nextcloud or Syncthing app) and keeps the last 7. Passwords, tokens and API
+  keys are never included, so after restoring on a new phone you enter them again.
+
 ## 0.0.28beta — 2026-10-17
 
 ### Fixed
