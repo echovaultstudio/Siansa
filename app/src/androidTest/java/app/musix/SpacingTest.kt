@@ -76,4 +76,9 @@ class SpacingTest {
         val divider = compose.onNodeWithTag("divider").getBoundsInRoot()
         assertEven("Equaliser preset chips", chip.top - heading.bottom, divider.top - chip.bottom)
     }
+
+    /** Now playing's ⋮ menu: every row the same height, so the list reads evenly. */
+    @Test fun menuRowsAreOneHeight() {
+        assertEven("Menu rows", app.musix.ui.MENU_ROW_HEIGHT, 48.dp, tolerance = 0.dp)
+    }
 }

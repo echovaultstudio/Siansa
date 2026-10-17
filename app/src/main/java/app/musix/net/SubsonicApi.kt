@@ -255,6 +255,11 @@ class SubsonicApi(
         call("createPlaylist", mapOf("name" to name), songIds.map { "songId" to it })
     }
 
+    /** Adds songs to the end of one of your playlists. */
+    suspend fun addToPlaylist(playlistId: String, songIds: List<String>) {
+        call("updatePlaylist", mapOf("playlistId" to playlistId), songIds.map { "songIdToAdd" to it })
+    }
+
     suspend fun star(id: String) {
         call("star", mapOf("id" to id))
     }
