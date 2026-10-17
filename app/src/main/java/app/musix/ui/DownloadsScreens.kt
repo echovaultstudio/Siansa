@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.musix.data.Song
+import app.musix.data.cover
 import app.musix.offline.OfflineItem
 import app.musix.offline.OfflineKind
 import app.musix.offline.OfflinePlan
