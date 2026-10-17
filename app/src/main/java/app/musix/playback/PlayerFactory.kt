@@ -59,6 +59,8 @@ object PlayerFactory {
         // The phone's FLAC decoder then outputs only silence and the song freezes; FFmpeg skips the
         // broken pieces (about 85 ms) and plays on.
         // The equaliser sits in the audio path after either decoder, so it works the same on every phone.
+        // Float output stays off: with it, media3 1.9 sends hi-res and float audio (everything FFmpeg
+        // decodes) straight out and skips the equaliser.
         val equaliser = EqualiserProcessor { graph.equaliser.state.value }
         val renderers = object : DefaultRenderersFactory(context) {
             override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioOutputPlaybackParams: Boolean): AudioSink =
