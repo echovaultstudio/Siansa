@@ -14,6 +14,10 @@ import app.musix.log.AppLog
 import app.musix.net.SubsonicApi
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.flow.MutableStateFlow
+import app.musix.net.offlinePick
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlin.random.Random
@@ -96,8 +100,37 @@ class PlayerConnection(
     /** Called when a new list starts playing (anything other than a radio topping itself up). */
     var onNewQueue: (() -> Unit)? = null
 
+    /** True while music can only come from the phone (no network, or the server doesn't answer). */
+    var isOffline: () -> Boolean = { false }
+    var isDownloaded: (String) -> Boolean = { false }
+
+    private val _notices = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    /** Short messages for the screen, e.g. why a song didn't play while offline. */
+    val notices: SharedFlow<String> = _notices.asSharedFlow()
+
+    private fun notice(message: String) {
+        AppLog.i("Player", message)
+        _notices.tryEmit(message)
+    }
+
     fun play(songs: List<Song>, startIndex: Int = 0, shuffle: Boolean = false) {
         if (songs.isEmpty()) return
+        if (isOffline()) {
+            // Offline: only downloaded songs can play. Say so instead of a play button that does nothing.
+            val pick = offlinePick(songs, startIndex.coerceIn(0, songs.size - 1), isDownloaded)
+            if (pick.songs.isEmpty()) {
+                notice(if (songs.size == 1) "You're offline and this song isn't downloaded" else "You're offline and none of these songs are downloaded")
+                return
+            }
+            if (pick.skipped && !shuffle) notice("You're offline: playing only the downloaded songs")
+            if (pick.songs.size < songs.size) {
+                return playNow(pick.songs, pick.start, shuffle)
+            }
+        }
+        playNow(songs, startIndex, shuffle)
+    }
+
+    private fun playNow(songs: List<Song>, startIndex: Int, shuffle: Boolean) {
         onNewQueue?.invoke()
         SongRegistry.register(songs)
         val items = songs.map { it.toMediaItem(api) }
@@ -111,6 +144,7 @@ class PlayerConnection(
     }
 
     fun playNext(song: Song) {
+        if (isOffline() && !isDownloaded(song.id)) return notice("You're offline and this song isn't downloaded")
         SongRegistry.register(listOf(song))
         withController { c ->
             if (c.mediaItemCount == 0) {
@@ -128,6 +162,7 @@ class PlayerConnection(
      * ahead of the rest of the album or playlist. With nothing playing, it starts playing.
      */
     fun addToQueue(song: Song) {
+        if (isOffline() && !isDownloaded(song.id)) return notice("You're offline and this song isn't downloaded")
         SongRegistry.register(listOf(song))
         withController { c ->
             val item = song.toMediaItem(api, queued = true)

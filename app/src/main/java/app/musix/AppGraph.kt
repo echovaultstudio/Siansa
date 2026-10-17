@@ -190,7 +190,12 @@ class AppGraph(val app: Application) {
     val insights = Insights(this)
     val radios = Radios(this)
     val suggestions = ArtistSuggestions(this)
-    val player = PlayerConnection(app, subsonic)
+    /** Whether the server and AudioMuse can be reached, for offline messages and playing only downloads. */
+    val connection = app.musix.net.Connection(app, http, { settings.current }, scope)
+    val player = PlayerConnection(app, subsonic).apply {
+        isOffline = { connection.current.offline }
+        isDownloaded = { downloads.isDownloaded(it) }
+    }
     val songRadio = SongRadio(this)
     val songPath = SongPath(this)
     val sleepTimer = SleepTimer()
