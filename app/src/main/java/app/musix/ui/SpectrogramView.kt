@@ -5,14 +5,11 @@ import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -22,15 +19,16 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -48,12 +46,11 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 /**
- * Now playing → tap the format badge: a live spectrogram of the song, to check whether a "lossless" file
- * really is. Only listens to the player while it is open.
+ * Now playing → tap the format badge: the cover makes way for a live spectrogram of the song, to check
+ * whether a "lossless" file really is. Listens to the player only while it's showing and musix is on screen.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SpectrogramSheet(state: PlayerState, onDismiss: () -> Unit) {
+fun SpectrogramView(state: PlayerState, casting: Boolean) {
     var spectrogram by remember { mutableStateOf<Spectrogram?>(null) }
     var drawn by remember { mutableIntStateOf(0) }
     val bitmap = remember { Bitmap.createBitmap(300, 200, Bitmap.Config.ARGB_8888).apply { eraseColor(Spectrogram.BLACK) } }
@@ -92,44 +89,40 @@ fun SpectrogramSheet(state: PlayerState, onDismiss: () -> Unit) {
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text("Sound check", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            val s = spectrogram
-            val rate = s?.sampleRate?.let { " · ${"%.1f".format(it / 1_000.0)} kHz" } ?: ""
-            Text(
-                (state.codec ?: "Unknown format") + rate,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            SpectrogramImage(bitmap, drawn, s?.sampleRate ?: 44_100)
-            // Re-judged about once a second as columns arrive.
-            val verdict = remember(s, drawn / 20, state.codec, state.transcodeKbps, state.isPlaying) {
-                when {
-                    s == null -> if (state.isPlaying) "Listening…" else "Play a song to see its sound."
-                    else -> Spectrogram.verdictText(s.cutoff.verdict(), s.cutoff.cutoffHz(), state.codec, state.transcodeKbps)
-                }
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically)) {
+        val s = spectrogram
+        val rate = s?.sampleRate?.let { " · ${"%.1f".format(it / 1_000.0)} kHz" } ?: ""
+        Text(
+            "Sound check · " + (state.codec ?: "unknown format") + rate,
+            style = MaterialTheme.typography.labelLarge,
+            color = Color.White.copy(alpha = 0.8f),
+        )
+        SpectrogramImage(bitmap, drawn, s?.sampleRate ?: 44_100, Modifier.weight(1f, fill = false).fillMaxWidth().aspectRatio(1.3f))
+        // Re-judged about once a second as columns arrive.
+        val verdict = remember(s, drawn / 20, state.codec, state.transcodeKbps, state.isPlaying, casting) {
+            when {
+                casting -> "Not available while casting: the TV or speaker plays the song, not this phone."
+                s == null -> if (state.isPlaying) "Listening…" else "Play a song to see its sound."
+                else -> Spectrogram.verdictText(s.cutoff.verdict(), s.cutoff.cutoffHz(), state.codec, state.transcodeKbps)
             }
-            Text(verdict, style = MaterialTheme.typography.bodyLarge)
-            Hint(
-                "Lossy formats (MP3, AAC, Opus) throw away the highest sounds, which shows as a flat ceiling: " +
-                    "about 16 kHz for a 128k MP3, 19 to 20 kHz for 320k. Lossless usually reaches 21 to 22 kHz. " +
-                    "It catches the usual fakes, but can't prove a file is untouched. Not available while casting.",
-            )
         }
+        Text(verdict, style = MaterialTheme.typography.bodyMedium, color = Color.White)
+        Text(
+            "Lossy formats cut off the highest sounds: about 16 kHz for a 128k MP3, 19 to 20 kHz for 320k. " +
+                "Lossless usually reaches 21 to 22 kHz. Tap the format badge again for the cover.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.6f),
+        )
     }
 }
 
 /** The spectrogram, stretched to the sheet's width, with a kHz scale on the left. */
 @Composable
-private fun SpectrogramImage(bitmap: Bitmap, drawn: Int, sampleRate: Int) {
+private fun SpectrogramImage(bitmap: Bitmap, drawn: Int, sampleRate: Int, modifier: Modifier) {
     val image = remember(bitmap) { bitmap.asImageBitmap() }
-    val label = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f).toArgb()
-    val grid = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
-    Canvas(Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(8.dp))) {
+    val label = Color.White.copy(alpha = 0.8f).toArgb()
+    val grid = Color.White.copy(alpha = 0.25f)
+    Canvas(modifier.clip(RoundedCornerShape(8.dp))) {
         // Read so the canvas redraws when a new column arrives.
         drawn.hashCode()
         drawImage(
