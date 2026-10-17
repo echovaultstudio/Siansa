@@ -78,7 +78,7 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
     var busy by remember { mutableStateOf(false) }
     val playlists by loadState("editable-playlists") {
         val all = runCatching { graph.subsonic.playlists() }.getOrElse { graph.library.playlists() }
-        editablePlaylists(all, graph.settings.current.navidromeUser)
+        editablePlaylists(graph.playlists.removed.visible(all), graph.settings.current.navidromeUser)
     }
     val ids = songs.map { it.id }
     if (naming) {
@@ -180,11 +180,12 @@ fun PlaylistNameDialog(title: String, initial: String, confirm: String, onDismis
 }
 
 /**
- * The ⋮ button on a playlist's page: rename, change or remove the picture, delete. [onChanged] runs
- * after a change (to load the page again), [onDeleted] after the playlist is gone.
+ * The ⋮ button on a playlist's page: rename and change or remove the picture (when it's [editable]),
+ * and remove it from musix, which keeps it on Navidrome. [onChanged] runs after a change (to load the
+ * page again), [onDeleted] after it's gone from musix.
  */
 @Composable
-fun PlaylistMenuButton(playlist: Playlist, notify: (String) -> Unit, onChanged: () -> Unit, onDeleted: () -> Unit) {
+fun PlaylistMenuButton(playlist: Playlist, editable: Boolean, notify: (String) -> Unit, onChanged: () -> Unit, onDeleted: () -> Unit) {
     val graph = LocalGraph.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -222,29 +223,31 @@ fun PlaylistMenuButton(playlist: Playlist, notify: (String) -> Unit, onChanged: 
     Box {
         IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "Playlist options", tint = Color.White) }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            if (editable) {
+                DropdownMenuItem(
+                    text = { Text("Rename") },
+                    leadingIcon = { Icon(Icons.Rounded.Edit, null) },
+                    onClick = { menu = false; renaming = true },
+                )
+                DropdownMenuItem(
+                    text = { Text("Change picture") },
+                    leadingIcon = { Icon(Icons.Rounded.Image, null) },
+                    onClick = {
+                        menu = false
+                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Remove picture") },
+                    leadingIcon = { Icon(Icons.Rounded.HideImage, null) },
+                    onClick = {
+                        menu = false
+                        scope.launch { report(graph.playlists.removePicture(playlist.id), "Picture removed", "Couldn't remove the picture") }
+                    },
+                )
+            }
             DropdownMenuItem(
-                text = { Text("Rename") },
-                leadingIcon = { Icon(Icons.Rounded.Edit, null) },
-                onClick = { menu = false; renaming = true },
-            )
-            DropdownMenuItem(
-                text = { Text("Change picture") },
-                leadingIcon = { Icon(Icons.Rounded.Image, null) },
-                onClick = {
-                    menu = false
-                    picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                },
-            )
-            DropdownMenuItem(
-                text = { Text("Remove picture") },
-                leadingIcon = { Icon(Icons.Rounded.HideImage, null) },
-                onClick = {
-                    menu = false
-                    scope.launch { report(graph.playlists.removePicture(playlist.id), "Picture removed", "Couldn't remove the picture") }
-                },
-            )
-            DropdownMenuItem(
-                text = { Text("Delete playlist") },
+                text = { Text("Remove from Musix") },
                 leadingIcon = { Icon(Icons.Rounded.Delete, null) },
                 onClick = { menu = false; deleting = true },
             )
@@ -266,19 +269,58 @@ fun PlaylistMenuButton(playlist: Playlist, notify: (String) -> Unit, onChanged: 
     if (deleting) {
         AlertDialog(
             onDismissRequest = { deleting = false },
-            title = { Text("Delete “${playlist.name}”?") },
-            text = { Text("It's deleted on Navidrome too. The songs stay in your library.") },
+            title = { Text("Remove “${playlist.name}”?") },
+            text = { Text("It stays on Navidrome. To get it back, use + then Import from Navidrome in Your Library.") },
             confirmButton = {
                 TextButton(onClick = {
                     deleting = false
-                    scope.launch {
-                        graph.playlists.delete(playlist.id)
-                            .onSuccess { notify("Deleted ${playlist.name}"); onDeleted() }
-                            .onFailure { notify(it.message?.takeIf { m -> m.isNotBlank() } ?: "Couldn't delete it") }
-                    }
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                    graph.playlists.removeFromApp(playlist.id)
+                    notify("Removed ${playlist.name}")
+                    onDeleted()
+                }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = { TextButton(onClick = { deleting = false }) { Text("Cancel") } },
         )
     }
+}
+
+/**
+ * Navidrome playlists you removed from Musix, to bring back. [onDone] gets the message to show, or null.
+ */
+@Composable
+fun ImportPlaylistsDialog(onDone: (String?) -> Unit) {
+    val graph = LocalGraph.current
+    val removed by loadState("removed-playlists") {
+        val ids = graph.playlists.removed.ids()
+        graph.subsonic.playlists().filter { it.id in ids }.sortedBy { it.name.lowercase() }
+    }
+    AlertDialog(
+        onDismissRequest = { onDone(null) },
+        title = { Text("Import from Navidrome") },
+        text = {
+            LoadBox(removed) { list ->
+                if (list.isEmpty()) {
+                    Text("Every Navidrome playlist is already in Musix. New ones show up by themselves.", style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    LazyColumn(Modifier.height(320.dp)) {
+                        items(list, key = { it.id }) { playlist ->
+                            PickerRow(onClick = {
+                                graph.playlists.restore(playlist.id)
+                                onDone("Imported ${playlist.name}")
+                            }) {
+                                Cover(playlist.coverArt, 150, Modifier.size(40.dp), RoundedCornerShape(4.dp))
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(playlist.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(playlistSubtitle(playlist, fallbackOwner = "Navidrome"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = { onDone(null) }) { Text("Close") } },
+    )
 }
