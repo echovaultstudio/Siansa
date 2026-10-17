@@ -3,6 +3,17 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.0.27beta — 2026-10-17
+
+### Fixed
+- **App icon looked off centre.** The sound bars now sit in the middle of the icon instead of leaning right and low.
+
+### Added
+- **Artists you might like** on Home: artists you don't have yet that are similar to the ones you play most, each with a photo. Tap one to see how many albums and fans it has, which of your artists it's like, and open it in Deezer to listen. The list is made once a day. Similar artists come from your Navidrome server (through Last.fm) and from Deezer; to find them and their photos, Musix sends Deezer only artist names. Like every Home row, you can move it under Arrange Home.
+
+### Changed
+- **App icon has more depth.** The bars have a soft shine and a gentle glow behind them, so the icon looks less flat. The themed (one-colour) icon stays plain.
+
 ## 0.0.26beta — 2026-10-17
 
 ### Fixed
