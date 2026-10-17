@@ -38,6 +38,8 @@ import app.musix.MusixApp
 import app.musix.data.PlayEvent
 import app.musix.data.Song
 import app.musix.log.AppLog
+import com.google.android.gms.cast.framework.CastSession
+import com.google.android.gms.cast.framework.SessionManagerListener
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
@@ -65,12 +67,15 @@ class PlaybackService : MediaSessionService() {
     private lateinit var exo: ExoPlayer
     private var castPlayer: RemoteCastPlayer? = null
     private var dlnaPlayer: DlnaPlayer? = null
+    // Where the music was on the TV as casting began to end, in case the TV forgets its queue while stopping.
+    private var castSaved: CastSpot<MediaItem>? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var graph: AppGraph
     private var events: Events? = null
     private var cacheFactory: CacheDataSource.Factory? = null
     private var precacheJob: Job? = null
     private var precacheWriter: CacheWriter? = null
+    private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     // The quality chosen when a song's stream first opens, so a network change can't switch format mid-song.
     private val chosenKbps: MutableMap<String, Int> = Collections.synchronizedMap(object : LinkedHashMap<String, Int>(64, 0.75f, true) {
@@ -118,8 +123,16 @@ class PlaybackService : MediaSessionService() {
             })
             .build()
 
+        // The sleep timer: check it while it runs, and put everything back when it's turned off.
+        mainScope.launch {
+            graph.sleepTimer.state.collect { timer ->
+                handler.removeCallbacks(sleepTick)
+                if (timer == null) endSleepFade(player) else handler.post(sleepTick)
+            }
+        }
+
         // Casting: playback moves to the TV when a Cast session starts and back when it ends.
-        Cast.whenReady(this) { _ ->
+        Cast.whenReady(this) { cast ->
             if (session == null) return@whenReady
             val remote = RemoteCastPlayer.Builder(this).setMediaItemConverter(CastItems(graph.subsonic)).build()
             castPlayer = remote
@@ -133,6 +146,19 @@ class PlaybackService : MediaSessionService() {
                     if (session?.player === remote) moveTo(exo)
                 }
             })
+            cast.sessionManager.addSessionManagerListener(object : SessionManagerListener<CastSession> {
+                override fun onSessionEnding(castSession: CastSession) {
+                    if (session?.player === remote) castSaved = spotOf(remote)
+                }
+                override fun onSessionStarting(castSession: CastSession) { castSaved = null }
+                override fun onSessionStarted(castSession: CastSession, sessionId: String) {}
+                override fun onSessionStartFailed(castSession: CastSession, error: Int) {}
+                override fun onSessionEnded(castSession: CastSession, error: Int) {}
+                override fun onSessionResuming(castSession: CastSession, sessionId: String) {}
+                override fun onSessionResumed(castSession: CastSession, wasSuspended: Boolean) {}
+                override fun onSessionResumeFailed(castSession: CastSession, error: Int) {}
+                override fun onSessionSuspended(castSession: CastSession, reason: Int) {}
+            }, CastSession::class.java)
             if (remote.isCastSessionAvailable) moveTo(remote)
         }
 
@@ -306,6 +332,7 @@ class PlaybackService : MediaSessionService() {
         val item = player.getMediaItemAt(index)
         val uri = item.localConfiguration?.uri ?: return
         if (kbpsFor(item.mediaId) > 0) return
+        if (graph.downloads.fileFor(item.mediaId) != null) return
         val factory = cacheFactory ?: return
         val writer = CacheWriter(factory.createDataSourceForDownloading(), DataSpec(uri), null, null)
         precacheWriter = writer
@@ -320,6 +347,71 @@ class PlaybackService : MediaSessionService() {
             } catch (e: Exception) {
                 AppLog.w("Cache", "Pre-caching ${item.mediaId} failed: ${e.message}")
             }
+        }
+    }
+
+    // ---- Sleep timer: finish the song, fade out over its last seconds, then pause ----
+
+    /** The ReplayGain volume of the current song, and how far the sleep timer has faded it (1 = not at all). */
+    private var baseVolume = 1f
+    private var sleepLevel = 1f
+
+    private fun applyVolume(player: Player) {
+        player.volume = baseVolume * sleepLevel
+    }
+
+    /** Time left in the current song, or -1 when its length isn't known yet. */
+    private fun songLeftMs(player: Player): Long {
+        val duration = player.duration
+        if (duration == C.TIME_UNSET || duration <= 0) return -1
+        return (duration - player.currentPosition).coerceAtLeast(0)
+    }
+
+    /** Puts the volume back and lets the queue play on, after the timer has paused or been turned off. */
+    private fun endSleepFade(player: ExoPlayer) {
+        if (player.pauseAtEndOfMediaItems) player.pauseAtEndOfMediaItems = false
+        if (sleepLevel != 1f) {
+            sleepLevel = 1f
+            applyVolume(player)
+        }
+    }
+
+    /** Every second while the timer runs, ten times a second while the last song fades out. */
+    private val sleepTick = object : Runnable {
+        override fun run() {
+            val player = session?.player ?: return
+            // On a TV or speaker the phone can't fade its volume or stop it at the song's end: it pauses it instead.
+            val onPhone = player === exo
+            val timer = graph.sleepTimer
+            val now = timer.now()
+            if (timer.state.value?.isTimeUp(now) == true) {
+                if (!player.playWhenReady) {
+                    AppLog.i("Sleep", "Time is up while nothing is playing; timer off")
+                    timer.done()
+                    return
+                }
+                timer.timeUp(songLeftMs(player))
+            }
+            val state = timer.state.value ?: return
+            if (state.finishing) {
+                // The player itself pauses at the song's end, so the next song never starts.
+                if (onPhone && state.cutAt == null && !exo.pauseAtEndOfMediaItems) exo.pauseAtEndOfMediaItems = true
+                val left = state.cutAt?.let { it - now } ?: songLeftMs(player)
+                if (onPhone) {
+                    val level = sleepFade(left)
+                    if (level != sleepLevel) {
+                        sleepLevel = level
+                        applyVolume(player)
+                    }
+                }
+                if (sleepPauseNow(onPhone, state, left)) {
+                    if (!onPhone) AppLog.i("Sleep", "Pausing the TV or speaker")
+                    player.pause()
+                    timer.done()
+                    return
+                }
+            }
+            handler.postDelayed(this, if (state.finishing) 100 else 1_000)
         }
     }
 
@@ -350,8 +442,9 @@ class PlaybackService : MediaSessionService() {
         val from = session.player
         if (from === target) return
         val toCast = target !== exo
-        val (items, index) = queueInPlayOrder(from)
-        val position = from.currentPosition.coerceAtLeast(0L)
+        val spot = if (from === castPlayer) spotFromTv(from) else spotOf(from)
+        castSaved = null
+        val (items, index, position) = spot
         val play = toCast && from.playWhenReady
         AppLog.i(
             "Cast",
@@ -366,12 +459,41 @@ class PlaybackService : MediaSessionService() {
         if (from === exo) exo.clearMediaItems()
         target.repeatMode = from.repeatMode
         if (items.isNotEmpty()) {
-            target.setMediaItems(items, index, position)
-            target.playWhenReady = play
-            target.prepare()
+            try {
+                target.setMediaItems(items, index, position)
+                target.playWhenReady = play
+                target.prepare()
+            } catch (e: RuntimeException) {
+                // Better an empty queue than the app closing.
+                AppLog.e("Cast", "Couldn't move the queue (${items.size} songs, song ${index + 1})", e)
+                target.clearMediaItems()
+            }
         }
         events?.attach(target)
         session.player = target
+    }
+
+    private fun spotOf(player: Player): CastSpot<MediaItem> {
+        val (items, index) = queueInPlayOrder(player)
+        return CastSpot(items, index, player.currentPosition.coerceAtLeast(0L))
+    }
+
+    /**
+     * The TV's queue, made playable on the phone. Songs the TV hands back can lack their stream address,
+     * or (when the TV has already let go) be blank; those are rebuilt or taken from [castSaved].
+     */
+    private fun spotFromTv(tv: Player): CastSpot<MediaItem> {
+        val live = spotOf(tv)
+        val picked = CastHandBack.pick(live, castSaved) { it.mediaId }
+        if (picked !== live) AppLog.w("Cast", "The TV forgot the queue while stopping; using the one saved as casting ended")
+        val spot = CastHandBack.withoutNameless(picked) { it.mediaId }
+        return spot.copy(items = spot.items.map(::playableOnPhone))
+    }
+
+    private fun playableOnPhone(item: MediaItem): MediaItem {
+        if (item.localConfiguration != null) return item
+        return SongRegistry.get(item.mediaId)?.toMediaItem(graph.subsonic)
+            ?: item.buildUpon().setUri(graph.subsonic.streamUrl(item.mediaId)).build()
     }
 
     /**
@@ -403,6 +525,9 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         handler.removeCallbacks(bufferingWatch)
+        handler.removeCallbacks(sleepTick)
+        mainScope.cancel()
+        graph.sleepTimer.cancel()
         events?.stopWatches()
         precacheWriter?.cancel()
         events?.finishCurrent()
@@ -471,7 +596,8 @@ class PlaybackService : MediaSessionService() {
             restarted = false
             resetProgressWatch()
             if (player.playWhenReady) armStartWatch()
-            if (onPhone) player.volume = replayGainVolume(song, graph.settings.current)
+            baseVolume = replayGainVolume(song, graph.settings.current)
+            if (onPhone) applyVolume(player)
             graph.scrobbler.nowPlaying(song)
             scope.launch {
                 runCatching { graph.history.add(PlayEvent(song.id, song.title, song.artist, song.genre, System.currentTimeMillis())) }
@@ -538,7 +664,11 @@ class PlaybackService : MediaSessionService() {
         override fun onPlaybackStateChanged(playbackState: Int) {
             handler.removeCallbacks(bufferingWatch)
             if (playbackState == Player.STATE_BUFFERING) handler.postDelayed(bufferingWatch, 8_000)
-            if (playbackState == Player.STATE_ENDED) finishCurrent()
+            if (playbackState == Player.STATE_ENDED) {
+                finishCurrent()
+                // The queue ran out while the sleep timer was finishing its song.
+                if (graph.sleepTimer.state.value?.finishing == true) graph.sleepTimer.done()
+            }
         }
 
         // ---- Start watchdog: a chosen song must actually start playing ----
@@ -551,6 +681,12 @@ class PlaybackService : MediaSessionService() {
             handler.removeCallbacks(progressWatch)
             watchedPosition = -1L
             if (playWhenReady && onPhone) handler.postDelayed(progressWatch, 1_000)
+            // Paused at the end of the last song (or by hand while it fades out): the sleep timer is done.
+            if (!playWhenReady && graph.sleepTimer.state.value?.finishing == true &&
+                (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM || reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
+            ) {
+                graph.sleepTimer.done()
+            }
             if (playWhenReady) armStartWatch() else if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
                 // Lost the audio moments after a song was chosen: almost always the app we took over
                 // from answering late. Take it back once instead of sitting paused.

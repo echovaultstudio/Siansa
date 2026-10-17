@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.DownloadForOffline
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.GraphicEq
@@ -72,6 +73,7 @@ import app.musix.data.ReplayGainMode
 import app.musix.data.SyncPhase
 import app.musix.data.Users
 import app.musix.log.AppLog
+import app.musix.playback.EqSettings
 import app.musix.log.problemsForClipboard
 import app.musix.log.logEntries
 import coil3.SingletonImageLoader
@@ -92,6 +94,7 @@ fun SettingsHub(nav: NavController) {
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
     val library = libraryState
     val vibes by graph.selectors.state.collectAsStateWithLifecycle()
+    val eq by graph.equaliser.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { graph.selectors.all() }
     Screen(title = "Settings", nav = nav) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -125,7 +128,7 @@ fun SettingsHub(nav: NavController) {
             HubRow(
                 Icons.Rounded.Equalizer,
                 "Playback",
-                "ReplayGain ${settings.replayGain.label.lowercase()} · Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}",
+                "ReplayGain ${settings.replayGain.label.lowercase()} · " + eqSummary(eq) + " · Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}",
             ) { nav.navigate("settings/playback") }
             HubRow(
                 Icons.Rounded.GraphicEq,
@@ -141,6 +144,13 @@ fun SettingsHub(nav: NavController) {
                 "Vibes",
                 vibes?.let { "${it.size} ${if (it.size == 1) "vibe" else "vibes"} for your daily mixes" } ?: "Times of day for your daily mixes",
             ) { nav.navigate("vibes") }
+            val downloads by graph.downloads.list.collectAsStateWithLifecycle()
+            HubRow(
+                Icons.Rounded.DownloadForOffline,
+                "Downloads",
+                if (downloads.items.isEmpty()) "Keep music on the phone for listening offline"
+                else "${downloads.done.size} songs on the phone" + if (downloads.waiting.isNotEmpty()) " · ${downloads.waiting.size} to go" else "",
+            ) { nav.navigate("downloads") }
             HubRow(Icons.Rounded.Storage, "Storage", "Songs up to ${formatMb(settings.songCacheMb)} · images ${imageLimit(settings.imageCacheMb)}" +
                     if (settings.coverDownload) " · all covers downloaded" else "") {
                 nav.navigate("settings/storage")
@@ -177,6 +187,8 @@ private fun HubRow(icon: ImageVector, title: String, subtitle: String, onClick: 
     }
 }
 
+private fun eqSummary(eq: EqSettings): String = if (eq.enabled) "equaliser ${eq.preset.label.lowercase()}" else "equaliser off"
+
 private fun imageLimit(mb: Int): String = if (mb <= 0) "without a limit" else "up to ${formatMb(mb)}"
 
 private fun formatMb(mb: Int): String = if (mb >= 1024) "${"%.0f".format(mb / 1024.0)} GB" else "$mb MB"
@@ -190,11 +202,23 @@ private fun formatBytes(bytes: Long): String = when {
 fun PlaybackSettingsScreen(nav: NavController) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
+    val eq by graph.equaliser.state.collectAsStateWithLifecycle()
     Screen(title = "Playback", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            Row(
+                Modifier.fillMaxWidth().clickable { nav.navigate("settings/equaliser") }.padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Heading("Equaliser")
+                    Hint(if (eq.enabled) "On · ${eq.preset.label}" else "Off · bass, vocals, treble and presets")
+                }
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
+            }
+            HorizontalDivider()
             Heading("ReplayGain")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ReplayGainMode.entries.forEach { mode ->
@@ -250,7 +274,7 @@ private fun QualityRow(label: String, value: Int, onPick: (Int) -> Unit) {
 private val cacheSizes = listOf(100, 250, 500, 1024, 2048, 5120, 0)
 private val songCacheSizes = listOf(512, 1024, 2048, 5120, 10240, 20480)
 
-private data class StorageUsage(val images: Long, val songs: Long, val library: Long, val logs: Long)
+private data class StorageUsage(val images: Long, val songs: Long, val downloads: Long, val library: Long, val logs: Long)
 
 /** Image and song cache sizes and usage, and what else the app keeps on the phone. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
@@ -268,6 +292,7 @@ fun StorageScreen(nav: NavController) {
             StorageUsage(
                 images = (SingletonImageLoader.get(context).diskCache?.size ?: 0L) + CoverStore.sizeBytes(),
                 songs = runCatching { graph.songCache.cacheSpace }.getOrDefault(0L),
+                downloads = graph.downloads.usedBytes(),
                 library = context.getDatabasePath(app.musix.data.Users.scoped(app.musix.data.UserFiles.DATABASE)).length(),
                 logs = AppLog.sizeBytes(),
             )
@@ -279,6 +304,15 @@ fun StorageScreen(nav: NavController) {
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            Heading("Downloads")
+            Hint("Music you chose to keep on the phone isn't part of the song cache and is never removed by itself.")
+            usage.valueOrNull()?.let { u -> Text("In use: ${formatBytes(u.downloads)}", style = MaterialTheme.typography.bodyLarge) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { nav.navigate("downloads") }) { Text("Manage downloads") }
+                OutlinedButton(onClick = { nav.navigate("downloads/songs") }) { Text("Downloaded songs") }
+            }
+
+            HorizontalDivider()
             Heading("Song cache")
             Hint("Songs are kept on the phone as they play, and the next song in the queue is fetched ahead, so replays and skips start at once and survive a bad connection. Only original-quality streams are cached.")
             usage.valueOrNull()?.let { u ->
