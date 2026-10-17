@@ -175,6 +175,8 @@ fun PlayerMenu(
                     if (radioSeed != null) {
                         graph.songRadio.stop()
                         notify("Song radio off")
+                    } else if (graph.connection.current.aiProblem(graph.settings.current) != null && graph.settings.current.audioMuseReady) {
+                        notify("AI backend is currently not available :( ${graph.connection.current.aiProblem(graph.settings.current)}")
                     } else {
                         notify("Starting song radio from ${song.title}…")
                         graph.songRadio.start(song) { message -> notify(message) }

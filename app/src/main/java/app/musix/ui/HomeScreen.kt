@@ -89,8 +89,17 @@ fun HomeScreen(nav: NavController) {
     val homeHidden = homeSettings.homeHidden
     var arranging by remember { mutableStateOf(false) }
 
+    // While AudioMuse can't be reached (offline, or it's down), mixes aren't attempted: a clear message instead.
+    val aiProblem = rememberAiProblem()
+    // Home only shows the sad message when AudioMuse is set up but can't be used; without it, Home stays as it was.
+    val aiDown = aiProblem.takeIf { homeSettings.audioMuseReady }
+
     fun build(selector: Selector?, force: Boolean, open: Boolean) {
         if (busySelector != null) return
+        aiDown?.let { problem ->
+            if (open) launch.notify("AI backend is currently not available :( $problem")
+            return
+        }
         // In the app's own scope, so leaving Home doesn't cancel a mix half-way.
         graph.scope.launch(Dispatchers.Main) {
             busySelector = selector?.id ?: "current"
@@ -125,6 +134,10 @@ fun HomeScreen(nav: NavController) {
 
     fun buildPersonal(kind: MixGenerator.Personal, open: Boolean, quiet: Boolean = false) {
         if (personalBusy != null) return
+        aiDown?.let { problem ->
+            if (open && !quiet) launch.notify("AI backend is currently not available :( $problem")
+            return
+        }
         graph.scope.launch(Dispatchers.Main) {
             personalBusy = kind.id
             try {
@@ -251,10 +264,11 @@ fun HomeScreen(nav: NavController) {
                                 onRegenerate = { build(null, force = true, open = false) },
                             )
                             busySelector == "current" -> BuildingCard()
+                            aiDown != null -> AiUnavailable(aiDown, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                             else -> Unit
                         }
                     }
-                    error?.let { message ->
+                    error?.takeIf { aiDown == null }?.let { message ->
                         item(key = "today_error") {
                             Column(Modifier.padding(horizontal = 16.dp)) {
                                 ErrorText(message, Modifier)
@@ -278,7 +292,7 @@ fun HomeScreen(nav: NavController) {
                                         colors = tileColors(selector.id),
                                         coverArt = mix?.songs?.firstOrNull()?.coverArt,
                                         subtitle = selector.name,
-                                        caption = if (mix != null) "${mix.songs.size} tracks · until %02d:00".format(selector.endHour) else "Tap to make today's mix",
+                                        caption = if (mix != null) "${mix.songs.size} tracks · until %02d:00".format(selector.endHour) else if (aiDown != null) "AI backend not available :(" else "Tap to make today's mix",
                                         busy = busySelector == selector.id,
                                         onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) },
                                     )
@@ -292,7 +306,7 @@ fun HomeScreen(nav: NavController) {
                                         colors = tileColors(kind.id),
                                         coverArt = mix?.songs?.firstOrNull()?.coverArt,
                                         subtitle = "For you",
-                                        caption = if (mix != null) "${mix.songs.size} tracks · ${mix.description}" else "Tap to make it",
+                                        caption = if (mix != null) "${mix.songs.size} tracks · ${mix.description}" else if (aiDown != null) "AI backend not available :(" else "Tap to make it",
                                         busy = personalBusy == kind.id,
                                         onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) },
                                     )
