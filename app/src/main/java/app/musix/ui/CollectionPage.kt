@@ -56,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.musix.data.Song
 import app.musix.data.discHeaders
+import app.musix.offline.OfflineItem
 
 /**
  * The page used for albums, playlists, mixes and radios, laid out like Spotify: the cover's colour
@@ -76,6 +77,8 @@ fun CollectionPage(
     showCovers: Boolean = true,
     // The line under each song's title; by default its artist and album.
     subtitleOf: ((Song) -> String?)? = null,
+    // What the download button keeps on the phone; null shows no button (mixes, radios).
+    offline: OfflineItem? = null,
     footer: LazyListScope.() -> Unit = {},
 ) {
     val graph = LocalGraph.current
@@ -131,7 +134,7 @@ fun CollectionPage(
                     Spacer(Modifier.height(8.dp))
                     header()
                     Spacer(Modifier.height(4.dp))
-                    ActionRow(songs.orEmpty())
+                    ActionRow(songs.orEmpty(), offline)
                 }
             }
             when {
@@ -231,14 +234,15 @@ private fun DiscHeading(label: String, cover: Color) {
     }
 }
 
-/** Queue all on the left; shuffle and the big round play button on the right. */
+/** Queue all and download on the left; shuffle and the big round play button on the right. */
 @Composable
-private fun ActionRow(songs: List<Song>) {
+private fun ActionRow(songs: List<Song>, offline: OfflineItem?) {
     val graph = LocalGraph.current
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = { songs.forEach { graph.player.addToQueue(it) } }, enabled = songs.isNotEmpty()) {
             Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add all to queue", Modifier.size(28.dp))
         }
+        if (offline != null) DownloadButton(offline, songs)
         Spacer(Modifier.weight(1f))
         IconButton(onClick = { graph.player.play(songs, shuffle = true) }, enabled = songs.isNotEmpty()) {
             Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
