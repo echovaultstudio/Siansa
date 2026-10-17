@@ -239,6 +239,7 @@ fun MusixRoot() {
                 composable("settings/connections") { ConnectionsScreen(nav) }
                 composable("settings/users") { UsersScreen(nav) }
                 composable("settings/playback") { PlaybackSettingsScreen(nav) }
+                composable("settings/equaliser") { EqualiserScreen(nav) }
                 composable("settings/storage") { StorageScreen(nav) }
                 composable("settings/logs") { LogsScreen(nav) }
                 composable("settings/backup") { BackupScreen(nav) }
