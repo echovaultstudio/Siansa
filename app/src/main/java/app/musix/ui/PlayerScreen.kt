@@ -765,7 +765,7 @@ private fun QueueView(state: PlayerState) {
         Spacer(Modifier.height(4.dp))
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             itemsIndexed(state.queue, key = { i, s -> "$i-${s.id}" }) { index, song ->
-                SongRow(song = song, onClick = { graph.player.skipTo(index) }, highlighted = index == state.index)
+                SongRow(song = song, onClick = { graph.player.skipTo(index) }, highlighted = index == state.index, swipeToQueue = false)
             }
         }
     }
