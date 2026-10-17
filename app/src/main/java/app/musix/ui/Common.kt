@@ -54,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -462,6 +463,13 @@ fun SongRow(
                     menu = false
                     graph.songRadio.start(song) { message -> launch.notify(message) }
                 })
+                if (graph.settings.current.audioMuseReady) {
+                    DropdownMenuItem(text = { Text("Song path…") }, onClick = {
+                        menu = false
+                        sheet.close()
+                        nav.openSongPath(song.id)
+                    })
+                }
                 song.albumId?.let { albumId ->
                     DropdownMenuItem(text = { Text("Go to album") }, onClick = {
                         menu = false
@@ -588,7 +596,14 @@ fun GradientTile(
 
 /** A compact "quick access" tile: small cover on the left, name on the right. */
 @Composable
-fun QuickTile(title: String, coverArt: String?, colors: Pair<Color, Color>?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun QuickTile(
+    title: String,
+    coverArt: String?,
+    colors: Pair<Color, Color>?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+) {
     Row(
         modifier
             .height(56.dp)
@@ -603,8 +618,11 @@ fun QuickTile(title: String, coverArt: String?, colors: Pair<Color, Color>?, onC
             Box(
                 Modifier.size(56.dp).background(
                     Brush.linearGradient(listOf(colors?.first ?: Color.Gray, colors?.second ?: Color.DarkGray))
-                )
-            )
+                ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (icon != null) Icon(icon, null, tint = Color.White, modifier = Modifier.size(26.dp))
+            }
         }
         Text(
             title,

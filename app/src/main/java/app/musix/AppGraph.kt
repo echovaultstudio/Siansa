@@ -15,10 +15,13 @@ import app.musix.log.AppLog
 import app.musix.mix.MixGenerator
 import app.musix.mix.Radios
 import app.musix.mix.Insights
+import app.musix.mix.ArtistSuggestions
+import app.musix.mix.SongPath
 import app.musix.mix.SongRadio
 import app.musix.mix.WindDown
 import app.musix.mix.Taste
 import app.musix.net.AudioMuseApi
+import app.musix.net.DeezerApi
 import app.musix.net.HistoryApi
 import app.musix.net.LastFmApi
 import app.musix.net.ListenBrainzApi
@@ -139,6 +142,7 @@ class AppGraph(val app: Application) {
     val subsonic = SubsonicApi(http) { settings.current }
     val audioMuse = AudioMuseApi(http) { settings.current }
     val openRouter = OpenRouterApi(http) { settings.current }
+    val deezer = DeezerApi(http)
 
     val selectors = SelectorStore(app)
     val mixes = MixStore(app)
@@ -177,8 +181,10 @@ class AppGraph(val app: Application) {
     val generator = MixGenerator(this)
     val insights = Insights(this)
     val radios = Radios(this)
+    val suggestions = ArtistSuggestions(this)
     val player = PlayerConnection(app, subsonic)
     val songRadio = SongRadio(this)
+    val songPath = SongPath(this)
     val sleepTimer = SleepTimer()
     val windDown = WindDown(this)
 }
