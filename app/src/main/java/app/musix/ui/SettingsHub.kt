@@ -72,6 +72,7 @@ import app.musix.data.ReplayGainMode
 import app.musix.data.SyncPhase
 import app.musix.data.Users
 import app.musix.log.AppLog
+import app.musix.playback.EqSettings
 import app.musix.log.problemsForClipboard
 import app.musix.log.logEntries
 import coil3.SingletonImageLoader
@@ -92,6 +93,7 @@ fun SettingsHub(nav: NavController) {
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
     val library = libraryState
     val vibes by graph.selectors.state.collectAsStateWithLifecycle()
+    val eq by graph.equaliser.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { graph.selectors.all() }
     Screen(title = "Settings", nav = nav) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -125,7 +127,7 @@ fun SettingsHub(nav: NavController) {
             HubRow(
                 Icons.Rounded.Equalizer,
                 "Playback",
-                "ReplayGain ${settings.replayGain.label.lowercase()} · Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}",
+                "ReplayGain ${settings.replayGain.label.lowercase()} · " + eqSummary(eq) + " · Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}",
             ) { nav.navigate("settings/playback") }
             HubRow(
                 Icons.Rounded.GraphicEq,
@@ -177,6 +179,8 @@ private fun HubRow(icon: ImageVector, title: String, subtitle: String, onClick: 
     }
 }
 
+private fun eqSummary(eq: EqSettings): String = if (eq.enabled) "equaliser ${eq.preset.label.lowercase()}" else "equaliser off"
+
 private fun imageLimit(mb: Int): String = if (mb <= 0) "without a limit" else "up to ${formatMb(mb)}"
 
 private fun formatMb(mb: Int): String = if (mb >= 1024) "${"%.0f".format(mb / 1024.0)} GB" else "$mb MB"
@@ -190,11 +194,23 @@ private fun formatBytes(bytes: Long): String = when {
 fun PlaybackSettingsScreen(nav: NavController) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
+    val eq by graph.equaliser.state.collectAsStateWithLifecycle()
     Screen(title = "Playback", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            Row(
+                Modifier.fillMaxWidth().clickable { nav.navigate("settings/equaliser") }.padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Heading("Equaliser")
+                    Hint(if (eq.enabled) "On · ${eq.preset.label}" else "Off · bass, vocals, treble and presets")
+                }
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
+            }
+            HorizontalDivider()
             Heading("ReplayGain")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ReplayGainMode.entries.forEach { mode ->
