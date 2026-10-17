@@ -605,7 +605,7 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
         artistRecent.merge(artistKey, ev.at) { a, b -> maxOf(a, b) }
         if (!ev.skipped) artistPlays.merge(artistKey, 1L) { a, b -> a + b }
     }
-    runCatching { graph.subsonic.albums("recent", 100, 0) }.getOrDefault(emptyList()).forEach { a ->
+    graph.library.keepSyncedAlbums(runCatching { graph.subsonic.albums("recent", 100, 0) }.getOrDefault(emptyList()), "Recently played").forEach { a ->
         val at = parseTime(a.played)
         if (at > 0) a.allIds.forEach { id -> albumRecent.merge(id, at) { x, y -> maxOf(x, y) } }
     }

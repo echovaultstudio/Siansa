@@ -85,6 +85,7 @@ class Taste(private val graph: AppGraph) {
             runCatching { graph.subsonic.albums("frequent", 40, 0) }
                 .onFailure { AppLog.w("Taste", "Navidrome most-played failed: ${it.message}") }
                 .getOrNull()
+                ?.let { graph.library.keepSyncedAlbums(it, "Most played") }
         }
 
         // Local plays: finished plays count fully, fading over about two months; skips don't count.
