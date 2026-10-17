@@ -91,7 +91,8 @@ fun HomeScreen(nav: NavController) {
 
     // While AudioMuse can't be reached (offline, or it's down), mixes aren't attempted: a clear message instead.
     val aiProblem = rememberAiProblem()
-    // Home only shows the sad message when AudioMuse is set up but can't be used; without it, Home stays as it was.
+    // Mixes aren't attempted (and tiles say why) only when AudioMuse is set up but can't be used; Today's mix
+    // shows the reason in either case.
     val aiDown = aiProblem.takeIf { homeSettings.audioMuseReady }
 
     fun build(selector: Selector?, force: Boolean, open: Boolean) {
@@ -264,11 +265,12 @@ fun HomeScreen(nav: NavController) {
                                 onRegenerate = { build(null, force = true, open = false) },
                             )
                             busySelector == "current" -> BuildingCard()
-                            aiDown != null -> AiUnavailable(aiDown, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                            aiProblem != null -> AiUnavailable(aiProblem, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                             else -> Unit
                         }
                     }
-                    error?.takeIf { aiDown == null }?.let { message ->
+                    // Without AudioMuse (or while it can't be reached) the card above says so; no error and Try again as well.
+                    error?.takeIf { aiProblem == null }?.let { message ->
                         item(key = "today_error") {
                             Column(Modifier.padding(horizontal = 16.dp)) {
                                 ErrorText(message, Modifier)

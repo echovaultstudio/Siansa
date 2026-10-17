@@ -42,7 +42,7 @@ data class ConnectionState(
 
     /** Why the AI tools can't be used, in plain words, or null when they can. */
     fun aiProblem(settings: AppSettings): String? = when {
-        !settings.audioMuseReady -> "AudioMuse isn't set up. Add it in Settings → Server."
+        !settings.audioMuseReady -> "AudioMuse isn't set up. Add it in Settings → Connections."
         !network -> "You're offline."
         audioMuse == false -> "AudioMuse isn't answering."
         else -> null
