@@ -8,10 +8,8 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.session.MediaController
-import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionToken
 import app.musix.data.Song
-import app.musix.log.AppLog
 import app.musix.net.SubsonicApi
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -195,13 +193,6 @@ class PlayerConnection(
             Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
             else -> Player.REPEAT_MODE_OFF
         }
-    }
-
-    /** Plays the current song (and the next ones) at [kbps] Opus, or 0 for the original file. */
-    fun setQuality(kbps: Int) = withController { c ->
-        AppLog.i("Player", "Quality picked in now playing: ${StreamQuality.choiceLabel(kbps)}")
-        val args = Bundle().apply { putInt(StreamQuality.EXTRA_KBPS, kbps) }
-        c.sendCustomCommand(SessionCommand(StreamQuality.ACTION_SET_QUALITY, Bundle.EMPTY), args)
     }
 
     fun positionMs(): Long = controller?.currentPosition ?: 0L
