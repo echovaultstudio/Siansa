@@ -96,8 +96,16 @@ data class AlbumDetail(val album: Album, val songs: List<Song>, val discTitles: 
 data class ArtistDetail(val artist: Artist, val albums: List<Album>)
 data class SearchResults(val artists: List<Artist>, val albums: List<Album>, val songs: List<Song>)
 
-data class LyricLine(val startMs: Long?, val text: String)
-data class Lyrics(val synced: Boolean, val lines: List<LyricLine>)
+/** A word (or syllable) of a line, with when it's sung, for lyrics that are timed word by word. */
+data class LyricWord(val startMs: Long, val text: String)
+
+/** A line of lyrics; [startMs] when it's synced, and its [words] when they're timed one by one. */
+data class LyricLine(val startMs: Long?, val text: String, val words: List<LyricWord> = emptyList())
+
+data class Lyrics(val synced: Boolean, val lines: List<LyricLine>) {
+    /** Timed word by word (karaoke style), not only line by line. */
+    val wordTimed: Boolean get() = lines.any { it.words.isNotEmpty() }
+}
 
 data class MusicFolder(val id: String, val name: String)
 

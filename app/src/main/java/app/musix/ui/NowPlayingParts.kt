@@ -76,6 +76,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.withStyle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.musix.data.Lyrics
 import app.musix.data.Playlist
@@ -515,6 +516,11 @@ fun LyricsScreen(song: Song?, tint: Color, onClose: () -> Unit, menu: () -> Unit
                 LaunchedEffect(current) { if (current >= 0) listState.animateScrollToItem(max(0, current - 2)) }
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 16.dp)) {
                     itemsIndexed(loaded.lines) { index, line ->
+                        // Word-timed lyrics: the line playing now fills in word by word (or syllable by syllable).
+                        if (index == current && line.words.isNotEmpty()) {
+                            KaraokeLine(line, Modifier.fillMaxWidth().clickable { line.startMs?.let { graph.player.seekTo(it) } }.padding(vertical = 8.dp))
+                            return@itemsIndexed
+                        }
                         Text(
                             line.text.ifBlank { "♪" },
                             style = MaterialTheme.typography.headlineSmall,
@@ -543,4 +549,30 @@ fun RoundIcon(icon: ImageVector, label: String, modifier: Modifier = Modifier, o
     Box(modifier.size(48.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Icon(icon, label, tint = Color.White.copy(alpha = 0.9f))
     }
+}
+
+/** How a word-timed line looks at [positionMs]: how many of its words have been sung. */
+fun sungWords(line: app.musix.data.LyricLine, positionMs: Long): Int = line.words.count { it.startMs <= positionMs }
+
+/**
+ * The line playing now, for lyrics timed word by word: sung words white, the rest of the line darker. It
+ * reads the player's position every few frames, so the words keep up with the singing.
+ */
+@Composable
+private fun KaraokeLine(line: app.musix.data.LyricLine, modifier: Modifier) {
+    val graph = LocalGraph.current
+    var position by remember { mutableStateOf(graph.player.positionMs()) }
+    LaunchedEffect(line) {
+        while (true) {
+            position = graph.player.positionMs()
+            kotlinx.coroutines.delay(40)
+        }
+    }
+    val sung = sungWords(line, position)
+    val text = androidx.compose.ui.text.buildAnnotatedString {
+        line.words.forEachIndexed { i, word ->
+            withStyle(androidx.compose.ui.text.SpanStyle(color = if (i < sung) Color.White else Color.White.copy(alpha = 0.45f))) { append(word.text) }
+        }
+    }
+    Text(text, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, modifier = modifier)
 }
