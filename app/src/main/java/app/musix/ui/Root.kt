@@ -33,6 +33,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -103,6 +105,21 @@ val LocalBottomBarPadding = compositionLocalOf { 0.dp }
 /** Bottom padding for a scrolling page: clear of the bottom bar, plus [extra]. */
 @Composable
 fun bottomBarPadding(extra: Dp = 24.dp): Dp = LocalBottomBarPadding.current + extra
+
+/**
+ * Ends a page at the top of the keyboard, so a focused text box scrolls up above it.
+ *
+ * Not imePadding(): the page has already taken off the bottom bar's height (consumeWindowInsets in
+ * [MusixRoot]), so imePadding() leaves out that much, yet the bar sits behind the keyboard too. That left a
+ * box near the bottom hidden behind the keyboard (#30 again). WindowInsets.ime itself is the keyboard's
+ * full height.
+ */
+@Composable
+fun Modifier.aboveKeyboard(): Modifier = padding(bottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding())
+
+/** True while the on-screen keyboard is showing. */
+@Composable
+fun keyboardOpen(): Boolean = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
 
 /**
  * Now playing is a sheet over the current page rather than a page of its own, so it slides up and down
