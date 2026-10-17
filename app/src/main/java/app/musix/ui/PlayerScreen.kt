@@ -28,6 +28,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Velocity
 import kotlinx.coroutines.flow.first
@@ -243,6 +244,9 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                     .systemBarsPadding()
                     .padding(horizontal = 24.dp),
             ) {
+                // A gap above the header that suits the screen's height, so the top of the player
+                // isn't pressed against the status bar.
+                Spacer(Modifier.height(playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp))
                 TopRow(song, onClose = onClose, onAlbum = ::openAlbum)
 
                 Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
