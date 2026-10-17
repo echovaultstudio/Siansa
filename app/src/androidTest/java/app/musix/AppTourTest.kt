@@ -23,7 +23,9 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
+import app.musix.data.SettingsRepository
 import app.musix.data.SyncPhase
+import app.musix.data.Users
 import app.musix.log.AppLog
 import org.junit.Assert.fail
 import org.junit.Rule
@@ -74,6 +76,48 @@ class AppTourTest {
             step("home") {
                 tab("Home")
                 shot("01-home")
+            }
+            step("source filter") {
+                tab("Home")
+                compose.onAllNodesWithContentDescription("Source filter").onFirst().performClick()
+                idle(1200)
+                waitText("Only downloaded music")
+                shot("01b-source-filter", popups = true)
+                // A second user (the same login here), shown alongside the first.
+                val second = 1
+                instrumentation.runOnMainSync {
+                    app.getSharedPreferences("users", android.content.Context.MODE_PRIVATE).edit().putString("ids", "0,$second").commit()
+                    SettingsRepository(app, second).save(graph.settings.current)
+                }
+                try {
+                    closeSheet()
+                    graph.guests.setShown(second, true)
+                    val end = SystemClock.elapsedRealtime() + 60_000
+                    while (SystemClock.elapsedRealtime() < end && graph.guests.state.value[second]?.let { !it.running && (it.songs != null || it.error != null) } != true) SystemClock.sleep(300)
+                    println("Tour: second user ${graph.guests.state.value[second]}")
+                    graph.guests.state.value[second]?.error?.let { problems += "source filter: the second user's music didn't load: $it" }
+                    idle(800)
+                    shot("01c-home-two-users")
+                    compose.onAllNodesWithContentDescription("Source filter").onFirst().performClick()
+                    idle(1200)
+                    waitText("Users and libraries")
+                    shot("01d-source-filter-two-users", popups = true)
+                    click("Only downloaded music")
+                    idle(800)
+                    shot("01e-only-downloaded-on", popups = true)
+                    closeSheet()
+                    idle(1000)
+                    shot("01f-home-only-downloaded")
+                    libraryAll()
+                    idle(1000)
+                    shot("01g-library-only-downloaded")
+                } finally {
+                    graph.settings.setDownloadedOnly(false)
+                    graph.guests.setShown(second, false)
+                    SystemClock.sleep(1500)
+                    instrumentation.runOnMainSync { Users.remove(app, second) }
+                    tab("Home")
+                }
             }
             step("library") {
                 libraryAll()
@@ -272,6 +316,12 @@ class AppTourTest {
         }
     }
 
+    /** Closes an open sheet: a real back key goes to the sheet's own window, not the app behind it. */
+    private fun closeSheet() {
+        instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        idle(800)
+    }
+
     private fun pausePlayback() {
         instrumentation.runOnMainSync { if (graph.player.state.value.isPlaying) graph.player.togglePlay() }
         SystemClock.sleep(500)
@@ -352,11 +402,31 @@ class AppTourTest {
     }
 
     /** The whole window as a small JPEG, written to the log in pieces. Never fails the tour. */
-    private fun shot(name: String) {
-        runCatching { shotNow(name) }.onFailure { println("Tour: screenshot $name failed: $it") }
+    /** [popups]: also draws open sheets, menus and dialogs, which live in windows of their own. */
+    private fun shot(name: String, popups: Boolean = false) {
+        runCatching { shotNow(name, popups) }.onFailure { println("Tour: screenshot $name failed: $it") }
     }
 
-    private fun shotNow(name: String) {
+    /** The app's other windows (sheets, menus, dialogs), drawn over [target] where they sit on screen. */
+    private fun drawPopups(target: Bitmap, activityRoot: android.view.View) {
+        val global = Class.forName("android.view.WindowManagerGlobal")
+        val instance = global.getMethod("getInstance").invoke(null)
+        val field = global.getDeclaredField("mViews").apply { isAccessible = true }
+        @Suppress("UNCHECKED_CAST")
+        val views = (field.get(instance) as List<android.view.View>).toList()
+        val canvas = android.graphics.Canvas(target)
+        val base = IntArray(2).also { activityRoot.getLocationOnScreen(it) }
+        views.filter { it !== activityRoot && it.isShown && it.width > 0 && it.height > 0 }.forEach { v ->
+            val at = IntArray(2).also { v.getLocationOnScreen(it) }
+            canvas.save()
+            canvas.translate((at[0] - base[0]).toFloat(), (at[1] - base[1]).toFloat())
+            v.draw(canvas)
+            canvas.restore()
+            println("Tour: drew a popup window ${v.javaClass.simpleName} ${v.width}x${v.height}")
+        }
+    }
+
+    private fun shotNow(name: String, popups: Boolean = false) {
         compose.waitForIdle()
         // PixelCopy reads the window's real pixels, hardware images included. (The CI emulator image
         // returns black system screenshots, and drawing the views can't handle hardware bitmaps.)
@@ -377,6 +447,14 @@ class AppTourTest {
         if (outcome != android.view.PixelCopy.SUCCESS) {
             println("Tour: screenshot $name: PixelCopy result $outcome")
             return
+        }
+        if (popups) {
+            val drawn = java.util.concurrent.CountDownLatch(1)
+            scenario.onActivity { activity ->
+                runCatching { drawPopups(full, activity.window.decorView) }.onFailure { println("Tour: popups for $name: $it") }
+                drawn.countDown()
+            }
+            drawn.await(5, java.util.concurrent.TimeUnit.SECONDS)
         }
         val width = 480
         val small = Bitmap.createScaledBitmap(full, width, full.height * width / full.width, true)

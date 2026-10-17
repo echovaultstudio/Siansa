@@ -46,8 +46,14 @@ class SubsonicApi(
         return token
     }
 
+    /**
+     * The login for a request about an item (by its id) when the item is another shown user's (issue #141):
+     * their songs stream, download, show covers and scrobble with their own login, from their server.
+     */
+    @Volatile var loginFor: (String?) -> AppSettings? = { null }
+
     fun url(endpoint: String, params: Map<String, String?> = emptyMap(), repeated: List<Pair<String, String>> = emptyList()): String {
-        val s = settings()
+        val s = loginFor(params["id"] ?: params["playlistId"]) ?: settings()
         val sb = StringBuilder(s.navidromeUrl)
             .append("/rest/").append(endpoint)
             .append("?u=").append(enc(s.navidromeUser))

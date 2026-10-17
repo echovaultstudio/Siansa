@@ -72,7 +72,8 @@ class SpacingTest {
             }
         }
         val heading = compose.onNodeWithTag("heading").getBoundsInRoot()
-        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Flat"))).getBoundsInRoot()
+        // The chip's label can sit in the unmerged tree only, depending on how the chip merges it.
+        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Flat")), useUnmergedTree = true).getBoundsInRoot()
         val divider = compose.onNodeWithTag("divider").getBoundsInRoot()
         assertEven("Equaliser preset chips", chip.top - heading.bottom, divider.top - chip.bottom)
     }
@@ -96,5 +97,15 @@ class SpacingTest {
         val pause = compose.onNodeWithText("Pause").getBoundsInRoot()
         val centreGap = ((pause.top + pause.bottom) - (totals.top + totals.bottom)) / 2
         assertTrue("Pause is ${centreGap.value} dp off the totals' line", abs(centreGap.value) <= 2f)
+    }
+
+    /** Source filter: a user's libraries sit as far below their name as they sit above the card's edge. */
+    @Test fun sourceCardLibrariesAreEvenlySpaced() {
+        compose.setContent { MusixTheme { app.musix.ui.SourceCardForTest() } }
+        val name = compose.onNodeWithTag("source-name").getBoundsInRoot()
+        // The chip merges its tick and name, so its text node is the whole chip.
+        val chipBox = compose.onNodeWithText("albums").getBoundsInRoot()
+        val card = compose.onNodeWithTag("source-card").getBoundsInRoot()
+        assertEven("Source card libraries", chipBox.top - name.bottom, card.bottom - chipBox.bottom)
     }
 }

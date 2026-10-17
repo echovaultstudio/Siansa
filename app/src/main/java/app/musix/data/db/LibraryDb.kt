@@ -90,6 +90,13 @@ data class PlaylistEntity(
     val position: Int,
 )
 
+/**
+ * Songs, albums, artists, playlists and covers that come from another user shown alongside the one in use
+ * (issue #141), with that user's id. Everything not listed here is the user in use's own.
+ */
+@Entity(tableName = "sources", indices = [Index("source")])
+data class SourceEntity(@PrimaryKey val id: String, val source: Int)
+
 @Entity(tableName = "meta")
 data class MetaEntity(@PrimaryKey val key: String, val value: String)
 
@@ -151,7 +158,8 @@ interface LibraryDao {
     @Query("DELETE FROM songs WHERE albumId IN (:albumIds)")
     suspend fun deleteSongsOfAlbums(albumIds: List<String>)
 
-    @Query("DELETE FROM songs")
+    /** Every own song (other users' songs stay). */
+    @Query("DELETE FROM songs WHERE id NOT IN (SELECT id FROM sources)")
     suspend fun deleteAllSongs()
 
     @Query("SELECT COUNT(*) FROM songs")
@@ -191,7 +199,8 @@ interface LibraryDao {
     @Query("SELECT releaseTypes, isCompilation FROM albums WHERE isPrimary = 1")
     suspend fun albumTypes(): List<AlbumTypeRow>
 
-    @Query("SELECT id, signature FROM albums")
+    /** Own albums only: other users' albums are kept up to date on their own. */
+    @Query("SELECT id, signature FROM albums WHERE id NOT IN (SELECT id FROM sources)")
     suspend fun albumSignatures(): List<AlbumSignature>
 
     @Query("SELECT id, groupKey, songCount FROM albums")
@@ -228,7 +237,7 @@ interface LibraryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun putArtists(artists: List<ArtistEntity>)
 
-    @Query("DELETE FROM artists")
+    @Query("DELETE FROM artists WHERE id NOT IN (SELECT id FROM sources)")
     suspend fun deleteAllArtists()
 
     @Query("SELECT COUNT(*) FROM artists")
@@ -238,11 +247,59 @@ interface LibraryDao {
     @Query("SELECT * FROM playlists ORDER BY position")
     suspend fun playlists(): List<PlaylistEntity>
 
-    @Query("DELETE FROM playlists")
+    @Query("DELETE FROM playlists WHERE id NOT IN (SELECT id FROM sources)")
     suspend fun deleteAllPlaylists()
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun putPlaylists(playlists: List<PlaylistEntity>)
+
+    // Other users' items
+    @Query("SELECT * FROM sources")
+    suspend fun sources(): List<SourceEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putSources(sources: List<SourceEntity>)
+
+    /** Ids that turned out to be the user in use's own (they gained access to them). */
+    @Query("DELETE FROM sources WHERE id IN (:ids)")
+    suspend fun forgetSources(ids: List<String>)
+
+    @Query("DELETE FROM songs WHERE id IN (SELECT id FROM sources WHERE source = :user)")
+    suspend fun deleteSongsOfSource(user: Int)
+
+    @Query("DELETE FROM albums WHERE id IN (SELECT id FROM sources WHERE source = :user)")
+    suspend fun deleteAlbumsOfSource(user: Int)
+
+    @Query("DELETE FROM artists WHERE id IN (SELECT id FROM sources WHERE source = :user)")
+    suspend fun deleteArtistsOfSource(user: Int)
+
+    @Query("DELETE FROM playlists WHERE id IN (SELECT id FROM sources WHERE source = :user)")
+    suspend fun deletePlaylistsOfSource(user: Int)
+
+    @Query("DELETE FROM sources WHERE source = :user")
+    suspend fun deleteSource(user: Int)
+
+    @Query("SELECT DISTINCT source FROM sources")
+    suspend fun sourceUsers(): List<Int>
+
+    @Query("SELECT id FROM songs WHERE id IN (:ids)")
+    suspend fun knownSongIds(ids: List<String>): List<String>
+
+    @Query("SELECT id FROM artists WHERE id IN (:ids)")
+    suspend fun knownArtistIds(ids: List<String>): List<String>
+
+    @Query("SELECT id FROM playlists WHERE id IN (:ids)")
+    suspend fun knownPlaylistIds(ids: List<String>): List<String>
+
+    /** Every album id sharing a name and album artist with one of [ids] (its copies in other libraries). */
+    @Query("SELECT id FROM albums WHERE groupKey IN (SELECT groupKey FROM albums WHERE id IN (:ids))")
+    suspend fun albumGroupIds(ids: List<String>): List<String>
+
+    @Query("SELECT * FROM songs WHERE id IN (:ids) AND genre IS NOT NULL AND genre != ''")
+    suspend fun songsWithGenre(ids: List<String>): List<SongEntity>
+
+    @Query("SELECT * FROM albums WHERE isPrimary = 1")
+    suspend fun primaryAlbums(): List<AlbumEntity>
 
     // Meta
     @Query("SELECT value FROM meta WHERE `key` = :key")
@@ -253,17 +310,26 @@ interface LibraryDao {
 }
 
 @Database(
-    entities = [SongEntity::class, AlbumEntity::class, ArtistEntity::class, PlaylistEntity::class, MetaEntity::class],
-    version = 1,
+    entities = [SongEntity::class, AlbumEntity::class, ArtistEntity::class, PlaylistEntity::class, MetaEntity::class, SourceEntity::class],
+    version = 2,
     exportSchema = false,
 )
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun dao(): LibraryDao
 
     companion object {
+        /** Version 2 adds the list of other users' items, keeping the synced library. */
+        val ADD_SOURCES = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `sources` (`id` TEXT NOT NULL, `source` INTEGER NOT NULL, PRIMARY KEY(`id`))")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sources_source` ON `sources` (`source`)")
+            }
+        }
+
         fun open(context: Context): LibraryDatabase =
             Room.databaseBuilder(context, LibraryDatabase::class.java, app.musix.data.Users.scoped(app.musix.data.UserFiles.DATABASE))
-                // The library can always be synced again, so a schema change simply starts fresh.
+                .addMigrations(ADD_SOURCES)
+                // The library can always be synced again, so any other schema change simply starts fresh.
                 .fallbackToDestructiveMigration()
                 .build()
     }

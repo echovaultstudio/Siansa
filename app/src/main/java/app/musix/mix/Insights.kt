@@ -125,8 +125,11 @@ class Insights(private val graph: AppGraph) {
     private var rediscoverCache: Pair<Long, List<Rediscovery>>? = null
 
     suspend fun rediscover(limit: Int = 20): List<Rediscovery> {
-        rediscoverCache?.let { (at, list) -> if (System.currentTimeMillis() - at < 6 * 3_600_000L) return list }
-        return findRediscoveries(limit).also { rediscoverCache = System.currentTimeMillis() to it }
+        val cached = rediscoverCache?.takeIf { (at, _) -> System.currentTimeMillis() - at < 6 * 3_600_000L }?.second
+        val list = cached ?: findRediscoveries(limit).also { rediscoverCache = System.currentTimeMillis() to it }
+        // With "Only downloaded music" on, only albums on the phone.
+        val only = graph.library.onlyDownloaded() ?: return list
+        return list.filter { only.albums(listOf(it.album)).isNotEmpty() }
     }
 
     private suspend fun findRediscoveries(limit: Int): List<Rediscovery> = coroutineScope {
