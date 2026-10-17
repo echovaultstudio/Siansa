@@ -1,6 +1,7 @@
 package app.musix.data
 
 import android.content.Context
+import androidx.core.content.edit
 import app.musix.log.AppLog
 import app.musix.playback.EqPreset
 import app.musix.playback.EqSettings
@@ -25,12 +26,12 @@ class EqualiserRepository(context: Context) {
     fun set(eq: EqSettings, save: Boolean = true) {
         _state.value = eq
         if (!save) return
-        prefs.edit()
-            .putBoolean("eq_on", eq.enabled)
-            .putString("eq_preset", eq.preset.name)
-            .putString("eq_custom", EqSettings.formatCustom(eq.custom))
-            .putFloat("eq_preamp", eq.preampDb)
-            .apply()
+        prefs.edit {
+            putBoolean("eq_on", eq.enabled)
+            putString("eq_preset", eq.preset.name)
+            putString("eq_custom", EqSettings.formatCustom(eq.custom))
+            putFloat("eq_preamp", eq.preampDb)
+        }
         AppLog.i("Equaliser", if (eq.enabled) "On · ${eq.preset.label} · pre-amp ${"%+.0f".format(eq.preampDb)} dB" else "Off")
     }
 }
