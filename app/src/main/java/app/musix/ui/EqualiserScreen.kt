@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.musix.data.ReplayGainMode
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.musix.playback.EqDesign
@@ -37,16 +38,32 @@ import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-/** Settings › Playback › Equaliser: on/off, presets, ten bands and a pre-amp. */
+/**
+ * Settings › Playback › Equaliser and ReplayGain: ReplayGain (evens out loudness), the equaliser's on/off,
+ * presets and ten bands, and the one pre-amp.
+ */
 @Composable
 fun EqualiserScreen(nav: NavController) {
     val graph = LocalGraph.current
     val eq by graph.equaliser.state.collectAsStateWithLifecycle()
-    Screen(title = "Equaliser", nav = nav) { padding ->
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    Screen(title = "Equaliser and ReplayGain", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            Heading("ReplayGain")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ReplayGainMode.entries.forEach { mode ->
+                    FilterChip(
+                        selected = settings.replayGain == mode,
+                        onClick = { graph.settings.save(graph.settings.current.copy(replayGain = mode)) },
+                        label = { Text(mode.label) },
+                    )
+                }
+            }
+            Hint("Evens out loudness. Track: every song at the same level. Album: an album's loud and quiet songs keep their difference. To make everything louder, use the pre-amp below.")
+            HorizontalDivider()
             SwitchRow("Equaliser", eq.enabled) { graph.equaliser.set(eq.copy(enabled = it)) }
             Hint("Shapes the sound of everything this phone plays, for example more bass or clearer vocals. Not used while casting to a TV or speaker.")
             EqCurve(eq)

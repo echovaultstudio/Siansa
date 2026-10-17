@@ -81,4 +81,20 @@ class SpacingTest {
     @Test fun menuRowsAreOneHeight() {
         assertEven("Menu rows", app.musix.ui.MENU_ROW_HEIGHT, 48.dp, tolerance = 0.dp)
     }
+
+    /** Downloads: Pause sits on the same line as the totals, centred with them, not squeezed into the buttons. */
+    @Test fun downloadPauseSitsWithTheTotals() {
+        compose.setContent {
+            MusixTheme {
+                androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    androidx.compose.material3.Text("120 songs · 840 MB", modifier = Modifier.weight(1f))
+                    app.musix.ui.DownloadControlForTest()
+                }
+            }
+        }
+        val totals = compose.onNodeWithText("120 songs · 840 MB").getBoundsInRoot()
+        val pause = compose.onNodeWithText("Pause").getBoundsInRoot()
+        val centreGap = ((pause.top + pause.bottom) - (totals.top + totals.bottom)) / 2
+        assertTrue("Pause is ${centreGap.value} dp off the totals' line", abs(centreGap.value) <= 2f)
+    }
 }
