@@ -170,7 +170,8 @@ class AppTourTest {
                 timedStart("search", "Long Song B") { click("Long Song B") }
             }
             step("vibes") {
-                tab("Vibes")
+                tab("Settings")
+                click("Vibes")
                 idle(1000)
                 shot("17-vibes")
             }
