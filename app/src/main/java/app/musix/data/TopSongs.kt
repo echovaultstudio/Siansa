@@ -72,7 +72,7 @@ class TopSongs(
     private val scope: CoroutineScope,
 ) {
     private val json = JsonFile(
-        File(context.cacheDir, "top_songs.json"),
+        File(context.cacheDir, Users.scoped("top_songs.json")),
         ListSerializer(TopSongsEntry.serializer()),
     ) { emptyList() }
     private val inFlight = HashMap<String, Deferred<List<Song>>>()

@@ -25,6 +25,8 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        // Which Navidrome user this start is for: their settings, library and history are opened below.
+        app.musix.data.Users.init(this)
         graph = AppGraph(this)
         AppLog.init(this, graph.settings.current.logging)
         Diagnostics.start(this)
