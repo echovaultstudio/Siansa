@@ -4,6 +4,7 @@ import app.musix.covers.CoverStore
 import kotlinx.coroutines.runBlocking
 
 import android.app.Application
+import app.musix.data.EqualiserRepository
 import app.musix.data.Favorites
 import app.musix.data.HistoryStore
 import app.musix.data.LibraryRepository
@@ -60,6 +61,7 @@ class AppGraph(val app: Application) {
         },
     )
     val settings = SettingsRepository(app)
+    val equaliser = EqualiserRepository(app)
 
     /**
      * One HTTP client for API calls, streaming and covers. When Navidrome sits behind a proxy that asks
