@@ -75,7 +75,9 @@ import app.musix.data.AlbumDetail
 import app.musix.data.category
 import app.musix.data.Playlist
 import app.musix.data.PlaylistDetail
+import app.musix.data.LocalPlaylists
 import app.musix.data.PlaylistEditor
+import app.musix.data.toPlaylist
 import app.musix.data.Song
 import app.musix.offline.OfflineItem
 import app.musix.offline.OfflineKind
@@ -122,11 +124,15 @@ fun PlaylistScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
     val launcher = rememberPlayLauncher()
     val scope = rememberCoroutineScope()
-    // Bumped after each change, to load the playlist again from Navidrome.
+    // Bumped after each change, to load the playlist again.
     var version by remember { mutableIntStateOf(0) }
     var removing by remember { mutableStateOf(false) }
+    val onPhone = LocalPlaylists.isLocal(id)
     val detail by loadState(id to version) {
-        val remote = try {
+        val remote = if (onPhone) {
+            val local = graph.localPlaylists.get(id) ?: throw IllegalStateException("This playlist isn't on this phone any more")
+            PlaylistDetail(local.toPlaylist(), local.songs)
+        } else try {
             graph.subsonic.playlist(id)
         } catch (e: Exception) {
             // Without a connection, a downloaded playlist still opens with its songs on the phone.
@@ -172,16 +178,20 @@ fun PlaylistScreen(nav: NavController, id: String) {
                 Spacer(Modifier.height(6.dp))
             }
             CollectionByline(
-                d?.playlist?.owner,
+                if (onPhone) "On this phone" else d?.playlist?.owner,
                 null,
                 null,
                 if (d == null) "" else "Playlist · ${d.songs.size} songs · ${formatDuration(d.songs.sumOf { it.durationSec.toLong() })}",
             )
         },
-        offline = d?.playlist?.offlineItem(),
+        // A phone playlist's songs download one by one (from their ⋮ menu); Downloads keeps Navidrome's playlists.
+        offline = if (onPhone) null else d?.playlist?.offlineItem(),
         actions = {
             if (d != null) {
-                PlaylistMenuButton(d.playlist, editable, notify = launcher::notify, onChanged = { version++ }, onDeleted = { nav.popBackStack() })
+                PlaylistMenuButton(d.playlist, editable, notify = launcher::notify, onChanged = { version++ }, onDeleted = { nav.popBackStack() }, onMoved = { made ->
+                    nav.popBackStack()
+                    made?.let { nav.navigate("playlist/${it.id}") }
+                })
             }
         },
         songMenu = if (editable) removeFromPlaylist else null,

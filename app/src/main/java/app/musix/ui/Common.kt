@@ -76,6 +76,7 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.navigation.NavController
 import app.musix.AppGraph
+import app.musix.data.LocalPlaylists
 import app.musix.data.Song
 import app.musix.log.AppLog
 import coil3.compose.AsyncImage
@@ -257,10 +258,10 @@ internal fun coverFallbackKeys(id: String, size: Int?): List<String> {
 /** The request [Cover] makes, so covers can be loaded ahead of time into the same cache entries. */
 fun coverRequest(context: android.content.Context, graph: app.musix.AppGraph, id: String, size: Int?): ImageRequest {
     val px = coverServerPx(size)
-    val builder = ImageRequest.Builder(context)
-        .data(graph.subsonic.coverUrl(id, px))
-        .diskCacheKey("cover:$id:${px ?: "full"}")
-        .memoryCacheKey(coverMemoryKey(id, size))
+    val builder = ImageRequest.Builder(context).memoryCacheKey(coverMemoryKey(id, size))
+    // A phone playlist's own picture, already on the phone.
+    if (id.startsWith(LocalPlaylists.FILE_COVER)) builder.data(java.io.File(id.removePrefix(LocalPlaylists.FILE_COVER)))
+    else builder.data(graph.subsonic.coverUrl(id, px)).diskCacheKey("cover:$id:${px ?: "full"}")
     // A fixed size lets the load start straight away instead of waiting for the layout.
     coverDecodePx(size)?.let { builder.size(it) }
     return builder.build()
