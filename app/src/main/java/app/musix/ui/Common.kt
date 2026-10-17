@@ -363,14 +363,17 @@ fun Screen(
 }
 
 @Composable
-fun SectionTitle(text: String, modifier: Modifier = Modifier) {
+fun SectionTitle(text: String, modifier: Modifier = Modifier, top: Dp = SECTION_GAP) {
     Text(
         text,
         style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Bold,
-        modifier = modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 10.dp),
+        modifier = modifier.padding(start = 16.dp, end = 16.dp, top = top, bottom = 10.dp),
     )
 }
+
+/** The space above a section's heading: between one section's last row and the next heading. */
+val SECTION_GAP = 24.dp
 
 fun formatDuration(seconds: Long): String {
     val s = seconds.coerceAtLeast(0)
