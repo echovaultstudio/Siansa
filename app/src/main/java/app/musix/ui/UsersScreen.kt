@@ -41,6 +41,7 @@ import app.musix.data.Users
 @Composable
 fun UsersScreen(nav: NavController) {
     val context = LocalContext.current
+    val graph = LocalGraph.current
     var changes by remember { mutableIntStateOf(0) }
     val users = remember(changes) { Users.all(context) }
     var removing by remember { mutableStateOf<UserEntry?>(null) }
@@ -48,7 +49,7 @@ fun UsersScreen(nav: NavController) {
     Screen(title = "Users", nav = nav) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
             Text(
-                "Each user has their own library, history and settings. Tap a user to switch; Musix restarts.",
+                "Each user has their own library, history and settings. Tap a user to switch; Musix restarts. To show several users' music together, use the filter button on Home.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -104,6 +105,8 @@ fun UsersScreen(nav: NavController) {
             text = { Text("Their library, history and settings are removed from this phone. Nothing changes on the server.") },
             confirmButton = {
                 TextButton(onClick = {
+                    // Their music leaves the library first, if it was shown.
+                    graph.guests.setShown(user.id, false)
                     Users.remove(context, user.id)
                     removing = null
                     changes++

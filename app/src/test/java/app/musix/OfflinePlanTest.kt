@@ -1,6 +1,7 @@
 package app.musix
 
 import app.musix.data.AppJson
+import app.musix.data.ArtistRef
 import app.musix.data.Song
 import app.musix.offline.DownloadList
 import app.musix.offline.OfflineItem
@@ -129,5 +130,29 @@ class OfflinePlanTest {
     @Test fun oldSavedListsWithoutSkippedStillLoad() {
         val text = """{"items":[],"done":[],"waiting":[]}"""
         assertTrue(AppJson.decodeFromString(DownloadList.serializer(), text).skipped.isEmpty())
+    }
+
+    @Test fun shelfShowsWhatIsOnThePhone() {
+        val one = Song(id = "1", title = "One", albumId = "al1", artistId = "ar1", artists = listOf(ArtistRef("ar1", "A"), ArtistRef("ar2", "B")))
+        val two = Song(id = "2", title = "Two", albumId = "al2", artistId = "ar3")
+        val liked = OfflineItem(OfflineKind.LIKED, OfflineItem.LIKED_ID, "Liked songs")
+        val list = OfflinePlan.choose(DownloadList(), playlist("p"), listOf(one, two))
+            .let { OfflinePlan.choose(it, playlist("waiting"), listOf(Song(id = "3", title = "Three"))) }
+            .let { OfflinePlan.choose(it, liked, listOf(Song(id = "4", title = "Four"))) }
+            .let { OfflinePlan.finished(it, one, 100, 1) }
+        val shelf = OfflinePlan.shelf(list)
+        assertEquals(setOf("1"), shelf.songs)
+        assertEquals(setOf("al1"), shelf.albums)
+        assertEquals(setOf("ar1", "ar2"), shelf.artists)
+        // Only playlists with something already downloaded; liked songs aren't here yet.
+        assertEquals(setOf("p"), shelf.playlists)
+        assertFalse(shelf.liked)
+        assertTrue(shelf.hasAll(listOf("1")))
+        assertFalse(shelf.hasAll(listOf("1", "2")))
+        assertFalse(shelf.hasAll(emptyList()))
+    }
+
+    @Test fun emptyShelf() {
+        assertTrue(OfflinePlan.shelf(DownloadList()).isEmpty)
     }
 }
