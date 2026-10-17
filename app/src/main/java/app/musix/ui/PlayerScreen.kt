@@ -156,6 +156,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     val heartChanges by graph.favorites.changes.collectAsStateWithLifecycle()
     var view by rememberSaveable { mutableStateOf(PlayerView.ART) }
     var queueOpen by rememberSaveable { mutableStateOf(false) }
+    var sleepOpen by rememberSaveable { mutableStateOf(false) }
     val song = state.current
     BackHandler(enabled = queueOpen) { queueOpen = false }
     val scope = rememberCoroutineScope()
@@ -247,7 +248,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 // A gap above the header that suits the screen's height, so the top of the player
                 // isn't pressed against the status bar.
                 Spacer(Modifier.height(playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp))
-                TopRow(song, onClose = onClose, onAlbum = ::openAlbum)
+                TopRow(song, onClose = onClose, onAlbum = ::openAlbum, onSleep = { sleepOpen = true })
 
                 Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
                     AnimatedContent(
@@ -387,6 +388,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 }
             }
         }
+        if (sleepOpen) SleepTimerSheet(hasSong = song != null) { sleepOpen = false }
     }
 }
 
@@ -444,7 +446,7 @@ private fun SwipeCover(song: Song?, onTap: () -> Unit) {
 }
 
 @Composable
-private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit) {
+private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit, onSleep: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onClose) { Icon(Icons.Rounded.KeyboardArrowDown, "Close", Modifier.size(32.dp)) }
         Column(Modifier.weight(1f).clickable(enabled = song?.albumId != null, onClick = onAlbum), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -457,7 +459,7 @@ private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(Modifier.size(48.dp))
+        SleepTimerButton(onClick = onSleep)
     }
 }
 
