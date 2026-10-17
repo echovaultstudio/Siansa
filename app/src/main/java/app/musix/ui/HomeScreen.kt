@@ -183,9 +183,6 @@ fun HomeScreen(nav: NavController) {
         else graph.subsonic.albums("random", 20, 0).distinctBy { it.name + "|" + it.artist }
     }
     val genres by loadState(version to "genres") { if (graph.library.isSynced) graph.library.genres(12) else emptyList() }
-    // Made once a day; never fails (an empty list hides the row).
-    val suggested by loadState(today to "suggested_artists") { graph.suggestions.today() }
-    var openSuggestion by remember { mutableStateOf<app.musix.mix.SuggestedArtist?>(null) }
 
     // The keyboard shrinks the list, so the "How are you feeling?" box scrolls up above it. While it shows, the
     // bottom bar is behind it, so the list needn't leave room for the bar.
@@ -359,17 +356,6 @@ fun HomeScreen(nav: NavController) {
                         }
                     }
                 }
-                HomeSection.SUGGESTED_ARTISTS -> {
-                    // Artists outside the library, like the ones you play most.
-                    item(key = "suggested_artists") {
-                        Shelf("Artists you might like", suggested.valueOrNull().orEmpty(), key = { it.name }) { artist ->
-                            SuggestedArtistTile(artist) {
-                                AppLog.i("Home", "Suggested artist opened")
-                                openSuggestion = artist
-                            }
-                        }
-                    }
-                }
                 HomeSection.ADDED -> {
                     item(key = "added") {
                         Shelf("Recently added", newest.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.RecentlyAdded)) { album ->
@@ -400,7 +386,6 @@ fun HomeScreen(nav: NavController) {
             }
         }
     }
-    openSuggestion?.let { SuggestedArtistDialog(it) { openSuggestion = null } }
     if (arranging) {
         ArrangeHomeSheet(homeOrder, homeHidden, onChange = {
             AppLog.i("Home", "Arranged: ${HomeSection.format(it)}")
