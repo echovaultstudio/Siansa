@@ -328,6 +328,7 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
                 ) {
                     Icon(if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, "Play or pause")
                 }
+                CastButton()
                 IconButton(onClick = { graph.player.next() }) {
                     Icon(Icons.Rounded.SkipNext, "Next")
                 }

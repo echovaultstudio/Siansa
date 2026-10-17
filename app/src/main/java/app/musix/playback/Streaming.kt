@@ -43,15 +43,26 @@ object Streaming {
             if ('?' !in u && '&' in u) u.replaceFirst('&', '?') else u
         }
 
-    fun rewrite(uri: Uri, kbps: Int): Uri {
+    fun rewrite(uri: Uri, kbps: Int): Uri = convert(uri, "opus", kbps)
+
+    /**
+     * The stream a Chromecast plays: MP3 320 converted by Navidrome, which every Cast device can play
+     * (the original file may be hi-res FLAC or ALAC, which they can't).
+     */
+    fun forCast(uri: Uri): Uri = convert(uri, "mp3", CAST_KBPS)
+
+    const val CAST_KBPS = 320
+    const val CAST_MIME = "audio/mpeg"
+
+    private fun convert(uri: Uri, format: String, kbps: Int): Uri {
         if (kbps <= 0 || uri.path?.endsWith("/rest/stream") != true) return uri
-        // Swap the "raw" (original) request for an Opus conversion.
+        // Swap the "raw" (original) request for a conversion.
         val builder = uri.buildUpon().clearQuery()
         uri.queryParameterNames.filter { it != "format" && it != "maxBitRate" && it != "estimateContentLength" }.forEach { name ->
             uri.getQueryParameters(name).forEach { builder.appendQueryParameter(name, it) }
         }
         return builder
-            .appendQueryParameter("format", "opus")
+            .appendQueryParameter("format", format)
             .appendQueryParameter("maxBitRate", kbps.toString())
             // Lets the player know the length of the converted stream, so the seek bar works.
             .appendQueryParameter("estimateContentLength", "true")

@@ -10,6 +10,9 @@
 # The FFmpeg audio renderer is created by name and calls into native code.
 -keep class androidx.media3.decoder.ffmpeg.** { *; }
 
+# Google Cast reads its options class by name from the manifest.
+-keep class app.musix.playback.CastSetup { <init>(); }
+
 # Background mix generation is started by class name.
 -keep class app.musix.mix.MixWorker { <init>(...); }
 

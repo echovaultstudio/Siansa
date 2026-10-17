@@ -1,0 +1,278 @@
+package app.musix.ui
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BluetoothAudio
+import androidx.compose.material.icons.rounded.Cast
+import androidx.compose.material.icons.rounded.CastConnected
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.Speaker
+import androidx.compose.material.icons.rounded.Tv
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.mediarouter.media.MediaRouter
+import app.musix.playback.Cast
+import app.musix.playback.AudioOutput
+import app.musix.playback.CastStatus
+import app.musix.playback.OutputDevice
+import app.musix.playback.dlna.Dlna
+
+/**
+ * The cast button: picks a TV or speaker to play on (Chromecast, or DLNA, which needs no Google Play services).
+ */
+@Composable
+fun CastButton(tint: Color = LocalContentColor.current) {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) { Cast.whenReady(context) { } }
+    val status by Cast.status.collectAsStateWithLifecycle()
+    val dlna by Dlna.selected.collectAsStateWithLifecycle()
+    val dlnaConnecting by Dlna.connecting.collectAsStateWithLifecycle()
+    var open by remember { mutableStateOf(false) }
+    // DLNA works without Google Play services, so the button is always there.
+    val device = dlna?.name ?: status.device
+    val connecting = dlnaConnecting || status.connecting
+    IconButton(onClick = { open = true }) {
+        Icon(
+            if (device != null) Icons.Rounded.CastConnected else Icons.Rounded.Cast,
+            if (device != null) "Playing on $device" else "Play on a TV or speaker",
+            tint = when {
+                connecting -> Accent.copy(alpha = 0.5f)
+                device != null -> Accent
+                else -> tint
+            },
+        )
+    }
+    if (open) CastSheet(onDismiss = { open = false })
+}
+
+/**
+ * The text next to the device button in now playing: the TV or speaker's name while casting,
+ * "Connecting…" while it connects, the Bluetooth or wired headphones the phone plays through,
+ * and nothing on the phone's own speaker.
+ */
+fun castDeviceLabel(status: CastStatus, output: OutputDevice? = null, dlna: String? = null, dlnaConnecting: Boolean = false): String? = when {
+    dlnaConnecting -> "Connecting…"
+    dlna != null -> dlna
+    status.device != null -> status.device
+    status.connecting -> "Connecting…"
+    output != null -> output.name
+    else -> null
+}
+
+/**
+ * Now playing's device button, bottom left as in Spotify: an icon for where the music plays, followed by
+ * the device's name when it isn't this phone's speaker ("Living Room TV", "Sony Headphones"). Tapping it
+ * picks a TV or speaker to cast to, on phones that can cast.
+ */
+@Composable
+fun CastDeviceButton(tint: Color, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        Cast.whenReady(context) { }
+        AudioOutput.start(context)
+    }
+    val status by Cast.status.collectAsStateWithLifecycle()
+    val output by AudioOutput.device.collectAsStateWithLifecycle()
+    val dlna by Dlna.selected.collectAsStateWithLifecycle()
+    val dlnaConnecting by Dlna.connecting.collectAsStateWithLifecycle()
+    var open by remember { mutableStateOf(false) }
+    val label = castDeviceLabel(status, output, dlna?.name, dlnaConnecting)
+    val remote = dlna != null || status.device != null
+    val connecting = dlnaConnecting || status.connecting
+    val color = when {
+        connecting -> Accent.copy(alpha = 0.6f)
+        remote -> Accent
+        output != null -> Accent
+        else -> tint
+    }
+    val icon = when {
+        connecting -> Icons.Rounded.Cast
+        remote -> Icons.Rounded.CastConnected
+        output?.bluetooth == true -> Icons.Rounded.BluetoothAudio
+        output != null -> Icons.Rounded.Headphones
+        else -> Icons.Rounded.Cast
+    }
+    Row(
+        modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClickLabel = "Choose where to play") { open = true }
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, if (label == null) "Play on a TV or speaker" else null, tint = color, modifier = Modifier.size(22.dp))
+        if (label != null) {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = color,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+    if (open) CastSheet(onDismiss = { open = false })
+}
+
+private class CastTarget(val route: MediaRouter.RouteInfo, val name: String, val detail: String?, val selected: Boolean, val icon: ImageVector)
+
+/**
+ * Lists the phone, every Cast device and every DLNA TV or speaker on the Wi-Fi; tapping one moves the
+ * music there.
+ */
+@Composable
+private fun CastSheet(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val router = remember { MediaRouter.getInstance(context) }
+    val status by Cast.status.collectAsStateWithLifecycle()
+    var targets by remember { mutableStateOf(emptyList<CastTarget>()) }
+    val dlnaDevices by Dlna.devices.collectAsStateWithLifecycle()
+    val dlna by Dlna.selected.collectAsStateWithLifecycle()
+    val dlnaConnecting by Dlna.connecting.collectAsStateWithLifecycle()
+
+    // DLNA devices are searched for only while the sheet is open.
+    DisposableEffect(Unit) {
+        Dlna.startSearch(context)
+        onDispose { Dlna.stopSearch() }
+    }
+
+    // Searches for devices only while the sheet is open.
+    DisposableEffect(router) {
+        fun refresh() {
+            targets = router.routes
+                .filter { !it.isDefault && !it.isBluetooth && it.isEnabled && it.matchesSelector(Cast.selector) }
+                .map { route ->
+                    CastTarget(
+                        route = route,
+                        name = route.name,
+                        detail = route.description?.takeIf { it.isNotBlank() },
+                        selected = route.isSelected,
+                        icon = if (route.deviceType == MediaRouter.RouteInfo.DEVICE_TYPE_SPEAKER) Icons.Rounded.Speaker else Icons.Rounded.Tv,
+                    )
+                }
+        }
+        val callback = object : MediaRouter.Callback() {
+            override fun onRouteAdded(router: MediaRouter, route: MediaRouter.RouteInfo) = refresh()
+            override fun onRouteRemoved(router: MediaRouter, route: MediaRouter.RouteInfo) = refresh()
+            override fun onRouteChanged(router: MediaRouter, route: MediaRouter.RouteInfo) = refresh()
+            override fun onRouteSelected(router: MediaRouter, route: MediaRouter.RouteInfo, reason: Int) = refresh()
+            override fun onRouteUnselected(router: MediaRouter, route: MediaRouter.RouteInfo, reason: Int) = refresh()
+        }
+        router.addCallback(Cast.selector, callback, MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY or MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN)
+        refresh()
+        onDispose { router.removeCallback(callback) }
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 16.dp)) {
+            Text(
+                "Play on",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            val onPhone = status.device == null && !status.connecting && dlna == null
+            TargetRow(Icons.Rounded.PhoneAndroid, "This phone", null, selected = onPhone) {
+                if (status.device != null || status.connecting) Cast.disconnect()
+                Dlna.select(null)
+                onDismiss()
+            }
+            targets.forEach { target ->
+                val connecting = status.connecting && target.selected
+                TargetRow(target.icon, target.name, if (connecting) "Connecting…" else target.detail ?: "Chromecast", selected = target.selected && !connecting && dlna == null) {
+                    if (!target.selected) target.route.select()
+                    onDismiss()
+                }
+            }
+            // DLNA names can repeat a Chromecast's (a TV with both): those show once, as Chromecast.
+            val castNames = targets.map { it.name.lowercase() }.toSet()
+            dlnaDevices.filter { it.name.lowercase() !in castNames }.forEach { device ->
+                val selected = dlna?.id == device.id
+                TargetRow(
+                    Icons.Rounded.Speaker,
+                    device.name,
+                    if (selected && dlnaConnecting) "Connecting…" else listOfNotNull("DLNA", device.model).joinToString(" · "),
+                    selected = selected && !dlnaConnecting,
+                ) {
+                    if (!selected) {
+                        if (status.device != null || status.connecting) Cast.disconnect()
+                        Dlna.select(device)
+                    }
+                    onDismiss()
+                }
+            }
+            if (targets.isEmpty() && dlnaDevices.isEmpty()) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(16.dp))
+                    Text("Looking for TVs and speakers…", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            Text(
+                "TVs and speakers show up when they're on the same Wi-Fi as this phone: Chromecast and Google TV, and DLNA ones (most smart TVs, Sonos, AV receivers). They play straight from your Navidrome server, as MP3 320 kbit/s.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TargetRow(icon: ImageVector, name: String, detail: String?, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Icon(icon, null, tint = if (selected) Accent else MaterialTheme.colorScheme.onSurface)
+        Column(Modifier.weight(1f)) {
+            Text(
+                name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (selected) Accent else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            detail?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        if (selected) Icon(Icons.Rounded.Check, null, tint = Accent)
+    }
+}
