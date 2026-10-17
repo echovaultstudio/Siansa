@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
@@ -53,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.musix.AppGraph
 import app.musix.data.Album
+import app.musix.data.HomeSection
 import app.musix.data.Artist
 import app.musix.data.Mix
 import app.musix.data.Playlist
@@ -82,6 +84,8 @@ fun HomeScreen(nav: NavController) {
     var current by remember { mutableStateOf<Mix?>(null) }
     var busySelector by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    val homeOrder = graph.settings.state.collectAsStateWithLifecycle().value.homeOrder
+    var arranging by remember { mutableStateOf(false) }
 
     fun build(selector: Selector?, force: Boolean, open: Boolean) {
         if (busySelector != null) return
@@ -186,172 +190,197 @@ fun HomeScreen(nav: NavController) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(greeting(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                IconButton(onClick = { arranging = true }) { Icon(Icons.Rounded.Tune, "Arrange Home") }
             }
         }
 
-        // Quick access, like the top grid in Spotify: today's mixes, playlists and recent albums.
-        item {
-            val quick = buildList<Triple<String, String?, () -> Unit>> {
-                add(Triple("Liked songs", null) { nav.navigate("liked") })
-                todaysMixes.take(2).forEach { m -> add(Triple(m.title, m.songs.firstOrNull()?.cover) { nav.navigate("mix/${m.id}") }) }
-                playlists.valueOrNull().orEmpty().take(2).forEach { p -> add(Triple(p.name, p.coverArt) { nav.navigate("playlist/${p.id}") }) }
-                recentAlbums.valueOrNull().orEmpty().take(6).forEach { a -> add(Triple(a.name, a.coverArt) { nav.navigate("album/${a.id}") }) }
-            }.take(6)
-            if (quick.isNotEmpty()) {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    quick.chunked(2).forEach { row ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            row.forEach { (title, cover, open) ->
-                                val colors = if (title == "Liked songs") Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(title)
-                                QuickTile(title, cover, colors, open, Modifier.weight(1f))
+        if (loaded && !synced) {
+            item(key = "sync") { Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { SyncPrompt(nav) } }
+        }
+
+        // The rest in the order chosen under Arrange Home.
+        for (section in homeOrder) {
+            when (section) {
+                HomeSection.QUICK -> {
+                    // Quick access, like the top grid in Spotify: today's mixes, playlists and recent albums.
+                    item(key = "quick") {
+                        val quick = buildList<Triple<String, String?, () -> Unit>> {
+                            add(Triple("Liked songs", null) { nav.navigate("liked") })
+                            todaysMixes.take(2).forEach { m -> add(Triple(m.title, m.songs.firstOrNull()?.cover) { nav.navigate("mix/${m.id}") }) }
+                            playlists.valueOrNull().orEmpty().take(2).forEach { p -> add(Triple(p.name, p.coverArt) { nav.navigate("playlist/${p.id}") }) }
+                            recentAlbums.valueOrNull().orEmpty().take(6).forEach { a -> add(Triple(a.name, a.coverArt) { nav.navigate("album/${a.id}") }) }
+                        }.take(6)
+                        if (quick.isNotEmpty()) {
+                            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                quick.chunked(2).forEach { row ->
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        row.forEach { (title, cover, open) ->
+                                            val colors = if (title == "Liked songs") Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(title)
+                                            QuickTile(title, cover, colors, open, Modifier.weight(1f))
+                                        }
+                                        if (row.size == 1) Spacer(Modifier.weight(1f))
+                                    }
+                                }
                             }
-                            if (row.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+                HomeSection.TODAY -> {
+                    item(key = "today") {
+                        val mix = current
+                        when {
+                            mix != null -> HeroMix(
+                                mix = mix,
+                                busy = busySelector == "current",
+                                onOpen = { nav.navigate("mix/${mix.id}") },
+                                onPlay = { graph.player.play(mix.songs) },
+                                onShuffle = { graph.player.play(mix.songs, shuffle = true) },
+                                onRegenerate = { build(null, force = true, open = false) },
+                            )
+                            busySelector == "current" -> BuildingCard()
+                            else -> Unit
+                        }
+                    }
+                    error?.let { message ->
+                        item(key = "today_error") {
+                            Column(Modifier.padding(horizontal = 16.dp)) {
+                                ErrorText(message, Modifier)
+                                TextButton(onClick = { build(null, force = false, open = false) }) { Text("Try again") }
+                            }
+                        }
+                    }
+                }
+                HomeSection.MOOD -> {
+                    item(key = "mood") { MoodBox(nav, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+                }
+                HomeSection.MADE_FOR_YOU -> {
+                    // Made for you: the vibe for this hour, then mixes from your own listening.
+                    item(key = "made") {
+                        val tiles: List<Pair<String, @Composable () -> Unit>> = buildList {
+                            applicable.forEach { selector ->
+                                add(selector.id to @Composable {
+                                    val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
+                                    GradientTile(
+                                        title = mix?.title ?: "${selector.name} mix",
+                                        colors = tileColors(selector.id),
+                                        coverArt = mix?.songs?.firstOrNull()?.coverArt,
+                                        subtitle = selector.name,
+                                        caption = if (mix != null) "${mix.songs.size} tracks · until %02d:00".format(selector.endHour) else "Tap to make today's mix",
+                                        busy = busySelector == selector.id,
+                                        onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) },
+                                    )
+                                })
+                            }
+                            MixGenerator.Personal.entries.forEach { kind ->
+                                add(kind.id to @Composable {
+                                    val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
+                                    GradientTile(
+                                        title = kind.title,
+                                        colors = tileColors(kind.id),
+                                        coverArt = mix?.songs?.firstOrNull()?.coverArt,
+                                        subtitle = "For you",
+                                        caption = if (mix != null) "${mix.songs.size} tracks · ${mix.description}" else "Tap to make it",
+                                        busy = personalBusy == kind.id,
+                                        onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) },
+                                    )
+                                })
+                            }
+                        }
+                        Shelf("Made for you", tiles, key = { it.first }) { it.second() }
+                    }
+                }
+                HomeSection.REDISCOVER -> {
+                    // Albums you loved a while ago but haven't played since.
+                    item(key = "rediscover") {
+                        Shelf("Rediscover", lovedBefore.valueOrNull().orEmpty(), key = { it.album.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.Rediscover)) { r ->
+                            AlbumTile(
+                                name = r.album.name,
+                                subtitle = rediscoverSubtitle(r),
+                                coverArt = r.album.coverArt,
+                                onClick = { nav.navigate("album/${r.album.id}") },
+                                modifier = Modifier.width(150.dp),
+                            )
+                        }
+                    }
+                }
+                HomeSection.RADIOS -> {
+                    item(key = "radios") {
+                        Shelf("Radios", moodRadios, key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.Radios)) { radio ->
+                            GradientTile(
+                                title = radio.name,
+                                colors = Color(radio.colors.first) to Color(radio.colors.second),
+                                size = 140.dp,
+                                caption = "Sound radio",
+                                onClick = { nav.openMoodRadio(radio.id) },
+                            )
+                        }
+                    }
+                }
+                HomeSection.PLAYLISTS -> {
+                    item(key = "playlists") {
+                        Shelf("Your playlists", playlists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.Playlists)) { playlist ->
+                            PlaylistTile(playlist) { nav.navigate("playlist/${playlist.id}") }
+                        }
+                    }
+                }
+                HomeSection.RECENT -> {
+                    item(key = "recent") {
+                        Shelf("Recently played", recentAlbums.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.RecentlyPlayed)) { album ->
+                            AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
+                        }
+                    }
+                }
+                HomeSection.ARTIST_RADIOS -> {
+                    item(key = "artist_radios") {
+                        Shelf("Artist radios", recentArtists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.ArtistRadios)) { artist ->
+                            AlbumTile(
+                                name = "${artist.name} radio",
+                                subtitle = "With similar artists",
+                                coverArt = artist.coverArt,
+                                onClick = {
+                                    launch.progressive("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
+                                },
+                                modifier = Modifier.width(140.dp),
+                                round = true,
+                            )
+                        }
+                    }
+                }
+                HomeSection.ADDED -> {
+                    item(key = "added") {
+                        Shelf("Recently added", newest.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.RecentlyAdded)) { album ->
+                            AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
+                        }
+                    }
+                }
+                HomeSection.GENRES -> {
+                    item(key = "genres") {
+                        Shelf("Your genres", genres.valueOrNull().orEmpty(), key = { it.name }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.Genres)) { genre ->
+                            GradientTile(
+                                title = genre.name,
+                                colors = tileColors(genre.name),
+                                size = 130.dp,
+                                caption = "${genre.songCount} songs",
+                                onClick = { nav.openGenreRadio(genre.name) },
+                            )
+                        }
+                    }
+                }
+                HomeSection.RANDOM -> {
+                    item(key = "random") {
+                        Shelf("Random picks", rediscover.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.RandomPicks)) { album ->
+                            AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
                         }
                     }
                 }
             }
         }
-
-        item {
-            val mix = current
-            when {
-                mix != null -> HeroMix(
-                    mix = mix,
-                    busy = busySelector == "current",
-                    onOpen = { nav.navigate("mix/${mix.id}") },
-                    onPlay = { graph.player.play(mix.songs) },
-                    onShuffle = { graph.player.play(mix.songs, shuffle = true) },
-                    onRegenerate = { build(null, force = true, open = false) },
-                )
-                busySelector == "current" -> BuildingCard()
-                else -> Unit
-            }
-        }
-        error?.let { message ->
-            item {
-                Column(Modifier.padding(horizontal = 16.dp)) {
-                    ErrorText(message, Modifier)
-                    TextButton(onClick = { build(null, force = false, open = false) }) { Text("Try again") }
-                }
-            }
-        }
-
-        item { MoodBox(nav, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
-
-        if (loaded && !synced) {
-            item { Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { SyncPrompt(nav) } }
-        }
-
-        // Made for you: the vibe for this hour, then mixes from your own listening.
-        item {
-            val tiles: List<Pair<String, @Composable () -> Unit>> = buildList {
-                applicable.forEach { selector ->
-                    add(selector.id to @Composable {
-                        val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
-                        GradientTile(
-                            title = mix?.title ?: "${selector.name} mix",
-                            colors = tileColors(selector.id),
-                            coverArt = mix?.songs?.firstOrNull()?.coverArt,
-                            subtitle = selector.name,
-                            caption = if (mix != null) "${mix.songs.size} tracks · until %02d:00".format(selector.endHour) else "Tap to make today's mix",
-                            busy = busySelector == selector.id,
-                            onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) },
-                        )
-                    })
-                }
-                MixGenerator.Personal.entries.forEach { kind ->
-                    add(kind.id to @Composable {
-                        val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
-                        GradientTile(
-                            title = kind.title,
-                            colors = tileColors(kind.id),
-                            coverArt = mix?.songs?.firstOrNull()?.coverArt,
-                            subtitle = "For you",
-                            caption = if (mix != null) "${mix.songs.size} tracks · ${mix.description}" else "Tap to make it",
-                            busy = personalBusy == kind.id,
-                            onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) },
-                        )
-                    })
-                }
-            }
-            Shelf("Made for you", tiles, key = { it.first }) { it.second() }
-        }
-
-        // Albums you loved a while ago but haven't played since.
-        item {
-            Shelf("Rediscover", lovedBefore.valueOrNull().orEmpty(), key = { it.album.id }, onOpenAll = nav.openAll(HomeSection.Rediscover)) { r ->
-                AlbumTile(
-                    name = r.album.name,
-                    subtitle = rediscoverSubtitle(r),
-                    coverArt = r.album.coverArt,
-                    onClick = { nav.navigate("album/${r.album.id}") },
-                    modifier = Modifier.width(150.dp),
-                )
-            }
-        }
-
-        item {
-            Shelf("Radios", moodRadios, key = { it.id }, onOpenAll = nav.openAll(HomeSection.Radios)) { radio ->
-                GradientTile(
-                    title = radio.name,
-                    colors = Color(radio.colors.first) to Color(radio.colors.second),
-                    size = 140.dp,
-                    caption = "Sound radio",
-                    onClick = { nav.openMoodRadio(radio.id) },
-                )
-            }
-        }
-
-        item {
-            Shelf("Your playlists", playlists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(HomeSection.Playlists)) { playlist ->
-                PlaylistTile(playlist) { nav.navigate("playlist/${playlist.id}") }
-            }
-        }
-
-        item {
-            Shelf("Recently played", recentAlbums.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(HomeSection.RecentlyPlayed)) { album ->
-                AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
-            }
-        }
-
-        item {
-            Shelf("Artist radios", recentArtists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(HomeSection.ArtistRadios)) { artist ->
-                AlbumTile(
-                    name = "${artist.name} radio",
-                    subtitle = "With similar artists",
-                    coverArt = artist.coverArt,
-                    onClick = {
-                        launch.progressive("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
-                    },
-                    modifier = Modifier.width(140.dp),
-                    round = true,
-                )
-            }
-        }
-
-        item {
-            Shelf("Recently added", newest.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(HomeSection.RecentlyAdded)) { album ->
-                AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
-            }
-        }
-
-        item {
-            Shelf("Your genres", genres.valueOrNull().orEmpty(), key = { it.name }, onOpenAll = nav.openAll(HomeSection.Genres)) { genre ->
-                GradientTile(
-                    title = genre.name,
-                    colors = tileColors(genre.name),
-                    size = 130.dp,
-                    caption = "${genre.songCount} songs",
-                    onClick = { nav.openGenreRadio(genre.name) },
-                )
-            }
-        }
-
-        item {
-            Shelf("Random picks", rediscover.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(HomeSection.RandomPicks)) { album ->
-                AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
-            }
-        }
+    }
+    if (arranging) {
+        ArrangeHomeSheet(homeOrder, onChange = {
+            AppLog.i("Home", "Arranged: ${HomeSection.format(it)}")
+            graph.settings.setHomeOrder(it)
+        }, onDismiss = { arranging = false })
     }
 }
 
@@ -372,7 +401,7 @@ internal suspend fun recentlyPlayedArtists(graph: AppGraph, limit: Int = 10): Li
 }
 
 /** Opens a Home row's full list; navigation stays on the main thread (it's called from a tap). */
-private fun NavController.openAll(section: HomeSection): () -> Unit = { navigate(section.route) }
+private fun NavController.openAll(section: app.musix.ui.HomeSection): () -> Unit = { navigate(section.route) }
 
 private fun greeting(): String {
     val hour = LocalTime.now().hour
