@@ -1,12 +1,12 @@
 # Changelog
 
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
-To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
+Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
-## 0.0.22beta — 2026-10-16
+## 0.0.25beta — 2026-10-16
 
-### Changed
-- **Album pages no longer repeat the album's artist and name under every song.** A song only shows a second line when other artists are on it (a "feat." or a duet), and then only those artists. Musix reads this from the song's artist tags as Navidrome reports them.
+### Added
+- **See everything in a Home row.** Rows with more than four items (Rediscover, Radios, Your playlists, Recently played, Artist radios, Recently added, Your genres, Random picks) now have an arrow next to their title. Tap the title to open a page with all of them in a grid, including ones Home has no room for: every radio, every playlist and genre, and longer lists of recently played and recently added albums.
 
 ## 0.0.18beta — 2026-10-16
 
