@@ -20,6 +20,8 @@ class PlaylistEditor(
     private val local: LocalPlaylists,
     val removed: RemovedPlaylists,
     private val isOffline: () -> Boolean,
+    /** Called when a phone playlist moved to Navidrome as the new playlist, to keep its downloads. */
+    private val moved: suspend (localId: String, made: Playlist) -> Unit = { _, _ -> },
 ) {
     /** The new playlist, or null when Navidrome didn't send it back (it was still made). */
     suspend fun create(name: String, songs: List<Song> = emptyList(), onPhone: Boolean = false): Result<Playlist?> =
@@ -97,6 +99,7 @@ class PlaylistEditor(
                 runCatching { native.uploadPlaylistImage(made.id, withContext(Dispatchers.IO) { picture.readBytes() }, mimeOf(picture.name)) }
                     .onFailure { AppLog.w("Playlist", "Picture not moved: ${it.message}") }
             }
+            if (made != null) runCatching { moved(playlistId, made) }.onFailure { AppLog.w("Playlist", "Downloads not moved: ${it.message}") }
             local.delete(playlistId)
             AppLog.i("Playlist", "Moved phone playlist $playlistId to Navidrome as ${made?.id}")
             made
