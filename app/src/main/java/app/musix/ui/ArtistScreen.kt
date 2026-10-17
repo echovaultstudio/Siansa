@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Shuffle
@@ -128,6 +129,7 @@ fun ArtistScreen(nav: NavController, id: String) {
             return@HeroPage
         }
         val top by loadState("top-$id") { loadTopSongs(graph, p) }
+        val others by loadState("appears-$id") { graph.library.appearsOn(p.artist) }
         val groups = p.albums.groupBy { it.category }.toList().sortedBy { it.first.ordinal }
 
         LazyVerticalGrid(
@@ -197,6 +199,25 @@ fun ArtistScreen(nav: NavController, id: String) {
                 }
             }
 
+            // Albums by others they're credited on: a row here, all of them on their own page.
+            val appearsOn = others.valueOrNull().orEmpty()
+            if (appearsOn.isNotEmpty()) {
+                full { AppearsOnTitle { nav.navigate("artist/${p.artist.id}/appears-on") } }
+                full {
+                    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        items(appearsOn.take(APPEARS_ON_ROW), key = { "appears-${it.id}" }) { album ->
+                            AlbumTile(
+                                name = album.name,
+                                subtitle = album.artist,
+                                coverArt = album.coverArt,
+                                onClick = { nav.navigate("album/${album.id}") },
+                                modifier = Modifier.width(150.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
             artistInfo?.biography?.let { bio -> full { Biography(bio) } }
 
             val similar = artistInfo?.similar.orEmpty()
@@ -204,6 +225,65 @@ fun ArtistScreen(nav: NavController, id: String) {
                 full { SectionTitle("Fans also like") }
                 full { SimilarRow(similar, nav) }
             }
+        }
+    }
+}
+
+private const val APPEARS_ON_ROW = 20
+
+/** "Appears on" with an arrow; tapping it opens every album the artist appears on. */
+@Composable
+private fun AppearsOnTitle(onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(end = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SectionTitle("Appears on", Modifier.weight(1f))
+        Icon(
+            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            "Show all",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 14.dp),
+        )
+    }
+}
+
+/** Every album the artist appears on without being its album artist, newest first. */
+@Composable
+fun AppearsOnScreen(nav: NavController, id: String) {
+    val graph = LocalGraph.current
+    val page by loadState(id) {
+        val artist = graph.library.artist(id)
+        artist to (artist?.let { graph.library.appearsOn(it) }.orEmpty())
+    }
+    val loaded = page.valueOrNull()
+    Screen(title = loaded?.first?.name?.let { "$it appears on" } ?: "Appears on", nav = nav) { padding ->
+        LoadBox(page, Modifier.padding(padding)) { (_, albums) ->
+          Box(Modifier.padding(padding)) {
+            if (albums.isEmpty()) {
+                Text(
+                    "No albums by other artists yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp),
+                )
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(150.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    items(albums, key = { it.id }) { album ->
+                        AlbumTile(
+                            name = album.name,
+                            subtitle = listOfNotNull(album.artist.ifBlank { null }, album.year?.toString()).joinToString(" · "),
+                            coverArt = album.coverArt,
+                            onClick = { nav.navigate("album/${album.id}") },
+                        )
+                    }
+                }
+            }
+          }
         }
     }
 }
