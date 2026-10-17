@@ -8,8 +8,9 @@ Source: `app/src/main/java/app/musix/`. Unit tests: `app/src/test/`. Emulator te
 - Build and test before opening a pull request: `gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease`.
   Lint errors fail the build.
 - Add or update unit tests in `app/src/test/` for any logic you change.
-- Add a section at the top of `CHANGELOG.md` and set the same version in `version.txt` (next `0.0.Nbeta`).
-  Write it for the app's user: what was wrong or new, in plain words, under `### Fixed` / `### Added` / `### Changed`.
+- Add a note file in `changelog.d/` (e.g. `changelog.d/issue-42.md`, see its README) with `### Fixed` /
+  `### Added` / `### Changed`, written for the app's user in plain words. Don't edit `CHANGELOG.md` or
+  `version.txt`: the release does that, so pull requests never conflict over them.
 - Log what matters for tracing problems with `AppLog` (`i`, `w`, `e`; `d` for detail). Never log addresses,
   passwords, tokens or API keys.
 - UI text: short, plain English, no jargon. Follow the existing Musix theme (`ui/Theme.kt`); test light and dark.
