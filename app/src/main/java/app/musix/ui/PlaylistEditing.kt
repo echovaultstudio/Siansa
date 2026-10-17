@@ -200,7 +200,7 @@ private fun NameDialog(
                 if (askWhere) {
                     Spacer(Modifier.height(12.dp))
                     WhereOption("On Navidrome", "Syncs with your server and your other apps.", selected = !onPhone) { onPhone = false }
-                    WhereOption("On this phone only", "Works offline. Only this phone has it.", selected = onPhone) { onPhone = true }
+                    WhereOption("On this phone only", "Its songs download to this phone so it works offline. Only this phone has it.", selected = onPhone) { onPhone = true }
                 }
             }
         },
