@@ -28,6 +28,7 @@ import app.musix.net.HistoryApi
 import app.musix.net.LastFmApi
 import app.musix.net.ListenBrainzApi
 import app.musix.net.OpenRouterApi
+import app.musix.net.Connection
 import app.musix.net.SubsonicApi
 import app.musix.offline.Downloads
 import app.musix.playback.PlayerConnection
@@ -191,7 +192,7 @@ class AppGraph(val app: Application) {
     val radios = Radios(this)
     val suggestions = ArtistSuggestions(this)
     /** Whether the server and AudioMuse can be reached, for offline messages and playing only downloads. */
-    val connection = app.musix.net.Connection(app, http, { settings.current }, scope)
+    val connection = Connection(app, http, { settings.current }, scope)
     val player = PlayerConnection(app, subsonic).apply {
         isOffline = { connection.current.offline }
         isDownloaded = { downloads.isDownloaded(it) }
