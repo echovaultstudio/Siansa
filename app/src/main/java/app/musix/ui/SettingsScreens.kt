@@ -36,6 +36,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -45,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.musix.data.AppSettings
 import app.musix.data.ReplayGainMode
+import app.musix.data.Users
 import app.musix.net.AudioMuseApi
 import app.musix.net.OpenRouterApi
 import app.musix.net.SubsonicApi
@@ -130,6 +132,12 @@ fun ConnectionsScreen(nav: NavController) {
                     "Welcome! Connect your Navidrome server to get started. AudioMuse and OpenRouter can be added now or later.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                // A user being added: a way back to the users already set up.
+                val context = LocalContext.current
+                val others = remember { Users.all(context).filter { it.id != Users.active && it.connected } }
+                others.forEach { user ->
+                    TextButton(onClick = { Users.switchTo(context, user.id) }) { Text("Switch back to ${user.label}") }
+                }
             }
 
             Heading("Navidrome")
@@ -149,6 +157,7 @@ fun ConnectionsScreen(nav: NavController) {
             HorizontalDivider()
             Heading("AudioMuse-AI")
             Field("Server address", draft.audioMuseUrl, "192.168.1.10:8000") { draft = draft.copy(audioMuseUrl = it) }
+            Hint("Leave the address empty if this user has no AudioMuse.")
             Hint("If AudioMuse has a login, use either an API token or its username and password.")
             SecretField("API token", draft.audioMuseToken) { draft = draft.copy(audioMuseToken = it) }
             Field("Username", draft.audioMuseUser, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseUser = it) }

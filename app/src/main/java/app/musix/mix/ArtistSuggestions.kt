@@ -37,7 +37,7 @@ private data class SavedSuggestions(val date: String, val artists: List<Suggeste
  */
 class ArtistSuggestions(private val graph: AppGraph) {
     private val lock = Mutex()
-    private val prefs by lazy { graph.app.getSharedPreferences("artist_suggestions", Context.MODE_PRIVATE) }
+    private val prefs by lazy { graph.app.getSharedPreferences(app.musix.data.Users.scoped("artist_suggestions"), Context.MODE_PRIVATE) }
     @Volatile private var memory: SavedSuggestions? = null
 
     suspend fun today(): List<SuggestedArtist> = lock.withLock {
