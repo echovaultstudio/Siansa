@@ -220,6 +220,7 @@ fun MusixRoot() {
                 composable("report/{range}") { ReportScreen(nav, it.arguments?.getString("range").orEmpty()) }
                 composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }
+                composable("artist/{id}/appears-on") { AppearsOnScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("playlist/{id}") { PlaylistScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("mix/{id}") { MixScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("selector/{id}") { SelectorEditor(nav, it.arguments?.getString("id").orEmpty()) }
