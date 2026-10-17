@@ -3,6 +3,35 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.3.0beta — 2026-10-17
+
+### Fixed
+- **Artists with "&" or "and" in their name were split in two**, so Chase & Status could show as just "Status"
+  or as two artists. Names that are one artist in your library now stay whole under a song and when choosing
+  an artist.
+- **Tapping the artist in now playing didn't offer every artist** on songs whose shown name is only the main
+  artist (for example "Fred again.." on a song with Skrillex). Musix now asks Navidrome for all of the song's
+  artists, so you can choose between them.
+- **Songs from libraries you unchecked still played.** Popular songs on artist pages, song and artist radios,
+  Liked songs, Rediscover and most played came straight from Navidrome, which includes every library. When
+  some libraries are unchecked in Settings → Library sync, songs and albums from them are now left out
+  everywhere, so for example a Dolby Atmos copy no longer plays after a song from your main library.
+- **"Copy errors" said there was nothing to copy** when the log only had warnings. It's now "Copy problems"
+  and copies the errors and the warnings, the same ones listed under Problems.
+
+### Added
+- **Cast to Chromecast and Google TV.** Tap the device button at the bottom left of the player (or the cast button on the song bar) and pick your TV or speaker: the queue, song and spot move there, and you keep controlling it from the phone, the notification or the lock screen. Pick "This phone" to bring the music back.
+- **Play on TVs and speakers without Chromecast (DLNA).** Most smart TVs, Sonos, AV receivers and many
+  network speakers show up in the same list, marked "DLNA". Play, pause, skip, seek and the phone's volume
+  buttons all work, and songs follow on one after another. No Google Play services needed.
+- **See where the music plays.** Like Spotify, the bottom left of the player shows the TV, speaker or Bluetooth headphones playing, for example "Sony Headphones".
+
+### Changed
+- **Calmer format label in now playing.** The label under the seek bar (FLAC, OPUS 160…) is now a quiet grey
+  with a faint outline instead of bright amber or violet, so it fits in with the times next to it.
+- **Now playing is spaced more evenly.** The seek bar sits a little higher, closer to the song title, and "Up
+  next" has room above the phone's gesture bar instead of touching the bottom edge.
+
 ## 0.2.0beta — 2026-10-17
 
 ### Fixed
