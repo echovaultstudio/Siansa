@@ -52,7 +52,10 @@ data class RankedTrack(val title: String, val artist: String, val plays: Long, v
 data class RankedAlbum(val title: String, val artist: String, val plays: Long, val album: Album?)
 
 enum class ReportRange(val id: String) {
-    THIS_MONTH("month"), LAST_MONTH("last-month"), THIS_YEAR("year");
+    THIS_MONTH("month"), LAST_MONTH("last-month"), THIS_YEAR("year"),
+
+    /** This month a year ago, the whole month. */
+    YEAR_AGO("year-ago");
 
     companion object {
         fun of(id: String) = entries.firstOrNull { it.id == id } ?: THIS_MONTH
@@ -63,6 +66,53 @@ enum class ReportRange(val id: String) {
  * Rediscover and Your month: built from Koito (when scrobbling there), Navidrome's play counts and
  * Musix's own history. Nothing here needs AudioMuse or AI.
  */
+/**
+ * The days a report covers ([from] inclusive, [to] exclusive), where the period before it starts (to
+ * spot rising and fading artists), and its title.
+ */
+data class ReportWindow(val from: LocalDate, val to: LocalDate, val prevFrom: LocalDate, val title: String, val subtitle: String)
+
+fun reportWindow(range: ReportRange, today: LocalDate): ReportWindow {
+    fun monthName(date: LocalDate) = date.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+    return when (range) {
+        ReportRange.THIS_MONTH -> {
+            val start = today.withDayOfMonth(1)
+            ReportWindow(start, today.plusDays(1), start.minusMonths(1), "Your ${monthName(today)}", "So far this month")
+        }
+        ReportRange.LAST_MONTH -> {
+            val start = today.withDayOfMonth(1).minusMonths(1)
+            ReportWindow(start, start.plusMonths(1), start.minusMonths(1), "Your ${monthName(start)}", "${monthName(start)} ${start.year}")
+        }
+        ReportRange.THIS_YEAR -> {
+            val start = today.withDayOfYear(1)
+            ReportWindow(start, today.plusDays(1), start.minusYears(1), "Your ${today.year}", "So far this year")
+        }
+        ReportRange.YEAR_AGO -> {
+            val start = today.withDayOfMonth(1).minusYears(1)
+            ReportWindow(start, start.plusMonths(1), start.minusMonths(1), "This time last year", "${monthName(start)} ${start.year}")
+        }
+    }
+}
+
+/** How many top songs and albums are asked from Koito, to still have 10 after leaving out ones not in the library. */
+private const val TOP_FETCH = 40
+
+/**
+ * The first [limit] of [items] (in order) that [find] matches in the library, each with its match.
+ * Stops searching once it has enough. Items with no match are left out and logged as a count.
+ */
+internal suspend fun <T, R : Any> keepInLibrary(items: List<T>, limit: Int, find: suspend (T) -> R?): List<Pair<T, R>> {
+    val kept = ArrayList<Pair<T, R>>(limit)
+    var skipped = 0
+    for (item in items) {
+        if (kept.size >= limit) break
+        val match = find(item)
+        if (match != null) kept += item to match else skipped++
+    }
+    if (skipped > 0) AppLog.d("Report", "Left out $skipped not in the library")
+    return kept
+}
+
 class Insights(private val graph: AppGraph) {
     private val zone: ZoneId get() = ZoneId.systemDefault()
 
@@ -141,20 +191,7 @@ class Insights(private val graph: AppGraph) {
     suspend fun report(range: ReportRange): ListeningReport = coroutineScope {
         val s = graph.settings.current
         val today = LocalDate.now()
-        val (from, to, prevFrom, title, subtitle) = when (range) {
-            ReportRange.THIS_MONTH -> {
-                val start = today.withDayOfMonth(1)
-                Window(start, today.plusDays(1), start.minusMonths(1), "Your ${monthName(today)}", "So far this month")
-            }
-            ReportRange.LAST_MONTH -> {
-                val start = today.withDayOfMonth(1).minusMonths(1)
-                Window(start, start.plusMonths(1), start.minusMonths(1), "Your ${monthName(start)}", "${monthName(start)} ${start.year}")
-            }
-            ReportRange.THIS_YEAR -> {
-                val start = today.withDayOfYear(1)
-                Window(start, today.plusDays(1), start.minusYears(1), "Your ${today.year}", "So far this year")
-            }
-        }
+        val (from, to, prevFrom, title, subtitle) = reportWindow(range, today)
         val fromSec = from.atStartOfDay(zone).toEpochSecond()
         val toSec = to.atStartOfDay(zone).toEpochSecond()
         val prevSec = prevFrom.atStartOfDay(zone).toEpochSecond()
@@ -170,6 +207,7 @@ class Insights(private val graph: AppGraph) {
         } else null
 
         val (genresUp, genresDown) = genreShift(inRange, before)
+        AppLog.d("Report", "${range.id}: $from to $to")
         val report = if (remote != null) {
             ListeningReport(
                 title = title, subtitle = subtitle,
@@ -177,8 +215,11 @@ class Insights(private val graph: AppGraph) {
                 artistCount = remote.totals.artists, trackCount = remote.totals.tracks,
                 newArtists = remote.totals.newArtists,
                 topArtists = remote.artists.take(10).map { RankedArtist(it.artist, it.count, findArtist(it.artist)) },
-                topTracks = remote.tracks.take(10).map { RankedTrack(it.title.orEmpty(), it.artist, it.count, matchSong(it.artist, it.title.orEmpty())) },
-                topAlbums = remote.albums.take(10).map { RankedAlbum(it.title.orEmpty(), it.artist, it.count, matchAlbum(it.artist, it.title.orEmpty())) },
+                // Koito also counts plays from other apps and services: only songs and albums in your library are shown.
+                topTracks = keepInLibrary(remote.tracks, 10) { matchSong(it.artist, it.title.orEmpty()) }
+                    .map { (p, song) -> RankedTrack(p.title.orEmpty(), p.artist, p.count, song) },
+                topAlbums = keepInLibrary(remote.albums, 10) { matchAlbum(it.artist, it.title.orEmpty()) }
+                    .map { (p, album) -> RankedAlbum(p.title.orEmpty(), p.artist, p.count, album) },
                 byHour = hours(remote.times.map { it * 1000 }),
                 rising = rising(remote.artists, remote.previous).map { RankedArtist(it.artist, it.count, findArtist(it.artist)) },
                 fading = fading(remote.artists, remote.previous),
@@ -191,8 +232,6 @@ class Insights(private val graph: AppGraph) {
         AppLog.i("Report", "${report.title}: ${report.plays} plays, ${report.minutes} min, top ${report.topArtists.take(3).map { it.name }} · ${report.source}")
         report
     }
-
-    private data class Window(val from: LocalDate, val to: LocalDate, val prevFrom: LocalDate, val title: String, val subtitle: String)
 
     private class KoitoData(
         val totals: HistoryApi.Totals,
@@ -207,8 +246,9 @@ class Insights(private val graph: AppGraph) {
         val api = graph.historyApi
         val totals = async { api.koitoTotals(url, token, from, to) }
         val artists = async { api.koitoTop(url, token, "artists", from, to, 40) }
-        val tracks = async { api.koitoTop(url, token, "tracks", from, to, 10) }
-        val albums = async { api.koitoTop(url, token, "albums", from, to, 10) }
+        // More than the 10 shown, as the ones not in your library are left out.
+        val tracks = async { api.koitoTop(url, token, "tracks", from, to, TOP_FETCH) }
+        val albums = async { api.koitoTop(url, token, "albums", from, to, TOP_FETCH) }
         val previous = async { api.koitoTop(url, token, "artists", prev, from, 40) }
         val times = async { api.koitoListenTimes(url, token, from, to) }
         KoitoData(totals.await(), artists.await(), tracks.await(), albums.await(), previous.await(), times.await())
@@ -224,7 +264,8 @@ class Insights(private val graph: AppGraph) {
             .map { (_, list) -> Played(list.first().artist, null, list.size.toLong()) }.sortedByDescending { it.count }
         val prevArtists = before.groupBy { normalizeKey(it.artist) }
             .map { (_, list) -> Played(list.first().artist, null, list.size.toLong()) }.sortedByDescending { it.count }
-        val tracks = plays.groupBy { it.id }.entries.sortedByDescending { it.value.size }.take(10)
+        // Songs since removed from the library are left out.
+        val tracks = plays.groupBy { it.id }.entries.filter { songs[it.key] != null }.sortedByDescending { it.value.size }.take(10)
         val albums = plays.mapNotNull { p -> songs[p.id]?.albumId }.groupingBy { it }.eachCount()
             .entries.sortedByDescending { it.value }.take(10)
         val minutes = plays.sumOf { p -> p.listenedMs ?: ((songs[p.id]?.durationSec ?: 210) * 1000L) } / 60_000
@@ -307,5 +348,4 @@ class Insights(private val graph: AppGraph) {
 
     private fun key(artist: String, title: String) = normalizeKey(artist) + "|" + normalizeKey(title)
 
-    private fun monthName(date: LocalDate) = date.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
 }

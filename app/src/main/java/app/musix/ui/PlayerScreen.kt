@@ -1,5 +1,10 @@
 package app.musix.ui
 
+import android.os.SystemClock
+import androidx.compose.runtime.withFrameMillis
+import app.musix.log.AppLog
+import app.musix.playback.SeekTracker
+import kotlinx.coroutines.delay
 import app.musix.data.cover
 import android.os.Build
 import androidx.compose.animation.AnimatedContent
@@ -23,6 +28,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Velocity
 import kotlinx.coroutines.flow.first
@@ -98,6 +104,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -234,6 +245,9 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                     .systemBarsPadding()
                     .padding(horizontal = 24.dp),
             ) {
+                // A gap above the header that suits the screen's height, so the top of the player
+                // isn't pressed against the status bar.
+                Spacer(Modifier.height(playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp))
                 TopRow(song, onClose = onClose, onAlbum = ::openAlbum)
 
                 Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
@@ -253,7 +267,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
                     song?.let { graph.favorites.toggle(it) }
                 }
-                SeekBar(state.durationMs)
+                SeekBar()
                 Controls(state)
                 Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     ViewToggle(Icons.Rounded.FormatQuote, "Lyrics", view == PlayerView.LYRICS) {
@@ -491,12 +505,33 @@ private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart:
  * while you drag, and the time shown follows your finger.
  */
 @Composable
-private fun SeekBar(durationMs: Long) {
+private fun SeekBar() {
     val graph = LocalGraph.current
-    val position by rememberPosition()
+    val tracker = remember { SeekTracker() }
+    var shown by remember { mutableStateOf(graph.player.progress().let { SeekTracker.Shown(it.positionMs, it.durationMs) }) }
+    // Read the player every frame (its position is estimated locally, so this is cheap) for smooth movement.
+    LaunchedEffect(tracker) {
+        var lastTrack: String? = null
+        while (true) {
+            val p = graph.player.progress()
+            shown = tracker.update(p.mediaId, p.positionMs, p.durationMs, p.playing, SystemClock.elapsedRealtime())
+            if (p.mediaId != lastTrack) {
+                AppLog.d("Player", "Seek bar: new song, starts at ${p.positionMs} ms of ${p.durationMs} ms")
+                lastTrack = p.mediaId
+            }
+            if (p.playing) withFrameMillis { } else delay(200)
+        }
+    }
     var dragging by remember { mutableStateOf<Float?>(null) }
-    val duration = durationMs.coerceAtLeast(1L)
-    val fraction = dragging ?: (position.toFloat() / duration).coerceIn(0f, 1f)
+    val duration = shown.durationMs.coerceAtLeast(1L)
+    val fraction = dragging ?: shown.fraction
+    fun seek(to: Float) {
+        val ms = (to * duration).toLong()
+        tracker.seekTo(ms, SystemClock.elapsedRealtime())
+        shown = SeekTracker.Shown(ms, shown.durationMs)
+        AppLog.d("Player", "Seek to $ms ms of $duration ms")
+        graph.player.seekTo(ms)
+    }
     val thumb by animateDpAsState(if (dragging != null) 16.dp else 11.dp, tween(100), label = "thumb")
     Column(Modifier.padding(top = 14.dp)) {
         BoxWithConstraints(
@@ -504,13 +539,13 @@ private fun SeekBar(durationMs: Long) {
                 .fillMaxWidth()
                 .height(28.dp)
                 .pointerInput(duration) {
-                    detectTapGestures { offset -> graph.player.seekTo(((offset.x / size.width).coerceIn(0f, 1f) * duration).toLong()) }
+                    detectTapGestures { offset -> seek((offset.x / size.width).coerceIn(0f, 1f)) }
                 }
                 .pointerInput(duration) {
                     detectHorizontalDragGestures(
                         onDragStart = { offset -> dragging = (offset.x / size.width).coerceIn(0f, 1f) },
                         onDragEnd = {
-                            dragging?.let { graph.player.seekTo((it * duration).toLong()) }
+                            dragging?.let { seek(it) }
                             dragging = null
                         },
                         onDragCancel = { dragging = null },
@@ -599,13 +634,26 @@ private fun ViewToggle(icon: androidx.compose.ui.graphics.vector.ImageVector, la
     }
 }
 
+private val LyricsShadow = Shadow(Color.Black.copy(alpha = 0.35f), blurRadius = 12f)
+
 @Composable
 private fun LyricsView(song: Song?) {
     val graph = LocalGraph.current
     val position by rememberPosition()
     val lyrics by loadState(song?.id) { song?.let { graph.subsonic.lyrics(it) } }
+    // No box behind the lyrics: they fade out at the top and bottom into the blurred cover, and a soft
+    // shadow keeps them readable on bright covers.
+    val fadePx = with(LocalDensity.current) { 48.dp.toPx() }
     Box(
-        Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.3f)).padding(16.dp),
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                val stops = lyricsFadeStops(size.height, fadePx).map { (at, alpha) -> at to Color.Black.copy(alpha = alpha) }
+                drawRect(Brush.verticalGradient(*stops.toTypedArray()), blendMode = BlendMode.DstIn)
+            }
+            .padding(horizontal = 4.dp),
     ) {
         LoadBox(lyrics) { loaded ->
             if (loaded == null || loaded.lines.isEmpty()) {
@@ -615,9 +663,9 @@ private fun LyricsView(song: Song?) {
             if (!loaded.synced) {
                 Text(
                     loaded.lines.joinToString("\n") { it.text },
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleMedium.copy(shadow = LyricsShadow),
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 24.dp),
                 )
                 return@LoadBox
             }
@@ -631,7 +679,7 @@ private fun LyricsView(song: Song?) {
                     val active = index == current
                     Text(
                         line.text.ifBlank { "♪" },
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.headlineSmall.copy(shadow = LyricsShadow),
                         fontWeight = FontWeight.Bold,
                         color = if (active) Color.White else Color.White.copy(alpha = if (index < current) 0.55f else 0.35f),
                         textAlign = TextAlign.Start,

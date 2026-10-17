@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.CircularProgressIndicator
@@ -53,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -227,7 +229,17 @@ fun coverDecodePx(size: Int?): Int? = when {
     else -> size
 }
 
-private fun coverMemoryKey(id: String, size: Int?) = "cover:$id:${coverServerPx(size) ?: "full"}@${coverDecodePx(size) ?: "full"}"
+internal fun coverMemoryKey(id: String, size: Int?) = "cover:$id:${coverServerPx(size) ?: "full"}@${coverDecodePx(size) ?: "full"}"
+
+/**
+ * The memory keys of the same cover at the other sizes the app shows it, biggest first: what can stand
+ * in while the size asked for loads. Opening now playing from a list finds the list's small cover
+ * (or the mini player's) there, so the big cover never starts as an empty grey square.
+ */
+internal fun coverFallbackKeys(id: String, size: Int?): List<String> {
+    val own = coverMemoryKey(id, size)
+    return listOf(null, LARGE_COVER, SMALL_COVER, 150).map { coverMemoryKey(id, it) }.distinct().filter { it != own }
+}
 
 /** The request [Cover] makes, so covers can be loaded ahead of time into the same cache entries. */
 fun coverRequest(context: android.content.Context, graph: app.musix.AppGraph, id: String, size: Int?): ImageRequest {
@@ -262,6 +274,11 @@ fun Cover(
     val cached = remember(coverId, size) {
         coverId?.let { loader.memoryCache?.get(MemoryCache.Key(coverMemoryKey(it, size)))?.image }
     }
+    // Not in memory at this size: show the same cover at another size that is, until this one is ready.
+    val standIn = remember(coverId, size, cached) {
+        if (cached != null || coverId == null) null
+        else coverFallbackKeys(coverId, size).firstNotNullOfOrNull { loader.memoryCache?.get(MemoryCache.Key(it))?.image }
+    }
     val request = remember(coverId, size) { coverId?.let { coverRequest(context, graph, it, size) } }
     Box(
         modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
@@ -274,12 +291,23 @@ fun Cover(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-            request != null -> AsyncImage(
-                model = request,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
+            request != null -> {
+                if (standIn != null) {
+                    Image(
+                        painter = remember(standIn) { standIn.asPainter(context) },
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                // Draws over the stand-in once loaded (and nothing until then).
+                AsyncImage(
+                    model = request,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             else -> Icon(Icons.Rounded.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -350,6 +378,10 @@ fun formatDuration(seconds: Long): String {
     else "%d:%02d".format(s / 60, s % 60)
 }
 
+/** A song's usual line under its title: "artist · album". */
+fun artistAndAlbum(song: Song): String? =
+    listOf(song.artist, song.album).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { null }
+
 /** A song row. Tap plays; the menu queues it, starts a radio from it or opens its album or artist. */
 @Composable
 fun SongRow(
@@ -358,6 +390,8 @@ fun SongRow(
     leading: String? = null,
     highlighted: Boolean = false,
     showCover: Boolean = true,
+    // The line under the title; null shows none.
+    subtitle: String? = artistAndAlbum(song),
 ) {
     val graph = LocalGraph.current
     val nav = LocalNav.current
@@ -392,13 +426,15 @@ fun SongRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                listOf(song.artist, song.album).filter { it.isNotBlank() }.joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         if (song.durationSec > 0) {
             Text(
@@ -427,6 +463,13 @@ fun SongRow(
                     menu = false
                     graph.songRadio.start(song) { message -> launch.notify(message) }
                 })
+                if (graph.settings.current.audioMuseReady) {
+                    DropdownMenuItem(text = { Text("Song path…") }, onClick = {
+                        menu = false
+                        sheet.close()
+                        nav.openSongPath(song.id)
+                    })
+                }
                 song.albumId?.let { albumId ->
                     DropdownMenuItem(text = { Text("Go to album") }, onClick = {
                         menu = false
@@ -553,7 +596,14 @@ fun GradientTile(
 
 /** A compact "quick access" tile: small cover on the left, name on the right. */
 @Composable
-fun QuickTile(title: String, coverArt: String?, colors: Pair<Color, Color>?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun QuickTile(
+    title: String,
+    coverArt: String?,
+    colors: Pair<Color, Color>?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+) {
     Row(
         modifier
             .height(56.dp)
@@ -568,8 +618,11 @@ fun QuickTile(title: String, coverArt: String?, colors: Pair<Color, Color>?, onC
             Box(
                 Modifier.size(56.dp).background(
                     Brush.linearGradient(listOf(colors?.first ?: Color.Gray, colors?.second ?: Color.DarkGray))
-                )
-            )
+                ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (icon != null) Icon(icon, null, tint = Color.White, modifier = Modifier.size(26.dp))
+            }
         }
         Text(
             title,
@@ -582,12 +635,46 @@ fun QuickTile(title: String, coverArt: String?, colors: Pair<Color, Color>?, onC
     }
 }
 
-/** A horizontal shelf of tiles under a section title. */
+/**
+ * A horizontal shelf of tiles under a section title. With [onOpenAll], a shelf with more than a handful of
+ * items gets a tappable title with an arrow that opens the full list.
+ */
 @Composable
-fun <T> Shelf(title: String, items: List<T>, key: (T) -> Any, content: @Composable (T) -> Unit) {
+fun <T> Shelf(
+    title: String,
+    items: List<T>,
+    key: (T) -> Any,
+    onOpenAll: (() -> Unit)? = null,
+    content: @Composable (T) -> Unit,
+) {
     if (items.isEmpty()) return
     Column {
-        SectionTitle(title)
+        if (onOpenAll != null && homeRowOpensFullList(items.size)) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClickLabel = "Show all", onClick = onOpenAll)
+                    .padding(start = 16.dp, end = 12.dp, top = 24.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Icon(
+                    Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = null,
+                    modifier = Modifier.padding(start = 4.dp).size(26.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            SectionTitle(title)
+        }
         LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(items, key = key) { content(it) }
         }

@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.background
@@ -39,7 +40,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Pause
@@ -85,6 +85,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import app.musix.log.AppLog
+import kotlinx.coroutines.CancellationException
 import app.musix.playback.PlayerState
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
@@ -93,7 +94,6 @@ private val tabs = listOf(
     Tab("home", "Home", Icons.Rounded.Home),
     Tab("search", "Search", Icons.Rounded.Search),
     Tab("library", "Your Library", Icons.Rounded.LibraryMusic),
-    Tab("vibes", "Vibes", Icons.Rounded.GraphicEq),
     Tab("settings", "Settings", Icons.Rounded.Settings),
 )
 
@@ -151,6 +151,18 @@ fun MusixRoot() {
     }
     // Nothing left to show (playback stopped): close now playing.
     LaunchedEffect(player.hasMedia) { if (!player.hasMedia) sheet.close() }
+    // Get the playing song's big cover ready as soon as it starts, so opening now playing shows it at once.
+    val appContext = LocalContext.current.applicationContext
+    LaunchedEffect(player.current?.id) {
+        val song = player.current ?: return@LaunchedEffect
+        try {
+            AnimatedCovers.preload(appContext, graph, song)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.w("Cover", "Preloading the playing song's cover failed: ${e.message}")
+        }
+    }
 
     AskForNotifications()
 
@@ -212,15 +224,27 @@ fun MusixRoot() {
                 composable("settings/storage") { StorageScreen(nav) }
                 composable("settings/logs") { LogsScreen(nav) }
                 composable("settings/scrobbling") { ScrobblingScreen(nav) }
+                composable("home/{section}") { HomeSectionScreen(nav, it.arguments?.getString("section").orEmpty()) }
                 composable("liked") { LikedScreen(nav) }
                 composable("radio/{kind}/{key}") {
                     RadioScreen(nav, it.arguments?.getString("kind").orEmpty(), it.arguments?.getString("key").orEmpty())
                 }
                 composable("mood/{text}") { MoodScreen(nav, it.arguments?.getString("text").orEmpty()) }
+                composable("songpath/{id}") { SongPathPicker(nav, it.arguments?.getString("id").orEmpty()) }
+                composable("songpath/{from}/{to}/{length}") {
+                    val args = it.arguments
+                    SongPathScreen(
+                        nav,
+                        args?.getString("from").orEmpty(),
+                        args?.getString("to").orEmpty(),
+                        args?.getString("length")?.toIntOrNull() ?: 20,
+                    )
+                }
                 composable("sync") { SyncScreen(nav) }
                 composable("report/{range}") { ReportScreen(nav, it.arguments?.getString("range").orEmpty()) }
                 composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }
+                composable("artist/{id}/appears-on") { AppearsOnScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("playlist/{id}") { PlaylistScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("mix/{id}") { MixScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("selector/{id}") { SelectorEditor(nav, it.arguments?.getString("id").orEmpty()) }

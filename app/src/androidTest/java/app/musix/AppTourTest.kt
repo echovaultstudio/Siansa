@@ -170,7 +170,8 @@ class AppTourTest {
                 timedStart("search", "Long Song B") { click("Long Song B") }
             }
             step("vibes") {
-                tab("Vibes")
+                tab("Settings")
+                click("Vibes")
                 idle(1000)
                 shot("17-vibes")
             }
@@ -292,7 +293,10 @@ class AppTourTest {
         val ms = SystemClock.elapsedRealtime() - started
         val ok = s.isPlaying && s.current?.title == title
         starts += "$where: ${if (ok) "$ms ms" else "did not start in 15 s (playing=${s.isPlaying}, current=${s.current?.title})"}"
-        if (!ok || ms > 5_000) problems += "Song from $where took ${if (ok) "$ms ms" else "over 15 s"} to start"
+        // A song that never plays is a failure. A slow start is reported (CI shows it) but isn't one:
+        // the throttled emulator link makes start times vary a lot from run to run (issue #25).
+        if (!ok) problems += "Song from $where didn't start within 15 s"
+        else if (ms > 5_000) println("Tour: slow start from $where: $ms ms")
     }
 
     /** The whole window as a small JPEG, written to the log in pieces. Never fails the tour. */

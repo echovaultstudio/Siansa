@@ -44,7 +44,7 @@ class SubsonicApi(
         return token
     }
 
-    fun url(endpoint: String, params: Map<String, String?> = emptyMap()): String {
+    fun url(endpoint: String, params: Map<String, String?> = emptyMap(), repeated: List<Pair<String, String>> = emptyList()): String {
         val s = settings()
         val sb = StringBuilder(s.navidromeUrl)
             .append("/rest/").append(endpoint)
@@ -55,6 +55,7 @@ class SubsonicApi(
         for ((key, value) in params) {
             if (value != null) sb.append('&').append(enc(key)).append('=').append(enc(value))
         }
+        for ((key, value) in repeated) sb.append('&').append(enc(key)).append('=').append(enc(value))
         return sb.toString()
     }
 
@@ -64,10 +65,14 @@ class SubsonicApi(
     fun coverUrl(id: String, size: Int?): String =
         url("getCoverArt", mapOf("id" to id, "size" to size?.toString()))
 
-    private suspend fun call(endpoint: String, params: Map<String, String?> = emptyMap()): JsonObject =
+    private suspend fun call(
+        endpoint: String,
+        params: Map<String, String?> = emptyMap(),
+        repeated: List<Pair<String, String>> = emptyList(),
+    ): JsonObject =
         withContext(Dispatchers.IO) {
             if (settings().navidromeUrl.isBlank()) throw ApiException("Navidrome isn't set up yet")
-            val request = Request.Builder().url(url(endpoint, params)).build()
+            val request = Request.Builder().url(url(endpoint, params, repeated)).build()
             http.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (response.code == 401 || response.code == 407) {
@@ -116,8 +121,16 @@ class SubsonicApi(
 
     suspend fun album(id: String): AlbumDetail {
         val album = call("getAlbum", mapOf("id" to id)).obj("album") ?: throw ApiException("Album not found")
-        return AlbumDetail(parseAlbum(album), album.arr("song").map(::parseSong))
+        return AlbumDetail(parseAlbum(album), album.arr("song").map(::parseSong), parseDiscTitles(album))
     }
+
+    /** OpenSubsonic "discTitles": [{"disc": 1, "title": "…"}], which Navidrome fills from the disctitle tag. */
+    private fun parseDiscTitles(album: JsonObject): Map<Int, String> =
+        album.arr("discTitles").mapNotNull { d ->
+            val disc = d.int("disc") ?: return@mapNotNull null
+            val title = d.str("title")?.trim()
+            if (title.isNullOrEmpty()) null else disc to title
+        }.toMap()
 
     suspend fun artists(folderId: String? = null): List<Artist> =
         call("getArtists", mapOf("musicFolderId" to folderId)).obj("artists")?.arr("index").orEmpty()
@@ -128,9 +141,12 @@ class SubsonicApi(
         return ArtistDetail(parseArtist(artist), artist.arr("album").map(::parseAlbum))
     }
 
-    /** Biography, image and similar artists that Navidrome already has (from its agents or AudioMuse). */
-    suspend fun artistInfo(id: String): ArtistInfo {
-        val info = call("getArtistInfo2", mapOf("id" to id, "count" to "20", "includeNotPresent" to "false"))
+    /**
+     * Biography, image and similar artists that Navidrome already has (from its agents or AudioMuse).
+     * With [includeNotPresent], similar artists that aren't in the library are listed too (by name only).
+     */
+    suspend fun artistInfo(id: String, includeNotPresent: Boolean = false): ArtistInfo {
+        val info = call("getArtistInfo2", mapOf("id" to id, "count" to "20", "includeNotPresent" to "$includeNotPresent"))
             .obj("artistInfo2")
         return ArtistInfo(
             biography = info?.str("biography")?.let(::cleanBiography)?.takeIf { it.isNotBlank() },
@@ -138,7 +154,7 @@ class SubsonicApi(
             lastFmUrl = info?.str("lastFmUrl"),
             similar = info?.arr("similarArtist").orEmpty().map { a ->
                 SimilarArtist(
-                    id = a.str("id"),
+                    id = a.str("id")?.takeIf { it.isNotBlank() },
                     name = a.str("name") ?: "",
                     coverArt = a.str("coverArt"),
                     imageUrl = a.str("artistImageUrl"),
@@ -226,6 +242,11 @@ class SubsonicApi(
     /** submission=false marks "now playing"; true records a finished play, at [timeMs] when given. */
     suspend fun scrobble(id: String, submission: Boolean, timeMs: Long? = null) {
         call("scrobble", mapOf("id" to id, "submission" to submission.toString(), "time" to timeMs?.toString()))
+    }
+
+    /** Saves [songIds], in order, as a new playlist on Navidrome. */
+    suspend fun createPlaylist(name: String, songIds: List<String>) {
+        call("createPlaylist", mapOf("name" to name), songIds.map { "songId" to it })
     }
 
     suspend fun star(id: String) {

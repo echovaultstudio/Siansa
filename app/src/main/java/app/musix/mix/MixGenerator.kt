@@ -5,6 +5,7 @@ import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import app.musix.AppGraph
 import app.musix.data.AppJson
+import app.musix.data.LibraryRepository
 import app.musix.data.Mix
 import app.musix.data.Selector
 import app.musix.data.Song
@@ -27,6 +28,13 @@ import kotlin.math.max
 import kotlin.random.Random
 
 class MixException(message: String) : Exception(message)
+
+/**
+ * Whether a song the synced library doesn't have may be fetched from Navidrome, from the libraries the last
+ * sync covered: never synced (null) or every library ("*") yes; only some libraries no, because the song is
+ * then most likely in a library you left out.
+ */
+fun mayFetchUnsynced(syncedFolders: String?): Boolean = syncedFolders == null || syncedFolders == "*"
 
 /**
  * Builds a daily mix for a selector on the phone:
@@ -350,13 +358,25 @@ class MixGenerator(private val graph: AppGraph) {
     /** Songs for AudioMuse ids, from the synced library where possible. */
     suspend fun resolveSongs(ids: List<String>): List<Song> = resolve(ids)
 
-    /** Songs from the synced library where possible, otherwise fetched from Navidrome. */
+    /**
+     * Songs from the synced library where possible, otherwise fetched from Navidrome. AudioMuse knows every
+     * library on the server, so when only some libraries are synced, songs outside them are left out.
+     */
     private suspend fun resolve(ids: List<String>): List<Song> = coroutineScope {
         val local = graph.library.songs(ids).associateBy { it.id }
+        val fetchMissing = mayFetchUnsynced(graph.library.meta(LibraryRepository.META_FOLDERS))
+        if (!fetchMissing) {
+            val skipped = ids.distinct().count { it !in local }
+            if (skipped > 0) AppLog.i("Mix", "Left out $skipped songs that aren't in the libraries you sync")
+        }
         val permits = Semaphore(6)
         ids.map { id ->
             async {
-                local[id] ?: permits.withPermit { runCatching { graph.subsonic.song(id) }.getOrNull() }
+                local[id] ?: if (fetchMissing) {
+                    permits.withPermit { runCatching { graph.subsonic.song(id) }.getOrNull() }
+                } else {
+                    null
+                }
             }
         }.awaitAll().filterNotNull().distinctBy { it.id }
     }

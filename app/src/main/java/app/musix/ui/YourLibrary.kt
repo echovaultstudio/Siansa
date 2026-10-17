@@ -9,6 +9,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -55,9 +56,11 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -80,6 +83,7 @@ import androidx.navigation.NavController
 import app.musix.data.AlbumCategory
 import app.musix.data.category
 import app.musix.mix.MixGenerator
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -161,7 +165,7 @@ fun YourLibraryScreen(nav: NavController) {
     val selectedKind = kind?.let { runCatching { Kind.valueOf(it) }.getOrNull() }
     val selectedSort = runCatching { Sort.valueOf(sort) }.getOrDefault(Sort.RECENTS)
     val all = data.valueOrNull()
-    val shown = remember(all, selectedKind, sub, selectedSort, query, pinned) {
+    val ordered = remember(all, selectedKind, sub, selectedSort, query, pinned) {
         val list = all?.entries.orEmpty()
             .filter { selectedKind == null || it.kind == selectedKind || (it.alwaysPinned && selectedKind == Kind.PLAYLIST && it.heart) }
             .filter { e -> sub.let { it == null || it in e.tags } }
@@ -169,14 +173,30 @@ fun YourLibraryScreen(nav: NavController) {
         val sorted = when (selectedSort) {
             Sort.RECENTS -> list.sortedWith(compareByDescending<Entry> { it.recentAt }.thenByDescending { it.addedAt })
             Sort.ADDED -> list.sortedByDescending { it.addedAt }
-            Sort.ALPHABETICAL -> list.sortedBy { it.title.lowercase() }
-            Sort.CREATOR -> list.sortedWith(compareBy<Entry> { it.creator.lowercase() }.thenBy { it.title.lowercase() })
+            Sort.ALPHABETICAL -> AlphabetIndex.sort(list, { it.title })
+            Sort.CREATOR -> AlphabetIndex.sort(list, { it.creator }, { it.title })
             Sort.PLAYS -> list.sortedWith(compareByDescending<Entry> { it.plays }.thenByDescending { it.recentAt })
         }
         // Pinned first (Liked songs and your listening always), then the rest in the chosen order.
         val (top, rest) = sorted.partition { it.alwaysPinned || it.key in pinned }
-        top.sortedBy { if (it.alwaysPinned) 0 else 1 } + rest
+        top.sortedBy { if (it.alwaysPinned) 0 else 1 } to rest
     }
+    val shown = remember(ordered) { ordered.first + ordered.second }
+    // A to Z bar for long lists sorted by name (or creator): where each letter starts in `shown`.
+    val letterStarts = remember(ordered, selectedSort) {
+        val name: ((Entry) -> String)? = when (selectedSort) {
+            Sort.ALPHABETICAL -> { e -> e.title }
+            Sort.CREATOR -> { e -> e.creator }
+            else -> null
+        }
+        val rest = ordered.second
+        if (name == null || !AlphabetIndex.shouldShow(rest.size, AlphabetIndex.starts(rest.map(name)))) null
+        else AlphabetIndex.starts(rest.map(name)).mapValues { it.value + ordered.first.size }
+    }
+    val letterOfShown = remember(letterStarts) {
+        letterStarts?.let { starts -> starts.entries.sortedBy { it.value }.map { it.value to it.key } }
+    }
+    val scope = rememberCoroutineScope()
 
     fun togglePin(e: Entry) {
         if (e.alwaysPinned) return
@@ -232,40 +252,77 @@ fun YourLibraryScreen(nav: NavController) {
                 if (grid) {
                     val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
                     PrefetchCovers(gridState.firstVisibleItemIndex, gridState.layoutInfo.visibleItemsInfo.size, covers, 300)
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(110.dp),
-                        state = gridState,
-                        contentPadding = PaddingValues(start = 10.dp, end = 10.dp, bottom = bottomBarPadding(16.dp)),
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        item(span = { GridItemSpan(maxLineSpan) }) { sortBar() }
-                        items(shown, key = { it.key }) { e ->
-                            GridEntry(e, pinned = e.alwaysPinned || e.key in pinned, held = held == e.key, onClick = { open(e) }, onHold = { held = e.key }, onTogglePin = { togglePin(e) })
+                    Box(Modifier.fillMaxSize()) {
+                        LazyVerticalGrid(
+                            // A little narrower with the bar, so it still fits as many tiles across.
+                            columns = GridCells.Adaptive(if (letterStarts != null) 100.dp else 110.dp),
+                            state = gridState,
+                            contentPadding = PaddingValues(start = 10.dp, end = if (letterStarts != null) AlphabetBarWidth + 4.dp else 10.dp, bottom = bottomBarPadding(16.dp)),
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            item(span = { GridItemSpan(maxLineSpan) }) { sortBar() }
+                            items(shown, key = { it.key }) { e ->
+                                GridEntry(e, pinned = e.alwaysPinned || e.key in pinned, held = held == e.key, onClick = { open(e) }, onHold = { held = e.key }, onTogglePin = { togglePin(e) })
+                            }
+                        }
+                        if (letterStarts != null && letterOfShown != null) {
+                            LibraryAlphabetBar(letterStarts, letterOfShown, { gridState.firstVisibleItemIndex }) { i -> scope.launch { gridState.scrollToItem(i) } }
                         }
                     }
                 } else {
                     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
                     PrefetchCovers(listState.firstVisibleItemIndex, listState.layoutInfo.visibleItemsInfo.size, covers, 150)
-                    LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = bottomBarPadding(16.dp))) {
-                        item { sortBar() }
-                        items(shown, key = { it.key }) { e ->
-                            RowEntry(e, pinned = e.alwaysPinned || e.key in pinned, held = held == e.key, onClick = { open(e) }, onHold = { held = e.key }, onTogglePin = { togglePin(e) })
-                        }
-                        if (shown.isEmpty()) {
-                            item {
-                                Text(
-                                    if (query.isNotBlank()) "Nothing in your library matches “$query”." else "Nothing here yet.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(16.dp),
-                                )
+                    Box(Modifier.fillMaxSize()) {
+                        LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(end = if (letterStarts != null) AlphabetBarWidth else 0.dp, bottom = bottomBarPadding(16.dp))) {
+                            item { sortBar() }
+                            items(shown, key = { it.key }) { e ->
+                                RowEntry(e, pinned = e.alwaysPinned || e.key in pinned, held = held == e.key, onClick = { open(e) }, onHold = { held = e.key }, onTogglePin = { togglePin(e) })
                             }
+                            if (shown.isEmpty()) {
+                                item {
+                                    Text(
+                                        if (query.isNotBlank()) "Nothing in your library matches “$query”." else "Nothing here yet.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(16.dp),
+                                    )
+                                }
+                            }
+                        }
+                        if (letterStarts != null && letterOfShown != null) {
+                            LibraryAlphabetBar(letterStarts, letterOfShown, { listState.firstVisibleItemIndex }) { i -> scope.launch { listState.scrollToItem(i) } }
                         }
                     }
                 }
             }
         }
     }
+}
+
+/**
+ * The A to Z bar over the right edge of Your Library. Positions are in `shown`; the list's first item is
+ * the sort bar, so list positions are one more.
+ */
+@Composable
+private fun BoxScope.LibraryAlphabetBar(
+    starts: Map<Char, Int>,
+    letterAt: List<Pair<Int, Char>>,
+    firstVisible: () -> Int,
+    scrollTo: (Int) -> Unit,
+) {
+    val current by remember(letterAt) {
+        derivedStateOf {
+            val top = firstVisible() - 1
+            letterAt.lastOrNull { it.first <= top }?.second
+        }
+    }
+    AlphabetBar(
+        present = starts.keys,
+        current = current,
+        // The first letter goes right to the top, so the sort row and pinned items stay in view.
+        onPick = { letter -> AlphabetIndex.target(letter, starts)?.let { scrollTo(if (it == starts.values.min()) 0 else it + 1) } },
+        modifier = Modifier.align(Alignment.TopEnd).padding(top = 56.dp, bottom = bottomBarPadding(8.dp)),
+    )
 }
 
 @Composable
@@ -566,13 +623,14 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
         tags = setOf("By you"),
     )
 
-    // Your listening: this month pinned in the full list; all three under their own filter.
+    // Your listening: this month pinned in the full list; all of them under their own filter.
     val month = { d: LocalDate -> d.month.getDisplayName(TextStyle.FULL, Locale.getDefault()) }
     val short = { d: LocalDate -> d.month.getDisplayName(TextStyle.SHORT, Locale.getDefault()).trimEnd('.') }
     listOf(
         Triple("month", "Your ${month(now)}", "This month") to short(now),
         Triple("last-month", "Your ${month(now.minusMonths(1))}", "Last month") to short(now.minusMonths(1)),
         Triple("year", "Your ${now.year}", "This year") to now.year.toString(),
+        Triple("year-ago", "This time last year", "This time last year") to "${short(now.minusYears(1))} ${now.year - 1}",
     ).forEach { (t, tileText) ->
         val (id, title, period) = t
         entries += Entry(
@@ -681,7 +739,7 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
         Kind.MIX to present(Kind.MIX, listOf("Today", "Made for you", "Vibes", "Earlier")),
         Kind.ALBUM to present(Kind.ALBUM, albumOrder),
         Kind.ARTIST to present(Kind.ARTIST, listOf("Played", "Not played yet")),
-        Kind.LISTENING to present(Kind.LISTENING, listOf("This month", "Last month", "This year")),
+        Kind.LISTENING to present(Kind.LISTENING, listOf("This month", "Last month", "This year", "This time last year")),
     )
     return LibraryData(entries, subFilters)
 }
