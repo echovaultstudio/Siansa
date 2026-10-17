@@ -3,6 +3,20 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.4.0beta](https://github.com/Th3K1ngP1n/musix/releases/tag/v0.4.0beta) — 2026-10-17
+
+- [#26](https://github.com/Th3K1ngP1n/musix/pull/26) Bump com.android.application from 8.13.0 to 8.13.2 (@dependabot[bot])
+- [#64](https://github.com/Th3K1ngP1n/musix/pull/64) Bump the actions group across 1 directory with 2 updates (@dependabot[bot])
+- [#77](https://github.com/Th3K1ngP1n/musix/pull/77) Sleep timer that finishes the song, fades out and can wind down (@Th3K1ngP1n)
+- [#117](https://github.com/Th3K1ngP1n/musix/pull/117) Equaliser: 10 bands, presets and a pre-amp that doesn't crackle (@kimchiwithrice)
+- [#118](https://github.com/Th3K1ngP1n/musix/pull/118) Offline mode: download music to the phone (@kimchiwithrice)
+- [#119](https://github.com/Th3K1ngP1n/musix/pull/119) List every release's pull requests in RELEASES.md (@kimchiwithrice)
+- [#122](https://github.com/Th3K1ngP1n/musix/pull/122) Keep text boxes above the keyboard (#30 again) (@kimchiwithrice)
+- [#123](https://github.com/Th3K1ngP1n/musix/pull/123) Casting: switching from the TV back to the phone no longer crashes (@kimchiwithrice)
+- [#125](https://github.com/Th3K1ngP1n/musix/pull/125) Now playing redesign like Spotify: ⋮ menu, cards and full-screen lyrics (@Th3K1ngP1n)
+- [#127](https://github.com/Th3K1ngP1n/musix/pull/127) Swipe a song left to add it to the queue; queue like Spotify (@Th3K1ngP1n)
+- [#128](https://github.com/Th3K1ngP1n/musix/pull/128) Merge the approved pull requests for 0.4.0beta (@Th3K1ngP1n)
+
 ## [0.3.0beta](https://github.com/Th3K1ngP1n/musix/releases/tag/v0.3.0beta) — 2026-10-17
 
 - [#22](https://github.com/Th3K1ngP1n/musix/pull/22) Cast to Chromecast and Google TV (@kimchiwithrice)

@@ -21,6 +21,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
 jobs:
   checks:
     name: Build, lint and unit tests
