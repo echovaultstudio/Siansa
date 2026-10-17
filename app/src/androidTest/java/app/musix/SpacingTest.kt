@@ -1,5 +1,6 @@
 package app.musix
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +18,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.musix.data.AlbumCategory
+import app.musix.playback.EqPreset
 import app.musix.ui.CHIPS_GAP
+import app.musix.ui.EqPresetRow
 import app.musix.ui.MusixTheme
 import app.musix.ui.ReleaseTypeRow
 import app.musix.ui.SectionTitle
@@ -55,5 +58,22 @@ class SpacingTest {
         val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Singles"))).getBoundsInRoot()
         val title = compose.onNodeWithText("Discography").getBoundsInRoot()
         assertEven("Release-type chips", chip.top - (song.bottom - 6.dp), title.top - chip.bottom)
+    }
+
+    /** Equaliser page: the preset chips sit evenly between the "Preset" heading and the line below them. */
+    @Test fun equaliserPresetChipsAreEvenlySpaced() {
+        compose.setContent {
+            MusixTheme {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(Modifier.fillMaxWidth().height(24.dp).testTag("heading"))
+                    EqPresetRow(EqPreset.FLAT) { }
+                    Box(Modifier.fillMaxWidth().height(1.dp).testTag("divider"))
+                }
+            }
+        }
+        val heading = compose.onNodeWithTag("heading").getBoundsInRoot()
+        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Flat"))).getBoundsInRoot()
+        val divider = compose.onNodeWithTag("divider").getBoundsInRoot()
+        assertEven("Equaliser preset chips", chip.top - heading.bottom, divider.top - chip.bottom)
     }
 }
