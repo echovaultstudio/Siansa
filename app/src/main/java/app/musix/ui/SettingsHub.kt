@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.NewReleases
+import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Share
@@ -66,6 +67,7 @@ import app.musix.covers.CoverDownload
 import app.musix.covers.CoverStore
 import app.musix.data.ReplayGainMode
 import app.musix.data.SyncPhase
+import app.musix.data.Users
 import app.musix.log.AppLog
 import coil3.SingletonImageLoader
 import kotlinx.coroutines.Dispatchers
@@ -88,6 +90,13 @@ fun SettingsHub(nav: NavController) {
     LaunchedEffect(Unit) { graph.selectors.all() }
     Screen(title = "Settings", nav = nav) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
+            val hubContext = LocalContext.current
+            val userCount = remember { Users.ids(hubContext).size }
+            HubRow(
+                Icons.Rounded.People,
+                "Users",
+                if (userCount > 1) "$userCount users on this phone · switch with one tap" else "Add another Navidrome login",
+            ) { nav.navigate("settings/users") }
             HubRow(
                 Icons.Rounded.Dns,
                 "Connections",
@@ -254,7 +263,7 @@ fun StorageScreen(nav: NavController) {
             StorageUsage(
                 images = (SingletonImageLoader.get(context).diskCache?.size ?: 0L) + CoverStore.sizeBytes(),
                 songs = runCatching { graph.songCache.cacheSpace }.getOrDefault(0L),
-                library = context.getDatabasePath("library.db").length(),
+                library = context.getDatabasePath(app.musix.data.Users.scoped(app.musix.data.UserFiles.DATABASE)).length(),
                 logs = AppLog.sizeBytes(),
             )
         }

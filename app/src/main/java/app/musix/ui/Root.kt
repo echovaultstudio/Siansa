@@ -220,6 +220,7 @@ fun MusixRoot() {
                 composable("vibes") { VibesScreen(nav) }
                 composable("settings") { SettingsHub(nav) }
                 composable("settings/connections") { ConnectionsScreen(nav) }
+                composable("settings/users") { UsersScreen(nav) }
                 composable("settings/playback") { PlaybackSettingsScreen(nav) }
                 composable("settings/storage") { StorageScreen(nav) }
                 composable("settings/logs") { LogsScreen(nav) }
