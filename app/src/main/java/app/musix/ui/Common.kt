@@ -439,6 +439,7 @@ fun SongRow(
                 )
             }
         }
+        DownloadedMark(song.id)
         if (song.durationSec > 0) {
             Text(
                 formatDuration(song.durationSec.toLong()),
@@ -491,6 +492,7 @@ fun SongRow(
                     sheet.close()
                     nav.openSongDetails(song.id)
                 })
+                SongDownloadMenuItem(song) { menu = false }
             }
         }
     }
