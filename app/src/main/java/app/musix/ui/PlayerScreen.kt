@@ -4,7 +4,6 @@ import android.os.SystemClock
 import androidx.compose.runtime.withFrameMillis
 import app.musix.log.AppLog
 import app.musix.playback.SeekTracker
-import app.musix.playback.StreamQuality
 import kotlinx.coroutines.delay
 import app.musix.data.cover
 import android.os.Build
@@ -125,7 +124,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.foundation.border
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
@@ -653,7 +651,6 @@ private fun SeekBar(state: PlayerState) {
                 color = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.weight(1f),
             )
-            QualityBadge(state)
             Text(
                 "-" + formatDuration(((duration - fraction * duration) / 1000).toLong()),
                 style = MaterialTheme.typography.labelSmall,
@@ -663,37 +660,6 @@ private fun SeekBar(state: PlayerState) {
             )
         }
     }
-}
-
-/**
- * The song's format between the times under the seek bar: the original file's ("FLAC"), or "OPUS 160" while
- * Navidrome converts it. Only shows what plays; the quality is set in Settings → Playback.
- */
-@Composable
-private fun QualityBadge(state: PlayerState) {
-    val label = StreamQuality.label(state.codec, state.transcodeKbps) ?: return
-    StreamBadge(label, converted = state.transcodeKbps > 0)
-}
-
-/**
- * A small tag no taller than the times next to it (16 dp, like their line), so the row under the seek bar
- * keeps the same height and the badge sits centred between them.
- */
-@Composable
-internal fun StreamBadge(label: String, converted: Boolean, modifier: Modifier = Modifier) {
-    // Quiet, like the times beside it: only a faint outline and a slightly lighter shade when converted.
-    val color = Color.White.copy(alpha = if (converted) 0.5f else 0.6f)
-    val shape = RoundedCornerShape(4.dp)
-    Text(
-        label,
-        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 12.sp, letterSpacing = 1.sp),
-        fontWeight = FontWeight.Medium,
-        color = color,
-        maxLines = 1,
-        modifier = modifier
-            .border(0.5.dp, Color.White.copy(alpha = 0.18f), shape)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
