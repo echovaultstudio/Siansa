@@ -39,15 +39,15 @@ Every push to `main` and every pull request runs `.github/workflows/ci.yml`:
 | **Unit tests** (`app/src/test`) | Mistakes in the app's own logic: server addresses, cover detection, ReplayGain, release types, name matching, the home-network check. Run in seconds, no phone needed. |
 | **Android Lint** | Likely crashes, wrong Android API use for older versions, and security issues. Errors appear as annotations on the commit. |
 | **Secret scan** (gitleaks, `.gitleaks.toml`) | Passwords, tokens or API keys committed anywhere in the history. |
-| **Emulator tests** (`app/src/androidTest`) | The app on an Android emulator against a real Navidrome behind a phone-speed link: animated covers downloaded once and shown as stills in lists, smooth playback while covers load, and a tour of every page that plays songs from several of them and must start each within 5 seconds. Screenshots of every page go to the `ci-screens` branch. |
+| **Emulator tests** (`app/src/androidTest`) | The app on an Android emulator against a real Navidrome behind a phone-speed link: animated covers downloaded once and shown as stills in lists, songs playing while covers load, and a tour of every page that plays songs from several of them. Screenshots of every page and the app's log go to the `ci-screens` branch. They run after each merge to main and nightly, not on pull requests, and report problems without holding back releases (song start times on the throttled emulator vary too much to fail on; slow starts are listed in the run). |
 | **Dependabot** (`.github/dependabot.yml`) | Weekly pull requests for outdated libraries and alerts for known vulnerabilities in them. |
 
-A release is published only when all of these pass. A failing check shows a red cross on the commit, and its details are in the run's annotations.
+A release is published from main when the build, Lint, unit tests and secret scan pass. A failing check shows a red cross on the commit, and its details are in the run's annotations.
 
 Inside the app, with **Settings → Logs → Keep a log** on, the log records each start (version, phone, settings that change behaviour), why the app last closed (crash, freeze, killed for memory, swiped away; Android 11+), every error in background work, playback decisions, downloads and covers. **Problems** on the Logs page shows only warnings and errors.
 
 ## Building
 
-GitHub Actions builds a signed APK on every push to `main` and publishes it once all quality checks pass. The version comes from `version.txt` (e.g. `0.0.3beta`). To publish a new release, add a section `## <version>` at the top of `CHANGELOG.md` with what was added, changed and fixed, set the same version in `version.txt`, and push: the release `v<version>` gets `musix-<version>.apk` and that changelog section as its notes. Edits to older changelog sections are copied to their releases too. The signing key is in `app/musix.keystore`, so each new build installs over the previous one. Keep this repository private.
+GitHub Actions builds a signed APK on every push to `main` and publishes it once all quality checks pass. The version comes from `version.txt` (e.g. `0.0.3beta`). Each change adds a note in `changelog.d/` (see its README). When changes are merged to `main` and the checks pass, CI raises the version by one, publishes `v<version>` with `musix-<version>.apk` and the notes, and records the section in `CHANGELOG.md` and the version in `version.txt`. Edits to older changelog sections are copied to their releases too. The signing key is in `app/musix.keystore`, so each new build installs over the previous one. Keep this repository private.
 
 To build locally: `gradle :app:assembleRelease` with Gradle 8.14+, JDK 17 and the Android SDK (platform 36).
