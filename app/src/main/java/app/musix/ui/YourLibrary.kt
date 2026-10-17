@@ -136,7 +136,7 @@ private fun NavController.goToTab(route: String) = navigate(route) {
     restoreState = true
 }
 
-private fun pins(context: Context) = context.getSharedPreferences("library_pins", Context.MODE_PRIVATE)
+private fun pins(context: Context) = context.getSharedPreferences(app.musix.data.Users.scoped("library_pins"), Context.MODE_PRIVATE)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
