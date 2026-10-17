@@ -1,18 +1,21 @@
 package app.musix.ui
 
-import android.view.HapticFeedbackConstants
+import android.os.VibrationEffect
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Swipe to queue's vibrations use what each Android version has. */
+/** Swipe to queue's vibrations: a click as the amber strip shows, a heavier one when the song is added. */
 class QueueHapticsTest {
-    @Test fun thresholdTick() {
-        assertEquals(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK, QueueHaptics.threshold(34))
-        assertEquals(HapticFeedbackConstants.CLOCK_TICK, QueueHaptics.threshold(33))
+    @Test fun predefinedClicksOnAndroid10AndLater() {
+        assertEquals(QueueHaptics.Effect(VibrationEffect.EFFECT_CLICK, 0), QueueHaptics.effect(QueueHaptics.Kind.START, 29))
+        assertEquals(QueueHaptics.Effect(VibrationEffect.EFFECT_HEAVY_CLICK, 0), QueueHaptics.effect(QueueHaptics.Kind.ADDED, 34))
     }
 
-    @Test fun addedBuzz() {
-        assertEquals(HapticFeedbackConstants.CONFIRM, QueueHaptics.added(30))
-        assertEquals(HapticFeedbackConstants.KEYBOARD_TAP, QueueHaptics.added(29))
+    @Test fun shortPulsesBefore() {
+        val start = QueueHaptics.effect(QueueHaptics.Kind.START, 28)
+        val added = QueueHaptics.effect(QueueHaptics.Kind.ADDED, 26)
+        assertEquals(null, start.predefined)
+        assertTrue("Adding is felt more than starting", added.pulseMs > start.pulseMs)
     }
 }

@@ -61,8 +61,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalView
-import android.view.HapticFeedbackConstants
+import android.os.VibratorManager
+import android.os.Vibrator
+import android.os.VibrationEffect
+import android.content.Context
 import android.os.Build
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.runtime.rememberUpdatedState
@@ -720,14 +722,14 @@ fun SwipeToQueue(song: Song, enabled: Boolean, onQueued: () -> Unit, content: @C
         return
     }
     val graph = LocalGraph.current
-    val view = LocalView.current
+    val context = LocalContext.current
     val current by rememberUpdatedState(song)
     val queued by rememberUpdatedState(onQueued)
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.EndToStart) {
-                // A small confirming buzz when the song is added.
-                view.performHapticFeedback(QueueHaptics.added(Build.VERSION.SDK_INT))
+                // A firmer buzz when the song is added.
+                QueueHaptics.vibrate(context, QueueHaptics.Kind.ADDED)
                 AppLog.i("Queue", "Swiped ${current.id} into the queue")
                 graph.player.addToQueue(current)
                 queued()
@@ -738,14 +740,9 @@ fun SwipeToQueue(song: Song, enabled: Boolean, onQueued: () -> Unit, content: @C
         positionalThreshold = { width -> width * SWIPE_TO_QUEUE_FRACTION },
     )
     val swiping = state.dismissDirection == SwipeToDismissBoxValue.EndToStart
-    // A light tick as the row passes the point where letting go adds it (and again if it goes back).
-    val armed = state.targetValue == SwipeToDismissBoxValue.EndToStart
-    var wasArmed by remember { mutableStateOf(false) }
-    LaunchedEffect(armed) {
-        if (armed != wasArmed) {
-            view.performHapticFeedback(QueueHaptics.threshold(Build.VERSION.SDK_INT))
-            wasArmed = armed
-        }
+    // A clear tap the moment the amber "Add to queue" strip shows, as the swipe starts.
+    LaunchedEffect(swiping) {
+        if (swiping) QueueHaptics.vibrate(context, QueueHaptics.Kind.START)
     }
     SwipeToDismissBox(
         state = state,
@@ -768,14 +765,46 @@ fun SwipeToQueue(song: Song, enabled: Boolean, onQueued: () -> Unit, content: @C
     }
 }
 
-/** The small vibrations of swipe to queue, as Android haptic constants for the phone's Android version. */
-@android.annotation.SuppressLint("InlinedApi") // each constant is only used on the Android version that has it
+/**
+ * The vibrations of swipe to queue. They use the phone's vibration motor directly (predefined click
+ * effects, or a short pulse on older phones), which is clearly stronger than a touch-feedback tick,
+ * but they're skipped when touch vibration is turned off in the phone's settings.
+ */
 object QueueHaptics {
-    /** Passing the point where letting go adds the song: the lightest tick there is. */
-    fun threshold(sdk: Int): Int = if (sdk >= 34) HapticFeedbackConstants.SEGMENT_FREQUENT_TICK else HapticFeedbackConstants.CLOCK_TICK
+    enum class Kind { START, ADDED }
 
-    /** The song was added: a short confirming buzz. */
-    fun added(sdk: Int): Int = if (sdk >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.KEYBOARD_TAP
+    /** What to play: a predefined effect id (Android 10+), else a pulse of [pulseMs]. */
+    data class Effect(val predefined: Int?, val pulseMs: Long)
+
+    @android.annotation.SuppressLint("InlinedApi") // the effect ids are only used on Android 10+
+    fun effect(kind: Kind, sdk: Int): Effect = when (kind) {
+        // As the amber strip appears: a crisp click.
+        Kind.START -> if (sdk >= 29) Effect(VibrationEffect.EFFECT_CLICK, 0) else Effect(null, 25)
+        // Song added: a heavier click.
+        Kind.ADDED -> if (sdk >= 29) Effect(VibrationEffect.EFFECT_HEAVY_CLICK, 0) else Effect(null, 45)
+    }
+
+    fun vibrate(context: Context, kind: Kind) {
+        val touchFeedback = runCatching {
+            android.provider.Settings.System.getInt(context.contentResolver, android.provider.Settings.System.HAPTIC_FEEDBACK_ENABLED, 1)
+        }.getOrDefault(1)
+        if (touchFeedback == 0) return
+        val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= 31) {
+            context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Vibrator::class.java)
+        }
+        if (vibrator == null || !vibrator.hasVibrator()) return
+        val e = effect(kind, Build.VERSION.SDK_INT)
+        runCatching {
+            if (Build.VERSION.SDK_INT >= 29 && e.predefined != null) {
+                vibrator.vibrate(VibrationEffect.createPredefined(e.predefined))
+            } else {
+                vibrator.vibrate(VibrationEffect.createOneShot(e.pulseMs, VibrationEffect.DEFAULT_AMPLITUDE))
+            }
+        }.onFailure { AppLog.w("Queue", "Vibration failed: ${it.javaClass.simpleName}") }
+    }
 }
 
 /** How far a song row has to be dragged (part of its width) to be added to the queue. */
