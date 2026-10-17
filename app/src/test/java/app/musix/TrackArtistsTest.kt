@@ -67,7 +67,8 @@ class SplitArtistsTest {
 
     @Test fun albumLineKeepsAKnownArtistWhole() {
         val s = Song(id = "s", title = "t", artist = "Chase & Status feat. Bou")
-        assertEquals("Chase & Status, Bou", extraArtists(s, null, "Sub Focus", known))
+        // None of it is the album artist: the name shows as tagged.
+        assertEquals("Chase & Status feat. Bou", extraArtists(s, null, "Sub Focus", known))
         assertEquals("Bou", extraArtists(s, null, "Chase & Status", known))
         val alone = Song(id = "s", title = "t", artist = "Chase & Status")
         assertEquals("Chase & Status", extraArtists(alone, null, "Sub Focus", known))
