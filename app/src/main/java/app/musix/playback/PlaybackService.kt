@@ -27,8 +27,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import androidx.media3.session.SessionCommand
-import androidx.media3.session.SessionResult
 import app.musix.AppGraph
 import app.musix.MainActivity
 import app.musix.MusixApp
@@ -43,6 +41,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.distinctUntilChanged
 import java.io.InterruptedIOException
 import java.util.Collections
 
@@ -89,30 +91,6 @@ class PlaybackService : MediaSessionService() {
             .setSessionActivity(openApp)
             .setBitmapLoader(CoverBitmapLoader(this, graph.scope))
             .setCallback(object : MediaSession.Callback {
-                // The app's own screens may also change the current song's quality from now playing.
-                override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
-                    if (controller.packageName != packageName) return super.onConnect(session, controller)
-                    val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
-                        .add(SessionCommand(StreamQuality.ACTION_SET_QUALITY, Bundle.EMPTY))
-                        .build()
-                    return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
-                        .setAvailableSessionCommands(commands)
-                        .build()
-                }
-
-                override fun onCustomCommand(
-                    session: MediaSession,
-                    controller: MediaSession.ControllerInfo,
-                    customCommand: SessionCommand,
-                    args: Bundle,
-                ): ListenableFuture<SessionResult> {
-                    if (customCommand.customAction != StreamQuality.ACTION_SET_QUALITY) {
-                        return super.onCustomCommand(session, controller, customCommand, args)
-                    }
-                    setQuality(args.getInt(StreamQuality.EXTRA_KBPS, 0))
-                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
-                }
-
                 // Items arrive from the app's controller without their URI, so it's restored here.
                 override fun onAddMediaItems(
                     mediaSession: MediaSession,
@@ -127,6 +105,15 @@ class PlaybackService : MediaSessionService() {
                 }
             })
             .build()
+
+        // A new quality in Settings → Playback applies straight away: the current song is loaded again at it.
+        scope.launch {
+            graph.settings.state
+                .map { it.transcodeWifiKbps to it.transcodeMobileKbps }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { withContext(Dispatchers.Main) { onQualitySettingsChanged() } }
+        }
 
         // Send any listens that were waiting from an earlier session.
         scope.launch { runCatching { graph.scrobbler.flush() } }
@@ -214,10 +201,33 @@ class PlaybackService : MediaSessionService() {
     }
 
     /**
-     * Quality picked in now playing: the current song carries on from where it was at [kbps] (0 = the
-     * original file), and the next songs are chosen afresh from the settings, which the app has updated.
+     * Wi-Fi or mobile quality changed in Settings. The next songs pick theirs afresh; the current one is
+     * loaded again at the new quality, carrying on from where it was, when it streams at another one.
      */
-    private fun setQuality(kbps: Int) {
+    private fun onQualitySettingsChanged() {
+        val player = session?.player ?: return
+        val item = player.currentMediaItem
+        val kbps = Streaming.bitrate(this, graph.settings.current)
+        val playing = item?.let { chosenKbps[it.mediaId] }
+        if (item == null || playing == null || playing == kbps || player.playbackState == Player.STATE_IDLE) {
+            // Nothing is streaming at another quality: just forget the choices made for the next songs.
+            AppLog.i("Stream", "Quality setting changed to ${if (kbps > 0) "Opus $kbps kbit/s" else "original"}; applies from the next song that loads")
+            precacheWriter?.cancel()
+            precacheJob?.cancel()
+            precachedFor = null
+            chosenKbps.keys.retainAll(setOfNotNull(item?.mediaId))
+            return
+        }
+        reloadAt(kbps)
+    }
+
+    private var reloads = 0
+
+    /**
+     * Loads the current song again at [kbps] (0 = the original file) from where it was, keeping it
+     * playing or paused; the next songs are chosen afresh from the settings.
+     */
+    private fun reloadAt(kbps: Int) {
         val player = session?.player ?: return
         val item = player.currentMediaItem ?: return
         if (kbps <= 0) {
@@ -231,11 +241,12 @@ class PlaybackService : MediaSessionService() {
         precachedFor = null
         chosenKbps.clear()
         chosenKbps[item.mediaId] = kbps
-        AppLog.i("Stream", "Song ${item.mediaId}: ${if (kbps > 0) "Opus $kbps kbit/s" else "original"}, picked in now playing")
         val index = player.currentMediaItemIndex
         val position = player.currentPosition
-        // Back to the plain stream address; the stream is pointed at the chosen quality when it opens.
-        val uri = Uri.parse(graph.subsonic.streamUrl(item.mediaId))
+        AppLog.i("Stream", "Song ${item.mediaId}: loading again as ${if (kbps > 0) "Opus $kbps kbit/s" else "the original"} at $position ms, after a quality change in Settings")
+        // The plain stream address, pointed at the chosen quality when it opens. The reload marker makes
+        // the address differ from before, otherwise the player would carry on with the old stream.
+        val uri = Uri.parse(Streaming.withReload(graph.subsonic.streamUrl(item.mediaId), ++reloads))
         player.replaceMediaItem(index, item.buildUpon().setUri(uri).build())
         player.seekTo(index, position)
         publishQuality()

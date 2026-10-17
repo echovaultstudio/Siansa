@@ -24,11 +24,30 @@ object Streaming {
     fun bitrate(context: Context, settings: AppSettings): Int =
         if (isUnmetered(context)) settings.transcodeWifiKbps else settings.transcodeMobileKbps
 
+    /**
+     * A marker added to the current song's address to make the player load it again (the player keeps
+     * playing the old stream when the address is unchanged). It's removed before the request is sent.
+     */
+    const val RELOAD_PARAM = "musixReload"
+
+    /** [url] with the reload marker set to [n] (any earlier marker replaced). */
+    fun withReload(url: String, n: Int): String {
+        val clean = withoutReload(url)
+        return clean + (if ('?' in clean) "&" else "?") + "$RELOAD_PARAM=$n"
+    }
+
+    /** [url] without the reload marker, exactly as it was before it was added. */
+    fun withoutReload(url: String): String =
+        url.replace(Regex("""[?&]$RELOAD_PARAM=[^&#]*"""), "").let { u ->
+            // When the marker was the first parameter, the next one now starts with '&'.
+            if ('?' !in u && '&' in u) u.replaceFirst('&', '?') else u
+        }
+
     fun rewrite(uri: Uri, kbps: Int): Uri {
         if (kbps <= 0 || uri.path?.endsWith("/rest/stream") != true) return uri
         // Swap the "raw" (original) request for an Opus conversion.
         val builder = uri.buildUpon().clearQuery()
-        uri.queryParameterNames.filter { it != "format" && it != "maxBitRate" }.forEach { name ->
+        uri.queryParameterNames.filter { it != "format" && it != "maxBitRate" && it != "estimateContentLength" }.forEach { name ->
             uri.getQueryParameters(name).forEach { builder.appendQueryParameter(name, it) }
         }
         return builder

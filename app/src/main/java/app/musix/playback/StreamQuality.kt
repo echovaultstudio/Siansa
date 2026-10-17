@@ -9,14 +9,6 @@ object StreamQuality {
     const val EXTRA_SONG_ID = "app.musix.quality.song"
     const val EXTRA_KBPS = "app.musix.quality.kbps"
 
-    /** Custom session command: play the current song (and the next ones) at this Opus kbit/s, or 0 for the original. */
-    const val ACTION_SET_QUALITY = "app.musix.SET_QUALITY"
-
-    /** The choices offered: the original file, then Opus bitrates (the same as in Settings → Playback). */
-    val choices = listOf(0, 96, 128, 160, 192, 256, 320)
-
-    fun choiceLabel(kbps: Int): String = if (kbps <= 0) "Original" else "Opus $kbps"
-
     /** A short name for an audio format from the player's MIME types, or null when it isn't known yet. */
     fun codecName(sampleMimeType: String?, containerMimeType: String? = null): String? {
         val mime = sampleMimeType?.lowercase()?.trim().orEmpty()

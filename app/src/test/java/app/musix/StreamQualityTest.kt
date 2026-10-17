@@ -1,11 +1,13 @@
 package app.musix
 
 import app.musix.playback.StreamQuality
+import app.musix.playback.Streaming
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The format shown under the seek bar in now playing, and the qualities you can pick there. */
+/** The format shown under the seek bar in now playing, and reloading a song at a new quality. */
 class StreamQualityTest {
     @Test fun namesCommonFormats() {
         assertEquals("FLAC", StreamQuality.codecName("audio/flac"))
@@ -42,9 +44,22 @@ class StreamQualityTest {
         assertNull(StreamQuality.label(null, 0))
     }
 
-    @Test fun choicesMatchSettings() {
-        assertEquals(listOf(0, 96, 128, 160, 192, 256, 320), StreamQuality.choices)
-        assertEquals("Original", StreamQuality.choiceLabel(0))
-        assertEquals("Opus 256", StreamQuality.choiceLabel(256))
+    @Test fun reloadMarkerMakesTheAddressDifferAndIsRemovedAgain() {
+        val url = "https://music.example.com/rest/stream?id=abc&format=raw&v=1.16.1"
+        val marked = Streaming.withReload(url, 3)
+        assertNotEquals(url, marked)
+        assertEquals("$url&musixReload=3", marked)
+        assertEquals(url, Streaming.withoutReload(marked))
+    }
+
+    @Test fun reloadMarkerIsReplacedNotRepeated() {
+        val url = "https://music.example.com/rest/stream?id=abc"
+        assertEquals("$url&musixReload=2", Streaming.withReload(Streaming.withReload(url, 1), 2))
+    }
+
+    @Test fun reloadMarkerAsTheOnlyOrFirstParameter() {
+        assertEquals("https://x/rest/stream", Streaming.withoutReload("https://x/rest/stream?musixReload=1"))
+        assertEquals("https://x/rest/stream?id=a", Streaming.withoutReload("https://x/rest/stream?musixReload=1&id=a"))
+        assertEquals("https://x/rest/stream?id=a", Streaming.withoutReload("https://x/rest/stream?id=a"))
     }
 }
