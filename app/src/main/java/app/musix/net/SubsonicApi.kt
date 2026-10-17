@@ -190,6 +190,12 @@ class SubsonicApi(
         return parseSong(song)
     }
 
+    /** The song's codec, bit rate, file path and play count, as Navidrome reports them. */
+    suspend fun songDetails(id: String): SongDetails {
+        val song = call("getSong", mapOf("id" to id)).obj("song") ?: throw ApiException("Song not found")
+        return parseSongDetails(song)
+    }
+
     /** One page of every song (empty search), used by library sync. */
     suspend fun songsPage(offset: Int, size: Int, folderId: String? = null): List<Song> =
         call(
