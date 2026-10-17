@@ -43,6 +43,7 @@ jobs:
       - name: Version and release notes
         id: notes
         run: |
+          python3 -m unittest discover -s scripts -q
           python3 scripts/release_notes.py prepare | tee -a "$GITHUB_OUTPUT"
           awk '/^## /{ v=$2; f="notes/" v ".md"; next } v { print > f }' CHANGELOG.md
 

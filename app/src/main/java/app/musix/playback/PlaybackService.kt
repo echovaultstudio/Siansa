@@ -3,6 +3,7 @@ package app.musix.playback
 import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
+import android.os.Bundle
 import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.cast.RemoteCastPlayer
@@ -28,6 +29,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
 import app.musix.AppGraph
 import app.musix.MainActivity
 import app.musix.MusixApp
@@ -94,6 +97,30 @@ class PlaybackService : MediaSessionService() {
             .setSessionActivity(openApp)
             .setBitmapLoader(CoverBitmapLoader(this, graph.scope))
             .setCallback(object : MediaSession.Callback {
+                // The app's own screens may also change the current song's quality from now playing.
+                override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
+                    if (controller.packageName != packageName) return super.onConnect(session, controller)
+                    val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+                        .add(SessionCommand(StreamQuality.ACTION_SET_QUALITY, Bundle.EMPTY))
+                        .build()
+                    return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                        .setAvailableSessionCommands(commands)
+                        .build()
+                }
+
+                override fun onCustomCommand(
+                    session: MediaSession,
+                    controller: MediaSession.ControllerInfo,
+                    customCommand: SessionCommand,
+                    args: Bundle,
+                ): ListenableFuture<SessionResult> {
+                    if (customCommand.customAction != StreamQuality.ACTION_SET_QUALITY) {
+                        return super.onCustomCommand(session, controller, customCommand, args)
+                    }
+                    setQuality(args.getInt(StreamQuality.EXTRA_KBPS, 0))
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
+
                 // Items arrive from the app's controller without their URI, so it's restored here.
                 override fun onAddMediaItems(
                     mediaSession: MediaSession,
@@ -193,6 +220,49 @@ class PlaybackService : MediaSessionService() {
         val position = player.currentPosition
         player.replaceMediaItem(index, item.buildUpon().setUri(Streaming.rewrite(uri, kbps)).build())
         player.seekTo(index, position)
+    }
+
+    /** Tells the app's screens what the current song streams as (Opus kbit/s, or 0 for the original file). */
+    private fun publishQuality() {
+        val s = session ?: return
+        val id = s.player.currentMediaItem?.mediaId
+        val kbps = id?.let { chosenKbps[it] } ?: 0
+        s.setSessionExtras(Bundle().apply {
+            putString(StreamQuality.EXTRA_SONG_ID, id)
+            putInt(StreamQuality.EXTRA_KBPS, kbps)
+        })
+    }
+
+    /**
+     * Quality picked in now playing: the current song carries on from where it was at [kbps] (0 = the
+     * original file), and the next songs are chosen afresh from the settings, which the app has updated.
+     */
+    private fun setQuality(kbps: Int) {
+        val player = session?.player ?: return
+        if (player !== exo) {
+            AppLog.i("Stream", "Quality change ignored while casting; the TV gets its own stream")
+            return
+        }
+        val item = player.currentMediaItem ?: return
+        if (kbps <= 0) {
+            // Asking for the original ends a slow-connection switch to Opus.
+            slowUntil = 0L
+            stalls.clear()
+        }
+        handler.removeCallbacks(bufferingWatch)
+        precacheWriter?.cancel()
+        precacheJob?.cancel()
+        precachedFor = null
+        chosenKbps.clear()
+        chosenKbps[item.mediaId] = kbps
+        AppLog.i("Stream", "Song ${item.mediaId}: ${if (kbps > 0) "Opus $kbps kbit/s" else "original"}, picked in now playing")
+        val index = player.currentMediaItemIndex
+        val position = player.currentPosition
+        // Back to the plain stream address; the stream is pointed at the chosen quality when it opens.
+        val uri = Uri.parse(graph.subsonic.streamUrl(item.mediaId))
+        player.replaceMediaItem(index, item.buildUpon().setUri(uri).build())
+        player.seekTo(index, position)
+        publishQuality()
     }
 
     /**
@@ -390,6 +460,7 @@ class PlaybackService : MediaSessionService() {
          * silently skipping through them, the song is played again as Opus converted by Navidrome.
          */
         override fun onTracksChanged(tracks: Tracks) {
+            publishQuality()
             if (!onPhone) return
             val item = player.currentMediaItem ?: return
             val audio = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }

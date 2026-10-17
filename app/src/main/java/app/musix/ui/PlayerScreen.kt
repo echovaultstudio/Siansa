@@ -4,6 +4,13 @@ import android.os.SystemClock
 import androidx.compose.runtime.withFrameMillis
 import app.musix.log.AppLog
 import app.musix.playback.SeekTracker
+import app.musix.playback.StreamQuality
+import app.musix.playback.Streaming
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
 import app.musix.data.cover
 import android.os.Build
@@ -120,10 +127,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.musix.playback.Cast
 import androidx.media3.common.Player
 import androidx.navigation.NavController
 import app.musix.data.Song
+import app.musix.playback.Cast
 import app.musix.playback.PlayerState
 import kotlin.math.max
 
@@ -173,13 +180,21 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     var upDrag by remember { mutableFloatStateOf(0f) }
     var heightPx by remember { mutableFloatStateOf(1f) }
     val velocity = remember { VelocityTracker() }
+    val cornerMaxPx = with(LocalDensity.current) { 28.dp.toPx() }
 
     MaterialTheme(colorScheme = PlayerColors, typography = MaterialTheme.typography) {
         Box(
             Modifier
                 .fillMaxSize()
                 .onSizeChanged { heightPx = it.height.toFloat().coerceAtLeast(1f) }
-                .graphicsLayer { translationY = dismissY }
+                // One solid card: everything is clipped to it (the enlarged, blurred cover used to show
+                // through above it), and its top corners round as it is dragged down.
+                .graphicsLayer {
+                    translationY = dismissY
+                    val corner = playerCardCornerPx(dismissY, cornerMaxPx)
+                    shape = RoundedCornerShape(topStart = corner, topEnd = corner)
+                    clip = true
+                }
                 .background(Color.Black)
                 .pointerInput(Unit) {
                     var total = 0f
@@ -267,11 +282,14 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
                     song?.let { graph.favorites.toggle(it) }
                 }
-                SeekBar()
+                SeekBar(state)
                 Controls(state)
-                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    ViewToggle(Icons.Rounded.FormatQuote, "Lyrics", view == PlayerView.LYRICS) {
-                        view = if (view == PlayerView.LYRICS) PlayerView.ART else PlayerView.LYRICS
+                // Like Spotify: where the music plays on the left (with the TV or speaker's name while casting),
+                // song radio in the middle, lyrics and the queue on the right.
+                val casting = Cast.status.collectAsStateWithLifecycle().value.device != null
+                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
                     }
                     // Song radio: AudioMuse keeps adding songs that sound like this one and share its mood.
                     val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
@@ -292,15 +310,28 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                             .padding(horizontal = 14.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Rounded.Radio, null, tint = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f), modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            if (radioSeed != null) "Radio on" else "Song radio",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f),
+                        Icon(
+                            Icons.Rounded.Radio,
+                            if (casting) (if (radioSeed != null) "Radio on" else "Song radio") else null,
+                            tint = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.size(20.dp),
                         )
+                        // While casting, the device's name needs the room, so the chip shows just its icon.
+                        if (!casting) {
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                if (radioSeed != null) "Radio on" else "Song radio",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f),
+                            )
+                        }
                     }
-                    ViewToggle(Icons.AutoMirrored.Rounded.QueueMusic, "Queue", queueOpen) { queueOpen = true }
+                    Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End) {
+                        ViewToggle(Icons.Rounded.FormatQuote, "Lyrics", view == PlayerView.LYRICS) {
+                            view = if (view == PlayerView.LYRICS) PlayerView.ART else PlayerView.LYRICS
+                        }
+                        ViewToggle(Icons.AutoMirrored.Rounded.QueueMusic, "Queue", queueOpen) { queueOpen = true }
+                    }
                 }
                 UpNextHandle(state) { queueOpen = true }
             }
@@ -448,15 +479,8 @@ private fun SwipeCover(song: Song?, onTap: () -> Unit) {
 private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onClose) { Icon(Icons.Rounded.KeyboardArrowDown, "Close", Modifier.size(32.dp)) }
-        val castTo = Cast.status.collectAsStateWithLifecycle().value.device
         Column(Modifier.weight(1f).clickable(enabled = song?.albumId != null, onClick = onAlbum), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                if (castTo != null) "PLAYING ON ${castTo.uppercase()}" else "PLAYING FROM ALBUM",
-                style = MaterialTheme.typography.labelSmall,
-                color = if (castTo != null) Accent else Color.White.copy(alpha = 0.7f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Text("PLAYING FROM ALBUM", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
             Text(
                 song?.album.orEmpty(),
                 style = MaterialTheme.typography.labelLarge,
@@ -465,7 +489,7 @@ private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        CastButton(tint = Color.White.copy(alpha = 0.8f), keepSpace = true)
+        Spacer(Modifier.size(48.dp))
     }
 }
 
@@ -505,7 +529,7 @@ private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart:
  * while you drag, and the time shown follows your finger.
  */
 @Composable
-private fun SeekBar() {
+private fun SeekBar(state: PlayerState) {
     val graph = LocalGraph.current
     val tracker = remember { SeekTracker() }
     var shown by remember { mutableStateOf(graph.player.progress().let { SeekTracker.Shown(it.positionMs, it.durationMs) }) }
@@ -564,14 +588,78 @@ private fun SeekBar() {
                     .background(Color.White),
             )
         }
-        Row(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 formatDuration(((fraction * duration) / 1000).toLong()),
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.weight(1f),
             )
-            Text("-" + formatDuration(((duration - fraction * duration) / 1000).toLong()), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+            QualityBadge(state)
+            Text(
+                "-" + formatDuration(((duration - fraction * duration) / 1000).toLong()),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.7f),
+                textAlign = TextAlign.End,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/**
+ * The song's format between the times under the seek bar: amber for the original file ("FLAC"), violet
+ * while Navidrome converts it ("OPUS 160"). Tap it to play this song, and the next ones on this kind of
+ * network, at another quality.
+ */
+@Composable
+private fun QualityBadge(state: PlayerState) {
+    val label = StreamQuality.label(state.codec, state.transcodeKbps) ?: return
+    val graph = LocalGraph.current
+    val context = LocalContext.current
+    val color = if (state.transcodeKbps > 0) Brand.Violet else Accent
+    val shape = RoundedCornerShape(6.dp)
+    var open by remember { mutableStateOf(false) }
+    var wifi by remember { mutableStateOf(true) }
+    Box {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            maxLines = 1,
+            modifier = Modifier
+                .clip(shape)
+                .background(color.copy(alpha = 0.14f))
+                .border(1.dp, color.copy(alpha = 0.45f), shape)
+                .clickable {
+                    wifi = Streaming.isUnmetered(context)
+                    open = true
+                }
+                .padding(horizontal = 8.dp, vertical = 3.dp),
+        )
+        MusixDarkTheme {
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                Text(
+                    if (wifi) "Quality on Wi-Fi" else "Quality on mobile data",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                StreamQuality.choices.forEach { kbps ->
+                    val selected = kbps == state.transcodeKbps
+                    DropdownMenuItem(
+                        text = { Text(StreamQuality.choiceLabel(kbps), color = if (selected) Accent else MaterialTheme.colorScheme.onSurface) },
+                        trailingIcon = { if (selected) Icon(Icons.Rounded.Check, null, tint = Accent) },
+                        onClick = {
+                            open = false
+                            val s = graph.settings.current
+                            graph.settings.save(if (wifi) s.copy(transcodeWifiKbps = kbps) else s.copy(transcodeMobileKbps = kbps))
+                            if (kbps != state.transcodeKbps) graph.player.setQuality(kbps)
+                        },
+                    )
+                }
+            }
         }
     }
 }

@@ -21,11 +21,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Share
@@ -129,6 +131,9 @@ fun SettingsHub(nav: NavController) {
                     if (settings.coverDownload) " · all covers downloaded" else "") {
                 nav.navigate("settings/storage")
             }
+            HubRow(Icons.Rounded.Backup, "Backup", "Save or restore your settings, vibes and history") {
+                nav.navigate("settings/backup")
+            }
             HubRow(Icons.Rounded.BugReport, "Logs", if (settings.logging) "Logging on" else "Logging off") {
                 nav.navigate("settings/logs")
             }
@@ -136,12 +141,9 @@ fun SettingsHub(nav: NavController) {
             val version = remember {
                 runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: ""
             }
-            Text(
-                "Musix $version",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp),
-            )
+            HubRow(Icons.Rounded.NewReleases, "What's new", "Musix $version · changes in each version") {
+                nav.navigate("settings/whatsnew")
+            }
         }
     }
 }
