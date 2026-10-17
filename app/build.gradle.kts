@@ -110,6 +110,9 @@ dependencies {
     implementation("androidx.media3:media3-session:1.9.0")
     implementation("androidx.media3:media3-datasource-okhttp:1.9.0")
     implementation("androidx.media3:media3-database:1.9.0")
+    // Google Cast: plays the queue on a Chromecast or Google TV (needs Google Play services on the phone).
+    implementation("androidx.media3:media3-cast:1.9.0")
+    implementation("androidx.mediarouter:mediarouter:1.7.0")
     // FFmpeg audio decoders (ALAC, and FLAC/MP3/AAC/AC-3 as backups) for formats the phone can't play itself.
     implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.9.0+1")
 
@@ -135,6 +138,34 @@ dependencies {
     androidTestImplementation(composeBom)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+// CHANGELOG.md (updated by CI before the build) goes into the APK's assets, for Settings → What's new.
+abstract class BundleChangelog : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val changelog: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val dir = outputDir.get().asFile
+        dir.deleteRecursively()
+        dir.mkdirs()
+        changelog.get().asFile.copyTo(File(dir, "CHANGELOG.md"), overwrite = true)
+    }
+}
+
+val bundleChangelog = tasks.register<BundleChangelog>("bundleChangelog") {
+    changelog.set(rootProject.layout.projectDirectory.file("CHANGELOG.md"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(bundleChangelog, BundleChangelog::outputDir)
+    }
 }
 
 kotlin {

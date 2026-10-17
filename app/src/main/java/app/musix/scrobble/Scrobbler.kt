@@ -33,7 +33,7 @@ class Scrobbler(
     private val listenBrainz: ListenBrainzApi,
     private val scope: CoroutineScope,
 ) {
-    private val pending = JsonFile(File(context.filesDir, "pending_scrobbles.json"), ListSerializer(PendingListen.serializer())) { emptyList() }
+    private val pending = JsonFile(File(context.filesDir, app.musix.data.Users.scoped("pending_scrobbles.json")), ListSerializer(PendingListen.serializer())) { emptyList() }
     private val flushLock = Mutex()
 
     fun nowPlaying(song: Song) {

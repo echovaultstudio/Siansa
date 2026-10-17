@@ -54,7 +54,7 @@ class JsonFile<T : Any>(
 
 class SelectorStore(context: Context) {
     private val json = JsonFile(
-        File(context.filesDir, "selectors.json"),
+        File(context.filesDir, Users.scoped("selectors.json")),
         ListSerializer(Selector.serializer()),
     ) { DefaultSelectors.all }
 
@@ -82,7 +82,7 @@ class SelectorStore(context: Context) {
 
 class MixStore(context: Context) {
     private val json = JsonFile(
-        File(context.filesDir, "mixes.json"),
+        File(context.filesDir, Users.scoped("mixes.json")),
         ListSerializer(Mix.serializer()),
     ) { emptyList() }
 
@@ -120,7 +120,7 @@ class HistoryStore(context: Context) {
     }
 
     private val json = JsonFile(
-        File(context.filesDir, "history.json"),
+        File(context.filesDir, Users.scoped("history.json")),
         ListSerializer(PlayEvent.serializer()),
     ) { emptyList() }
 

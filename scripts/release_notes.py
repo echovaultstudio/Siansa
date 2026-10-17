@@ -5,8 +5,9 @@ Every pull request adds one small file to changelog.d/ (e.g. changelog.d/issue-4
 "### Fixed" / "### Added" / "### Changed" notes, and leaves CHANGELOG.md and version.txt alone. That way
 pull requests never conflict with each other over the changelog or the version number.
 
-  prepare  Used by CI on every build. If changelog.d/ has notes, the next version is version.txt's with
-           its last number raised by one; version.txt and CHANGELOG.md are updated in the working copy
+  prepare  Used by CI on every build. If changelog.d/ has notes, the next version is version.txt's
+           raised by the size of the change (see level_of: fixes 0.1.3 → 0.1.4, new features 0.1.3 →
+           0.2.0, 1.0 only when a note asks for it); version.txt and CHANGELOG.md are updated in the working copy
            (so the APK carries the new version), notes/<version>.md is written for the release, and
            notes/fragments.txt lists the files used. Prints "version=..." for $GITHUB_OUTPUT.
            Without notes, version.txt's version is used with its existing CHANGELOG.md section.
@@ -30,11 +31,38 @@ def fragments():
     )
 
 
-def bump(version):
+LEVELS = ["patch", "minor", "major"]
+
+
+def bump(version, level="patch"):
+    """0.1.3 → 0.1.4 (patch: fixes and small changes), 0.2.0 (minor: new features), 1.0.0 (major).
+    Anything after the numbers (e.g. "beta") is kept."""
     m = re.match(r"^(\d+)\.(\d+)\.(\d+)(.*)$", version)
     if not m:
-        sys.exit(f"version.txt holds '{version}', expected something like 0.0.25beta")
-    return f"{m[1]}.{m[2]}.{int(m[3]) + 1}{m[4]}"
+        sys.exit(f"version.txt holds '{version}', expected something like 0.1.0beta")
+    major, minor, patch, rest = int(m[1]), int(m[2]), int(m[3]), m[4]
+    if level == "major":
+        return f"{major + 1}.0.0{rest}"
+    if level == "minor":
+        return f"{major}.{minor + 1}.0{rest}"
+    return f"{major}.{minor}.{patch + 1}{rest}"
+
+
+RELEASE_MARK = re.compile(r"^\s*<!--\s*release:\s*(patch|minor|major)\s*-->\s*$", re.I)
+
+
+def level_of(files):
+    """How big the release is: major only when a note asks for it (<!-- release: major -->), minor when
+    any note adds something (### Added) or asks for minor, otherwise patch."""
+    level = "patch"
+    for f in files:
+        text = open(f, encoding="utf-8").read()
+        asked = [RELEASE_MARK.match(l)[1].lower() for l in text.splitlines() if RELEASE_MARK.match(l)]
+        found = asked + (["minor"] if re.search(r"^#{2,4}\s+Added\b", text, re.M | re.I) else [])
+        for l in found:
+            if LEVELS.index(l) > LEVELS.index(level):
+                level = l
+    return level
 
 
 def combine(files):
@@ -43,6 +71,8 @@ def combine(files):
     for f in files:
         current = "Changed"
         for line in open(f, encoding="utf-8").read().splitlines():
+            if RELEASE_MARK.match(line):
+                continue
             heading = re.match(r"^#{2,4}\s+(\w+)", line)
             if heading:
                 current = heading[1].capitalize()
@@ -78,7 +108,7 @@ def prepare():
     current = open("version.txt").read().strip()
     files = fragments()
     if files:
-        version = bump(current)
+        version = bump(current, level_of(files))
         body = combine(files)
         open("version.txt", "w").write(version + "\n")
         write_changelog(version, body)

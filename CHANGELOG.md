@@ -3,6 +3,60 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.2.0beta — 2026-10-17
+
+### Fixed
+- **Release type chips on artist pages were squeezed against Popular.** The chips now have the same space
+  above them as below them, so they sit evenly between the popular songs and the albums.
+- **Changing the quality in Settings didn't change the song that was playing.** When you change the Wi-Fi or
+  mobile data quality in Settings → Playback, the song that's playing now loads again at the new quality and
+  carries on from the same spot, instead of staying at the old quality (or going silent).
+
+### Added
+- **Copy errors.** On Settings → Logs, "Copy errors" puts every error in the log, with its details, on the
+  clipboard, ready to paste into a message or an issue. The app version and phone model are at the top.
+- **Several Navidrome users.** Add more logins (on the same server or different ones) in Settings → Users and switch between them with one tap. Each user has their own library, history, mixes and settings, including AudioMuse, which can be left empty for a user without it. Musix restarts when you switch.
+
+### Changed
+- **The format under the seek bar is just a label now.** Tapping it no longer opens a quality menu (switching
+  there didn't work); set the quality in Settings → Playback. The label is smaller, sits evenly between the
+  two times and no longer makes the row taller.
+
+## 0.1.0beta — 2026-10-17
+
+### Fixed
+- **Popular songs on an artist's page were slow to appear.** They're now kept on the phone and show straight
+  away when you open an artist again. They're updated in the background every few days, and the first time a
+  placeholder keeps their space so the page doesn't jump.
+
+### Added
+- **Song details.** "Show details" in a song's menu (the three dots) shows its format (FLAC, MP3, Opus…), bit rate, sample rate, file size, how often it was played, how often you skipped it on this phone, and the file's path on the server.
+- **What's new in Settings.** A new page lists what changed in each version of Musix, newest first, with the version you have marked. Tap your version at the top (or any version's number) to open its release on GitHub.
+- **Release type chips on artist pages.** Tap Albums, Singles, DJ-mixes and so on to see only that kind of
+  release. Tap it again, or ✕, to see everything. Only the types the artist has are shown.
+- **Hide parts of Home.** In Arrange Home, tap the eye next to a row to hide it from Home, and tap it again to bring
+  it back. Reset shows everything again.
+- **Song format in now playing.** Under the seek bar you now see what's playing: FLAC, ALAC, MP3, Opus and so on,
+  in amber for the original file and in violet with its bitrate (for example "OPUS 160") when Navidrome converts
+  the song. Tap it to pick another quality: the song carries on from where it was, and the next songs on Wi-Fi
+  (or mobile data) use the same choice.
+
+### Changed
+- **Your playlists now show as a list.** Opening "Your playlists" from Home shows each playlist as a row with a
+  small cover, its name, who made it and how many songs it has, like Spotify, instead of big album tiles.
+  Playlists in Your Library also show how many songs they have.
+- **Version numbers now show how big each release is.** A release with only fixes and small changes raises the last number (0.1.3 → 0.1.4); one with new features raises the middle number (0.1.3 → 0.2.0). 1.0 is kept for the first full release. The next release with new features will be 0.1.0beta.
+- **Now playing moves as one card.** When you swipe it down, the blurred cover no longer shows through above it:
+  the whole screen slides down as a single card with rounded top corners.
+
+## 0.0.29beta — 2026-10-17
+
+### Added
+- **Backup.** Settings → Backup saves your settings, vibes, mixes, play history and Home and library layout to a
+  file, and restores them, for example on a new phone. Automatic backup saves one a day to a folder you choose
+  (also a NAS folder through an SMB, Nextcloud or Syncthing app) and keeps the last 7. Passwords, tokens and API
+  keys are never included, so after restoring on a new phone you enter them again.
+
 ## 0.0.28beta — 2026-10-17
 
 ### Fixed

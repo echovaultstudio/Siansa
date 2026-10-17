@@ -21,11 +21,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.NewReleases
+import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Share
@@ -54,6 +58,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import android.content.ClipData
+import android.content.ClipboardManager
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,7 +70,10 @@ import app.musix.covers.CoverDownload
 import app.musix.covers.CoverStore
 import app.musix.data.ReplayGainMode
 import app.musix.data.SyncPhase
+import app.musix.data.Users
 import app.musix.log.AppLog
+import app.musix.log.problemsForClipboard
+import app.musix.log.logEntries
 import coil3.SingletonImageLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -86,6 +95,13 @@ fun SettingsHub(nav: NavController) {
     LaunchedEffect(Unit) { graph.selectors.all() }
     Screen(title = "Settings", nav = nav) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
+            val hubContext = LocalContext.current
+            val userCount = remember { Users.ids(hubContext).size }
+            HubRow(
+                Icons.Rounded.People,
+                "Users",
+                if (userCount > 1) "$userCount users on this phone · switch with one tap" else "Add another Navidrome login",
+            ) { nav.navigate("settings/users") }
             HubRow(
                 Icons.Rounded.Dns,
                 "Connections",
@@ -129,6 +145,9 @@ fun SettingsHub(nav: NavController) {
                     if (settings.coverDownload) " · all covers downloaded" else "") {
                 nav.navigate("settings/storage")
             }
+            HubRow(Icons.Rounded.Backup, "Backup", "Save or restore your settings, vibes and history") {
+                nav.navigate("settings/backup")
+            }
             HubRow(Icons.Rounded.BugReport, "Logs", if (settings.logging) "Logging on" else "Logging off") {
                 nav.navigate("settings/logs")
             }
@@ -136,12 +155,9 @@ fun SettingsHub(nav: NavController) {
             val version = remember {
                 runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: ""
             }
-            Text(
-                "Musix $version",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp),
-            )
+            HubRow(Icons.Rounded.NewReleases, "What's new", "Musix $version · changes in each version") {
+                nav.navigate("settings/whatsnew")
+            }
         }
     }
 }
@@ -252,7 +268,7 @@ fun StorageScreen(nav: NavController) {
             StorageUsage(
                 images = (SingletonImageLoader.get(context).diskCache?.size ?: 0L) + CoverStore.sizeBytes(),
                 songs = runCatching { graph.songCache.cacheSpace }.getOrDefault(0L),
-                library = context.getDatabasePath("library.db").length(),
+                library = context.getDatabasePath(app.musix.data.Users.scoped(app.musix.data.UserFiles.DATABASE)).length(),
                 logs = AppLog.sizeBytes(),
             )
         }
@@ -398,31 +414,6 @@ fun StorageScreen(nav: NavController) {
     }
 }
 
-private class LogEntry(val level: String, val lines: List<String>) {
-    val problem get() = level == "E" || level == "W"
-}
-
-private val entryStart = Regex("""^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} ([A-Z])/""")
-
-/** Groups log lines into entries: a timestamped line plus the lines that continue it (stack traces). */
-private fun logEntries(lines: List<String>): List<LogEntry> {
-    val out = ArrayList<LogEntry>()
-    var level = "I"
-    var current = ArrayList<String>()
-    for (line in lines) {
-        val m = entryStart.find(line)
-        if (m != null) {
-            if (current.isNotEmpty()) out += LogEntry(level, current)
-            current = arrayListOf(line)
-            level = m.groupValues[1]
-        } else {
-            current += line
-        }
-    }
-    if (current.isNotEmpty()) out += LogEntry(level, current)
-    return out
-}
-
 private fun restartApp(context: Context) {
     val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
     val component = launch.component ?: return
@@ -430,7 +421,8 @@ private fun restartApp(context: Context) {
     Runtime.getRuntime().exit(0)
 }
 
-/** Optional logging for troubleshooting: on/off, a preview, share and clear. */
+/** Optional logging for troubleshooting: on/off, a preview, save, share, clear and copy the errors. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun LogsScreen(nav: NavController) {
     val graph = LocalGraph.current
@@ -483,7 +475,10 @@ fun LogsScreen(nav: NavController) {
                             "audio format, phone memory, temperature and battery saver, errors and crashes. " +
                             "Passwords, tokens and API keys are removed. Nothing is recorded while this is off, and nothing leaves the phone unless you share it.",
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                         Button(onClick = {
                             val stamp = java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.ROOT).format(Date())
                             saver.launch("musix-logs-$stamp.txt")
@@ -501,6 +496,28 @@ fun LogsScreen(nav: NavController) {
                             AppLog.clear()
                             refresh++
                         }) { Text("Clear") }
+                        // Every error and warning with its details, ready to paste into a message or an issue.
+                        OutlinedButton(onClick = {
+                            scope.launch {
+                                val text = withContext(Dispatchers.IO) {
+                                    problemsForClipboard(logEntries(AppLog.allLines()), AppLog.header)
+                                }
+                                if (text == null) {
+                                    snack.showSnackbar("No errors or warnings in the log")
+                                    return@launch
+                                }
+                                val ok = runCatching {
+                                    context.getSystemService(ClipboardManager::class.java)
+                                        .setPrimaryClip(ClipData.newPlainText("Musix problems", text))
+                                }.isSuccess
+                                AppLog.i("Logs", "Copied problems to the clipboard (${text.length} characters)")
+                                snack.showSnackbar(if (ok) "Errors and warnings copied" else "Couldn't copy them")
+                            }
+                        }) {
+                            Icon(Icons.Rounded.ContentCopy, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Copy problems")
+                        }
                     }
                     val all = entries.valueOrNull().orEmpty()
                     val errors = all.count { it.level == "E" }

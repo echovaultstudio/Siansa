@@ -4,6 +4,7 @@ import android.os.SystemClock
 import androidx.compose.runtime.withFrameMillis
 import app.musix.log.AppLog
 import app.musix.playback.SeekTracker
+import app.musix.playback.StreamQuality
 import kotlinx.coroutines.delay
 import app.musix.data.cover
 import android.os.Build
@@ -119,10 +120,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.border
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import androidx.navigation.NavController
 import app.musix.data.Song
+import app.musix.playback.AudioOutput
+import app.musix.playback.Cast
 import app.musix.playback.PlayerState
 import kotlin.math.max
 
@@ -173,13 +178,21 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     var upDrag by remember { mutableFloatStateOf(0f) }
     var heightPx by remember { mutableFloatStateOf(1f) }
     val velocity = remember { VelocityTracker() }
+    val cornerMaxPx = with(LocalDensity.current) { 28.dp.toPx() }
 
     MaterialTheme(colorScheme = PlayerColors, typography = MaterialTheme.typography) {
         Box(
             Modifier
                 .fillMaxSize()
                 .onSizeChanged { heightPx = it.height.toFloat().coerceAtLeast(1f) }
-                .graphicsLayer { translationY = dismissY }
+                // One solid card: everything is clipped to it (the enlarged, blurred cover used to show
+                // through above it), and its top corners round as it is dragged down.
+                .graphicsLayer {
+                    translationY = dismissY
+                    val corner = playerCardCornerPx(dismissY, cornerMaxPx)
+                    shape = RoundedCornerShape(topStart = corner, topEnd = corner)
+                    clip = true
+                }
                 .background(Color.Black)
                 .pointerInput(Unit) {
                     var total = 0f
@@ -250,7 +263,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 Spacer(Modifier.height(playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp))
                 TopRow(song, onClose = onClose, onAlbum = ::openAlbum, onSleep = { sleepOpen = true })
 
-                Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.weight(1f).fillMaxWidth().padding(top = 16.dp, bottom = 12.dp), contentAlignment = Alignment.Center) {
                     AnimatedContent(
                         targetState = view,
                         transitionSpec = { fadeIn(tween(140)) togetherWith fadeOut(tween(90)) },
@@ -267,11 +280,17 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
                     song?.let { graph.favorites.toggle(it) }
                 }
-                SeekBar()
+                SeekBar(state)
                 Controls(state)
-                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    ViewToggle(Icons.Rounded.FormatQuote, "Lyrics", view == PlayerView.LYRICS) {
-                        view = if (view == PlayerView.LYRICS) PlayerView.ART else PlayerView.LYRICS
+                // Like Spotify: where the music plays on the left (with the TV, speaker or headphones' name),
+                // song radio in the middle, lyrics and the queue on the right.
+                val castStatus by Cast.status.collectAsStateWithLifecycle()
+                val output by AudioOutput.device.collectAsStateWithLifecycle()
+                val dlnaDevice by app.musix.playback.dlna.Dlna.selected.collectAsStateWithLifecycle()
+                val casting = castDeviceLabel(castStatus, output, dlnaDevice?.name) != null
+                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
                     }
                     // Song radio: AudioMuse keeps adding songs that sound like this one and share its mood.
                     val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
@@ -292,17 +311,32 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                             .padding(horizontal = 14.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Rounded.Radio, null, tint = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f), modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            if (radioSeed != null) "Radio on" else "Song radio",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f),
+                        Icon(
+                            Icons.Rounded.Radio,
+                            if (casting) (if (radioSeed != null) "Radio on" else "Song radio") else null,
+                            tint = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.size(20.dp),
                         )
+                        // While a device's name shows, it needs the room, so the chip shows just its icon.
+                        if (!casting) {
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                if (radioSeed != null) "Radio on" else "Song radio",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f),
+                            )
+                        }
                     }
-                    ViewToggle(Icons.AutoMirrored.Rounded.QueueMusic, "Queue", queueOpen) { queueOpen = true }
+                    Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End) {
+                        ViewToggle(Icons.Rounded.FormatQuote, "Lyrics", view == PlayerView.LYRICS) {
+                            view = if (view == PlayerView.LYRICS) PlayerView.ART else PlayerView.LYRICS
+                        }
+                        ViewToggle(Icons.AutoMirrored.Rounded.QueueMusic, "Queue", queueOpen) { queueOpen = true }
+                    }
                 }
                 UpNextHandle(state) { queueOpen = true }
+                // Room above the phone's gesture bar, so "Up next" isn't pressed against the bottom edge.
+                Spacer(Modifier.height(8.dp))
             }
 
             // The queue slides up over the player.
@@ -499,7 +533,7 @@ private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart:
  * while you drag, and the time shown follows your finger.
  */
 @Composable
-private fun SeekBar() {
+private fun SeekBar(state: PlayerState) {
     val graph = LocalGraph.current
     val tracker = remember { SeekTracker() }
     var shown by remember { mutableStateOf(graph.player.progress().let { SeekTracker.Shown(it.positionMs, it.durationMs) }) }
@@ -527,7 +561,7 @@ private fun SeekBar() {
         graph.player.seekTo(ms)
     }
     val thumb by animateDpAsState(if (dragging != null) 16.dp else 11.dp, tween(100), label = "thumb")
-    Column(Modifier.padding(top = 14.dp)) {
+    Column(Modifier.padding(top = 10.dp)) {
         BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
@@ -558,16 +592,54 @@ private fun SeekBar() {
                     .background(Color.White),
             )
         }
-        Row(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 formatDuration(((fraction * duration) / 1000).toLong()),
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.weight(1f),
             )
-            Text("-" + formatDuration(((duration - fraction * duration) / 1000).toLong()), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+            QualityBadge(state)
+            Text(
+                "-" + formatDuration(((duration - fraction * duration) / 1000).toLong()),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.7f),
+                textAlign = TextAlign.End,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
+}
+
+/**
+ * The song's format between the times under the seek bar: the original file's ("FLAC"), or "OPUS 160" while
+ * Navidrome converts it. Only shows what plays; the quality is set in Settings → Playback.
+ */
+@Composable
+private fun QualityBadge(state: PlayerState) {
+    val label = StreamQuality.label(state.codec, state.transcodeKbps) ?: return
+    StreamBadge(label, converted = state.transcodeKbps > 0)
+}
+
+/**
+ * A small tag no taller than the times next to it (16 dp, like their line), so the row under the seek bar
+ * keeps the same height and the badge sits centred between them.
+ */
+@Composable
+internal fun StreamBadge(label: String, converted: Boolean, modifier: Modifier = Modifier) {
+    // Quiet, like the times beside it: only a faint outline and a slightly lighter shade when converted.
+    val color = Color.White.copy(alpha = if (converted) 0.5f else 0.6f)
+    val shape = RoundedCornerShape(4.dp)
+    Text(
+        label,
+        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 12.sp, letterSpacing = 1.sp),
+        fontWeight = FontWeight.Medium,
+        color = color,
+        maxLines = 1,
+        modifier = modifier
+            .border(0.5.dp, Color.White.copy(alpha = 0.18f), shape)
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)

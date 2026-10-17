@@ -363,14 +363,17 @@ fun Screen(
 }
 
 @Composable
-fun SectionTitle(text: String, modifier: Modifier = Modifier) {
+fun SectionTitle(text: String, modifier: Modifier = Modifier, top: Dp = SECTION_GAP) {
     Text(
         text,
         style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Bold,
-        modifier = modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 10.dp),
+        modifier = modifier.padding(start = 16.dp, end = 16.dp, top = top, bottom = 10.dp),
     )
 }
+
+/** The space above a section's heading: between one section's last row and the next heading. */
+val SECTION_GAP = 24.dp
 
 fun formatDuration(seconds: Long): String {
     val s = seconds.coerceAtLeast(0)
@@ -382,7 +385,7 @@ fun formatDuration(seconds: Long): String {
 fun artistAndAlbum(song: Song): String? =
     listOf(song.artist, song.album).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { null }
 
-/** A song row. Tap plays; the menu queues it, starts a radio from it or opens its album or artist. */
+/** A song row. Tap plays; the menu queues it, starts a radio from it, opens its album or artist, or shows its details. */
 @Composable
 fun SongRow(
     song: Song,
@@ -483,6 +486,11 @@ fun SongRow(
                         openArtist(song)
                     })
                 }
+                DropdownMenuItem(text = { Text("Show details") }, onClick = {
+                    menu = false
+                    sheet.close()
+                    nav.openSongDetails(song.id)
+                })
             }
         }
     }
