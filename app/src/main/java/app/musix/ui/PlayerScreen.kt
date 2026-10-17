@@ -120,6 +120,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.border
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
@@ -259,7 +260,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 Spacer(Modifier.height(playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp))
                 TopRow(song, onClose = onClose, onAlbum = ::openAlbum)
 
-                Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.weight(1f).fillMaxWidth().padding(top = 16.dp, bottom = 12.dp), contentAlignment = Alignment.Center) {
                     AnimatedContent(
                         targetState = view,
                         transitionSpec = { fadeIn(tween(140)) togetherWith fadeOut(tween(90)) },
@@ -312,6 +313,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                     ViewToggle(Icons.AutoMirrored.Rounded.QueueMusic, "Queue", queueOpen) { queueOpen = true }
                 }
                 UpNextHandle(state) { queueOpen = true }
+                // Room above the phone's gesture bar, so "Up next" isn't pressed against the bottom edge.
+                Spacer(Modifier.height(8.dp))
             }
 
             // The queue slides up over the player.
@@ -535,7 +538,7 @@ private fun SeekBar(state: PlayerState) {
         graph.player.seekTo(ms)
     }
     val thumb by animateDpAsState(if (dragging != null) 16.dp else 11.dp, tween(100), label = "thumb")
-    Column(Modifier.padding(top = 14.dp)) {
+    Column(Modifier.padding(top = 10.dp)) {
         BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
@@ -586,8 +589,8 @@ private fun SeekBar(state: PlayerState) {
 }
 
 /**
- * The song's format between the times under the seek bar: amber for the original file ("FLAC"), violet
- * while Navidrome converts it ("OPUS 160"). Only shows what plays; the quality is set in Settings → Playback.
+ * The song's format between the times under the seek bar: the original file's ("FLAC"), or "OPUS 160" while
+ * Navidrome converts it. Only shows what plays; the quality is set in Settings → Playback.
  */
 @Composable
 private fun QualityBadge(state: PlayerState) {
@@ -601,16 +604,17 @@ private fun QualityBadge(state: PlayerState) {
  */
 @Composable
 internal fun StreamBadge(label: String, converted: Boolean, modifier: Modifier = Modifier) {
-    val color = if (converted) Brand.Violet else Accent
+    // Quiet, like the times beside it: only a faint outline and a slightly lighter shade when converted.
+    val color = Color.White.copy(alpha = if (converted) 0.5f else 0.6f)
+    val shape = RoundedCornerShape(4.dp)
     Text(
         label,
-        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 12.sp, letterSpacing = 0.8.sp),
-        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 12.sp, letterSpacing = 1.sp),
+        fontWeight = FontWeight.Medium,
         color = color,
         maxLines = 1,
         modifier = modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(color.copy(alpha = 0.16f))
+            .border(0.5.dp, Color.White.copy(alpha = 0.18f), shape)
             .padding(horizontal = 6.dp, vertical = 2.dp),
     )
 }
