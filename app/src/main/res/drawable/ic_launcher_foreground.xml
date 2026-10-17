@@ -1,13 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher icon: sound bars rising like a sunrise, centred on the 108x108 canvas (centre 54,54).
+     The bars span x 31..77 and y 34..70: the group sits 2dp above the middle because bars that share a
+     bottom line look low when centred exactly. LauncherIconTest checks this, keep the paths' format. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Sound bars rising like a sunrise -->
-    <path android:fillColor="#B9A4FF" android:pathData="M33,62a3,3 0 0,1 6,0v8a3,3 0 0,1 -6,0z" />
-    <path android:fillColor="#C9B8FF" android:pathData="M43,50a3,3 0 0,1 6,0v20a3,3 0 0,1 -6,0z" />
-    <path android:fillColor="#FFD38A" android:pathData="M53,40a3,3 0 0,1 6,0v30a3,3 0 0,1 -6,0z" />
-    <path android:fillColor="#C9B8FF" android:pathData="M63,48a3,3 0 0,1 6,0v22a3,3 0 0,1 -6,0z" />
-    <path android:fillColor="#B9A4FF" android:pathData="M73,58a3,3 0 0,1 6,0v12a3,3 0 0,1 -6,0z" />
+    <!-- Soft glow behind the bars so they lift off the dark background -->
+    <path android:pathData="M54,52m-34,0a34,34 0 1,1 68,0a34,34 0 1,1 -68,0">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="54" android:centerY="52" android:gradientRadius="34">
+                <item android:offset="0" android:color="#667C5CFF" />
+                <item android:offset="0.55" android:color="#227C5CFF" />
+                <item android:offset="1" android:color="#007C5CFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M31,59a3,3 0 0,1 6,0v8a3,3 0 0,1 -6,0z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="34" android:startY="56" android:endX="34" android:endY="70"
+                android:startColor="#E4DCFF" android:endColor="#9A80F5" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M41,47a3,3 0 0,1 6,0v20a3,3 0 0,1 -6,0z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="44" android:startY="44" android:endX="44" android:endY="70"
+                android:startColor="#EDE6FF" android:endColor="#A891FF" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M51,37a3,3 0 0,1 6,0v30a3,3 0 0,1 -6,0z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="54" android:startY="34" android:endX="54" android:endY="70"
+                android:startColor="#FFEBC2" android:endColor="#FFB04A" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M61,45a3,3 0 0,1 6,0v22a3,3 0 0,1 -6,0z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="64" android:startY="42" android:endX="64" android:endY="70"
+                android:startColor="#EDE6FF" android:endColor="#A891FF" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M71,55a3,3 0 0,1 6,0v12a3,3 0 0,1 -6,0z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="74" android:startY="52" android:endX="74" android:endY="70"
+                android:startColor="#E4DCFF" android:endColor="#9A80F5" />
+        </aapt:attr>
+    </path>
 </vector>
