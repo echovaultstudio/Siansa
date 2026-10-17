@@ -169,3 +169,29 @@ class CastItems(private val api: SubsonicApi) : MediaItemConverter {
         const val TV_COVER = 800
     }
 }
+
+/** The queue, song and position on the TV, in play order. */
+data class CastSpot<T>(val items: List<T>, val index: Int, val positionMs: Long)
+
+/** Bringing the music back from the TV to the phone. */
+object CastHandBack {
+    /**
+     * The TV's queue as it is now, unless the TV already forgot songs while it was stopping (an empty queue,
+     * or songs it can no longer name): then the spot [saved] just before casting ended.
+     */
+    fun <T> pick(live: CastSpot<T>, saved: CastSpot<T>?, id: (T) -> String): CastSpot<T> {
+        val lost = live.items.isEmpty() || live.items.any { id(it).isBlank() }
+        return if (lost && saved != null && saved.items.isNotEmpty()) saved else live
+    }
+
+    /** Leaves out songs with no id, which the phone couldn't play, keeping the same song current. */
+    fun <T> withoutNameless(spot: CastSpot<T>, id: (T) -> String): CastSpot<T> {
+        if (spot.items.none { id(it).isBlank() }) return spot
+        val kept = spot.items.withIndex().filter { id(it.value).isNotBlank() }
+        if (kept.isEmpty()) return CastSpot(emptyList(), 0, 0L)
+        val at = kept.indexOfFirst { it.index >= spot.index }
+        // The current song itself had no id: start the next one from the top.
+        val sameSong = at >= 0 && kept[at].index == spot.index
+        return CastSpot(kept.map { it.value }, if (at >= 0) at else kept.lastIndex, if (sameSong) spot.positionMs else 0L)
+    }
+}
