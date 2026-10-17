@@ -222,8 +222,13 @@ fun ArtistScreen(nav: NavController, id: String) {
             }
 
             // Discography by release type: Albums, EPs, Singles, Live, Compilations, DJ-mixes…
-            shownGroups.forEach { (category, albums) ->
-                full { SectionTitle(if (albums.size == 1) category.single else category.plural) }
+            shownGroups.forEachIndexed { i, (category, albums) ->
+                full {
+                    SectionTitle(
+                        if (albums.size == 1) category.single else category.plural,
+                        top = if (i == 0 && types.isNotEmpty()) CHIPS_GAP else SECTION_GAP,
+                    )
+                }
                 items(albums, key = { "album-${it.id}" }) { album ->
                     AlbumTile(
                         name = album.name,
