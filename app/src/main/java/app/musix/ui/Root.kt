@@ -230,6 +230,16 @@ fun MusixRoot() {
                     RadioScreen(nav, it.arguments?.getString("kind").orEmpty(), it.arguments?.getString("key").orEmpty())
                 }
                 composable("mood/{text}") { MoodScreen(nav, it.arguments?.getString("text").orEmpty()) }
+                composable("songpath/{id}") { SongPathPicker(nav, it.arguments?.getString("id").orEmpty()) }
+                composable("songpath/{from}/{to}/{length}") {
+                    val args = it.arguments
+                    SongPathScreen(
+                        nav,
+                        args?.getString("from").orEmpty(),
+                        args?.getString("to").orEmpty(),
+                        args?.getString("length")?.toIntOrNull() ?: 20,
+                    )
+                }
                 composable("sync") { SyncScreen(nav) }
                 composable("report/{range}") { ReportScreen(nav, it.arguments?.getString("range").orEmpty()) }
                 composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }

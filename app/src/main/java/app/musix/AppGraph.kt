@@ -16,6 +16,7 @@ import app.musix.mix.MixGenerator
 import app.musix.mix.Radios
 import app.musix.mix.Insights
 import app.musix.mix.ArtistSuggestions
+import app.musix.mix.SongPath
 import app.musix.mix.SongRadio
 import app.musix.mix.Taste
 import app.musix.net.AudioMuseApi
@@ -181,4 +182,5 @@ class AppGraph(val app: Application) {
     val suggestions = ArtistSuggestions(this)
     val player = PlayerConnection(app, subsonic)
     val songRadio = SongRadio(this)
+    val songPath = SongPath(this)
 }
