@@ -85,7 +85,9 @@ fun HomeScreen(nav: NavController) {
     var current by remember { mutableStateOf<Mix?>(null) }
     var busySelector by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    val homeOrder = graph.settings.state.collectAsStateWithLifecycle().value.homeOrder
+    val homeSettings by graph.settings.state.collectAsStateWithLifecycle()
+    val homeOrder = homeSettings.homeOrder
+    val homeHidden = homeSettings.homeHidden
     var arranging by remember { mutableStateOf(false) }
 
     fun build(selector: Selector?, force: Boolean, open: Boolean) {
@@ -202,8 +204,8 @@ fun HomeScreen(nav: NavController) {
             item(key = "sync") { Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { SyncPrompt(nav) } }
         }
 
-        // The rest in the order chosen under Arrange Home.
-        for (section in homeOrder) {
+        // The rest in the order chosen under Arrange Home, without the hidden ones.
+        for (section in HomeSection.visible(homeOrder, homeHidden)) {
             when (section) {
                 HomeSection.QUICK -> {
                     // Quick access, like the top grid in Spotify: today's mixes, playlists and recent albums.
@@ -397,9 +399,12 @@ fun HomeScreen(nav: NavController) {
     }
     openSuggestion?.let { SuggestedArtistDialog(it) { openSuggestion = null } }
     if (arranging) {
-        ArrangeHomeSheet(homeOrder, onChange = {
+        ArrangeHomeSheet(homeOrder, homeHidden, onChange = {
             AppLog.i("Home", "Arranged: ${HomeSection.format(it)}")
             graph.settings.setHomeOrder(it)
+        }, onHiddenChange = {
+            AppLog.i("Home", "Hidden: ${HomeSection.formatHidden(it).ifEmpty { "none" }}")
+            graph.settings.setHomeHidden(it)
         }, onDismiss = { arranging = false })
     }
 }
