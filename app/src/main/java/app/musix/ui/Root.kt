@@ -142,6 +142,8 @@ fun MusixRoot() {
     val graph = LocalGraph.current
     val nav = rememberNavController()
     val snack = remember { SnackbarHostState() }
+    // Messages from the player, e.g. a song that can't play while offline.
+    LaunchedEffect(Unit) { graph.player.notices.collect { snack.showSnackbar(it) } }
     val sheet = remember { PlayerSheet() }
     val player by graph.player.state.collectAsStateWithLifecycle()
     val entry by nav.currentBackStackEntryAsState()
@@ -266,6 +268,7 @@ fun MusixRoot() {
                 }
                 composable("sync") { SyncScreen(nav) }
                 composable("report/{range}") { ReportScreen(nav, it.arguments?.getString("range").orEmpty()) }
+                composable("discover/artists") { ArtistDiscoveryScreen(nav) }
                 composable("song/{id}/details") { SongDetailsScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }

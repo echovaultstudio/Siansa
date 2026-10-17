@@ -534,7 +534,7 @@ private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit, onMenu
             )
         }
         SleepIndicator(onClick = onSleep)
-        IconButton(onClick = onMenu, enabled = song != null) { Icon(Icons.Rounded.MoreVert, "More") }
+        IconButton(onClick = onMenu, enabled = song != null) { Icon(Icons.Rounded.MoreVert, "Song options") }
     }
 }
 

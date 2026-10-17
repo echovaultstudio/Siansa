@@ -11,7 +11,6 @@ enum class HomeSection(val id: String, val label: String) {
     PLAYLISTS("playlists", "Your playlists"),
     RECENT("recent", "Recently played"),
     ARTIST_RADIOS("artist_radios", "Artist radios"),
-    SUGGESTED_ARTISTS("suggested_artists", "Artists you might like"),
     ADDED("added", "Recently added"),
     GENRES("genres", "Your genres"),
     RANDOM("random", "Random picks");

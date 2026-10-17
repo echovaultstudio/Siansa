@@ -38,6 +38,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import app.musix.net.ApiException
+import androidx.compose.foundation.layout.Column
 import app.musix.mix.moodRadios
 
 fun NavController.openMoodRadio(id: String) = navigate("radio/mood/${Uri.encode(id)}")
@@ -54,7 +56,10 @@ fun RadioScreen(nav: NavController, kind: String, key: String) {
     val colors = if (mood != null) Color(mood.colors.first) to Color(mood.colors.second) else tileColors(key)
     val songs by loadState(Triple(kind, key, round)) {
         when (kind) {
-            "mood" -> graph.radios.mood(mood ?: throw IllegalStateException("Unknown radio"))
+            "mood" -> {
+                graph.connection.current.aiProblem(graph.settings.current)?.let { throw ApiException("AI backend is currently not available :( $it") }
+                graph.radios.mood(mood ?: throw IllegalStateException("Unknown radio"))
+            }
             else -> graph.radios.genre(key)
         }
     }
@@ -89,7 +94,10 @@ fun RadioScreen(nav: NavController, kind: String, key: String) {
 fun MoodScreen(nav: NavController, text: String) {
     val graph = LocalGraph.current
     var round by remember { mutableIntStateOf(0) }
-    val result by loadState(text to round) { graph.generator.moodPlaylist(text) }
+    val result by loadState(text to round) {
+        graph.connection.current.aiProblem(graph.settings.current)?.let { throw ApiException("AI backend is currently not available :( $it") }
+        graph.generator.moodPlaylist(text)
+    }
     val r = result.valueOrNull()
     val colors = tileColors(text)
     CollectionPage(
@@ -121,11 +129,12 @@ fun MoodScreen(nav: NavController, text: String) {
 @Composable
 fun MoodBox(nav: NavController, modifier: Modifier = Modifier) {
     var text by rememberSaveable { mutableStateOf("") }
+    val aiProblem = rememberAiProblem()
     fun go() {
         if (text.trim().length >= 3) nav.openMoodPlaylist(text.trim())
     }
     val colors = Color(0xFF4B2BD6) to Color(0xFFD6338A)
-    androidx.compose.foundation.layout.Column(
+    Column(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
@@ -137,6 +146,11 @@ fun MoodBox(nav: NavController, modifier: Modifier = Modifier) {
             Text("How are you feeling?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
         }
         Spacer(Modifier.height(8.dp))
+        if (aiProblem != null) {
+            // No box to type into while AudioMuse can't be reached: it would only make an empty playlist.
+            AiUnavailable(aiProblem, onDark = true)
+            return@Column
+        }
         OutlinedTextField(
             value = text,
             onValueChange = { text = it },

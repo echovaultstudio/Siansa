@@ -89,8 +89,18 @@ fun HomeScreen(nav: NavController) {
     val homeHidden = homeSettings.homeHidden
     var arranging by remember { mutableStateOf(false) }
 
+    // While AudioMuse can't be reached (offline, or it's down), mixes aren't attempted: a clear message instead.
+    val aiProblem = rememberAiProblem()
+    // Mixes aren't attempted (and tiles say why) only when AudioMuse is set up but can't be used; Today's mix
+    // shows the reason in either case.
+    val aiDown = aiProblem.takeIf { homeSettings.audioMuseReady }
+
     fun build(selector: Selector?, force: Boolean, open: Boolean) {
         if (busySelector != null) return
+        aiDown?.let { problem ->
+            if (open) launch.notify("AI backend is currently not available :( $problem")
+            return
+        }
         // In the app's own scope, so leaving Home doesn't cancel a mix half-way.
         graph.scope.launch(Dispatchers.Main) {
             busySelector = selector?.id ?: "current"
@@ -125,6 +135,10 @@ fun HomeScreen(nav: NavController) {
 
     fun buildPersonal(kind: MixGenerator.Personal, open: Boolean, quiet: Boolean = false) {
         if (personalBusy != null) return
+        aiDown?.let { problem ->
+            if (open && !quiet) launch.notify("AI backend is currently not available :( $problem")
+            return
+        }
         graph.scope.launch(Dispatchers.Main) {
             personalBusy = kind.id
             try {
@@ -183,9 +197,6 @@ fun HomeScreen(nav: NavController) {
         else graph.subsonic.albums("random", 20, 0).distinctBy { it.name + "|" + it.artist }
     }
     val genres by loadState(version to "genres") { if (graph.library.isSynced) graph.library.genres(12) else emptyList() }
-    // Made once a day; never fails (an empty list hides the row).
-    val suggested by loadState(today to "suggested_artists") { graph.suggestions.today() }
-    var openSuggestion by remember { mutableStateOf<app.musix.mix.SuggestedArtist?>(null) }
 
     // The keyboard shrinks the list, so the "How are you feeling?" box scrolls up above it. While it shows, the
     // bottom bar is behind it, so the list needn't leave room for the bar.
@@ -251,10 +262,12 @@ fun HomeScreen(nav: NavController) {
                                 onRegenerate = { build(null, force = true, open = false) },
                             )
                             busySelector == "current" -> BuildingCard()
+                            aiProblem != null -> AiUnavailable(aiProblem, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                             else -> Unit
                         }
                     }
-                    error?.let { message ->
+                    // Without AudioMuse (or while it can't be reached) the card above says so; no error and Try again as well.
+                    error?.takeIf { aiProblem == null }?.let { message ->
                         item(key = "today_error") {
                             Column(Modifier.padding(horizontal = 16.dp)) {
                                 ErrorText(message, Modifier)
@@ -278,7 +291,7 @@ fun HomeScreen(nav: NavController) {
                                         colors = tileColors(selector.id),
                                         coverArt = mix?.songs?.firstOrNull()?.coverArt,
                                         subtitle = selector.name,
-                                        caption = if (mix != null) "${mix.songs.size} tracks · until %02d:00".format(selector.endHour) else "Tap to make today's mix",
+                                        caption = if (mix != null) "${mix.songs.size} tracks · until %02d:00".format(selector.endHour) else if (aiDown != null) "AI backend not available :(" else "Tap to make today's mix",
                                         busy = busySelector == selector.id,
                                         onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) },
                                     )
@@ -292,7 +305,7 @@ fun HomeScreen(nav: NavController) {
                                         colors = tileColors(kind.id),
                                         coverArt = mix?.songs?.firstOrNull()?.coverArt,
                                         subtitle = "For you",
-                                        caption = if (mix != null) "${mix.songs.size} tracks · ${mix.description}" else "Tap to make it",
+                                        caption = if (mix != null) "${mix.songs.size} tracks · ${mix.description}" else if (aiDown != null) "AI backend not available :(" else "Tap to make it",
                                         busy = personalBusy == kind.id,
                                         onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) },
                                     )
@@ -359,17 +372,6 @@ fun HomeScreen(nav: NavController) {
                         }
                     }
                 }
-                HomeSection.SUGGESTED_ARTISTS -> {
-                    // Artists outside the library, like the ones you play most.
-                    item(key = "suggested_artists") {
-                        Shelf("Artists you might like", suggested.valueOrNull().orEmpty(), key = { it.name }) { artist ->
-                            SuggestedArtistTile(artist) {
-                                AppLog.i("Home", "Suggested artist opened")
-                                openSuggestion = artist
-                            }
-                        }
-                    }
-                }
                 HomeSection.ADDED -> {
                     item(key = "added") {
                         Shelf("Recently added", newest.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.RecentlyAdded)) { album ->
@@ -400,7 +402,6 @@ fun HomeScreen(nav: NavController) {
             }
         }
     }
-    openSuggestion?.let { SuggestedArtistDialog(it) { openSuggestion = null } }
     if (arranging) {
         ArrangeHomeSheet(homeOrder, homeHidden, onChange = {
             AppLog.i("Home", "Arranged: ${HomeSection.format(it)}")

@@ -28,6 +28,7 @@ import app.musix.net.HistoryApi
 import app.musix.net.LastFmApi
 import app.musix.net.ListenBrainzApi
 import app.musix.net.OpenRouterApi
+import app.musix.net.Connection
 import app.musix.net.SubsonicApi
 import app.musix.offline.Downloads
 import app.musix.playback.PlayerConnection
@@ -64,7 +65,16 @@ class AppGraph(val app: Application) {
         },
     )
     val settings = SettingsRepository(app)
-    val equaliser = EqualiserRepository(app)
+    val equaliser = EqualiserRepository(app).also { eq ->
+        // There used to be a second pre-amp with ReplayGain; its level moves to the equaliser's, once.
+        val old = settings.current.preampDb
+        val moved = movedPreamp(old, eq.state.value.preampDb)
+        if (moved != null) {
+            eq.set(eq.state.value.copy(preampDb = moved))
+            settings.save(settings.current.copy(preampDb = 0f))
+            AppLog.i("Settings", "Moved the ReplayGain pre-amp (${old} dB) to the equaliser's pre-amp")
+        }
+    }
 
     /**
      * One HTTP client for API calls, streaming and covers. When Navidrome sits behind a proxy that asks
@@ -190,9 +200,23 @@ class AppGraph(val app: Application) {
     val insights = Insights(this)
     val radios = Radios(this)
     val suggestions = ArtistSuggestions(this)
-    val player = PlayerConnection(app, subsonic)
+    /** Whether the server and AudioMuse can be reached, for offline messages and playing only downloads. */
+    val connection = Connection(app, http, { settings.current }, scope)
+    val player = PlayerConnection(app, subsonic).apply {
+        isOffline = { connection.current.offline }
+        isDownloaded = { downloads.isDownloaded(it) }
+    }
     val songRadio = SongRadio(this)
     val songPath = SongPath(this)
     val sleepTimer = SleepTimer()
     val windDown = WindDown(this)
+}
+
+/**
+ * The equaliser pre-amp to use after the ReplayGain pre-amp went away: the old level when one was set and
+ * the equaliser's is still at 0 (within the equaliser's range), else null (nothing to move).
+ */
+fun movedPreamp(oldReplayGainPreamp: Float, equaliserPreamp: Float): Float? {
+    if (oldReplayGainPreamp == 0f || equaliserPreamp != 0f) return null
+    return oldReplayGainPreamp.coerceIn(-app.musix.playback.EqSettings.MAX_PREAMP_DB, app.musix.playback.EqSettings.MAX_PREAMP_DB)
 }
