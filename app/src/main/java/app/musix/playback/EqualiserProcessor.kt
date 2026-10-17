@@ -5,11 +5,15 @@ import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.util.Util
+import app.musix.log.AppLog
 import java.nio.ByteBuffer
+import kotlin.math.roundToInt
 
 /**
  * Runs the filters of an [EqDesign] over interleaved samples (-1..1), keeping each channel's filter
- * memory between calls so the sound stays continuous from one buffer to the next.
+ * memory between calls so the sound stays continuous from one buffer to the next. The result can go
+ * past -1..1 (pre-amp, boosted bands); [PeakLimiter] brings it back without clipping.
  */
 class EqFilterBank(val design: EqDesign, val channels: Int) {
     private val count = design.filters.size
@@ -21,7 +25,7 @@ class EqFilterBank(val design: EqDesign, val channels: Int) {
     private val z1 = DoubleArray(count * channels)
     private val z2 = DoubleArray(count * channels)
 
-    /** One sample of [channel], returned clipped to -1..1. */
+    /** One sample of [channel]. */
     fun process(sample: Double, channel: Int): Double {
         var x = sample * design.inputGain
         var state = channel
@@ -33,7 +37,7 @@ class EqFilterBank(val design: EqDesign, val channels: Int) {
             x = y
             state += channels
         }
-        return x.coerceIn(-1.0, 1.0)
+        return x
     }
 
     fun reset() {
@@ -51,34 +55,62 @@ class EqFilterBank(val design: EqDesign, val channels: Int) {
 
 /**
  * The equaliser in the player's audio path: after decoding (FFmpeg or the phone's own), before the sound
- * goes out. It always takes part for 16-bit and float audio and passes it through untouched while off, so
- * switching it on or moving a band is heard at once, without restarting the song.
+ * goes out. It always takes part and passes the sound through untouched while off, so switching it on or
+ * moving a band is heard at once, without restarting the song.
+ *
+ * Its output always goes through a [PeakLimiter]: a pre-amp or boosted bands can push loud songs past full
+ * scale, and cutting those peaks off is heard as crackling (#92). 16-bit audio stays 16-bit; 24- and 32-bit
+ * audio comes out as float, which the player then turns into 16-bit.
  */
 @OptIn(UnstableApi::class)
 class EqualiserProcessor(private val settings: () -> EqSettings) : BaseAudioProcessor() {
     private var applied: EqSettings? = null
     private var bank: EqFilterBank? = null
+    private var limiter: PeakLimiter? = null
+    private var frame = DoubleArray(0)
+    private var framesSinceReport = 0L
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
-        if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT && inputAudioFormat.encoding != C.ENCODING_PCM_FLOAT) {
-            return AudioProcessor.AudioFormat.NOT_SET
+        val output = when (inputAudioFormat.encoding) {
+            C.ENCODING_PCM_16BIT -> C.ENCODING_PCM_16BIT
+            C.ENCODING_PCM_FLOAT, C.ENCODING_PCM_24BIT, C.ENCODING_PCM_32BIT -> C.ENCODING_PCM_FLOAT
+            else -> return AudioProcessor.AudioFormat.NOT_SET
         }
-        return inputAudioFormat
+        return AudioProcessor.AudioFormat(inputAudioFormat.sampleRate, inputAudioFormat.channelCount, output)
     }
 
     override fun queueInput(inputBuffer: ByteBuffer) {
-        val size = inputBuffer.remaining()
-        if (size == 0) return
-        val output = replaceOutputBuffer(size)
+        if (!inputBuffer.hasRemaining()) return
+        val format = inputAudioFormat
+        val channels = format.channelCount
+        val inBytes = Util.getPcmFrameSize(format.encoding, channels)
+        val outBytes = Util.getPcmFrameSize(outputAudioFormat.encoding, channels)
+        val frames = inputBuffer.remaining() / inBytes
+        val output = replaceOutputBuffer(frames * outBytes)
+        val filters = currentBank(format)
+        val limiter = limiter ?: PeakLimiter(format.sampleRate, channels, ceilingFor(format.encoding)).also { limiter = it }
+        if (frame.size != channels) frame = DoubleArray(channels)
+        repeat(frames) {
+            for (c in 0 until channels) {
+                val x = read(inputBuffer, format.encoding)
+                frame[c] = filters?.process(x, c) ?: x
+            }
+            limiter.process(frame)
+            for (c in 0 until channels) write(output, frame[c])
+        }
+        output.flip()
+        framesSinceReport += frames
+        if (framesSinceReport >= format.sampleRate * REPORT_SECONDS) report()
+    }
+
+    /** The filters for the current setting, or null while the equaliser is off. */
+    private fun currentBank(format: AudioProcessor.AudioFormat): EqFilterBank? {
         val current = settings()
         if (!current.active) {
             applied = null
             bank = null
-            output.put(inputBuffer)
-            output.flip()
-            return
+            return null
         }
-        val format = inputAudioFormat
         if (current != applied || bank == null) {
             val previous = bank
             bank = EqFilterBank(EqDesign.of(current, format.sampleRate), format.channelCount).also { new ->
@@ -86,30 +118,70 @@ class EqualiserProcessor(private val settings: () -> EqSettings) : BaseAudioProc
             }
             applied = current
         }
-        val filters = bank!!
-        val channels = format.channelCount
-        var channel = 0
-        if (format.encoding == C.ENCODING_PCM_16BIT) {
-            while (inputBuffer.remaining() >= 2) {
-                val y = filters.process(inputBuffer.getShort() / 32_768.0, channel)
-                output.putShort((y * 32_767.0).toInt().toShort())
-                if (++channel == channels) channel = 0
-            }
-        } else {
-            while (inputBuffer.remaining() >= 4) {
-                output.putFloat(filters.process(inputBuffer.getFloat().toDouble(), channel).toFloat())
-                if (++channel == channels) channel = 0
-            }
-        }
-        output.flip()
+        return bank
     }
 
+    private fun read(buffer: ByteBuffer, encoding: Int): Double = when (encoding) {
+        C.ENCODING_PCM_16BIT -> buffer.getShort() / 32_768.0
+        C.ENCODING_PCM_24BIT -> {
+            val low = buffer.get().toInt() and 0xFF
+            val mid = buffer.get().toInt() and 0xFF
+            val high = buffer.get().toInt()
+            ((high shl 16) or (mid shl 8) or low) / 8_388_608.0
+        }
+        C.ENCODING_PCM_32BIT -> buffer.getInt() / 2_147_483_648.0
+        else -> buffer.getFloat().toDouble()
+    }
+
+    private fun write(buffer: ByteBuffer, sample: Double) {
+        if (outputAudioFormat.encoding == C.ENCODING_PCM_16BIT) {
+            buffer.putShort((sample * 32_768.0).roundToInt().coerceIn(-32_768, 32_767).toShort())
+        } else {
+            buffer.putFloat(sample.toFloat())
+        }
+    }
+
+    /** Notes in the log how far the limiter had to turn peaks down, when it had to at all. */
+    private fun report() {
+        framesSinceReport = 0
+        val db = limiter?.takeDeepestDb() ?: return
+        if (db < -0.5) AppLog.i("Equaliser", "Limiter turned peaks down by up to ${"%.1f".format(-db)} dB")
+    }
+
+    override fun onQueueEndOfStream() {
+        // Let out the last moment of sound still waiting inside the limiter.
+        val limiter = limiter ?: return
+        val channels = outputAudioFormat.channelCount
+        val outBytes = Util.getPcmFrameSize(outputAudioFormat.encoding, channels)
+        val output = replaceOutputBuffer(limiter.latencyFrames * outBytes)
+        if (frame.size != channels) frame = DoubleArray(channels)
+        repeat(limiter.latencyFrames) {
+            frame.fill(0.0)
+            limiter.process(frame)
+            for (c in 0 until channels) write(output, frame[c])
+        }
+        output.flip()
+        report()
+        limiter.reset()
+    }
+
+    // After a seek or a new song: start clean, sized for the (possibly new) sample rate and channels.
     override fun onFlush(streamMetadata: AudioProcessor.StreamMetadata) {
-        bank?.reset()
+        applied = null
+        bank = null
+        limiter = null
     }
 
     override fun onReset() {
         applied = null
         bank = null
+        limiter = null
+        framesSinceReport = 0
+    }
+
+    private fun ceilingFor(encoding: Int) = if (encoding == C.ENCODING_PCM_16BIT) 32_767 / 32_768.0 else 1.0
+
+    private companion object {
+        const val REPORT_SECONDS = 10
     }
 }

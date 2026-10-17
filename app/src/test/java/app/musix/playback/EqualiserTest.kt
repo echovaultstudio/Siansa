@@ -80,8 +80,13 @@ class EqualiserTest {
         assertEquals(-6.0, db, 0.2)
     }
 
-    @Test fun outputNeverGoesPastFullScale() {
+    @Test fun outputNeverGoesPastFullScaleAfterTheLimiter() {
         val bank = EqFilterBank(EqDesign.of(EqSettings(enabled = true, preampDb = 12f), 44_100), channels = 1)
-        repeat(1_000) { assertTrue(abs(bank.process(if (it % 2 == 0) 1.0 else -1.0, 0)) <= 1.0) }
+        val limiter = PeakLimiter(44_100, 1)
+        repeat(1_000) {
+            val frame = doubleArrayOf(bank.process(if (it % 2 == 0) 1.0 else -1.0, 0))
+            limiter.process(frame)
+            assertTrue(abs(frame[0]) <= 1.0)
+        }
     }
 }
