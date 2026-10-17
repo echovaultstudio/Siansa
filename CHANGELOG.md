@@ -3,6 +3,34 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.5.0beta — 2026-10-17
+
+### Fixed
+- **Pause and Resume in Downloads looked squashed.** They were squeezed in next to Add music and Shuffle all. They're now a
+  small button next to the number of songs and their size, right above the download progress line.
+- **AI tools no longer make empty playlists when AudioMuse can't be reached.** Offline, or while AudioMuse doesn't
+  answer, the mood box, sound search, mixes, mood radios and song radio say "AI backend is currently not available :("
+  and why (for example "You're offline."), instead of letting you type a prompt that ends in a network error.
+- **Songs that aren't downloaded no longer freeze the play button offline.** When the phone is offline (or the
+  server doesn't answer), songs that aren't on the phone are dimmed. Tapping one says it isn't downloaded, and
+  playing a list plays only its downloaded songs.
+
+### Added
+- **Lyrics in every common format, including word by word.** Musix now reads LRC (also with several times on one
+  line and an offset), enhanced LRC with word or syllable times, TTML (Apple Music style), SRT and WebVTT, and plain
+  text: from the song's tags or a .lrc / .txt file next to it, as Navidrome provides them. When there are several,
+  the most detailed one is used (word by word, then line by line, then plain), in your phone's language first.
+  Lyrics timed word by word fill in as they're sung in the full-screen lyrics.
+
+### Changed
+- **"Artists you might like" moved from Home to Your Library → Your listening**, as **Other artists you might like**:
+  a page with a map of how each suggested artist connects to the artists you play most (thicker, brighter lines for
+  the ones you play more), and a card per artist saying why: who they're like, how often you've played that artist
+  lately, how many people listen to them, and how many albums there are to discover. Tap one for more and a Deezer link.
+- **ReplayGain is now on the Equaliser page** (Settings → Playback → Equaliser and ReplayGain), and there's one
+  pre-amp instead of two: the equaliser's. If you had set the old ReplayGain pre-amp, its level moves to the
+  equaliser's pre-amp.
+
 ## 0.4.2beta — 2026-10-17
 
 ### Changed
