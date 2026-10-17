@@ -92,6 +92,22 @@
   .tag.on{background:rgba(255,181,71,.16);color:var(--amber)}
   .sep{height:1px;background:rgba(255,255,255,.07);margin:4px 20px}
   .label{font-size:11px;letter-spacing:.9px;color:var(--faint);font-weight:600;padding:10px 20px 4px}
+
+  /* --- lyrics --- */
+  .ly{background:linear-gradient(180deg,#5b4a86 0%,#4a3c70 60%,#3a2f5a 100%);display:flex;flex-direction:column}
+  .ly .head{display:flex;align-items:center;gap:8px;padding:8px 12px 6px}
+  .ly .head .t{flex:1;text-align:center}
+  .ly .head .s{font-size:14px;font-weight:700}
+  .ly .head .a{font-size:12px;color:rgba(255,255,255,.7);margin-top:1px}
+  .ly .lines{flex:1;padding:18px 24px 0;overflow:hidden;-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 8%,#000 82%,transparent 100%)}
+  .ly .lines p{font-size:24px;font-weight:800;line-height:1.25;margin-bottom:16px;letter-spacing:-.3px}
+  .ly .lines .past{color:rgba(255,255,255,.55)}
+  .ly .lines .now{color:#fff}
+  .ly .lines .next{color:rgba(26,16,48,.82)}
+  .ly .foot{padding:10px 24px 34px}
+  .ly .foot .ctl{display:flex;align-items:center;justify-content:space-between;margin-top:14px}
+  .ly .play{background:#fff}
+  .ly .synced{font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.3px}
 </style></head>
 <body>
 
@@ -121,6 +137,7 @@
   </div>
   <div class="bottom">
     <div class="device"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FFB547" stroke-width="2" stroke-linecap="round"><path d="M3 18a3 3 0 013 3M3 14a7 7 0 017 7M3 10a11 11 0 0111 11"/><path d="M5 6V5a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2h-3"/></svg>Sony WH-1000XM5</div>
+    <svg class="ic" viewBox="0 0 24 24" style="width:24px;height:24px;stroke:rgba(255,255,255,.9)"><path d="M4 6h16M4 11h16M4 16h10"/><path d="M18 14v7M15.5 18.5L18 21l2.5-2.5" transform="rotate(180 18 17.5)"/></svg>
   </div>
   <div class="peek"><h4>Lyrics preview</h4></div>
 </div>
@@ -190,6 +207,40 @@
     <div class="item"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4M14 15h3"/></svg><span class="grow">Lyrics</span><span class="tag on">ON</span></div>
     <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg><span class="grow">Song details</span></div>
     <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg><span class="grow">Sleep timer</span><span class="tag">COMING SOON</span></div>
+  </div>
+</div>
+
+<!-- 4. Lyrics opened -->
+<div class="phone ly" id="ly">
+  <div class="status"><span>14:20</span><span>76%</span></div>
+  <div class="head">
+    <div class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+    <div class="t"><div class="s">Tribute</div><div class="a">Chase &amp; Status</div></div>
+    <div class="iconbtn"><svg viewBox="0 0 24 24" width="24" height="24"><circle class="fill" cx="12" cy="5" r="2"/><circle class="fill" cx="12" cy="12" r="2"/><circle class="fill" cx="12" cy="19" r="2"/></svg></div>
+  </div>
+  <div class="lines">
+    <p class="past">Lines already sung</p>
+    <p class="past">stay light and readable</p>
+    <p class="now">The line playing now is white</p>
+    <p class="next">and the lines still to come</p>
+    <p class="next">wait in a darker shade,</p>
+    <p class="next">scrolling up by themselves</p>
+    <p class="next">as the song goes on.</p>
+    <p class="next">Tap any line to jump there</p>
+    <p class="next">Lyrics come from Navidrome</p>
+    <p class="next">or the song's own tags</p>
+    <p class="next">and fade out at the bottom</p>
+  </div>
+  <div class="foot">
+    <div class="bar"><div class="done" style="width:38%"></div><div class="thumb" style="left:38%"></div></div>
+    <div class="times"><span>2:11</span><span class="synced">SYNCED LYRICS</span><span>-3:35</span></div>
+    <div class="ctl">
+      <svg class="ic" viewBox="0 0 24 24" style="width:24px;height:24px;stroke:rgba(255,255,255,.85)"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+      <svg viewBox="0 0 24 24" width="32" height="32"><path class="fill" d="M6 5h2.5v14H6zM20 5v14L9.5 12z"/></svg>
+      <div class="play"><svg viewBox="0 0 24 24" width="30" height="30"><path d="M7 4h4v16H7zM13 4h4v16h-4z" fill="#2a1f45"/></svg></div>
+      <svg viewBox="0 0 24 24" width="32" height="32"><path class="fill" d="M15.5 5H18v14h-2.5zM4 5v14l10.5-7z"/></svg>
+      <svg class="ic" viewBox="0 0 24 24" style="width:24px;height:24px;stroke:rgba(255,255,255,.85)"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 013-3h15M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 01-3 3H3"/></svg>
+    </div>
   </div>
 </div>
 
