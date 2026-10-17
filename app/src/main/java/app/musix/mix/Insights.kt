@@ -139,6 +139,7 @@ class Insights(private val graph: AppGraph) {
             runCatching { graph.subsonic.albums("frequent", 500, 0) }
                 .onFailure { AppLog.w("Rediscover", "Navidrome most-played failed: ${it.message}") }
                 .getOrDefault(emptyList())
+                .let { graph.library.keepSyncedAlbums(it, "Rediscover") }
         }
         val koito = async {
             if (!s.listenBrainzReady || !graph.historyApi.isKoito(s.listenBrainzUrl)) return@async null

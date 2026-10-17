@@ -80,7 +80,8 @@ class TopSongs(
     /** The saved songs for this artist, each as synced in the library when it is; null when none are saved. */
     suspend fun cached(artistId: String): TopSongsEntry? {
         val entry = json.read().firstOrNull { it.artistId == artistId } ?: return null
-        return entry.copy(songs = preferLocal(entry.songs, library.songs(entry.songs.map { it.id })))
+        val songs = preferLocal(entry.songs, library.songs(entry.songs.map { it.id }))
+        return entry.copy(songs = library.keepSyncedSongs(songs, "Popular songs"))
     }
 
     /** Asks Navidrome for the artist's popular songs and saves them; one request per artist at a time. */
@@ -104,12 +105,13 @@ class TopSongs(
             AppLog.w(TAG, "Popular songs request failed: ${e.javaClass.simpleName}")
             null
         }
-        val matched = remote?.let { preferLocal(it, library.songs(it.map { s -> s.id })) }
+        // Navidrome's popular songs come from every library, also ones left out in Settings → Library sync.
+        val matched = remote?.let { library.keepSyncedSongs(preferLocal(it, library.songs(it.map { s -> s.id })), "Popular songs") }
         AppLog.i(TAG, "Popular songs: ${remote?.size ?: "none"} from Navidrome in ${System.currentTimeMillis() - started}ms")
         val previous = json.read().firstOrNull { it.artistId == artist.id }
         val next = nextTopSongs(previous, matched, artist.id, System.currentTimeMillis()) {
             ownSongs.shuffled().take(TOP_SONGS_COUNT)
-        } ?: return previous?.let { preferLocal(it.songs, library.songs(it.songs.map { s -> s.id })) }.orEmpty()
+        } ?: return previous?.let { library.keepSyncedSongs(preferLocal(it.songs, library.songs(it.songs.map { s -> s.id })), "Popular songs") }.orEmpty()
         json.update { putTopSongs(it, next) }
         return next.songs
     }
