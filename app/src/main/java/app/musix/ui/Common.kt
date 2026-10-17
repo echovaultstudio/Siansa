@@ -382,7 +382,7 @@ fun formatDuration(seconds: Long): String {
 fun artistAndAlbum(song: Song): String? =
     listOf(song.artist, song.album).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { null }
 
-/** A song row. Tap plays; the menu queues it, starts a radio from it or opens its album or artist. */
+/** A song row. Tap plays; the menu queues it, starts a radio from it, opens its album or artist, or shows its details. */
 @Composable
 fun SongRow(
     song: Song,
@@ -483,6 +483,11 @@ fun SongRow(
                         openArtist(song)
                     })
                 }
+                DropdownMenuItem(text = { Text("Show details") }, onClick = {
+                    menu = false
+                    sheet.close()
+                    nav.openSongDetails(song.id)
+                })
             }
         }
     }
