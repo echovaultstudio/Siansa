@@ -99,4 +99,35 @@ class OfflinePlanTest {
         val text = AppJson.encodeToString(DownloadList.serializer(), list)
         assertEquals(list, AppJson.decodeFromString(DownloadList.serializer(), text))
     }
+
+    @Test fun removingSongsByHandTakesThemOutEverywhere() {
+        val list = OfflinePlan.choose(OfflinePlan.choose(DownloadList(), album("a"), songs("1", "2")), playlist("p"), songs("2", "3")).doneAll()
+        val after = OfflinePlan.removeSongs(list, setOf("2", "3"))
+        assertEquals(listOf("1"), after.done.map { it.song.id })
+        assertEquals(listOf("1"), after.items.single { it.key == album("a").key }.songIds)
+        // The playlist had only songs 2 and 3, so it's gone.
+        assertTrue(after.items.none { it.key == playlist("p").key })
+        assertEquals(setOf("2", "3"), after.skipped)
+    }
+
+    @Test fun songsRemovedByHandStayOutWhenAPlaylistIsCheckedAgain() {
+        val list = OfflinePlan.choose(DownloadList(), playlist("p"), songs("1", "2", "3")).doneAll()
+        val removed = OfflinePlan.removeSongs(list, setOf("2"))
+        // The playlist on the server still has song 2, and a new song 4.
+        val checked = OfflinePlan.choose(removed, playlist("p"), songs("1", "2", "3", "4"), explicit = false)
+        assertEquals(listOf("4"), checked.waiting.map { it.id })
+        assertEquals(listOf("1", "3", "4"), checked.items.single().songIds)
+    }
+
+    @Test fun choosingAgainBringsRemovedSongsBack() {
+        val list = OfflinePlan.removeSongs(OfflinePlan.choose(DownloadList(), playlist("p"), songs("1", "2")).doneAll(), setOf("2"))
+        val again = OfflinePlan.choose(list, playlist("p"), songs("1", "2"))
+        assertEquals(listOf("2"), again.waiting.map { it.id })
+        assertTrue(again.skipped.isEmpty())
+    }
+
+    @Test fun oldSavedListsWithoutSkippedStillLoad() {
+        val text = """{"items":[],"done":[],"waiting":[]}"""
+        assertTrue(AppJson.decodeFromString(DownloadList.serializer(), text).skipped.isEmpty())
+    }
 }

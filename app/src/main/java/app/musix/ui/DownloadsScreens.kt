@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.DownloadForOffline
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Search
@@ -208,6 +210,29 @@ fun DownloadsScreen(nav: NavController) {
                     }
                 }
             }
+            if (list.done.isNotEmpty()) {
+                item(key = "all-songs") {
+                    Row(
+                        Modifier.fillMaxWidth().clickable { nav.navigate("downloads/songs") }.padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            Modifier.size(52.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(Icons.Rounded.LibraryMusic, null, tint = Accent) }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Downloaded songs", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                            Text(
+                                "Every song on the phone · remove several at once",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
             if (list.items.isEmpty()) {
                 item {
                     Text(
@@ -335,6 +360,23 @@ fun DownloadPickerScreen(nav: NavController) {
                     )
                 }
             }
+            val visible = shown
+            if (visible.size > 1) {
+                item(key = "all") {
+                    val allChosen = visible.all { it.key in ids.items }
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = {
+                            if (allChosen) graph.downloads.dropAll(visible.map { it.key })
+                            else graph.downloads.chooseAll(visible.filterNot { it.key in ids.items })
+                        }) {
+                            Text(
+                                if (allChosen) "Remove all ${visible.size} ${tab.label.lowercase()}"
+                                else "Download all ${visible.size} ${tab.label.lowercase()}",
+                            )
+                        }
+                    }
+                }
+            }
             if (query.isBlank()) {
                 item(key = "liked") {
                     val liked = remember { likedOfflineItem() }
@@ -414,4 +456,106 @@ internal fun formatSize(bytes: Long): String = when {
     bytes >= 1L shl 30 -> "%.1f GB".format(bytes / (1L shl 30).toDouble())
     bytes >= 1L shl 20 -> "%.0f MB".format(bytes / (1L shl 20).toDouble())
     else -> "%.0f KB".format(bytes / 1024.0)
+}
+
+/** How a downloaded song was saved: "Original" or "Opus 160". */
+fun downloadQualityLabel(kbps: Int): String = if (kbps > 0) "Opus $kbps" else "Original"
+
+/**
+ * Every downloaded song, wherever it came from (album, playlist, artist, Liked songs or one song), with
+ * how much room it takes. Tick songs, or Select all, and remove them together. Removed songs aren't
+ * downloaded again when a playlist is checked for new songs.
+ */
+@Composable
+fun DownloadedSongsScreen(nav: NavController) {
+    val graph = LocalGraph.current
+    val list by graph.downloads.list.collectAsStateWithLifecycle()
+    var query by rememberSaveable { mutableStateOf("") }
+    var selected by remember { mutableStateOf(emptySet<String>()) }
+    var confirm by remember { mutableStateOf(false) }
+    val songs = remember(list.done, query) {
+        val terms = query.trim().lowercase().split(' ').filter { it.isNotEmpty() }
+        list.done
+            .filter { d -> terms.all { "${d.song.title} ${d.song.artist} ${d.song.album}".lowercase().contains(it) } }
+            .sortedWith(compareBy({ it.song.artist.lowercase() }, { it.song.album.lowercase() }, { it.song.disc ?: 1 }, { it.song.track ?: 0 }))
+    }
+    // Songs that are gone (removed elsewhere) can't stay ticked.
+    LaunchedEffect(list.done) { selected = selected intersect list.done.mapTo(HashSet()) { it.song.id } }
+    val selectedBytes = list.done.filter { it.song.id in selected }.sumOf { it.bytes }
+
+    Screen(title = "Downloaded songs", nav = nav) { padding ->
+        Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "${list.done.size} songs · ${formatSize(list.done.sumOf { it.bytes })}",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                    placeholder = { Text("Find a song, artist or album") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val allShown = songs.isNotEmpty() && songs.all { it.song.id in selected }
+                    TextButton(onClick = {
+                        selected = if (allShown) selected - songs.mapTo(HashSet()) { it.song.id } else selected + songs.map { it.song.id }
+                    }, enabled = songs.isNotEmpty()) { Text(if (allShown) "Clear selection" else "Select all") }
+                    Spacer(Modifier.weight(1f))
+                    FilledTonalButton(onClick = { confirm = true }, enabled = selected.isNotEmpty()) {
+                        Text(if (selected.isEmpty()) "Remove" else "Remove ${selected.size} · ${formatSize(selectedBytes)}")
+                    }
+                }
+            }
+            if (list.done.isEmpty()) {
+                Text(
+                    "No songs on the phone yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp))) {
+                items(songs, key = { it.song.id }) { d ->
+                    val ticked = d.song.id in selected
+                    val toggle = { selected = if (ticked) selected - d.song.id else selected + d.song.id }
+                    Row(
+                        Modifier.fillMaxWidth().clickable(onClick = toggle).padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Cover(d.song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(d.song.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                listOf(d.song.artist, formatSize(d.bytes), downloadQualityLabel(d.kbps)).filter { it.isNotBlank() }.joinToString(" · "),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Checkbox(checked = ticked, onCheckedChange = { toggle() })
+                    }
+                }
+            }
+        }
+    }
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text(if (selected.size == 1) "Remove 1 song?" else "Remove ${selected.size} songs?") },
+            text = { Text("They'll need a connection to play again, and playlists won't download them back. Download the album or playlist again to get them back.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirm = false
+                    graph.downloads.removeSongs(selected)
+                    selected = emptySet()
+                }) { Text("Remove") }
+            },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Keep") } },
+        )
+    }
 }
