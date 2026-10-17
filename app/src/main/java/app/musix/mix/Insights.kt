@@ -52,7 +52,10 @@ data class RankedTrack(val title: String, val artist: String, val plays: Long, v
 data class RankedAlbum(val title: String, val artist: String, val plays: Long, val album: Album?)
 
 enum class ReportRange(val id: String) {
-    THIS_MONTH("month"), LAST_MONTH("last-month"), THIS_YEAR("year");
+    THIS_MONTH("month"), LAST_MONTH("last-month"), THIS_YEAR("year"),
+
+    /** This month a year ago, the whole month. */
+    YEAR_AGO("year-ago");
 
     companion object {
         fun of(id: String) = entries.firstOrNull { it.id == id } ?: THIS_MONTH
@@ -63,6 +66,34 @@ enum class ReportRange(val id: String) {
  * Rediscover and Your month: built from Koito (when scrobbling there), Navidrome's play counts and
  * Musix's own history. Nothing here needs AudioMuse or AI.
  */
+/**
+ * The days a report covers ([from] inclusive, [to] exclusive), where the period before it starts (to
+ * spot rising and fading artists), and its title.
+ */
+data class ReportWindow(val from: LocalDate, val to: LocalDate, val prevFrom: LocalDate, val title: String, val subtitle: String)
+
+fun reportWindow(range: ReportRange, today: LocalDate): ReportWindow {
+    fun monthName(date: LocalDate) = date.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+    return when (range) {
+        ReportRange.THIS_MONTH -> {
+            val start = today.withDayOfMonth(1)
+            ReportWindow(start, today.plusDays(1), start.minusMonths(1), "Your ${monthName(today)}", "So far this month")
+        }
+        ReportRange.LAST_MONTH -> {
+            val start = today.withDayOfMonth(1).minusMonths(1)
+            ReportWindow(start, start.plusMonths(1), start.minusMonths(1), "Your ${monthName(start)}", "${monthName(start)} ${start.year}")
+        }
+        ReportRange.THIS_YEAR -> {
+            val start = today.withDayOfYear(1)
+            ReportWindow(start, today.plusDays(1), start.minusYears(1), "Your ${today.year}", "So far this year")
+        }
+        ReportRange.YEAR_AGO -> {
+            val start = today.withDayOfMonth(1).minusYears(1)
+            ReportWindow(start, start.plusMonths(1), start.minusMonths(1), "This time last year", "${monthName(start)} ${start.year}")
+        }
+    }
+}
+
 class Insights(private val graph: AppGraph) {
     private val zone: ZoneId get() = ZoneId.systemDefault()
 
@@ -141,20 +172,7 @@ class Insights(private val graph: AppGraph) {
     suspend fun report(range: ReportRange): ListeningReport = coroutineScope {
         val s = graph.settings.current
         val today = LocalDate.now()
-        val (from, to, prevFrom, title, subtitle) = when (range) {
-            ReportRange.THIS_MONTH -> {
-                val start = today.withDayOfMonth(1)
-                Window(start, today.plusDays(1), start.minusMonths(1), "Your ${monthName(today)}", "So far this month")
-            }
-            ReportRange.LAST_MONTH -> {
-                val start = today.withDayOfMonth(1).minusMonths(1)
-                Window(start, start.plusMonths(1), start.minusMonths(1), "Your ${monthName(start)}", "${monthName(start)} ${start.year}")
-            }
-            ReportRange.THIS_YEAR -> {
-                val start = today.withDayOfYear(1)
-                Window(start, today.plusDays(1), start.minusYears(1), "Your ${today.year}", "So far this year")
-            }
-        }
+        val (from, to, prevFrom, title, subtitle) = reportWindow(range, today)
         val fromSec = from.atStartOfDay(zone).toEpochSecond()
         val toSec = to.atStartOfDay(zone).toEpochSecond()
         val prevSec = prevFrom.atStartOfDay(zone).toEpochSecond()
@@ -170,6 +188,7 @@ class Insights(private val graph: AppGraph) {
         } else null
 
         val (genresUp, genresDown) = genreShift(inRange, before)
+        AppLog.d("Report", "${range.id}: $from to $to")
         val report = if (remote != null) {
             ListeningReport(
                 title = title, subtitle = subtitle,
@@ -191,8 +210,6 @@ class Insights(private val graph: AppGraph) {
         AppLog.i("Report", "${report.title}: ${report.plays} plays, ${report.minutes} min, top ${report.topArtists.take(3).map { it.name }} · ${report.source}")
         report
     }
-
-    private data class Window(val from: LocalDate, val to: LocalDate, val prevFrom: LocalDate, val title: String, val subtitle: String)
 
     private class KoitoData(
         val totals: HistoryApi.Totals,
@@ -307,5 +324,4 @@ class Insights(private val graph: AppGraph) {
 
     private fun key(artist: String, title: String) = normalizeKey(artist) + "|" + normalizeKey(title)
 
-    private fun monthName(date: LocalDate) = date.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
 }
