@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -49,27 +50,32 @@ fun EqualiserScreen(nav: NavController) {
             SwitchRow("Equaliser", eq.enabled) { graph.equaliser.set(eq.copy(enabled = it)) }
             Hint("Shapes the sound of everything this phone plays, for example more bass or clearer vocals. Not used while casting to a TV or speaker.")
             EqCurve(eq)
+            // While off, the controls are faded but still work: using one switches the equaliser on.
+            val controls = Modifier.alpha(if (eq.enabled) 1f else 0.5f)
             Heading("Preset")
-            EqPresetRow(eq.preset) { graph.equaliser.set(eq.copy(preset = it, enabled = true)) }
+            Column(controls) { EqPresetRow(eq.preset) { graph.equaliser.set(eq.copy(preset = it, enabled = true)) } }
             HorizontalDivider()
             Heading("Bands")
-            EqSettings.BANDS.forEachIndexed { band, hz ->
-                DbSliderRow(
-                    label = EqSettings.bandLabel(hz),
-                    value = eq.gains[band],
-                    range = EqSettings.MAX_DB,
-                    onChange = { graph.equaliser.set(graph.equaliser.state.value.withBand(band, it).copy(enabled = true), save = false) },
-                    onDone = { graph.equaliser.set(graph.equaliser.state.value) },
-                )
+            Column(controls, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                EqSettings.BANDS.forEachIndexed { band, hz ->
+                    DbSliderRow(
+                        label = EqSettings.bandLabel(hz),
+                        value = eq.gains[band],
+                        range = EqSettings.MAX_DB,
+                        onChange = { graph.equaliser.set(graph.equaliser.state.value.withBand(band, it).copy(enabled = true), save = false) },
+                        onDone = { graph.equaliser.set(graph.equaliser.state.value) },
+                    )
+                }
             }
             Hint("Moving a band saves it as your Custom preset.")
             HorizontalDivider()
             Heading("Pre-amp")
             DbSliderRow(
+                modifier = controls,
                 label = "Level",
                 value = eq.preampDb,
                 range = EqSettings.MAX_PREAMP_DB,
-                onChange = { graph.equaliser.set(graph.equaliser.state.value.copy(preampDb = it), save = false) },
+                onChange = { graph.equaliser.set(graph.equaliser.state.value.copy(preampDb = it, enabled = true), save = false) },
                 onDone = { graph.equaliser.set(graph.equaliser.state.value) },
             )
             Hint("Boosting bands turns the whole sound down by the same amount, so loud songs don't distort. Raise the pre-amp to make up for it; too much can distort.")
@@ -77,19 +83,29 @@ fun EqualiserScreen(nav: NavController) {
     }
 }
 
+/** Custom comes right after Flat, so it's in view once a band has been moved. */
+private val presetOrder = listOf(EqPreset.FLAT, EqPreset.CUSTOM) + EqPreset.entries.filter { it != EqPreset.FLAT && it != EqPreset.CUSTOM }
+
 /** The preset chips, scrolling sideways. */
 @Composable
 internal fun EqPresetRow(selected: EqPreset, onPick: (EqPreset) -> Unit) {
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        EqPreset.entries.forEach { preset ->
+        presetOrder.forEach { preset ->
             FilterChip(selected = selected == preset, onClick = { onPick(preset) }, label = { Text(preset.label) })
         }
     }
 }
 
 @Composable
-private fun DbSliderRow(label: String, value: Float, range: Float, onChange: (Float) -> Unit, onDone: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+private fun DbSliderRow(
+    label: String,
+    value: Float,
+    range: Float,
+    onChange: (Float) -> Unit,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(56.dp))
         Slider(
             value = value,
