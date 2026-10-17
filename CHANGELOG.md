@@ -3,6 +3,12 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.4.2beta — 2026-10-17
+
+### Changed
+- **Swipe to queue vibrates sooner and stronger.** You feel a clear click the moment the amber "Add to queue" strip
+  shows, and a firmer one when the song is added. It follows the phone's touch vibration setting.
+
 ## 0.4.1beta — 2026-10-17
 
 ### Changed
