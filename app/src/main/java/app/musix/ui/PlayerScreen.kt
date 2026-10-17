@@ -4,6 +4,13 @@ import android.os.SystemClock
 import androidx.compose.runtime.withFrameMillis
 import app.musix.log.AppLog
 import app.musix.playback.SeekTracker
+import app.musix.playback.StreamQuality
+import app.musix.playback.Streaming
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
 import app.musix.data.cover
 import android.os.Build
@@ -266,7 +273,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
                     song?.let { graph.favorites.toggle(it) }
                 }
-                SeekBar()
+                SeekBar(state)
                 Controls(state)
                 Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     ViewToggle(Icons.Rounded.FormatQuote, "Lyrics", view == PlayerView.LYRICS) {
@@ -497,7 +504,7 @@ private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart:
  * while you drag, and the time shown follows your finger.
  */
 @Composable
-private fun SeekBar() {
+private fun SeekBar(state: PlayerState) {
     val graph = LocalGraph.current
     val tracker = remember { SeekTracker() }
     var shown by remember { mutableStateOf(graph.player.progress().let { SeekTracker.Shown(it.positionMs, it.durationMs) }) }
@@ -556,14 +563,78 @@ private fun SeekBar() {
                     .background(Color.White),
             )
         }
-        Row(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 formatDuration(((fraction * duration) / 1000).toLong()),
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.weight(1f),
             )
-            Text("-" + formatDuration(((duration - fraction * duration) / 1000).toLong()), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+            QualityBadge(state)
+            Text(
+                "-" + formatDuration(((duration - fraction * duration) / 1000).toLong()),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.7f),
+                textAlign = TextAlign.End,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/**
+ * The song's format between the times under the seek bar: amber for the original file ("FLAC"), violet
+ * while Navidrome converts it ("OPUS 160"). Tap it to play this song, and the next ones on this kind of
+ * network, at another quality.
+ */
+@Composable
+private fun QualityBadge(state: PlayerState) {
+    val label = StreamQuality.label(state.codec, state.transcodeKbps) ?: return
+    val graph = LocalGraph.current
+    val context = LocalContext.current
+    val color = if (state.transcodeKbps > 0) Brand.Violet else Accent
+    val shape = RoundedCornerShape(6.dp)
+    var open by remember { mutableStateOf(false) }
+    var wifi by remember { mutableStateOf(true) }
+    Box {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            maxLines = 1,
+            modifier = Modifier
+                .clip(shape)
+                .background(color.copy(alpha = 0.14f))
+                .border(1.dp, color.copy(alpha = 0.45f), shape)
+                .clickable {
+                    wifi = Streaming.isUnmetered(context)
+                    open = true
+                }
+                .padding(horizontal = 8.dp, vertical = 3.dp),
+        )
+        MusixDarkTheme {
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                Text(
+                    if (wifi) "Quality on Wi-Fi" else "Quality on mobile data",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                StreamQuality.choices.forEach { kbps ->
+                    val selected = kbps == state.transcodeKbps
+                    DropdownMenuItem(
+                        text = { Text(StreamQuality.choiceLabel(kbps), color = if (selected) Accent else MaterialTheme.colorScheme.onSurface) },
+                        trailingIcon = { if (selected) Icon(Icons.Rounded.Check, null, tint = Accent) },
+                        onClick = {
+                            open = false
+                            val s = graph.settings.current
+                            graph.settings.save(if (wifi) s.copy(transcodeWifiKbps = kbps) else s.copy(transcodeMobileKbps = kbps))
+                            if (kbps != state.transcodeKbps) graph.player.setQuality(kbps)
+                        },
+                    )
+                }
+            }
         }
     }
 }
