@@ -1,12 +1,12 @@
 # Changelog
 
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
-To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
+Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
-## 0.0.24beta — 2026-10-16
+## 0.0.25beta — 2026-10-16
 
 ### Added
-- **Appears on** on artist pages: a row of albums by other artists that this artist is on, such as features ("feat."), compilations and splits. Tap the "Appears on" heading to see all of them on one page. It uses your synced library, so it shows after a sync.
+- **See everything in a Home row.** Rows with more than four items (Rediscover, Radios, Your playlists, Recently played, Artist radios, Recently added, Your genres, Random picks) now have an arrow next to their title. Tap the title to open a page with all of them in a grid, including ones Home has no room for: every radio, every playlist and genre, and longer lists of recently played and recently added albums.
 
 ## 0.0.18beta — 2026-10-16
 
