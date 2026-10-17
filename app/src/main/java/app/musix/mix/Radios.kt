@@ -59,10 +59,10 @@ class Radios(private val graph: AppGraph) {
         return graph.library.songsOf(artist).shuffled().filter { it.id !in have }.take(60)
     }
 
-    /** The synced copies of songs from the server, which carry hearts and ReplayGain as stored. */
+    /** The synced copies of songs from the server, which carry hearts and ReplayGain as stored; none from unchecked libraries. */
     private suspend fun local(songs: List<Song>): List<Song> {
         val found = graph.library.songs(songs.map { it.id }).associateBy { it.id }
-        return songs.map { found[it.id] ?: it }
+        return graph.library.keepSyncedSongs(songs.map { found[it.id] ?: it }, "Radio")
     }
 
     /** At most two songs per artist in a row of picks, then shuffled lightly. */

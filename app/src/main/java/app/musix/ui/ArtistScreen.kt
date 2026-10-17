@@ -85,7 +85,8 @@ fun ArtistScreen(nav: NavController, id: String) {
             ArtistPage(local, graph.library.albumsOf(local), graph.library.songsOf(local))
         } else {
             val remote = graph.subsonic.artist(id)
-            ArtistPage(remote.artist, remote.albums.sortedByDescending { it.year ?: 0 }, emptyList())
+            val albums = graph.library.keepSyncedAlbums(remote.albums, "Artist page")
+            ArtistPage(remote.artist, albums.sortedByDescending { it.year ?: 0 }, emptyList())
         }
     }
     val info by loadState("info-$id") { graph.subsonic.artistInfo(id) }

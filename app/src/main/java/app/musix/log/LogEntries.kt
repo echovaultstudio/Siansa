@@ -28,12 +28,12 @@ fun logEntries(lines: List<String>): List<LogEntry> {
 }
 
 /**
- * Every error in [entries] as one text for the clipboard, oldest first with their stack traces, under
- * [header] (e.g. the app version). Kept under [maxChars] by leaving out the oldest errors, since the
- * clipboard can't take a huge text. Null when there are no errors.
+ * Every problem in [entries] (errors and warnings, as under "Problems") as one text for the clipboard,
+ * oldest first with their stack traces, under [header] (e.g. the app version). Kept under [maxChars] by
+ * leaving out the oldest ones, since the clipboard can't take a huge text. Null when there are none.
  */
-fun errorsForClipboard(entries: List<LogEntry>, header: String, maxChars: Int = 200_000): String? {
-    val errors = entries.filter { it.error }
+fun problemsForClipboard(entries: List<LogEntry>, header: String, maxChars: Int = 200_000): String? {
+    val errors = entries.filter { it.problem }
     if (errors.isEmpty()) return null
     val kept = ArrayDeque<String>()
     var size = header.length
@@ -44,7 +44,13 @@ fun errorsForClipboard(entries: List<LogEntry>, header: String, maxChars: Int = 
         size += text.length + 1
     }
     val left = errors.size - kept.size
-    val title = header + " · " + (if (errors.size == 1) "1 error" else "${errors.size} errors") +
+    val errorCount = errors.count { it.error }
+    val warningCount = errors.size - errorCount
+    val counts = listOfNotNull(
+        errorCount.takeIf { it > 0 }?.let { if (it == 1) "1 error" else "$it errors" },
+        warningCount.takeIf { it > 0 }?.let { if (it == 1) "1 warning" else "$it warnings" },
+    ).joinToString(", ")
+    val title = header + " · " + counts +
         (if (left > 0) " (oldest $left left out)" else "")
     return (listOf(title) + kept).joinToString("\n") + "\n"
 }

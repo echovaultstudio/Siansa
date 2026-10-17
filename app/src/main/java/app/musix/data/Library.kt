@@ -86,6 +86,32 @@ class LibraryRepository(context: Context) {
         return ids.mapNotNull { found[it]?.toSong() }
     }
 
+    /**
+     * True when some Navidrome libraries are unchecked in Settings → Library sync. Then songs and albums
+     * Navidrome sends that the phone doesn't have are from a left-out library and must not show or play.
+     */
+    suspend fun leavesOutLibraries(): Boolean = !app.musix.mix.mayFetchUnsynced(meta(META_FOLDERS))
+
+    /**
+     * [songs] from Navidrome (popular songs, radios, liked songs…) without those from unchecked libraries,
+     * using the phone's copy of each. Unchanged when every library is synced.
+     */
+    suspend fun keepSyncedSongs(songs: List<Song>, why: String): List<Song> {
+        if (songs.isEmpty() || !leavesOutLibraries()) return songs
+        val kept = keepKnown(songs, songs(songs.map { it.id }).associateBy { it.id })
+        if (kept.size < songs.size) AppLog.i("Library", "$why: left out ${songs.size - kept.size} of ${songs.size} songs from unchecked libraries")
+        return kept
+    }
+
+    /** [albums] from Navidrome without those from unchecked libraries. Unchanged when every library is synced. */
+    suspend fun keepSyncedAlbums(albums: List<Album>, why: String): List<Album> {
+        if (albums.isEmpty() || !leavesOutLibraries()) return albums
+        val known = albums.map { it.id }.distinct().chunked(CHUNK).flatMap { dao.knownAlbumIds(it) }.toSet()
+        val kept = albums.filter { it.id in known }
+        if (kept.size < albums.size) AppLog.i("Library", "$why: left out ${albums.size - kept.size} of ${albums.size} albums from unchecked libraries")
+        return kept
+    }
+
     /** The album for any of its ids, with every id of the same album in other libraries. */
     suspend fun album(id: String): Album? {
         val entity = dao.album(id) ?: return null
@@ -272,3 +298,6 @@ class LibraryRepository(context: Context) {
                 .joinToString("|")
     }
 }
+
+/** Songs from Navidrome that the phone has (by id), in their order, as the phone's copy; the rest left out. */
+internal fun keepKnown(songs: List<Song>, local: Map<String, Song>): List<Song> = songs.mapNotNull { local[it.id] }
