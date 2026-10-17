@@ -120,6 +120,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.foundation.border
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -131,8 +136,6 @@ import app.musix.playback.Cast
 import app.musix.playback.PlayerState
 import kotlin.math.max
 
-private enum class PlayerView { ART, LYRICS, QUEUE }
-
 private val PlayerColors = darkColorScheme(
     primary = Accent,
     onPrimary = Color(0xFF2A1700),
@@ -143,7 +146,9 @@ private val PlayerColors = darkColorScheme(
 
 /**
  * Now playing, in the style of Spotify: the cover blurred into the background, a large cover that
- * opens its album, title and artist with a heart, and the controls below.
+ * opens its album, title and artist with a heart, the controls, where the music plays (bottom left) and
+ * the queue (bottom right). The ⋮ menu has everything else. Scrolling down shows the lyrics, the artist
+ * and the song's details on cards.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -159,12 +164,18 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     }
     // Re-read hearts when one changes.
     val heartChanges by graph.favorites.changes.collectAsStateWithLifecycle()
-    var view by rememberSaveable { mutableStateOf(PlayerView.ART) }
     var queueOpen by rememberSaveable { mutableStateOf(false) }
+    var lyricsOpen by rememberSaveable { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
     val song = state.current
     BackHandler(enabled = queueOpen) { queueOpen = false }
     val scope = rememberCoroutineScope()
+    val snack = LocalSnack.current
     val openArtist = rememberArtistOpener(beforeOpen = onClose)
+    val scroll = rememberScrollState()
+    // The cover's colour, for the lyrics card and the lyrics screen.
+    val tint = rememberCoverColor(song?.cover)
+    val close by rememberUpdatedState(onClose)
 
     fun openAlbum() {
         val albumId = song?.albumId ?: return
@@ -172,12 +183,59 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
         nav.navigate("album/$albumId")
     }
 
-    // Dragging down moves the whole player with the finger; let go far or fast enough and it closes.
+    fun openDetails() {
+        val id = song?.id ?: return
+        onClose()
+        nav.openSongDetails(id)
+    }
+
+    fun openSongPath() {
+        val id = song?.id ?: return
+        onClose()
+        nav.openSongPath(id)
+    }
+
+    // Dragging down (at the top of the page) moves the whole player with the finger; let go far or fast
+    // enough and it closes. Swiping up scrolls down to the cards under the player.
     var dismissY by remember { mutableFloatStateOf(0f) }
-    var upDrag by remember { mutableFloatStateOf(0f) }
     var heightPx by remember { mutableFloatStateOf(1f) }
-    val velocity = remember { VelocityTracker() }
     val cornerMaxPx = with(LocalDensity.current) { 28.dp.toPx() }
+    fun settle(speed: Float) {
+        if (dismissY > heightPx * 0.22f || (dismissY > 40f && speed > 1400f)) {
+            close()
+        } else if (dismissY > 0f) {
+            val from = dismissY
+            scope.launch { animate(from, 0f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { v, _ -> dismissY = v } }
+        }
+    }
+    val dismissOnPull = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (dismissY > 0f && available.y < 0f) {
+                    val used = max(available.y, -dismissY)
+                    dismissY += used
+                    return Offset(0f, used)
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (available.y > 0f && source == NestedScrollSource.UserInput) {
+                    dismissY += available.y
+                    return Offset(0f, available.y)
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (dismissY > 0f) {
+                    settle(available.y)
+                    return available
+                }
+                return Velocity.Zero
+            }
+        }
+    }
 
     MaterialTheme(colorScheme = PlayerColors, typography = MaterialTheme.typography) {
         Box(
@@ -193,42 +251,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                     clip = true
                 }
                 .background(Color.Black)
-                .pointerInput(Unit) {
-                    var total = 0f
-                    detectVerticalDragGestures(
-                        onDragStart = {
-                            total = 0f
-                            upDrag = 0f
-                            velocity.resetTracking()
-                        },
-                        onDragEnd = {
-                            val speed = velocity.calculateVelocity().y
-                            val close = dismissY > heightPx * 0.22f || (dismissY > 40f && speed > 1400f)
-                            when {
-                                close -> onClose()
-                                dismissY > 0f -> {
-                                    val from = dismissY
-                                    scope.launch { animate(from, 0f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { v, _ -> dismissY = v } }
-                                }
-                                upDrag < -120f -> queueOpen = true
-                            }
-                            upDrag = 0f
-                        },
-                        onDragCancel = {
-                            val from = dismissY
-                            scope.launch { animate(from, 0f) { v, _ -> dismissY = v } }
-                            upDrag = 0f
-                        },
-                    ) { change, dy ->
-                        total += dy
-                        velocity.addPosition(change.uptimeMillis, Offset(0f, total))
-                        if (dismissY > 0f || (dy > 0f && upDrag >= 0f)) {
-                            dismissY = (dismissY + dy).coerceAtLeast(0f)
-                        } else {
-                            upDrag += dy
-                        }
-                    }
-                },
+                .nestedScroll(dismissOnPull),
         ) {
             // The cover, enlarged and blurred, as the background (a darker plain version before Android 12).
             Cover(
@@ -250,92 +273,108 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 )
             )
 
-            // Swipe up anywhere to open the queue; swipe down to close the player.
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .systemBarsPadding()
-                    .padding(horizontal = 24.dp),
-            ) {
-                // A gap above the header that suits the screen's height, so the top of the player
-                // isn't pressed against the status bar.
-                Spacer(Modifier.height(playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp))
-                TopRow(song, onClose = onClose, onAlbum = ::openAlbum)
-
-                Box(Modifier.weight(1f).fillMaxWidth().padding(top = 16.dp, bottom = 12.dp), contentAlignment = Alignment.Center) {
-                    AnimatedContent(
-                        targetState = view,
-                        transitionSpec = { fadeIn(tween(140)) togetherWith fadeOut(tween(90)) },
-                        label = "player-view",
-                    ) { v ->
-                        when (v) {
-                            PlayerView.ART -> SwipeCover(song, onTap = ::openAlbum)
-                            PlayerView.LYRICS -> LyricsView(song)
-                            PlayerView.QUEUE -> Box(Modifier.fillMaxSize())
-                        }
-                    }
-                }
-
-                TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
-                    song?.let { graph.favorites.toggle(it) }
-                }
-                SeekBar(state)
-                Controls(state)
-                // Like Spotify: where the music plays on the left (with the TV, speaker or headphones' name),
-                // song radio in the middle, lyrics and the queue on the right.
-                val castStatus by Cast.status.collectAsStateWithLifecycle()
-                val output by AudioOutput.device.collectAsStateWithLifecycle()
-                val dlnaDevice by app.musix.playback.dlna.Dlna.selected.collectAsStateWithLifecycle()
-                val casting = castDeviceLabel(castStatus, output, dlnaDevice?.name) != null
-                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                        CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
-                    }
-                    // Song radio: AudioMuse keeps adding songs that sound like this one and share its mood.
-                    val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
-                    val snack = LocalSnack.current
-                    Row(
+            val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                // The player fills the screen except for the top of the lyrics card peeking in at the bottom,
+                // as in Spotify, to show there's more below.
+                val pageHeight = maxHeight - PLAYER_PEEK - navBar
+                val pageHeightPx = with(LocalDensity.current) { pageHeight.toPx() }
+                Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
+                    Column(
                         Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(if (radioSeed != null) Accent.copy(alpha = 0.18f) else Color.Transparent)
-                            .clickable(enabled = song != null) {
-                                if (radioSeed != null) {
-                                    graph.songRadio.stop()
-                                    scope.launch { snack.showSnackbar("Song radio off") }
-                                } else song?.let { s ->
-                                    scope.launch { snack.showSnackbar("Starting song radio from ${s.title}…") }
-                                    graph.songRadio.start(s) { message -> scope.launch { snack.showSnackbar(message) } }
-                                }
-                            }
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                            .height(pageHeight)
+                            .statusBarsPadding()
+                            .padding(horizontal = 24.dp),
                     ) {
-                        Icon(
-                            Icons.Rounded.Radio,
-                            if (casting) (if (radioSeed != null) "Radio on" else "Song radio") else null,
-                            tint = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size(20.dp),
-                        )
-                        // While a device's name shows, it needs the room, so the chip shows just its icon.
-                        if (!casting) {
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                if (radioSeed != null) "Radio on" else "Song radio",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f),
-                            )
+                        // A gap above the header that suits the screen's height, so the top of the player
+                        // isn't pressed against the status bar.
+                        Spacer(Modifier.height(playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp))
+                        TopRow(song, onClose = onClose, onAlbum = ::openAlbum, onMenu = { menuOpen = true })
+
+                        Box(Modifier.weight(1f).fillMaxWidth().padding(top = 16.dp, bottom = 12.dp), contentAlignment = Alignment.Center) {
+                            SwipeCover(song, onTap = ::openAlbum)
+                        }
+
+                        TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
+                            song?.let { graph.favorites.toggle(it) }
+                        }
+                        SeekBar(state)
+                        Controls(state)
+                        // Like Spotify: where the music plays bottom left (with the TV, speaker or headphones'
+                        // name), and the queue bottom right: tap it, or swipe up from it.
+                        Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                                CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
+                            }
+                            RoundIcon(
+                                Icons.AutoMirrored.Rounded.QueueMusic,
+                                "Queue",
+                                Modifier.pointerInput(Unit) {
+                                    var pulled = 0f
+                                    detectVerticalDragGestures(onDragStart = { pulled = 0f }) { change, dy ->
+                                        change.consume()
+                                        pulled += dy
+                                        if (pulled < -QUEUE_PULL_PX) queueOpen = true
+                                    }
+                                },
+                            ) { queueOpen = true }
                         }
                     }
-                    Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End) {
-                        ViewToggle(Icons.Rounded.FormatQuote, "Lyrics", view == PlayerView.LYRICS) {
-                            view = if (view == PlayerView.LYRICS) PlayerView.ART else PlayerView.LYRICS
-                        }
-                        ViewToggle(Icons.AutoMirrored.Rounded.QueueMusic, "Queue", queueOpen) { queueOpen = true }
+                    if (song != null) {
+                        LyricsPreviewCard(song, tint) { lyricsOpen = true }
+                        Spacer(Modifier.height(12.dp))
+                        AboutArtistCard(song) { openArtist(song) }
+                        Spacer(Modifier.height(12.dp))
+                        AboutSongCard(song, onOpenDetails = ::openDetails)
+                    }
+                    Spacer(Modifier.height(24.dp + navBar))
+                }
+
+                // Once the cards are in view, a small header keeps the song and play/pause at hand.
+                val position by rememberPosition()
+                AnimatedVisibility(
+                    visible = scroll.value > pageHeightPx * 0.6f,
+                    enter = fadeIn(tween(150)),
+                    exit = fadeOut(tween(120)),
+                ) {
+                    val duration = (song?.durationSec ?: 0) * 1000f
+                    PlayerMiniHeader(
+                        song = song,
+                        isPlaying = state.isPlaying,
+                        progress = if (duration > 0f) position / duration else 0f,
+                        liked = song != null && heartChanges.let { graph.favorites.isLiked(song) },
+                        onHeart = { song?.let { graph.favorites.toggle(it) } },
+                        onPlayPause = { graph.player.togglePlay() },
+                        onTop = { scope.launch { scroll.animateScrollTo(0) } },
+                    )
+                }
+            }
+
+            // Lyrics, opened from the card or the menu, over the whole player.
+            AnimatedVisibility(
+                visible = lyricsOpen,
+                enter = slideInVertically(tween(230, easing = FastOutSlowInEasing)) { it },
+                exit = slideOutVertically(tween(180, easing = FastOutLinearInEasing)) { it },
+            ) {
+                LyricsScreen(song, tint, onClose = { lyricsOpen = false }, menu = { menuOpen = true }) {
+                    Column {
+                        SeekBar(state)
+                        Controls(state)
                     }
                 }
-                UpNextHandle(state) { queueOpen = true }
-                // Room above the phone's gesture bar, so "Up next" isn't pressed against the bottom edge.
-                Spacer(Modifier.height(8.dp))
+            }
+
+            if (menuOpen && song != null) {
+                PlayerMenu(
+                    song = song,
+                    onDismiss = { menuOpen = false },
+                    onOpenAlbum = ::openAlbum,
+                    onOpenArtist = { openArtist(song) },
+                    onOpenLyrics = { lyricsOpen = true },
+                    onOpenDetails = ::openDetails,
+                    onOpenSongPath = ::openSongPath,
+                    notify = { message -> scope.launch { snack.showSnackbar(message) } },
+                )
             }
 
             // The queue slides up over the player.
@@ -478,7 +517,7 @@ private fun SwipeCover(song: Song?, onTap: () -> Unit) {
 }
 
 @Composable
-private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit) {
+private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit, onMenu: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onClose) { Icon(Icons.Rounded.KeyboardArrowDown, "Close", Modifier.size(32.dp)) }
         Column(Modifier.weight(1f).clickable(enabled = song?.albumId != null, onClick = onAlbum), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -491,7 +530,7 @@ private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(Modifier.size(48.dp))
+        IconButton(onClick = onMenu, enabled = song != null) { Icon(Icons.Rounded.MoreVert, "More") }
     }
 }
 
@@ -692,73 +731,6 @@ private fun Controls(state: PlayerState) {
 }
 
 @Composable
-private fun ViewToggle(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, active: Boolean, onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
-        Icon(icon, label, tint = if (active) Accent else Color.White.copy(alpha = 0.8f))
-    }
-}
-
-private val LyricsShadow = Shadow(Color.Black.copy(alpha = 0.35f), blurRadius = 12f)
-
-@Composable
-private fun LyricsView(song: Song?) {
-    val graph = LocalGraph.current
-    val position by rememberPosition()
-    val lyrics by loadState(song?.id) { song?.let { graph.subsonic.lyrics(it) } }
-    // No box behind the lyrics: they fade out at the top and bottom into the blurred cover, and a soft
-    // shadow keeps them readable on bright covers.
-    val fadePx = with(LocalDensity.current) { 48.dp.toPx() }
-    Box(
-        Modifier
-            .fillMaxSize()
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .drawWithContent {
-                drawContent()
-                val stops = lyricsFadeStops(size.height, fadePx).map { (at, alpha) -> at to Color.Black.copy(alpha = alpha) }
-                drawRect(Brush.verticalGradient(*stops.toTypedArray()), blendMode = BlendMode.DstIn)
-            }
-            .padding(horizontal = 4.dp),
-    ) {
-        LoadBox(lyrics) { loaded ->
-            if (loaded == null || loaded.lines.isEmpty()) {
-                Text("No lyrics for this song", color = Color.White.copy(alpha = 0.7f), modifier = Modifier.align(Alignment.Center))
-                return@LoadBox
-            }
-            if (!loaded.synced) {
-                Text(
-                    loaded.lines.joinToString("\n") { it.text },
-                    style = MaterialTheme.typography.titleMedium.copy(shadow = LyricsShadow),
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 24.dp),
-                )
-                return@LoadBox
-            }
-            val listState = rememberLazyListState()
-            val current = loaded.lines.indexOfLast { (it.startMs ?: Long.MAX_VALUE) <= position }
-            LaunchedEffect(current) {
-                if (current >= 0) listState.animateScrollToItem(max(0, current - 2))
-            }
-            LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 24.dp)) {
-                itemsIndexed(loaded.lines) { index, line ->
-                    val active = index == current
-                    Text(
-                        line.text.ifBlank { "♪" },
-                        style = MaterialTheme.typography.headlineSmall.copy(shadow = LyricsShadow),
-                        fontWeight = FontWeight.Bold,
-                        color = if (active) Color.White else Color.White.copy(alpha = if (index < current) 0.55f else 0.35f),
-                        textAlign = TextAlign.Start,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { line.startMs?.let { graph.player.seekTo(it) } }
-                            .padding(vertical = 6.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun QueueView(state: PlayerState) {
     val graph = LocalGraph.current
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = max(0, state.index - 1))
@@ -782,26 +754,9 @@ private fun QueueView(state: PlayerState) {
     }
 }
 
-/** "Up next" line at the bottom of the player: tap or swipe up to see the whole queue. */
-@Composable
-private fun UpNextHandle(state: PlayerState, onOpen: () -> Unit) {
-    val next = state.queue.getOrNull(state.index + 1)
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onOpen)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Icon(Icons.Rounded.KeyboardArrowUp, null, tint = Color.White.copy(alpha = 0.7f))
-        Text(
-            if (next != null) "Up next: ${next.title} · ${next.artist}" else "Queue",
-            style = MaterialTheme.typography.labelMedium,
-            color = Color.White.copy(alpha = 0.7f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
+
+/** How much of the lyrics card shows under the player before scrolling. */
+private val PLAYER_PEEK = 44.dp
+
+/** How far up the queue button has to be pulled to open the queue. */
+private const val QUEUE_PULL_PX = 40f
