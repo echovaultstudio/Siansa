@@ -3,6 +3,14 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.4.1beta — 2026-10-17
+
+### Changed
+- **Swipe to queue vibrates.** Swiping a song from right to left gives a light tick as it passes the point where
+  letting go adds it, and a short buzz when it's added to the queue.
+- **No format label under the seek bar.** Now playing no longer shows FLAC, OPUS 160 and so on between the times;
+  the format is still under About this song, further down.
+
 ## 0.4.0beta — 2026-10-17
 
 ### Fixed
