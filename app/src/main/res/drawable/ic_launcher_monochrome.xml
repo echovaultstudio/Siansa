@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed (monochrome) launcher icon: the same bars as ic_launcher_foreground.xml in one flat colour,
+     which Android tints to match the wallpaper. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M31,59a3,3 0 0,1 6,0v8a3,3 0 0,1 -6,0z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M41,47a3,3 0 0,1 6,0v20a3,3 0 0,1 -6,0z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M51,37a3,3 0 0,1 6,0v30a3,3 0 0,1 -6,0z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M61,45a3,3 0 0,1 6,0v22a3,3 0 0,1 -6,0z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M71,55a3,3 0 0,1 6,0v12a3,3 0 0,1 -6,0z" />
+</vector>

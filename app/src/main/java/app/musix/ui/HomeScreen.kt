@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
@@ -181,6 +182,9 @@ fun HomeScreen(nav: NavController) {
         else graph.subsonic.albums("random", 20, 0).distinctBy { it.name + "|" + it.artist }
     }
     val genres by loadState(version to "genres") { if (graph.library.isSynced) graph.library.genres(12) else emptyList() }
+    // Made once a day; never fails (an empty list hides the row).
+    val suggested by loadState(today to "suggested_artists") { graph.suggestions.today() }
+    var openSuggestion by remember { mutableStateOf<app.musix.mix.SuggestedArtist?>(null) }
 
     // imePadding: the keyboard shrinks the list, so the "How are you feeling?" box scrolls up above it.
     LazyColumn(Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp))) {
@@ -215,8 +219,12 @@ fun HomeScreen(nav: NavController) {
                                 quick.chunked(2).forEach { row ->
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         row.forEach { (title, cover, open) ->
-                                            val colors = if (title == "Liked songs") Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(title)
-                                            QuickTile(title, cover, colors, open, Modifier.weight(1f))
+                                            val liked = title == "Liked songs" && cover == null
+                                            val colors = if (liked) Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(title)
+                                            QuickTile(
+                                                title, cover, colors, open, Modifier.weight(1f),
+                                                icon = if (liked) Icons.Rounded.Favorite else null,
+                                            )
                                         }
                                         if (row.size == 1) Spacer(Modifier.weight(1f))
                                     }
@@ -346,6 +354,17 @@ fun HomeScreen(nav: NavController) {
                         }
                     }
                 }
+                HomeSection.SUGGESTED_ARTISTS -> {
+                    // Artists outside the library, like the ones you play most.
+                    item(key = "suggested_artists") {
+                        Shelf("Artists you might like", suggested.valueOrNull().orEmpty(), key = { it.name }) { artist ->
+                            SuggestedArtistTile(artist) {
+                                AppLog.i("Home", "Suggested artist opened")
+                                openSuggestion = artist
+                            }
+                        }
+                    }
+                }
                 HomeSection.ADDED -> {
                     item(key = "added") {
                         Shelf("Recently added", newest.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.RecentlyAdded)) { album ->
@@ -376,6 +395,7 @@ fun HomeScreen(nav: NavController) {
             }
         }
     }
+    openSuggestion?.let { SuggestedArtistDialog(it) { openSuggestion = null } }
     if (arranging) {
         ArrangeHomeSheet(homeOrder, onChange = {
             AppLog.i("Home", "Arranged: ${HomeSection.format(it)}")
