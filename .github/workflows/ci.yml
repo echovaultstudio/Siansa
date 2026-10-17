@@ -38,16 +38,13 @@ jobs:
         with:
           gradle-version: "8.14.3"
 
-      # Every version needs its section in CHANGELOG.md; it becomes the release notes.
-      - name: Release notes from CHANGELOG.md
+      # Notes waiting in changelog.d/ become the next version's section (see scripts/release_notes.py);
+      # the APK is built with that version.
+      - name: Version and release notes
+        id: notes
         run: |
-          VERSION=$(tr -d '[:space:]' < version.txt)
-          mkdir -p notes
+          python3 scripts/release_notes.py prepare | tee -a "$GITHUB_OUTPUT"
           awk '/^## /{ v=$2; f="notes/" v ".md"; next } v { print > f }' CHANGELOG.md
-          if [ ! -s "notes/$VERSION.md" ]; then
-            echo "::error::CHANGELOG.md has no section '## $VERSION'. Add one before publishing."
-            exit 1
-          fi
 
       # Compiling catches syntax and type errors; unit tests check the app's own logic; Android Lint
       # finds likely crashes, wrong API use and security issues.
@@ -277,6 +274,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/download-artifact@v7
         with:
@@ -285,11 +284,27 @@ jobs:
       - name: Version
         id: version
         run: |
-          VERSION=$(tr -d '[:space:]' < version.txt)
+          VERSION=$(tr -d '[:space:]' < notes/version.txt)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::Release v$VERSION already exists; bump version.txt to publish a new one."
+            echo "::notice::v$VERSION is already released; nothing new to publish (no notes in changelog.d/)."
+          elif [ ! -s "notes/$VERSION.md" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::No release notes for v$VERSION; add a note in changelog.d/ to publish one."
+          fi
+
+      # Moves the notes from changelog.d/ into CHANGELOG.md and sets version.txt, as a commit on main.
+      - name: Record the release on main
+        if: steps.version.outputs.exists != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          python3 scripts/release_notes.py apply notes/fragments.txt
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A CHANGELOG.md version.txt changelog.d
+            git commit -q -m "Release ${{ steps.version.outputs.version }} [skip ci]"
+            for i in 1 2 3; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 5; done
           fi
 
       # One release per version, so the APK can be downloaded straight from the Releases page on a phone.
