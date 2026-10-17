@@ -136,9 +136,12 @@ class SubsonicApi(
         return ArtistDetail(parseArtist(artist), artist.arr("album").map(::parseAlbum))
     }
 
-    /** Biography, image and similar artists that Navidrome already has (from its agents or AudioMuse). */
-    suspend fun artistInfo(id: String): ArtistInfo {
-        val info = call("getArtistInfo2", mapOf("id" to id, "count" to "20", "includeNotPresent" to "false"))
+    /**
+     * Biography, image and similar artists that Navidrome already has (from its agents or AudioMuse).
+     * With [includeNotPresent], similar artists that aren't in the library are listed too (by name only).
+     */
+    suspend fun artistInfo(id: String, includeNotPresent: Boolean = false): ArtistInfo {
+        val info = call("getArtistInfo2", mapOf("id" to id, "count" to "20", "includeNotPresent" to "$includeNotPresent"))
             .obj("artistInfo2")
         return ArtistInfo(
             biography = info?.str("biography")?.let(::cleanBiography)?.takeIf { it.isNotBlank() },
@@ -146,7 +149,7 @@ class SubsonicApi(
             lastFmUrl = info?.str("lastFmUrl"),
             similar = info?.arr("similarArtist").orEmpty().map { a ->
                 SimilarArtist(
-                    id = a.str("id"),
+                    id = a.str("id")?.takeIf { it.isNotBlank() },
                     name = a.str("name") ?: "",
                     coverArt = a.str("coverArt"),
                     imageUrl = a.str("artistImageUrl"),
