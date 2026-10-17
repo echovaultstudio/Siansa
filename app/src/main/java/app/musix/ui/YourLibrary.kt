@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
@@ -198,6 +199,9 @@ fun YourLibraryScreen(nav: NavController) {
         letterStarts?.let { starts -> starts.entries.sortedBy { it.value }.map { it.value to it.key } }
     }
     val scope = rememberCoroutineScope()
+    val launcher = rememberPlayLauncher()
+    var naming by remember { mutableStateOf(false) }
+    var creating by remember { mutableStateOf(false) }
 
     fun togglePin(e: Entry) {
         if (e.alwaysPinned) return
@@ -217,7 +221,31 @@ fun YourLibraryScreen(nav: NavController) {
             onSync = { nav.navigate("sync") },
             onSoundSearch = { nav.goToTab("search") },
             onDownloads = { nav.navigate("downloads") },
+            onNewPlaylist = { naming = true },
         )
+        if (naming) {
+            PlaylistNameDialog(
+                title = "New playlist",
+                initial = "",
+                confirm = "Create",
+                onDismiss = { naming = false },
+                onConfirm = { name ->
+                    if (!creating) {
+                        creating = true
+                        scope.launch {
+                            graph.playlists.create(name)
+                                .onSuccess { made ->
+                                    naming = false
+                                    launcher.notify("Made $name")
+                                    if (made != null) nav.navigate("playlist/${made.id}")
+                                }
+                                .onFailure { launcher.notify(it.message?.takeIf { m -> m.isNotBlank() } ?: "Couldn't make the playlist") }
+                            creating = false
+                        }
+                    }
+                },
+            )
+        }
         if (searching) {
             TextField(
                 value = query,
@@ -336,6 +364,7 @@ private fun LibraryHeader(
     onSync: () -> Unit,
     onSoundSearch: () -> Unit,
     onDownloads: () -> Unit,
+    onNewPlaylist: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(
@@ -360,6 +389,11 @@ private fun LibraryHeader(
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.Add, "More") }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(
+                    text = { Text("New playlist") },
+                    leadingIcon = { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, null) },
+                    onClick = { menu = false; onNewPlaylist() },
+                )
                 DropdownMenuItem(
                     text = { Text("Mix from a sound description") },
                     leadingIcon = { Icon(Icons.Rounded.Search, null) },

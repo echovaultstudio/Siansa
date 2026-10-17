@@ -1,0 +1,2 @@
+### Added
+- **Make and change your own playlists.** Your Library's + button now has "New playlist", and "Add to playlist" (in a song's ⋮ menu and in now playing) can make a new one too. On one of your playlists, the ⋮ at the top renames it, changes or removes its picture, or deletes it, and a song's ⋮ menu removes it from the playlist. Every change is saved on Navidrome straight away. Pictures need Navidrome 0.61 or later.
