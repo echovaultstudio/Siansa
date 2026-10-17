@@ -39,7 +39,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Pause
@@ -93,7 +92,6 @@ private val tabs = listOf(
     Tab("home", "Home", Icons.Rounded.Home),
     Tab("search", "Search", Icons.Rounded.Search),
     Tab("library", "Your Library", Icons.Rounded.LibraryMusic),
-    Tab("vibes", "Vibes", Icons.Rounded.GraphicEq),
     Tab("settings", "Settings", Icons.Rounded.Settings),
 )
 

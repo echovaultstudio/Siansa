@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.Sync
@@ -81,6 +82,8 @@ fun SettingsHub(nav: NavController) {
     val libraryState by graph.library.status.collectAsStateWithLifecycle()
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
     val library = libraryState
+    val vibes by graph.selectors.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { graph.selectors.all() }
     Screen(title = "Settings", nav = nav) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
             HubRow(
@@ -117,6 +120,11 @@ fun SettingsHub(nav: NavController) {
                     "ListenBrainz/Koito".takeIf { settings.listenBrainzReady },
                 ).joinToString(" · ").ifEmpty { "Off" },
             ) { nav.navigate("settings/scrobbling") }
+            HubRow(
+                Icons.Rounded.Schedule,
+                "Vibes",
+                vibes?.let { "${it.size} ${if (it.size == 1) "vibe" else "vibes"} for your daily mixes" } ?: "Times of day for your daily mixes",
+            ) { nav.navigate("vibes") }
             HubRow(Icons.Rounded.Storage, "Storage", "Songs up to ${formatMb(settings.songCacheMb)} · images ${imageLimit(settings.imageCacheMb)}" +
                     if (settings.coverDownload) " · all covers downloaded" else "") {
                 nav.navigate("settings/storage")
