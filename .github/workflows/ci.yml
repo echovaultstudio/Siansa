@@ -16,6 +16,8 @@ on:
 
 permissions:
   contents: write
+  # The release history (scripts/release_prs.py) looks up which pull request each commit came from.
+  pull-requests: read
 
 concurrency:
   group: ci-${{ github.ref }}
