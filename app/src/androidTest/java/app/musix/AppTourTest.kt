@@ -15,6 +15,9 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -123,6 +126,25 @@ class AppTourTest {
                 back()
                 idle(600)
             }
+            step("now playing menu, cards and lyrics") {
+                compose.onAllNodesWithTag("miniPlayer").onFirst().performClick()
+                idle(1500)
+                // The ⋮ menu.
+                compose.onAllNodesWithContentDescription("Song options").onFirst().performClick()
+                idle(1200)
+                shot("10b-now-playing-menu")
+                click("Lyrics")
+                idle(1500)
+                shot("10c-lyrics")
+                back()
+                idle(600)
+                // Scrolled down to the cards under the player.
+                compose.onRoot().performTouchInput { swipeUp(startY = bottom * 0.8f, endY = top + bottom * 0.1f) }
+                idle(1500)
+                shot("10d-now-playing-cards")
+                back()
+                idle(600)
+            }
             step("artist page and playing from it") {
                 click("Test Artist")
                 waitText("Popular")
@@ -158,6 +180,14 @@ class AppTourTest {
                 shot("14-your-listening")
                 back()
             }
+            step("other artists you might like") {
+                libraryAll()
+                click("Your listening")
+                click("Other artists you might like")
+                idle(2500)
+                shot("14b-other-artists")
+                back()
+            }
             step("search and playing from it") {
                 tab("Search")
                 idle(500)
@@ -179,7 +209,7 @@ class AppTourTest {
                 tab("Settings")
                 idle(800)
                 shot("18-settings")
-                listOf("Connections", "Library sync", "Playback", "Scrobbling", "Storage", "Logs").forEachIndexed { i, page ->
+                listOf("Connections", "Library sync", "Playback", "Downloads", "Scrobbling", "Storage", "Logs").forEachIndexed { i, page ->
                     tab("Settings")
                     click(page)
                     idle(1200)
@@ -187,6 +217,21 @@ class AppTourTest {
                     back()
                     idle(400)
                 }
+            }
+            step("equaliser and ReplayGain") {
+                tab("Settings")
+                click("Playback")
+                click("Equaliser and ReplayGain")
+                idle(1200)
+                shot("19b-equaliser")
+                back()
+                back()
+            }
+            step("sound search") {
+                tab("Search")
+                click("Sound")
+                idle(800)
+                shot("15b-sound-search")
             }
             step("home after playing") {
                 tab("Home")
