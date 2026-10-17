@@ -103,7 +103,7 @@ object DiscoveryMap {
     fun spreadAngles(sorted: List<Float>, gap: Float): List<Float> {
         if (sorted.size < 2) return sorted
         val out = sorted.toMutableList()
-        repeat(40) {
+        repeat(200) {
             var moved = false
             for (i in out.indices) {
                 val next = (i + 1) % out.size
