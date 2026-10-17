@@ -213,34 +213,11 @@ fun PlaybackSettingsScreen(nav: NavController) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Heading("Equaliser")
-                    Hint(if (eq.enabled) "On · ${eq.preset.label}" else "Off · bass, vocals, treble and presets")
+                    Heading("Equaliser and ReplayGain")
+                    Hint((if (eq.enabled) "On · ${eq.preset.label}" else "Equaliser off") + " · ReplayGain ${settings.replayGain.label.lowercase()}")
                 }
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
             }
-            HorizontalDivider()
-            Heading("ReplayGain")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ReplayGainMode.entries.forEach { mode ->
-                    FilterChip(
-                        selected = settings.replayGain == mode,
-                        onClick = { graph.settings.save(settings.copy(replayGain = mode)) },
-                        label = { Text(mode.label) },
-                    )
-                }
-            }
-            Hint("Track evens out every song; Album keeps the loudness differences within an album.")
-            var preamp by remember { mutableStateOf(settings.preampDb) }
-            Text("Pre-amp: ${"%+.0f".format(preamp)} dB", style = MaterialTheme.typography.bodyLarge)
-            Slider(
-                value = preamp,
-                onValueChange = { preamp = it.roundToInt().toFloat() },
-                onValueChangeFinished = { graph.settings.save(graph.settings.current.copy(preampDb = preamp)) },
-                valueRange = -12f..6f,
-                steps = 17,
-            )
-            Hint("Tracks can only be turned down, so raise the pre-amp only if quiet tracks still sound too quiet. Applies from the next song.")
-
             HorizontalDivider()
             Heading("Streaming quality")
             Hint("Opus is converted by Navidrome with its own \"opus\" transcoding profile. It saves data on mobile; the original file is best on Wi-Fi. Applies from the next song.")

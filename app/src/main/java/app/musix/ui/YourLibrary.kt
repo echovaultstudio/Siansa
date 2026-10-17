@@ -652,6 +652,19 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
         )
     }
 
+    // Artists you don't have yet, like the ones you play most (made once a day), with why.
+    entries += Entry(
+        key = "discover-artists",
+        kind = Kind.LISTENING,
+        title = "Other artists you might like",
+        subtitle = "Your listening · Discover",
+        route = "discover/artists",
+        gradient = Color(0xFF5B3FD0) to Color(0xFFFFB547),
+        badge = "New",
+        recentAt = System.currentTimeMillis() - 1,
+        tags = setOf("Discover"),
+    )
+
     // Playlists from Navidrome.
     val playlists = runCatching { graph.subsonic.playlists().also { graph.library.updatePlaylists(it) } }
         .getOrElse { graph.library.playlists() }

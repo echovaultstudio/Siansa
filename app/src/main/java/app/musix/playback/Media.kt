@@ -74,7 +74,7 @@ fun replayGainVolume(song: Song?, settings: AppSettings): Float {
     val album = settings.replayGain == ReplayGainMode.ALBUM
     val gain = if (album) song.albumGain ?: song.trackGain else song.trackGain ?: song.albumGain
     val peak = if (album) song.albumPeak ?: song.trackPeak else song.trackPeak ?: song.albumPeak
-    var volume = 10f.pow(((gain ?: 0f) + settings.preampDb) / 20f)
+    var volume = 10f.pow((gain ?: 0f) / 20f)
     if (peak != null && peak > 0f) volume = min(volume, 1f / peak)
     return volume.coerceIn(0f, 1f)
 }
