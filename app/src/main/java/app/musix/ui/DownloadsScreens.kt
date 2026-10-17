@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.DownloadForOffline
@@ -175,10 +177,19 @@ fun DownloadsScreen(nav: NavController) {
             item {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Hint("Music you download stays on the phone and plays without a connection, for example on a plane. It's kept until you remove it here.")
-                    Text(
-                        "${list.done.size} songs · ${formatSize(used)}" + if (settings.downloadLimitMb > 0) " of ${formatSize(settings.downloadLimitMb * 1024L * 1024L)}" else "",
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
+                    // Pause or resume sits next to the totals, right above the progress line it controls.
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "${list.done.size} songs · ${formatSize(used)}" + if (settings.downloadLimitMb > 0) " of ${formatSize(settings.downloadLimitMb * 1024L * 1024L)}" else "",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (progress.running) {
+                            DownloadControl(Icons.Rounded.Pause, "Pause") { graph.downloads.pause() }
+                        } else if (list.waiting.isNotEmpty()) {
+                            DownloadControl(Icons.Rounded.PlayArrow, "Resume") { graph.downloads.retry() }
+                        }
+                    }
                     if (progress.running) {
                         val song = progress.current
                         LinearProgressIndicator(
@@ -206,8 +217,6 @@ fun DownloadsScreen(nav: NavController) {
                                 Text("Shuffle all")
                             }
                         }
-                        if (progress.running) OutlinedButton(onClick = { graph.downloads.pause() }) { Text("Pause") }
-                        else if (list.waiting.isNotEmpty()) OutlinedButton(onClick = { graph.downloads.retry() }) { Text("Resume") }
                     }
                 }
             }
@@ -560,3 +569,24 @@ fun DownloadedSongsScreen(nav: NavController) {
         )
     }
 }
+
+/** Pause or Resume next to the download totals: a small pill with an icon, the height of the text beside it. */
+@Composable
+private fun DownloadControl(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, Modifier.size(18.dp), tint = Accent)
+        Spacer(Modifier.width(6.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** The Pause control as it shows while downloading, for the spacing test. */
+@Composable
+internal fun DownloadControlForTest() = DownloadControl(Icons.Rounded.Pause, "Pause") { }
