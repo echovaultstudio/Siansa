@@ -39,8 +39,9 @@ object PlayerFactory {
         val switching = CachingSwitchDataSource.Factory(cacheFactory, http)
         // Each stream is pointed at the original file or an Opus conversion when it opens.
         val resolving = ResolvingDataSource.Factory(switching) { spec ->
-            val key = spec.uri.getQueryParameter("id") ?: spec.uri.toString()
-            spec.withUri(Streaming.rewrite(spec.uri, kbpsFor(key)))
+            val uri = spec.uri.toString().let { if (Streaming.RELOAD_PARAM in it) android.net.Uri.parse(Streaming.withoutReload(it)) else spec.uri }
+            val key = uri.getQueryParameter("id") ?: uri.toString()
+            spec.withUri(Streaming.rewrite(uri, kbpsFor(key)))
         }
         val dataSource = DefaultDataSource.Factory(context, resolving)
 
