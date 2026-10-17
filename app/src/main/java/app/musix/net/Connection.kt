@@ -38,12 +38,14 @@ data class ConnectionState(
     val offline: Boolean get() = !network || server == false
 
     /** Mixes, mood playlists, sound search, song radio and song path can work. */
-    fun aiAvailable(settings: AppSettings): Boolean = settings.audioMuseReady && network && audioMuse != false
+    fun aiAvailable(settings: AppSettings): Boolean = aiProblem(settings) == null
 
     /** Why the AI tools can't be used, in plain words, or null when they can. */
     fun aiProblem(settings: AppSettings): String? = when {
         !settings.audioMuseReady -> "AudioMuse isn't set up. Add it in Settings → Connections."
         !network -> "You're offline."
+        // Its picks would mostly be songs that aren't on the phone.
+        settings.downloadedOnly -> "Only downloaded music is on."
         audioMuse == false -> "AudioMuse isn't answering."
         else -> null
     }

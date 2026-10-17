@@ -97,4 +97,14 @@ class SpacingTest {
         val centreGap = ((pause.top + pause.bottom) - (totals.top + totals.bottom)) / 2
         assertTrue("Pause is ${centreGap.value} dp off the totals' line", abs(centreGap.value) <= 2f)
     }
+
+    /** Source filter: a user's libraries sit as far below their name as they sit above the card's edge. */
+    @Test fun sourceCardLibrariesAreEvenlySpaced() {
+        compose.setContent { MusixTheme { app.musix.ui.SourceCardForTest() } }
+        val name = compose.onNodeWithTag("source-name").getBoundsInRoot()
+        // The chip merges its tick and name, so its text node is the whole chip.
+        val chipBox = compose.onNodeWithText("albums").getBoundsInRoot()
+        val card = compose.onNodeWithTag("source-card").getBoundsInRoot()
+        assertEven("Source card libraries", chipBox.top - name.bottom, card.bottom - chipBox.bottom)
+    }
 }

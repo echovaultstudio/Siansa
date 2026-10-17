@@ -666,8 +666,7 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
     )
 
     // Playlists from Navidrome.
-    val playlists = runCatching { graph.subsonic.playlists().also { graph.library.updatePlaylists(it) } }
-        .getOrElse { graph.library.playlists() }
+    val playlists = runCatching { graph.library.refreshPlaylists { graph.subsonic.playlists() } }.getOrElse { graph.library.playlists() }
     playlists.forEach { p ->
         val mine = me.isNotBlank() && p.owner.equals(me, ignoreCase = true)
         entries += Entry(

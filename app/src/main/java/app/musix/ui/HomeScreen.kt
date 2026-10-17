@@ -88,6 +88,7 @@ fun HomeScreen(nav: NavController) {
     val homeOrder = homeSettings.homeOrder
     val homeHidden = homeSettings.homeHidden
     var arranging by remember { mutableStateOf(false) }
+    var openOnSources by remember { mutableStateOf(false) }
 
     // While AudioMuse can't be reached (offline, or it's down), mixes aren't attempted: a clear message instead.
     val aiProblem = rememberAiProblem()
@@ -180,18 +181,14 @@ fun HomeScreen(nav: NavController) {
     val todaysMixes = mixes.orEmpty().filter { m ->
         m.date == today && (m.selectorId in personalIds || applicable.any { it.id == m.selectorId })
     }
-    val playlists by loadState("playlists") {
-        runCatching { graph.subsonic.playlists() }
-            .onSuccess { graph.library.updatePlaylists(it) }
-            .getOrElse { if (graph.library.isSynced) graph.library.playlists() else throw it }
-    }
+    val playlists by loadState(version to "playlists") { graph.library.refreshPlaylists { graph.subsonic.playlists() } }
     val recentAlbums by loadState(version to "recent") { recentlyPlayedAlbums(graph) }
     val recentArtists by loadState(version to "artists") { recentlyPlayedArtists(graph) }
     val newest by loadState(version to "newest") {
         if (graph.library.isSynced) graph.library.albums("newest").take(20)
         else graph.subsonic.albums("newest", 20, 0).distinctBy { it.name + "|" + it.artist }
     }
-    val lovedBefore by loadState(today) { graph.insights.rediscover() }
+    val lovedBefore by loadState(version to today) { graph.insights.rediscover() }
     val rediscover by loadState(version to "random") {
         if (graph.library.isSynced) graph.library.randomAlbums(20)
         else graph.subsonic.albums("random", 20, 0).distinctBy { it.name + "|" + it.artist }
@@ -210,9 +207,11 @@ fun HomeScreen(nav: NavController) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(greeting(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                IconButton(onClick = { arranging = true }) { Icon(Icons.Rounded.Tune, "Arrange Home") }
+                SourceFilterButton { openOnSources = true; arranging = true }
+                IconButton(onClick = { openOnSources = false; arranging = true }) { Icon(Icons.Rounded.Tune, "Arrange Home") }
             }
         }
+        item(key = "sources") { SourceChips { openOnSources = true; arranging = true } }
 
         if (loaded && !synced) {
             item(key = "sync") { Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { SyncPrompt(nav) } }
@@ -409,21 +408,24 @@ fun HomeScreen(nav: NavController) {
         }, onHiddenChange = {
             AppLog.i("Home", "Hidden: ${HomeSection.formatHidden(it).ifEmpty { "none" }}")
             graph.settings.setHomeHidden(it)
-        }, onDismiss = { arranging = false })
+        }, onDismiss = { arranging = false }, startOnSources = openOnSources)
     }
 }
 
 internal suspend fun recentlyPlayedAlbums(graph: AppGraph, limit: Int = 15): List<Album> {
     if (!graph.library.isSynced) return emptyList()
     // The full list looks further back in the history than the row on Home.
-    val songs = graph.library.songs(graph.history.recent(if (limit > 15) 2000 else 300).map { it.id }.distinct())
+    val heard = graph.library.songs(graph.history.recent(if (limit > 15) 2000 else 300).map { it.id }.distinct())
+    // With "Only downloaded music" on, only songs on the phone count.
+    val songs = graph.library.onlyDownloaded()?.songs(heard) ?: heard
     val albumIds = songs.mapNotNull { it.albumId }.distinct().take(limit)
     return albumIds.mapNotNull { graph.library.album(it) }.distinctBy { it.id }
 }
 
 internal suspend fun recentlyPlayedArtists(graph: AppGraph, limit: Int = 10): List<Artist> {
     if (!graph.library.isSynced) return emptyList()
-    val songs = graph.library.songs(graph.history.recent(if (limit > 10) 2000 else 300).map { it.id }.distinct())
+    val heard = graph.library.songs(graph.history.recent(if (limit > 10) 2000 else 300).map { it.id }.distinct())
+    val songs = graph.library.onlyDownloaded()?.songs(heard) ?: heard
     return songs.distinctBy { it.artistId ?: it.artist }.take(limit).mapNotNull { s ->
         s.artistId?.let { graph.library.artist(it) } ?: graph.library.artistByName(s.artist)
     }.distinctBy { it.id }
