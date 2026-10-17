@@ -178,6 +178,27 @@ class AudioMuseApi(
         }
     }
 
+    /**
+     * A song path: tracks that move step by step from the sound of [startId] to the sound of [endId]
+     * (AudioMuse's `find_path`), in order, normally including both ends. [maxSteps] limits its length.
+     */
+    suspend fun findPath(startId: String, endId: String, maxSteps: Int): List<ClapHit> {
+        val s = settings()
+        val url = s.audioMuseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/find_path")
+            .addQueryParameter("start_song_id", startId)
+            .addQueryParameter("end_song_id", endId)
+            .addQueryParameter("max_steps", maxSteps.toString())
+            .build()
+        val root = executeElement { request("").url(url).get().build() }
+        val rows = (root as? JsonArray) ?: (root as? JsonObject)?.let { it["path"] as? JsonArray } ?: JsonArray(emptyList())
+        return rows.mapNotNull { element ->
+            val r = element as? JsonObject ?: return@mapNotNull null
+            val id = r.str("item_id") ?: return@mapNotNull null
+            ClapHit(id, r.str("title").orEmpty(), r.str("author").orEmpty(), r.str("album"), 1.0)
+        }
+    }
+
     /** Sound concepts this library's search understands well, to steer the AI's wording. */
     suspend fun concepts(): List<String> {
         val root = execute { request("/api/clap/concepts").get().build() }

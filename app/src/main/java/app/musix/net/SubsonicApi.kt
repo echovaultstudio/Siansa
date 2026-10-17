@@ -44,7 +44,7 @@ class SubsonicApi(
         return token
     }
 
-    fun url(endpoint: String, params: Map<String, String?> = emptyMap()): String {
+    fun url(endpoint: String, params: Map<String, String?> = emptyMap(), repeated: List<Pair<String, String>> = emptyList()): String {
         val s = settings()
         val sb = StringBuilder(s.navidromeUrl)
             .append("/rest/").append(endpoint)
@@ -55,6 +55,7 @@ class SubsonicApi(
         for ((key, value) in params) {
             if (value != null) sb.append('&').append(enc(key)).append('=').append(enc(value))
         }
+        for ((key, value) in repeated) sb.append('&').append(enc(key)).append('=').append(enc(value))
         return sb.toString()
     }
 
@@ -64,10 +65,14 @@ class SubsonicApi(
     fun coverUrl(id: String, size: Int?): String =
         url("getCoverArt", mapOf("id" to id, "size" to size?.toString()))
 
-    private suspend fun call(endpoint: String, params: Map<String, String?> = emptyMap()): JsonObject =
+    private suspend fun call(
+        endpoint: String,
+        params: Map<String, String?> = emptyMap(),
+        repeated: List<Pair<String, String>> = emptyList(),
+    ): JsonObject =
         withContext(Dispatchers.IO) {
             if (settings().navidromeUrl.isBlank()) throw ApiException("Navidrome isn't set up yet")
-            val request = Request.Builder().url(url(endpoint, params)).build()
+            val request = Request.Builder().url(url(endpoint, params, repeated)).build()
             http.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (response.code == 401 || response.code == 407) {
@@ -237,6 +242,11 @@ class SubsonicApi(
     /** submission=false marks "now playing"; true records a finished play, at [timeMs] when given. */
     suspend fun scrobble(id: String, submission: Boolean, timeMs: Long? = null) {
         call("scrobble", mapOf("id" to id, "submission" to submission.toString(), "time" to timeMs?.toString()))
+    }
+
+    /** Saves [songIds], in order, as a new playlist on Navidrome. */
+    suspend fun createPlaylist(name: String, songIds: List<String>) {
+        call("createPlaylist", mapOf("name" to name), songIds.map { "songId" to it })
     }
 
     suspend fun star(id: String) {
