@@ -103,6 +103,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -617,13 +622,26 @@ private fun ViewToggle(icon: androidx.compose.ui.graphics.vector.ImageVector, la
     }
 }
 
+private val LyricsShadow = Shadow(Color.Black.copy(alpha = 0.35f), blurRadius = 12f)
+
 @Composable
 private fun LyricsView(song: Song?) {
     val graph = LocalGraph.current
     val position by rememberPosition()
     val lyrics by loadState(song?.id) { song?.let { graph.subsonic.lyrics(it) } }
+    // No box behind the lyrics: they fade out at the top and bottom into the blurred cover, and a soft
+    // shadow keeps them readable on bright covers.
+    val fadePx = with(LocalDensity.current) { 48.dp.toPx() }
     Box(
-        Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.3f)).padding(16.dp),
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                val stops = lyricsFadeStops(size.height, fadePx).map { (at, alpha) -> at to Color.Black.copy(alpha = alpha) }
+                drawRect(Brush.verticalGradient(*stops.toTypedArray()), blendMode = BlendMode.DstIn)
+            }
+            .padding(horizontal = 4.dp),
     ) {
         LoadBox(lyrics) { loaded ->
             if (loaded == null || loaded.lines.isEmpty()) {
@@ -633,9 +651,9 @@ private fun LyricsView(song: Song?) {
             if (!loaded.synced) {
                 Text(
                     loaded.lines.joinToString("\n") { it.text },
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleMedium.copy(shadow = LyricsShadow),
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 24.dp),
                 )
                 return@LoadBox
             }
@@ -649,7 +667,7 @@ private fun LyricsView(song: Song?) {
                     val active = index == current
                     Text(
                         line.text.ifBlank { "♪" },
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.headlineSmall.copy(shadow = LyricsShadow),
                         fontWeight = FontWeight.Bold,
                         color = if (active) Color.White else Color.White.copy(alpha = if (index < current) 0.55f else 0.35f),
                         textAlign = TextAlign.Start,
