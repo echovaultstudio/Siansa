@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -93,11 +94,14 @@ fun HomeScreen(nav: NavController) {
                 if (selector == null || selector.id == current?.selectorId) current = mix
                 if (mix == null) error = "No vibe covers this hour. Add one under Vibes."
                 if (open && mix != null) nav.navigate("mix/${mix.id}")
+                if (open && mix == null) launch.notify(error!!)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 AppLog.w("Home", "Mix failed: ${e.message}")
                 error = e.message ?: "Couldn't build the mix"
+                // Tapped on a tile further down: the message at the top of the page is out of sight.
+                if (open) launch.notify(error!!)
             } finally {
                 busySelector = null
             }
@@ -174,7 +178,8 @@ fun HomeScreen(nav: NavController) {
     }
     val genres by loadState(version to "genres") { if (graph.library.isSynced) graph.library.genres(12) else emptyList() }
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp))) {
+    // imePadding: the keyboard shrinks the list, so the "How are you feeling?" box scrolls up above it.
+    LazyColumn(Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp))) {
         item {
             Row(
                 Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 12.dp),
@@ -274,15 +279,10 @@ fun HomeScreen(nav: NavController) {
 
         // Albums you loved a while ago but haven't played since.
         item {
-            Shelf("Rediscover", lovedBefore.valueOrNull().orEmpty(), key = { it.album.id }) { r ->
-                val ago = r.lastPlayed?.let { java.time.temporal.ChronoUnit.MONTHS.between(it, LocalDate.now()) }
+            Shelf("Rediscover", lovedBefore.valueOrNull().orEmpty(), key = { it.album.id }, onOpenAll = nav.openAll(HomeSection.Rediscover)) { r ->
                 AlbumTile(
                     name = r.album.name,
-                    subtitle = when {
-                        ago != null && ago >= 12 -> "Last played ${ago / 12} year${if (ago >= 24) "s" else ""} ago"
-                        ago != null -> "Last played $ago months ago"
-                        else -> r.album.artist
-                    },
+                    subtitle = rediscoverSubtitle(r),
                     coverArt = r.album.coverArt,
                     onClick = { nav.navigate("album/${r.album.id}") },
                     modifier = Modifier.width(150.dp),
@@ -291,7 +291,7 @@ fun HomeScreen(nav: NavController) {
         }
 
         item {
-            Shelf("Radios", moodRadios, key = { it.id }) { radio ->
+            Shelf("Radios", moodRadios, key = { it.id }, onOpenAll = nav.openAll(HomeSection.Radios)) { radio ->
                 GradientTile(
                     title = radio.name,
                     colors = Color(radio.colors.first) to Color(radio.colors.second),
@@ -303,19 +303,19 @@ fun HomeScreen(nav: NavController) {
         }
 
         item {
-            Shelf("Your playlists", playlists.valueOrNull().orEmpty(), key = { it.id }) { playlist ->
+            Shelf("Your playlists", playlists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(HomeSection.Playlists)) { playlist ->
                 PlaylistTile(playlist) { nav.navigate("playlist/${playlist.id}") }
             }
         }
 
         item {
-            Shelf("Recently played", recentAlbums.valueOrNull().orEmpty(), key = { it.id }) { album ->
+            Shelf("Recently played", recentAlbums.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(HomeSection.RecentlyPlayed)) { album ->
                 AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
             }
         }
 
         item {
-            Shelf("Artist radios", recentArtists.valueOrNull().orEmpty(), key = { it.id }) { artist ->
+            Shelf("Artist radios", recentArtists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(HomeSection.ArtistRadios)) { artist ->
                 AlbumTile(
                     name = "${artist.name} radio",
                     subtitle = "With similar artists",
@@ -330,13 +330,13 @@ fun HomeScreen(nav: NavController) {
         }
 
         item {
-            Shelf("Recently added", newest.valueOrNull().orEmpty(), key = { it.id }) { album ->
+            Shelf("Recently added", newest.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(HomeSection.RecentlyAdded)) { album ->
                 AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
             }
         }
 
         item {
-            Shelf("Your genres", genres.valueOrNull().orEmpty(), key = { it.name }) { genre ->
+            Shelf("Your genres", genres.valueOrNull().orEmpty(), key = { it.name }, onOpenAll = nav.openAll(HomeSection.Genres)) { genre ->
                 GradientTile(
                     title = genre.name,
                     colors = tileColors(genre.name),
@@ -348,27 +348,31 @@ fun HomeScreen(nav: NavController) {
         }
 
         item {
-            Shelf("Random picks", rediscover.valueOrNull().orEmpty(), key = { it.id }) { album ->
+            Shelf("Random picks", rediscover.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(HomeSection.RandomPicks)) { album ->
                 AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
             }
         }
     }
 }
 
-private suspend fun recentlyPlayedAlbums(graph: AppGraph): List<Album> {
+internal suspend fun recentlyPlayedAlbums(graph: AppGraph, limit: Int = 15): List<Album> {
     if (!graph.library.isSynced) return emptyList()
-    val songs = graph.library.songs(graph.history.recent(300).map { it.id }.distinct())
-    val albumIds = songs.mapNotNull { it.albumId }.distinct().take(15)
+    // The full list looks further back in the history than the row on Home.
+    val songs = graph.library.songs(graph.history.recent(if (limit > 15) 2000 else 300).map { it.id }.distinct())
+    val albumIds = songs.mapNotNull { it.albumId }.distinct().take(limit)
     return albumIds.mapNotNull { graph.library.album(it) }.distinctBy { it.id }
 }
 
-private suspend fun recentlyPlayedArtists(graph: AppGraph): List<Artist> {
+internal suspend fun recentlyPlayedArtists(graph: AppGraph, limit: Int = 10): List<Artist> {
     if (!graph.library.isSynced) return emptyList()
-    val songs = graph.library.songs(graph.history.recent(300).map { it.id }.distinct())
-    return songs.distinctBy { it.artistId ?: it.artist }.take(10).mapNotNull { s ->
+    val songs = graph.library.songs(graph.history.recent(if (limit > 10) 2000 else 300).map { it.id }.distinct())
+    return songs.distinctBy { it.artistId ?: it.artist }.take(limit).mapNotNull { s ->
         s.artistId?.let { graph.library.artist(it) } ?: graph.library.artistByName(s.artist)
     }.distinctBy { it.id }
 }
+
+/** Opens a Home row's full list; navigation stays on the main thread (it's called from a tap). */
+private fun NavController.openAll(section: HomeSection): () -> Unit = { navigate(section.route) }
 
 private fun greeting(): String {
     val hour = LocalTime.now().hour
