@@ -1,0 +1,207 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  :root{
+    --amber:#FFB547; --violet:#B69CFF; --plum:#110D1C; --plumRaised:#1C1630; --plumHigh:#272040;
+    --text:#EDE7F6; --muted:rgba(237,231,246,.62); --faint:rgba(237,231,246,.38);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#444;font-family:Inter,sans-serif;color:var(--text);display:flex;gap:40px;padding:40px;flex-wrap:wrap}
+  .phone{width:360px;height:780px;position:relative;overflow:hidden;border-radius:0;background:var(--plum)}
+  .status{height:28px;display:flex;justify-content:space-between;align-items:center;padding:0 18px;font-size:12px;font-weight:600;color:#fff}
+  svg{display:block}
+  .ic{width:24px;height:24px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .fill{fill:#fff;stroke:none}
+
+  /* --- now playing --- */
+  .np{background:linear-gradient(180deg,#5a5560 0%,#3a3542 38%,#1d1828 70%,var(--plum) 100%)}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:8px 12px 0}
+  .top .mid{text-align:center}
+  .top .from{font-size:10.5px;letter-spacing:.9px;color:var(--muted);font-weight:500}
+  .top .name{font-size:13px;font-weight:700;margin-top:1px}
+  .iconbtn{width:40px;height:40px;display:flex;align-items:center;justify-content:center}
+  .cover{margin:30px 24px 0;width:312px;height:312px;border-radius:8px;overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.45)}
+  .cover img{width:100%;height:100%;display:block}
+  .title-row{display:flex;align-items:center;margin:34px 24px 0}
+  .title-row .t{flex:1;min-width:0}
+  .song{font-size:22px;font-weight:700;letter-spacing:-.2px}
+  .artist{font-size:15px;color:var(--muted);margin-top:3px}
+  .seek{margin:20px 24px 0}
+  .bar{height:4px;border-radius:2px;background:rgba(255,255,255,.22);position:relative}
+  .bar .done{position:absolute;left:0;top:0;bottom:0;width:22%;border-radius:2px;background:#fff}
+  .bar .thumb{position:absolute;left:22%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#fff}
+  .times{display:flex;justify-content:space-between;align-items:center;margin-top:7px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .fmt{font-size:9.5px;letter-spacing:1px;color:var(--faint);font-weight:600}
+  .controls{display:flex;align-items:center;justify-content:space-between;margin:10px 18px 0}
+  .play{width:64px;height:64px;border-radius:50%;background:var(--amber);display:flex;align-items:center;justify-content:center}
+  .bottom{display:flex;align-items:center;justify-content:space-between;margin:14px 20px 0}
+  .bottom .right{display:flex;gap:22px}
+  .device{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--amber)}
+  .peek{position:absolute;left:12px;right:12px;bottom:-40px;height:86px;border-radius:12px;background:#4a3f6b;padding:14px 16px}
+  .peek h4{font-size:14px;font-weight:700}
+
+  /* --- scrolled --- */
+  .sc{background:var(--plum)}
+  .mini{display:flex;align-items:center;gap:10px;padding:10px 16px 10px;background:#2a2533;border-bottom:1px solid rgba(255,255,255,.06)}
+  .mini .t{flex:1;min-width:0}
+  .mini .s{font-size:14px;font-weight:600}
+  .mini .a{font-size:12px;color:var(--muted);margin-top:2px}
+  .progress{height:2px;background:rgba(255,255,255,.15)}
+  .progress div{height:2px;width:22%;background:#fff}
+  .card{margin:12px 12px 0;border-radius:12px;overflow:hidden}
+  .lyrics{background:linear-gradient(160deg,#5b4a86,#3d3260);padding:18px 18px 18px}
+  .card h3{font-size:15px;font-weight:700;margin-bottom:12px}
+  .lyrics p{font-size:19px;font-weight:700;line-height:1.28;color:rgba(255,255,255,.92);margin-bottom:10px}
+  .lyrics p.fade{color:rgba(255,255,255,.35);margin-bottom:0;height:20px;overflow:hidden}
+  .pill{display:inline-block;margin-top:14px;background:#fff;color:#111;font-size:13px;font-weight:700;padding:8px 16px;border-radius:20px}
+  .pill.out{background:none;color:#fff;border:1px solid rgba(255,255,255,.5)}
+  .about{background:var(--plumRaised)}
+  .about .photo{height:150px;position:relative;background:url(cover.jpg) center 30%/cover;filter:grayscale(.2)}
+  .about .photo::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(17,13,28,.7),rgba(17,13,28,.25) 45%,rgba(28,22,48,.95))}
+  .about .photo h3{position:absolute;left:18px;top:16px;z-index:1}
+  .about .body{padding:12px 18px 18px}
+  .about .n{display:flex;align-items:center;justify-content:space-between}
+  .about .n b{font-size:20px}
+  .about .n .pill{margin:0}
+  .about .meta{font-size:12.5px;color:var(--muted);margin-top:4px}
+  .about .bio{font-size:12.5px;color:var(--muted);line-height:1.45;margin-top:10px}
+  .queue{background:var(--plumRaised);padding:16px 18px 6px}
+  .queue .h{display:flex;justify-content:space-between;align-items:baseline}
+  .queue .h span{font-size:12px;color:var(--amber);font-weight:600}
+  .row{display:flex;align-items:center;gap:12px;padding:7px 0}
+  .row .th{width:40px;height:40px;border-radius:4px;background:#3b3355;flex:none}
+  .row .s{font-size:13.5px;font-weight:600}
+  .row .a{font-size:12px;color:var(--muted);margin-top:2px}
+  .details{background:var(--plumRaised);padding:16px 18px;margin-bottom:12px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
+  .grid div{font-size:11px;color:var(--faint);letter-spacing:.3px}
+  .grid b{display:block;font-size:14px;color:var(--text);font-weight:600;margin-top:2px;letter-spacing:0}
+
+  /* --- menu --- */
+  .dim{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+  .sheet{position:absolute;left:0;right:0;top:64px;bottom:0;background:#221c2e;border-radius:16px 16px 0 0}
+  .handle{width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.3);margin:8px auto 10px}
+  .sh{display:flex;align-items:center;gap:12px;padding:4px 18px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .sh img{width:48px;height:48px;border-radius:4px}
+  .sh .s{font-size:15px;font-weight:600}
+  .sh .a{font-size:13px;color:var(--muted);margin-top:2px}
+  .item{display:flex;align-items:center;gap:18px;padding:0 20px;height:46px;font-size:15px}
+  .item .ic{stroke:rgba(255,255,255,.85)}
+  .item .grow{flex:1}
+  .tag{font-size:10.5px;font-weight:700;letter-spacing:.4px;padding:3px 8px;border-radius:10px;background:rgba(182,156,255,.16);color:var(--violet)}
+  .tag.on{background:rgba(255,181,71,.16);color:var(--amber)}
+  .sep{height:1px;background:rgba(255,255,255,.07);margin:4px 20px}
+  .label{font-size:11px;letter-spacing:.9px;color:var(--faint);font-weight:600;padding:10px 20px 4px}
+</style></head>
+<body>
+
+<!-- 1. Now playing -->
+<div class="phone np" id="np">
+  <div class="status"><span>14:14</span><span>77%</span></div>
+  <div class="top">
+    <div class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+    <div class="mid"><div class="from">PLAYING FROM ALBUM</div><div class="name">Tribe</div></div>
+    <div class="iconbtn"><svg viewBox="0 0 24 24" width="24" height="24"><circle class="fill" cx="12" cy="5" r="2"/><circle class="fill" cx="12" cy="12" r="2"/><circle class="fill" cx="12" cy="19" r="2"/></svg></div>
+  </div>
+  <div class="cover"><img src="cover.jpg"></div>
+  <div class="title-row">
+    <div class="t"><div class="song">Tribute</div><div class="artist">Chase &amp; Status</div></div>
+    <svg class="ic" viewBox="0 0 24 24" style="width:28px;height:28px"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8.2 3.4 4.8 6.8 4.6c2.1-.1 3.7 1 5.2 2.9 1.5-1.9 3.1-3 5.2-2.9 3.4.2 5.3 3.6 4.1 6.7-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg>
+  </div>
+  <div class="seek">
+    <div class="bar"><div class="done"></div><div class="thumb"></div></div>
+    <div class="times"><span>1:14</span><span class="fmt">FLAC</span><span>-4:32</span></div>
+  </div>
+  <div class="controls">
+    <svg class="ic" viewBox="0 0 24 24" style="width:26px;height:26px"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+    <svg viewBox="0 0 24 24" width="36" height="36"><path class="fill" d="M6 5h2.5v14H6zM20 5v14L9.5 12z"/></svg>
+    <div class="play"><svg viewBox="0 0 24 24" width="30" height="30"><path d="M7 4h4v16H7zM13 4h4v16h-4z" fill="#2A1700"/></svg></div>
+    <svg viewBox="0 0 24 24" width="36" height="36"><path class="fill" d="M15.5 5H18v14h-2.5zM4 5v14l10.5-7z"/></svg>
+    <svg class="ic" viewBox="0 0 24 24" style="width:26px;height:26px"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 013-3h15M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 01-3 3H3"/></svg>
+  </div>
+  <div class="bottom">
+    <div class="device"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FFB547" stroke-width="2" stroke-linecap="round"><path d="M3 18a3 3 0 013 3M3 14a7 7 0 017 7M3 10a11 11 0 0111 11"/><path d="M5 6V5a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2h-3"/></svg>Sony WH-1000XM5</div>
+    <div class="right">
+      <svg class="ic" viewBox="0 0 24 24" style="width:22px;height:22px;stroke:rgba(255,255,255,.85)"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/></svg>
+      <svg class="ic" viewBox="0 0 24 24" style="width:22px;height:22px;stroke:rgba(255,255,255,.85)"><path d="M3 6h13M3 12h13M3 18h8M19 10v8M15 14l4 4 4-4" transform="translate(-1 0)"/></svg>
+    </div>
+  </div>
+  <div class="peek"><h4>Lyrics preview</h4></div>
+</div>
+
+<!-- 2. Scrolled down -->
+<div class="phone sc" id="sc">
+  <div class="status" style="background:#2a2533"><span>14:18</span><span>76%</span></div>
+  <div class="mini">
+    <div class="t"><div class="s">Tribute</div><div class="a">Chase &amp; Status</div></div>
+    <svg class="ic" viewBox="0 0 24 24" style="width:24px;height:24px"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8.2 3.4 4.8 6.8 4.6c2.1-.1 3.7 1 5.2 2.9 1.5-1.9 3.1-3 5.2-2.9 3.4.2 5.3 3.6 4.1 6.7-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg>
+    <svg viewBox="0 0 24 24" width="26" height="26" style="margin-left:10px"><path class="fill" d="M7 4h4v16H7zM13 4h4v16h-4z"/></svg>
+  </div>
+  <div class="progress"><div></div></div>
+
+  <div class="card lyrics">
+    <h3>Lyrics preview</h3>
+    <p>Lyrics from Navidrome</p>
+    <p>show here, line by line,</p>
+    <p>the one playing now bright</p>
+    <p class="fade">and the next ones fading</p>
+    <div class="pill">Show lyrics</div>
+  </div>
+
+  <div class="card about">
+    <div class="photo"><h3>About the artist</h3></div>
+    <div class="body">
+      <div class="n"><b>Chase &amp; Status</b><div class="pill out">Open artist</div></div>
+      <div class="meta">12 albums · 148 songs in your library · 312 plays</div>
+      <div class="bio">London duo Saul Milton and Will Kennard, mixing drum and bass, dubstep and grime since 2003…</div>
+    </div>
+  </div>
+
+  <div class="card queue">
+    <div class="h"><h3>Up next</h3><span>Open queue</span></div>
+    <div class="row"><div class="th"></div><div><div class="s">Shadow Box</div><div class="a">Elite Force</div></div></div>
+    <div class="row"><div class="th" style="background:#4a3f2a"></div><div><div class="s">Blk &amp; Blu</div><div class="a">Chase &amp; Status, Ed Thomas</div></div></div>
+  </div>
+
+  <div class="card details">
+    <h3>About this song</h3>
+    <div class="grid">
+      <div>FORMAT<b>FLAC · 24-bit</b></div>
+      <div>SAMPLE RATE<b>44.1 kHz</b></div>
+      <div>BIT RATE<b>1,411 kbit/s</b></div>
+      <div>PLAYS<b>23 · skipped 2</b></div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. Three-dot menu -->
+<div class="phone np" id="menu">
+  <div class="status"><span>14:17</span><span>76%</span></div>
+  <div class="top">
+    <div class="iconbtn"><svg class="ic" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+    <div class="mid"><div class="from">PLAYING FROM ALBUM</div><div class="name">Tribe</div></div>
+    <div class="iconbtn"></div>
+  </div>
+  <div class="dim"></div>
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="sh"><img src="cover.jpg"><div><div class="s">Tribute</div><div class="a">Chase &amp; Status</div></div></div>
+    <div style="height:6px"></div>
+    <div class="item"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8.2 3.4 4.8 6.8 4.6c2.1-.1 3.7 1 5.2 2.9 1.5-1.9 3.1-3 5.2-2.9 3.4.2 5.3 3.6 4.1 6.7-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg><span class="grow">Add to Liked songs</span></div>
+    <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span class="grow">Add to playlist</span></div>
+    <div class="item"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h11M4 12h11M4 17h7M19 14v6M16 17h6"/></svg><span class="grow">Add to queue</span></div>
+    <div class="item"><svg class="ic" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span class="grow">Go to queue</span></div>
+    <div class="sep"></div>
+    <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg><span class="grow">Go to album</span></div>
+    <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="10" cy="8" r="4"/><path d="M3 20c0-3.5 3-6 7-6M17 13v6M17 19a2 2 0 11-2-2h2"/></svg><span class="grow">Go to artists</span></div>
+    <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M7.8 7.8a6 6 0 000 8.4M16.2 16.2a6 6 0 000-8.4M4.9 4.9a10 10 0 000 14.2M19.1 19.1a10 10 0 000-14.2"/></svg><span class="grow">Start song radio</span></div>
+    <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M7 18h4a4 4 0 004-4v-4a4 4 0 014-4"/></svg><span class="grow">Song path…</span></div>
+    <div class="sep"></div>
+    <div class="item"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4M14 15h3"/></svg><span class="grow">Lyrics</span><span class="tag on">ON</span></div>
+    <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg><span class="grow">Song details</span></div>
+    <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg><span class="grow">Sleep timer</span><span class="tag">COMING SOON</span></div>
+    <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/></svg><span class="grow">Share</span></div>
+  </div>
+</div>
+
+</body></html>
