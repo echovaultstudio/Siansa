@@ -7,3 +7,10 @@ package app.musix.ui
  * everything down.
  */
 fun playerTopGapDp(screenHeightDp: Int): Float = (screenHeightDp * 0.025f).coerceIn(12f, 28f)
+
+/**
+ * How round now playing's top corners are, in px, while it is dragged [dragPx] down: square when it fills
+ * the screen, rounding as it follows the finger down (up to [maxPx]) so it moves as one card over the page
+ * underneath.
+ */
+fun playerCardCornerPx(dragPx: Float, maxPx: Float): Float = dragPx.coerceIn(0f, maxPx.coerceAtLeast(0f))
