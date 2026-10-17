@@ -125,6 +125,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import androidx.navigation.NavController
 import app.musix.data.Song
+import app.musix.playback.AudioOutput
+import app.musix.playback.Cast
 import app.musix.playback.PlayerState
 import kotlin.math.max
 
@@ -278,9 +280,15 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 }
                 SeekBar(state)
                 Controls(state)
-                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    ViewToggle(Icons.Rounded.FormatQuote, "Lyrics", view == PlayerView.LYRICS) {
-                        view = if (view == PlayerView.LYRICS) PlayerView.ART else PlayerView.LYRICS
+                // Like Spotify: where the music plays on the left (with the TV, speaker or headphones' name),
+                // song radio in the middle, lyrics and the queue on the right.
+                val castStatus by Cast.status.collectAsStateWithLifecycle()
+                val output by AudioOutput.device.collectAsStateWithLifecycle()
+                val dlnaDevice by app.musix.playback.dlna.Dlna.selected.collectAsStateWithLifecycle()
+                val casting = castDeviceLabel(castStatus, output, dlnaDevice?.name) != null
+                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
                     }
                     // Song radio: AudioMuse keeps adding songs that sound like this one and share its mood.
                     val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
@@ -301,15 +309,28 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                             .padding(horizontal = 14.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Rounded.Radio, null, tint = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f), modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            if (radioSeed != null) "Radio on" else "Song radio",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f),
+                        Icon(
+                            Icons.Rounded.Radio,
+                            if (casting) (if (radioSeed != null) "Radio on" else "Song radio") else null,
+                            tint = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.size(20.dp),
                         )
+                        // While a device's name shows, it needs the room, so the chip shows just its icon.
+                        if (!casting) {
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                if (radioSeed != null) "Radio on" else "Song radio",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (radioSeed != null) Accent else Color.White.copy(alpha = 0.8f),
+                            )
+                        }
                     }
-                    ViewToggle(Icons.AutoMirrored.Rounded.QueueMusic, "Queue", queueOpen) { queueOpen = true }
+                    Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End) {
+                        ViewToggle(Icons.Rounded.FormatQuote, "Lyrics", view == PlayerView.LYRICS) {
+                            view = if (view == PlayerView.LYRICS) PlayerView.ART else PlayerView.LYRICS
+                        }
+                        ViewToggle(Icons.AutoMirrored.Rounded.QueueMusic, "Queue", queueOpen) { queueOpen = true }
+                    }
                 }
                 UpNextHandle(state) { queueOpen = true }
             }
