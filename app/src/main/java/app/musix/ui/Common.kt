@@ -61,6 +61,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.SwipeToDismissBox
 import androidx.navigation.NavController
 import app.musix.AppGraph
 import app.musix.data.Song
@@ -385,7 +392,10 @@ fun formatDuration(seconds: Long): String {
 fun artistAndAlbum(song: Song): String? =
     listOf(song.artist, song.album).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { null }
 
-/** A song row. Tap plays; the menu queues it, starts a radio from it, opens its album or artist, or shows its details. */
+/**
+ * A song row. Tap plays; swipe it from right to left to add it to the queue; the menu queues it, starts a
+ * radio from it, opens its album or artist, or shows its details.
+ */
 @Composable
 fun SongRow(
     song: Song,
@@ -395,6 +405,8 @@ fun SongRow(
     showCover: Boolean = true,
     // The line under the title; null shows none.
     subtitle: String? = artistAndAlbum(song),
+    // Swipe from right to left adds the song to the queue (not in the queue itself).
+    swipeToQueue: Boolean = true,
 ) {
     val graph = LocalGraph.current
     val nav = LocalNav.current
@@ -402,95 +414,98 @@ fun SongRow(
     val openArtist = rememberArtistOpener(beforeOpen = { sheet.close() })
     val launch = rememberPlayLauncher()
     var menu by remember { mutableStateOf(false) }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (leading != null) {
-            Text(
-                leading,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.width(32.dp),
-            )
-        }
-        if (showCover) {
-            Cover(song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
-            Spacer(Modifier.width(12.dp))
-        }
-        Column(Modifier.weight(1f)) {
-            Text(
-                song.title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (subtitle != null) {
+    SwipeToQueue(song, enabled = swipeToQueue, onQueued = { launch.notify("Added to the queue") }) { rowBackground ->
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .then(rowBackground)
+                .clickable(onClick = onClick)
+                .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (leading != null) {
                 Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    leading,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(32.dp),
+                )
+            }
+            if (showCover) {
+                Cover(song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
+                Spacer(Modifier.width(12.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    song.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (subtitle != null) {
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
-        }
-        if (song.durationSec > 0) {
-            Text(
-                formatDuration(song.durationSec.toLong()),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Box {
-            IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(text = { Text("Play next") }, onClick = {
-                    menu = false
-                    graph.player.playNext(song)
-                })
-                DropdownMenuItem(text = { Text("Add to queue") }, onClick = {
-                    menu = false
-                    graph.player.addToQueue(song)
-                })
-                val liked = graph.favorites.isLiked(song)
-                DropdownMenuItem(text = { Text(if (liked) "Remove from liked songs" else "Add to liked songs") }, onClick = {
-                    menu = false
-                    graph.favorites.toggle(song)
-                })
-                DropdownMenuItem(text = { Text("Start song radio") }, onClick = {
-                    menu = false
-                    graph.songRadio.start(song) { message -> launch.notify(message) }
-                })
-                if (graph.settings.current.audioMuseReady) {
-                    DropdownMenuItem(text = { Text("Song path…") }, onClick = {
+            if (song.durationSec > 0) {
+                Text(
+                    formatDuration(song.durationSec.toLong()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Box {
+                IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("Play next") }, onClick = {
+                        menu = false
+                        graph.player.playNext(song)
+                    })
+                    DropdownMenuItem(text = { Text("Add to queue") }, onClick = {
+                        menu = false
+                        graph.player.addToQueue(song)
+                    })
+                    val liked = graph.favorites.isLiked(song)
+                    DropdownMenuItem(text = { Text(if (liked) "Remove from liked songs" else "Add to liked songs") }, onClick = {
+                        menu = false
+                        graph.favorites.toggle(song)
+                    })
+                    DropdownMenuItem(text = { Text("Start song radio") }, onClick = {
+                        menu = false
+                        graph.songRadio.start(song) { message -> launch.notify(message) }
+                    })
+                    if (graph.settings.current.audioMuseReady) {
+                        DropdownMenuItem(text = { Text("Song path…") }, onClick = {
+                            menu = false
+                            sheet.close()
+                            nav.openSongPath(song.id)
+                        })
+                    }
+                    song.albumId?.let { albumId ->
+                        DropdownMenuItem(text = { Text("Go to album") }, onClick = {
+                            menu = false
+                            sheet.close()
+                            nav.navigate("album/$albumId")
+                        })
+                    }
+                    if (song.artistId != null || song.artists.isNotEmpty()) {
+                        DropdownMenuItem(text = { Text("Go to artist") }, onClick = {
+                            menu = false
+                            openArtist(song)
+                        })
+                    }
+                    DropdownMenuItem(text = { Text("Show details") }, onClick = {
                         menu = false
                         sheet.close()
-                        nav.openSongPath(song.id)
+                        nav.openSongDetails(song.id)
                     })
                 }
-                song.albumId?.let { albumId ->
-                    DropdownMenuItem(text = { Text("Go to album") }, onClick = {
-                        menu = false
-                        sheet.close()
-                        nav.navigate("album/$albumId")
-                    })
-                }
-                if (song.artistId != null || song.artists.isNotEmpty()) {
-                    DropdownMenuItem(text = { Text("Go to artist") }, onClick = {
-                        menu = false
-                        openArtist(song)
-                    })
-                }
-                DropdownMenuItem(text = { Text("Show details") }, onClick = {
-                    menu = false
-                    sheet.close()
-                    nav.openSongDetails(song.id)
-                })
             }
         }
     }
@@ -688,3 +703,57 @@ fun <T> Shelf(
         }
     }
 }
+
+/**
+ * Spotify's swipe to queue: drag a song row from right to left past a third of its width and let go, and
+ * the song is added to the queue (after the songs queued before it). The row slides back; an amber strip
+ * with the queue icon shows behind it while dragging. [content] gets a background for the row, solid
+ * only while it's dragged so the row looks as usual otherwise.
+ */
+@Composable
+fun SwipeToQueue(song: Song, enabled: Boolean, onQueued: () -> Unit, content: @Composable (Modifier) -> Unit) {
+    if (!enabled) {
+        content(Modifier)
+        return
+    }
+    val graph = LocalGraph.current
+    val haptics = LocalHapticFeedback.current
+    val current by rememberUpdatedState(song)
+    val queued by rememberUpdatedState(onQueued)
+    val state = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                AppLog.i("Queue", "Swiped ${current.id} into the queue")
+                graph.player.addToQueue(current)
+                queued()
+            }
+            // Never stays swiped away: the row slides back.
+            false
+        },
+        positionalThreshold = { width -> width * SWIPE_TO_QUEUE_FRACTION },
+    )
+    val swiping = state.dismissDirection == SwipeToDismissBoxValue.EndToStart
+    SwipeToDismissBox(
+        state = state,
+        enableDismissFromStartToEnd = false,
+        backgroundContent = {
+            Row(
+                Modifier.fillMaxSize().background(if (swiping) Accent else Color.Transparent).padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End,
+            ) {
+                if (swiping) {
+                    Text("Add to queue", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color(0xFF2A1700))
+                    Spacer(Modifier.width(10.dp))
+                    Icon(Icons.AutoMirrored.Rounded.QueueMusic, null, tint = Color(0xFF2A1700))
+                }
+            }
+        },
+    ) {
+        content(if (swiping) Modifier.background(MaterialTheme.colorScheme.surface) else Modifier)
+    }
+}
+
+/** How far a song row has to be dragged (part of its width) to be added to the queue. */
+const val SWIPE_TO_QUEUE_FRACTION = 0.35f
