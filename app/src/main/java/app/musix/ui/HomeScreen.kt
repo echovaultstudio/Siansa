@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
@@ -218,8 +219,12 @@ fun HomeScreen(nav: NavController) {
                                 quick.chunked(2).forEach { row ->
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         row.forEach { (title, cover, open) ->
-                                            val colors = if (title == "Liked songs") Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(title)
-                                            QuickTile(title, cover, colors, open, Modifier.weight(1f))
+                                            val liked = title == "Liked songs" && cover == null
+                                            val colors = if (liked) Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(title)
+                                            QuickTile(
+                                                title, cover, colors, open, Modifier.weight(1f),
+                                                icon = if (liked) Icons.Rounded.Favorite else null,
+                                            )
                                         }
                                         if (row.size == 1) Spacer(Modifier.weight(1f))
                                     }
