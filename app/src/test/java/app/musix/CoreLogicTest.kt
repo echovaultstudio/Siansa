@@ -201,6 +201,36 @@ class HomeLayoutTest {
         assertEquals(HomeSection.default, order)
     }
 
+    @Test fun nothingSavedHidesNothing() {
+        assertEquals(emptySet<HomeSection>(), HomeSection.parseHidden(null))
+        assertEquals(emptySet<HomeSection>(), HomeSection.parseHidden(""))
+        assertEquals(HomeSection.default, HomeSection.visible(HomeSection.default, HomeSection.parseHidden(null)))
+    }
+
+    @Test fun hiddenSectionsRoundTrip() {
+        val hidden = setOf(HomeSection.GENRES, HomeSection.RADIOS)
+        assertEquals("radios,genres", HomeSection.formatHidden(hidden))
+        assertEquals(hidden, HomeSection.parseHidden(HomeSection.formatHidden(hidden)))
+        assertEquals("", HomeSection.formatHidden(emptySet()))
+    }
+
+    @Test fun unknownHiddenIdsAreDropped() {
+        assertEquals(setOf(HomeSection.MOOD), HomeSection.parseHidden("gone, mood ,mood,"))
+    }
+
+    @Test fun hiddenSectionsAreLeftOutOfHomeInOrder() {
+        val order = HomeSection.default.reversed()
+        val visible = HomeSection.visible(order, setOf(HomeSection.QUICK, HomeSection.RANDOM))
+        assertEquals(order.size - 2, visible.size)
+        assertFalse(HomeSection.QUICK in visible)
+        assertFalse(HomeSection.RANDOM in visible)
+        assertEquals(order.filter { it != HomeSection.QUICK && it != HomeSection.RANDOM }, visible)
+    }
+
+    @Test fun everySectionHiddenLeavesHomeEmpty() {
+        assertTrue(HomeSection.visible(HomeSection.default, HomeSection.entries.toSet()).isEmpty())
+    }
+
     @Test fun movingAnItem() {
         val list = listOf("a", "b", "c", "d")
         assertEquals(listOf("b", "c", "a", "d"), list.moved(0, 2))
