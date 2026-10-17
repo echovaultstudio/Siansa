@@ -1,15 +1,12 @@
 # Changelog
 
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
-To publish a new version: add a section at the top, set the same version in `version.txt`, and push.
+Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
 ## 0.0.25beta — 2026-10-16
 
 ### Added
-- **A to Z bar in Your Library.** When the library is sorted Alphabetical or by Creator and the list is long, a bar of letters runs down the right edge. Tap a letter, or drag along the bar, to jump there; a big letter shows next to your finger while you drag. Letters with nothing in them are dimmed, and names starting with a number or symbol are under #.
-
-### Changed
-- Alphabetical and Creator sorting now put names with accents with their letter (Ångström with the A's), and names starting with a number or symbol first.
+- **See everything in a Home row.** Rows with more than four items (Rediscover, Radios, Your playlists, Recently played, Artist radios, Recently added, Your genres, Random picks) now have an arrow next to their title. Tap the title to open a page with all of them in a grid, including ones Home has no room for: every radio, every playlist and genre, and longer lists of recently played and recently added albums.
 
 ## 0.0.18beta — 2026-10-16
 
