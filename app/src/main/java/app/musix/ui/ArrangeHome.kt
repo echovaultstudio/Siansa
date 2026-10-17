@@ -48,7 +48,9 @@ import app.musix.data.HomeSection
 import app.musix.data.moved
 
 /**
- * A short list of Home's sections to drag into a new order: hold a row, or grab its handle, and move it.
+ * Home settings, behind Home's top-right button: Sources (what Home shows, see [SourcesPanel]) and Arrange.
+ *
+ * Arrange is a short list of Home's sections to drag into a new order: hold a row, or grab its handle, and move it.
  * Only the row being dragged follows the finger; the others slide out of the way. The order is saved
  * when a row is let go. The eye on each row hides the section from Home, or shows it again.
  */
@@ -59,7 +61,9 @@ fun ArrangeHomeSheet(
     onChange: (List<HomeSection>) -> Unit,
     onHiddenChange: (Set<HomeSection>) -> Unit,
     onDismiss: () -> Unit,
+    startOnSources: Boolean = false,
 ) {
+    var sources by remember { mutableStateOf(startOnSources) }
     var items by remember { mutableStateOf(order) }
     var hiddenItems by remember { mutableStateOf(hidden) }
     var dragging by remember { mutableStateOf<HomeSection?>(null) }
@@ -97,14 +101,14 @@ fun ArrangeHomeSheet(
         Column(Modifier.navigationBarsPadding().padding(bottom = 8.dp)) {
             Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Arrange Home", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Home settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
-                        "Hold a row and drag it. Tap the eye to hide it.",
+                        if (sources) "What shows on Home" else "Hold a row and drag it. Tap the eye to hide it.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                TextButton(
+                if (!sources) TextButton(
                     onClick = {
                         if (items != HomeSection.default) {
                             items = HomeSection.default
@@ -118,7 +122,12 @@ fun ArrangeHomeSheet(
                     enabled = items != HomeSection.default || hiddenItems.isNotEmpty(),
                 ) { Text("Reset") }
             }
+            SheetTabs(sources) { sources = it }
             Spacer(Modifier.height(8.dp))
+            if (sources) {
+                SourcesPanel()
+                return@Column
+            }
             LazyColumn(state = list, userScrollEnabled = dragging == null) {
                 items(items, key = { it.id }) { section ->
                     val lifted = section == dragging
@@ -182,6 +191,36 @@ fun ArrangeHomeSheet(
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/** Sources | Arrange, as two halves of one rounded bar. */
+@Composable
+private fun SheetTabs(sources: Boolean, onSources: (Boolean) -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp),
+    ) {
+        Row(Modifier.padding(3.dp)) {
+            listOf(true to "Sources", false to "Arrange").forEach { (isSources, label) ->
+                val on = sources == isSources
+                Surface(
+                    onClick = { onSources(isSources) },
+                    shape = RoundedCornerShape(50),
+                    color = if (on) Accent else androidx.compose.ui.graphics.Color.Transparent,
+                    contentColor = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelLarge,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 9.dp),
+                    )
                 }
             }
         }

@@ -60,6 +60,7 @@ import app.musix.data.Mix
 import app.musix.data.Playlist
 import app.musix.data.Selector
 import app.musix.log.AppLog
+import app.musix.offline.SourceFilter
 import app.musix.mix.moodRadios
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -88,6 +89,10 @@ fun HomeScreen(nav: NavController) {
     val homeOrder = homeSettings.homeOrder
     val homeHidden = homeSettings.homeHidden
     var arranging by remember { mutableStateOf(false) }
+    var openOnSources by remember { mutableStateOf(false) }
+    val shelf by graph.downloads.shelf.collectAsStateWithLifecycle()
+    val online = rememberOnline()
+    val filter = SourceFilter(homeSettings.homeDownloadedOnly, homeSettings.homeHiddenOwners, shelf)
 
     fun build(selector: Selector?, force: Boolean, open: Boolean) {
         if (busySelector != null) return
@@ -163,9 +168,9 @@ fun HomeScreen(nav: NavController) {
     val personalIds = MixGenerator.Personal.entries.map { it.id }.toSet()
     // Only what fits now: the vibe for this hour and the personal mixes, not this morning's mix in the evening.
     val applicable = selectors.orEmpty().filter { it.enabled && it.covers(hour) }
-    val todaysMixes = mixes.orEmpty().filter { m ->
+    val todaysMixes = filter.mixes(mixes.orEmpty().filter { m ->
         m.date == today && (m.selectorId in personalIds || applicable.any { it.id == m.selectorId })
-    }
+    })
     val playlists by loadState("playlists") {
         runCatching { graph.subsonic.playlists() }
             .onSuccess { graph.library.updatePlaylists(it) }
@@ -199,8 +204,12 @@ fun HomeScreen(nav: NavController) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(greeting(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                IconButton(onClick = { arranging = true }) { Icon(Icons.Rounded.Tune, "Arrange Home") }
+                IconButton(onClick = { openOnSources = false; arranging = true }) { Icon(Icons.Rounded.Tune, "Home settings") }
             }
+        }
+        item(key = "sources") {
+            SourceChips(filter.downloadedOnly, filter.hiddenOwners.size) { openOnSources = true; arranging = true }
+            if (!online && !filter.downloadedOnly && !shelf.isEmpty) OfflineOffer { graph.settings.setHomeDownloadedOnly(true) }
         }
 
         if (loaded && !synced) {
@@ -208,16 +217,16 @@ fun HomeScreen(nav: NavController) {
         }
 
         // The rest in the order chosen under Arrange Home, without the hidden ones.
-        for (section in HomeSection.visible(homeOrder, homeHidden)) {
+        for (section in HomeSection.visible(homeOrder, homeHidden).filter(filter::shows)) {
             when (section) {
                 HomeSection.QUICK -> {
                     // Quick access, like the top grid in Spotify: today's mixes, playlists and recent albums.
                     item(key = "quick") {
                         val quick = buildList<Triple<String, String?, () -> Unit>> {
-                            add(Triple("Liked songs", null) { nav.navigate("liked") })
+                            if (filter.likedShown) add(Triple("Liked songs", null) { nav.navigate("liked") })
                             todaysMixes.take(2).forEach { m -> add(Triple(m.title, m.songs.firstOrNull()?.cover) { nav.navigate("mix/${m.id}") }) }
-                            playlists.valueOrNull().orEmpty().take(2).forEach { p -> add(Triple(p.name, p.coverArt) { nav.navigate("playlist/${p.id}") }) }
-                            recentAlbums.valueOrNull().orEmpty().take(6).forEach { a -> add(Triple(a.name, a.coverArt) { nav.navigate("album/${a.id}") }) }
+                            filter.playlists(playlists.valueOrNull().orEmpty()).take(2).forEach { p -> add(Triple(p.name, p.coverArt) { nav.navigate("playlist/${p.id}") }) }
+                            filter.albums(recentAlbums.valueOrNull().orEmpty()).take(6).forEach { a -> add(Triple(a.name, a.coverArt) { nav.navigate("album/${a.id}") }) }
                         }.take(6)
                         if (quick.isNotEmpty()) {
                             Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -305,7 +314,7 @@ fun HomeScreen(nav: NavController) {
                 HomeSection.REDISCOVER -> {
                     // Albums you loved a while ago but haven't played since.
                     item(key = "rediscover") {
-                        Shelf("Rediscover", lovedBefore.valueOrNull().orEmpty(), key = { it.album.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.Rediscover)) { r ->
+                        Shelf("Rediscover", lovedBefore.valueOrNull().orEmpty().filter { filter.albums(listOf(it.album)).isNotEmpty() }, key = { it.album.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.Rediscover)) { r ->
                             AlbumTile(
                                 name = r.album.name,
                                 subtitle = rediscoverSubtitle(r),
@@ -331,21 +340,21 @@ fun HomeScreen(nav: NavController) {
                 }
                 HomeSection.PLAYLISTS -> {
                     item(key = "playlists") {
-                        Shelf("Your playlists", playlists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.Playlists)) { playlist ->
+                        Shelf("Your playlists", filter.playlists(playlists.valueOrNull().orEmpty()), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.Playlists)) { playlist ->
                             PlaylistTile(playlist) { nav.navigate("playlist/${playlist.id}") }
                         }
                     }
                 }
                 HomeSection.RECENT -> {
                     item(key = "recent") {
-                        Shelf("Recently played", recentAlbums.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.RecentlyPlayed)) { album ->
+                        Shelf("Recently played", filter.albums(recentAlbums.valueOrNull().orEmpty()), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.RecentlyPlayed)) { album ->
                             AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
                         }
                     }
                 }
                 HomeSection.ARTIST_RADIOS -> {
                     item(key = "artist_radios") {
-                        Shelf("Artist radios", recentArtists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.ArtistRadios)) { artist ->
+                        Shelf("Artist radios", filter.artists(recentArtists.valueOrNull().orEmpty()), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.ArtistRadios)) { artist ->
                             AlbumTile(
                                 name = "${artist.name} radio",
                                 subtitle = "With similar artists",
@@ -372,7 +381,7 @@ fun HomeScreen(nav: NavController) {
                 }
                 HomeSection.ADDED -> {
                     item(key = "added") {
-                        Shelf("Recently added", newest.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.RecentlyAdded)) { album ->
+                        Shelf("Recently added", filter.albums(newest.valueOrNull().orEmpty()), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.RecentlyAdded)) { album ->
                             AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
                         }
                     }
@@ -392,7 +401,7 @@ fun HomeScreen(nav: NavController) {
                 }
                 HomeSection.RANDOM -> {
                     item(key = "random") {
-                        Shelf("Random picks", rediscover.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.RandomPicks)) { album ->
+                        Shelf("Random picks", filter.albums(rediscover.valueOrNull().orEmpty()), key = { it.id }, onOpenAll = nav.openAll(app.musix.ui.HomeSection.RandomPicks)) { album ->
                             AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
                         }
                     }
@@ -408,7 +417,7 @@ fun HomeScreen(nav: NavController) {
         }, onHiddenChange = {
             AppLog.i("Home", "Hidden: ${HomeSection.formatHidden(it).ifEmpty { "none" }}")
             graph.settings.setHomeHidden(it)
-        }, onDismiss = { arranging = false })
+        }, onDismiss = { arranging = false }, startOnSources = openOnSources)
     }
 }
 

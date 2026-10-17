@@ -54,6 +54,10 @@ data class AppSettings(
     val downloadKbps: Int = 0,
     val homeOrder: List<HomeSection> = HomeSection.default,
     val homeHidden: Set<HomeSection> = emptySet(),
+    /** Home shows only music on the phone (issue #56). */
+    val homeDownloadedOnly: Boolean = false,
+    /** Navidrome users whose playlists Home leaves out, in lower case. */
+    val homeHiddenOwners: Set<String> = emptySet(),
 ) {
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
@@ -162,6 +166,8 @@ class SettingsRepository(context: Context) {
         downloadKbps = prefs.getInt("download_kbps", 0),
         homeOrder = HomeSection.parse(prefs.getString("home_order", null)),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
+        homeDownloadedOnly = prefs.getBoolean("home_downloaded_only", false),
+        homeHiddenOwners = prefs.getStringSet("home_hidden_owners", emptySet())?.toSet() ?: emptySet(),
     )
 
     /**
@@ -264,6 +270,16 @@ class SettingsRepository(context: Context) {
     fun setHomeHidden(hidden: Set<HomeSection>) {
         prefs.edit().putString("home_hidden", HomeSection.formatHidden(hidden)).apply()
         _state.value = _state.value.copy(homeHidden = hidden)
+    }
+
+    fun setHomeDownloadedOnly(on: Boolean) {
+        prefs.edit().putBoolean("home_downloaded_only", on).apply()
+        _state.value = _state.value.copy(homeDownloadedOnly = on)
+    }
+
+    fun setHomeHiddenOwners(owners: Set<String>) {
+        prefs.edit().putStringSet("home_hidden_owners", owners).apply()
+        _state.value = _state.value.copy(homeHiddenOwners = owners)
     }
 
     fun setSyncFolders(ids: Set<String>) {
