@@ -22,11 +22,16 @@ object SongRegistry {
 }
 
 private const val SONG_EXTRA = "musix.song"
+private const val QUEUED_EXTRA = "musix.queued"
 
-fun Song.toMediaItem(api: SubsonicApi): MediaItem {
+/** [queued] marks a song added with "Add to queue", so the next one added goes after it (see [queueInsertIndex]). */
+fun Song.toMediaItem(api: SubsonicApi, queued: Boolean = false): MediaItem {
     val uri = Uri.parse(api.streamUrl(id))
     // The whole song travels with the item, so its details survive the trip through the media session.
-    val extras = Bundle().apply { putString(SONG_EXTRA, AppJson.encodeToString(Song.serializer(), this@toMediaItem)) }
+    val extras = Bundle().apply {
+        putString(SONG_EXTRA, AppJson.encodeToString(Song.serializer(), this@toMediaItem))
+        if (queued) putBoolean(QUEUED_EXTRA, true)
+    }
     val metadata = MediaMetadata.Builder()
         .setTitle(title)
         .setArtist(artist)
@@ -72,4 +77,19 @@ fun replayGainVolume(song: Song?, settings: AppSettings): Float {
     var volume = 10f.pow(((gain ?: 0f) + settings.preampDb) / 20f)
     if (peak != null && peak > 0f) volume = min(volume, 1f / peak)
     return volume.coerceIn(0f, 1f)
+}
+
+/** Whether this queue item was added with "Add to queue". */
+fun MediaItem.isQueued(): Boolean = mediaMetadata.extras?.getBoolean(QUEUED_EXTRA, false) == true
+
+/**
+ * Where "Add to queue" puts a song, as Spotify does: right after the song playing and after the songs you
+ * queued before it (in the order you added them), ahead of the rest of the album or playlist.
+ * [isQueued] tells for a queue position whether that song was added with "Add to queue".
+ */
+fun queueInsertIndex(currentIndex: Int, count: Int, isQueued: (Int) -> Boolean): Int {
+    if (count <= 0) return 0
+    var at = (currentIndex + 1).coerceIn(0, count)
+    while (at < count && isQueued(at)) at++
+    return at
 }

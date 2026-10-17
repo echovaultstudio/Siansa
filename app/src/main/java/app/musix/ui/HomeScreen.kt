@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -188,8 +187,12 @@ fun HomeScreen(nav: NavController) {
     val suggested by loadState(today to "suggested_artists") { graph.suggestions.today() }
     var openSuggestion by remember { mutableStateOf<app.musix.mix.SuggestedArtist?>(null) }
 
-    // imePadding: the keyboard shrinks the list, so the "How are you feeling?" box scrolls up above it.
-    LazyColumn(Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp))) {
+    // The keyboard shrinks the list, so the "How are you feeling?" box scrolls up above it. While it shows, the
+    // bottom bar is behind it, so the list needn't leave room for the bar.
+    LazyColumn(
+        Modifier.fillMaxSize().aboveKeyboard(),
+        contentPadding = PaddingValues(bottom = if (keyboardOpen()) 16.dp else bottomBarPadding(24.dp)),
+    ) {
         item {
             Row(
                 Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 12.dp),

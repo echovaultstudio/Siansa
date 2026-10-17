@@ -13,6 +13,8 @@ import androidx.media3.decoder.ffmpeg.FfmpegLibrary
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import app.musix.AppGraph
 import app.musix.log.AppLog
@@ -43,7 +45,11 @@ object PlayerFactory {
             val key = uri.getQueryParameter("id") ?: uri.toString()
             spec.withUri(Streaming.rewrite(uri, kbpsFor(key)))
         }
-        val dataSource = DefaultDataSource.Factory(context, resolving)
+        // Songs downloaded for offline listening play from their file, with no network at all.
+        val dataSource = ResolvingDataSource.Factory(DefaultDataSource.Factory(context, resolving)) { spec ->
+            val id = if (spec.uri.scheme == "http" || spec.uri.scheme == "https") spec.uri.getQueryParameter("id") else null
+            id?.let { graph.downloads.fileFor(it) }?.let { spec.withUri(android.net.Uri.fromFile(it)) } ?: spec
+        }
 
         // Start playing after one second of audio, for a snappy start. After running dry mid-song, wait for
         // five seconds' worth so a slow connection gives fewer, longer stretches instead of constant stops.
@@ -56,8 +62,18 @@ object PlayerFactory {
         // so audio that happens to look like a header splits a real frame in two (Skinty Fia at 0:59).
         // The phone's FLAC decoder then outputs only silence and the song freezes; FFmpeg skips the
         // broken pieces (about 85 ms) and plays on.
-        val renderers = DefaultRenderersFactory(context)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+        // The equaliser sits in the audio path after either decoder, so it works the same on every phone.
+        // Float output stays off: with it, media3 1.9 sends hi-res and float audio (everything FFmpeg
+        // decodes) straight out and skips the equaliser.
+        val equaliser = EqualiserProcessor { graph.equaliser.state.value }
+        val renderers = object : DefaultRenderersFactory(context) {
+            override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioOutputPlaybackParams: Boolean): AudioSink =
+                DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
+                    .setAudioProcessors(arrayOf(equaliser))
+                    .build()
+        }.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
         AppLog.i("Player", "FFmpeg decoders " + if (FfmpegLibrary.isAvailable()) "ready (${FfmpegLibrary.getVersion()})" else "not available")
 
         val player = ExoPlayer.Builder(context, renderers)

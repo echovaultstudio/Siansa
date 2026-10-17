@@ -10,6 +10,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import app.musix.data.Song
+import app.musix.log.AppLog
 import app.musix.net.SubsonicApi
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -122,14 +123,23 @@ class PlayerConnection(
         }
     }
 
+    /**
+     * Spotify's "Add to queue": the song plays after the current one and after songs queued before it,
+     * ahead of the rest of the album or playlist. With nothing playing, it starts playing.
+     */
     fun addToQueue(song: Song) {
         SongRegistry.register(listOf(song))
         withController { c ->
-            c.addMediaItem(song.toMediaItem(api))
-            if (c.mediaItemCount == 1) {
+            val item = song.toMediaItem(api, queued = true)
+            if (c.mediaItemCount == 0) {
+                c.setMediaItem(item)
                 c.prepare()
                 c.play()
+                return@withController
             }
+            val at = queueInsertIndex(c.currentMediaItemIndex, c.mediaItemCount) { c.getMediaItemAt(it).isQueued() }
+            c.addMediaItem(at, item)
+            AppLog.d("Player", "Added ${song.id} to the queue at ${at + 1} of ${c.mediaItemCount}")
         }
     }
 
