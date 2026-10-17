@@ -61,9 +61,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalView
+import android.view.HapticFeedbackConstants
+import android.os.Build
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -719,13 +720,14 @@ fun SwipeToQueue(song: Song, enabled: Boolean, onQueued: () -> Unit, content: @C
         return
     }
     val graph = LocalGraph.current
-    val haptics = LocalHapticFeedback.current
+    val view = LocalView.current
     val current by rememberUpdatedState(song)
     val queued by rememberUpdatedState(onQueued)
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.EndToStart) {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                // A small confirming buzz when the song is added.
+                view.performHapticFeedback(QueueHaptics.added(Build.VERSION.SDK_INT))
                 AppLog.i("Queue", "Swiped ${current.id} into the queue")
                 graph.player.addToQueue(current)
                 queued()
@@ -736,6 +738,15 @@ fun SwipeToQueue(song: Song, enabled: Boolean, onQueued: () -> Unit, content: @C
         positionalThreshold = { width -> width * SWIPE_TO_QUEUE_FRACTION },
     )
     val swiping = state.dismissDirection == SwipeToDismissBoxValue.EndToStart
+    // A light tick as the row passes the point where letting go adds it (and again if it goes back).
+    val armed = state.targetValue == SwipeToDismissBoxValue.EndToStart
+    var wasArmed by remember { mutableStateOf(false) }
+    LaunchedEffect(armed) {
+        if (armed != wasArmed) {
+            view.performHapticFeedback(QueueHaptics.threshold(Build.VERSION.SDK_INT))
+            wasArmed = armed
+        }
+    }
     SwipeToDismissBox(
         state = state,
         enableDismissFromStartToEnd = false,
@@ -755,6 +766,16 @@ fun SwipeToQueue(song: Song, enabled: Boolean, onQueued: () -> Unit, content: @C
     ) {
         content(if (swiping) Modifier.background(MaterialTheme.colorScheme.surface) else Modifier)
     }
+}
+
+/** The small vibrations of swipe to queue, as Android haptic constants for the phone's Android version. */
+@android.annotation.SuppressLint("InlinedApi") // each constant is only used on the Android version that has it
+object QueueHaptics {
+    /** Passing the point where letting go adds the song: the lightest tick there is. */
+    fun threshold(sdk: Int): Int = if (sdk >= 34) HapticFeedbackConstants.SEGMENT_FREQUENT_TICK else HapticFeedbackConstants.CLOCK_TICK
+
+    /** The song was added: a short confirming buzz. */
+    fun added(sdk: Int): Int = if (sdk >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.KEYBOARD_TAP
 }
 
 /** How far a song row has to be dragged (part of its width) to be added to the queue. */

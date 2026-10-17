@@ -6,3 +6,7 @@ local.properties
 .DS_Store
 captures/
 .kotlin/
+
+# Python bytecode from the release scripts
+__pycache__/
+*.pyc
