@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.CircularProgressIndicator
@@ -608,12 +609,46 @@ fun QuickTile(title: String, coverArt: String?, colors: Pair<Color, Color>?, onC
     }
 }
 
-/** A horizontal shelf of tiles under a section title. */
+/**
+ * A horizontal shelf of tiles under a section title. With [onOpenAll], a shelf with more than a handful of
+ * items gets a tappable title with an arrow that opens the full list.
+ */
 @Composable
-fun <T> Shelf(title: String, items: List<T>, key: (T) -> Any, content: @Composable (T) -> Unit) {
+fun <T> Shelf(
+    title: String,
+    items: List<T>,
+    key: (T) -> Any,
+    onOpenAll: (() -> Unit)? = null,
+    content: @Composable (T) -> Unit,
+) {
     if (items.isEmpty()) return
     Column {
-        SectionTitle(title)
+        if (onOpenAll != null && homeRowOpensFullList(items.size)) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClickLabel = "Show all", onClick = onOpenAll)
+                    .padding(start = 16.dp, end = 12.dp, top = 24.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Icon(
+                    Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = null,
+                    modifier = Modifier.padding(start = 4.dp).size(26.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            SectionTitle(title)
+        }
         LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(items, key = key) { content(it) }
         }
