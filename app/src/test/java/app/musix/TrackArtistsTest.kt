@@ -48,3 +48,29 @@ class TrackArtistsTest {
         assertNull(extraArtists(song(""), null, "Someone"))
     }
 }
+
+/** Splitting a tagged artist name without breaking artists whose own name has "&" or "and" in it. */
+class SplitArtistsTest {
+    private val known = setOf("chase status", "earth wind fire", "simon garfunkel").let { k -> { name: String -> app.musix.data.normalizeKey(name) in k } }
+
+    @Test fun knownArtistWithAJoinStaysWhole() {
+        assertEquals(listOf("Chase & Status"), app.musix.data.splitArtists("Chase & Status", known))
+        assertEquals(listOf("Chase & Status", "Bou"), app.musix.data.splitArtists("Chase & Status feat. Bou", known))
+        assertEquals(listOf("Sub Focus", "Chase & Status"), app.musix.data.splitArtists("Sub Focus, Chase & Status", known))
+        assertEquals(listOf("Earth, Wind & Fire"), app.musix.data.splitArtists("Earth, Wind & Fire", known))
+    }
+
+    @Test fun unknownNamesAreSplitAtEveryJoin() {
+        assertEquals(listOf("Chase", "Status"), app.musix.data.splitArtists("Chase & Status"))
+        assertEquals(listOf("Jay-Z", "Kanye West", "Frank Ocean"), app.musix.data.splitArtists("Jay-Z, Kanye West feat. Frank Ocean"))
+    }
+
+    @Test fun albumLineKeepsAKnownArtistWhole() {
+        val s = Song(id = "s", title = "t", artist = "Chase & Status feat. Bou")
+        // None of it is the album artist: the name shows as tagged.
+        assertEquals("Chase & Status feat. Bou", extraArtists(s, null, "Sub Focus", known))
+        assertEquals("Bou", extraArtists(s, null, "Chase & Status", known))
+        val alone = Song(id = "s", title = "t", artist = "Chase & Status")
+        assertEquals("Chase & Status", extraArtists(alone, null, "Sub Focus", known))
+    }
+}

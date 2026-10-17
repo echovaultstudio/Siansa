@@ -1,6 +1,7 @@
 package app.musix.ui
 
 import app.musix.data.extraArtists
+import app.musix.data.normalizeKey
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.rounded.Favorite
@@ -177,6 +178,8 @@ fun AlbumScreen(nav: NavController, id: String) {
     // Disc titles aren't kept in the synced library: for an album with several discs, ask Navidrome.
     // Without them (offline, older server) the discs are simply headed "Disc 1", "Disc 2"…
     val discTitles by loadState(d) { d?.let { discTitlesOf(graph, it) }.orEmpty() }
+    // Library artists by name, so a name like "Chase & Status" isn't split into two artists.
+    val knownArtists by loadState("artist-names") { graph.library.artists().map { normalizeKey(it.name) }.toSet() }
     CollectionPage(
         nav = nav,
         title = d?.album?.name ?: "Album",
@@ -187,7 +190,11 @@ fun AlbumScreen(nav: NavController, id: String) {
         discTitles = discTitles.valueOrNull() ?: d?.discTitles.orEmpty(),
         showCovers = false,
         // Only artists beyond the album's own, as Navidrome's artist tags list them.
-        subtitleOf = d?.album?.let { album -> { song: Song -> extraArtists(song, album.artistId, album.artist) } },
+        subtitleOf = d?.album?.let { album ->
+            val known = knownArtists.valueOrNull().orEmpty()
+            val subtitle: (Song) -> String? = { song -> extraArtists(song, album.artistId, album.artist) { normalizeKey(it) in known } }
+            subtitle
+        },
         cover = { m ->
             BigCover(d?.album?.coverArt, d?.album?.coverArt ?: d?.album?.id, m, RoundedCornerShape(6.dp))
         },
