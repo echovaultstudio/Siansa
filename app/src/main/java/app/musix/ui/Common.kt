@@ -413,6 +413,8 @@ fun SongRow(
     subtitle: String? = artistAndAlbum(song),
     // Swipe from right to left adds the song to the queue (not in the queue itself).
     swipeToQueue: Boolean = true,
+    // Extra items at the end of the ⋮ menu (such as removing it from a playlist); call close() when picked.
+    extraMenu: @Composable (close: () -> Unit) -> Unit = {},
 ) {
     val graph = LocalGraph.current
     val nav = LocalNav.current
@@ -420,6 +422,7 @@ fun SongRow(
     val openArtist = rememberArtistOpener(beforeOpen = { sheet.close() })
     val launch = rememberPlayLauncher()
     var menu by remember { mutableStateOf(false) }
+    var pickPlaylist by remember { mutableStateOf(false) }
     // Offline, songs that aren't downloaded are dimmed: they can't play until the connection is back.
     val connection by graph.connection.state.collectAsStateWithLifecycle()
     val unavailable = connection.offline && !graph.downloads.isDownloaded(song.id)
@@ -487,6 +490,10 @@ fun SongRow(
                         menu = false
                         graph.favorites.toggle(song)
                     })
+                    DropdownMenuItem(text = { Text("Add to playlist") }, onClick = {
+                        menu = false
+                        pickPlaylist = true
+                    })
                     DropdownMenuItem(text = { Text("Start song radio") }, onClick = {
                         menu = false
                         if (graph.connection.current.offline) launch.notify("You're offline: song radio needs the server")
@@ -518,8 +525,15 @@ fun SongRow(
                         nav.openSongDetails(song.id)
                     })
                     SongDownloadMenuItem(song) { menu = false }
+                    extraMenu { menu = false }
                 }
             }
+        }
+    }
+    if (pickPlaylist) {
+        AddToPlaylistDialog(listOf(song)) { message ->
+            pickPlaylist = false
+            message?.let { launch.notify(it) }
         }
     }
 }

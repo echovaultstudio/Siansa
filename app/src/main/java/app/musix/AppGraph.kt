@@ -11,6 +11,7 @@ import app.musix.data.HistoryStore
 import app.musix.data.LibraryRepository
 import app.musix.data.LibrarySync
 import app.musix.data.MixStore
+import app.musix.data.PlaylistEditor
 import app.musix.data.SelectorStore
 import app.musix.data.SettingsRepository
 import app.musix.data.SyncPhase
@@ -29,6 +30,7 @@ import app.musix.net.DeezerApi
 import app.musix.net.HistoryApi
 import app.musix.net.LastFmApi
 import app.musix.net.ListenBrainzApi
+import app.musix.net.NavidromeNativeApi
 import app.musix.net.OpenRouterApi
 import app.musix.net.Connection
 import app.musix.net.SubsonicApi
@@ -233,6 +235,7 @@ class AppGraph(val app: Application) {
         onlyDownloads = { settings.current.downloadedOnly }
         isDownloaded = { downloads.isDownloaded(it) }
     }
+    val playlists = PlaylistEditor(subsonic, NavidromeNativeApi(http) { settings.current }, library) { connection.current.offline }
     val songRadio = SongRadio(this)
     val songPath = SongPath(this)
     val sleepTimer = SleepTimer()

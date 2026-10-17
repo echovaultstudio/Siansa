@@ -268,9 +268,21 @@ class SubsonicApi(
         call("scrobble", mapOf("id" to id, "submission" to submission.toString(), "time" to timeMs?.toString()))
     }
 
-    /** Saves [songIds], in order, as a new playlist on Navidrome. */
-    suspend fun createPlaylist(name: String, songIds: List<String>) {
-        call("createPlaylist", mapOf("name" to name), songIds.map { "songId" to it })
+    /** Saves [songIds], in order, as a new playlist on Navidrome; the new playlist, when the server sends it back. */
+    suspend fun createPlaylist(name: String, songIds: List<String>): Playlist? =
+        call("createPlaylist", mapOf("name" to name), songIds.map { "songId" to it }).obj("playlist")?.let(::parsePlaylist)
+
+    suspend fun renamePlaylist(playlistId: String, name: String) {
+        call("updatePlaylist", mapOf("playlistId" to playlistId, "name" to name))
+    }
+
+    /** Removes the songs at these positions (from 0, in the playlist's own order). */
+    suspend fun removeFromPlaylist(playlistId: String, indexes: List<Int>) {
+        call("updatePlaylist", mapOf("playlistId" to playlistId), indexes.map { "songIndexToRemove" to "$it" })
+    }
+
+    suspend fun deletePlaylist(playlistId: String) {
+        call("deletePlaylist", mapOf("id" to playlistId))
     }
 
     /** Adds songs to the end of one of your playlists. */
@@ -343,6 +355,7 @@ class SubsonicApi(
         owner = o.str("owner"),
         comment = o.str("comment"),
         changed = o.str("changed"),
+        readonly = o.bool("readonly"),
     )
 
     private fun parseArtist(o: JsonObject) = Artist(

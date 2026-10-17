@@ -42,7 +42,6 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Subtitles
 import androidx.compose.material.icons.rounded.Bedtime
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -50,14 +49,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,14 +77,13 @@ import androidx.compose.ui.text.withStyle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.musix.data.Lyrics
 import app.musix.data.Playlist
+import app.musix.data.PlaylistEditor
 import app.musix.data.Song
 import app.musix.data.cover
-import app.musix.log.AppLog
 import app.musix.net.formatSampleRate
 import app.musix.playback.leftMs
 import app.musix.playback.sleepTimeShort
 import coil3.compose.AsyncImage
-import kotlinx.coroutines.launch
 import kotlin.math.max
 
 // ---- Pure parts, unit tested ----
@@ -115,9 +111,9 @@ fun artistLibraryLine(albums: Int, songs: Int): String? {
     return parts.joinToString(" · ") + " in your library"
 }
 
-/** Playlists you can add songs to: your own (Navidrome only lets the owner change a playlist). */
+/** Playlists you can add songs to: your own, and not smart playlists (Navidrome only lets the owner change a playlist). */
 fun editablePlaylists(playlists: List<Playlist>, user: String): List<Playlist> =
-    playlists.filter { it.owner.isNullOrBlank() || it.owner.equals(user, ignoreCase = true) }.sortedBy { it.name.lowercase() }
+    playlists.filter { PlaylistEditor.canEdit(it, user) }.sortedBy { it.name.lowercase() }
 
 // ---- Now playing's ⋮ menu ----
 
@@ -201,7 +197,7 @@ fun PlayerMenu(
             }
         }
         if (pickPlaylist) {
-            AddToPlaylistDialog(song, onDone = { message ->
+            AddToPlaylistDialog(listOf(song), onDone = { message ->
                 pickPlaylist = false
                 message?.let(notify)
                 if (message != null) onDismiss()
@@ -244,54 +240,6 @@ internal val MENU_ROW_HEIGHT = 48.dp
 @Composable
 private fun MenuDivider() {
     HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
-}
-
-/** Picks one of your playlists and adds the song to its end; [onDone] gets the message to show, or null. */
-@Composable
-private fun AddToPlaylistDialog(song: Song, onDone: (String?) -> Unit) {
-    val graph = LocalGraph.current
-    val scope = rememberCoroutineScope()
-    val playlists by loadState("editable-playlists") {
-        val all = runCatching { graph.subsonic.playlists() }.getOrElse { graph.library.playlists() }
-        editablePlaylists(all, graph.settings.current.navidromeUser)
-    }
-    AlertDialog(
-        onDismissRequest = { onDone(null) },
-        title = { Text("Add to playlist") },
-        text = {
-            LoadBox(playlists) { list ->
-                if (list.isEmpty()) {
-                    Text("You have no playlists of your own yet.", style = MaterialTheme.typography.bodyMedium)
-                } else {
-                    LazyColumn(Modifier.height(320.dp)) {
-                        itemsIndexed(list, key = { _, p -> p.id }) { _, playlist ->
-                            Row(
-                                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable {
-                                    scope.launch {
-                                        val ok = runCatching { graph.subsonic.addToPlaylist(playlist.id, listOf(song.id)) }
-                                            .onFailure { AppLog.w("Playlist", "Adding to a playlist failed: ${it.message}") }
-                                            .isSuccess
-                                        if (ok) AppLog.i("Playlist", "Added ${song.id} to playlist ${playlist.id}")
-                                        onDone(if (ok) "Added to ${playlist.name}" else "Couldn't add it to ${playlist.name}")
-                                    }
-                                }.padding(vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Cover(playlist.coverArt, 150, Modifier.size(40.dp), RoundedCornerShape(4.dp))
-                                Spacer(Modifier.width(12.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(playlist.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text("${playlist.songCount} songs", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = { onDone(null) }) { Text("Cancel") } },
-    )
 }
 
 // ---- Cards under the player ----

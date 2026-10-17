@@ -79,6 +79,10 @@ fun CollectionPage(
     subtitleOf: ((Song) -> String?)? = null,
     // What the download button keeps on the phone; null shows no button (mixes, radios).
     offline: OfflineItem? = null,
+    // Buttons at the right of the title bar (a playlist's ⋮ menu).
+    actions: @Composable () -> Unit = {},
+    // Extra items in a song's ⋮ menu, by its position in [songs].
+    songMenu: (@Composable (index: Int, song: Song, close: () -> Unit) -> Unit)? = null,
     footer: LazyListScope.() -> Unit = {},
 ) {
     val graph = LocalGraph.current
@@ -157,6 +161,7 @@ fun CollectionPage(
                                 highlighted = song.id == player.current?.id,
                                 showCover = showCovers,
                                 subtitle = if (subtitleOf != null) subtitleOf(song) else artistAndAlbum(song),
+                                extraMenu = { close -> songMenu?.invoke(index, song, close) },
                             )
                         }
                     }
@@ -190,6 +195,7 @@ fun CollectionPage(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).graphicsLayer { alpha = barAlpha },
             )
+            actions()
         }
     }
 }
