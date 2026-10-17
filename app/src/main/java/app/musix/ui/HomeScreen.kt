@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -93,11 +94,14 @@ fun HomeScreen(nav: NavController) {
                 if (selector == null || selector.id == current?.selectorId) current = mix
                 if (mix == null) error = "No vibe covers this hour. Add one under Vibes."
                 if (open && mix != null) nav.navigate("mix/${mix.id}")
+                if (open && mix == null) launch.notify(error!!)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 AppLog.w("Home", "Mix failed: ${e.message}")
                 error = e.message ?: "Couldn't build the mix"
+                // Tapped on a tile further down: the message at the top of the page is out of sight.
+                if (open) launch.notify(error!!)
             } finally {
                 busySelector = null
             }
@@ -174,7 +178,8 @@ fun HomeScreen(nav: NavController) {
     }
     val genres by loadState(version to "genres") { if (graph.library.isSynced) graph.library.genres(12) else emptyList() }
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp))) {
+    // imePadding: the keyboard shrinks the list, so the "How are you feeling?" box scrolls up above it.
+    LazyColumn(Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp))) {
         item {
             Row(
                 Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 12.dp),
