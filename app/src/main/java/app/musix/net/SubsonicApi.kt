@@ -281,10 +281,6 @@ class SubsonicApi(
         call("updatePlaylist", mapOf("playlistId" to playlistId), indexes.map { "songIndexToRemove" to "$it" })
     }
 
-    suspend fun deletePlaylist(playlistId: String) {
-        call("deletePlaylist", mapOf("id" to playlistId))
-    }
-
     /** Adds songs to the end of one of your playlists. */
     suspend fun addToPlaylist(playlistId: String, songIds: List<String>) {
         call("updatePlaylist", mapOf("playlistId" to playlistId), songIds.map { "songIdToAdd" to it })

@@ -2,6 +2,7 @@ package app.musix
 
 import app.musix.data.Playlist
 import app.musix.data.PlaylistEditor
+import app.musix.data.RemovedPlaylists
 import app.musix.net.NavidromeNativeApi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -37,5 +38,12 @@ class PlaylistEditorTest {
         assertEquals(".webp", NavidromeNativeApi.extensionOf("IMAGE/WEBP"))
         assertEquals(".jpg", NavidromeNativeApi.extensionOf("image/jpeg"))
         assertEquals(".jpg", NavidromeNativeApi.extensionOf("image/heic"))
+    }
+
+    @Test
+    fun removedPlaylistsAreHiddenButOthersStay() {
+        val lists = listOf(Playlist("1", "Keep"), Playlist("2", "Gone"), Playlist("3", "New on the server"))
+        assertEquals(listOf("Keep", "New on the server"), RemovedPlaylists.hide(lists, setOf("2")).map { it.name })
+        assertEquals(lists, RemovedPlaylists.hide(lists, emptySet()))
     }
 }

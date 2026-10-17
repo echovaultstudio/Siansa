@@ -7,12 +7,14 @@ import kotlinx.coroutines.CancellationException
 
 /**
  * Making and changing your playlists. They live on Navidrome: every change goes straight to the server,
- * and nothing is changed on the phone when that fails, so the two never disagree.
+ * and nothing is changed on the phone when that fails, so the two never disagree. Removing one only takes
+ * it out of musix ([removed]); musix never deletes a playlist on Navidrome.
  */
 class PlaylistEditor(
     private val subsonic: SubsonicApi,
     private val native: NavidromeNativeApi,
     private val library: LibraryRepository,
+    val removed: RemovedPlaylists,
     private val isOffline: () -> Boolean,
 ) {
     /** The new playlist, or null when Navidrome didn't send it back (it was still made). */
@@ -42,11 +44,19 @@ class PlaylistEditor(
             AppLog.i("Playlist", "Removed song $index from playlist $playlistId")
         }
 
-    suspend fun delete(playlistId: String): Result<Unit> =
-        change("Deleting a playlist") {
-            subsonic.deletePlaylist(playlistId)
-            AppLog.i("Playlist", "Deleted playlist $playlistId")
-        }
+    /** Takes a playlist out of musix. It stays on Navidrome, and [restore] brings it back. */
+    fun removeFromApp(playlistId: String) {
+        removed.remove(playlistId)
+        AppLog.i("Playlist", "Removed playlist $playlistId from musix (kept on Navidrome)")
+        library.bump()
+    }
+
+    /** Brings a removed Navidrome playlist back into musix. */
+    fun restore(playlistId: String) {
+        removed.restore(playlistId)
+        AppLog.i("Playlist", "Imported playlist $playlistId again")
+        library.bump()
+    }
 
     suspend fun setPicture(playlistId: String, bytes: ByteArray, mime: String): Result<Unit> =
         change("Setting a playlist picture") {

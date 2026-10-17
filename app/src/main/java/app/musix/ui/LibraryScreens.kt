@@ -180,8 +180,8 @@ fun PlaylistScreen(nav: NavController, id: String) {
         },
         offline = d?.playlist?.offlineItem(),
         actions = {
-            if (d != null && editable) {
-                PlaylistMenuButton(d.playlist, notify = launcher::notify, onChanged = { version++ }, onDeleted = { nav.popBackStack() })
+            if (d != null) {
+                PlaylistMenuButton(d.playlist, editable, notify = launcher::notify, onChanged = { version++ }, onDeleted = { nav.popBackStack() })
             }
         },
         songMenu = if (editable) removeFromPlaylist else null,

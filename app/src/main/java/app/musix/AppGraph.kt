@@ -12,6 +12,7 @@ import app.musix.data.LibraryRepository
 import app.musix.data.LibrarySync
 import app.musix.data.MixStore
 import app.musix.data.PlaylistEditor
+import app.musix.data.RemovedPlaylists
 import app.musix.data.SelectorStore
 import app.musix.data.SettingsRepository
 import app.musix.data.SyncPhase
@@ -235,7 +236,7 @@ class AppGraph(val app: Application) {
         onlyDownloads = { settings.current.downloadedOnly }
         isDownloaded = { downloads.isDownloaded(it) }
     }
-    val playlists = PlaylistEditor(subsonic, NavidromeNativeApi(http) { settings.current }, library) { connection.current.offline }
+    val playlists = PlaylistEditor(subsonic, NavidromeNativeApi(http) { settings.current }, library, RemovedPlaylists(app)) { connection.current.offline }
     val songRadio = SongRadio(this)
     val songPath = SongPath(this)
     val sleepTimer = SleepTimer()

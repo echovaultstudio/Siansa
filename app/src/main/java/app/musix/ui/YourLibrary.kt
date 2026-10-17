@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.GridView
@@ -202,6 +203,7 @@ fun YourLibraryScreen(nav: NavController) {
     val launcher = rememberPlayLauncher()
     var naming by remember { mutableStateOf(false) }
     var creating by remember { mutableStateOf(false) }
+    var importing by remember { mutableStateOf(false) }
 
     fun togglePin(e: Entry) {
         if (e.alwaysPinned) return
@@ -222,7 +224,14 @@ fun YourLibraryScreen(nav: NavController) {
             onSoundSearch = { nav.goToTab("search") },
             onDownloads = { nav.navigate("downloads") },
             onNewPlaylist = { naming = true },
+            onImportPlaylists = { importing = true },
         )
+        if (importing) {
+            ImportPlaylistsDialog { message ->
+                importing = false
+                message?.let { launcher.notify(it) }
+            }
+        }
         if (naming) {
             PlaylistNameDialog(
                 title = "New playlist",
@@ -365,6 +374,7 @@ private fun LibraryHeader(
     onSoundSearch: () -> Unit,
     onDownloads: () -> Unit,
     onNewPlaylist: () -> Unit,
+    onImportPlaylists: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(
@@ -393,6 +403,11 @@ private fun LibraryHeader(
                     text = { Text("New playlist") },
                     leadingIcon = { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, null) },
                     onClick = { menu = false; onNewPlaylist() },
+                )
+                DropdownMenuItem(
+                    text = { Text("Import from Navidrome") },
+                    leadingIcon = { Icon(Icons.Rounded.CloudDownload, null) },
+                    onClick = { menu = false; onImportPlaylists() },
                 )
                 DropdownMenuItem(
                     text = { Text("Mix from a sound description") },
@@ -701,6 +716,7 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
 
     // Playlists from Navidrome.
     val playlists = runCatching { graph.library.refreshPlaylists { graph.subsonic.playlists() } }.getOrElse { graph.library.playlists() }
+        .let(graph.playlists.removed::visible)
     playlists.forEach { p ->
         val mine = me.isNotBlank() && p.owner.equals(me, ignoreCase = true)
         entries += Entry(
