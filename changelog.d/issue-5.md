@@ -1,2 +1,2 @@
 ### Added
-- **Cast to Chromecast and Google TV.** Tap the cast button on Home, the song bar or the player and pick your TV: the queue, song and spot move to the TV, and you keep controlling it from the phone, the notification or the lock screen. Pick "This phone" to bring the music back.
+- **Cast to Chromecast and Google TV.** Tap the cast button at the bottom left of the player (or on Home or the song bar) and pick your TV or speaker: the queue, song and spot move there, and its name shows next to the button while it plays. You keep controlling it from the phone, the notification or the lock screen. Pick "This phone" to bring the music back.

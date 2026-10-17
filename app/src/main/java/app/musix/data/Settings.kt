@@ -47,6 +47,7 @@ data class AppSettings(
     val transcodeMobileKbps: Int = 0,
     val songCacheMb: Int = 2048,
     val homeOrder: List<HomeSection> = HomeSection.default,
+    val homeHidden: Set<HomeSection> = emptySet(),
 ) {
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
@@ -151,6 +152,7 @@ class SettingsRepository(context: Context) {
         transcodeMobileKbps = prefs.getInt("tc_mobile", 0),
         songCacheMb = prefs.getInt("song_cache_mb", 2048),
         homeOrder = HomeSection.parse(prefs.getString("home_order", null)),
+        homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
     )
 
     /**
@@ -239,6 +241,11 @@ class SettingsRepository(context: Context) {
     fun setHomeOrder(order: List<HomeSection>) {
         prefs.edit().putString("home_order", HomeSection.format(order)).apply()
         _state.value = _state.value.copy(homeOrder = order)
+    }
+
+    fun setHomeHidden(hidden: Set<HomeSection>) {
+        prefs.edit().putString("home_hidden", HomeSection.formatHidden(hidden)).apply()
+        _state.value = _state.value.copy(homeHidden = hidden)
     }
 
     fun setSyncFolders(ids: Set<String>) {

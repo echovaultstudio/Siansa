@@ -1,6 +1,7 @@
 package app.musix.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.mediarouter.media.MediaRouter
 import app.musix.playback.Cast
+import app.musix.playback.CastStatus
 
 /**
  * The cast button: picks a TV or speaker to play on. Hidden on phones that can't cast, where
@@ -67,6 +70,61 @@ fun CastButton(tint: Color = LocalContentColor.current, keepSpace: Boolean = fal
                 else -> tint
             },
         )
+    }
+    if (open) CastSheet(onDismiss = { open = false })
+}
+
+/**
+ * The text next to the device button in now playing: the TV or speaker's name while casting,
+ * "Connecting…" while it connects, and nothing while the music plays on this phone.
+ */
+fun castDeviceLabel(status: CastStatus): String? = when {
+    status.device != null -> status.device
+    status.connecting -> "Connecting…"
+    else -> null
+}
+
+/**
+ * Now playing's device button, bottom left as in Spotify: the cast icon, followed by the name of the TV
+ * or speaker while the music plays there. Tapping it picks where to play. Hidden on phones that can't cast.
+ */
+@Composable
+fun CastDeviceButton(tint: Color, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) { Cast.whenReady(context) { } }
+    val status by Cast.status.collectAsStateWithLifecycle()
+    var open by remember { mutableStateOf(false) }
+    if (!status.available) return
+    val label = castDeviceLabel(status)
+    val color = when {
+        status.device != null -> Accent
+        status.connecting -> Accent.copy(alpha = 0.6f)
+        else -> tint
+    }
+    Row(
+        modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClickLabel = "Choose where to play") { open = true }
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            if (status.device != null) Icons.Rounded.CastConnected else Icons.Rounded.Cast,
+            if (label == null) "Play on a TV or speaker" else null,
+            tint = color,
+            modifier = Modifier.size(22.dp),
+        )
+        if (label != null) {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = color,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
     if (open) CastSheet(onDismiss = { open = false })
 }
