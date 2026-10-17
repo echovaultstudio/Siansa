@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Download
@@ -128,6 +129,9 @@ fun SettingsHub(nav: NavController) {
             HubRow(Icons.Rounded.Storage, "Storage", "Songs up to ${formatMb(settings.songCacheMb)} · images ${imageLimit(settings.imageCacheMb)}" +
                     if (settings.coverDownload) " · all covers downloaded" else "") {
                 nav.navigate("settings/storage")
+            }
+            HubRow(Icons.Rounded.Backup, "Backup", "Save or restore your settings, vibes and history") {
+                nav.navigate("settings/backup")
             }
             HubRow(Icons.Rounded.BugReport, "Logs", if (settings.logging) "Logging on" else "Logging off") {
                 nav.navigate("settings/logs")
