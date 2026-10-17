@@ -127,6 +127,8 @@ class AppTourTest {
                 idle(600)
             }
             step("now playing menu, cards and lyrics") {
+                // Paused, so the seek bar isn't redrawn every frame and the screen can settle for the checks.
+                pausePlayback()
                 compose.onAllNodesWithTag("miniPlayer").onFirst().performClick()
                 idle(1500)
                 // The ⋮ menu.
@@ -268,6 +270,11 @@ class AppTourTest {
             runCatching { shot("FAIL-" + name.replace(' ', '-')) }
             runCatching { back() }
         }
+    }
+
+    private fun pausePlayback() {
+        instrumentation.runOnMainSync { if (graph.player.state.value.isPlaying) graph.player.togglePlay() }
+        SystemClock.sleep(500)
     }
 
     private fun idle(ms: Long = 300) {
