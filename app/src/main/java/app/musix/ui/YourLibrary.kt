@@ -1,6 +1,7 @@
 package app.musix.ui
 
 import app.musix.data.cover
+import app.musix.data.toPlaylist
 import android.content.Context
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -233,16 +234,13 @@ fun YourLibraryScreen(nav: NavController) {
             }
         }
         if (naming) {
-            PlaylistNameDialog(
-                title = "New playlist",
-                initial = "",
-                confirm = "Create",
+            NewPlaylistDialog(
                 onDismiss = { naming = false },
-                onConfirm = { name ->
+                onCreate = { name, onPhone ->
                     if (!creating) {
                         creating = true
                         scope.launch {
-                            graph.playlists.create(name)
+                            graph.playlists.create(name, onPhone = onPhone)
                                 .onSuccess { made ->
                                     naming = false
                                     launcher.notify("Made $name")
@@ -714,6 +712,23 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
         tags = setOf("Discover"),
     )
 
+    // Playlists kept only on this phone.
+    graph.localPlaylists.all().forEach { local ->
+        val p = local.toPlaylist()
+        entries += Entry(
+            key = "playlist-${p.id}",
+            kind = Kind.PLAYLIST,
+            title = p.name,
+            subtitle = "Playlist · On this phone",
+            route = "playlist/${p.id}",
+            coverArt = p.coverArt,
+            recentAt = local.changedAt,
+            addedAt = local.createdAt,
+            creator = me,
+            tags = setOf("By you", "On this phone"),
+        )
+    }
+
     // Playlists from Navidrome.
     val playlists = runCatching { graph.library.refreshPlaylists { graph.subsonic.playlists() } }.getOrElse { graph.library.playlists() }
         .let(graph.playlists.removed::visible)
@@ -801,7 +816,7 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
     }
     val albumOrder = listOf("Played", "Not played yet") + AlbumCategory.entries.map { it.plural }
     val subFilters = mapOf(
-        Kind.PLAYLIST to present(Kind.PLAYLIST, listOf("By you", "By others")),
+        Kind.PLAYLIST to present(Kind.PLAYLIST, listOf("By you", "By others", "On this phone")),
         Kind.MIX to present(Kind.MIX, listOf("Today", "Made for you", "Vibes", "Earlier")),
         Kind.ALBUM to present(Kind.ALBUM, albumOrder),
         Kind.ARTIST to present(Kind.ARTIST, listOf("Played", "Not played yet")),
