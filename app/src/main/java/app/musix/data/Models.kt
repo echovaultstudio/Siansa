@@ -91,7 +91,8 @@ data class Playlist(
 
 data class PlaylistDetail(val playlist: Playlist, val songs: List<Song>)
 
-data class AlbumDetail(val album: Album, val songs: List<Song>)
+/** [discTitles]: the names of the album's discs by disc number (Navidrome's "disctitle" tag), when it has any. */
+data class AlbumDetail(val album: Album, val songs: List<Song>, val discTitles: Map<Int, String> = emptyMap())
 data class ArtistDetail(val artist: Artist, val albums: List<Album>)
 data class SearchResults(val artists: List<Artist>, val albums: List<Album>, val songs: List<Song>)
 

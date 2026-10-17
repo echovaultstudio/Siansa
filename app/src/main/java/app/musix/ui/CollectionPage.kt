@@ -20,13 +20,13 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.CircularProgressIndicator
@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.musix.data.Song
+import app.musix.data.discHeaders
 
 /**
  * The page used for albums, playlists, mixes and radios, laid out like Spotify: the cover's colour
@@ -69,6 +70,7 @@ fun CollectionPage(
     cover: @Composable (Modifier) -> Unit,
     header: @Composable ColumnScope.() -> Unit,
     numbered: Boolean = false,
+    discTitles: Map<Int, String> = emptyMap(),
     showCovers: Boolean = true,
     // The line under each song's title; by default its artist and album.
     subtitleOf: ((Song) -> String?)? = null,
@@ -136,16 +138,22 @@ fun CollectionPage(
                 }
                 error != null -> item { ErrorText(error) }
                 songs != null -> {
-                    val multiDisc = numbered && songs.mapNotNull { it.disc }.distinct().size > 1
-                    itemsIndexed(songs, key = { i, s -> "$i-${s.id}" }) { index, song ->
-                        SongRow(
-                            song = song,
-                            onClick = { graph.player.play(songs, index) },
-                            leading = if (numbered) song.track?.let { t -> if (multiDisc && song.disc != null) "${song.disc}.$t" else "$t" } ?: "${index + 1}" else null,
-                            highlighted = song.id == player.current?.id,
-                            showCover = showCovers,
-                            subtitle = if (subtitleOf != null) subtitleOf(song) else artistAndAlbum(song),
-                        )
+                    // Albums with several discs get a heading above each disc (its title, or "Disc 2").
+                    val discs = if (numbered) discHeaders(songs, discTitles) else emptyMap()
+                    songs.forEachIndexed { index, song ->
+                        discs[index]?.let { header ->
+                            item(key = "disc-$index-${header.disc}", contentType = "disc") { DiscHeading(header.label) }
+                        }
+                        item(key = "$index-${song.id}", contentType = "song") {
+                            SongRow(
+                                song = song,
+                                onClick = { graph.player.play(songs, index) },
+                                leading = if (numbered) song.track?.toString() ?: "${index + 1}" else null,
+                                highlighted = song.id == player.current?.id,
+                                showCover = showCovers,
+                                subtitle = if (subtitleOf != null) subtitleOf(song) else artistAndAlbum(song),
+                            )
+                        }
                     }
                 }
             }
@@ -178,6 +186,26 @@ fun CollectionPage(
                 modifier = Modifier.weight(1f).graphicsLayer { alpha = barAlpha },
             )
         }
+    }
+}
+
+/** The heading above each disc of a multi-disc album. */
+@Composable
+private fun DiscHeading(label: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Rounded.Album, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(10.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
