@@ -38,6 +38,8 @@ import app.musix.MusixApp
 import app.musix.data.PlayEvent
 import app.musix.data.Song
 import app.musix.log.AppLog
+import com.google.android.gms.cast.framework.CastSession
+import com.google.android.gms.cast.framework.SessionManagerListener
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
@@ -65,6 +67,8 @@ class PlaybackService : MediaSessionService() {
     private lateinit var exo: ExoPlayer
     private var castPlayer: RemoteCastPlayer? = null
     private var dlnaPlayer: DlnaPlayer? = null
+    // Where the music was on the TV as casting began to end, in case the TV forgets its queue while stopping.
+    private var castSaved: CastSpot<MediaItem>? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var graph: AppGraph
     private var events: Events? = null
@@ -119,7 +123,7 @@ class PlaybackService : MediaSessionService() {
             .build()
 
         // Casting: playback moves to the TV when a Cast session starts and back when it ends.
-        Cast.whenReady(this) { _ ->
+        Cast.whenReady(this) { cast ->
             if (session == null) return@whenReady
             val remote = RemoteCastPlayer.Builder(this).setMediaItemConverter(CastItems(graph.subsonic)).build()
             castPlayer = remote
@@ -133,6 +137,19 @@ class PlaybackService : MediaSessionService() {
                     if (session?.player === remote) moveTo(exo)
                 }
             })
+            cast.sessionManager.addSessionManagerListener(object : SessionManagerListener<CastSession> {
+                override fun onSessionEnding(castSession: CastSession) {
+                    if (session?.player === remote) castSaved = spotOf(remote)
+                }
+                override fun onSessionStarting(castSession: CastSession) { castSaved = null }
+                override fun onSessionStarted(castSession: CastSession, sessionId: String) {}
+                override fun onSessionStartFailed(castSession: CastSession, error: Int) {}
+                override fun onSessionEnded(castSession: CastSession, error: Int) {}
+                override fun onSessionResuming(castSession: CastSession, sessionId: String) {}
+                override fun onSessionResumed(castSession: CastSession, wasSuspended: Boolean) {}
+                override fun onSessionResumeFailed(castSession: CastSession, error: Int) {}
+                override fun onSessionSuspended(castSession: CastSession, reason: Int) {}
+            }, CastSession::class.java)
             if (remote.isCastSessionAvailable) moveTo(remote)
         }
 
@@ -350,8 +367,9 @@ class PlaybackService : MediaSessionService() {
         val from = session.player
         if (from === target) return
         val toCast = target !== exo
-        val (items, index) = queueInPlayOrder(from)
-        val position = from.currentPosition.coerceAtLeast(0L)
+        val spot = if (from === castPlayer) spotFromTv(from) else spotOf(from)
+        castSaved = null
+        val (items, index, position) = spot
         val play = toCast && from.playWhenReady
         AppLog.i(
             "Cast",
@@ -366,12 +384,41 @@ class PlaybackService : MediaSessionService() {
         if (from === exo) exo.clearMediaItems()
         target.repeatMode = from.repeatMode
         if (items.isNotEmpty()) {
-            target.setMediaItems(items, index, position)
-            target.playWhenReady = play
-            target.prepare()
+            try {
+                target.setMediaItems(items, index, position)
+                target.playWhenReady = play
+                target.prepare()
+            } catch (e: RuntimeException) {
+                // Better an empty queue than the app closing.
+                AppLog.e("Cast", "Couldn't move the queue (${items.size} songs, song ${index + 1})", e)
+                target.clearMediaItems()
+            }
         }
         events?.attach(target)
         session.player = target
+    }
+
+    private fun spotOf(player: Player): CastSpot<MediaItem> {
+        val (items, index) = queueInPlayOrder(player)
+        return CastSpot(items, index, player.currentPosition.coerceAtLeast(0L))
+    }
+
+    /**
+     * The TV's queue, made playable on the phone. Songs the TV hands back can lack their stream address,
+     * or (when the TV has already let go) be blank; those are rebuilt or taken from [castSaved].
+     */
+    private fun spotFromTv(tv: Player): CastSpot<MediaItem> {
+        val live = spotOf(tv)
+        val picked = CastHandBack.pick(live, castSaved) { it.mediaId }
+        if (picked !== live) AppLog.w("Cast", "The TV forgot the queue while stopping; using the one saved as casting ended")
+        val spot = CastHandBack.withoutNameless(picked) { it.mediaId }
+        return spot.copy(items = spot.items.map(::playableOnPhone))
+    }
+
+    private fun playableOnPhone(item: MediaItem): MediaItem {
+        if (item.localConfiguration != null) return item
+        return SongRegistry.get(item.mediaId)?.toMediaItem(graph.subsonic)
+            ?: item.buildUpon().setUri(graph.subsonic.streamUrl(item.mediaId)).build()
     }
 
     /**
