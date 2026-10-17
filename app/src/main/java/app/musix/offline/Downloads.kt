@@ -90,6 +90,24 @@ data class DownloadList(
 /** How much of an album or playlist is on the phone, for its download button. */
 enum class OfflineState { NONE, WAITING, PARTLY, ALL }
 
+/**
+ * What's on the phone, for Your Library's Downloaded filter (issue #56): the albums and artists that
+ * have at least one downloaded song, the playlists chosen for downloading that have some of their songs
+ * here, and every downloaded song.
+ */
+data class OfflineShelf(
+    val songs: Set<String> = emptySet(),
+    val albums: Set<String> = emptySet(),
+    val artists: Set<String> = emptySet(),
+    val playlists: Set<String> = emptySet(),
+    val liked: Boolean = false,
+) {
+    val isEmpty: Boolean get() = songs.isEmpty()
+
+    /** True when every one of [songIds] is on the phone (a mix plays offline only then). */
+    fun hasAll(songIds: List<String>): Boolean = songIds.isNotEmpty() && songIds.all { it in songs }
+}
+
 /** The download list's decisions, kept apart from files and the network so they can be tested. */
 object OfflinePlan {
     /**
@@ -162,6 +180,19 @@ object OfflinePlan {
         }
     }
 
+    /** What [list] has on the phone, by album, artist and playlist. */
+    fun shelf(list: DownloadList): OfflineShelf {
+        val songs = list.done.mapTo(HashSet()) { it.song.id }
+        val withSongs = list.items.filter { item -> item.songIds.any { it in songs } }
+        return OfflineShelf(
+            songs = songs,
+            albums = list.done.mapNotNullTo(HashSet()) { it.song.albumId },
+            artists = list.done.flatMapTo(HashSet()) { d -> listOfNotNull(d.song.artistId) + d.song.artists.map { it.id } },
+            playlists = withSongs.filter { it.kind == OfflineKind.PLAYLIST }.mapTo(HashSet()) { it.id },
+            liked = withSongs.any { it.kind == OfflineKind.LIKED },
+        )
+    }
+
     /**
      * Whether a finished download got all of the file. Opus conversions only have an estimated length,
      * so they can end a little short or long of it.
@@ -209,6 +240,9 @@ class Downloads(
     val list: StateFlow<DownloadList> = _list.asStateFlow()
     private val _ids = MutableStateFlow(Ids())
     val ids: StateFlow<Ids> = _ids.asStateFlow()
+    private val _shelf = MutableStateFlow(OfflineShelf())
+    /** What's on the phone by album, artist and playlist, for Your Library's Downloaded filter. */
+    val shelf: StateFlow<OfflineShelf> = _shelf.asStateFlow()
     private val _progress = MutableStateFlow(Progress())
     val progress: StateFlow<Progress> = _progress.asStateFlow()
 
@@ -493,6 +527,7 @@ class Downloads(
     private fun publish(list: DownloadList) {
         _list.value = list
         _ids.value = Ids(list.done.mapTo(HashSet()) { it.song.id }, list.waiting.mapTo(HashSet()) { it.id }, list.items.mapTo(HashSet()) { it.key })
+        _shelf.value = OfflinePlan.shelf(list)
     }
 
     private companion object {

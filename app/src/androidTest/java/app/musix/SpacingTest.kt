@@ -22,6 +22,7 @@ import app.musix.playback.EqPreset
 import app.musix.ui.CHIPS_GAP
 import app.musix.ui.EqPresetRow
 import app.musix.ui.MusixTheme
+import app.musix.ui.OfflineOffer
 import app.musix.ui.ReleaseTypeRow
 import app.musix.ui.SectionTitle
 import org.junit.Assert.assertTrue
@@ -80,5 +81,22 @@ class SpacingTest {
     /** Now playing's ⋮ menu: every row the same height, so the list reads evenly. */
     @Test fun menuRowsAreOneHeight() {
         assertEven("Menu rows", app.musix.ui.MENU_ROW_HEIGHT, 48.dp, tolerance = 0.dp)
+    }
+
+    /** Home: the "You're offline" offer sits evenly between the greeting and the first row. */
+    @Test fun offlineOfferIsEvenlySpaced() {
+        compose.setContent {
+            MusixTheme {
+                Column {
+                    Box(Modifier.fillMaxWidth().height(48.dp).testTag("chips"))
+                    OfflineOffer { }
+                    Box(Modifier.fillMaxWidth().height(48.dp).testTag("list"))
+                }
+            }
+        }
+        val chips = compose.onNodeWithTag("chips").getBoundsInRoot()
+        val offer = compose.onNodeWithTag("offline-offer").getBoundsInRoot()
+        val list = compose.onNodeWithTag("list").getBoundsInRoot()
+        assertEven("Offline offer", offer.top - chips.bottom, list.top - offer.bottom)
     }
 }
