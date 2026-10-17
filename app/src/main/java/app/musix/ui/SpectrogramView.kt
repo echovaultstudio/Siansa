@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.createBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -53,7 +54,7 @@ import kotlinx.coroutines.withContext
 fun SpectrogramView(state: PlayerState, casting: Boolean) {
     var spectrogram by remember { mutableStateOf<Spectrogram?>(null) }
     var drawn by remember { mutableIntStateOf(0) }
-    val bitmap = remember { Bitmap.createBitmap(300, 200, Bitmap.Config.ARGB_8888).apply { eraseColor(Spectrogram.BLACK) } }
+    val bitmap = remember { createBitmap(300, 200).apply { eraseColor(Spectrogram.BLACK) } }
 
     DisposableEffect(Unit) {
         onDispose { SpectrumFeed.listening = false }
