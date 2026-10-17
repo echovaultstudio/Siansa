@@ -172,13 +172,21 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     var upDrag by remember { mutableFloatStateOf(0f) }
     var heightPx by remember { mutableFloatStateOf(1f) }
     val velocity = remember { VelocityTracker() }
+    val cornerMaxPx = with(LocalDensity.current) { 28.dp.toPx() }
 
     MaterialTheme(colorScheme = PlayerColors, typography = MaterialTheme.typography) {
         Box(
             Modifier
                 .fillMaxSize()
                 .onSizeChanged { heightPx = it.height.toFloat().coerceAtLeast(1f) }
-                .graphicsLayer { translationY = dismissY }
+                // One solid card: everything is clipped to it (the enlarged, blurred cover used to show
+                // through above it), and its top corners round as it is dragged down.
+                .graphicsLayer {
+                    translationY = dismissY
+                    val corner = playerCardCornerPx(dismissY, cornerMaxPx)
+                    shape = RoundedCornerShape(topStart = corner, topEnd = corner)
+                    clip = true
+                }
                 .background(Color.Black)
                 .pointerInput(Unit) {
                     var total = 0f
