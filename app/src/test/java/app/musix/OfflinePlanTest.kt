@@ -77,6 +77,18 @@ class OfflinePlanTest {
         assertTrue(OfflinePlan.full(1024L shl 20, 1024))
     }
 
+    @Test fun opusDownloadsMayDifferFromTheirEstimatedLength() {
+        assertTrue(OfflinePlan.complete(100, 100, converted = false))
+        assertFalse(OfflinePlan.complete(90, 100, converted = false))
+        assertTrue(OfflinePlan.complete(90, 100, converted = true))
+        assertTrue(OfflinePlan.complete(90, -1, converted = false))
+    }
+
+    @Test fun downloadKeepsItsQuality() {
+        val list = OfflinePlan.finished(DownloadList(), song("1"), 42, 7, kbps = 160)
+        assertEquals(160, list.done.single().kbps)
+    }
+
     @Test fun fileNamesAreSafe() {
         assertEquals("abc123", OfflinePlan.fileName("abc123"))
         assertEquals("______etc", OfflinePlan.fileName("../../etc"))

@@ -39,7 +39,7 @@ import kotlin.coroutines.coroutineContext
 
 /** A song saved on the phone: its details (so it can be listed and played offline) and its size. */
 @Serializable
-data class DownloadedSong(val song: Song, val bytes: Long = 0, val at: Long = 0)
+data class DownloadedSong(val song: Song, val bytes: Long = 0, val at: Long = 0, val kbps: Int = 0)
 
 /** What can be picked for downloading in the Downloads menu. */
 @Serializable
@@ -122,8 +122,8 @@ object OfflinePlan {
         list.copy(done = list.done.filterNot { it.song.id in ids }, waiting = list.waiting.filterNot { it.id in ids })
 
     /** [song] moved from waiting to done. */
-    fun finished(list: DownloadList, song: Song, bytes: Long, at: Long): DownloadList = list.copy(
-        done = list.done.filterNot { it.song.id == song.id } + DownloadedSong(song, bytes, at),
+    fun finished(list: DownloadList, song: Song, bytes: Long, at: Long, kbps: Int = 0): DownloadList = list.copy(
+        done = list.done.filterNot { it.song.id == song.id } + DownloadedSong(song, bytes, at, kbps),
         waiting = list.waiting.filterNot { it.id == song.id },
     )
 
@@ -137,6 +137,12 @@ object OfflinePlan {
             else -> OfflineState.NONE
         }
     }
+
+    /**
+     * Whether a finished download got all of the file. Opus conversions only have an estimated length,
+     * so they can end a little short or long of it.
+     */
+    fun complete(written: Long, total: Long, converted: Boolean): Boolean = converted || total <= 0 || written == total
 
     /** True when downloads have used up the limit ([limitMb] 0 = no limit). */
     fun full(usedBytes: Long, limitMb: Int): Boolean = limitMb > 0 && usedBytes >= limitMb * 1024L * 1024L
@@ -343,8 +349,9 @@ class Downloads(
                 return stopped("Storage limit reached")
             }
             _progress.value = Progress(running = true, current = song)
+            val kbps = s.downloadKbps
             val bytes = try {
-                download(song)
+                download(song, kbps)
             } catch (e: IOException) {
                 AppLog.w("Downloads", "Download of ${song.id} stopped: ${e.javaClass.simpleName}: ${e.message}")
                 later(if (s.downloadWifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
@@ -356,18 +363,20 @@ class Downloads(
                 change { OfflinePlan.remove(it, setOf(song.id)) }
                 continue
             }
-            publish(json.update { OfflinePlan.finished(it, song, bytes, System.currentTimeMillis()) })
+            publish(json.update { OfflinePlan.finished(it, song, bytes, System.currentTimeMillis(), kbps) })
         }
         val done = _list.value.done
         AppLog.i("Downloads", "Downloads done: ${done.size} songs, ${done.sumOf { it.bytes } / 1_048_576} MB")
         _progress.value = Progress(note = null)
     }
 
-    /** Saves one song's original file. Returns its size, or null when Navidrome refused it. */
-    private suspend fun download(song: Song): Long? {
+    /** Saves one song: the original file, or Opus when kbps > 0. Returns its size, or null when Navidrome refused it. */
+    private suspend fun download(song: Song, kbps: Int): Long? {
         val target = File(dir, OfflinePlan.fileName(song.id))
         val part = File(dir, OfflinePlan.fileName(song.id) + PART)
-        val call = http.newCall(Request.Builder().url(subsonic.streamUrl(song.id)).build())
+        // The original file, or an Opus conversion by Navidrome when that's the chosen download quality.
+        val url = if (kbps > 0) Streaming.rewrite(android.net.Uri.parse(subsonic.streamUrl(song.id)), kbps).toString() else subsonic.streamUrl(song.id)
+        val call = http.newCall(Request.Builder().url(url).build())
         val cancel = coroutineContext[Job]?.invokeOnCompletion { call.cancel() }
         try {
             call.execute().use { response ->
@@ -403,10 +412,10 @@ class Downloads(
                         }
                     }
                 }
-                if (total > 0 && written != total) throw IOException("Got $written of $total bytes")
+                if (!OfflinePlan.complete(written, total, converted = kbps > 0)) throw IOException("Got $written of $total bytes")
                 coroutineContext.ensureActive()
                 if (!part.renameTo(target)) throw IOException("Couldn't save the file")
-                AppLog.d("Downloads", "Song ${song.id}: ${written / 1024} KB")
+                AppLog.d("Downloads", "Song ${song.id}: ${written / 1024} KB" + if (kbps > 0) " (Opus $kbps)" else "")
                 return written
             }
         } finally {

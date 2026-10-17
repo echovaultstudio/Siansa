@@ -143,6 +143,8 @@ private fun RemoveDialog(name: String, onDismiss: () -> Unit, onRemove: () -> Un
     )
 }
 
+private val downloadQualities = listOf(0, 128, 160, 192, 256, 320)
+
 private val downloadLimits = listOf(0, 1024, 2048, 5120, 10240, 20480, 51200)
 
 /**
@@ -239,6 +241,17 @@ fun DownloadsScreen(nav: NavController) {
                         graph.settings.setDownloads(wifiOnly = on)
                         graph.downloads.retry()
                     }
+                    Text("Download quality", style = MaterialTheme.typography.bodyLarge)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        downloadQualities.forEach { kbps ->
+                            FilterChip(
+                                selected = settings.downloadKbps == kbps,
+                                onClick = { graph.settings.setDownloads(kbps = kbps) },
+                                label = { Text(if (kbps == 0) "Original" else "Opus $kbps") },
+                            )
+                        }
+                    }
+                    Hint("Opus is converted by Navidrome and takes far less space than the original file. Applies to songs downloaded from now on.")
                     Text("Storage limit", style = MaterialTheme.typography.bodyLarge)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         downloadLimits.forEach { mb ->
