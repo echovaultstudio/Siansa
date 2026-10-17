@@ -11,6 +11,7 @@ import app.musix.data.LibrarySync
 import app.musix.data.MixStore
 import app.musix.data.SelectorStore
 import app.musix.data.SettingsRepository
+import app.musix.data.TopSongs
 import app.musix.log.AppLog
 import app.musix.mix.MixGenerator
 import app.musix.mix.Radios
@@ -146,6 +147,7 @@ class AppGraph(val app: Application) {
     val mixes = MixStore(app)
     val history = HistoryStore(app)
     val library = LibraryRepository(app)
+    val topSongs = TopSongs(app, subsonic, library, scope)
 
     init {
         CoverStore.init(app)
