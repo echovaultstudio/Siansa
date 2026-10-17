@@ -72,7 +72,7 @@ import app.musix.data.ReplayGainMode
 import app.musix.data.SyncPhase
 import app.musix.data.Users
 import app.musix.log.AppLog
-import app.musix.log.errorsForClipboard
+import app.musix.log.problemsForClipboard
 import app.musix.log.logEntries
 import coil3.SingletonImageLoader
 import kotlinx.coroutines.Dispatchers
@@ -496,27 +496,27 @@ fun LogsScreen(nav: NavController) {
                             AppLog.clear()
                             refresh++
                         }) { Text("Clear") }
-                        // Every error with its details, ready to paste into a message or an issue.
+                        // Every error and warning with its details, ready to paste into a message or an issue.
                         OutlinedButton(onClick = {
                             scope.launch {
                                 val text = withContext(Dispatchers.IO) {
-                                    errorsForClipboard(logEntries(AppLog.allLines()), AppLog.header)
+                                    problemsForClipboard(logEntries(AppLog.allLines()), AppLog.header)
                                 }
                                 if (text == null) {
-                                    snack.showSnackbar("No errors in the log")
+                                    snack.showSnackbar("No errors or warnings in the log")
                                     return@launch
                                 }
                                 val ok = runCatching {
                                     context.getSystemService(ClipboardManager::class.java)
-                                        .setPrimaryClip(ClipData.newPlainText("Musix errors", text))
+                                        .setPrimaryClip(ClipData.newPlainText("Musix problems", text))
                                 }.isSuccess
-                                AppLog.i("Logs", "Copied errors to the clipboard (${text.length} characters)")
-                                snack.showSnackbar(if (ok) "Errors copied" else "Couldn't copy the errors")
+                                AppLog.i("Logs", "Copied problems to the clipboard (${text.length} characters)")
+                                snack.showSnackbar(if (ok) "Errors and warnings copied" else "Couldn't copy them")
                             }
                         }) {
                             Icon(Icons.Rounded.ContentCopy, null)
                             Spacer(Modifier.width(6.dp))
-                            Text("Copy errors")
+                            Text("Copy problems")
                         }
                     }
                     val all = entries.valueOrNull().orEmpty()
