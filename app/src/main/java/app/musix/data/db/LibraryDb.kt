@@ -259,7 +259,7 @@ abstract class LibraryDatabase : RoomDatabase() {
 
     companion object {
         fun open(context: Context): LibraryDatabase =
-            Room.databaseBuilder(context, LibraryDatabase::class.java, "library.db")
+            Room.databaseBuilder(context, LibraryDatabase::class.java, app.musix.data.Users.scoped(app.musix.data.UserFiles.DATABASE))
                 // The library can always be synced again, so a schema change simply starts fresh.
                 .fallbackToDestructiveMigration()
                 .build()

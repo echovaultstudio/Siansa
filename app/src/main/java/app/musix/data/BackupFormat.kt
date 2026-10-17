@@ -58,12 +58,15 @@ object BackupRules {
         encodeDefaults = true
     }
 
-    /** Library stores (WorkManager, …) and caches are left out; anything else the app keeps is included. */
-    fun includesPrefs(name: String): Boolean = PREFS_NAME.matches(name) && name !in SKIPPED_PREFS
+    /**
+     * Library stores (WorkManager, …) and caches are left out; anything else the app keeps is included.
+     * Each Navidrome user's copy (`settings__u2`, `history__u2.json`) follows the same rules as the first's.
+     */
+    fun includesPrefs(name: String): Boolean = PREFS_NAME.matches(name) && UserFiles.base(name) !in SKIPPED_PREFS
 
-    fun includesFile(name: String): Boolean = FILE_NAME.matches(name) && name !in SKIPPED_FILES
+    fun includesFile(name: String): Boolean = FILE_NAME.matches(name) && UserFiles.base(name) !in SKIPPED_FILES
 
-    fun isSecret(prefs: String, key: String): Boolean = key in SECRET_KEYS[prefs].orEmpty()
+    fun isSecret(prefs: String, key: String): Boolean = key in SECRET_KEYS[UserFiles.base(prefs)].orEmpty()
 
     fun encodeValue(value: Any?): BackupValue? = when (value) {
         is String -> BackupValue("string", JsonPrimitive(value))
