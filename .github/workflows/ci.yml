@@ -330,3 +330,19 @@ jobs:
               gh release edit "v$v" --notes-file "$f"
             fi
           done
+
+      # RELEASES.md lists every release with the pull requests in it, as a commit on main.
+      - name: Update the release history
+        if: steps.version.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git pull -q --rebase origin main
+          python3 scripts/release_prs.py
+          git add RELEASES.md
+          if ! git diff --cached --quiet; then
+            git commit -q -m "Release history [skip ci]"
+            for i in 1 2 3; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 5; done
+          fi
