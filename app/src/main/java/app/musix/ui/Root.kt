@@ -197,8 +197,8 @@ fun MusixRoot() {
                         Modifier.background(
                             Brush.verticalGradient(
                                 0f to Color.Transparent,
-                                0.3f to Brand.Plum.copy(alpha = 0.78f),
-                                1f to Brand.Plum.copy(alpha = 0.96f),
+                                0.3f to DarkColours.surface.copy(alpha = 0.78f),
+                                1f to DarkColours.surface.copy(alpha = 0.96f),
                             )
                         )
                     ) {
@@ -241,6 +241,7 @@ fun MusixRoot() {
                 composable("settings/connections") { ConnectionsScreen(nav) }
                 composable("settings/users") { UsersScreen(nav) }
                 composable("settings/playback") { PlaybackSettingsScreen(nav) }
+                composable("settings/themes") { ThemesScreen(nav) }
                 composable("settings/equaliser") { EqualiserScreen(nav) }
                 composable("settings/storage") { StorageScreen(nav) }
                 composable("downloads") { DownloadsScreen(nav) }

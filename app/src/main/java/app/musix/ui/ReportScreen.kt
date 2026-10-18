@@ -199,7 +199,7 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
             if (playable.isNotEmpty()) {
                 Button(
                     onClick = { graph.player.play(playable) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF2A1700)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = OnAccent),
                 ) {
                     Icon(Icons.Rounded.PlayArrow, null)
                     Spacer(Modifier.width(4.dp))
@@ -328,13 +328,14 @@ private fun ListeningClock(byHour: IntArray, peak: Int?) {
     }
     val max = byHour.maxOrNull()?.coerceAtLeast(1) ?: 1
     val faint = Color.White.copy(alpha = 0.18f)
+    val accent = Accent
     Canvas(Modifier.fillMaxWidth().height(120.dp).padding(horizontal = 16.dp, vertical = 12.dp)) {
         val gap = 3.dp.toPx()
         val barWidth = (size.width - gap * 23) / 24
         byHour.forEachIndexed { hour, count ->
             val h = (count.toFloat() / max) * size.height
             drawRoundRect(
-                color = if (hour == peak) Accent else if (count > 0) Brand.Violet.copy(alpha = 0.75f) else faint,
+                color = if (hour == peak) accent else if (count > 0) Brand.Violet.copy(alpha = 0.75f) else faint,
                 topLeft = Offset(hour * (barWidth + gap), size.height - h.coerceAtLeast(2f)),
                 size = Size(barWidth, h.coerceAtLeast(2f)),
                 cornerRadius = CornerRadius(barWidth / 3, barWidth / 3),

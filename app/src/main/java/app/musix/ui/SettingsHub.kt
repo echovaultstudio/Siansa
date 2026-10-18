@@ -30,6 +30,7 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.NewReleases
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Schedule
@@ -130,6 +131,16 @@ fun SettingsHub(nav: NavController) {
                 "Playback",
                 "ReplayGain ${settings.replayGain.label.lowercase()} · " + eqSummary(eq) + " · Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}",
             ) { nav.navigate("settings/playback") }
+            val theme = themeChoiceOf(settings)
+            HubRow(
+                Icons.Rounded.Palette,
+                "Themes",
+                "${theme.colours.label} colours · " + when (theme.mode) {
+                    ThemeMode.AUTO -> "follows the phone"
+                    ThemeMode.LIGHT -> "light"
+                    ThemeMode.DARK -> if (theme.pureBlack) "dark, pure black" else "dark"
+                },
+            ) { nav.navigate("settings/themes") }
             HubRow(
                 Icons.Rounded.GraphicEq,
                 "Scrobbling",

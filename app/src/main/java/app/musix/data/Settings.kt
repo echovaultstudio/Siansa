@@ -56,6 +56,10 @@ data class AppSettings(
     val homeHidden: Set<HomeSection> = emptySet(),
     /** Show only music on the phone, across the whole app (issue #141). */
     val downloadedOnly: Boolean = false,
+    /** Theme (issue #148): "AUTO", "LIGHT" or "DARK"; colours by name ("MUSIX", "OCEAN"…); pure black when dark. */
+    val themeMode: String = "AUTO",
+    val themeColours: String = "MUSIX",
+    val pureBlack: Boolean = false,
 ) {
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
@@ -166,6 +170,9 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeOrder = HomeSection.parse(prefs.getString("home_order", null)),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
+        themeMode = prefs.getString("theme_mode", "AUTO") ?: "AUTO",
+        themeColours = prefs.getString("theme_colours", "MUSIX") ?: "MUSIX",
+        pureBlack = prefs.getBoolean("pure_black", false),
     )
 
     /**
@@ -278,5 +285,10 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setDownloadedOnly(on: Boolean) {
         prefs.edit().putBoolean("downloaded_only", on).apply()
         _state.value = _state.value.copy(downloadedOnly = on)
+    }
+
+    fun setTheme(mode: String = _state.value.themeMode, colours: String = _state.value.themeColours, pureBlack: Boolean = _state.value.pureBlack) {
+        prefs.edit().putString("theme_mode", mode).putString("theme_colours", colours).putBoolean("pure_black", pureBlack).apply()
+        _state.value = _state.value.copy(themeMode = mode, themeColours = colours, pureBlack = pureBlack)
     }
 }
