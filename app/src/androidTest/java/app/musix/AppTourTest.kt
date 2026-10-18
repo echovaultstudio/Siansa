@@ -249,7 +249,8 @@ class AppTourTest {
                 // Below the other Your listening entries, so possibly not on screen yet.
                 compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Time machine"))
                 idle(400)
-                click("Time machine")
+                // Scrolled into view at the bottom edge, under the mini player: a touch there opens now playing.
+                tapRow("Time machine")
                 waitText("Whole year")
                 idle(2500)
                 shot("14b-time-machine")
