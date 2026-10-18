@@ -240,6 +240,18 @@ class AppTourTest {
                 shot("14-your-listening")
                 back()
             }
+            step("time machine") {
+                libraryAll()
+                click("Your listening")
+                click("Time machine")
+                waitText("Whole year")
+                idle(2500)
+                shot("14b-time-machine")
+                click("Whole year")
+                idle(2500)
+                shot("14c-time-machine-year")
+                back()
+            }
             step("other artists you might like") {
                 libraryAll()
                 click("Your listening")

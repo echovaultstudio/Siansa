@@ -118,6 +118,28 @@ class HistoryApi(private val http: OkHttpClient) {
         return artists to tracks
     }
 
+    /**
+     * Tracks you played on Last.fm between [fromSec] and [toSec] (epoch seconds), most played first, for
+     * the time machine (issue #186). Public data: only the API key and user name are needed.
+     */
+    suspend fun lastFmTracks(apiKey: String, user: String, fromSec: Long, toSec: Long, limit: Int): List<Played> {
+        val url = "https://ws.audioscrobbler.com/2.0/".toHttpUrl().newBuilder()
+            .addQueryParameter("method", "user.getWeeklyTrackChart")
+            .addQueryParameter("user", user)
+            .addQueryParameter("from", fromSec.toString())
+            .addQueryParameter("to", toSec.toString())
+            .addQueryParameter("api_key", apiKey)
+            .addQueryParameter("format", "json")
+            .build().toString()
+        return get(url, null).obj("weeklytrackchart")?.arr("track").orEmpty()
+            .mapNotNull { t ->
+                val artist = t.obj("artist")?.str("#text") ?: t.obj("artist")?.str("name") ?: return@mapNotNull null
+                Played(artist, t.str("name") ?: return@mapNotNull null, t.long("playcount") ?: 0)
+            }
+            .sortedByDescending { it.count }
+            .take(limit)
+    }
+
     private suspend fun get(url: String, token: String?): JsonObject = withContext(Dispatchers.IO) {
         val request = Request.Builder().url(url).apply { if (token != null) header("Authorization", "Token $token") }.get().build()
         http.newCall(request).execute().use { response ->
