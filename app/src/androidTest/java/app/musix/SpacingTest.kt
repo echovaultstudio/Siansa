@@ -12,6 +12,7 @@ import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Dp
@@ -134,18 +135,20 @@ class SpacingTest {
         assertEven("Swatch grid end", grid.bottom - second.bottom, 0.dp, tolerance = 1.dp)
     }
 
-    /** "Your colour" picker: hue slider, quick picks, colour code and previews are one even gap apart (issue #148). */
+    /** "Your colour" picker: hue slider, quick picks, colour code, opacity and previews are one even gap apart (issues #148, #181). */
     @Test fun yourColourPickerIsEvenlySpaced() {
         compose.setContent { MusixTheme { app.musix.ui.YourColourPicker(0xFF0E9AA7.toInt(), onCancel = {}, onUse = {}) } }
         val hue = compose.onNodeWithTag("hue").getBoundsInRoot()
         val quick = compose.onNodeWithTag("quick").getBoundsInRoot()
         val hex = compose.onNodeWithTag("hex").getBoundsInRoot()
+        val opacity = compose.onNodeWithTag("opacity").getBoundsInRoot()
         val previews = compose.onNodeWithTag("previews").getBoundsInRoot()
         val gap = app.musix.ui.PICKER_GAP
         assertEven("Hue slider to quick picks", quick.top - hue.bottom, gap, tolerance = 1.dp)
         assertEven("Quick picks to colour code", hex.top - quick.bottom, gap, tolerance = 1.dp)
         // The text field reserves a little room above it for its floating label.
-        assertEven("Colour code to previews", previews.top - hex.bottom, gap, tolerance = 1.dp)
+        assertEven("Colour code to opacity", opacity.top - hex.bottom, gap, tolerance = 1.dp)
+        assertEven("Opacity to previews", previews.top - opacity.bottom, gap, tolerance = 1.dp)
     }
 
     /** Crossfade and loudness: the source and crossfade chips sit evenly between their heading and the hint below (issue #60). */
@@ -178,5 +181,20 @@ class SpacingTest {
         val year = compose.onNodeWithTag("year").getBoundsInRoot()
         val months = compose.onNodeWithTag("months").getBoundsInRoot()
         assertEven("Year to months", months.top - year.bottom, app.musix.ui.TIME_MACHINE_GAP, tolerance = 1.dp)
+    }
+
+    /** Recent searches: the rows are one height, follow each other without gaps, and their words sit in the middle (issue #177). */
+    @Test fun recentSearchRowsAreEvenlySpaced() {
+        val searches = listOf("alt-j", "bonobo", "vance joy").map { app.musix.data.RecentSearch(it) }
+        compose.setContent { MusixTheme { app.musix.ui.RecentSearchList(searches, onPick = {}, onRemove = {}, onClear = {}) } }
+        val rows = compose.onAllNodesWithTag("recent", useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
+        assertTrue("three rows: ${rows.size}", rows.size == 3)
+        val density = compose.density.density
+        fun dp(px: Float) = (px / density).dp
+        assertEven("Row heights", dp(rows[0].height), dp(rows[1].height), tolerance = 1.dp)
+        assertEven("Gap between rows", dp(rows[1].top - rows[0].bottom), 0.dp, tolerance = 1.dp)
+        val text = compose.onNodeWithText("bonobo", useUnmergedTree = true).getBoundsInRoot()
+        val row = rows[1]
+        assertEven("Words in the row", text.top - dp(row.top), dp(row.bottom) - text.bottom)
     }
 }

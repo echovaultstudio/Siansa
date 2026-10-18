@@ -27,11 +27,14 @@ object ThemeTones {
     /** Light or dark colours from [seed]; [mono] makes a grey theme; [black] gives dark a pure black background. */
     fun scheme(seed: Int, dark: Boolean, mono: Boolean = false, black: Boolean = false): Roles {
         val (_, c, h) = lch(seed)
-        val pc = if (mono) 0.0 else maxOf(c, 48.0)
-        val sc = if (mono) 0.0 else 16.0
-        val tc = if (mono) 0.0 else 28.0
-        val nc = if (mono) 0.0 else 5.0
-        val nvc = if (mono) 0.0 else 9.0
+        // The seed's opacity (issue #181) sets how strongly its colour shows: every role keeps its tone (so
+        // text stays as readable) and loses colour towards grey, like the colour laid thinly over grey.
+        val k = opacityOf(seed)
+        val pc = if (mono) 0.0 else maxOf(c, 48.0) * k
+        val sc = if (mono) 0.0 else 16.0 * k
+        val tc = if (mono) 0.0 else 28.0 * k
+        val nc = if (mono) 0.0 else 5.0 * k
+        val nvc = if (mono) 0.0 else 9.0 * k
         val th = (h + 60) % 360
         fun p(t: Int) = tone(h, pc, t)
         fun s(t: Int) = tone(h, sc, t)
@@ -60,6 +63,27 @@ object ThemeTones {
     }
 
     const val BLACK = 0xFF000000.toInt()
+
+    /** The lowest opacity "Your colour" offers: below it a theme is all but grey (use the Grey theme then). */
+    const val MIN_OPACITY = 0.2
+
+    /**
+     * How strongly [argb]'s colour shows in its theme, 0.2–1, from its alpha (issue #181). Colours without
+     * an alpha (0) count as fully opaque, so presets and colours saved before opacity existed are unchanged.
+     */
+    fun opacityOf(argb: Int): Double {
+        val a = argb ushr 24
+        return if (a == 0) 1.0 else (a / 255.0).coerceIn(MIN_OPACITY, 1.0)
+    }
+
+    /** [argb] with its opacity set to [opacity] (0.2–1), kept in the alpha. */
+    fun withOpacity(argb: Int, opacity: Double): Int {
+        val a = (opacity.coerceIn(MIN_OPACITY, 1.0) * 255).roundToInt()
+        return (a shl 24) or (argb and 0xFFFFFF)
+    }
+
+    /** "80 %" for [argb]'s opacity, in steps of 5. */
+    fun opacityLabel(argb: Int): String = "${(opacityOf(argb) * 20).roundToInt() * 5} %"
 
     // ---- "Your colour" (issue #148, step 2) ----
 
