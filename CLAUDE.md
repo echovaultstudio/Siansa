@@ -29,8 +29,10 @@ implements them and opens a pull request. Labels show where each one is: `claude
 
 - One issue per pull request; reference it with `Fixes #N`.
 - Describe before and after, and how it was tested.
-- Don't merge: the owner reviews, and CI (`.github/workflows/ci.yml`) must pass. Pull requests run the build,
-  Lint, unit tests and secret scan; emulator tests run after merging to main.
+- Don't merge unless the owner asks. Never merge a pull request unless its CI run (`.github/workflows/ci.yml`)
+  is fully green, including the "Emulator tests against Navidrome" check. Pull requests run the build, Lint,
+  unit tests, secret scan and emulator tests; a release is published from main only when all of them pass.
+- Merge via the API (`PUT /pulls/{n}/merge` with the head sha); pushing directly to main isn't allowed.
 
 ## Don'ts
 
