@@ -189,15 +189,16 @@ private fun ColourPreview(seed: Int, dark: Boolean, modifier: Modifier) {
         color = scheme.surface,
         modifier = modifier.border(1.dp, scheme.outlineVariant, RoundedCornerShape(14.dp)),
     ) {
-        Column(Modifier.padding(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+        // A miniature of the app, so the small steps: with the full-size ones its song name didn't fit.
+        Column(Modifier.padding(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
             Text(if (dark) "Dark" else "Light", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(scheme.surfaceContainerHighest).padding(Space.Small),
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(scheme.surfaceContainerHighest).padding(Space.Tight),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.size(28.dp).clip(RoundedCornerShape(5.dp)).background(Brush.linearGradient(listOf(Color(0xFF6B4FA8), Color(0xFF2B6AA8)))))
                 Text("Midnight City", style = MaterialTheme.typography.labelMedium, color = scheme.onSurface, maxLines = 1,
-                    modifier = Modifier.weight(1f).padding(horizontal = Space.Small))
+                    modifier = Modifier.weight(1f).padding(horizontal = Space.Tight))
                 Box(Modifier.size(26.dp).clip(CircleShape).background(scheme.primary), contentAlignment = Alignment.Center) {
                     Icon(Icons.Rounded.PlayArrow, null, Modifier.size(16.dp), tint = scheme.onPrimary)
                 }
