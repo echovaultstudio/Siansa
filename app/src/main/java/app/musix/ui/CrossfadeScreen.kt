@@ -38,7 +38,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /** The gap between the pieces of this screen. */
-internal val CROSSFADE_GAP = 12.dp
+internal val CROSSFADE_GAP = Space.Medium
 
 /**
  * Settings › Playback › Crossfade and loudness (issue #60): where song loudness and fade shapes come from,
@@ -52,7 +52,7 @@ fun CrossfadeScreen(nav: NavController) {
     var test by remember { mutableStateOf<String?>(null) }
     Screen(title = "Crossfade and loudness", nav = nav) { padding ->
         Column(
-            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP),
         ) {
             Heading("Where loudness and fades come from")
@@ -65,7 +65,7 @@ fun CrossfadeScreen(nav: NavController) {
                 if (!settings.audioMuseReady) {
                     Hint("Set up AudioMuse in Settings › Connections first. Until then, song tags are used.")
                 } else {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                         OutlinedButton(onClick = {
                             test = "Testing…"
                             scope.launch {
@@ -127,7 +127,7 @@ private fun crossfadeHint(s: AppSettings): String = when (s.crossfade) {
 /** The choice of where loudness and fades come from. */
 @Composable
 internal fun LoudnessSourceRow(selected: LoudnessSource, onPick: (LoudnessSource) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         LoudnessSource.entries.forEach { source ->
             FilterChip(selected = selected == source, onClick = { onPick(source) }, label = { Text(source.label) })
         }
@@ -136,7 +136,7 @@ internal fun LoudnessSourceRow(selected: LoudnessSource, onPick: (LoudnessSource
 
 @Composable
 private fun LoudnessTargetRow(selected: Int, onPick: (Int) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         Levelling.TARGETS.sorted().forEach { target ->
             FilterChip(selected = selected == target, onClick = { onPick(target) }, label = { Text("−${-target} LUFS") })
         }
@@ -146,7 +146,7 @@ private fun LoudnessTargetRow(selected: Int, onPick: (Int) -> Unit) {
 /** Off, Fixed or Smart. */
 @Composable
 internal fun CrossfadeModeRow(selected: CrossfadeMode, onPick: (CrossfadeMode) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         CrossfadeMode.entries.forEach { mode ->
             FilterChip(selected = selected == mode, onClick = { onPick(mode) }, label = { Text(mode.label) })
         }

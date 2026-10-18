@@ -33,14 +33,14 @@ fun playlistSubtitle(playlist: Playlist, fallbackOwner: String? = null): String 
 @Composable
 fun PlaylistRow(playlist: Playlist, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(
-        modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 6.dp),
+        modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Space.Page, vertical = Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Cover(playlist.coverArt, 150, Modifier.size(56.dp), RoundedCornerShape(4.dp))
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(Space.Medium))
         Column(Modifier.weight(1f)) {
             Text(playlist.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(Space.Tight))
             Text(
                 playlistSubtitle(playlist),
                 style = MaterialTheme.typography.bodyMedium,

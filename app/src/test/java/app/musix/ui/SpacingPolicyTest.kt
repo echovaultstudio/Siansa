@@ -26,6 +26,16 @@ class SpacingPolicyTest {
         }
     }
 
+    /** Named gaps (CHIPS_GAP, PICKER_GAP, …) are steps of the scale too. */
+    @Test fun namedGapsUseTheScale() {
+        val root = roots.firstOrNull { it.isDirectory } ?: return fail("UI sources not found")
+        val raw = Regex("""val\s+[A-Z_]*(GAP|PAD)[A-Z_]*\s*(:\s*Dp)?\s*=\s*\d+(\.\d+)?\.dp""")
+        val problems = root.walkTopDown().filter { it.extension == "kt" }.flatMap { f ->
+            f.readLines().mapIndexedNotNull { i, line -> if (raw.containsMatchIn(line)) "${f.name}:${i + 1}: ${line.trim()}" else null }
+        }.toList()
+        assertTrue("Named gaps must be Space.* steps:\n" + problems.joinToString("\n"), problems.isEmpty())
+    }
+
     @Test fun theCheckerFindsRawNumbers() {
         val code = """
             Modifier.padding(16.dp)

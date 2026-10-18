@@ -90,14 +90,14 @@ fun VibesScreen(nav: NavController) {
     ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = bottomBarPadding(24.dp)),
+            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = bottomBarPadding(Space.Section)),
         ) {
             item {
                 Text(
                     "Each vibe covers part of the day. When you open the app, the vibe for the current hour builds today's mix.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
                 )
             }
             error?.let { item { ErrorText(it) } }
@@ -154,8 +154,8 @@ private fun SelectorCard(
     onToggle: (Boolean) -> Unit,
     onMake: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clickable(onClick = onOpen)) {
-        Column(Modifier.padding(16.dp)) {
+    Card(Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Small).clickable(onClick = onOpen)) {
+        Column(Modifier.padding(Space.Page)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(selector.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -167,21 +167,21 @@ private fun SelectorCard(
                 }
                 Switch(checked = selector.enabled, onCheckedChange = onToggle)
             }
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(Space.Small))
             Text(
                 selector.guidance,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Space.Small))
             FilledTonalButton(onClick = onMake, enabled = !making && selector.enabled) {
                 if (making) {
                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                 } else {
                     Icon(Icons.Rounded.AutoAwesome, null, Modifier.size(18.dp))
                 }
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(Space.Small))
                 Text("Make a mix now")
             }
         }
@@ -278,11 +278,11 @@ fun SelectorEditor(nav: NavController, id: String) {
                 .fillMaxSize()
                 .aboveKeyboard()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(Space.Page),
+            verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                 OutlinedTextField(
                     start, { start = it.filter(Char::isDigit).take(2) },
                     label = { Text("From hour") },

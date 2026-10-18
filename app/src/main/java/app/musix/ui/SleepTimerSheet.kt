@@ -125,8 +125,8 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
         containerColor = DarkColours.surfaceContainer,
         contentColor = SheetText,
     ) {
-        Column(Modifier.navigationBarsPadding().padding(bottom = 8.dp)) {
-            Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.navigationBarsPadding().padding(bottom = Space.Small)) {
+            Row(Modifier.fillMaxWidth().padding(start = Space.Section, end = Space.Medium), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Sleep timer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
@@ -139,7 +139,7 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
                     TextButton(onClick = { graph.sleepTimer.cancel(); onDismiss() }) { Text("Turn off", color = Accent) }
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Space.Small))
             listOf(15, 30, 45, 60).forEach { minutes ->
                 SheetRow(if (minutes == 60) "1 hour" else "$minutes minutes") { start(minutes) }
             }
@@ -149,7 +149,7 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
             }
             SheetRow("Custom time") { custom = !custom }
             if (custom) {
-                Column(Modifier.padding(horizontal = 24.dp)) {
+                Column(Modifier.padding(horizontal = Space.Section)) {
                     Slider(
                         value = customMinutes,
                         onValueChange = { customMinutes = it },
@@ -165,12 +165,12 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
                     }
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Space.Small))
             Row(
                 Modifier
                     .fillMaxWidth()
                     .clickable(enabled = audioMuse) { windDown = !windDown }
-                    .padding(horizontal = 24.dp, vertical = 10.dp),
+                    .padding(horizontal = Space.Section, vertical = Space.Medium),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
@@ -182,7 +182,7 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
                         color = SheetSubtle,
                     )
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Space.Medium))
                 Switch(
                     checked = windDown,
                     onCheckedChange = { windDown = it },
@@ -203,6 +203,6 @@ private fun SheetRow(label: String, enabled: Boolean = true, onClick: () -> Unit
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 14.dp),
+            .padding(horizontal = Space.Section, vertical = Space.Page),
     )
 }

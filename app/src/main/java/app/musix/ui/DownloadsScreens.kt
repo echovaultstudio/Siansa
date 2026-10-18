@@ -111,7 +111,7 @@ fun DownloadedMark(songId: String) {
     val graph = LocalGraph.current
     val ids by graph.downloads.ids.collectAsStateWithLifecycle()
     if (songId in ids.done) {
-        Icon(Icons.Rounded.DownloadForOffline, "Downloaded", tint = Accent, modifier = Modifier.padding(end = 6.dp).size(16.dp))
+        Icon(Icons.Rounded.DownloadForOffline, "Downloaded", tint = Accent, modifier = Modifier.padding(end = Space.Tight).size(16.dp))
     }
 }
 
@@ -173,10 +173,10 @@ fun DownloadsScreen(nav: NavController) {
     Screen(title = "Downloads", nav = nav) { padding ->
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = bottomBarPadding(24.dp)),
+            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = bottomBarPadding(Space.Section)),
         ) {
             item {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
                     Hint("Music you download stays on the phone and plays without a connection, for example on a plane. It's kept until you remove it here.")
                     // Pause or resume sits next to the totals, right above the progress line it controls.
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -209,12 +209,12 @@ fun DownloadsScreen(nav: NavController) {
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                         FilledTonalButton(onClick = { nav.navigate("downloads/add") }) { Text("Add music") }
                         if (list.done.isNotEmpty()) {
                             OutlinedButton(onClick = { graph.player.play(list.done.map { it.song }, shuffle = true) }) {
                                 Icon(Icons.Rounded.Shuffle, null, Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
+                                Spacer(Modifier.width(Space.Small))
                                 Text("Shuffle all")
                             }
                         }
@@ -224,14 +224,14 @@ fun DownloadsScreen(nav: NavController) {
             if (list.done.isNotEmpty()) {
                 item(key = "all-songs") {
                     Row(
-                        Modifier.fillMaxWidth().clickable { nav.navigate("downloads/songs") }.padding(horizontal = 16.dp, vertical = 12.dp),
+                        Modifier.fillMaxWidth().clickable { nav.navigate("downloads/songs") }.padding(horizontal = Space.Page, vertical = Space.Medium),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(
                             Modifier.size(52.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
                             contentAlignment = Alignment.Center,
                         ) { Icon(Icons.Rounded.LibraryMusic, null, tint = Accent) }
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(Space.Medium))
                         Column(Modifier.weight(1f)) {
                             Text("Downloaded songs", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                             Text(
@@ -250,7 +250,7 @@ fun DownloadsScreen(nav: NavController) {
                         "Nothing downloaded yet. Tap Add music, or the download button on an album or playlist.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(Space.Page),
                     )
                 }
             }
@@ -273,7 +273,7 @@ fun DownloadsScreen(nav: NavController) {
                 }
             }
             item {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
                     HorizontalDivider()
                     Heading("Settings")
                     SwitchRow("Download on Wi-Fi only", settings.downloadWifiOnly) { on ->
@@ -281,7 +281,7 @@ fun DownloadsScreen(nav: NavController) {
                         graph.downloads.retry()
                     }
                     Text("Download quality", style = MaterialTheme.typography.bodyLarge)
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                         downloadQualities.forEach { kbps ->
                             FilterChip(
                                 selected = settings.downloadKbps == kbps,
@@ -292,7 +292,7 @@ fun DownloadsScreen(nav: NavController) {
                     }
                     Hint("Opus is converted by Navidrome and takes far less space than the original file. Applies to songs downloaded from now on.")
                     Text("Storage limit", style = MaterialTheme.typography.bodyLarge)
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                         downloadLimits.forEach { mb ->
                             FilterChip(
                                 selected = settings.downloadLimitMb == mb,
@@ -355,11 +355,11 @@ fun DownloadPickerScreen(nav: NavController) {
     Screen(title = "Add music", nav = nav) { padding ->
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = bottomBarPadding(24.dp)),
+            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = bottomBarPadding(Space.Section)),
         ) {
             item {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Tight), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                         PickTab.entries.forEach { t ->
                             FilterChip(selected = tab == t, onClick = { tab = t }, label = { Text(t.label) })
                         }
@@ -378,7 +378,7 @@ fun DownloadPickerScreen(nav: NavController) {
             if (visible.size > 1) {
                 item(key = "all") {
                     val allChosen = visible.all { it.key in ids.items }
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.End) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = Space.Small), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = {
                             if (allChosen) graph.downloads.dropAll(visible.map { it.key })
                             else graph.downloads.chooseAll(visible.filterNot { it.key in ids.items })
@@ -401,7 +401,7 @@ fun DownloadPickerScreen(nav: NavController) {
             }
             when (val o = options) {
                 is Load.Loading -> item {
-                    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Accent) }
+                    Box(Modifier.fillMaxWidth().padding(Space.Large), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Accent) }
                 }
                 is Load.Err -> item { ErrorText(o.message) }
                 is Load.Ok -> {
@@ -410,7 +410,7 @@ fun DownloadPickerScreen(nav: NavController) {
                             "Nothing here yet. Sync your library first (Settings → Library sync).",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(16.dp),
+                            modifier = Modifier.padding(Space.Page),
                         )
                     }
                     items(shown, key = { it.key }) { item ->
@@ -427,7 +427,7 @@ fun DownloadPickerScreen(nav: NavController) {
 @Composable
 private fun OfflineRow(item: OfflineItem, detail: String, onClick: () -> Unit, trailing: @Composable () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = Space.Page, end = Space.Tight, top = Space.Small, bottom = Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val shape = if (item.kind == OfflineKind.ARTIST) CircleShape else RoundedCornerShape(6.dp)
@@ -439,7 +439,7 @@ private fun OfflineRow(item: OfflineItem, detail: String, onClick: () -> Unit, t
         } else {
             Cover(item.cover, 150, Modifier.size(52.dp), shape)
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(Space.Medium))
         Column(Modifier.weight(1f)) {
             Text(item.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (detail.isNotBlank()) {
@@ -499,7 +499,7 @@ fun DownloadedSongsScreen(nav: NavController) {
 
     Screen(title = "Downloaded songs", nav = nav) { padding ->
         Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
-            Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Tight), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                 Text(
                     "${list.done.size} songs · ${formatSize(list.done.sumOf { it.bytes })}",
                     style = MaterialTheme.typography.bodyLarge,
@@ -528,19 +528,19 @@ fun DownloadedSongsScreen(nav: NavController) {
                     "No songs on the phone yet.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(Space.Page),
                 )
             }
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp))) {
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
                 items(songs, key = { it.song.id }) { d ->
                     val ticked = d.song.id in selected
                     val toggle = { selected = if (ticked) selected - d.song.id else selected + d.song.id }
                     Row(
-                        Modifier.fillMaxWidth().clickable(onClick = toggle).padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                        Modifier.fillMaxWidth().clickable(onClick = toggle).padding(start = Space.Page, end = Space.Tight, top = Space.Small, bottom = Space.Small),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Cover(d.song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(Space.Medium))
                         Column(Modifier.weight(1f)) {
                             Text(d.song.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
@@ -582,11 +582,11 @@ private fun DownloadControl(icon: androidx.compose.ui.graphics.vector.ImageVecto
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = Space.Medium, vertical = Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, Modifier.size(18.dp), tint = Accent)
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(Space.Small))
         Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }
 }

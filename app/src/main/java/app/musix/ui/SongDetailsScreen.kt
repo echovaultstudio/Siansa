@@ -51,9 +51,9 @@ fun SongDetailsScreen(nav: NavController, songId: String) {
     Screen("Song details", nav) { padding ->
         LoadBox(page, Modifier.padding(padding)) { p ->
             Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
-                Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(Space.Page), verticalAlignment = Alignment.CenterVertically) {
                     Cover(p.song.cover, 300, Modifier.size(72.dp), RoundedCornerShape(8.dp))
-                    Spacer(Modifier.width(16.dp))
+                    Spacer(Modifier.width(Space.Page))
                     Column(Modifier.weight(1f)) {
                         Text(
                             p.song.title,
@@ -100,7 +100,7 @@ fun songDetailRows(d: SongDetails, skips: Int): List<Pair<String, String>> {
 
 @Composable
 private fun DetailRow(label: String, value: String) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Small)) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = Accent)
         SelectionContainer {
             Text(value, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)

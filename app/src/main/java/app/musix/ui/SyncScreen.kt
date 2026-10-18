@@ -59,8 +59,8 @@ fun SyncScreen(nav: NavController) {
                 .padding(top = padding.calculateTopPadding())
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(Space.Page),
+            verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             Text(
                 "Musix keeps a copy of your library on the phone, so browsing and search are instant and mixes build quickly. " +
@@ -115,7 +115,7 @@ fun SyncScreen(nav: NavController) {
             } else {
                 Button(onClick = { graph.sync.start() }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Rounded.Sync, null)
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(Space.Small))
                     Text(if (library == null) "Sync now" else "Check for changes")
                 }
                 if (library != null) {
@@ -152,14 +152,14 @@ private fun SectionLabel(text: String) {
 private fun ProgressCard(p: SyncProgress) {
     val n = NumberFormat.getIntegerInstance()
     Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 when (p.phase) {
                     SyncPhase.DONE -> Icon(Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
                     SyncPhase.FAILED -> Unit
                     else -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                 }
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(Space.Medium))
                 Text(
                     when (p.phase) {
                         SyncPhase.DONE -> when {
@@ -217,7 +217,7 @@ private fun StepRow(icon: ImageVector, label: String, value: String, active: Boo
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(Space.Medium))
         Text(label, style = MaterialTheme.typography.bodyLarge, color = color, modifier = Modifier.weight(1f))
         Text(value, style = MaterialTheme.typography.bodyLarge, color = color)
         Box(Modifier.width(28.dp), contentAlignment = Alignment.CenterEnd) {

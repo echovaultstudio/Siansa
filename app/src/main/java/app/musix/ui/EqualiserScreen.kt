@@ -49,11 +49,11 @@ fun EqualiserScreen(nav: NavController) {
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     Screen(title = "Equaliser and ReplayGain", nav = nav) { padding ->
         Column(
-            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
+            verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             Heading("ReplayGain")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 ReplayGainMode.entries.forEach { mode ->
                     FilterChip(
                         selected = settings.replayGain == mode,
@@ -73,7 +73,7 @@ fun EqualiserScreen(nav: NavController) {
             Column(controls) { EqPresetRow(eq.preset) { graph.equaliser.set(eq.copy(preset = it, enabled = true)) } }
             HorizontalDivider()
             Heading("Bands")
-            Column(controls, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(controls, verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
                 EqSettings.BANDS.forEachIndexed { band, hz ->
                     DbSliderRow(
                         label = EqSettings.bandLabel(hz),
@@ -106,7 +106,7 @@ private val presetOrder = listOf(EqPreset.FLAT, EqPreset.CUSTOM) + EqPreset.entr
 /** The preset chips, scrolling sideways. */
 @Composable
 internal fun EqPresetRow(selected: EqPreset, onPick: (EqPreset) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         presetOrder.forEach { preset ->
             FilterChip(selected = selected == preset, onClick = { onPick(preset) }, label = { Text(preset.label) })
         }

@@ -135,7 +135,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                     color = androidx.compose.ui.graphics.Color.White,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 12.dp),
+                    modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Section, bottom = Space.Medium),
                 )
             }
         },
@@ -164,12 +164,12 @@ fun ArtistScreen(nav: NavController, id: String) {
         LazyVerticalGrid(
             state = gridState,
             columns = GridCells.Adaptive(150.dp),
-            contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp)),
+            contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section)),
             modifier = Modifier.fillMaxSize().then(cardModifier),
         ) {
             full { HeroSpacer(HERO) }
             full {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium)) {
                     Text(
                         listOfNotNull(
                             "${p.albums.size} ${if (p.albums.size == 1) "release" else "releases"}",
@@ -178,7 +178,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(Space.Medium))
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         OutlinedButton(onClick = {
                             launch.progressive("${p.artist.name} radio", { graph.radios.artistStart(p.artist) }) {
@@ -186,7 +186,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                             }
                         }) {
                             Icon(Icons.Rounded.Radio, null)
-                            Spacer(Modifier.width(4.dp))
+                            Spacer(Modifier.width(Space.Tight))
                             Text("Radio")
                         }
                         Spacer(Modifier.weight(1f))
@@ -194,7 +194,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                             IconButton(onClick = { graph.player.play(p.songs, shuffle = true) }) {
                                 Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
                             }
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(Space.Small))
                             Box(
                                 Modifier.size(56.dp).clip(CircleShape).background(Accent).clickable { graph.player.play(p.songs) },
                                 contentAlignment = Alignment.Center,
@@ -236,7 +236,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                         subtitle = album.year?.toString() ?: "",
                         coverArt = album.coverArt,
                         onClick = { nav.navigate("album/${album.id}") },
-                        modifier = Modifier.padding(horizontal = 4.dp),
+                        modifier = Modifier.padding(horizontal = Space.Tight),
                     )
                 }
             }
@@ -246,7 +246,7 @@ fun ArtistScreen(nav: NavController, id: String) {
             if (appearsOn.isNotEmpty()) {
                 full { AppearsOnTitle { nav.navigate("artist/${p.artist.id}/appears-on") } }
                 full {
-                    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    LazyRow(contentPadding = PaddingValues(horizontal = Space.Medium), horizontalArrangement = Arrangement.spacedBy(Space.Tight)) {
                         items(appearsOn.take(APPEARS_ON_ROW), key = { "appears-${it.id}" }) { album ->
                             AlbumTile(
                                 name = album.name,
@@ -277,7 +277,7 @@ private const val APPEARS_ON_ROW = 20
 @Composable
 private fun AppearsOnTitle(onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(end = 12.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(end = Space.Medium),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SectionTitle("Appears on", Modifier.weight(1f))
@@ -285,7 +285,7 @@ private fun AppearsOnTitle(onClick: () -> Unit) {
             Icons.AutoMirrored.Rounded.KeyboardArrowRight,
             "Show all",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 14.dp),
+            modifier = Modifier.padding(top = Space.Medium),
         )
     }
 }
@@ -307,12 +307,12 @@ fun AppearsOnScreen(nav: NavController, id: String) {
                     "No albums by other artists yet.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(Space.Page),
                 )
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(150.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                    contentPadding = PaddingValues(horizontal = Space.Small, vertical = Space.Small),
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     items(albums, key = { it.id }) { album ->
@@ -341,15 +341,15 @@ private const val TOP_ROWS = 5
 private fun SongRowPlaceholder() {
     val shade = MaterialTheme.colorScheme.surfaceVariant
     Row(
-        Modifier.fillMaxWidth().height(60.dp).padding(start = 16.dp, end = 16.dp),
+        Modifier.fillMaxWidth().height(60.dp).padding(start = Space.Page, end = Space.Page),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Spacer(Modifier.width(32.dp))
+        Spacer(Modifier.width(Space.Large))
         Box(Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)).background(shade))
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(Space.Medium))
         Column(Modifier.weight(1f)) {
             Box(Modifier.fillMaxWidth(0.6f).height(14.dp).clip(RoundedCornerShape(4.dp)).background(shade))
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(Space.Small))
             Box(Modifier.fillMaxWidth(0.4f).height(10.dp).clip(RoundedCornerShape(4.dp)).background(shade))
         }
     }
@@ -358,12 +358,12 @@ private fun SongRowPlaceholder() {
 @Composable
 private fun Biography(text: String) {
     var expanded by remember { mutableStateOf(false) }
-    Column(Modifier.padding(horizontal = 16.dp).animateContentSize()) {
+    Column(Modifier.padding(horizontal = Space.Page).animateContentSize()) {
         Text(
             "About",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 24.dp, bottom = 10.dp),
+            modifier = Modifier.padding(top = Space.Section, bottom = Space.Medium),
         )
         Text(
             text,
@@ -385,14 +385,14 @@ private fun SimilarRow(similar: List<SimilarArtist>, nav: NavController) {
     val matched by loadState(similar) {
         similar.map { a -> a to (a.id?.let { graph.library.artist(it) } ?: graph.library.artistByName(a.name)) }
     }
-    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    LazyRow(contentPadding = PaddingValues(horizontal = Space.Medium), horizontalArrangement = Arrangement.spacedBy(Space.Tight)) {
         items(matched.valueOrNull() ?: similar.map { it to null }, key = { it.first.id ?: it.first.name }) { (artist, local) ->
             val target = local?.id ?: artist.id
             Column(
                 Modifier
                     .width(110.dp)
                     .clickable(enabled = target != null) { target?.let { nav.navigate("artist/$it") } }
-                    .padding(4.dp),
+                    .padding(Space.Tight),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 val photo = artist.imageUrl ?: local?.imageUrl
@@ -406,7 +406,7 @@ private fun SimilarRow(similar: List<SimilarArtist>, nav: NavController) {
                 } else {
                     Cover(artist.coverArt ?: local?.coverArt, 150, Modifier.size(96.dp), CircleShape)
                 }
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(Space.Tight))
                 Text(artist.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }

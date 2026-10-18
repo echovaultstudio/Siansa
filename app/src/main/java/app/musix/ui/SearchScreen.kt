@@ -161,7 +161,7 @@ fun SearchScreen(nav: NavController) {
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).focusRequester(focus).onFocusChanged { focused = it.isFocused }.testTag("searchField"),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Space.Page).focusRequester(focus).onFocusChanged { focused = it.isFocused }.testTag("searchField"),
                 placeholder = {
                     Text(if (soundMode) "Describe a sound, e.g. rainy jazz piano" else "Artists, albums, songs")
                 },
@@ -173,16 +173,16 @@ fun SearchScreen(nav: NavController) {
                     focusManager.clearFocus()
                 }),
             )
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.padding(horizontal = Space.Page, vertical = Space.Small), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 FilterChip(selected = !soundMode, onClick = { soundMode = false }, label = { Text("Library") })
                 FilterChip(selected = soundMode, onClick = { soundMode = true }, label = { Text("Sound") })
             }
             if (busy) {
-                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                Box(Modifier.fillMaxWidth().padding(Space.Page), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             }
             error?.let { ErrorText(it) }
             when {
-                soundMode && aiProblem != null -> AiUnavailable(aiProblem, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                soundMode && aiProblem != null -> AiUnavailable(aiProblem, Modifier.padding(horizontal = Space.Page, vertical = Space.Small))
                 focused && query.trim().length < 2 && recent.isNotEmpty() -> RecentSearchList(
                     recent,
                     onPick = { picked ->
@@ -209,13 +209,13 @@ private fun SoundResults(songs: List<Song>?, onPlay: () -> Unit) {
             "Describe a mood, genre or instruments and press search. AudioMuse finds matching tracks by how they sound.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(Space.Page),
         )
         return
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp))) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
         item {
-            Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { PlayButtons(songs) }
+            Box(Modifier.padding(horizontal = Space.Page, vertical = Space.Small)) { PlayButtons(songs) }
         }
         itemsIndexed(songs, key = { i, s -> "$i-${s.id}" }) { index, song ->
             SongRow(song = song, onClick = { onPlay(); graph.player.play(songs, index) })
@@ -228,17 +228,17 @@ private fun LibraryResults(results: SearchResults?, nav: NavController, onOpen: 
     val graph = LocalGraph.current
     if (results == null) return
     if (results.artists.isEmpty() && results.albums.isEmpty() && results.songs.isEmpty()) {
-        Text("Nothing found", modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Nothing found", modifier = Modifier.padding(Space.Page), color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp))) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
         if (results.artists.isNotEmpty()) {
             item { SectionTitle("Artists") }
             item {
-                LazyRow(contentPadding = PaddingValues(horizontal = 12.dp)) {
+                LazyRow(contentPadding = PaddingValues(horizontal = Space.Medium)) {
                     items(results.artists, key = { it.id }) { artist ->
                         Column(
-                            Modifier.width(96.dp).clickable { onOpen(); nav.navigate("artist/${artist.id}") }.padding(4.dp),
+                            Modifier.width(96.dp).clickable { onOpen(); nav.navigate("artist/${artist.id}") }.padding(Space.Tight),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Cover(artist.coverArt, 150, Modifier.size(80.dp), CircleShape)
@@ -256,7 +256,7 @@ private fun LibraryResults(results: SearchResults?, nav: NavController, onOpen: 
         if (results.albums.isNotEmpty()) {
             item { SectionTitle("Albums") }
             item {
-                LazyRow(contentPadding = PaddingValues(horizontal = 8.dp)) {
+                LazyRow(contentPadding = PaddingValues(horizontal = Space.Small)) {
                     items(results.albums, key = { it.id }) { album ->
                         Box(Modifier.width(150.dp)) {
                             AlbumTile(album.name, album.artist, album.coverArt, onClick = { onOpen(); nav.navigate("album/${album.id}") })
@@ -271,7 +271,7 @@ private fun LibraryResults(results: SearchResults?, nav: NavController, onOpen: 
                 SongRow(song = song, onClick = { onOpen(); graph.player.play(results.songs, index) })
             }
         }
-        item { Spacer(Modifier.size(8.dp)) }
+        item { Spacer(Modifier.size(Space.Small)) }
     }
 }
 
@@ -284,21 +284,21 @@ private fun BrowseGrid(nav: NavController) {
     val genres = genreList.valueOrNull().orEmpty()
     LazyVerticalGrid(
         columns = GridCells.Adaptive(160.dp),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = bottomBarPadding(24.dp)),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(start = Space.Page, end = Space.Page, bottom = bottomBarPadding(Space.Section)),
+        horizontalArrangement = Arrangement.spacedBy(Space.Medium),
+        verticalArrangement = Arrangement.spacedBy(Space.Medium),
         modifier = Modifier.fillMaxSize(),
     ) {
-        item(span = { GridItemSpan(maxLineSpan) }) { MoodBox(nav, Modifier.padding(top = 4.dp)) }
+        item(span = { GridItemSpan(maxLineSpan) }) { MoodBox(nav, Modifier.padding(top = Space.Tight)) }
         item(span = { GridItemSpan(maxLineSpan) }) {
-            Text("Radios", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+            Text("Radios", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = Space.Small))
         }
         items(moodRadios, key = { "mood-" + it.id }) { radio ->
             BrowseTile(radio.name, Color(radio.colors.first) to Color(radio.colors.second)) { nav.openMoodRadio(radio.id) }
         }
         if (genres.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Text("Genres", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                Text("Genres", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = Space.Small))
             }
             items(genres, key = { "genre-" + it.name }) { genre ->
                 BrowseTile(genre.name, tileColors(genre.name)) { nav.openGenreRadio(genre.name) }
@@ -316,14 +316,14 @@ private fun BrowseTile(title: String, colors: Pair<Color, Color>, onClick: () ->
             .clip(RoundedCornerShape(8.dp))
             .background(Brush.linearGradient(listOf(colors.first, colors.second)))
             .clickable(onClick = onClick)
-            .padding(12.dp),
+            .padding(Space.Medium),
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 2)
     }
 }
 
 /** The gap between the heading of recent searches and its first row, and between rows (the rows' own padding). */
-internal val RECENT_ROW_PAD: Dp = 10.dp
+internal val RECENT_ROW_PAD: Dp = Space.Medium
 
 /**
  * Recent searches (issue #177), newest first: tap one to search it again, × to forget it, or clear them all.
@@ -336,9 +336,9 @@ internal fun RecentSearchList(
     onRemove: (RecentSearch) -> Unit,
     onClear: () -> Unit,
 ) {
-    LazyColumn(Modifier.fillMaxSize().testTag("recentSearches"), contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp))) {
+    LazyColumn(Modifier.fillMaxSize().testTag("recentSearches"), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
         item {
-            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Tight, top = Space.Small), verticalAlignment = Alignment.CenterVertically) {
                 Text("Recent searches", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f).testTag("recentTitle"))
                 TextButton(onClick = onClear) { Text("Clear all") }
             }
@@ -348,7 +348,7 @@ internal fun RecentSearchList(
                 Modifier
                     .fillMaxWidth()
                     .clickable { onPick(search) }
-                    .padding(start = 16.dp, end = 4.dp)
+                    .padding(start = Space.Page, end = Space.Tight)
                     .testTag("recent"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -358,7 +358,7 @@ internal fun RecentSearchList(
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).padding(horizontal = 16.dp, vertical = RECENT_ROW_PAD),
+                    modifier = Modifier.weight(1f).padding(horizontal = Space.Page, vertical = RECENT_ROW_PAD),
                 )
                 IconButton(onClick = { onRemove(search) }) { Icon(Icons.Rounded.Close, "Remove ${search.query}") }
             }

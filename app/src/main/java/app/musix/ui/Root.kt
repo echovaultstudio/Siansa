@@ -104,7 +104,7 @@ val LocalBottomBarPadding = compositionLocalOf { 0.dp }
 
 /** Bottom padding for a scrolling page: clear of the bottom bar, plus [extra]. */
 @Composable
-fun bottomBarPadding(extra: Dp = 24.dp): Dp = LocalBottomBarPadding.current + extra
+fun bottomBarPadding(extra: Dp = Space.Section): Dp = LocalBottomBarPadding.current + extra
 
 /**
  * Ends a page at the top of the keyboard, so a focused text box scrolls up above it.
@@ -321,15 +321,15 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
     // Tinted with the cover's colour, like now playing, and darkened so white text stays readable.
     val tone = rememberCoverColor(song.cover)
     val background = lerp(tone, Color.Black, 0.45f)
-    Box(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+    Box(Modifier.padding(horizontal = Space.Small, vertical = Space.Tight)) {
       CompositionLocalProvider(LocalContentColor provides Color.White) {
         Column(Modifier.clip(RoundedCornerShape(10.dp)).background(background)) {
             Row(
-                Modifier.fillMaxWidth().testTag("miniPlayer").clickable(onClick = onOpen).padding(horizontal = 8.dp, vertical = 8.dp),
+                Modifier.fillMaxWidth().testTag("miniPlayer").clickable(onClick = onOpen).padding(horizontal = Space.Small, vertical = Space.Small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Cover(song.cover, 150, Modifier.size(44.dp), RoundedCornerShape(6.dp))
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Space.Medium))
                 Column(Modifier.weight(1f)) {
                     Text(song.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
@@ -372,7 +372,7 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
 private fun MiniProgress(durationMs: Long) {
     val position by rememberPosition()
     val fraction = if (durationMs > 0) (position.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
-    androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(2.dp).clip(RoundedCornerShape(1.dp)).background(Color.White.copy(alpha = 0.2f))) {
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().padding(horizontal = Space.Small).height(2.dp).clip(RoundedCornerShape(1.dp)).background(Color.White.copy(alpha = 0.2f))) {
         androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth(fraction).height(2.dp).background(Color.White))
     }
 }
