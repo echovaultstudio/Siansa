@@ -342,7 +342,10 @@ internal fun sourceChipLabels(downloadedOnly: Boolean, shownUsers: Int): List<St
     if (shownUsers > 1) add("$shownUsers users")
 }
 
-/** Home's filter button: lit while the source filter hides something or shows several users. */
+/**
+ * Home's one settings button (issue #152): opens the panel with Sources and Arrange. Lit while the source
+ * filter hides something or shows several users.
+ */
 @Composable
 internal fun SourceFilterButton(onClick: () -> Unit) {
     val graph = LocalGraph.current
@@ -350,7 +353,7 @@ internal fun SourceFilterButton(onClick: () -> Unit) {
     val shown by graph.guests.shown.collectAsStateWithLifecycle()
     val active = sourceChipLabels(settings.downloadedOnly, shown.size).isNotEmpty()
     IconButton(onClick = onClick) {
-        Icon(Icons.Rounded.FilterList, "Source filter", tint = if (active) Accent else MaterialTheme.colorScheme.onSurface)
+        Icon(Icons.Rounded.FilterList, "Source filter and Arrange Home", tint = if (active) Accent else MaterialTheme.colorScheme.onSurface)
     }
 }
 
