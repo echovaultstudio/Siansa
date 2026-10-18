@@ -281,12 +281,17 @@ class RealServerTest {
      * to −18 LUFS (a volume of 10^(−9/20) ≈ 0.355).
      */
     @Test
-    fun e_crossfadeBlendsSongsWithLumaeProfiles() {
+    fun f_crossfadeBlendsSongsWithLumaeProfiles() {
         val lumae = FakeLumae(lufs = -9.0, introChunks = 10, tailChunks = 30)
         val before = graph.settings.current
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
-            graph.settings.save(graph.settings.current.copy(audioMuseUrl = lumae.url, audioMuseToken = "test", replayGain = ReplayGainMode.TRACK))
+            graph.settings.save(
+                graph.settings.current.copy(
+                    audioMuseUrl = lumae.url, audioMuseToken = "test", replayGain = ReplayGainMode.TRACK,
+                    transcodeWifiKbps = 0, transcodeMobileKbps = 0,
+                ),
+            )
             graph.settings.setLoudness(LoudnessSource.LUMAE, -18)
             graph.settings.setCrossfade(CrossfadeMode.SMART, 8)
             val check = runBlocking { graph.profiles.check() }
@@ -297,6 +302,13 @@ class RealServerTest {
             val second = songOf(a.getValue("WebP Animated"))
             instrumentation.runOnMainSync { graph.player.play(listOf(first, second)) }
             waitFor(30_000, "the first song to play") { graph.player.state.value.let { it.isPlaying && it.current?.id == first.id } }
+            // Fades need the original file. An earlier test's slow-link switch to Opus is ended by asking for
+            // the original again while the song plays.
+            if (graph.player.state.value.transcodeKbps > 0) {
+                graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = 160, transcodeMobileKbps = 160))
+                graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = 0, transcodeMobileKbps = 0))
+                SystemClock.sleep(3_000)
+            }
             // Let it load (about 5 MB over the slow link), then go to 12 s before its end.
             SystemClock.sleep(12_000)
             instrumentation.runOnMainSync { graph.player.seekTo(18_000) }
@@ -339,7 +351,12 @@ class RealServerTest {
             instrumentation.runOnMainSync { graph.player.stop() }
             graph.settings.setCrossfade(before.crossfade, before.crossfadeSeconds)
             graph.settings.setLoudness(before.loudnessSource, before.loudnessTarget)
-            graph.settings.save(graph.settings.current.copy(audioMuseUrl = before.audioMuseUrl, audioMuseToken = before.audioMuseToken))
+            graph.settings.save(
+                graph.settings.current.copy(
+                    audioMuseUrl = before.audioMuseUrl, audioMuseToken = before.audioMuseToken,
+                    transcodeWifiKbps = before.transcodeWifiKbps, transcodeMobileKbps = before.transcodeMobileKbps,
+                ),
+            )
             scenario.close()
             lumae.close()
         }
