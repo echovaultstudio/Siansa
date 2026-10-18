@@ -43,29 +43,57 @@ object Streaming {
             if ('?' !in u && '&' in u) u.replaceFirst('&', '?') else u
         }
 
-    fun rewrite(uri: Uri, kbps: Int): Uri = convert(uri, "opus", kbps)
+    /**
+     * The Opus conversion of a song. Without an estimated length: with one, the player first reads the end of
+     * the stream to learn the song's length, and Navidrome is still converting at that point, so the song
+     * didn't start (or, after a switch, didn't continue) for a long time (issue #162). The song's length comes
+     * from the library instead, and seeking is done by Navidrome ([ServerSeekPlayer]).
+     */
+    fun rewrite(uri: Uri, kbps: Int): Uri = convert(uri, "opus", kbps, estimateLength = false)
+
+    /** Navidrome's start offset for a converted stream, in seconds (issue #162). */
+    const val OFFSET_PARAM = "timeOffset"
+
+    /** Where a stream asked to start part-way in starts in its song, in ms (0 when it starts at the beginning). */
+    fun offsetMs(uri: Uri?): Long = (uri?.getQueryParameter(OFFSET_PARAM)?.toLongOrNull() ?: 0L).coerceAtLeast(0) * 1000
+
+    /** Whether Navidrome can start this stream part-way in (a song stream; it does so when it converts). */
+    fun canStartAt(uri: Uri): Boolean = uri.path?.endsWith("/rest/stream") == true
+
+    /** [uri] starting at the whole second of [positionMs] (or at the beginning, for 0). */
+    fun startingAt(uri: Uri, positionMs: Long): Uri {
+        val seconds = (positionMs / 1000).coerceAtLeast(0)
+        val builder = uri.buildUpon().clearQuery()
+        uri.queryParameterNames.filter { it != OFFSET_PARAM && it != "estimateContentLength" }.forEach { name ->
+            uri.getQueryParameters(name).forEach { builder.appendQueryParameter(name, it) }
+        }
+        if (seconds > 0) builder.appendQueryParameter(OFFSET_PARAM, seconds.toString())
+        return builder.build()
+    }
 
     /**
      * The stream a Chromecast plays: MP3 320 converted by Navidrome, which every Cast device can play
      * (the original file may be hi-res FLAC or ALAC, which they can't).
      */
-    fun forCast(uri: Uri): Uri = convert(uri, "mp3", CAST_KBPS)
+    fun forCast(uri: Uri): Uri = convert(uri, "mp3", CAST_KBPS, estimateLength = true)
 
     const val CAST_KBPS = 320
     const val CAST_MIME = "audio/mpeg"
 
-    private fun convert(uri: Uri, format: String, kbps: Int): Uri {
+    private fun convert(uri: Uri, format: String, kbps: Int, estimateLength: Boolean): Uri {
         if (kbps <= 0 || uri.path?.endsWith("/rest/stream") != true) return uri
         // Swap the "raw" (original) request for a conversion.
         val builder = uri.buildUpon().clearQuery()
         uri.queryParameterNames.filter { it != "format" && it != "maxBitRate" && it != "estimateContentLength" }.forEach { name ->
             uri.getQueryParameters(name).forEach { builder.appendQueryParameter(name, it) }
         }
-        return builder
+        builder
             .appendQueryParameter("format", format)
             .appendQueryParameter("maxBitRate", kbps.toString())
-            // Lets the player know the length of the converted stream, so the seek bar works.
-            .appendQueryParameter("estimateContentLength", "true")
-            .build()
+        // Lets the player know the length of the converted stream, so the seek bar works. Not for a stream
+        // that starts part-way in: the estimate is for the whole song, so the player would wait for data
+        // that never comes at the end.
+        if (estimateLength && uri.getQueryParameter(OFFSET_PARAM) == null) builder.appendQueryParameter("estimateContentLength", "true")
+        return builder.build()
     }
 }

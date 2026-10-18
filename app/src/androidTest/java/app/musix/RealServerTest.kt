@@ -213,6 +213,45 @@ class RealServerTest {
         if (result.startMs > 6_000 || result.stalls > 0) println("Smooth-playback check: slow start or stops: $result")
     }
 
+    /**
+     * Seeking in a song that streams converted (Opus) starts it there at once: Navidrome is asked to start
+     * the conversion at that second instead of the player reading up to it, which left songs stuck after a
+     * switch to Opus (issue #162). The seek bar shows the song's real position.
+     */
+    @Test
+    fun e_seekingAConvertedSongStartsThere() {
+        val before = graph.settings.current
+        graph.settings.save(before.copy(transcodeWifiKbps = 160, transcodeMobileKbps = 160))
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        try {
+            val song = songOf(albums().getValue("Still Album"))
+            instrumentation.runOnMainSync { graph.player.play(listOf(song)) }
+            val startBy = SystemClock.elapsedRealtime() + 30_000
+            while (!graph.player.state.value.isPlaying && SystemClock.elapsedRealtime() < startBy) SystemClock.sleep(200)
+            assertTrue("Converted song never started. ${recentLog()}", graph.player.state.value.isPlaying)
+            instrumentation.runOnMainSync { graph.player.seekTo(150_000) }
+            // Within 10 s it plays on from there.
+            val end = SystemClock.elapsedRealtime() + 10_000
+            var at = 0L
+            while (SystemClock.elapsedRealtime() < end) {
+                SystemClock.sleep(250)
+                instrumentation.runOnMainSync { at = graph.player.positionMs() }
+                if (at > 151_500 && graph.player.state.value.isPlaying) break
+            }
+            println("Converted seek: at $at ms, playing=${graph.player.state.value.isPlaying}")
+            assertTrue("After seeking to 2:30 in a converted song it's at ${at} ms. ${recentLog()}", at in 151_500..170_000)
+        } finally {
+            instrumentation.runOnMainSync { graph.player.stop() }
+            scenario.close()
+            graph.settings.save(before)
+        }
+    }
+
+    /** The app's last playback log lines, for a failure message (CI shows the message, not the whole log). */
+    private fun recentLog(): String = AppLog.tail(300)
+        .filter { line -> listOf("/Stream", "/Player", "/Audio", "/Http").any { it in line } }
+        .takeLast(8).joinToString(" | ") { it.substringAfter(' ').take(160) }
+
     /** Control: the old setup's full-size cover downloads, to show the test catches the problem. */
     @Test
     fun d_oldSetupBigCoverDownloadsStarveTheSong() {
@@ -240,12 +279,20 @@ class RealServerTest {
             var wasPlaying = false
             var position = 0L
             val end = started + seconds * 1000L
+            var lastLog = started
             while (SystemClock.elapsedRealtime() < end) {
                 SystemClock.sleep(100)
                 val state = graph.player.state.value
                 if (state.isPlaying && startMs == 0L) startMs = SystemClock.elapsedRealtime() - started
                 if (wasPlaying && state.buffering) stalls++
                 wasPlaying = state.isPlaying
+                // Where the song is every second, so a stuck or slow song can be told apart (issue #162).
+                if (SystemClock.elapsedRealtime() - lastLog >= 1_000) {
+                    lastLog = SystemClock.elapsedRealtime()
+                    var at = 0L
+                    instrumentation.runOnMainSync { at = graph.player.positionMs() }
+                    println("Watch: ${(lastLog - started) / 1000}s: at ${at} ms, playing=${state.isPlaying}, waiting=${state.buffering}")
+                }
             }
             instrumentation.runOnMainSync { position = graph.player.positionMs() }
             return Watch(startMs, stalls, position)

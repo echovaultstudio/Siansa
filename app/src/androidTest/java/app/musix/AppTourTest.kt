@@ -198,6 +198,9 @@ class AppTourTest {
                 idle(600)
             }
             step("artist page and playing from it") {
+                // From Your Library's artists: every step starts with nothing open (issue #162).
+                libraryAll()
+                click("Artists")
                 click("Test Artist")
                 waitText("Popular")
                 idle(1000)
@@ -323,7 +326,12 @@ class AppTourTest {
         val log = AppLog.tail(1500)
         log.forEach { println("TOURLOG $it") }
         // Every cover on every page must show: any picture the app couldn't show is a problem.
-        val blank = log.filter { it.contains("W/Image: Couldn't show") }
+        // Covers Navidrome itself failed to send (it answers with an error, e.g. when it can't shrink the test
+        // library's 13 MB GIF in time) are the server's doing: Musix retries, never caches them and shows the
+        // placeholder. They're listed, not failed on; every other picture must show (issue #162).
+        val serverFailed = log.filter { it.contains("W/Image: Couldn't show") && it.contains("HTTP 502") }
+        if (serverFailed.isNotEmpty()) println("Tour: ${serverFailed.size} cover(s) Navidrome couldn't send, e.g. ${serverFailed.first().substringAfter("Couldn't show ")}")
+        val blank = log.filter { it.contains("W/Image: Couldn't show") && !it.contains("HTTP 502") }
         if (blank.isNotEmpty()) problems += "${blank.size} picture(s) couldn't be shown, e.g. ${blank.first().substringAfter("Couldn't show ")}"
         // And no errors in the app's log during the tour.
         log.filter { Regex("""^\S+ \S+ E/""").containsMatchIn(it) }.take(3).forEach { problems += "Error in the log: ${it.take(200)}" }
@@ -333,6 +341,8 @@ class AppTourTest {
     // ---- Helpers --------------------------------------------------------------------------------------
 
     private fun step(name: String, block: () -> Unit) {
+        // Every step starts from the app with nothing open, so one failing step can't take the next down (issue #162).
+        runCatching { settle() }.onFailure { println("Tour: couldn't tidy up before $name: $it") }
         try {
             block()
             println("Tour: OK $name")
@@ -342,8 +352,33 @@ class AppTourTest {
             println("Tour: FAILED $name: $e$at")
             println("Tour: stack " + e.stackTrace.take(25).joinToString(" <- ") { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" })
             runCatching { shot("FAIL-" + name.replace(' ', '-')) }
-            runCatching { back() }
+            // Not "back": on Home it would close the app and every later step would fail with it.
+            runCatching { settle() }
         }
+    }
+
+    /** Closes whatever a step left open: sheets, menus and dialogs (their own windows), then now playing. */
+    private fun settle() {
+        repeat(3) { if (popupWindows() > 0) closeSheet() }
+        val nowPlaying = compose.onAllNodesWithContentDescription("Song options").fetchSemanticsNodes().isNotEmpty()
+        if (nowPlaying) {
+            back()
+            idle(600)
+        }
+    }
+
+    /** How many of the app's windows besides the main one are showing (sheets, menus, dialogs). */
+    private fun popupWindows(): Int {
+        var count = 0
+        instrumentation.runOnMainSync {
+            val global = Class.forName("android.view.WindowManagerGlobal")
+            val instance = global.getMethod("getInstance").invoke(null)
+            val field = global.getDeclaredField("mViews").apply { isAccessible = true }
+            @Suppress("UNCHECKED_CAST")
+            val views = (field.get(instance) as List<android.view.View>).toList()
+            count = views.count { it.isShown } - 1
+        }
+        return count.coerceAtLeast(0)
     }
 
     /** Closes an open sheet: a real back key goes to the sheet's own window, not the app behind it. */
