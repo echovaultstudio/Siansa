@@ -20,6 +20,7 @@ import app.musix.data.SettingsRepository
 import app.musix.data.SyncPhase
 import app.musix.data.TopSongs
 import app.musix.log.AppLog
+import app.musix.log.NetLog
 import app.musix.mix.MixGenerator
 import app.musix.mix.Radios
 import app.musix.mix.Insights
@@ -139,7 +140,7 @@ class AppGraph(val app: Application) {
                 throw e
             }
         }
-        .addNetworkInterceptor(app.musix.log.NetLog.interceptor)
+        .addNetworkInterceptor(NetLog.interceptor)
         .build()
 
     /**
