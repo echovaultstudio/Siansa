@@ -30,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -82,8 +83,9 @@ fun YourColourSheet(start: Int, onDismiss: () -> Unit, onUse: (Int) -> Unit) {
 internal fun YourColourPicker(start: Int, onCancel: () -> Unit, onUse: (Int) -> Unit, modifier: Modifier = Modifier) {
     var seed by remember { mutableIntStateOf(start) }
     var hex by remember { mutableStateOf(ThemeTones.toHex(start)) }
+    // A new colour keeps the opacity already chosen (issue #181).
     fun pick(c: Int) {
-        seed = c
+        seed = ThemeTones.withOpacity(c, ThemeTones.opacityOf(seed))
         hex = ThemeTones.toHex(c)
     }
 
@@ -102,7 +104,7 @@ internal fun YourColourPicker(start: Int, onCancel: () -> Unit, onUse: (Int) -> 
 
         Row(Modifier.fillMaxWidth().testTag("quick"), horizontalArrangement = Arrangement.SpaceBetween) {
             QUICK_COLOURS.forEach { c ->
-                val selected = c == seed
+                val selected = (c and 0xFFFFFF) == (seed and 0xFFFFFF)
                 Box(
                     Modifier
                         .size(34.dp)
@@ -119,7 +121,7 @@ internal fun YourColourPicker(start: Int, onCancel: () -> Unit, onUse: (Int) -> 
             value = hex,
             onValueChange = { text ->
                 hex = text.take(7)
-                ThemeTones.parseHex(text)?.let { seed = it }
+                ThemeTones.parseHex(text)?.let { seed = ThemeTones.withOpacity(it, ThemeTones.opacityOf(seed)) }
             },
             singleLine = true,
             isError = ThemeTones.parseHex(hex) == null,
@@ -128,6 +130,8 @@ internal fun YourColourPicker(start: Int, onCancel: () -> Unit, onUse: (Int) -> 
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
             modifier = Modifier.fillMaxWidth().testTag("hex"),
         )
+
+        OpacitySlider(seed, onChange = { seed = ThemeTones.withOpacity(seed, it) }, Modifier.testTag("opacity"))
 
         Row(Modifier.fillMaxWidth().testTag("previews"), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ColourPreview(seed, dark = false, Modifier.weight(1f))
@@ -209,5 +213,32 @@ private fun ColourPreview(seed: Int, dark: Boolean, modifier: Modifier) {
                 }
             }
         }
+    }
+}
+
+/**
+ * How strongly the colour shows in the theme (issue #181): 100 % is the colour as picked, lower lays it more
+ * thinly, towards grey. Text stays as readable at every opacity.
+ */
+@Composable
+private fun OpacitySlider(seed: Int, onChange: (Double) -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Opacity", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text(ThemeTones.opacityLabel(seed), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Slider(
+            value = ThemeTones.opacityOf(seed).toFloat(),
+            onValueChange = { onChange(it.toDouble()) },
+            valueRange = ThemeTones.MIN_OPACITY.toFloat()..1f,
+            // Steps of 5 %: 20, 25 … 100.
+            steps = ((1.0 - ThemeTones.MIN_OPACITY) * 20).roundToInt() - 1,
+            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Opacity" },
+        )
+        Text(
+            "How strongly your colour shows. Lower is softer, closer to grey.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
