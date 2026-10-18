@@ -169,4 +169,14 @@ class SpacingTest {
         val hint2 = compose.onNodeWithTag("hint2").getBoundsInRoot()
         assertEven("Crossfade chips", mode.top - hint.bottom, hint2.top - mode.bottom)
     }
+
+    /** Time machine: the year and the month chips are one even gap apart (issue #186). */
+    @Test fun timeMachinePickerIsEvenlySpaced() {
+        compose.setContent {
+            MusixTheme { app.musix.ui.TimePicker(2025, 3, java.time.LocalDate.of(2026, 10, 18), onYear = {}, onMonth = {}) }
+        }
+        val year = compose.onNodeWithTag("year").getBoundsInRoot()
+        val months = compose.onNodeWithTag("months").getBoundsInRoot()
+        assertEven("Year to months", months.top - year.bottom, app.musix.ui.TIME_MACHINE_GAP, tolerance = 1.dp)
+    }
 }
