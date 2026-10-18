@@ -62,6 +62,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.musix.data.LocalPlaylists
 import app.musix.data.Song
 import app.musix.data.cover
 import app.musix.offline.OfflineItem
@@ -265,7 +266,10 @@ fun DownloadsScreen(nav: NavController) {
                     ).joinToString(" · "),
                     onClick = { open(nav, item) },
                 ) {
-                    IconButton(onClick = { removing = item }) { Icon(Icons.Rounded.Close, "Remove") }
+                    // Phone-only playlists are always kept; deleting the playlist removes its downloads.
+                    if (!(item.kind == OfflineKind.PLAYLIST && LocalPlaylists.isLocal(item.id))) {
+                        IconButton(onClick = { removing = item }) { Icon(Icons.Rounded.Close, "Remove") }
+                    }
                 }
             }
             item {
@@ -313,7 +317,7 @@ fun DownloadsScreen(nav: NavController) {
         AlertDialog(
             onDismissRequest = { removeAll = false },
             title = { Text("Remove all downloads?") },
-            text = { Text("Everything will need a connection to play again.") },
+            text = { Text("Everything will need a connection to play again. Playlists kept on this phone download again.") },
             confirmButton = {
                 TextButton(onClick = {
                     removeAll = false

@@ -15,6 +15,9 @@ import app.musix.data.JsonFile
 import app.musix.data.Playlist
 import app.musix.data.cover
 import app.musix.data.LibraryRepository
+import app.musix.data.LocalPlaylist
+import app.musix.data.LocalPlaylists
+import app.musix.data.toPlaylist
 import app.musix.data.Song
 import app.musix.data.SettingsRepository
 import app.musix.data.Users
@@ -72,6 +75,7 @@ fun Album.offlineItem() = OfflineItem(OfflineKind.ALBUM, id, name, artist, cover
 fun Playlist.offlineItem() = OfflineItem(OfflineKind.PLAYLIST, id, name, owner.orEmpty(), coverArt)
 fun Artist.offlineItem() = OfflineItem(OfflineKind.ARTIST, id, name, "", coverArt)
 fun Song.offlineItem() = OfflineItem(OfflineKind.SONG, id, title, artist, cover)
+fun LocalPlaylist.offlineItem() = toPlaylist().offlineItem().copy(subtitle = "On this phone")
 fun likedOfflineItem() = OfflineItem(OfflineKind.LIKED, OfflineItem.LIKED_ID, "Liked songs")
 
 /** What you chose, what's downloaded, and what's still waiting to be (oldest first). */
@@ -136,6 +140,39 @@ object OfflinePlan {
             .map { it.copy(songIds = it.songIds.filterNot { id -> id in ids }) }
             .filter { it.songIds.isNotEmpty() }
         return remove(list.copy(items = items, skipped = list.skipped + ids), ids)
+    }
+
+    /**
+     * [list] with every phone-only playlist ([phone], each with its songs) kept on the phone, so they play
+     * offline (issue #147): songs added to one download, songs taken out go unless something else wants
+     * them, and a playlist deleted (or sent to Navidrome) goes with its songs. Songs removed by hand from
+     * Downloaded songs stay out, unless they're added to the playlist again: [previous] is each playlist's
+     * songs at the last sync (null when the app has just started, so nothing counts as added).
+     */
+    fun syncPhonePlaylists(
+        list: DownloadList,
+        phone: List<Pair<OfflineItem, List<Song>>>,
+        previous: Map<String, Set<String>>?,
+        now: Long,
+    ): DownloadList {
+        val keys = phone.mapTo(HashSet()) { it.first.key }
+        var result = list.items
+            .filter { it.kind == OfflineKind.PLAYLIST && LocalPlaylists.isLocal(it.id) && it.key !in keys }
+            .fold(list) { l, gone -> drop(l, gone.key) }
+        for ((item, songs) in phone) {
+            val old = result.items.firstOrNull { it.key == item.key }
+            if (songs.isEmpty()) {
+                if (old != null) result = drop(result, item.key)
+                continue
+            }
+            val ids = songs.mapTo(HashSet()) { it.id }
+            val added = if (previous == null) emptySet() else ids - previous[item.key].orEmpty()
+            val skipped = result.skipped - added
+            val wanted = songs.filter { it.id !in skipped }.map { it.id }.distinct()
+            if (old != null && old.songIds == wanted && old.name == item.name && old.cover == item.cover) continue
+            result = choose(result.copy(skipped = skipped), item.copy(addedAt = old?.addedAt ?: now), songs, explicit = false)
+        }
+        return result
     }
 
     /** [list] without the item [key], and without songs no other item still wants. */
@@ -248,6 +285,9 @@ class Downloads(
 
     @Volatile private var job: Job? = null
 
+    // Each phone-only playlist's songs at the last sync, to tell songs added to it.
+    private var lastPhone: Map<String, Set<String>>? = null
+
     init {
         scope.launch {
             publish(json.read())
@@ -323,6 +363,29 @@ class Downloads(
         }
     }
 
+    /** Keeps every phone-only playlist downloaded; called whenever they change. */
+    suspend fun syncPhonePlaylists(playlists: List<LocalPlaylist>) {
+        val phone = playlists.map { it.offlineItem() to it.songs }
+        val previous = lastPhone
+        lastPhone = phone.associate { (item, songs) -> item.key to songs.mapTo(HashSet()) { it.id } }
+        // Nothing to do (the usual case): leave the file alone.
+        if (OfflinePlan.syncPhonePlaylists(_list.value, phone, previous, 0) == _list.value) return
+        val before = _list.value.waiting.size
+        change { OfflinePlan.syncPhonePlaylists(it, phone, previous, System.currentTimeMillis()) }
+        val waiting = _list.value.waiting.size
+        if (waiting != before) AppLog.i("Downloads", "Phone playlists synced (${playlists.size}), $waiting waiting")
+        if (waiting > 0) start("phone playlists")
+    }
+
+    /**
+     * Keeps the downloads of the item [fromKey] under [to] instead, so a phone playlist sent to Navidrome
+     * stays on the phone without downloading its songs again.
+     */
+    suspend fun moveItem(fromKey: String, to: OfflineItem) {
+        change { list -> list.copy(items = list.items.map { if (it.key == fromKey) to.copy(songIds = it.songIds, addedAt = it.addedAt) else it }) }
+        AppLog.i("Downloads", "Kept the downloads of $fromKey as ${to.key}")
+    }
+
     /** Downloads [items] (e.g. every playlist), one after the other. */
     fun chooseAll(items: List<OfflineItem>) {
         AppLog.i("Downloads", "Chose ${items.size} items at once")
@@ -354,7 +417,9 @@ class Downloads(
      */
     fun refresh() {
         scope.launch {
-            for (item in _list.value.items.filter { it.kind == OfflineKind.PLAYLIST || it.kind == OfflineKind.ARTIST || it.kind == OfflineKind.LIKED }) {
+            // Phone-only playlists aren't on Navidrome; syncPhonePlaylists keeps them up to date.
+            val checked = _list.value.items.filter { it.kind == OfflineKind.PLAYLIST || it.kind == OfflineKind.ARTIST || it.kind == OfflineKind.LIKED }
+            for (item in checked.filterNot { it.kind == OfflineKind.PLAYLIST && LocalPlaylists.isLocal(it.id) }) {
                 val songs = runCatching { songsOf(item) }.getOrNull() ?: continue
                 // Songs removed by hand stay out; they don't count as a change either.
                 val skipped = _list.value.skipped
