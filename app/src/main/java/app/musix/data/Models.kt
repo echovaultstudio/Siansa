@@ -87,6 +87,8 @@ data class Playlist(
     val owner: String? = null,
     val comment: String? = null,
     val changed: String? = null,
+    /** Navidrome's OpenSubsonic "readonly": true for smart playlists and other people's; null when it didn't say. */
+    val readonly: Boolean? = null,
 )
 
 data class PlaylistDetail(val playlist: Playlist, val songs: List<Song>)

@@ -1,6 +1,7 @@
 package app.musix.ui
 
 import app.musix.data.cover
+import app.musix.data.toPlaylist
 import android.content.Context
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -33,9 +34,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.GridView
@@ -198,6 +201,10 @@ fun YourLibraryScreen(nav: NavController) {
         letterStarts?.let { starts -> starts.entries.sortedBy { it.value }.map { it.value to it.key } }
     }
     val scope = rememberCoroutineScope()
+    val launcher = rememberPlayLauncher()
+    var naming by remember { mutableStateOf(false) }
+    var creating by remember { mutableStateOf(false) }
+    var importing by remember { mutableStateOf(false) }
 
     fun togglePin(e: Entry) {
         if (e.alwaysPinned) return
@@ -217,7 +224,35 @@ fun YourLibraryScreen(nav: NavController) {
             onSync = { nav.navigate("sync") },
             onSoundSearch = { nav.goToTab("search") },
             onDownloads = { nav.navigate("downloads") },
+            onNewPlaylist = { naming = true },
+            onImportPlaylists = { importing = true },
         )
+        if (importing) {
+            ImportPlaylistsDialog { message ->
+                importing = false
+                message?.let { launcher.notify(it) }
+            }
+        }
+        if (naming) {
+            NewPlaylistDialog(
+                onDismiss = { naming = false },
+                onCreate = { name, onPhone ->
+                    if (!creating) {
+                        creating = true
+                        scope.launch {
+                            graph.playlists.create(name, onPhone = onPhone)
+                                .onSuccess { made ->
+                                    naming = false
+                                    launcher.notify("Made $name")
+                                    if (made != null) nav.navigate("playlist/${made.id}")
+                                }
+                                .onFailure { launcher.notify(it.message?.takeIf { m -> m.isNotBlank() } ?: "Couldn't make the playlist") }
+                            creating = false
+                        }
+                    }
+                },
+            )
+        }
         if (searching) {
             TextField(
                 value = query,
@@ -336,6 +371,8 @@ private fun LibraryHeader(
     onSync: () -> Unit,
     onSoundSearch: () -> Unit,
     onDownloads: () -> Unit,
+    onNewPlaylist: () -> Unit,
+    onImportPlaylists: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(
@@ -360,6 +397,16 @@ private fun LibraryHeader(
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.Add, "More") }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(
+                    text = { Text("New playlist") },
+                    leadingIcon = { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, null) },
+                    onClick = { menu = false; onNewPlaylist() },
+                )
+                DropdownMenuItem(
+                    text = { Text("Import from Navidrome") },
+                    leadingIcon = { Icon(Icons.Rounded.CloudDownload, null) },
+                    onClick = { menu = false; onImportPlaylists() },
+                )
                 DropdownMenuItem(
                     text = { Text("Mix from a sound description") },
                     leadingIcon = { Icon(Icons.Rounded.Search, null) },
@@ -665,8 +712,26 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
         tags = setOf("Discover"),
     )
 
+    // Playlists kept only on this phone.
+    graph.localPlaylists.all().forEach { local ->
+        val p = local.toPlaylist()
+        entries += Entry(
+            key = "playlist-${p.id}",
+            kind = Kind.PLAYLIST,
+            title = p.name,
+            subtitle = "Playlist · On this phone",
+            route = "playlist/${p.id}",
+            coverArt = p.coverArt,
+            recentAt = local.changedAt,
+            addedAt = local.createdAt,
+            creator = me,
+            tags = setOf("By you", "On this phone"),
+        )
+    }
+
     // Playlists from Navidrome.
     val playlists = runCatching { graph.library.refreshPlaylists { graph.subsonic.playlists() } }.getOrElse { graph.library.playlists() }
+        .let(graph.playlists.removed::visible)
     playlists.forEach { p ->
         val mine = me.isNotBlank() && p.owner.equals(me, ignoreCase = true)
         entries += Entry(
@@ -751,7 +816,7 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
     }
     val albumOrder = listOf("Played", "Not played yet") + AlbumCategory.entries.map { it.plural }
     val subFilters = mapOf(
-        Kind.PLAYLIST to present(Kind.PLAYLIST, listOf("By you", "By others")),
+        Kind.PLAYLIST to present(Kind.PLAYLIST, listOf("By you", "By others", "On this phone")),
         Kind.MIX to present(Kind.MIX, listOf("Today", "Made for you", "Vibes", "Earlier")),
         Kind.ALBUM to present(Kind.ALBUM, albumOrder),
         Kind.ARTIST to present(Kind.ARTIST, listOf("Played", "Not played yet")),

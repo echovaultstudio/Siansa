@@ -122,6 +122,7 @@ private suspend fun loadSection(graph: AppGraph, section: HomeSection): List<Sec
         HomeSection.Rediscover -> graph.insights.rediscover().map { SectionItem.AlbumItem(it.album, rediscoverSubtitle(it)) }
         HomeSection.Radios -> moodRadios.map { SectionItem.Radio(it) }
         HomeSection.Playlists -> graph.library.refreshPlaylists { graph.subsonic.playlists() }
+            .let(graph.playlists.removed::visible)
             .map { SectionItem.PlaylistItem(it) }
         HomeSection.RecentlyPlayed -> recentlyPlayedAlbums(graph, 100).map { SectionItem.AlbumItem(it, it.artist) }
         HomeSection.ArtistRadios -> recentlyPlayedArtists(graph, 60).map { SectionItem.ArtistItem(it) }
