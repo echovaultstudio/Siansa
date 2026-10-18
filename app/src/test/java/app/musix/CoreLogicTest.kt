@@ -76,6 +76,18 @@ class CoverSniffTest {
         assertFalse(CoverStore.sniff(webp(false, 600, 600))!!.animated)
     }
 
+    /** Issue #162: every extended WebP goes to the first-frame decoder, animated or not; plain WebPs don't. */
+    @Test fun extendedWebpIsMarked() {
+        assertTrue(CoverStore.sniff(webp(false, 300, 300))!!.extendedWebP)
+        assertTrue(CoverStore.sniff(webp(true, 300, 300))!!.extendedWebP)
+        val plain = ByteArray(30)
+        "RIFF".forEachIndexed { i, c -> plain[i] = c.code.toByte() }
+        "WEBP".forEachIndexed { i, c -> plain[8 + i] = c.code.toByte() }
+        "VP8 ".forEachIndexed { i, c -> plain[12 + i] = c.code.toByte() }
+        assertFalse(CoverStore.sniff(plain)!!.extendedWebP)
+        assertFalse(CoverStore.sniff(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte()))!!.extendedWebP)
+    }
+
     @Test fun gifSizeFromHeader() {
         val b = ByteArray(16)
         "GIF89a".forEachIndexed { i, c -> b[i] = c.code.toByte() }
