@@ -181,7 +181,7 @@ fun HomeScreen(nav: NavController) {
     val todaysMixes = mixes.orEmpty().filter { m ->
         m.date == today && (m.selectorId in personalIds || applicable.any { it.id == m.selectorId })
     }
-    val playlists by loadState(version to "playlists") { graph.library.refreshPlaylists { graph.subsonic.playlists() } }
+    val playlists by loadState(version to "playlists") { graph.library.refreshPlaylists { graph.subsonic.playlists() }.let(graph.playlists.removed::visible) }
     val recentAlbums by loadState(version to "recent") { recentlyPlayedAlbums(graph) }
     val recentArtists by loadState(version to "artists") { recentlyPlayedArtists(graph) }
     val newest by loadState(version to "newest") {

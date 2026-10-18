@@ -10,7 +10,10 @@ import app.musix.data.Guests
 import app.musix.data.HistoryStore
 import app.musix.data.LibraryRepository
 import app.musix.data.LibrarySync
+import app.musix.data.LocalPlaylists
 import app.musix.data.MixStore
+import app.musix.data.PlaylistEditor
+import app.musix.data.RemovedPlaylists
 import app.musix.data.SelectorStore
 import app.musix.data.SettingsRepository
 import app.musix.data.SyncPhase
@@ -29,10 +32,14 @@ import app.musix.net.DeezerApi
 import app.musix.net.HistoryApi
 import app.musix.net.LastFmApi
 import app.musix.net.ListenBrainzApi
+import app.musix.net.NavidromeNativeApi
 import app.musix.net.OpenRouterApi
 import app.musix.net.Connection
 import app.musix.net.SubsonicApi
 import app.musix.offline.Downloads
+import app.musix.offline.OfflineItem
+import app.musix.offline.OfflineKind
+import app.musix.offline.offlineItem
 import app.musix.playback.PlayerConnection
 import app.musix.playback.SleepTimer
 import app.musix.scrobble.Scrobbler
@@ -46,6 +53,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -233,6 +241,25 @@ class AppGraph(val app: Application) {
         onlyDownloads = { settings.current.downloadedOnly }
         isDownloaded = { downloads.isDownloaded(it) }
     }
+    /** Playlists kept only on this phone. */
+    val localPlaylists = LocalPlaylists(app).also { local ->
+        // Phone-only playlists are kept downloaded, so they play without a connection.
+        scope.launch(CoroutineName("phone-playlist-downloads")) {
+            local.all()
+            // Also when the download list changes, so "Remove all downloads" doesn't leave them behind.
+            combine(local.state.filterNotNull(), downloads.ids.map { it.items }.distinctUntilChanged()) { playlists, _ -> playlists }
+                .collect { downloads.syncPhonePlaylists(it) }
+        }
+    }
+    val playlists = PlaylistEditor(
+        subsonic,
+        NavidromeNativeApi(http) { settings.current },
+        library,
+        localPlaylists,
+        RemovedPlaylists(app),
+        isOffline = { connection.current.offline },
+        moved = { localId, made -> downloads.moveItem(OfflineItem.key(OfflineKind.PLAYLIST, localId), made.offlineItem()) },
+    )
     val songRadio = SongRadio(this)
     val songPath = SongPath(this)
     val sleepTimer = SleepTimer()
