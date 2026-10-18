@@ -103,5 +103,5 @@ fun changelogSpans(text: String): List<ChangelogSpan> {
 
 /** The GitHub release page of a version (the repository is private, so it opens for its owner). */
 fun releaseUrl(version: String): String =
-    if (version.isBlank()) "https://github.com/Th3K1ngP1n/musix/releases"
-    else "https://github.com/Th3K1ngP1n/musix/releases/tag/v${version.trim()}"
+    if (version.isBlank()) "https://github.com/Musix-Industreez/musix/releases"
+    else "https://github.com/Musix-Industreez/musix/releases/tag/v${version.trim()}"
