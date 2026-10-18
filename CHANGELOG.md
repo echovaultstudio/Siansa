@@ -3,6 +3,15 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.8.0beta — 2026-10-18
+
+### Added
+- **Themes.** Settings → Themes picks light, dark, or Auto (follows your phone, including its dark-mode
+  schedule), a **Pure black** background for dark mode, and the colours: Musix's own, **Wallpaper** (your phone's
+  Material You colours, Android 12 and later), or the presets Ocean, Forest, Rose, Sunset and Mono. A preview
+  shows the choice straight away. Album, artist and now playing pages keep their colours from the cover; their
+  buttons take the theme's colour.
+
 ## 0.7.2beta — 2026-10-18
 
 ### Fixed
