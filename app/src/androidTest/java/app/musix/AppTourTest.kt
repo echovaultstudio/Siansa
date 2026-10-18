@@ -79,10 +79,16 @@ class AppTourTest {
             }
             step("source filter") {
                 tab("Home")
-                compose.onAllNodesWithContentDescription("Source filter").onFirst().performClick()
+                compose.onAllNodesWithContentDescription("Source filter and Arrange Home").onFirst().performClick()
                 idle(1200)
                 waitText("Only downloaded music")
                 shot("01b-source-filter", popups = true)
+                // The same panel's other tab (issue #152).
+                click("Arrange")
+                idle(600)
+                shot("01b2-arrange-tab", popups = true)
+                click("Sources")
+                idle(400)
                 // A second user (the same login here), shown alongside the first.
                 val second = 1
                 instrumentation.runOnMainSync {
@@ -98,7 +104,7 @@ class AppTourTest {
                     graph.guests.state.value[second]?.error?.let { problems += "source filter: the second user's music didn't load: $it" }
                     idle(800)
                     shot("01c-home-two-users")
-                    compose.onAllNodesWithContentDescription("Source filter").onFirst().performClick()
+                    compose.onAllNodesWithContentDescription("Source filter and Arrange Home").onFirst().performClick()
                     idle(1200)
                     waitText("Users and libraries")
                     shot("01d-source-filter-two-users", popups = true)

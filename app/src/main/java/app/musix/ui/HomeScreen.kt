@@ -25,7 +25,6 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shuffle
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
@@ -88,7 +87,6 @@ fun HomeScreen(nav: NavController) {
     val homeOrder = homeSettings.homeOrder
     val homeHidden = homeSettings.homeHidden
     var arranging by remember { mutableStateOf(false) }
-    var openOnSources by remember { mutableStateOf(false) }
 
     // While AudioMuse can't be reached (offline, or it's down), mixes aren't attempted: a clear message instead.
     val aiProblem = rememberAiProblem()
@@ -202,16 +200,10 @@ fun HomeScreen(nav: NavController) {
         contentPadding = PaddingValues(bottom = if (keyboardOpen()) 16.dp else bottomBarPadding(24.dp)),
     ) {
         item {
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(greeting(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                SourceFilterButton { openOnSources = true; arranging = true }
-                IconButton(onClick = { openOnSources = false; arranging = true }) { Icon(Icons.Rounded.Tune, "Arrange Home") }
-            }
+            // One button for the source filter and arranging Home (issue #152): both are tabs of one panel.
+            HomeHeader(greeting(), Modifier.statusBarsPadding()) { SourceFilterButton { arranging = true } }
         }
-        item(key = "sources") { SourceChips { openOnSources = true; arranging = true } }
+        item(key = "sources") { SourceChips { arranging = true } }
 
         if (loaded && !synced) {
             item(key = "sync") { Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { SyncPrompt(nav) } }
@@ -408,7 +400,7 @@ fun HomeScreen(nav: NavController) {
         }, onHiddenChange = {
             AppLog.i("Home", "Hidden: ${HomeSection.formatHidden(it).ifEmpty { "none" }}")
             graph.settings.setHomeHidden(it)
-        }, onDismiss = { arranging = false }, startOnSources = openOnSources)
+        }, onDismiss = { arranging = false }, startOnSources = true)
     }
 }
 
@@ -572,5 +564,17 @@ fun MixRow(mix: Mix, onClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/** Home's top line: the greeting, and the one button for the source filter and arranging Home. */
+@Composable
+internal fun HomeHeader(title: String, modifier: Modifier = Modifier, action: @Composable () -> Unit) {
+    Row(
+        modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        action()
     }
 }
