@@ -333,6 +333,8 @@ class AppTourTest {
     // ---- Helpers --------------------------------------------------------------------------------------
 
     private fun step(name: String, block: () -> Unit) {
+        // Every step starts from the app with nothing open, so one failing step can't take the next down (issue #162).
+        runCatching { settle() }.onFailure { println("Tour: couldn't tidy up before $name: $it") }
         try {
             block()
             println("Tour: OK $name")
@@ -344,6 +346,30 @@ class AppTourTest {
             runCatching { shot("FAIL-" + name.replace(' ', '-')) }
             runCatching { back() }
         }
+    }
+
+    /** Closes whatever a step left open: sheets, menus and dialogs (their own windows), then now playing. */
+    private fun settle() {
+        repeat(3) { if (popupWindows() > 0) closeSheet() }
+        val nowPlaying = compose.onAllNodesWithContentDescription("Song options").fetchSemanticsNodes().isNotEmpty()
+        if (nowPlaying) {
+            back()
+            idle(600)
+        }
+    }
+
+    /** How many of the app's windows besides the main one are showing (sheets, menus, dialogs). */
+    private fun popupWindows(): Int {
+        var count = 0
+        instrumentation.runOnMainSync {
+            val global = Class.forName("android.view.WindowManagerGlobal")
+            val instance = global.getMethod("getInstance").invoke(null)
+            val field = global.getDeclaredField("mViews").apply { isAccessible = true }
+            @Suppress("UNCHECKED_CAST")
+            val views = (field.get(instance) as List<android.view.View>).toList()
+            count = views.count { it.isShown } - 1
+        }
+        return count.coerceAtLeast(0)
     }
 
     /** Closes an open sheet: a real back key goes to the sheet's own window, not the app behind it. */

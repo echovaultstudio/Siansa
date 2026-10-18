@@ -1,7 +1,6 @@
 package app.musix.ui
 
 import android.os.SystemClock
-import androidx.compose.runtime.withFrameMillis
 import app.musix.log.AppLog
 import app.musix.playback.SeekTracker
 import kotlinx.coroutines.delay
@@ -601,7 +600,10 @@ private fun SeekBar(state: PlayerState) {
                 AppLog.d("Player", "Seek bar: new song, starts at ${p.positionMs} ms of ${p.durationMs} ms")
                 lastTrack = p.mediaId
             }
-            if (p.playing) withFrameMillis { } else delay(200)
+            // Five times a second is smooth for a thin bar (a 4-minute song moves it about a pixel each time),
+            // and between updates the screen is idle: no redrawing every frame (battery, and the emulator
+            // tests that wait for the screen to settle, issue #162).
+            delay(if (p.playing) 200 else 400)
         }
     }
     var dragging by remember { mutableStateOf<Float?>(null) }
