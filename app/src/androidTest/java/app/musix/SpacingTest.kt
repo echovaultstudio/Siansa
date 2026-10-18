@@ -12,6 +12,7 @@ import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Dp
@@ -168,5 +169,20 @@ class SpacingTest {
         val mode = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Smart")), useUnmergedTree = true).getBoundsInRoot()
         val hint2 = compose.onNodeWithTag("hint2").getBoundsInRoot()
         assertEven("Crossfade chips", mode.top - hint.bottom, hint2.top - mode.bottom)
+    }
+
+    /** Recent searches: the rows are one height, follow each other without gaps, and their words sit in the middle (issue #177). */
+    @Test fun recentSearchRowsAreEvenlySpaced() {
+        val searches = listOf("alt-j", "bonobo", "vance joy").map { app.musix.data.RecentSearch(it) }
+        compose.setContent { MusixTheme { app.musix.ui.RecentSearchList(searches, onPick = {}, onRemove = {}, onClear = {}) } }
+        val rows = compose.onAllNodesWithTag("recent", useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
+        assertTrue("three rows: ${rows.size}", rows.size == 3)
+        val density = compose.density.density
+        fun dp(px: Float) = (px / density).dp
+        assertEven("Row heights", dp(rows[0].height), dp(rows[1].height), tolerance = 1.dp)
+        assertEven("Gap between rows", dp(rows[1].top - rows[0].bottom), 0.dp, tolerance = 1.dp)
+        val text = compose.onNodeWithText("bonobo", useUnmergedTree = true).getBoundsInRoot()
+        val row = rows[1]
+        assertEven("Words in the row", text.top - dp(row.top), dp(row.bottom) - text.bottom)
     }
 }
