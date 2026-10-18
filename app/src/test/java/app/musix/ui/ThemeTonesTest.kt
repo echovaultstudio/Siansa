@@ -112,4 +112,49 @@ class YourColourTest {
         assertEquals(ThemeColours.YOURS, ThemeColours.entries.last())
         assertEquals(null, ThemeColours.YOURS.seed)
     }
+
+    // ---- Opacity (issue #181) ----
+
+    @Test fun opacityIsKeptInTheAlpha() {
+        val pink = 0xFFD81B60.toInt()
+        assertEquals(1.0, ThemeTones.opacityOf(pink), 0.001)
+        val half = ThemeTones.withOpacity(pink, 0.5)
+        assertEquals(0.5, ThemeTones.opacityOf(half), 0.01)
+        assertEquals("#D81B60", ThemeTones.toHex(half))
+        assertEquals("50 %", ThemeTones.opacityLabel(half))
+    }
+
+    @Test fun opacityStaysInRange() {
+        val pink = 0xFFD81B60.toInt()
+        assertEquals(ThemeTones.MIN_OPACITY, ThemeTones.opacityOf(ThemeTones.withOpacity(pink, 0.0)), 0.01)
+        assertEquals(1.0, ThemeTones.opacityOf(ThemeTones.withOpacity(pink, 3.0)), 0.001)
+        // No alpha at all (an old saved colour) counts as fully opaque.
+        assertEquals(1.0, ThemeTones.opacityOf(0x00D81B60), 0.001)
+    }
+
+    @Test fun lowerOpacityMeansLessColourSameTone() {
+        val pink = 0xFFD81B60.toInt()
+        for (dark in listOf(false, true)) {
+            val full = ThemeTones.scheme(pink, dark)
+            val soft = ThemeTones.scheme(ThemeTones.withOpacity(pink, 0.3), dark)
+            for ((a, b) in listOf(full.primary to soft.primary, full.surface to soft.surface, full.secondaryContainer to soft.secondaryContainer)) {
+                val (la, ca, _) = ThemeTones.lch(a)
+                val (lb, cb, _) = ThemeTones.lch(b)
+                assertEquals("same lightness", la, lb, 1.5)
+                assertTrue("less colour: $ca → $cb", cb < ca)
+            }
+        }
+    }
+
+    @Test fun everyOpacityHasReadableText() {
+        for (seed in listOf(0xFFD81B60, 0xFF0E9AA7, 0xFFF6BF26, 0xFF3F51B5).map { it.toInt() })
+            for (opacity in listOf(0.2, 0.5, 0.8)) for (dark in listOf(false, true)) {
+                val r = ThemeTones.scheme(ThemeTones.withOpacity(seed, opacity), dark)
+                val name = "${ThemeTones.toHex(seed)} at $opacity ${if (dark) "dark" else "light"}"
+                readable("$name text", r.onSurface, r.surface, 7.0)
+                readable("$name buttons", r.onPrimary, r.primary, 4.5)
+                readable("$name chips", r.onSecondaryContainer, r.secondaryContainer, 4.5)
+                readable("$name accent", r.primary, r.surface, 3.0)
+            }
+    }
 }
