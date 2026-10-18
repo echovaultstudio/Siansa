@@ -3,6 +3,11 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.7.1beta](https://github.com/Th3K1ngP1n/musix/releases/tag/v0.7.1beta) — 2026-10-18
+
+- [#154](https://github.com/Th3K1ngP1n/musix/pull/154) CI: the nightly run no longer cancels a release run on main (@Th3K1ngP1n)
+- [#156](https://github.com/Th3K1ngP1n/musix/pull/156) Home: one button for the source filter and arranging (#152) (@Th3K1ngP1n)
+
 ## [0.7.0beta](https://github.com/Th3K1ngP1n/musix/releases/tag/v0.7.0beta) — 2026-10-18
 
 - [#136](https://github.com/Th3K1ngP1n/musix/pull/136) Let the release job read pull requests for the release history (@Th3K1ngP1n)
