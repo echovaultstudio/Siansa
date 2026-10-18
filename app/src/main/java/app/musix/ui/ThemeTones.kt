@@ -61,6 +61,28 @@ object ThemeTones {
 
     const val BLACK = 0xFF000000.toInt()
 
+    // ---- "Your colour" (issue #148, step 2) ----
+
+    /** True when [argb] has almost no colour (a grey), so its theme should be grey too rather than tinted. */
+    fun isGrey(argb: Int): Boolean = lch(argb).second < 8.0
+
+    /** A vivid, mid-light colour of hue [h] (0–360), for the hue slider. */
+    fun fromHue(h: Double): Int = tone(((h % 360) + 360) % 360, 70.0, 55)
+
+    /** The hue (0–360) of [argb], to place it on the hue slider. */
+    fun hueOf(argb: Int): Double = lch(argb).third
+
+    /** "#0E9AA7" for [argb]. */
+    fun toHex(argb: Int): String = "#%06X".format(argb and 0xFFFFFF)
+
+    /** The colour written as "#0E9AA7", "0e9aa7" or "#09A" (short form), or null if it isn't one. */
+    fun parseHex(text: String): Int? {
+        var t = text.trim().removePrefix("#")
+        if (t.length == 3) t = t.map { "$it$it" }.joinToString("")
+        if (t.length != 6 || !t.all { it in '0'..'9' || it.lowercaseChar() in 'a'..'f' }) return null
+        return (0xFF shl 24) or t.toInt(16)
+    }
+
     /** How readable [fg] is on [bg] (WCAG contrast ratio, 1 to 21; 4.5 is enough for text). */
     fun contrast(fg: Int, bg: Int): Double {
         fun lum(c: Int): Double {

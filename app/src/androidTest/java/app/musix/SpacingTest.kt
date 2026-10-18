@@ -133,4 +133,18 @@ class SpacingTest {
         // The grid ends with the second row: no gap left below it.
         assertEven("Swatch grid end", grid.bottom - second.bottom, 0.dp, tolerance = 1.dp)
     }
+
+    /** "Your colour" picker: hue slider, quick picks, colour code and previews are one even gap apart (issue #148). */
+    @Test fun yourColourPickerIsEvenlySpaced() {
+        compose.setContent { MusixTheme { app.musix.ui.YourColourPicker(0xFF0E9AA7.toInt(), onCancel = {}, onUse = {}) } }
+        val hue = compose.onNodeWithTag("hue").getBoundsInRoot()
+        val quick = compose.onNodeWithTag("quick").getBoundsInRoot()
+        val hex = compose.onNodeWithTag("hex").getBoundsInRoot()
+        val previews = compose.onNodeWithTag("previews").getBoundsInRoot()
+        val gap = app.musix.ui.PICKER_GAP
+        assertEven("Hue slider to quick picks", quick.top - hue.bottom, gap, tolerance = 1.dp)
+        assertEven("Quick picks to colour code", hex.top - quick.bottom, gap, tolerance = 1.dp)
+        // The text field reserves a little room above it for its floating label.
+        assertEven("Colour code to previews", previews.top - hex.bottom, gap, tolerance = 1.dp)
+    }
 }

@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FilterList
@@ -36,6 +37,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -68,9 +72,23 @@ fun ThemesScreen(nav: NavController) {
     val choice = themeChoiceOf(settings)
     val dark = isDark(choice)
 
-    fun save(mode: ThemeMode = choice.mode, colours: ThemeColours = choice.colours, pureBlack: Boolean = choice.pureBlack) {
-        AppLog.i("Themes", "Theme: ${colours.label}, ${mode.label}${if (pureBlack) ", pure black" else ""}")
-        graph.settings.setTheme(mode.name, colours.name, pureBlack)
+    var picking by rememberSaveable { mutableStateOf(false) }
+
+    fun save(mode: ThemeMode = choice.mode, colours: ThemeColours = choice.colours, pureBlack: Boolean = choice.pureBlack, seed: Int = choice.seed) {
+        val yours = if (colours == ThemeColours.YOURS) " ${ThemeTones.toHex(seed)}" else ""
+        AppLog.i("Themes", "Theme: ${colours.label}$yours, ${mode.label}${if (pureBlack) ", pure black" else ""}")
+        graph.settings.setTheme(mode.name, colours.name, pureBlack, seed)
+    }
+
+    if (picking) {
+        YourColourSheet(
+            start = choice.seed,
+            onDismiss = { picking = false },
+            onUse = { seed ->
+                picking = false
+                save(colours = ThemeColours.YOURS, seed = seed)
+            },
+        )
     }
 
     Screen(title = "Themes", nav = nav) { padding ->
@@ -120,7 +138,8 @@ fun ThemesScreen(nav: NavController) {
                 ThemeColours.available,
                 selected = choice.colours,
                 dark = dark,
-                onPick = { save(colours = it) },
+                // "Your colour" opens the picker; the colour is used once it's confirmed there.
+                onPick = { if (it == ThemeColours.YOURS) picking = true else save(colours = it) },
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
             Text(
@@ -188,6 +207,7 @@ private fun Swatch(option: ThemeColours, selected: Boolean, dark: Boolean, modif
                 }
             }
             if (selected) Icon(Icons.Rounded.Check, null, Modifier.align(Alignment.Center), tint = Color.White)
+            else if (option == ThemeColours.YOURS) Icon(Icons.Rounded.Add, "Pick your colour", Modifier.align(Alignment.Center), tint = Color.White)
         }
         Text(
             option.label,
@@ -196,6 +216,9 @@ private fun Swatch(option: ThemeColours, selected: Boolean, dark: Boolean, modif
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 6.dp),
         )
+        if (option == ThemeColours.YOURS && selected) {
+            Text("Tap to change", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        }
         if (option == ThemeColours.WALLPAPER) {
             Text("From your wallpaper", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         }
