@@ -37,6 +37,9 @@ import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
+/** The quality songs stream at during the tour (see [AppTourTest.tourEveryPage]). */
+private const val TOUR_KBPS = 128
+
 /**
  * A walk through every page of the app on the emulator, against the real Navidrome test library:
  * each tab, the library's filters, sort and grid, album, artist, search, liked songs, your listening,
@@ -63,7 +66,15 @@ class AppTourTest {
 
     @Test
     fun tourEveryPage() {
-        graph.settings.save(graph.settings.current.copy(navidromeUrl = url, navidromeUser = "admin", navidromePassword = "admin"))
+        // Opus 128: the tour checks pages and that songs start, on a link shared with cover downloads and
+        // slowed to 4.3 Mbit/s. Since songs no longer switch to Opus on their own (#166), originals there
+        // often take over 15 s to start. Original playback is checked in RealServerTest.
+        graph.settings.save(
+            graph.settings.current.copy(
+                navidromeUrl = url, navidromeUser = "admin", navidromePassword = "admin",
+                transcodeWifiKbps = TOUR_KBPS, transcodeMobileKbps = TOUR_KBPS,
+            )
+        )
         graph.settings.setLogging(true)
         AppLog.init(app, true)
         // A synced library, as on the phone.
@@ -338,6 +349,8 @@ class AppTourTest {
         } finally {
             instrumentation.runOnMainSync { graph.player.stop() }
             scenario.close()
+            // Back to originals for the tests that run after this one.
+            graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = 0, transcodeMobileKbps = 0))
         }
         println("Tour: song starts: ${starts.joinToString(" | ")}")
         // The app's own log, saved next to the screenshots on the ci-screens branch (tour-log.txt).
