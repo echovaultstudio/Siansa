@@ -22,7 +22,10 @@ import androidx.test.rule.GrantPermissionRule
 import app.musix.covers.CoverStore
 import app.musix.data.Album
 import app.musix.data.Song
+import app.musix.data.ReplayGainMode
 import app.musix.log.AppLog
+import app.musix.playback.CrossfadeMode
+import app.musix.playback.LoudnessSource
 import app.musix.ui.AnimatedCover
 import app.musix.ui.AnimatedCovers
 import app.musix.ui.LocalGraph
@@ -47,6 +50,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
 import java.io.IOException
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.Socket
+import java.net.URLDecoder
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.math.pow
 
 /**
  * Runs against a real Navidrome (0.64.2, with ffmpeg) on the CI machine, reached through a proxy that
@@ -263,6 +272,132 @@ class RealServerTest {
         }
         println("Old setup (3 original covers downloading): $result")
         // For comparison only: timing on the emulator link varies too much to fail on.
+    }
+
+    /**
+     * Crossfade with measured loudness (issue #60), against a stand-in for the Lumae plugin on AudioMuse:
+     * every song measures −9 LUFS, gets going 1 s after it starts and is quiet for its last 3 s. Smart mode
+     * should then start the next song 4 s before the end of the current one, fade it in, and level both
+     * to −18 LUFS (a volume of 10^(−9/20) ≈ 0.355).
+     */
+    @Test
+    fun e_crossfadeBlendsSongsWithLumaeProfiles() {
+        val lumae = FakeLumae(lufs = -9.0, introChunks = 10, tailChunks = 30)
+        val before = graph.settings.current
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        try {
+            graph.settings.save(graph.settings.current.copy(audioMuseUrl = lumae.url, audioMuseToken = "test", replayGain = ReplayGainMode.TRACK))
+            graph.settings.setLoudness(LoudnessSource.LUMAE, -18)
+            graph.settings.setCrossfade(CrossfadeMode.SMART, 8)
+            val check = runBlocking { graph.profiles.check() }
+            assertTrue("Plugin check: ${check.message}", check.ok)
+
+            val a = albums()
+            val first = songOf(a.getValue("Small Animated"))
+            val second = songOf(a.getValue("WebP Animated"))
+            instrumentation.runOnMainSync { graph.player.play(listOf(first, second)) }
+            waitFor(30_000, "the first song to play") { graph.player.state.value.let { it.isPlaying && it.current?.id == first.id } }
+            // Let it load (about 5 MB over the slow link), then go to 12 s before its end.
+            SystemClock.sleep(12_000)
+            instrumentation.runOnMainSync { graph.player.seekTo(18_000) }
+            val levelled = 10.0.pow(-9 / 20.0).toFloat()
+            var lastFirst = 0L
+            var switchedAt = 0L
+            val volumes = ArrayList<Pair<Long, Float>>() // ms after the switch, volume
+            val end = SystemClock.elapsedRealtime() + 25_000
+            while (SystemClock.elapsedRealtime() < end) {
+                var id: String? = null
+                var position = 0L
+                var volume = 1f
+                instrumentation.runOnMainSync {
+                    val p = graph.player.progress()
+                    id = p.mediaId
+                    position = p.positionMs
+                    volume = graph.player.volumeForTest()
+                }
+                val now = SystemClock.elapsedRealtime()
+                if (id == first.id) lastFirst = position
+                if (id == second.id) {
+                    if (switchedAt == 0L) switchedAt = now
+                    volumes += (now - switchedAt) to volume
+                    if (now - switchedAt > 4_000) break
+                }
+                SystemClock.sleep(50)
+            }
+            println("Crossfade: first song left at ${lastFirst} ms; volumes after the switch: " + volumes.filterIndexed { i, _ -> i % 4 == 0 }.joinToString { "${it.first}ms=${"%.2f".format(it.second)}" })
+            val log = AppLog.tail(400)
+            assertTrue("The second song never started", switchedAt > 0)
+            assertTrue("Profiles weren't asked for", lumae.asked.any { it.contains("/api/profiles") && it.contains(first.id) })
+            assertTrue("No fade was logged:\n" + log.takeLast(30).joinToString("\n"), log.any { "Fading ${first.id} into ${second.id}" in it })
+            assertTrue("The fade wasn't ready in time", log.none { "wasn't ready to fade" in it })
+            // The next song starts about 4 s before the end (30 s song, so near 26 s), not at the end.
+            assertTrue("Next song started with the first at ${lastFirst} ms, expected about 26 s", lastFirst in 23_000..28_500)
+            // It fades in: quieter than its level at first, at its level after.
+            assertTrue("No fade-in: ${volumes.take(6)}", volumes.take(10).any { it.second < levelled * 0.8f })
+            assertEquals("Levelled volume after the fade", levelled, volumes.last().second, 0.03f)
+        } finally {
+            instrumentation.runOnMainSync { graph.player.stop() }
+            graph.settings.setCrossfade(before.crossfade, before.crossfadeSeconds)
+            graph.settings.setLoudness(before.loudnessSource, before.loudnessTarget)
+            graph.settings.save(graph.settings.current.copy(audioMuseUrl = before.audioMuseUrl, audioMuseToken = before.audioMuseToken))
+            scenario.close()
+            lumae.close()
+        }
+    }
+
+    private fun waitFor(ms: Long, what: String, condition: () -> Boolean) {
+        val end = SystemClock.elapsedRealtime() + ms
+        while (SystemClock.elapsedRealtime() < end) {
+            if (condition()) return
+            SystemClock.sleep(100)
+        }
+        throw AssertionError("Waited ${ms / 1000} s for $what")
+    }
+
+    /** A stand-in for the Lumae plugin's health and profiles endpoints, on the phone itself. */
+    private class FakeLumae(private val lufs: Double, private val introChunks: Int, private val tailChunks: Int) : AutoCloseable {
+        private val server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
+        val url = "http://127.0.0.1:${server.localPort}"
+        val asked = CopyOnWriteArrayList<String>()
+
+        init {
+            Thread {
+                while (!server.isClosed) {
+                    val client = runCatching { server.accept() }.getOrNull() ?: break
+                    runCatching { answer(client) }
+                }
+            }.apply { isDaemon = true }.start()
+        }
+
+        private fun ramp(db: Int, chunk: Int): String =
+            android.util.Base64.encodeToString(byteArrayOf(db.toByte(), (chunk and 0xFF).toByte(), (chunk shr 8).toByte()), android.util.Base64.NO_WRAP)
+
+        private fun answer(client: Socket): Unit = client.use {
+            val reader = client.getInputStream().bufferedReader()
+            val path = reader.readLine()?.split(" ")?.getOrNull(1) ?: return
+            while (reader.readLine()?.isNotEmpty() == true) Unit
+            asked += path
+            val body = when {
+                path.startsWith("/plugins/lumae_analysis/api/health") -> """{"plugin":"lumae_analysis","plugin_version":"test","status":"ok"}"""
+                path.startsWith("/plugins/lumae_analysis/api/profiles") -> {
+                    val ids = URLDecoder.decode(path.substringAfter("ids="), "UTF-8").split(",")
+                    val profiles = ids.joinToString(",") { id ->
+                        """{"track_id":"$id","source":"waveform","ref_lufs":$lufs,"start_ramp":"${ramp(-18, introChunks)}","end_ramp":"${ramp(-18, tailChunks)}"}"""
+                    }
+                    """{"schema_version":1,"analyzer_version":1,"profiles":[$profiles],"missing":[],"failed":[]}"""
+                }
+                else -> null
+            }
+            val bytes = (body ?: "not found").toByteArray()
+            val status = if (body != null) "200 OK" else "404 Not Found"
+            client.getOutputStream().apply {
+                write("HTTP/1.1 $status\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())
+                write(bytes)
+                flush()
+            }
+        }
+
+        override fun close() = server.close()
     }
 
     data class Watch(val startMs: Long, val stalls: Int, val positionMs: Long)

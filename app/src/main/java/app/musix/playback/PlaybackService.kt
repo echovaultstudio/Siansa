@@ -57,6 +57,9 @@ import java.util.Collections
 
 private const val FALLBACK_KBPS = 320
 
+/** How many songs ahead to fetch loudness and fade shapes for. */
+private const val PROFILES_AHEAD = 5
+
 /**
  * Background playback with a media notification, lock-screen controls, ReplayGain, transcoding and scrobbling.
  * While casting, the media session drives a [RemoteCastPlayer] instead of the phone's own player.
@@ -74,6 +77,7 @@ class PlaybackService : MediaSessionService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var graph: AppGraph
     private var events: Events? = null
+    private var crossfader: Crossfader? = null
     private var cacheFactory: CacheDataSource.Factory? = null
     private var precacheJob: Job? = null
     private var precacheWriter: CacheWriter? = null
@@ -98,6 +102,18 @@ class PlaybackService : MediaSessionService() {
         phone = player
         cacheFactory = built.cacheFactory
         events = Events(player).also { player.addListener(it) }
+        // Crossfades work on the ExoPlayer itself: only songs it can jump in (originals, downloads, the cache) fade.
+        crossfader = Crossfader(
+            main = exo,
+            handler = handler,
+            newTail = { PlayerFactory.build(this, graph, ::kbpsFor, handleAudioFocus = false).player },
+            settings = { graph.settings.current },
+            profiles = graph.profiles,
+            levelOf = { song -> Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id)) },
+            sleepLevel = { sleepLevel },
+            allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true },
+            onLevel = { if (session?.player === phone) applyVolume(phone) },
+        ).also { it.start() }
         exo.addAnalyticsListener(PlaybackDiagnostics(exo, this))
         exo.addAnalyticsListener(object : AnalyticsListener {
             override fun onAudioDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
@@ -181,6 +197,15 @@ class PlaybackService : MediaSessionService() {
                 .distinctUntilChanged()
                 .drop(1)
                 .collect { withContext(Dispatchers.Main) { onQualitySettingsChanged() } }
+        }
+
+        // Levelling changed in Settings (ReplayGain, or where loudness comes from): applies to this song too.
+        scope.launch {
+            graph.settings.state
+                .map { Triple(it.replayGain, it.loudnessSource, it.loudnessTarget) }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { withContext(Dispatchers.Main) { events?.relevel() } }
         }
 
         // Send any listens that were waiting from an earlier session.
@@ -298,7 +323,8 @@ class PlaybackService : MediaSessionService() {
     private var sleepLevel = 1f
 
     private fun applyVolume(player: Player) {
-        player.volume = baseVolume * sleepLevel
+        val fade = if (player === phone || player === exo) crossfader?.level ?: 1f else 1f
+        player.volume = baseVolume * sleepLevel * fade
     }
 
     /** Time left in the current song, or -1 when its length isn't known yet. */
@@ -394,6 +420,7 @@ class PlaybackService : MediaSessionService() {
         )
         precacheWriter?.cancel()
         precacheJob?.cancel()
+        crossfader?.cancel("the music moved to another device")
         events?.let { from.removeListener(it) }
         from.stop()
         if (from === phone) exo.clearMediaItems()
@@ -456,6 +483,21 @@ class PlaybackService : MediaSessionService() {
         return order.map { player.getMediaItemAt(it) } to order.indexOf(current).coerceAtLeast(0)
     }
 
+    /** The current song and the next [ahead] in the order they will play. */
+    private fun upcomingIds(player: Player, ahead: Int): List<String> {
+        val count = player.mediaItemCount
+        if (count == 0) return emptyList()
+        val timeline = player.currentTimeline
+        var index = player.currentMediaItemIndex.coerceIn(0, count - 1)
+        if (timeline.isEmpty) return listOf(player.getMediaItemAt(index).mediaId)
+        val ids = ArrayList<String>(ahead + 1)
+        while (index != C.INDEX_UNSET && index < count && ids.size <= ahead) {
+            ids += player.getMediaItemAt(index).mediaId
+            index = timeline.getNextWindowIndex(index, Player.REPEAT_MODE_OFF, player.shuffleModeEnabled)
+        }
+        return ids
+    }
+
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -474,6 +516,8 @@ class PlaybackService : MediaSessionService() {
         castPlayer?.release()
         dlnaPlayer?.release()
         dlnaPlayer = null
+        crossfader?.release()
+        crossfader = null
         exo.release()
         session?.release()
         session = null
@@ -535,11 +579,36 @@ class PlaybackService : MediaSessionService() {
             restarted = false
             resetProgressWatch()
             if (player.playWhenReady) armStartWatch()
-            baseVolume = replayGainVolume(song, graph.settings.current)
+            baseVolume = Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id))
             if (onPhone) applyVolume(player)
+            fetchProfiles(song)
             graph.scrobbler.nowPlaying(song)
             scope.launch {
                 runCatching { graph.history.add(PlayEvent(song.id, song.title, song.artist, song.genre, System.currentTimeMillis())) }
+            }
+        }
+
+        /** Levels the current song again, after a setting changed or its measured loudness arrived. */
+        fun relevel(profile: TrackProfile? = null) {
+            val song = current ?: return
+            val volume = Levelling.songVolume(song, graph.settings.current, profile ?: graph.profiles.cached(song.id))
+            if (volume == baseVolume) return
+            AppLog.d("Loudness", "Song ${song.id} levelled to ${"%.2f".format(volume)} (was ${"%.2f".format(baseVolume)})")
+            baseVolume = volume
+            if (onPhone) applyVolume(player)
+        }
+
+        /**
+         * Fetches the measured loudness and fade shapes of this song and the next few, so they're here before
+         * each song starts. The first song of a session may get its measurement a moment after it starts.
+         */
+        private fun fetchProfiles(song: Song) {
+            if (!graph.profiles.active) return
+            val ids = upcomingIds(player, PROFILES_AHEAD)
+            scope.launch {
+                val found = graph.profiles.fetch(ids)
+                val profile = found[song.id] ?: return@launch
+                withContext(Dispatchers.Main) { if (current?.id == song.id) relevel(profile) }
             }
         }
 

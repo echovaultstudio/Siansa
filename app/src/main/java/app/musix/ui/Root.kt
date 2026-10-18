@@ -243,6 +243,7 @@ fun MusixRoot() {
                 composable("settings/playback") { PlaybackSettingsScreen(nav) }
                 composable("settings/themes") { ThemesScreen(nav) }
                 composable("settings/equaliser") { EqualiserScreen(nav) }
+                composable("settings/crossfade") { CrossfadeScreen(nav) }
                 composable("settings/storage") { StorageScreen(nav) }
                 composable("downloads") { DownloadsScreen(nav) }
                 composable("downloads/add") { DownloadPickerScreen(nav) }

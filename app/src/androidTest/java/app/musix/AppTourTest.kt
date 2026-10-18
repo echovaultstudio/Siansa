@@ -324,6 +324,24 @@ class AppTourTest {
                 back()
                 back()
             }
+            step("crossfade and loudness") {
+                try {
+                    tab("Settings")
+                    click("Playback")
+                    click("Crossfade and loudness")
+                    idle(1000)
+                    shot("19j-crossfade")
+                    graph.settings.setLoudness(app.musix.playback.LoudnessSource.LUMAE)
+                    graph.settings.setCrossfade(app.musix.playback.CrossfadeMode.SMART, 8)
+                    idle(800)
+                    shot("19k-crossfade-smart-lumae")
+                    back()
+                    back()
+                } finally {
+                    graph.settings.setCrossfade(app.musix.playback.CrossfadeMode.OFF, 6)
+                    graph.settings.setLoudness(app.musix.playback.LoudnessSource.TAGS)
+                }
+            }
             step("sound search") {
                 tab("Search")
                 click("Sound")

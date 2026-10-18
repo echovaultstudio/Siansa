@@ -147,4 +147,26 @@ class SpacingTest {
         // The text field reserves a little room above it for its floating label.
         assertEven("Colour code to previews", previews.top - hex.bottom, gap, tolerance = 1.dp)
     }
+
+    /** Crossfade and loudness: the source and crossfade chips sit evenly between their heading and the hint below (issue #60). */
+    @Test fun crossfadeChipsAreEvenlySpaced() {
+        compose.setContent {
+            MusixTheme {
+                Column(verticalArrangement = Arrangement.spacedBy(app.musix.ui.CROSSFADE_GAP)) {
+                    Box(Modifier.fillMaxWidth().height(24.dp).testTag("heading"))
+                    app.musix.ui.LoudnessSourceRow(app.musix.playback.LoudnessSource.TAGS) { }
+                    Box(Modifier.fillMaxWidth().height(16.dp).testTag("hint"))
+                    app.musix.ui.CrossfadeModeRow(app.musix.playback.CrossfadeMode.OFF) { }
+                    Box(Modifier.fillMaxWidth().height(16.dp).testTag("hint2"))
+                }
+            }
+        }
+        val heading = compose.onNodeWithTag("heading").getBoundsInRoot()
+        val source = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Song tags")), useUnmergedTree = true).getBoundsInRoot()
+        val hint = compose.onNodeWithTag("hint").getBoundsInRoot()
+        assertEven("Loudness source chips", source.top - heading.bottom, hint.top - source.bottom)
+        val mode = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Smart")), useUnmergedTree = true).getBoundsInRoot()
+        val hint2 = compose.onNodeWithTag("hint2").getBoundsInRoot()
+        assertEven("Crossfade chips", mode.top - hint.bottom, hint2.top - mode.bottom)
+    }
 }
