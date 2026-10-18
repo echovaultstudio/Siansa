@@ -45,8 +45,10 @@ class ServerSeekPlayer(
 
     override fun getDuration(): Long {
         val offset = offset()
-        if (offset == 0L) return exo.duration
         val id = exo.currentMediaItem?.mediaId
+        // A converted stream has no length the player can see: the song's own length, from the library.
+        val converted = id != null && converted(id)
+        if (offset == 0L && !converted) return exo.duration
         return id?.let(durationMsOf) ?: exo.duration.let { if (it == C.TIME_UNSET) it else it + offset }
     }
 

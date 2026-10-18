@@ -198,6 +198,9 @@ class AppTourTest {
                 idle(600)
             }
             step("artist page and playing from it") {
+                // From Your Library's artists: every step starts with nothing open (issue #162).
+                libraryAll()
+                click("Artists")
                 click("Test Artist")
                 waitText("Popular")
                 idle(1000)
@@ -344,7 +347,8 @@ class AppTourTest {
             println("Tour: FAILED $name: $e$at")
             println("Tour: stack " + e.stackTrace.take(25).joinToString(" <- ") { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" })
             runCatching { shot("FAIL-" + name.replace(' ', '-')) }
-            runCatching { back() }
+            // Not "back": on Home it would close the app and every later step would fail with it.
+            runCatching { settle() }
         }
     }
 
