@@ -14,16 +14,27 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 OUT = "RELEASES.md"
 
 
+def gh(path, run=subprocess.run, wait=time.sleep, tries=4):
+    """`gh api` output for a listing. gh now and then fails one call of the hundreds made here
+    ("unexpected end of JSON input"), which failed the release job after 0.9.0beta, so it's tried again."""
+    for attempt in range(1, tries + 1):
+        result = run(["gh", "api", "--paginate", "--slurp", path], capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout
+        print(f"gh api {path} failed (try {attempt} of {tries}): {result.stderr.strip()}", file=sys.stderr)
+        if attempt < tries:
+            wait(2 * attempt)
+    raise subprocess.CalledProcessError(result.returncode, result.args, result.stdout, result.stderr)
+
+
 def api(path):
     """Every item of a GitHub REST listing, following its pages."""
-    out = subprocess.run(
-        ["gh", "api", "--paginate", "--slurp", path], check=True, capture_output=True, text=True
-    ).stdout
-    pages = json.loads(out)
+    pages = json.loads(gh(path))
     items = []
     for page in pages:
         items += page["commits"] if isinstance(page, dict) and "commits" in page else page
