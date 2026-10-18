@@ -180,6 +180,7 @@ class AppGraph(val app: Application) {
     val deezer = DeezerApi(http)
 
     val selectors = SelectorStore(app)
+    val searchHistory = app.musix.data.SearchHistory(app)
     /** Other users' music shown alongside the user in use's (issue #141). */
     val guests: Guests by lazy { Guests(app, http, library, scope) }
     val mixes = MixStore(app)

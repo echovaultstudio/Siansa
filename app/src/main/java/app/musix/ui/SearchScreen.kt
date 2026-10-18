@@ -35,7 +35,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
+import app.musix.data.RecentSearch
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -73,6 +82,19 @@ fun SearchScreen(nav: NavController) {
     var soundSongs by remember { mutableStateOf<List<Song>?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // Recent searches show under the box while you're typing into it, before there's anything to search.
+    var focused by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val history by graph.searchHistory.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { graph.searchHistory.all() }
+    val recent = history.orEmpty().filter { it.sound == soundMode }
+
+    /** Keeps what's in the box as a recent search (on the search key, or when a result is opened). */
+    fun keepSearch() {
+        val q = query
+        val sound = soundMode
+        scope.launch { graph.searchHistory.add(q, sound) }
+    }
 
     // Name search runs as you type; sound search waits for the search key, since it takes longer.
     LaunchedEffect(query, soundMode) {
@@ -101,6 +123,7 @@ fun SearchScreen(nav: NavController) {
     fun runSound() {
         val q = query.trim()
         if (q.length < 3 || aiProblem != null) return
+        keepSearch()
         scope.launch {
             busy = true
             error = null
@@ -121,14 +144,17 @@ fun SearchScreen(nav: NavController) {
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).onFocusChanged { focused = it.isFocused }.testTag("searchField"),
                 placeholder = {
                     Text(if (soundMode) "Describe a sound, e.g. rainy jazz piano" else "Artists, albums, songs")
                 },
                 leadingIcon = { Icon(Icons.Rounded.Search, null) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { if (soundMode) runSound() }),
+                keyboardActions = KeyboardActions(onSearch = {
+                    if (soundMode) runSound() else keepSearch()
+                    focusManager.clearFocus()
+                }),
             )
             Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = !soundMode, onClick = { soundMode = false }, label = { Text("Library") })
@@ -140,16 +166,26 @@ fun SearchScreen(nav: NavController) {
             error?.let { ErrorText(it) }
             when {
                 soundMode && aiProblem != null -> AiUnavailable(aiProblem, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-                soundMode -> SoundResults(soundSongs)
+                focused && query.trim().length < 2 && recent.isNotEmpty() -> RecentSearchList(
+                    recent,
+                    onPick = { picked ->
+                        query = picked.query
+                        focusManager.clearFocus()
+                        if (soundMode) runSound() else keepSearch()
+                    },
+                    onRemove = { scope.launch { graph.searchHistory.remove(it) } },
+                    onClear = { scope.launch { graph.searchHistory.clear() } },
+                )
+                soundMode -> SoundResults(soundSongs, onPlay = ::keepSearch)
                 query.trim().length < 2 -> BrowseGrid(nav)
-                else -> LibraryResults(results, nav)
+                else -> LibraryResults(results, nav, onOpen = ::keepSearch)
             }
         }
     }
 }
 
 @Composable
-private fun SoundResults(songs: List<Song>?) {
+private fun SoundResults(songs: List<Song>?, onPlay: () -> Unit) {
     val graph = LocalGraph.current
     if (songs == null) {
         Text(
@@ -165,13 +201,13 @@ private fun SoundResults(songs: List<Song>?) {
             Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { PlayButtons(songs) }
         }
         itemsIndexed(songs, key = { i, s -> "$i-${s.id}" }) { index, song ->
-            SongRow(song = song, onClick = { graph.player.play(songs, index) })
+            SongRow(song = song, onClick = { onPlay(); graph.player.play(songs, index) })
         }
     }
 }
 
 @Composable
-private fun LibraryResults(results: SearchResults?, nav: NavController) {
+private fun LibraryResults(results: SearchResults?, nav: NavController, onOpen: () -> Unit) {
     val graph = LocalGraph.current
     if (results == null) return
     if (results.artists.isEmpty() && results.albums.isEmpty() && results.songs.isEmpty()) {
@@ -185,7 +221,7 @@ private fun LibraryResults(results: SearchResults?, nav: NavController) {
                 LazyRow(contentPadding = PaddingValues(horizontal = 12.dp)) {
                     items(results.artists, key = { it.id }) { artist ->
                         Column(
-                            Modifier.width(96.dp).clickable { nav.navigate("artist/${artist.id}") }.padding(4.dp),
+                            Modifier.width(96.dp).clickable { onOpen(); nav.navigate("artist/${artist.id}") }.padding(4.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Cover(artist.coverArt, 150, Modifier.size(80.dp), CircleShape)
@@ -206,7 +242,7 @@ private fun LibraryResults(results: SearchResults?, nav: NavController) {
                 LazyRow(contentPadding = PaddingValues(horizontal = 8.dp)) {
                     items(results.albums, key = { it.id }) { album ->
                         Box(Modifier.width(150.dp)) {
-                            AlbumTile(album.name, album.artist, album.coverArt, onClick = { nav.navigate("album/${album.id}") })
+                            AlbumTile(album.name, album.artist, album.coverArt, onClick = { onOpen(); nav.navigate("album/${album.id}") })
                         }
                     }
                 }
@@ -215,7 +251,7 @@ private fun LibraryResults(results: SearchResults?, nav: NavController) {
         if (results.songs.isNotEmpty()) {
             item { SectionTitle("Songs") }
             itemsIndexed(results.songs, key = { i, s -> "$i-${s.id}" }) { index, song ->
-                SongRow(song = song, onClick = { graph.player.play(results.songs, index) })
+                SongRow(song = song, onClick = { onOpen(); graph.player.play(results.songs, index) })
             }
         }
         item { Spacer(Modifier.size(8.dp)) }
@@ -266,5 +302,49 @@ private fun BrowseTile(title: String, colors: Pair<Color, Color>, onClick: () ->
             .padding(12.dp),
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 2)
+    }
+}
+
+/** The gap between the heading of recent searches and its first row, and between rows (the rows' own padding). */
+internal val RECENT_ROW_PAD: Dp = 10.dp
+
+/**
+ * Recent searches (issue #177), newest first: tap one to search it again, × to forget it, or clear them all.
+ * Shown under the search box once you tap into it, before you've typed anything.
+ */
+@Composable
+internal fun RecentSearchList(
+    searches: List<RecentSearch>,
+    onPick: (RecentSearch) -> Unit,
+    onRemove: (RecentSearch) -> Unit,
+    onClear: () -> Unit,
+) {
+    LazyColumn(Modifier.fillMaxSize().testTag("recentSearches"), contentPadding = PaddingValues(bottom = bottomBarPadding(24.dp))) {
+        item {
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Recent searches", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f).testTag("recentTitle"))
+                TextButton(onClick = onClear) { Text("Clear all") }
+            }
+        }
+        items(searches, key = { (if (it.sound) "s:" else "l:") + it.query }) { search ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onPick(search) }
+                    .padding(start = 16.dp, end = 4.dp)
+                    .testTag("recent"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Rounded.History, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    search.query,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(horizontal = 16.dp, vertical = RECENT_ROW_PAD),
+                )
+                IconButton(onClick = { onRemove(search) }) { Icon(Icons.Rounded.Close, "Remove ${search.query}") }
+            }
+        }
     }
 }
