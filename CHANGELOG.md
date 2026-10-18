@@ -3,6 +3,11 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.10.2beta — 2026-10-18
+
+### Fixed
+- **Time machine loads much faster.** Finding which of a month's songs are in your library used to take up to 12 seconds on a big library; it's now near instant. Going back to a month you've just looked at shows it straight away.
+
 ## 0.10.1beta — 2026-10-18
 
 ### Fixed
