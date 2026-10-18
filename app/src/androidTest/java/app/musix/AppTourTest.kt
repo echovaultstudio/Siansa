@@ -29,6 +29,8 @@ import app.musix.data.SyncPhase
 import app.musix.data.Users
 import app.musix.log.AppLog
 import org.junit.Assert.fail
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.performSemanticsAction
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,9 +38,6 @@ import java.io.ByteArrayOutputStream
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
-
-/** The quality songs stream at during the tour (see [AppTourTest.tourEveryPage]). */
-private const val TOUR_KBPS = 128
 
 /**
  * A walk through every page of the app on the emulator, against the real Navidrome test library:
@@ -66,15 +65,7 @@ class AppTourTest {
 
     @Test
     fun tourEveryPage() {
-        // Opus 128: the tour checks pages and that songs start, on a link shared with cover downloads and
-        // slowed to 4.3 Mbit/s. Since songs no longer switch to Opus on their own (#166), originals there
-        // often take over 15 s to start. Original playback is checked in RealServerTest.
-        graph.settings.save(
-            graph.settings.current.copy(
-                navidromeUrl = url, navidromeUser = "admin", navidromePassword = "admin",
-                transcodeWifiKbps = TOUR_KBPS, transcodeMobileKbps = TOUR_KBPS,
-            )
-        )
+        graph.settings.save(graph.settings.current.copy(navidromeUrl = url, navidromeUser = "admin", navidromePassword = "admin"))
         graph.settings.setLogging(true)
         AppLog.init(app, true)
         // A synced library, as on the phone.
@@ -178,7 +169,7 @@ class AppTourTest {
                 waitText("WebP Song")
                 idle(1500)
                 shot("08-album-webp")
-                timedStart("album page", "WebP Song") { click("WebP Song") }
+                timedStart("album page", "WebP Song") { tapRow("WebP Song") }
                 shot("09-album-playing")
             }
             step("now playing") {
@@ -218,7 +209,7 @@ class AppTourTest {
                 idle(1000)
                 shot("11-artist")
                 val title = listOf("Long Song A", "Long Song B", "Short Song", "WebP Song").first { exists(it) }
-                timedStart("artist page", title) { click(title) }
+                timedStart("artist page", title) { tapRow(title) }
                 back()
             }
             step("album with a big animated GIF") {
@@ -228,7 +219,7 @@ class AppTourTest {
                 waitText("Long Song A")
                 idle(2000)
                 shot("12-album-gif")
-                timedStart("album page (GIF cover)", "Long Song A") { click("Long Song A") }
+                timedStart("album page (GIF cover)", "Long Song A") { tapRow("Long Song A") }
                 back()
             }
             step("liked songs") {
@@ -264,7 +255,7 @@ class AppTourTest {
                 waitText("Long Song B")
                 idle(800)
                 shot("16-search-results")
-                timedStart("search", "Long Song B") { click("Long Song B") }
+                timedStart("search", "Long Song B") { tapRow("Long Song B") }
             }
             step("vibes") {
                 tab("Settings")
@@ -349,8 +340,6 @@ class AppTourTest {
         } finally {
             instrumentation.runOnMainSync { graph.player.stop() }
             scenario.close()
-            // Back to originals for the tests that run after this one.
-            graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = 0, transcodeMobileKbps = 0))
         }
         println("Tour: song starts: ${starts.joinToString(" | ")}")
         // The app's own log, saved next to the screenshots on the ci-screens branch (tour-log.txt).
@@ -445,6 +434,16 @@ class AppTourTest {
 
     private fun click(text: String) {
         node(text).performClick()
+        idle()
+    }
+
+    /**
+     * Taps a song row through its click action rather than a touch at its centre: a row low on the page sits
+     * under the mini player once something is playing, and a touch there opens now playing instead of
+     * starting the song (which is what failed the artist page start after the album page had played).
+     */
+    private fun tapRow(text: String) {
+        node(text).performSemanticsAction(SemanticsActions.OnClick)
         idle()
     }
 
