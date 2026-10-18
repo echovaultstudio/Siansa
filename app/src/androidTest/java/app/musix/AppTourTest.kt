@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.SemanticsMatcher
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -248,17 +249,23 @@ class AppTourTest {
                 libraryAll()
                 click("Your listening")
                 idle(800)
-                // Below the other Your listening entries, so possibly not on screen yet.
-                compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Time machine"))
+                // What the Your listening list shows (the step couldn't open Time machine on CI; see the PR).
+                shot("14b-your-listening-list")
+                println("Tour: listening list: " + onScreenTexts())
+                runCatching {
+                    compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Time machine"))
+                }.onFailure { println("Tour: scroll to Time machine failed: $it") }
                 idle(400)
-                // Scrolled into view at the bottom edge, under the mini player: a touch there opens now playing.
+                println("Tour: after scrolling: " + onScreenTexts())
                 tapRow("Time machine")
+                idle(1500)
+                shot("14c-after-tapping-time-machine")
                 waitText("Whole year")
                 idle(2500)
-                shot("14b-time-machine")
+                shot("14d-time-machine")
                 click("Whole year")
                 idle(2500)
-                shot("14c-time-machine-year")
+                shot("14e-time-machine-year")
                 back()
             }
             step("other artists you might like") {
@@ -470,6 +477,10 @@ class AppTourTest {
     private fun onPage(text: String) = hasText(text) and !hasTestTag("miniPlayer") and !hasAnyAncestor(hasTestTag("miniPlayer"))
 
     private fun exists(text: String) = compose.onAllNodes(onPage(text)).fetchSemanticsNodes().isNotEmpty()
+
+    /** Every text on screen, for working out why a step couldn't find something. */
+    private fun onScreenTexts(): String = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text))
+        .fetchSemanticsNodes().joinToString(" | ") { it.config[SemanticsProperties.Text].joinToString(" / ") }
 
     private fun waitText(text: String, timeoutMs: Long = 20_000) {
         compose.waitUntil(timeoutMs) { exists(text) }
