@@ -1,12 +1,15 @@
 name: CI
 
-# Every push and pull request must compile, pass Android Lint, the unit tests, the secret scan and the
-# emulator tests against a real Navidrome; a release is published from main only when all of those pass.
-# The emulator tests also run weekly, so they keep watching main on quiet weeks.
+# Every push and pull request must compile, pass Android Lint, the unit tests and the secret scan. The
+# emulator tests against a real Navidrome take ~20 minutes, so on a pull request they run only once it has
+# the "ready to merge" label (added just before merging); until then their check fails with a note saying
+# so. They also run on main, weekly and on demand, and a release is published only when all checks pass.
 on:
   push:
     branches: [main]
   pull_request:
+    # "labeled": adding "ready to merge" starts the emulator tests on the pull request.
+    types: [opened, synchronize, reopened, labeled]
   # Actions → CI → Run workflow: builds, checks and releases main on demand.
   workflow_dispatch:
   # Weekly (Mondays), so the emulator tests keep watching main even on quiet weeks.
@@ -168,11 +171,18 @@ jobs:
   device-tests:
     name: Emulator tests against Navidrome
     needs: checks
-    # On every pull request and push, weekly, and on demand. A required check: pull requests aren't merged and
-    # releases aren't published unless it passes.
+    # A required check: pull requests aren't merged and releases aren't published unless it passes. On a pull
+    # request it runs only with the "ready to merge" label. It isn't skipped without it but fails at once, since
+    # a skipped job would count as a passed required check.
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      - name: Wait for the "ready to merge" label
+        if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'ready to merge')
+        run: |
+          echo "::error::Emulator tests run on a pull request only once it has the \"ready to merge\" label. Add it just before merging."
+          exit 1
+
       # The emulator needs ~7.5 GB for its storage; the runner image leaves too little free.
       - name: Free disk space
         run: |
