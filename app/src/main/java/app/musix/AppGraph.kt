@@ -1,5 +1,6 @@
 package app.musix
 
+import app.musix.playback.ProfileStore
 import app.musix.covers.CoverStore
 import kotlinx.coroutines.runBlocking
 
@@ -174,7 +175,7 @@ class AppGraph(val app: Application) {
     val subsonic = SubsonicApi(http) { settings.current }.apply { loginFor = { id -> guests.loginFor(id) } }
     val audioMuse = AudioMuseApi(http) { settings.current }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
-    val profiles = app.musix.playback.ProfileStore({ audioMuse.plugin(it) }, { settings.current })
+    val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
     val openRouter = OpenRouterApi(http) { settings.current }
     val deezer = DeezerApi(http)
 
