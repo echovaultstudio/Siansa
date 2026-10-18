@@ -107,7 +107,8 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
                     AppLog.w("Image", "Couldn't show $what: ${e.javaClass.simpleName}: ${e.message}")
                     // A cover that can't be read may be an error message Navidrome sent once and the cache
                     // kept; forgetting it lets the next look fetch it again (issue #162).
-                    if (e is coil3.decode.DecodeException) {
+                    // Android's ImageDecoder.DecodeException (by name: the class only exists from Android 9).
+                    if (e.javaClass.simpleName == "DecodeException") {
                         request.diskCacheKey?.let { key -> runCatching { coil3.SingletonImageLoader.get(this@MusixApp).diskCache?.remove(key) } }
                     }
                 }
