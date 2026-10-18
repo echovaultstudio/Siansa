@@ -54,3 +54,24 @@ fun problemsForClipboard(entries: List<LogEntry>, header: String, maxChars: Int 
         (if (left > 0) " (oldest $left left out)" else "")
     return (listOf(title) + kept).joinToString("\n") + "\n"
 }
+
+/**
+ * The whole log as one text for the clipboard, oldest first, under [header] (e.g. the app version).
+ * Android's clipboard can't take a huge text (about 1 MB, and the log can be 30 MB with every request in it),
+ * so when it doesn't fit in [maxChars] the newest whole entries that do are kept and the top line says how
+ * many older ones were left out. Null when the log is empty.
+ */
+fun logForClipboard(entries: List<LogEntry>, header: String, maxChars: Int = 400_000): String? {
+    if (entries.isEmpty()) return null
+    val kept = ArrayDeque<String>()
+    var size = header.length + 60
+    for (e in entries.asReversed()) {
+        val text = e.lines.joinToString("\n")
+        if (kept.isNotEmpty() && size + text.length + 1 > maxChars) break
+        kept.addFirst(text)
+        size += text.length + 1
+    }
+    val left = entries.size - kept.size
+    val title = header + " · " + (if (left > 0) "newest ${kept.size} of ${entries.size} entries (Save logs has them all)" else "${entries.size} entries")
+    return (listOf(title) + kept).joinToString("\n") + "\n"
+}
