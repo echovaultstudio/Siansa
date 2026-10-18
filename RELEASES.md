@@ -3,6 +3,11 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.11.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.11.0beta) — 2026-10-18
+
+- [#195](https://github.com/Musix-Industreez/musix/pull/195) Logs: Copy whole log (@Th3K1ngP1n)
+- [#197](https://github.com/Musix-Industreez/musix/pull/197) Reports: show the loading circle when switching range (@Th3K1ngP1n)
+
 ## [0.10.2beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.10.2beta) — 2026-10-18
 
 - [#191](https://github.com/Musix-Industreez/musix/pull/191) Tour: fix the emulator test build after #190 (missing import) (@Th3K1ngP1n)
