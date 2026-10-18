@@ -11,6 +11,7 @@ import app.musix.net.HistoryApi
 import app.musix.net.Played
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -295,12 +296,40 @@ class Insights(private val graph: AppGraph) {
 
     // ---------------- Time machine (issue #186) ----------------
 
+    /** Every song by title, built once per library version ([SongIndex]). */
+    private var cachedIndex: Pair<Int, SongIndex>? = null
+    private val indexLock = kotlinx.coroutines.sync.Mutex()
+
+    private suspend fun songIndex(): SongIndex = indexLock.withLock {
+        val version = graph.library.version.value
+        cachedIndex?.takeIf { it.first == version }?.second ?: run {
+            val started = System.currentTimeMillis()
+            val index = SongIndex(graph.library.songTitles().map { SongIndex.Entry(it.id, it.title, it.artist) })
+            AppLog.d("TimeMachine", "Song index: ${index.size} songs in ${System.currentTimeMillis() - started}ms")
+            cachedIndex = version to index
+            index
+        }
+    }
+
+    /** Months already looked at, so going back to one is instant. Kept 15 minutes, and until the library changes. */
+    private val timeMachineCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, TimeMachine>>()
+
     /**
      * Your most played songs in [month] of [year] (or the whole year when [month] is null): from Koito and
      * Last.fm, whichever are set up (both: the higher count for each song), else Musix's own history. Only
      * songs in your library, up to [limit].
      */
-    suspend fun timeMachine(year: Int, month: Int?, limit: Int = 50): TimeMachine = coroutineScope {
+    suspend fun timeMachine(year: Int, month: Int?, limit: Int = 50): TimeMachine {
+        val key = "$year-${month ?: "all"}-$limit-${graph.library.version.value}"
+        timeMachineCache[key]?.takeIf { System.currentTimeMillis() - it.first < 15 * 60_000L }?.let { return it.second }
+        val result = lookUpTimeMachine(year, month, limit)
+        // Not kept when Koito or Last.fm couldn't be reached: the next look tries them again.
+        if (result.complete) timeMachineCache[key] = System.currentTimeMillis() to result
+        return result
+    }
+
+    private suspend fun lookUpTimeMachine(year: Int, month: Int?, limit: Int): TimeMachine = coroutineScope {
+        val started = System.currentTimeMillis()
         val s = graph.settings.current
         val window = timeWindow(year, month)
         val fromSec = window.from.atStartOfDay(zone).toEpochSecond()
@@ -324,9 +353,19 @@ class Insights(private val graph: AppGraph) {
         val used = listOfNotNull("Koito".takeIf { fromKoito != null }, "Last.fm".takeIf { fromLastFm != null })
         val result = if (used.isNotEmpty()) {
             val plays = mergePlays(fromKoito.orEmpty(), fromLastFm.orEmpty())
-            val tracks = keepInLibrary(plays, limit) { matchSong(it.artist, it.title.orEmpty()) }
-                .map { (p, song) -> RankedTrack(p.title.orEmpty(), p.artist, p.count, song) }
-            TimeMachine(window.label, tracks, "From ${used.joinToString(" and ")}, songs in your library only")
+            // All of them against one index of the library, then the matched songs in one read.
+            val index = songIndex()
+            val only = graph.library.onlyDownloaded()
+            val allowed = only?.shelf?.songs
+            val matched = keepInLibrary(plays, limit) { p ->
+                index.find(p.artist, p.title.orEmpty())?.takeIf { allowed == null || it in allowed }
+            }.distinctBy { it.second }
+            val songs = graph.library.songs(matched.map { it.second }).associateBy { it.id }
+            val tracks = matched.mapNotNull { (p, id) -> songs[id]?.let { RankedTrack(p.title.orEmpty(), p.artist, p.count, it) } }
+            TimeMachine(
+                window.label, tracks, "From ${used.joinToString(" and ")}, songs in your library only",
+                complete = (fromKoito != null || !koitoOn) && (fromLastFm != null || !lastFmOn),
+            )
         } else {
             val events = graph.history.all().filter { it.at / 1000 in fromSec until toSec && !it.skipped }
             val songs = graph.library.songs(events.map { it.id }.distinct()).associateBy { it.id }
@@ -334,9 +373,9 @@ class Insights(private val graph: AppGraph) {
                 .sortedByDescending { it.value.size }.take(limit)
                 .map { (id, list) -> RankedTrack(list.first().title, list.first().artist, list.size.toLong(), songs[id]) }
             val why = if (koitoOn || lastFmOn) "Koito and Last.fm couldn't be reached" else "Set up Koito or Last.fm under Scrobbling for your full history"
-            TimeMachine(window.label, tracks, "From Musix's own history. $why")
+            TimeMachine(window.label, tracks, "From Musix's own history. $why", complete = !(koitoOn || lastFmOn))
         }
-        AppLog.i("TimeMachine", "${window.label}: ${result.tracks.size} songs in the library · ${result.source}")
+        AppLog.i("TimeMachine", "${window.label}: ${result.tracks.size} songs in the library in ${System.currentTimeMillis() - started}ms · ${result.source}")
         result
     }
 
