@@ -167,6 +167,11 @@ fun PlaylistNameDialog(title: String, initial: String, confirm: String, onDismis
 fun NewPlaylistDialog(onDismiss: () -> Unit, onCreate: (name: String, onPhone: Boolean) -> Unit) =
     NameDialog("New playlist", "", "Create", askWhere = true, onDismiss = onDismiss, onConfirm = onCreate)
 
+/** "Create memory" (issue #186): the playlist's name, ready filled in, and where to keep it. */
+@Composable
+fun MemoryDialog(initial: String, onDismiss: () -> Unit, onCreate: (name: String, onPhone: Boolean) -> Unit) =
+    NameDialog("Create memory", initial, "Create", askWhere = true, onDismiss = onDismiss, onConfirm = onCreate)
+
 @Composable
 private fun NameDialog(
     title: String,

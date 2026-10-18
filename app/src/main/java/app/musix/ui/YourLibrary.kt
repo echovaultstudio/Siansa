@@ -699,6 +699,19 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
         )
     }
 
+    // The time machine (issue #186): your most played songs from any month or year.
+    entries += Entry(
+        key = "time-machine",
+        kind = Kind.LISTENING,
+        title = "Time machine",
+        subtitle = "Your listening · Any month or year",
+        route = "timemachine",
+        gradient = Color(0xFF2B6AA8) to Color(0xFFB86A00),
+        badge = "${now.year - 1}",
+        recentAt = System.currentTimeMillis() - 2,
+        tags = setOf("Time machine"),
+    )
+
     // Artists you don't have yet, like the ones you play most (made once a day), with why.
     entries += Entry(
         key = "discover-artists",

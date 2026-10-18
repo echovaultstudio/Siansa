@@ -271,6 +271,7 @@ fun MusixRoot() {
                 composable("sync") { SyncScreen(nav) }
                 composable("report/{range}") { ReportScreen(nav, it.arguments?.getString("range").orEmpty()) }
                 composable("discover/artists") { ArtistDiscoveryScreen(nav) }
+                composable("timemachine") { TimeMachineScreen(nav) }
                 composable("song/{id}/details") { SongDetailsScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }
