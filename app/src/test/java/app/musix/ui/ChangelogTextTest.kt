@@ -96,7 +96,7 @@ class ChangelogTextTest {
     }
 
     @Test fun releaseLinks() {
-        assertEquals("https://github.com/Th3K1ngP1n/musix/releases/tag/v0.0.29beta", releaseUrl("0.0.29beta"))
-        assertEquals("https://github.com/Th3K1ngP1n/musix/releases", releaseUrl(""))
+        assertEquals("https://github.com/Musix-Industreez/musix/releases/tag/v0.0.29beta", releaseUrl("0.0.29beta"))
+        assertEquals("https://github.com/Musix-Industreez/musix/releases", releaseUrl(""))
     }
 }
