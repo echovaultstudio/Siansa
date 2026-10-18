@@ -79,13 +79,13 @@ fun WhatsNewScreen(nav: NavController) {
     Screen(title = "What's new", nav = nav) { padding ->
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding() + 8.dp, bottom = 24.dp),
+            contentPadding = PaddingValues(top = padding.calculateTopPadding() + Space.Small, bottom = Space.Section),
         ) {
             item(key = "version") { VersionCard(version) { openRelease(releaseUrl(version)) } }
             val list = blocks
             when {
                 list == null -> item(key = "loading") {
-                    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxWidth().padding(Space.Large), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
                 }
@@ -94,7 +94,7 @@ fun WhatsNewScreen(nav: NavController) {
                         "The list of changes isn't available in this version.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(Space.Page),
                     )
                 }
                 else -> itemsIndexed(list) { _, block ->
@@ -109,10 +109,10 @@ fun WhatsNewScreen(nav: NavController) {
 private fun VersionCard(version: String, onOpen: () -> Unit) {
     Card(
         onClick = onOpen,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Small),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(Space.Page), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
                     "Musix ${version.ifEmpty { "?" }}",
@@ -137,9 +137,9 @@ private fun ChangelogItem(block: ChangelogBlock, current: String, onOpenVersion:
             Modifier
                 .fillMaxWidth()
                 .clickable { onOpenVersion(block.version) }
-                .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 4.dp),
+                .padding(start = Space.Page, end = Space.Page, top = Space.Section, bottom = Space.Tight),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Space.Small),
         ) {
             Text(block.version, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             if (block.version == current) {
@@ -149,7 +149,7 @@ private fun ChangelogItem(block: ChangelogBlock, current: String, onOpenVersion:
                     color = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier
                         .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50))
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                        .padding(horizontal = Space.Small, vertical = Space.Tight),
                 )
             }
             if (block.date.isNotEmpty()) {
@@ -161,23 +161,23 @@ private fun ChangelogItem(block: ChangelogBlock, current: String, onOpenVersion:
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+            modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Medium, bottom = Space.Tight),
         )
         is ChangelogBlock.Bullet -> Row(
-            Modifier.fillMaxWidth().padding(start = 16.dp + 18.dp * block.level, end = 16.dp, top = 3.dp, bottom = 3.dp),
+            Modifier.fillMaxWidth().padding(start = Space.Page + Space.Page * block.level, end = Space.Page, top = Space.Tight, bottom = Space.Tight),
         ) {
             Text(
                 if (block.level == 0) "•" else "◦",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(end = 8.dp),
+                modifier = Modifier.padding(end = Space.Small),
             )
             Text(styled(block.text), style = MaterialTheme.typography.bodyMedium)
         }
         is ChangelogBlock.Paragraph -> Text(
             styled(block.text),
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Tight),
         )
     }
 }

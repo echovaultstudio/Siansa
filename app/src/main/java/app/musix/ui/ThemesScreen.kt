@@ -57,7 +57,7 @@ import androidx.navigation.NavController
 import app.musix.log.AppLog
 
 /** The gap between the rows of colour swatches, and around them. */
-internal val SWATCH_GAP = 16.dp
+internal val SWATCH_GAP = Space.Page
 
 /**
  * Settings → Themes (issue #148): light, dark or following the phone; pure black; and where the colours
@@ -93,10 +93,10 @@ fun ThemesScreen(nav: NavController) {
 
     Screen(title = "Themes", nav = nav) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
-            ThemePreview(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            ThemePreview(Modifier.padding(horizontal = Space.Page, vertical = Space.Small))
 
             ThemeLabel("Light or dark")
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = Space.Page)) {
                 ThemeMode.entries.forEachIndexed { i, mode ->
                     SegmentedButton(
                         selected = choice.mode == mode,
@@ -109,15 +109,15 @@ fun ThemesScreen(nav: NavController) {
                 "Auto follows your phone, including its dark-mode schedule.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp),
+                modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Small),
             )
 
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp)
+                    .padding(top = Space.Small)
                     .toggleable(choice.pureBlack, role = Role.Switch) { save(pureBlack = it) }
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .padding(horizontal = Space.Page, vertical = Space.Medium)
                     .alpha(if (dark) 1f else 0.6f),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -129,7 +129,7 @@ fun ThemesScreen(nav: NavController) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Space.Medium))
                 Switch(checked = choice.pureBlack, onCheckedChange = null)
             }
 
@@ -140,13 +140,13 @@ fun ThemesScreen(nav: NavController) {
                 dark = dark,
                 // "Your colour" opens the picker; the colour is used once it's confirmed there.
                 onPick = { if (it == ThemeColours.YOURS) picking = true else save(colours = it) },
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier.padding(horizontal = Space.Page),
             )
             Text(
                 "Album, artist and now playing pages keep their colours from the cover.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = SWATCH_GAP, bottom = 24.dp),
+                modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = SWATCH_GAP, bottom = Space.Section),
             )
         }
     }
@@ -159,7 +159,7 @@ private fun ThemeLabel(text: String) {
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 10.dp),
+        modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Section, bottom = Space.Medium),
     )
 }
 
@@ -196,7 +196,7 @@ private fun Swatch(option: ThemeColours, selected: Boolean, dark: Boolean, modif
         Box(
             Modifier
                 .size(58.dp)
-                .then(if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, CircleShape).padding(5.dp) else Modifier)
+                .then(if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, CircleShape).padding(5.dp) else Modifier)  // spacing: exact (the ring around the chosen theme)
                 .clip(CircleShape),
         ) {
             Column(Modifier.fillMaxSize()) {
@@ -214,7 +214,7 @@ private fun Swatch(option: ThemeColours, selected: Boolean, dark: Boolean, modif
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 6.dp),
+            modifier = Modifier.padding(top = Space.Small),
         )
         if (option == ThemeColours.YOURS && selected) {
             Text("Tap to change", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
@@ -233,25 +233,25 @@ private fun ThemePreview(modifier: Modifier) {
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(20.dp)),
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Good evening", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 Icon(Icons.Rounded.FilterList, null, tint = Accent)
             }
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
                 Text("Only downloaded", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
+                    modifier = Modifier.padding(horizontal = Space.Medium, vertical = Space.Small))
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 PreviewTile("Liked songs", Modifier.weight(1f), Brush.linearGradient(BrandGradient), heart = true)
                 PreviewTile("Daily mix", Modifier.weight(1f), Brush.linearGradient(listOf(MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.secondary)))
             }
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest).padding(8.dp),
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest).padding(Space.Small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.size(38.dp).clip(RoundedCornerShape(6.dp)).background(Brush.linearGradient(listOf(Color(0xFF6B4FA8), Color(0xFF2B6AA8)))))
-                Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                Column(Modifier.weight(1f).padding(start = Space.Medium)) {
                     Text("Midnight City", style = MaterialTheme.typography.labelLarge)
                     Text("M83", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -272,7 +272,7 @@ private fun PreviewTile(name: String, modifier: Modifier, art: Brush, heart: Boo
         Box(Modifier.size(44.dp).background(art), contentAlignment = Alignment.Center) {
             if (heart) Icon(Icons.Rounded.Favorite, null, Modifier.size(18.dp), tint = Color.White)
         }
-        Text(name, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 8.dp))
+        Text(name, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = Space.Small))
     }
 }
 

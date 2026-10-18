@@ -123,8 +123,8 @@ fun ConnectionsScreen(nav: NavController) {
                 .fillMaxSize()
                 .aboveKeyboard()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(Space.Page),
+            verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             if (firstRun) {
                 Text(
@@ -234,7 +234,7 @@ private fun SecretField(label: String, value: String, onChange: (String) -> Unit
 
 @Composable
 private fun TestRow(result: String?, onTest: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
         OutlinedButton(onClick = onTest) { Text("Test") }
         if (result != null) {
             Text(

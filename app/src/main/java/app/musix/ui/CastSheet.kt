@@ -130,12 +130,12 @@ fun CastDeviceButton(tint: Color, modifier: Modifier = Modifier) {
         modifier
             .clip(RoundedCornerShape(20.dp))
             .clickable(onClickLabel = "Choose where to play") { open = true }
-            .padding(12.dp),
+            .padding(Space.Medium),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, if (label == null) "Play on a TV or speaker" else null, tint = color, modifier = Modifier.size(22.dp))
         if (label != null) {
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Space.Small))
             Text(
                 label,
                 style = MaterialTheme.typography.labelLarge,
@@ -199,12 +199,12 @@ private fun CastSheet(onDismiss: () -> Unit) {
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 16.dp)) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = Space.Page)) {
             Text(
                 "Play on",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = Space.Section, vertical = Space.Small),
             )
             val onPhone = status.device == null && !status.connecting && dlna == null
             TargetRow(Icons.Rounded.PhoneAndroid, "This phone", null, selected = onPhone) {
@@ -237,9 +237,9 @@ private fun CastSheet(onDismiss: () -> Unit) {
                 }
             }
             if (targets.isEmpty() && dlnaDevices.isEmpty()) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = Space.Section, vertical = Space.Page), verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(16.dp))
+                    Spacer(Modifier.width(Space.Page))
                     Text("Looking for TVs and speakers…", style = MaterialTheme.typography.bodyMedium)
                 }
             }
@@ -247,7 +247,7 @@ private fun CastSheet(onDismiss: () -> Unit) {
                 "TVs and speakers show up when they're on the same Wi-Fi as this phone: Chromecast and Google TV, and DLNA ones (most smart TVs, Sonos, AV receivers). They play straight from your Navidrome server, as MP3 320 kbit/s.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                modifier = Modifier.padding(horizontal = Space.Section, vertical = Space.Medium),
             )
         }
     }
@@ -256,9 +256,9 @@ private fun CastSheet(onDismiss: () -> Unit) {
 @Composable
 private fun TargetRow(icon: ImageVector, name: String, detail: String?, selected: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 24.dp, vertical = 14.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Space.Section, vertical = Space.Page),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(Space.Page),
     ) {
         Icon(icon, null, tint = if (selected) Accent else MaterialTheme.colorScheme.onSurface)
         Column(Modifier.weight(1f)) {

@@ -143,16 +143,16 @@ fun PlayerMenu(
 
     MusixDarkTheme {
         ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 8.dp)) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = Space.Small)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Tight), verticalAlignment = Alignment.CenterVertically) {
                     Cover(song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(4.dp))
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(Space.Medium))
                     Column(Modifier.weight(1f)) {
                         Text(song.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(song.artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                HorizontalDivider(Modifier.padding(top = 12.dp, bottom = 4.dp))
+                HorizontalDivider(Modifier.padding(top = Space.Medium, bottom = Space.Tight))
                 MenuRow(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (liked) "Remove from Liked songs" else "Add to Liked songs", tint = if (liked) Accent else null) {
                     graph.favorites.toggle(song)
                     onDismiss()
@@ -214,11 +214,11 @@ private fun MenuRow(icon: ImageVector, label: String, tint: Color? = null, enabl
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onClick)
             .height(MENU_ROW_HEIGHT)
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = Space.Page),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, tint = tint ?: color.copy(alpha = if (enabled) 0.85f else 0.45f), modifier = Modifier.size(24.dp))
-        Spacer(Modifier.width(18.dp))
+        Spacer(Modifier.width(Space.Page))
         Text(label, style = MaterialTheme.typography.bodyLarge, color = tint ?: color, modifier = Modifier.weight(1f))
         if (tag != null) {
             Text(
@@ -229,7 +229,7 @@ private fun MenuRow(icon: ImageVector, label: String, tint: Color? = null, enabl
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.16f))
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                    .padding(horizontal = Space.Small, vertical = Space.Tight),
             )
         }
     }
@@ -239,7 +239,7 @@ internal val MENU_ROW_HEIGHT = 48.dp
 
 @Composable
 private fun MenuDivider() {
-    HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+    HorizontalDivider(Modifier.padding(horizontal = Space.Page, vertical = Space.Tight), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
 }
 
 // ---- Cards under the player ----
@@ -258,12 +258,12 @@ fun LyricsPreviewCard(song: Song, tint: Color, onOpen: () -> Unit) {
     if (lines.isEmpty()) return
     Column(
         Modifier
-            .padding(horizontal = 12.dp)
+            .padding(horizontal = Space.Page)
             .fillMaxWidth()
             .clip(CardShape)
             .background(Brush.linearGradient(listOf(lerp(tint, Color.Black, 0.15f), lerp(tint, Color.Black, 0.45f))))
             .clickable(onClick = onOpen)
-            .padding(18.dp),
+            .padding(Space.Page),
     ) {
         CardTitle("Lyrics preview")
         lines.forEachIndexed { i, line ->
@@ -274,10 +274,10 @@ fun LyricsPreviewCard(song: Song, tint: Color, onOpen: () -> Unit) {
                 color = Color.White.copy(alpha = if (i == lines.lastIndex) 0.4f else 0.95f),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(bottom = 8.dp),
+                modifier = Modifier.padding(bottom = Space.Small),
             )
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(Space.Small))
         Pill("Show lyrics", filled = true, onClick = onOpen)
     }
 }
@@ -294,7 +294,7 @@ fun AboutArtistCard(song: Song, onOpenArtist: () -> Unit) {
     val artist = local.valueOrNull()
     val name = artist?.first?.name ?: song.artists.firstOrNull()?.name ?: song.artist
     val photo = info.valueOrNull()?.imageUrl ?: artist?.first?.imageUrl
-    Column(Modifier.padding(horizontal = 12.dp).fillMaxWidth().clip(CardShape).background(CardSurface).clickable(onClick = onOpenArtist)) {
+    Column(Modifier.padding(horizontal = Space.Page).fillMaxWidth().clip(CardShape).background(CardSurface).clickable(onClick = onOpenArtist)) {
         Box(Modifier.fillMaxWidth().height(170.dp)) {
             if (photo != null) {
                 AsyncImage(model = photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -306,16 +306,16 @@ fun AboutArtistCard(song: Song, onOpenArtist: () -> Unit) {
                     Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.55f), 0.45f to Color.Transparent, 1f to CardSurface),
                 ),
             )
-            CardTitle("About the artist", Modifier.padding(18.dp))
+            CardTitle("About the artist", Modifier.padding(Space.Page))
         }
-        Column(Modifier.padding(start = 18.dp, end = 18.dp, bottom = 18.dp)) {
+        Column(Modifier.padding(start = Space.Page, end = Space.Page, bottom = Space.Page)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Space.Medium))
                 Pill("Open artist", filled = false, onClick = onOpenArtist)
             }
             artist?.let { (_, albums, songs) -> artistLibraryLine(albums, songs) }?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.62f), modifier = Modifier.padding(top = 4.dp))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.62f), modifier = Modifier.padding(top = Space.Tight))
             }
             info.valueOrNull()?.biography?.let { bio ->
                 Text(
@@ -324,7 +324,7 @@ fun AboutArtistCard(song: Song, onOpenArtist: () -> Unit) {
                     color = Color.White.copy(alpha = 0.62f),
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 10.dp),
+                    modifier = Modifier.padding(top = Space.Medium),
                 )
             }
         }
@@ -344,10 +344,10 @@ fun AboutSongCard(song: Song, onOpenDetails: () -> Unit) {
         d.playCount?.let { "Plays" to "$it" },
     )
     if (cells.isEmpty()) return
-    Column(Modifier.padding(horizontal = 12.dp).fillMaxWidth().clip(CardShape).background(CardSurface).clickable(onClick = onOpenDetails).padding(18.dp)) {
+    Column(Modifier.padding(horizontal = Space.Page).fillMaxWidth().clip(CardShape).background(CardSurface).clickable(onClick = onOpenDetails).padding(Space.Page)) {
         CardTitle("About this song")
         cells.chunked(2).forEach { row ->
-            Row(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+            Row(Modifier.fillMaxWidth().padding(bottom = Space.Medium)) {
                 row.forEach { (label, value) ->
                     Column(Modifier.weight(1f)) {
                         Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.45f), letterSpacing = 0.4.sp)
@@ -362,7 +362,7 @@ fun AboutSongCard(song: Song, onOpenDetails: () -> Unit) {
 
 @Composable
 private fun CardTitle(text: String, modifier: Modifier = Modifier) {
-    Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White, modifier = modifier.padding(bottom = 12.dp))
+    Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White, modifier = modifier.padding(bottom = Space.Medium))
 }
 
 @Composable
@@ -377,7 +377,7 @@ private fun Pill(text: String, filled: Boolean, onClick: () -> Unit) {
             .clip(shape)
             .then(if (filled) Modifier.background(Color.White) else Modifier.border(1.dp, Color.White.copy(alpha = 0.5f), shape))
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = Space.Page, vertical = Space.Small),
     )
 }
 
@@ -385,7 +385,7 @@ private fun Pill(text: String, filled: Boolean, onClick: () -> Unit) {
 @Composable
 fun PlayerMiniHeader(song: Song?, isPlaying: Boolean, progress: Float, liked: Boolean, onHeart: () -> Unit, onPlayPause: () -> Unit, onTop: () -> Unit) {
     Column(Modifier.fillMaxWidth().background(Color(0xFF221C2E)).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().clickable(onClick = onTop).padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().clickable(onClick = onTop).padding(start = Space.Page, end = Space.Tight, top = Space.Small, bottom = Space.Small), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(song?.title.orEmpty(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(song?.artist.orEmpty(), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.62f), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -426,7 +426,7 @@ fun LyricsScreen(song: Song?, tint: Color, onClose: () -> Unit, menu: () -> Unit
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = Space.Tight, vertical = Space.Tight), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) { Icon(Icons.Rounded.KeyboardArrowDown, "Close lyrics", Modifier.size(32.dp)) }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(song?.title.orEmpty(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -446,7 +446,7 @@ fun LyricsScreen(song: Song?, tint: Color, onClose: () -> Unit, menu: () -> Unit
                     val stops = lyricsFadeStops(size.height, fadePx).map { (at, alpha) -> at to Color.Black.copy(alpha = alpha) }
                     drawRect(Brush.verticalGradient(*stops.toTypedArray()), blendMode = BlendMode.DstIn)
                 }
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = Space.Section),
         ) {
             LoadBox(lyrics) { loaded ->
                 if (loaded == null || loaded.lines.isEmpty()) {
@@ -458,18 +458,18 @@ fun LyricsScreen(song: Song?, tint: Color, onClose: () -> Unit, menu: () -> Unit
                         loaded.lines.joinToString("\n") { it.text },
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 16.dp),
+                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = Space.Page),
                     )
                     return@LoadBox
                 }
                 val listState = rememberLazyListState()
                 val current = loaded.lines.indexOfLast { (it.startMs ?: Long.MAX_VALUE) <= position }
                 LaunchedEffect(current) { if (current >= 0) listState.animateScrollToItem(max(0, current - 2)) }
-                LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 16.dp)) {
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = Space.Page)) {
                     itemsIndexed(loaded.lines) { index, line ->
                         // Word-timed lyrics: the line playing now fills in word by word (or syllable by syllable).
                         if (index == current && line.words.isNotEmpty()) {
-                            KaraokeLine(line, colors, Modifier.fillMaxWidth().clickable { line.startMs?.let { graph.player.seekTo(it) } }.padding(vertical = 8.dp))
+                            KaraokeLine(line, colors, Modifier.fillMaxWidth().clickable { line.startMs?.let { graph.player.seekTo(it) } }.padding(vertical = Space.Small))
                             return@itemsIndexed
                         }
                         Text(
@@ -484,13 +484,13 @@ fun LyricsScreen(song: Song?, tint: Color, onClose: () -> Unit, menu: () -> Unit
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { line.startMs?.let { graph.player.seekTo(it) } }
-                                .padding(vertical = 8.dp),
+                                .padding(vertical = Space.Small),
                         )
                     }
                 }
             }
         }
-        Box(Modifier.padding(horizontal = 24.dp).padding(bottom = 16.dp)) { controls() }
+        Box(Modifier.padding(horizontal = Space.Section).padding(bottom = Space.Page)) { controls() }
     }
 }
 

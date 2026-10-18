@@ -102,7 +102,7 @@ fun HeroPage(
                 .fillMaxWidth()
                 .background(color.copy(alpha = barAlpha))
                 .statusBarsPadding()
-                .padding(horizontal = 4.dp, vertical = 4.dp),
+                .padding(horizontal = Space.Tight, vertical = Space.Tight),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(
@@ -111,7 +111,7 @@ fun HeroPage(
             ) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White)
             }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Space.Small))
             Text(
                 title,
                 style = MaterialTheme.typography.titleMedium,

@@ -103,14 +103,14 @@ fun CollectionPage(
             val covers = remember(songs) { songs.map { it.cover } }
             PrefetchCovers(listState.firstVisibleItemIndex, listState.layoutInfo.visibleItemsInfo.size, covers, 150)
         }
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(32.dp))) {
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item {
                 Column(
                     Modifier
                         .fillMaxWidth()
                         .background(Brush.verticalGradient(0f to color, 0.75f to color.copy(alpha = 0.35f), 1f to surface))
                         .statusBarsPadding()
-                        .padding(top = 56.dp, start = 16.dp, end = 16.dp),
+                        .padding(top = 56.dp, start = Space.Page, end = Space.Page),  // spacing: exact (below the top bar)
                 ) {
                     // The cover stays a little behind the scroll, shrinking and fading as it goes.
                     Box(
@@ -127,7 +127,7 @@ fun CollectionPage(
                     ) {
                         cover(Modifier.size(coverSize).shadow(18.dp, RoundedCornerShape(6.dp)))
                     }
-                    Spacer(Modifier.height(20.dp))
+                    Spacer(Modifier.height(Space.Page))
                     Text(
                         title,
                         style = MaterialTheme.typography.headlineMedium,
@@ -135,15 +135,15 @@ fun CollectionPage(
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(Space.Small))
                     header()
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(Space.Tight))
                     ActionRow(songs.orEmpty(), offline)
                 }
             }
             when {
                 songs == null && error == null -> item {
-                    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Accent) }
+                    Box(Modifier.fillMaxWidth().padding(Space.Large), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Accent) }
                 }
                 error != null -> item { ErrorText(error) }
                 songs != null -> {
@@ -176,7 +176,7 @@ fun CollectionPage(
                 .fillMaxWidth()
                 .background(color.copy(alpha = barAlpha))
                 .statusBarsPadding()
-                .padding(horizontal = 4.dp, vertical = 4.dp),
+                .padding(horizontal = Space.Tight, vertical = Space.Tight),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(
@@ -185,7 +185,7 @@ fun CollectionPage(
             ) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White)
             }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Space.Small))
             Text(
                 title,
                 style = MaterialTheme.typography.titleMedium,
@@ -221,14 +221,14 @@ private fun DiscHeading(label: String, cover: Color) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(start = 8.dp, end = 8.dp, top = 16.dp, bottom = 4.dp)
+            .padding(start = Space.Small, end = Space.Small, top = Space.Page, bottom = Space.Tight)
             .clip(RoundedCornerShape(10.dp))
             .background(Brush.horizontalGradient(0f to band.start, 0.6f to band.start.copy(alpha = 0.75f), 1f to band.start.copy(alpha = 0f)))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = Space.Medium, vertical = Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(Icons.Rounded.Album, null, tint = band.text.copy(alpha = 0.85f), modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(Space.Medium))
         Text(
             label,
             style = MaterialTheme.typography.titleSmall,
@@ -253,7 +253,7 @@ private fun ActionRow(songs: List<Song>, offline: OfflineItem?) {
         IconButton(onClick = { graph.player.play(songs, shuffle = true) }, enabled = songs.isNotEmpty()) {
             Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(Space.Small))
         Box(
             Modifier
                 .size(56.dp)
@@ -270,7 +270,7 @@ private fun ActionRow(songs: List<Song>, offline: OfflineItem?) {
 /** A small "meta" line under the title: artist avatar and name, then details. */
 @Composable
 fun CollectionByline(name: String?, avatarCover: String?, onClick: (() -> Unit)?, details: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
         if (!name.isNullOrBlank()) {
             Row(
                 Modifier.clickable(enabled = onClick != null) { onClick?.invoke() },
@@ -278,7 +278,7 @@ fun CollectionByline(name: String?, avatarCover: String?, onClick: (() -> Unit)?
             ) {
                 if (avatarCover != null) {
                     Cover(avatarCover, 80, Modifier.size(26.dp), CircleShape)
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(Space.Small))
                 }
                 Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             }
@@ -303,7 +303,7 @@ fun GeneratedCover(title: String, colors: Pair<Color, Color>, modifier: Modifier
             color = Color.White,
             maxLines = 4,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.align(Alignment.BottomStart).padding(16.dp),
+            modifier = Modifier.align(Alignment.BottomStart).padding(Space.Page),
         )
     }
 }
