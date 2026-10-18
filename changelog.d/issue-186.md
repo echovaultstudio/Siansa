@@ -1,2 +1,0 @@
-### Added
-- **Time machine**, under Your listening in Your Library: pick a year and a month (or the whole year) to see the songs you played most then, from Koito and Last.fm (whichever you've set up). Only songs in your library are shown. Play them, use ⋮ to add one to a playlist, or swipe to queue it. **Create memory** makes them a playlist called "Time Machine - March 2019", on Navidrome or this phone, with a picture of that time's top albums.

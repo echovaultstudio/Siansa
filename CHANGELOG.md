@@ -3,6 +3,19 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.10.0beta — 2026-10-18
+
+### Fixed
+- **The lyrics to come were hard to read.** On most covers they were dark on a dark background. They're now a soft white you can read ahead with, a step below the line playing now. Lyrics on a very bright cover (white, yellow) get a darker background in the cover's colour, so every line stays readable.
+
+### Added
+- **Recent searches.** Tap into the search box and your last searches are listed under it: tap one to search it again, × to remove it, or Clear all. A search is kept when you press the search key or open one of its results. Library and Sound searches each have their own list.
+- **Opacity for Your colour.** In Settings → Themes → Your colour, an Opacity slider (20 to 100 %) sets how strongly your colour shows across the app: lower is softer, closer to grey. Text stays just as readable at every opacity, and both previews show the result.
+- **Time machine**, under Your listening in Your Library: pick a year and a month (or the whole year) to see the songs you played most then, from Koito and Last.fm (whichever you've set up). Only songs in your library are shown. Play them, use ⋮ to add one to a playlist, or swipe to queue it. **Create memory** makes them a playlist called "Time Machine - March 2019", on Navidrome or this phone, with a picture of that time's top albums.
+
+### Changed
+- **The log now records every request in full** while it's on: which server and IP address it went to, the whole address with its settings, the headers, what came back, its size and how long it took. Covers and song streams are included too. Passwords, tokens and API keys are still removed. Logs grow faster, so each part now holds 15 MB.
+
 ## 0.9.0beta — 2026-10-18
 
 ### Fixed
