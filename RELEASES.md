@@ -3,6 +3,11 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.10.2beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.10.2beta) — 2026-10-18
+
+- [#191](https://github.com/Musix-Industreez/musix/pull/191) Tour: fix the emulator test build after #190 (missing import) (@Th3K1ngP1n)
+- [#193](https://github.com/Musix-Industreez/musix/pull/193) Time machine: much faster matching, months remembered (@Th3K1ngP1n)
+
 ## [0.10.1beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.10.1beta) — 2026-10-18
 
 - [#190](https://github.com/Musix-Industreez/musix/pull/190) Small fixes: Search tab starts a new search, Time machine shows loading (@Th3K1ngP1n)
