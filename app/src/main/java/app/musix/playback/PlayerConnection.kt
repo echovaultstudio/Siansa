@@ -248,6 +248,9 @@ class PlayerConnection(
 
     fun positionMs(): Long = controller?.currentPosition ?: 0L
 
+    /** The phone player's volume (levelling × crossfade × sleep timer), for the emulator tests. */
+    internal fun volumeForTest(): Float = controller?.volume ?: 1f
+
     /** The current song, where it is and how long it is, read together so they always belong to the same song. */
     data class Progress(val mediaId: String?, val positionMs: Long, val durationMs: Long, val playing: Boolean)
 

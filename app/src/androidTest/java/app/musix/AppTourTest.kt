@@ -25,6 +25,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import app.musix.data.SettingsRepository
+import app.musix.playback.CrossfadeMode
+import app.musix.playback.LoudnessSource
 import app.musix.data.SyncPhase
 import app.musix.data.Users
 import app.musix.log.AppLog
@@ -325,6 +327,24 @@ class AppTourTest {
                 shot("19b-equaliser")
                 back()
                 back()
+            }
+            step("crossfade and loudness") {
+                try {
+                    tab("Settings")
+                    click("Playback")
+                    click("Crossfade and loudness")
+                    idle(1000)
+                    shot("19j-crossfade")
+                    graph.settings.setLoudness(LoudnessSource.LUMAE)
+                    graph.settings.setCrossfade(CrossfadeMode.SMART, 8)
+                    idle(800)
+                    shot("19k-crossfade-smart-lumae")
+                    back()
+                    back()
+                } finally {
+                    graph.settings.setCrossfade(CrossfadeMode.OFF, 6)
+                    graph.settings.setLoudness(LoudnessSource.TAGS)
+                }
             }
             step("sound search") {
                 tab("Search")
