@@ -231,7 +231,8 @@ object CoverStore {
         val head = runCatching { response.peekBody(512).string() }.getOrNull() ?: return null
         if (!type.contains("json") && !type.contains("xml") && !head.trimStart().startsWith("{") && !head.trimStart().startsWith("<")) return null
         if (!head.contains("subsonic-response")) return null
-        return Regex(""""message"\s*:\s*"([^"]*)"""").find(head)?.groupValues?.get(1) ?: "status not ok"
+        return Regex(""""message"\s*:\s*"([^"]*)"""").find(head)?.groupValues?.get(1)
+            ?: head.replace(Regex("\\s+"), " ").take(200)
     }
 
     private fun waitFor(future: CompletableFuture<Boolean>) {

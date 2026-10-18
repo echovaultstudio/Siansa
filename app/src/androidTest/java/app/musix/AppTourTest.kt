@@ -326,7 +326,12 @@ class AppTourTest {
         val log = AppLog.tail(1500)
         log.forEach { println("TOURLOG $it") }
         // Every cover on every page must show: any picture the app couldn't show is a problem.
-        val blank = log.filter { it.contains("W/Image: Couldn't show") }
+        // Covers Navidrome itself failed to send (it answers with an error, e.g. when it can't shrink the test
+        // library's 13 MB GIF in time) are the server's doing: Musix retries, never caches them and shows the
+        // placeholder. They're listed, not failed on; every other picture must show (issue #162).
+        val serverFailed = log.filter { it.contains("W/Image: Couldn't show") && it.contains("HTTP 502") }
+        if (serverFailed.isNotEmpty()) println("Tour: ${serverFailed.size} cover(s) Navidrome couldn't send, e.g. ${serverFailed.first().substringAfter("Couldn't show ")}")
+        val blank = log.filter { it.contains("W/Image: Couldn't show") && !it.contains("HTTP 502") }
         if (blank.isNotEmpty()) problems += "${blank.size} picture(s) couldn't be shown, e.g. ${blank.first().substringAfter("Couldn't show ")}"
         // And no errors in the app's log during the tour.
         log.filter { Regex("""^\S+ \S+ E/""").containsMatchIn(it) }.take(3).forEach { problems += "Error in the log: ${it.take(200)}" }
