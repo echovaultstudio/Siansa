@@ -208,6 +208,7 @@ fun MusixRoot() {
                                 NavigationBarItem(
                                     selected = currentTab == tab.route,
                                     onClick = {
+                                        if (tabTapClearsSearch(currentTab, tab.route)) SearchReset.request()
                                         if (currentTab == tab.route) nav.backToTabTop(tab.route) else nav.switchTab(tab.route)
                                         currentTab = tab.route
                                     },

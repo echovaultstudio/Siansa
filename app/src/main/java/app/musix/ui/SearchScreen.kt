@@ -40,6 +40,8 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -88,6 +90,21 @@ fun SearchScreen(nav: NavController) {
     val history by graph.searchHistory.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { graph.searchHistory.all() }
     val recent = history.orEmpty().filter { it.sound == soundMode }
+
+    // The Search tab tapped again (issue #189): a new search, with an empty box ready to type in.
+    val focus = remember { FocusRequester() }
+    val resets by SearchReset.requests.collectAsStateWithLifecycle()
+    var handledReset by rememberSaveable { mutableStateOf(resets) }
+    LaunchedEffect(resets) {
+        val pending = searchResetPending(resets, handledReset)
+        handledReset = resets
+        if (!pending) return@LaunchedEffect
+        query = ""
+        results = null
+        soundSongs = null
+        error = null
+        runCatching { focus.requestFocus() }
+    }
 
     /** Keeps what's in the box as a recent search (on the search key, or when a result is opened). */
     fun keepSearch() {
@@ -144,7 +161,7 @@ fun SearchScreen(nav: NavController) {
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).onFocusChanged { focused = it.isFocused }.testTag("searchField"),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).focusRequester(focus).onFocusChanged { focused = it.isFocused }.testTag("searchField"),
                 placeholder = {
                     Text(if (soundMode) "Describe a sound, e.g. rainy jazz piano" else "Artists, albums, songs")
                 },
