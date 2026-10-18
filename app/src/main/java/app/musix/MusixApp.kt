@@ -129,7 +129,7 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
             "memory class ${am?.memoryClass ?: "?"} MB",
             network,
             "Navidrome ${if (s.navidromeReady) "set" else "not set"}, AudioMuse ${if (s.audioMuseReady) "set" else "not set"}, AI ${if (s.aiReady) "on" else "off"}",
-            "quality Wi-Fi ${if (s.transcodeWifiKbps > 0) "Opus ${s.transcodeWifiKbps}" else "original"}, mobile ${if (s.transcodeMobileKbps > 0) "Opus ${s.transcodeMobileKbps}" else "original"}, auto-switch ${if (s.autoQuality) "on" else "off"}",
+            "quality Wi-Fi ${if (s.transcodeWifiKbps > 0) "Opus ${s.transcodeWifiKbps}" else "original"}, mobile ${if (s.transcodeMobileKbps > 0) "Opus ${s.transcodeMobileKbps}" else "original"}",
             "ReplayGain ${s.replayGain.label}",
             "song cache ${mb(s.songCacheMb)}, image cache ${mb(s.imageCacheMb)}",
             "animated covers ${if (s.animatedCovers) "on" else "off"}, download all covers ${if (s.coverDownload) (if (s.coverDownloadAnyWifi) "any Wi-Fi" else "home") else "off"}",

@@ -32,7 +32,6 @@ data class AppSettings(
     val coverDownload: Boolean = false,
     /** ...on any Wi-Fi, rather than only on the same local network as Navidrome. */
     val coverDownloadAnyWifi: Boolean = false,
-    val autoQuality: Boolean = true,
     val logging: Boolean = false,
     val scrobbleNavidrome: Boolean = true,
     val lastFmEnabled: Boolean = false,
@@ -150,7 +149,6 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         animatedCovers = prefs.getBoolean("animated_covers", true),
         coverDownload = prefs.getBoolean("cover_download", false),
         coverDownloadAnyWifi = prefs.getBoolean("cover_download_any_wifi", false),
-        autoQuality = prefs.getBoolean("auto_quality", true),
         logging = prefs.getBoolean("logging", false),
         scrobbleNavidrome = prefs.getBoolean("scrobble_nd", true),
         lastFmEnabled = prefs.getBoolean("lfm_on", false),
@@ -238,10 +236,6 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(imageCacheMb = mb)
     }
 
-    fun setAutoQuality(on: Boolean) {
-        prefs.edit().putBoolean("auto_quality", on).apply()
-        _state.value = _state.value.copy(autoQuality = on)
-    }
 
     fun setCoverDownload(on: Boolean, anyWifi: Boolean = _state.value.coverDownloadAnyWifi) {
         prefs.edit().putBoolean("cover_download", on).putBoolean("cover_download_any_wifi", anyWifi).apply()

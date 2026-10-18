@@ -234,9 +234,7 @@ fun PlaybackSettingsScreen(nav: NavController) {
             Hint("Opus is converted by Navidrome with its own \"opus\" transcoding profile. It saves data on mobile; the original file is best on Wi-Fi. Applies from the next song.")
             QualityRow("On Wi-Fi", settings.transcodeWifiKbps) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
             QualityRow("On mobile data", settings.transcodeMobileKbps) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
-            Hint("Seeking inside an Opus song can take a moment, since Navidrome converts it as it streams.")
-            SwitchRow("Switch to Opus when the connection is too slow", settings.autoQuality) { graph.settings.setAutoQuality(it) }
-            Hint("If the original keeps stopping to wait for data (three times in two minutes), Musix carries on in Opus at a bitrate the connection can manage, picking up where you were, and tries the original again after 15 minutes.")
+            Hint("Musix always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
         }
     }
 }

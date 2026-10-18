@@ -28,8 +28,6 @@ import java.io.IOException
 class PlaybackDiagnostics(
     private val player: ExoPlayer,
     private val context: Context,
-    /** Called after playback had to stop and wait for data, with how long it waited. */
-    private val onStall: (waitedMs: Long) -> Unit = {},
 ) : AnalyticsListener {
     private var bufferingSince = 0L
     private var underruns = 0
@@ -65,7 +63,6 @@ class PlaybackDiagnostics(
                 if (player.playWhenReady) {
                     if (waited > 1500) AppLog.w("Audio", "Waited ${waited}ms for data before playing · ${where(eventTime)}")
                     else AppLog.d("Audio", "Ready after ${waited}ms")
-                    onStall(waited)
                 }
             }
             else -> Unit
