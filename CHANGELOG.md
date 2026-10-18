@@ -3,6 +3,20 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.7.1beta — 2026-10-18
+
+### Changed
+- **One button at the top of Home.** The filter button now opens both Sources and Arrange (as two tabs of one
+  panel), so the separate Arrange button is gone.
+
+## 0.7.0beta — 2026-10-18
+
+### Added
+- **Playlists on this phone only.** When you make a playlist you can keep it on Navidrome or on this phone only. A phone playlist works offline, can have its own picture, and can be sent to Navidrome later with "Send to Navidrome" in its ⋮ menu. Your Library lists them under "On this phone".
+- **Phone playlists download their songs.** Songs you add to a phone playlist are downloaded so they play offline (using your download settings). Songs you take out are removed from the phone, unless an album or other download still needs them.
+- **Make and change your own playlists.** Your Library's + button now has "New playlist", and "Add to playlist" (in a song's ⋮ menu and in now playing) can make a new one too. On one of your playlists, the ⋮ at the top renames it or changes or removes its picture, and a song's ⋮ menu removes it from the playlist. Every change is saved on Navidrome straight away. Pictures need Navidrome 0.61 or later.
+- **Remove playlists you don't need.** "Remove from Musix" in a playlist's ⋮ menu takes it out of the app but never deletes it on Navidrome. Bring it back with + → "Import from Navidrome" in Your Library.
+
 ## 0.6.0beta — 2026-10-17
 
 ### Added
