@@ -299,7 +299,7 @@ class AppTourTest {
                     click("Your colour")
                     waitText("Use this colour")
                     idle(800)
-                    shot("19g-your-colour-picker-light")
+                    shot("19g-your-colour-picker-light", popups = true)
                     click("Use this colour")
                     idle(800)
                     shot("19h-themes-your-colour-light")
