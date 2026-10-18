@@ -20,7 +20,9 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # The nightly run has a group of its own: GitHub often starts it hours late, and in the shared group it
+  # cancelled the run of a merge to main that was about to publish the release.
+  group: ci-${{ github.ref }}${{ github.event_name == 'schedule' && '-nightly' || '' }}
   cancel-in-progress: true
 
 env:
