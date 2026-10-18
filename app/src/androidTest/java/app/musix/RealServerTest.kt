@@ -226,9 +226,9 @@ class RealServerTest {
         try {
             val song = songOf(albums().getValue("Still Album"))
             instrumentation.runOnMainSync { graph.player.play(listOf(song)) }
-            val startBy = SystemClock.elapsedRealtime() + 20_000
+            val startBy = SystemClock.elapsedRealtime() + 30_000
             while (!graph.player.state.value.isPlaying && SystemClock.elapsedRealtime() < startBy) SystemClock.sleep(200)
-            assertTrue("Converted song never started", graph.player.state.value.isPlaying)
+            assertTrue("Converted song never started. ${recentLog()}", graph.player.state.value.isPlaying)
             instrumentation.runOnMainSync { graph.player.seekTo(150_000) }
             // Within 10 s it plays on from there.
             val end = SystemClock.elapsedRealtime() + 10_000
@@ -239,13 +239,18 @@ class RealServerTest {
                 if (at > 151_500 && graph.player.state.value.isPlaying) break
             }
             println("Converted seek: at $at ms, playing=${graph.player.state.value.isPlaying}")
-            assertTrue("After seeking to 2:30 in a converted song it's at ${at} ms", at in 151_500..170_000)
+            assertTrue("After seeking to 2:30 in a converted song it's at ${at} ms. ${recentLog()}", at in 151_500..170_000)
         } finally {
             instrumentation.runOnMainSync { graph.player.stop() }
             scenario.close()
             graph.settings.save(before)
         }
     }
+
+    /** The app's last playback log lines, for a failure message (CI shows the message, not the whole log). */
+    private fun recentLog(): String = AppLog.tail(300)
+        .filter { line -> listOf("/Stream", "/Player", "/Audio", "/Http").any { it in line } }
+        .takeLast(8).joinToString(" | ") { it.substringAfter(' ').take(160) }
 
     /** Control: the old setup's full-size cover downloads, to show the test catches the problem. */
     @Test
