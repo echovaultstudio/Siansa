@@ -3,6 +3,13 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.8.2beta — 2026-10-18
+
+### Changed
+- **Musix no longer switches to Opus on its own on a slow connection.** Songs always play in the quality chosen
+  in Settings → Playback (Wi-Fi and mobile data); the "Switch to Opus when the connection is too slow" setting is
+  gone. On a slow connection, choose Opus for mobile data there.
+
 ## 0.8.1beta — 2026-10-18
 
 ### Fixed
