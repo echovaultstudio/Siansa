@@ -80,7 +80,8 @@ private fun TimeMachinePage(nav: NavController) {
     // A year ago by default: the most likely time to want to go back to.
     var year by rememberSaveable { mutableIntStateOf(today.year - 1) }
     var month by rememberSaveable { mutableStateOf<Int?>(today.monthValue) }
-    val result by loadState("timemachine-$year-$month") { graph.insights.timeMachine(year, month) }
+    // A new year or month shows the spinner straight away, not the last list (issue #189).
+    val result by loadStateFresh("timemachine-$year-$month") { graph.insights.timeMachine(year, month) }
     var creating by rememberSaveable { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().background(Brand.Plum)) {

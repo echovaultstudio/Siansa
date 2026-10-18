@@ -118,6 +118,26 @@ fun <T> loadState(key: Any?, block: suspend () -> T): State<Load<T>> =
         this.value = result
     }
 
+/**
+ * Like [loadState], but back to [Load.Loading] as soon as [key] changes, so a page shows the spinner while
+ * the new choice loads instead of the old result, which looks like the app hanging (issue #189, time machine).
+ */
+@android.annotation.SuppressLint("ProduceStateDoesNotAssignValue")
+@Composable
+fun <T> loadStateFresh(key: Any?, block: suspend () -> T): State<Load<T>> =
+    produceState<Load<T>>(Load.Loading, key) {
+        this.value = Load.Loading
+        val result: Load<T> = try {
+            Load.Ok(block())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.w("Ui", "Loading failed: ${e.message}")
+            Load.Err(e.message ?: e.javaClass.simpleName)
+        }
+        this.value = result
+    }
+
 @Composable
 fun <T> LoadBox(load: Load<T>, modifier: Modifier = Modifier, content: @Composable (T) -> Unit) {
     when (load) {
