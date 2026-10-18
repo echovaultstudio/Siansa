@@ -156,6 +156,19 @@ class RealServerTest {
         repeat(3) { loadCoverImage(cover, 1000, null, cached = false) }
         assertEquals(again, CoverStore.downloads.get())
 
+        // Song lists (playlists, Popular) ask for the disc's cover, dc-<album>:<disc>, which Navidrome answers
+        // with the album's file in full: it must be linked to the kept one, not downloaded again, and give a still.
+        val disc = "dc-${CoverStore.canonical(cover).removePrefix("al-")}:1"
+        val served = graph.imageHttp.newCall(
+            Request.Builder().url(graph.subsonic.coverUrl(disc, SMALL_COVER)).header(CoverStore.PEEK, "1").build()
+        ).execute().use { r -> r.isSuccessful && CoverStore.sniff(r.peekBody(32).bytes()) != null }
+        org.junit.Assume.assumeTrue("This Navidrome doesn't send disc covers", served)
+        val discImage = loadCoverImage(disc, SMALL_COVER, null, cached = false)?.asDrawable(res)
+        println("Disc cover: ${discImage?.javaClass?.simpleName} ${discImage?.intrinsicWidth}×${discImage?.intrinsicHeight}, downloads ${CoverStore.downloads.get() - again}")
+        assertEquals("A disc cover should reuse the album's kept file, not download it again", again, CoverStore.downloads.get())
+        assertTrue("A disc cover in a list should be a still: $discImage", discImage != null && discImage !is Animatable)
+        assertEquals("The disc's cover should share the album's file", CoverStore.local(cover)?.original, CoverStore.local(disc)?.original)
+
         val kind = runBlocking { AnimatedCovers.kind(graph, cover) }
         assertEquals(AnimatedCovers.Kind.Local, kind)
         val d = runBlocking { AnimatedCovers.load(app, graph, cover, kind!!, 720) }

@@ -82,6 +82,20 @@ object CoverStore {
 
     private fun resolve(id: String): String = canonical(id).let { aliases[it] ?: it }
 
+    /**
+     * The album cover a song's or a disc's cover id belongs to, or null for any other id. Navidrome gives
+     * songs either their own `mf-…` id or their disc's `dc-<album>:<disc>`; without a picture of their own,
+     * both are the album's cover sent again in full. `dc-` names its album; `mf-` is looked up in the library.
+     */
+    fun albumCoverOf(id: String): String? {
+        val own = canonical(id)
+        return when {
+            own.startsWith("dc-") -> own.removePrefix("dc-").substringBefore(':').takeIf { it.isNotEmpty() }?.let { "al-$it" }
+            own.startsWith("mf-") -> runCatching { albumCoverOfSong(id) }.getOrNull()
+            else -> null
+        }
+    }
+
     private fun safe(key: String) = key.replace(Regex("[^A-Za-z0-9-]"), "_")
     private fun originalFile(key: String) = File(dir, safe(key) + ".anim")
     private fun stillFile(key: String) = File(dir, safe(key) + ".jpg")
@@ -134,10 +148,8 @@ object CoverStore {
         val clean = request.newBuilder().removeHeader(WANT_ANIMATION).build()
         val size = url.queryParameter("size")?.toIntOrNull()
 
-        // A song without its own picture often turns out to be its album's: if that's downloading, wait.
-        if (canonical(id).startsWith("mf-")) {
-            runCatching { albumCoverOfSong(id) }.getOrNull()?.let { album -> pending[resolve(album)]?.let { waitFor(it) } }
-        }
+        // A song or disc without its own picture often turns out to be its album's: if that's downloading, wait.
+        albumCoverOf(id)?.let { album -> pending[resolve(album)]?.let { waitFor(it) } }
         // One request per cover at a time: the album page, now playing, the background and the colour
         // often ask together, and if it's an animated original only the first should download it.
         val gateKey = resolve(id)
@@ -240,14 +252,14 @@ object CoverStore {
     }
 
     /**
-     * Which key to save under. A song without its own picture gets its album's file from Navidrome:
-     * when the first 64 KB match the album's kept file, the song is linked to it rather than downloaded
-     * again (the server often doesn't send a size to compare).
+     * Which key to save under. A song or disc without its own picture gets its album's file from Navidrome:
+     * when the first 64 KB match the album's kept file, it's linked to it rather than downloaded again (the
+     * server often doesn't send a size to compare). Song lists use disc covers (`dc-…`), so without this
+     * every playlist and Popular list downloaded each album's animation once more, often 10 MB or more.
      */
     private fun keyFor(id: String, response: Response): String {
         val own = canonical(id)
-        if (!own.startsWith("mf-")) return own
-        val album = runCatching { albumCoverOfSong(id) }.getOrNull()?.let { canonical(it) } ?: return own
+        val album = albumCoverOf(id)?.let { canonical(it) } ?: return own
         val albumKey = aliases[album] ?: album
         val albumFile = originalFile(albumKey)
         if (!albumFile.exists()) return own
@@ -256,7 +268,7 @@ object CoverStore {
         if (length > 0 && length != albumFile.length()) return own
         if (!startsWith(albumFile, head)) return own
         link(own, albumKey)
-        AppLog.i("Cover", "Song cover $id is its album's animated cover; using the one already on the phone")
+        AppLog.i("Cover", "${if (own.startsWith("dc-")) "Disc" else "Song"} cover $id is its album's animated cover; using the one already on the phone")
         return albumKey
     }
 
