@@ -119,6 +119,12 @@ class AudioMuseApi(
         }
     }
 
+    /**
+     * A GET to a plugin on the AudioMuse server ([pathAndQuery] after the address, e.g. the Lumae plugin's
+     * profiles), with the same login as the rest of AudioMuse.
+     */
+    suspend fun plugin(pathAndQuery: String): JsonElement = executeElement { request(pathAndQuery).get().build() }
+
     suspend fun textSearch(query: String, limit: Int): List<ClapHit> {
         val payload = buildJsonObject {
             put("query", query)

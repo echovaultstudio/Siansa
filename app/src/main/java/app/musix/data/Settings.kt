@@ -4,6 +4,8 @@ import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import app.musix.playback.CrossfadeMode
+import app.musix.playback.LoudnessSource
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.net.URLDecoder
 
@@ -64,6 +66,13 @@ data class AppSettings(
     val pureBlack: Boolean = false,
     /** The seed for "Your colour" (issue #148, step 2), as ARGB. */
     val themeSeed: Int = DEFAULT_THEME_SEED,
+    /** Where song loudness and fade shapes come from (issue #60): ReplayGain tags, or the Lumae plugin. */
+    val loudnessSource: LoudnessSource = LoudnessSource.TAGS,
+    /** The loudness, in LUFS, that measured levelling brings songs towards. */
+    val loudnessTarget: Int = DEFAULT_LOUDNESS_TARGET,
+    val crossfade: CrossfadeMode = CrossfadeMode.OFF,
+    /** The crossfade length; in smart mode, the longest a fade may be. */
+    val crossfadeSeconds: Int = DEFAULT_CROSSFADE_SECONDS,
 ) {
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
@@ -77,6 +86,10 @@ data class AppSettings(
 
     companion object {
         const val DEFAULT_MODEL = "google/gemini-2.5-flash"
+        /** Close to what ReplayGain tags aim for, so switching where loudness comes from doesn't change the overall level. */
+        const val DEFAULT_LOUDNESS_TARGET = -18
+        const val DEFAULT_CROSSFADE_SECONDS = 6
+        val CROSSFADE_SECONDS = 1..12
     }
 }
 
@@ -177,6 +190,10 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         themeColours = prefs.getString("theme_colours", "MUSIX") ?: "MUSIX",
         pureBlack = prefs.getBoolean("pure_black", false),
         themeSeed = prefs.getInt("theme_seed", DEFAULT_THEME_SEED),
+        loudnessSource = LoudnessSource.parse(prefs.getString("loudness_source", null)),
+        loudnessTarget = prefs.getInt("loudness_target", AppSettings.DEFAULT_LOUDNESS_TARGET),
+        crossfade = CrossfadeMode.parse(prefs.getString("crossfade", null)),
+        crossfadeSeconds = prefs.getInt("crossfade_s", AppSettings.DEFAULT_CROSSFADE_SECONDS).coerceIn(AppSettings.CROSSFADE_SECONDS),
     )
 
     /**
@@ -296,5 +313,16 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         prefs.edit().putString("theme_mode", mode).putString("theme_colours", colours).putBoolean("pure_black", pureBlack)
             .putInt("theme_seed", seed).apply()
         _state.value = _state.value.copy(themeMode = mode, themeColours = colours, pureBlack = pureBlack, themeSeed = seed)
+    }
+
+    fun setLoudness(source: LoudnessSource = _state.value.loudnessSource, target: Int = _state.value.loudnessTarget) {
+        prefs.edit().putString("loudness_source", source.name).putInt("loudness_target", target).apply()
+        _state.value = _state.value.copy(loudnessSource = source, loudnessTarget = target)
+    }
+
+    fun setCrossfade(mode: CrossfadeMode = _state.value.crossfade, seconds: Int = _state.value.crossfadeSeconds) {
+        val length = seconds.coerceIn(AppSettings.CROSSFADE_SECONDS)
+        prefs.edit().putString("crossfade", mode.name).putInt("crossfade_s", length).apply()
+        _state.value = _state.value.copy(crossfade = mode, crossfadeSeconds = length)
     }
 }
