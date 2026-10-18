@@ -249,7 +249,8 @@ class AppTourTest {
                 // Below the other Your listening entries, so possibly not on screen yet.
                 compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Time machine"))
                 idle(400)
-                click("Time machine")
+                // Scrolled into view at the bottom edge, under the mini player: a touch there opens now playing.
+                tapRow("Time machine")
                 waitText("Whole year")
                 idle(2500)
                 shot("14b-time-machine")
@@ -276,6 +277,13 @@ class AppTourTest {
                 idle(800)
                 shot("16-search-results")
                 timedStart("search", "Long Song B") { tapRow("Long Song B") }
+                // Tapping Search again starts a new search with an empty box (issue #189).
+                tab("Search")
+                idle(800)
+                val typed = compose.onAllNodesWithTag("searchField").fetchSemanticsNodes().firstOrNull()
+                    ?.config?.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.EditableText)?.text.orEmpty()
+                if (typed.isNotEmpty()) problems += "Search tapped again kept \"$typed\" in the box"
+                shot("16b-search-again")
             }
             step("vibes") {
                 tab("Settings")
