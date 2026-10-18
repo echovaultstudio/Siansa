@@ -31,7 +31,9 @@ implements them and opens a pull request. Labels show where each one is: `claude
 - Describe before and after, and how it was tested.
 - Don't merge unless the owner asks. Never merge a pull request unless its CI run (`.github/workflows/ci.yml`)
   is fully green, including the "Emulator tests against Navidrome" check. Pull requests run the build, Lint,
-  unit tests, secret scan and emulator tests; a release is published from main only when all of them pass.
+  unit tests and secret scan on every push. The emulator tests (~20 minutes) run once, just before merging: add
+  the `ready to merge` label to the pull request when it's otherwise done. Until then their check fails on
+  purpose. A release is published from main only when all checks pass.
 - Merge via the API (`PUT /pulls/{n}/merge` with the head sha); pushing directly to main isn't allowed.
 
 ## Don'ts
