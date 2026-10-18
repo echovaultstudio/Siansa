@@ -33,7 +33,9 @@ implements them and opens a pull request. Labels show where each one is: `claude
   is fully green, including the "Emulator tests against Navidrome" check. Pull requests run the build, Lint,
   unit tests and secret scan on every push. The emulator tests (~20 minutes) run once, just before merging: add
   the `ready to merge` label to the pull request when it's otherwise done. Until then their check fails on
-  purpose. A release is published from main only when all checks pass.
+  purpose. The branch must be up to date with main before merging; if main moved, update it and let the
+  emulator tests run again. They don't run after merging, and a release is published from main when the build,
+  Lint, unit tests and secret scan pass.
 - Merge via the API (`PUT /pulls/{n}/merge` with the head sha); pushing directly to main isn't allowed.
 
 ## Don'ts
