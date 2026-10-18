@@ -69,7 +69,8 @@ fun ReportScreen(nav: NavController, rangeId: String) {
 private fun ReportPage(nav: NavController, rangeId: String) {
     val graph = LocalGraph.current
     var range by rememberSaveable { mutableStateOf(ReportRange.of(rangeId)) }
-    val report by loadState(range) { graph.insights.report(range) }
+    // Another range shows the loading circle straight away, not the last report (like the time machine).
+    val report by loadStateFresh(range) { graph.insights.report(range) }
 
     Box(Modifier.fillMaxSize().background(Brand.Plum)) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(32.dp))) {
