@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.onRoot
@@ -291,6 +292,23 @@ class AppTourTest {
                     graph.settings.setTheme("DARK", "MUSIX", false)
                     idle(800)
                     shot("19f-themes-musix-dark")
+                    // "Your colour": the picker, then the picked colour on the Themes page and Home.
+                    graph.settings.setTheme("LIGHT", "MUSIX", false)
+                    idle(600)
+                    node("Your colour").performScrollTo()
+                    click("Your colour")
+                    waitText("Use this colour")
+                    idle(800)
+                    shot("19g-your-colour-picker-light")
+                    click("Use this colour")
+                    idle(800)
+                    shot("19h-themes-your-colour-light")
+                    graph.settings.setTheme("DARK", "YOURS", false, 0xFFD81B60.toInt())
+                    tab("Home")
+                    idle(1200)
+                    shot("19i-home-your-colour-pink-dark")
+                    tab("Settings")
+                    idle(400)
                     back()
                 } finally {
                     graph.settings.setTheme("AUTO", "MUSIX", false)

@@ -135,7 +135,7 @@ fun SettingsHub(nav: NavController) {
             HubRow(
                 Icons.Rounded.Palette,
                 "Themes",
-                "${theme.colours.label} colours · " + when (theme.mode) {
+                (if (theme.colours == ThemeColours.YOURS) "Your colour ${ThemeTones.toHex(theme.seed)} · " else "${theme.colours.label} colours · ") + when (theme.mode) {
                     ThemeMode.AUTO -> "follows the phone"
                     ThemeMode.LIGHT -> "light"
                     ThemeMode.DARK -> if (theme.pureBlack) "dark, pure black" else "dark"
