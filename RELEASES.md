@@ -3,6 +3,10 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.8.1beta](https://github.com/Th3K1ngP1n/musix/releases/tag/v0.8.1beta) — 2026-10-18
+
+- [#164](https://github.com/Th3K1ngP1n/musix/pull/164) Emulator tests pass: Opus seeking on Navidrome, steadier covers and seek bar, independent tour steps (#162) (@Th3K1ngP1n)
+
 ## [0.8.0beta](https://github.com/Th3K1ngP1n/musix/releases/tag/v0.8.0beta) — 2026-10-18
 
 - [#158](https://github.com/Th3K1ngP1n/musix/pull/158) Themes: Auto/Light/Dark, pure black, wallpaper colours and presets (#148, step 1) (@Th3K1ngP1n)
