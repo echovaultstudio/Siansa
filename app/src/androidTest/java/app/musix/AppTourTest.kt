@@ -33,6 +33,8 @@ import app.musix.log.AppLog
 import org.junit.Assert.fail
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.performScrollToNode
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -243,6 +245,10 @@ class AppTourTest {
             step("time machine") {
                 libraryAll()
                 click("Your listening")
+                idle(800)
+                // Below the other Your listening entries, so possibly not on screen yet.
+                compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Time machine"))
+                idle(400)
                 click("Time machine")
                 waitText("Whole year")
                 idle(2500)
