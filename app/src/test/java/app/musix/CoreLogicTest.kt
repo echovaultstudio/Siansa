@@ -64,6 +64,29 @@ class CoverSniffTest {
         return b
     }
 
+    /** Song lists ask for disc covers (dc-<album>:<disc>); they belong to the album's cover, kept once. */
+    @Test fun discCoverBelongsToItsAlbum() {
+        assertEquals("al-04ma51dJTRaxdNkt4iTewP", CoverStore.albumCoverOf("dc-04ma51dJTRaxdNkt4iTewP:1"))
+        assertEquals("al-04ma51dJTRaxdNkt4iTewP", CoverStore.albumCoverOf("dc-04ma51dJTRaxdNkt4iTewP:2_e7605fcd483c77e4"))
+        assertNull(CoverStore.albumCoverOf("dc-"))
+        assertNull(CoverStore.albumCoverOf("al-04ma51dJTRaxdNkt4iTewP"))
+        assertNull(CoverStore.albumCoverOf("ar-3U1PQUzLdxQo97Ri9peaE5"))
+    }
+
+    /** A song's own cover id is looked up in the library; when it isn't known, there's no album to share. */
+    @Test fun songCoverAlbumIsLookedUp() {
+        val before = CoverStore.albumCoverOfSong
+        try {
+            CoverStore.albumCoverOfSong = { if (it == "mf-1_abc") "al-9_def" else null }
+            assertEquals("al-9_def", CoverStore.albumCoverOf("mf-1_abc"))
+            assertNull(CoverStore.albumCoverOf("mf-2"))
+            CoverStore.albumCoverOfSong = { throw IllegalStateException("library not open") }
+            assertNull(CoverStore.albumCoverOf("mf-1_abc"))
+        } finally {
+            CoverStore.albumCoverOfSong = before
+        }
+    }
+
     @Test fun animatedWebpWithSize() {
         val s = CoverStore.sniff(webp(true, 1080, 1080))!!
         assertTrue(s.animated)
