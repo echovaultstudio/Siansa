@@ -78,6 +78,7 @@ import app.musix.log.AppLog
 import app.musix.playback.CrossfadeMode
 import app.musix.playback.EqSettings
 import app.musix.playback.LoudnessSource
+import app.musix.log.logForClipboard
 import app.musix.log.problemsForClipboard
 import app.musix.log.logEntries
 import coil3.SingletonImageLoader
@@ -563,6 +564,34 @@ fun LogsScreen(nav: NavController) {
                             Icon(Icons.Rounded.ContentCopy, null)
                             Spacer(Modifier.width(6.dp))
                             Text("Copy problems")
+                        }
+                        // The whole log, ready to paste; the newest part when it's too big for the clipboard.
+                        OutlinedButton(onClick = {
+                            scope.launch {
+                                val entries = withContext(Dispatchers.IO) { logEntries(AppLog.allLines()) }
+                                val text = withContext(Dispatchers.Default) { logForClipboard(entries, AppLog.header) }
+                                if (text == null) {
+                                    snack.showSnackbar("The log is empty")
+                                    return@launch
+                                }
+                                val ok = runCatching {
+                                    context.getSystemService(ClipboardManager::class.java)
+                                        .setPrimaryClip(ClipData.newPlainText("Musix log", text))
+                                }.isSuccess
+                                val whole = text.lineSequence().first().endsWith(" entries")
+                                AppLog.i("Logs", "Copied the log to the clipboard (${text.length} characters${if (whole) "" else ", newest part"})")
+                                snack.showSnackbar(
+                                    when {
+                                        !ok -> "Couldn't copy the log"
+                                        whole -> "Whole log copied"
+                                        else -> "Log copied: the newest part, as the whole log is too big to copy. Save logs has it all."
+                                    }
+                                )
+                            }
+                        }) {
+                            Icon(Icons.Rounded.ContentCopy, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Copy whole log")
                         }
                     }
                     val all = entries.valueOrNull().orEmpty()
