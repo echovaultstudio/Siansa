@@ -34,8 +34,8 @@ object Brand {
 enum class ThemeMode(val label: String) { AUTO("Auto"), LIGHT("Light"), DARK("Dark") }
 
 /**
- * Where the theme's colours come from (issue #148): Musix's own, the phone's wallpaper (Android 12+), or a
- * preset made from one [seed] colour.
+ * Where the theme's colours come from (issue #148): Musix's own, the phone's wallpaper (Android 12+), a
+ * preset made from one [seed] colour, or [YOURS]: a seed colour the listener picks.
  */
 enum class ThemeColours(val label: String, val seed: Long? = null) {
     MUSIX("Musix"),
@@ -44,7 +44,8 @@ enum class ThemeColours(val label: String, val seed: Long? = null) {
     FOREST("Forest", 0xFF2E7D4F),
     ROSE("Rose", 0xFFC2416E),
     SUNSET("Sunset", 0xFFE8692A),
-    MONO("Mono", 0xFF777777);
+    MONO("Mono", 0xFF777777),
+    YOURS("Your colour");
 
     companion object {
         fun parse(value: String?): ThemeColours = entries.firstOrNull { it.name == value } ?: MUSIX
@@ -62,6 +63,8 @@ data class ThemeChoice(
     val mode: ThemeMode = ThemeMode.AUTO,
     val colours: ThemeColours = ThemeColours.MUSIX,
     val pureBlack: Boolean = false,
+    /** The seed for [ThemeColours.YOURS], as ARGB. */
+    val seed: Int = app.musix.data.DEFAULT_THEME_SEED,
 )
 
 /** The colour for play buttons, active controls, hearts and the playing song: the theme's main colour. */
@@ -153,11 +156,12 @@ private fun ThemeTones.Roles.toScheme(dark: Boolean): ColorScheme {
     )
 }
 
-/** The colours for [colours] in light or [dark]; pure black only applies to dark. */
+/** The colours for [colours] in light or [dark]; pure black only applies to dark. [seed] is used for "Your colour". */
 @Composable
-fun themeScheme(colours: ThemeColours, dark: Boolean, pureBlack: Boolean = false): ColorScheme {
+fun themeScheme(colours: ThemeColours, dark: Boolean, pureBlack: Boolean = false, seed: Int = LocalChoice.current.seed): ColorScheme {
     val context = LocalContext.current
     val base = when {
+        colours == ThemeColours.YOURS -> remember(seed, dark) { ThemeTones.scheme(seed, dark, mono = ThemeTones.isGrey(seed)).toScheme(dark) }
         colours == ThemeColours.MUSIX -> if (dark) MusixDark else MusixLight
         colours == ThemeColours.WALLPAPER && ThemeColours.wallpaperAvailable ->
             if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -188,8 +192,8 @@ fun isDark(choice: ThemeChoice): Boolean = when (choice.mode) {
 @Composable
 fun MusixTheme(choice: ThemeChoice = ThemeChoice(), content: @Composable () -> Unit) {
     val dark = isDark(choice)
-    val scheme = themeScheme(choice.colours, dark, choice.pureBlack)
-    val darkScheme = if (dark) scheme else themeScheme(choice.colours, true, choice.pureBlack)
+    val scheme = themeScheme(choice.colours, dark, choice.pureBlack, choice.seed)
+    val darkScheme = if (dark) scheme else themeScheme(choice.colours, true, choice.pureBlack, choice.seed)
     CompositionLocalProvider(
         LocalChoice provides choice,
         LocalAccent provides accentOf(choice.colours, scheme),
@@ -204,7 +208,7 @@ fun MusixTheme(choice: ThemeChoice = ThemeChoice(), content: @Composable () -> U
 @Composable
 fun MusixDarkTheme(content: @Composable () -> Unit) {
     val choice = LocalChoice.current
-    val scheme = themeScheme(choice.colours, true)
+    val scheme = themeScheme(choice.colours, true, seed = choice.seed)
     CompositionLocalProvider(LocalAccent provides accentOf(choice.colours, scheme), LocalOnAccent provides onAccentOf(choice.colours, scheme)) {
         MaterialTheme(colorScheme = scheme, content = content)
     }
@@ -221,4 +225,5 @@ fun themeChoiceOf(settings: app.musix.data.AppSettings): ThemeChoice = ThemeChoi
     mode = ThemeMode.entries.firstOrNull { it.name == settings.themeMode } ?: ThemeMode.AUTO,
     colours = ThemeColours.parse(settings.themeColours).let { if (it == ThemeColours.WALLPAPER && !ThemeColours.wallpaperAvailable) ThemeColours.MUSIX else it },
     pureBlack = settings.pureBlack,
+    seed = settings.themeSeed,
 )

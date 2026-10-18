@@ -9,6 +9,9 @@ import java.net.URLDecoder
 
 enum class ReplayGainMode(val label: String) { TRACK("Track"), ALBUM("Album"), OFF("Off") }
 
+/** "Your colour" starts as a teal until someone picks their own (issue #148). */
+const val DEFAULT_THEME_SEED: Int = 0xFF0E9AA7.toInt()
+
 data class AppSettings(
     val navidromeUrl: String = "",
     val navidromeUser: String = "",
@@ -59,6 +62,8 @@ data class AppSettings(
     val themeMode: String = "AUTO",
     val themeColours: String = "MUSIX",
     val pureBlack: Boolean = false,
+    /** The seed for "Your colour" (issue #148, step 2), as ARGB. */
+    val themeSeed: Int = DEFAULT_THEME_SEED,
 ) {
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
@@ -171,6 +176,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         themeMode = prefs.getString("theme_mode", "AUTO") ?: "AUTO",
         themeColours = prefs.getString("theme_colours", "MUSIX") ?: "MUSIX",
         pureBlack = prefs.getBoolean("pure_black", false),
+        themeSeed = prefs.getInt("theme_seed", DEFAULT_THEME_SEED),
     )
 
     /**
@@ -281,8 +287,14 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(downloadedOnly = on)
     }
 
-    fun setTheme(mode: String = _state.value.themeMode, colours: String = _state.value.themeColours, pureBlack: Boolean = _state.value.pureBlack) {
-        prefs.edit().putString("theme_mode", mode).putString("theme_colours", colours).putBoolean("pure_black", pureBlack).apply()
-        _state.value = _state.value.copy(themeMode = mode, themeColours = colours, pureBlack = pureBlack)
+    fun setTheme(
+        mode: String = _state.value.themeMode,
+        colours: String = _state.value.themeColours,
+        pureBlack: Boolean = _state.value.pureBlack,
+        seed: Int = _state.value.themeSeed,
+    ) {
+        prefs.edit().putString("theme_mode", mode).putString("theme_colours", colours).putBoolean("pure_black", pureBlack)
+            .putInt("theme_seed", seed).apply()
+        _state.value = _state.value.copy(themeMode = mode, themeColours = colours, pureBlack = pureBlack, themeSeed = seed)
     }
 }
