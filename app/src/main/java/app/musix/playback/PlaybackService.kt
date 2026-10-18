@@ -98,7 +98,7 @@ class PlaybackService : MediaSessionService() {
         phone = player
         cacheFactory = built.cacheFactory
         events = Events(player).also { player.addListener(it) }
-        exo.addAnalyticsListener(PlaybackDiagnostics(exo, this) { waited -> onStall(player, waited) })
+        exo.addAnalyticsListener(PlaybackDiagnostics(exo, this))
         exo.addAnalyticsListener(object : AnalyticsListener {
             override fun onAudioDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
                 AppLog.i("Audio", "Decoder $decoderName")
@@ -188,74 +188,13 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun kbpsFor(songId: String): Int = chosenKbps.getOrPut(songId) {
-        val chosen = Streaming.bitrate(this, graph.settings.current)
-        val slow = chosen == 0 && SystemClock.elapsedRealtime() < slowUntil
-        (if (slow) slowKbps else chosen).also {
-            AppLog.i("Stream", "Song $songId: " + when {
-                slow -> "Opus $it kbit/s (connection was too slow for the original)"
-                it > 0 -> "Opus $it kbit/s"
-                else -> "original"
-            })
+        // Only what's chosen in Settings → Playback: Musix never switches quality on its own.
+        Streaming.bitrate(this, graph.settings.current).also {
+            AppLog.i("Stream", "Song $songId: " + if (it > 0) "Opus $it kbit/s" else "original")
         }
     }
 
-    // ---- Slow connection: switch to Opus for a while instead of stopping every few seconds ----
-
-    @Volatile private var slowUntil = 0L
-    @Volatile private var slowKbps = 0
-    private val stalls = ArrayDeque<Long>()
-
-    private fun onStall(player: Player, waitedMs: Long) {
-        if (waitedMs < 1500) return
-        val now = SystemClock.elapsedRealtime()
-        stalls.addLast(now)
-        while (stalls.isNotEmpty() && now - stalls.first() > 120_000) stalls.removeFirst()
-        if (stalls.size < 3) return
-        stalls.clear()
-        switchToOpus(player, "stopped 3 times in 2 minutes")
-    }
-
-    /** Started when playback begins waiting for data; switches early if the wait drags on and data is too slow. */
-    private val bufferingWatch = Runnable {
-        val player = session?.player?.takeIf { it === phone } ?: return@Runnable
-        if (player.playbackState != Player.STATE_BUFFERING || !player.playWhenReady) return@Runnable
-        val id = player.currentMediaItem?.mediaId ?: return@Runnable
-        val arriving = StreamStats.recentKbps()
-        val needed = StreamStats.neededKbps(id) ?: return@Runnable
-        if (arriving < 0 || arriving < needed * 0.9) switchToOpus(player, "waited 8 s for the song to start or continue")
-    }
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
-
-    private fun switchToOpus(player: Player, why: String) {
-        val item = player.currentMediaItem ?: return
-        if ((chosenKbps[item.mediaId] ?: 0) > 0) return
-        if (!graph.settings.current.autoQuality) {
-            AppLog.w("Stream", "Playback $why; the automatic switch to Opus is off in Settings → Playback")
-            return
-        }
-        val now = SystemClock.elapsedRealtime()
-        val arriving = StreamStats.recentKbps()
-        // Pick an Opus bitrate that fits comfortably in what's arriving (Opus 160 already sounds very good).
-        val kbps = if (arriving <= 0) 160 else listOf(320, 256, 192, 160, 128, 96).firstOrNull { it <= arriving * 0.7 } ?: 96
-        slowKbps = kbps
-        slowUntil = now + 15 * 60_000
-        stalls.clear()
-        handler.removeCallbacks(bufferingWatch)
-        precacheWriter?.cancel()
-        precacheJob?.cancel()
-        AppLog.w(
-            "Stream",
-            "Playback $why: the connection is too slow for the original file (arriving at ${if (arriving > 0) "$arriving kbit/s" else "an unknown speed"}, " +
-                "song needs ~${StreamStats.neededKbps(item.mediaId) ?: "?"} kbit/s). Switching to Opus $kbps kbit/s for 15 minutes.",
-        )
-        chosenKbps.clear()
-        chosenKbps[item.mediaId] = kbps
-        val uri = item.localConfiguration?.uri ?: return
-        val index = player.currentMediaItemIndex
-        val position = player.currentPosition
-        player.replaceMediaItem(index, item.buildUpon().setUri(Streaming.rewrite(uri, kbps)).build())
-        player.seekTo(index, position)
-    }
 
     /** Tells the app's screens what the current song streams as (Opus kbit/s, or 0 for the original file). */
     private fun publishQuality() {
@@ -303,12 +242,6 @@ class PlaybackService : MediaSessionService() {
             return
         }
         val item = player.currentMediaItem ?: return
-        if (kbps <= 0) {
-            // Asking for the original ends a slow-connection switch to Opus.
-            slowUntil = 0L
-            stalls.clear()
-        }
-        handler.removeCallbacks(bufferingWatch)
         precacheWriter?.cancel()
         precacheJob?.cancel()
         precachedFor = null
@@ -459,7 +392,6 @@ class PlaybackService : MediaSessionService() {
             (if (toCast) "Playing on ${(target as? DlnaPlayer)?.name ?: Cast.deviceName() ?: "a Cast device"}" else "Cast ended; music back on the phone, paused") +
                 " (${items.size} songs, song ${index + 1} at ${position / 1000}s)",
         )
-        handler.removeCallbacks(bufferingWatch)
         precacheWriter?.cancel()
         precacheJob?.cancel()
         events?.let { from.removeListener(it) }
@@ -532,7 +464,6 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
-        handler.removeCallbacks(bufferingWatch)
         handler.removeCallbacks(sleepTick)
         mainScope.cancel()
         graph.sleepTimer.cancel()
@@ -670,8 +601,6 @@ class PlaybackService : MediaSessionService() {
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            handler.removeCallbacks(bufferingWatch)
-            if (playbackState == Player.STATE_BUFFERING) handler.postDelayed(bufferingWatch, 8_000)
             if (playbackState == Player.STATE_ENDED) {
                 finishCurrent()
                 // The queue ran out while the sleep timer was finishing its song.
