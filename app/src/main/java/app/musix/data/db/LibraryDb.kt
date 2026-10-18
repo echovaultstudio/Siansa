@@ -104,6 +104,8 @@ data class AlbumSignature(val id: String, val signature: String)
 data class AlbumGroupRow(val id: String, val groupKey: String, val songCount: Int)
 data class AlbumTypeRow(val releaseTypes: String, val isCompilation: Boolean)
 data class GenreRow(val name: String, val songCount: Int)
+/** Just what matching songs by title and artist needs (issue #186's time machine). */
+data class SongTitleRow(val id: String, val title: String, val artist: String)
 
 @Dao
 interface LibraryDao {
@@ -113,6 +115,9 @@ interface LibraryDao {
 
     @Query("SELECT * FROM songs WHERE id IN (:ids)")
     suspend fun songs(ids: List<String>): List<SongEntity>
+
+    @Query("SELECT id, title, artist FROM songs")
+    suspend fun songTitles(): List<SongTitleRow>
 
     /** The album cover id for a song's cover id (a song without its own picture shows its album's). */
     @Query("SELECT a.coverArt FROM songs s JOIN albums a ON a.id = s.albumId WHERE s.coverArt = :songCover LIMIT 1")

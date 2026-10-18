@@ -3,6 +3,7 @@ package app.musix.data
 import android.content.Context
 import androidx.room.withTransaction
 import app.musix.data.db.AlbumEntity
+import app.musix.data.db.SongTitleRow
 import app.musix.data.db.ArtistEntity
 import app.musix.data.db.LibraryDatabase
 import app.musix.data.db.MetaEntity
@@ -98,6 +99,9 @@ class LibraryRepository(context: Context) {
     suspend fun albumCoverOfSongCover(songCover: String): String? = dao.albumCoverOfSongCover(songCover)
 
     /** Songs by id, in the order asked for; ids the library doesn't have are left out. */
+    /** Every song's id, title and artist, for matching many songs from other services at once. */
+    suspend fun songTitles(): List<SongTitleRow> = withContext(Dispatchers.IO) { dao.songTitles() }
+
     suspend fun songs(ids: List<String>): List<Song> {
         if (ids.isEmpty()) return emptyList()
         val found = ids.distinct().chunked(CHUNK).flatMap { dao.songs(it) }.associateBy { it.id }
