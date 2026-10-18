@@ -3,6 +3,35 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.7.0beta](https://github.com/Th3K1ngP1n/musix/releases/tag/v0.7.0beta) — 2026-10-18
+
+- [#136](https://github.com/Th3K1ngP1n/musix/pull/136) Let the release job read pull requests for the release history (@Th3K1ngP1n)
+- [#149](https://github.com/Th3K1ngP1n/musix/pull/149) Make, rename, delete and change your playlists (@kimchiwithrice)
+- [#150](https://github.com/Th3K1ngP1n/musix/pull/150) Playlists (can be) kept on this phone only for offline use (@kimchiwithrice)
+
+## [0.6.0beta](https://github.com/Th3K1ngP1n/musix/releases/tag/v0.6.0beta) — 2026-10-17
+
+- [#151](https://github.com/Th3K1ngP1n/musix/pull/151) Source filter: several users at once, libraries and only downloaded music (#141) (@Th3K1ngP1n)
+
+## [0.5.0beta](https://github.com/Th3K1ngP1n/musix/releases/tag/v0.5.0beta) — 2026-10-17
+
+- [#142](https://github.com/Th3K1ngP1n/musix/pull/142) Downloads: Pause and Resume next to the totals (@Th3K1ngP1n)
+- [#143](https://github.com/Th3K1ngP1n/musix/pull/143) Offline: clear messages for AI tools and songs that are not downloaded (@Th3K1ngP1n)
+- [#144](https://github.com/Th3K1ngP1n/musix/pull/144) Lyrics in every common format, with word-by-word highlighting (@Th3K1ngP1n)
+- [#145](https://github.com/Th3K1ngP1n/musix/pull/145) Artist suggestions as a Your listening dashboard; ReplayGain on the equaliser page (@Th3K1ngP1n)
+- [#146](https://github.com/Th3K1ngP1n/musix/pull/146) Merge for 0.5.0beta: #142, #143, #144, #145 (@Th3K1ngP1n)
+
+## [0.4.2beta](https://github.com/Th3K1ngP1n/musix/releases/tag/v0.4.2beta) — 2026-10-17
+
+- [#137](https://github.com/Th3K1ngP1n/musix/pull/137) Swipe to queue: stronger vibration as soon as the amber strip shows (@Th3K1ngP1n)
+
+## [0.4.1beta](https://github.com/Th3K1ngP1n/musix/releases/tag/v0.4.1beta) — 2026-10-17
+
+- [#129](https://github.com/Th3K1ngP1n/musix/pull/129) Fix the release history step after 0.4.0beta (@Th3K1ngP1n)
+- [#132](https://github.com/Th3K1ngP1n/musix/pull/132) Remove the format label under the seek bar (@Th3K1ngP1n)
+- [#133](https://github.com/Th3K1ngP1n/musix/pull/133) Small vibrations for swipe to queue (@Th3K1ngP1n)
+- [#134](https://github.com/Th3K1ngP1n/musix/pull/134) Merge for 0.4.1beta: format label removed, swipe vibrations, release history fix (@Th3K1ngP1n)
+
 ## [0.4.0beta](https://github.com/Th3K1ngP1n/musix/releases/tag/v0.4.0beta) — 2026-10-17
 
 - [#26](https://github.com/Th3K1ngP1n/musix/pull/26) Bump com.android.application from 8.13.0 to 8.13.2 (@dependabot[bot])
