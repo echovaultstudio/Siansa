@@ -3,6 +3,12 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.7.1beta — 2026-10-18
+
+### Changed
+- **One button at the top of Home.** The filter button now opens both Sources and Arrange (as two tabs of one
+  panel), so the separate Arrange button is gone.
+
 ## 0.7.0beta — 2026-10-18
 
 ### Added
