@@ -122,7 +122,7 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Brand.PlumRaised,
+        containerColor = DarkColours.surfaceContainer,
         contentColor = SheetText,
     ) {
         Column(Modifier.navigationBarsPadding().padding(bottom = 8.dp)) {
@@ -160,7 +160,7 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
                         Text(sleepTimeLabel(customMinutes.roundToInt() * 60_000L), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                         Button(
                             onClick = { start(customMinutes.roundToInt()) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF2A1700)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = OnAccent),
                         ) { Text("Start") }
                     }
                 }
@@ -187,7 +187,7 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
                     checked = windDown,
                     onCheckedChange = { windDown = it },
                     enabled = audioMuse,
-                    colors = SwitchDefaults.colors(checkedTrackColor = Accent, checkedThumbColor = Color(0xFF2A1700)),
+                    colors = SwitchDefaults.colors(checkedTrackColor = Accent, checkedThumbColor = OnAccent),
                 )
             }
         }

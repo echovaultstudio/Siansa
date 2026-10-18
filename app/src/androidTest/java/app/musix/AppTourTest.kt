@@ -261,13 +261,37 @@ class AppTourTest {
                 tab("Settings")
                 idle(800)
                 shot("18-settings")
-                listOf("Connections", "Library sync", "Playback", "Downloads", "Scrobbling", "Storage", "Logs").forEachIndexed { i, page ->
+                listOf("Connections", "Library sync", "Playback", "Themes", "Downloads", "Scrobbling", "Storage", "Logs").forEachIndexed { i, page ->
                     tab("Settings")
                     click(page)
                     idle(1200)
                     shot("19-settings-${i + 1}-" + page.lowercase().replace(' ', '-'))
                     back()
                     idle(400)
+                }
+            }
+            step("themes") {
+                // Two presets shown on Home and on the Themes page, then back to Musix colours.
+                try {
+                    graph.settings.setTheme("LIGHT", "OCEAN", false)
+                    tab("Home")
+                    idle(1200)
+                    shot("19c-home-ocean-light")
+                    graph.settings.setTheme("DARK", "SUNSET", true)
+                    idle(1200)
+                    shot("19d-home-sunset-pure-black")
+                    tab("Settings")
+                    click("Themes")
+                    waitText("Pure black")
+                    idle(800)
+                    shot("19e-themes-sunset-dark")
+                    graph.settings.setTheme("DARK", "MUSIX", false)
+                    idle(800)
+                    shot("19f-themes-musix-dark")
+                    back()
+                } finally {
+                    graph.settings.setTheme("AUTO", "MUSIX", false)
+                    idle(800)
                 }
             }
             step("equaliser and ReplayGain") {

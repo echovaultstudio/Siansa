@@ -199,7 +199,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                                 Modifier.size(56.dp).clip(CircleShape).background(Accent).clickable { graph.player.play(p.songs) },
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Icon(Icons.Rounded.PlayArrow, "Play", tint = androidx.compose.ui.graphics.Color(0xFF2A1700), modifier = Modifier.size(32.dp))
+                                Icon(Icons.Rounded.PlayArrow, "Play", tint = OnAccent, modifier = Modifier.size(32.dp))
                             }
                         }
                     }

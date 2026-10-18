@@ -214,7 +214,7 @@ private fun ConnectionMap(map: DiscoveryMap.Graph, suggestions: List<SuggestedAr
             "You",
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF2A1700),
+            color = OnAccent,
             textAlign = TextAlign.Center,
             modifier = Modifier.width(48.dp).offset(x = w * 0.5f - 24.dp, y = w * 0.5f - 9.dp),
         )
