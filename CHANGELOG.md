@@ -3,6 +3,18 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.9.0beta — 2026-10-18
+
+### Fixed
+- **Release links in What's new open the right page again.** The app's releases moved to a new address on
+  GitHub, and the links now go there.
+- **Animated album covers stayed grey in song lists** (playlists, an artist's Popular songs). Songs now use the copy of the album's cover that's already on your phone, instead of downloading the whole animation again for each list.
+
+### Added
+- **Your colour** in Settings → Themes: pick one colour with the rainbow slider, a quick pick or a colour code, and Musix makes the whole light and dark theme from it. Both are previewed side by side before you use it. Grey picks give a grey theme, and text stays readable whatever colour you choose.
+- **Crossfade.** Songs can blend into each other: Off (the default), Fixed (1 to 12 seconds) or Smart, in Settings › Playback › Crossfade and loudness. Smart keeps songs on one album that run straight on gapless.
+- **Loudness from the Lumae plugin.** If your AudioMuse server has the Lumae plugin, Musix can use its measurement of each song to even out loudness (to −18 or −14 LUFS), also for songs without ReplayGain tags. Smart crossfades then start where a song goes quiet and last as long as the two songs need. Songs the plugin hasn't measured use their tags, as before.
+
 ## 0.8.2beta — 2026-10-18
 
 ### Changed
