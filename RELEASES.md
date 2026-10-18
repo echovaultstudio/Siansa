@@ -3,6 +3,14 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.9.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.9.0beta) — 2026-10-18
+
+- [#163](https://github.com/Musix-Industreez/musix/pull/163) Themes: Your colour from one seed colour (#148, step 2) (@Th3K1ngP1n)
+- [#165](https://github.com/Musix-Industreez/musix/pull/165) Crossfade, SmoothFade and levelling from the Lumae plugin (#60) (@Th3K1ngP1n)
+- [#170](https://github.com/Musix-Industreez/musix/pull/170) Point release links at Musix-Industreez/musix (@Th3K1ngP1n)
+- [#173](https://github.com/Musix-Industreez/musix/pull/173) Tour: start songs through the row's click action, not a touch under the mini player (@Th3K1ngP1n)
+- [#175](https://github.com/Musix-Industreez/musix/pull/175) Song lists reuse the album's kept animated cover for disc covers (@Th3K1ngP1n)
+
 ## [0.8.2beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.8.2beta) — 2026-10-18
 
 - [#167](https://github.com/Musix-Industreez/musix/pull/167) Remove the automatic switch to Opus on slow connections (#166) (@Th3K1ngP1n)
