@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.palette.graphics.Palette
+import app.musix.data.LocalPlaylists
 import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
@@ -38,9 +39,10 @@ fun rememberCoverColor(coverId: String?): Color {
         if (coverId == null || colorCache.containsKey(coverId)) return@LaunchedEffect
         val argb = withContext(Dispatchers.IO) {
             runCatching {
-                val request = ImageRequest.Builder(context)
-                    .data(graph.subsonic.coverUrl(coverId, 300))
-                    .diskCacheKey("cover:$coverId:300")
+                val builder = ImageRequest.Builder(context)
+                if (coverId.startsWith(LocalPlaylists.FILE_COVER)) builder.data(java.io.File(coverId.removePrefix(LocalPlaylists.FILE_COVER)))
+                else builder.data(graph.subsonic.coverUrl(coverId, 300)).diskCacheKey("cover:$coverId:300")
+                val request = builder
                     .memoryCacheKey("cover:$coverId:palette")
                     .allowHardware(false)
                     .size(120)

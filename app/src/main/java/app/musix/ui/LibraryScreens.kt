@@ -43,6 +43,7 @@ import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -52,6 +53,9 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,6 +75,9 @@ import app.musix.data.AlbumDetail
 import app.musix.data.category
 import app.musix.data.Playlist
 import app.musix.data.PlaylistDetail
+import app.musix.data.LocalPlaylists
+import app.musix.data.PlaylistEditor
+import app.musix.data.toPlaylist
 import app.musix.data.Song
 import app.musix.offline.OfflineItem
 import app.musix.offline.OfflineKind
@@ -78,6 +85,7 @@ import app.musix.offline.likedOfflineItem
 import app.musix.offline.offlineItem
 import app.musix.log.AppLog
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 /** Songs with a heart, newest first as Navidrome lists them. */
 @Composable
@@ -110,12 +118,21 @@ fun LikedScreen(nav: NavController) {
     )
 }
 
-/** A Navidrome playlist, with songs matched to the synced library. */
+/** A Navidrome playlist, with songs matched to the synced library; yours can be renamed, changed and deleted. */
 @Composable
 fun PlaylistScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
-    val detail by loadState(id) {
-        val remote = try {
+    val launcher = rememberPlayLauncher()
+    val scope = rememberCoroutineScope()
+    // Bumped after each change, to load the playlist again.
+    var version by remember { mutableIntStateOf(0) }
+    var removing by remember { mutableStateOf(false) }
+    val onPhone = LocalPlaylists.isLocal(id)
+    val detail by loadState(id to version) {
+        val remote = if (onPhone) {
+            val local = graph.localPlaylists.get(id) ?: throw IllegalStateException("This playlist isn't on this phone any more")
+            PlaylistDetail(local.toPlaylist(), local.songs)
+        } else try {
             graph.subsonic.playlist(id)
         } catch (e: Exception) {
             // Without a connection, a downloaded playlist still opens with its songs on the phone.
@@ -126,7 +143,28 @@ fun PlaylistScreen(nav: NavController, id: String) {
         val local = graph.library.songs(remote.songs.map { it.id }).associateBy { it.id }
         remote.copy(songs = remote.songs.map { local[it.id] ?: it })
     }
-    val d = detail.valueOrNull()
+    // While it loads again after a change, the page keeps showing the playlist as it was.
+    var last by remember { mutableStateOf<PlaylistDetail?>(null) }
+    LaunchedEffect(detail) { detail.valueOrNull()?.let { last = it } }
+    val d = detail.valueOrNull() ?: last
+    val editable = d != null && PlaylistEditor.canEdit(d.playlist, graph.settings.current.navidromeUser)
+    val removeFromPlaylist: @Composable (Int, Song, () -> Unit) -> Unit = { index, song, close ->
+        DropdownMenuItem(text = { Text("Remove from this playlist") }, onClick = {
+            close()
+            // Positions are only right for the playlist as Navidrome has it now, not while it loads again.
+            val playlist = detail.valueOrNull()?.playlist
+            if (playlist == null || removing) launcher.notify("One moment, the playlist is still loading")
+            else {
+                removing = true
+                scope.launch {
+                    graph.playlists.remove(playlist.id, index)
+                        .onSuccess { launcher.notify("Removed ${song.title}"); version++ }
+                        .onFailure { launcher.notify(it.message?.takeIf { m -> m.isNotBlank() } ?: "Couldn't remove it") }
+                    removing = false
+                }
+            }
+        })
+    }
     CollectionPage(
         nav = nav,
         title = d?.playlist?.name ?: "Playlist",
@@ -140,13 +178,23 @@ fun PlaylistScreen(nav: NavController, id: String) {
                 Spacer(Modifier.height(6.dp))
             }
             CollectionByline(
-                d?.playlist?.owner,
+                if (onPhone) "On this phone" else d?.playlist?.owner,
                 null,
                 null,
                 if (d == null) "" else "Playlist · ${d.songs.size} songs · ${formatDuration(d.songs.sumOf { it.durationSec.toLong() })}",
             )
         },
-        offline = d?.playlist?.offlineItem(),
+        // A phone playlist's songs download one by one (from their ⋮ menu); Downloads keeps Navidrome's playlists.
+        offline = if (onPhone) null else d?.playlist?.offlineItem(),
+        actions = {
+            if (d != null) {
+                PlaylistMenuButton(d.playlist, editable, notify = launcher::notify, onChanged = { version++ }, onDeleted = { nav.popBackStack() }, onMoved = { made ->
+                    nav.popBackStack()
+                    made?.let { nav.navigate("playlist/${it.id}") }
+                })
+            }
+        },
+        songMenu = if (editable) removeFromPlaylist else null,
     )
 }
 

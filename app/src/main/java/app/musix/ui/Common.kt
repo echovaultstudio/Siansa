@@ -76,6 +76,7 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.navigation.NavController
 import app.musix.AppGraph
+import app.musix.data.LocalPlaylists
 import app.musix.data.Song
 import app.musix.log.AppLog
 import coil3.compose.AsyncImage
@@ -257,10 +258,10 @@ internal fun coverFallbackKeys(id: String, size: Int?): List<String> {
 /** The request [Cover] makes, so covers can be loaded ahead of time into the same cache entries. */
 fun coverRequest(context: android.content.Context, graph: app.musix.AppGraph, id: String, size: Int?): ImageRequest {
     val px = coverServerPx(size)
-    val builder = ImageRequest.Builder(context)
-        .data(graph.subsonic.coverUrl(id, px))
-        .diskCacheKey("cover:$id:${px ?: "full"}")
-        .memoryCacheKey(coverMemoryKey(id, size))
+    val builder = ImageRequest.Builder(context).memoryCacheKey(coverMemoryKey(id, size))
+    // A phone playlist's own picture, already on the phone.
+    if (id.startsWith(LocalPlaylists.FILE_COVER)) builder.data(java.io.File(id.removePrefix(LocalPlaylists.FILE_COVER)))
+    else builder.data(graph.subsonic.coverUrl(id, px)).diskCacheKey("cover:$id:${px ?: "full"}")
     // A fixed size lets the load start straight away instead of waiting for the layout.
     coverDecodePx(size)?.let { builder.size(it) }
     return builder.build()
@@ -413,6 +414,8 @@ fun SongRow(
     subtitle: String? = artistAndAlbum(song),
     // Swipe from right to left adds the song to the queue (not in the queue itself).
     swipeToQueue: Boolean = true,
+    // Extra items at the end of the ⋮ menu (such as removing it from a playlist); call close() when picked.
+    extraMenu: @Composable (close: () -> Unit) -> Unit = {},
 ) {
     val graph = LocalGraph.current
     val nav = LocalNav.current
@@ -420,6 +423,7 @@ fun SongRow(
     val openArtist = rememberArtistOpener(beforeOpen = { sheet.close() })
     val launch = rememberPlayLauncher()
     var menu by remember { mutableStateOf(false) }
+    var pickPlaylist by remember { mutableStateOf(false) }
     // Offline, songs that aren't downloaded are dimmed: they can't play until the connection is back.
     val connection by graph.connection.state.collectAsStateWithLifecycle()
     val unavailable = connection.offline && !graph.downloads.isDownloaded(song.id)
@@ -487,6 +491,10 @@ fun SongRow(
                         menu = false
                         graph.favorites.toggle(song)
                     })
+                    DropdownMenuItem(text = { Text("Add to playlist") }, onClick = {
+                        menu = false
+                        pickPlaylist = true
+                    })
                     DropdownMenuItem(text = { Text("Start song radio") }, onClick = {
                         menu = false
                         if (graph.connection.current.offline) launch.notify("You're offline: song radio needs the server")
@@ -518,8 +526,15 @@ fun SongRow(
                         nav.openSongDetails(song.id)
                     })
                     SongDownloadMenuItem(song) { menu = false }
+                    extraMenu { menu = false }
                 }
             }
+        }
+    }
+    if (pickPlaylist) {
+        AddToPlaylistDialog(listOf(song)) { message ->
+            pickPlaylist = false
+            message?.let { launch.notify(it) }
         }
     }
 }
