@@ -262,7 +262,7 @@ private fun ActionRow(songs: List<Song>, offline: OfflineItem?) {
                 .clickable(enabled = songs.isNotEmpty()) { graph.player.play(songs) },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.PlayArrow, "Play", tint = Color(0xFF2A1700), modifier = Modifier.size(32.dp))
+            Icon(Icons.Rounded.PlayArrow, "Play", tint = OnAccent, modifier = Modifier.size(32.dp))
         }
     }
 }

@@ -124,7 +124,7 @@ fun AlphabetBar(present: Set<Char>, current: Char?, onPick: (Char) -> Unit, modi
             ) {
                 Text(
                     l.toString(),
-                    color = Color(0xFF2A1700),
+                    color = OnAccent,
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
                 )

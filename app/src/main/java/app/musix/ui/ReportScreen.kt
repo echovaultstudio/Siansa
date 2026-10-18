@@ -199,7 +199,7 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
             if (playable.isNotEmpty()) {
                 Button(
                     onClick = { graph.player.play(playable) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF2A1700)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = OnAccent),
                 ) {
                     Icon(Icons.Rounded.PlayArrow, null)
                     Spacer(Modifier.width(4.dp))

@@ -134,9 +134,11 @@ import app.musix.playback.Cast
 import app.musix.playback.PlayerState
 import kotlin.math.max
 
-private val PlayerColors = darkColorScheme(
+/** Now playing's colours: white on the cover's colours, with the theme's accent for buttons. */
+@Composable
+private fun playerColors() = darkColorScheme(
     primary = Accent,
-    onPrimary = Color(0xFF2A1700),
+    onPrimary = OnAccent,
     surface = Color.Transparent,
     onSurface = Color.White,
     onSurfaceVariant = Color.White.copy(alpha = 0.7f),
@@ -236,7 +238,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
         }
     }
 
-    MaterialTheme(colorScheme = PlayerColors, typography = MaterialTheme.typography) {
+    MaterialTheme(colorScheme = playerColors(), typography = MaterialTheme.typography) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -696,7 +698,7 @@ private fun Controls(state: PlayerState) {
             Icon(
                 if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                 "Play or pause",
-                tint = Color(0xFF2A1700),
+                tint = OnAccent,
                 modifier = Modifier.size(38.dp),
             )
         }
