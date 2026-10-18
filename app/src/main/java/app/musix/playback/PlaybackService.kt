@@ -283,7 +283,8 @@ class PlaybackService : MediaSessionService() {
             precacheWriter?.cancel()
             precacheJob?.cancel()
             precachedFor = null
-            chosenKbps.keys.retainAll(setOfNotNull(item?.mediaId))
+            // A stopped song starts afresh too when it's played again, so only a loaded, playing one keeps its choice.
+            if (player.playbackState == Player.STATE_IDLE) chosenKbps.clear() else chosenKbps.keys.retainAll(setOfNotNull(item?.mediaId))
             return
         }
         reloadAt(kbps)
