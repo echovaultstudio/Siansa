@@ -34,7 +34,8 @@ object LyricsFormats {
         }
         // Synced lines may still carry word times inside them (enhanced LRC kept as text).
         if (lyrics.lines.none { WORD_TAG.containsMatchIn(it.text) }) return lyrics
-        return Lyrics(true, lyrics.lines.map { line -> words(line.startMs, line.text) })
+        // Lines that already have their words (from the server's cues) keep them.
+        return Lyrics(true, lyrics.lines.map { line -> if (line.words.isNotEmpty()) line else words(line.startMs, line.text) })
     }
 
     /** Lyrics from raw text in any supported format; null when it's just plain text. */
