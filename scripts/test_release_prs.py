@@ -1,5 +1,6 @@
 """Tests for release_prs.py (run in CI: python3 -m unittest discover -s scripts)."""
 import os
+import subprocess
 import sys
 import unittest
 
@@ -44,6 +45,33 @@ class Page(unittest.TestCase):
         self.assertLess(text.index("## [0.2.0]"), text.index("## [0.1.0]"))
         self.assertIn("- [#7](https://x/pull/7) Shiny (@someone)", text)
         self.assertIn("- 1 commit pushed straight to main", text)
+
+
+class Retries(unittest.TestCase):
+    """gh sometimes fails one call ("unexpected end of JSON input"); it's tried again (after 0.9.0beta)."""
+
+    @staticmethod
+    def runner(*codes):
+        calls = []
+
+        def run(args, **_):
+            code = codes[len(calls)]
+            calls.append(args)
+            return subprocess.CompletedProcess(args, code, "[[]]" if code == 0 else "[]", "" if code == 0 else "unexpected end of JSON input")
+        return run, calls
+
+    def test_failed_call_is_tried_again(self):
+        run, calls = self.runner(1, 1, 0)
+        waits = []
+        self.assertEqual("[[]]", rp.gh("repos/x/commits/1/pulls", run=run, wait=waits.append))
+        self.assertEqual(3, len(calls))
+        self.assertEqual([2, 4], waits)
+
+    def test_gives_up_after_the_last_try(self):
+        run, calls = self.runner(1, 1, 1, 1)
+        with self.assertRaises(subprocess.CalledProcessError):
+            rp.gh("repos/x/commits/1/pulls", run=run, wait=lambda s: None)
+        self.assertEqual(4, len(calls))
 
 
 if __name__ == "__main__":
