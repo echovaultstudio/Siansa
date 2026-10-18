@@ -606,7 +606,7 @@ class PlaybackService : MediaSessionService() {
             if (!graph.profiles.active) return
             val ids = upcomingIds(player, PROFILES_AHEAD)
             scope.launch {
-                val found = graph.profiles.fetch(ids)
+                val found: Map<String, TrackProfile> = graph.profiles.fetch(ids)
                 val profile = found[song.id] ?: return@launch
                 withContext(Dispatchers.Main) { if (current?.id == song.id) relevel(profile) }
             }
