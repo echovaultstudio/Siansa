@@ -302,13 +302,8 @@ class RealServerTest {
             val second = songOf(a.getValue("WebP Animated"))
             instrumentation.runOnMainSync { graph.player.play(listOf(first, second)) }
             waitFor(30_000, "the first song to play") { graph.player.state.value.let { it.isPlaying && it.current?.id == first.id } }
-            // Fades need the original file. An earlier test's slow-link switch to Opus is ended by asking for
-            // the original again while the song plays.
-            if (graph.player.state.value.transcodeKbps > 0) {
-                graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = 160, transcodeMobileKbps = 160))
-                graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = 0, transcodeMobileKbps = 0))
-                SystemClock.sleep(3_000)
-            }
+            // Fades need the original file (set above), which the player can jump in.
+            assertEquals("The song should play as the original file", 0, graph.player.state.value.transcodeKbps)
             // Let it load (about 5 MB over the slow link), then go to 12 s before its end.
             SystemClock.sleep(12_000)
             instrumentation.runOnMainSync { graph.player.seekTo(18_000) }
