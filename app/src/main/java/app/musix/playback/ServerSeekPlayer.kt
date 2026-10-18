@@ -31,7 +31,12 @@ class ServerSeekPlayer(
     init {
         // A song left behind with a stream that starts part-way in plays from its start when it comes round again.
         exo.addListener(object : Player.Listener {
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = resetOthers()
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                resetOthers()
+                announceSeek()
+            }
+            override fun onAvailableCommandsChanged(availableCommands: Player.Commands) = announceSeek()
+            override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) = announceSeek()
         })
     }
 
@@ -67,19 +72,27 @@ class ServerSeekPlayer(
     override fun getAvailableCommands(): Player.Commands = withSeek(exo.availableCommands)
     override fun isCommandAvailable(command: Int): Boolean = availableCommands.contains(command)
 
-    private val wrapped = HashMap<Player.Listener, Player.Listener>()
+    // Listeners get every event from the player unchanged. Right after the player announces what can be done
+    // (which never includes seeking in a converted stream), they're told once more, with seeking. (Wrapping the
+    // listeners instead lost their other events: Kotlin's delegation skips Java's default methods.)
+    private val outer = java.util.concurrent.CopyOnWriteArrayList<Player.Listener>()
+    private val handler = android.os.Handler(exo.applicationLooper)
 
     override fun addListener(listener: Player.Listener) {
-        val seekAware = object : Player.Listener by listener {
-            override fun onAvailableCommandsChanged(availableCommands: Player.Commands) =
-                listener.onAvailableCommandsChanged(withSeek(availableCommands))
-        }
-        wrapped[listener] = seekAware
-        super.addListener(seekAware)
+        outer += listener
+        super.addListener(listener)
     }
 
     override fun removeListener(listener: Player.Listener) {
-        super.removeListener(wrapped.remove(listener) ?: listener)
+        outer -= listener
+        super.removeListener(listener)
+    }
+
+    private fun announceSeek() {
+        handler.post {
+            val commands = availableCommands
+            if (commands != exo.availableCommands) outer.forEach { it.onAvailableCommandsChanged(commands) }
+        }
     }
 
     override fun isCurrentMediaItemSeekable(): Boolean =
