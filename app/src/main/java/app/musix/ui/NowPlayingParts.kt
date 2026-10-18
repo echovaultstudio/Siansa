@@ -406,8 +406,8 @@ fun PlayerMiniHeader(song: Song?, isPlaying: Boolean, progress: Float, liked: Bo
 // ---- Lyrics, opened ----
 
 /**
- * Lyrics over the whole screen, on a colour from the cover: lines already sung light, the line playing
- * now white, the ones to come darker. Synced lyrics follow the song and a tap on a line jumps there; plain
+ * Lyrics over the whole screen, on a colour from the cover: the line playing now white, lines already sung
+ * dimmed, and the ones to come in a colour that stays readable on that background ([lyricsColors]). Synced lyrics follow the song and a tap on a line jumps there; plain
  * lyrics just scroll. The seek bar and controls stay at the bottom.
  */
 @Composable
@@ -416,10 +416,11 @@ fun LyricsScreen(song: Song?, tint: Color, onClose: () -> Unit, menu: () -> Unit
     val graph = LocalGraph.current
     val position by rememberPosition()
     val lyrics by loadState("lyrics-${song?.id}") { song?.let { graph.subsonic.lyrics(it) } }
+    val colors = LyricsTextColors
     Column(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(lerp(tint, Color.Black, 0.1f), lerp(tint, Color.Black, 0.4f))))
+            .background(Brush.verticalGradient(lyricsBackground(tint)))
             // Covers the player completely: touches don't reach it.
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
             .statusBarsPadding()
@@ -468,7 +469,7 @@ fun LyricsScreen(song: Song?, tint: Color, onClose: () -> Unit, menu: () -> Unit
                     itemsIndexed(loaded.lines) { index, line ->
                         // Word-timed lyrics: the line playing now fills in word by word (or syllable by syllable).
                         if (index == current && line.words.isNotEmpty()) {
-                            KaraokeLine(line, Modifier.fillMaxWidth().clickable { line.startMs?.let { graph.player.seekTo(it) } }.padding(vertical = 8.dp))
+                            KaraokeLine(line, colors, Modifier.fillMaxWidth().clickable { line.startMs?.let { graph.player.seekTo(it) } }.padding(vertical = 8.dp))
                             return@itemsIndexed
                         }
                         Text(
@@ -476,9 +477,9 @@ fun LyricsScreen(song: Song?, tint: Color, onClose: () -> Unit, menu: () -> Unit
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.ExtraBold,
                             color = when {
-                                index == current -> Color.White
-                                index < current -> Color.White.copy(alpha = 0.55f)
-                                else -> Color(0xFF1A1030).copy(alpha = 0.8f)
+                                index == current -> colors.current
+                                index < current -> colors.sung
+                                else -> colors.upcoming
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -505,11 +506,12 @@ fun RoundIcon(icon: ImageVector, label: String, modifier: Modifier = Modifier, o
 fun sungWords(line: app.musix.data.LyricLine, positionMs: Long): Int = line.words.count { it.startMs <= positionMs }
 
 /**
- * The line playing now, for lyrics timed word by word: sung words white, the rest of the line darker. It
+ * The line playing now, for lyrics timed word by word: sung words white, the rest of the line in the colour
+ * of the lines to come. It
  * reads the player's position every few frames, so the words keep up with the singing.
  */
 @Composable
-private fun KaraokeLine(line: app.musix.data.LyricLine, modifier: Modifier) {
+private fun KaraokeLine(line: app.musix.data.LyricLine, colors: LyricsColors, modifier: Modifier) {
     val graph = LocalGraph.current
     var position by remember { mutableStateOf(graph.player.positionMs()) }
     LaunchedEffect(line) {
@@ -521,7 +523,7 @@ private fun KaraokeLine(line: app.musix.data.LyricLine, modifier: Modifier) {
     val sung = sungWords(line, position)
     val text = androidx.compose.ui.text.buildAnnotatedString {
         line.words.forEachIndexed { i, word ->
-            withStyle(androidx.compose.ui.text.SpanStyle(color = if (i < sung) Color.White else Color.White.copy(alpha = 0.45f))) { append(word.text) }
+            withStyle(androidx.compose.ui.text.SpanStyle(color = if (i < sung) colors.current else colors.upcoming)) { append(word.text) }
         }
     }
     Text(text, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, modifier = modifier)
