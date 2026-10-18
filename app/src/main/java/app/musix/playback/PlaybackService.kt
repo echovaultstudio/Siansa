@@ -65,6 +65,8 @@ private const val FALLBACK_KBPS = 320
 class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
     private lateinit var exo: ExoPlayer
+    /** [exo] as the rest of the app sees it: converted songs seek on Navidrome (issue #162). */
+    private lateinit var phone: ServerSeekPlayer
     private var castPlayer: RemoteCastPlayer? = null
     private var dlnaPlayer: DlnaPlayer? = null
     // Where the music was on the TV as casting began to end, in case the TV forgets its queue while stopping.
@@ -87,12 +89,17 @@ class PlaybackService : MediaSessionService() {
         graph = (application as MusixApp).graph
 
         val built = PlayerFactory.build(this, graph, ::kbpsFor)
-        val player = built.player
-        exo = player
+        exo = built.player
+        val player = ServerSeekPlayer(
+            exo,
+            converted = { id -> graph.downloads.fileFor(id) == null && (chosenKbps[id] ?: Streaming.bitrate(this, graph.settings.current)) > 0 },
+            durationMsOf = { id -> SongRegistry.get(id)?.durationSec?.takeIf { it > 0 }?.let { it * 1000L } },
+        )
+        phone = player
         cacheFactory = built.cacheFactory
         events = Events(player).also { player.addListener(it) }
-        player.addAnalyticsListener(PlaybackDiagnostics(player, this) { waited -> onStall(player, waited) })
-        player.addAnalyticsListener(object : AnalyticsListener {
+        exo.addAnalyticsListener(PlaybackDiagnostics(exo, this) { waited -> onStall(player, waited) })
+        exo.addAnalyticsListener(object : AnalyticsListener {
             override fun onAudioDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
                 AppLog.i("Audio", "Decoder $decoderName")
             }
@@ -127,7 +134,7 @@ class PlaybackService : MediaSessionService() {
         mainScope.launch {
             graph.sleepTimer.state.collect { timer ->
                 handler.removeCallbacks(sleepTick)
-                if (timer == null) endSleepFade(player) else handler.post(sleepTick)
+                if (timer == null) endSleepFade(exo) else handler.post(sleepTick)
             }
         }
 
@@ -143,7 +150,7 @@ class PlaybackService : MediaSessionService() {
                     Dlna.select(null)
                 }
                 override fun onCastSessionUnavailable() {
-                    if (session?.player === remote) moveTo(exo)
+                    if (session?.player === remote) moveTo(phone)
                 }
             })
             cast.sessionManager.addSessionManagerListener(object : SessionManagerListener<CastSession> {
@@ -198,7 +205,7 @@ class PlaybackService : MediaSessionService() {
     @Volatile private var slowKbps = 0
     private val stalls = ArrayDeque<Long>()
 
-    private fun onStall(player: ExoPlayer, waitedMs: Long) {
+    private fun onStall(player: Player, waitedMs: Long) {
         if (waitedMs < 1500) return
         val now = SystemClock.elapsedRealtime()
         stalls.addLast(now)
@@ -210,7 +217,7 @@ class PlaybackService : MediaSessionService() {
 
     /** Started when playback begins waiting for data; switches early if the wait drags on and data is too slow. */
     private val bufferingWatch = Runnable {
-        val player = session?.player as? ExoPlayer ?: return@Runnable
+        val player = session?.player?.takeIf { it === phone } ?: return@Runnable
         if (player.playbackState != Player.STATE_BUFFERING || !player.playWhenReady) return@Runnable
         val id = player.currentMediaItem?.mediaId ?: return@Runnable
         val arriving = StreamStats.recentKbps()
@@ -219,7 +226,7 @@ class PlaybackService : MediaSessionService() {
     }
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
 
-    private fun switchToOpus(player: ExoPlayer, why: String) {
+    private fun switchToOpus(player: Player, why: String) {
         val item = player.currentMediaItem ?: return
         if ((chosenKbps[item.mediaId] ?: 0) > 0) return
         if (!graph.settings.current.autoQuality) {
@@ -290,7 +297,7 @@ class PlaybackService : MediaSessionService() {
      */
     private fun reloadAt(kbps: Int) {
         val player = session?.player ?: return
-        if (player !== exo) {
+        if (player !== phone) {
             AppLog.i("Stream", "Quality change ignored while casting; the TV gets its own stream")
             return
         }
@@ -381,7 +388,7 @@ class PlaybackService : MediaSessionService() {
         override fun run() {
             val player = session?.player ?: return
             // On a TV or speaker the phone can't fade its volume or stop it at the song's end: it pauses it instead.
-            val onPhone = player === exo
+            val onPhone = player === phone
             val timer = graph.sleepTimer
             val now = timer.now()
             if (timer.state.value?.isTimeUp(now) == true) {
@@ -428,7 +435,7 @@ class PlaybackService : MediaSessionService() {
             moveTo(player)
         } else {
             dlnaPlayer = null
-            if (old != null && session.player === old) moveTo(exo)
+            if (old != null && session.player === old) moveTo(phone)
         }
         if (old != null && old !== dlnaPlayer) old.release()
     }
@@ -441,7 +448,7 @@ class PlaybackService : MediaSessionService() {
         val session = session ?: return
         val from = session.player
         if (from === target) return
-        val toCast = target !== exo
+        val toCast = target !== phone
         val spot = if (from === castPlayer) spotFromTv(from) else spotOf(from)
         castSaved = null
         val (items, index, position) = spot
@@ -456,7 +463,7 @@ class PlaybackService : MediaSessionService() {
         precacheJob?.cancel()
         events?.let { from.removeListener(it) }
         from.stop()
-        if (from === exo) exo.clearMediaItems()
+        if (from === phone) exo.clearMediaItems()
         target.repeatMode = from.repeatMode
         if (items.isNotEmpty()) {
             try {
@@ -550,7 +557,7 @@ class PlaybackService : MediaSessionService() {
         private var current: Song? = null
         // The song playing when playback moved between phone and TV: still the same listen.
         private var carriedOver: String? = null
-        private val onPhone get() = player === exo
+        private val onPhone get() = player === phone
 
         fun attach(target: Player) {
             val now = SystemClock.elapsedRealtime()

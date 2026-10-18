@@ -24,6 +24,7 @@ class FirstFrameDecoder(private val result: SourceFetchResult, private val optio
         val file = result.source.fileOrNull()?.toFile()
         val bitmap = if (file != null) CoverStore.firstFrame(file, maxPx)
         else CoverStore.firstFrame(result.source.source().readByteArray(), maxPx)
+        if (bitmap == null) app.musix.log.AppLog.w("Cover", "Couldn't read the first frame of a cover with any decoder")
         return bitmap?.let { DecodeResult(image = it.asImage(), isSampled = true) }
     }
 
@@ -34,8 +35,15 @@ class FirstFrameDecoder(private val result: SourceFetchResult, private val optio
                 peek.request(32)
                 peek.readByteArray(minOf(32L, peek.buffer.size))
             }.getOrNull() ?: return null
-            val image = CoverStore.sniff(head) ?: return null
-            return if (image.animated) FirstFrameDecoder(result, options) else null
+            val image = CoverStore.sniff(head)
+            if (image == null) {
+                if (head.isNotEmpty()) app.musix.log.AppLog.d("Cover", "Not a cover type Musix knows (first bytes ${head.take(16).joinToString("") { "%02x".format(it) }}); Android decodes it")
+                return null
+            }
+            // Every GIF and every extended WebP (the format animations, transparency and colour profiles use)
+            // goes here, not only those marked animated: Android's still decoder fails on some of these too,
+            // which left animated albums blank in lists now and then (issue #162). Stills read as before.
+            return if (image.animated || image.extendedWebP || image.mime == "image/gif") FirstFrameDecoder(result, options) else null
         }
     }
 }

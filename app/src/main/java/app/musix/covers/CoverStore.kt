@@ -381,7 +381,10 @@ object CoverStore {
 
     // ---- Recognising images from their first bytes -------------------------------------------------------
 
-    class Sniffed(val kind: String, val mime: String, val animated: Boolean, val width: Int, val height: Int)
+    class Sniffed(val kind: String, val mime: String, val animated: Boolean, val width: Int, val height: Int) {
+        /** A WebP in the extended format (VP8X): animated, transparent or with a colour profile. */
+        val extendedWebP: Boolean get() = mime == "image/webp" && width > 0
+    }
 
     /** Reads the image type, whether it's animated, and its size from the first 30 bytes. */
     fun sniff(b: ByteArray): Sniffed? {
