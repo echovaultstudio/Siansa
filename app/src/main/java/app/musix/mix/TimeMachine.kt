@@ -16,6 +16,8 @@ data class TimeMachine(
     val tracks: List<RankedTrack>,
     /** Where the plays came from, shown under the list. */
     val source: String,
+    /** False when a service that's set up couldn't be reached, so this isn't the full picture. */
+    val complete: Boolean = true,
 )
 
 /** The days a time machine covers: [from] inclusive, [to] exclusive. */
