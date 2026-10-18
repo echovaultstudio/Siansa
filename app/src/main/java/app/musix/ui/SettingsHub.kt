@@ -514,10 +514,12 @@ fun LogsScreen(nav: NavController) {
                     }
                     Hint(
                         "Save logs writes a text file (choose Downloads), which you can then upload anywhere. " +
-                            "While on, it records everything that can help trace a problem: server requests, sync, mixes, playback and buffering, " +
+                            "While on, it records everything that can help trace a problem: every request in full (server, IP address, parameters, headers, " +
+                            "size and time, covers and song streams included), sync, mixes, playback and buffering, " +
                             "every download and cache read, cover downloads, slow screen frames and freezes (with what the app was doing), " +
                             "audio format, phone memory, temperature and battery saver, errors and crashes. " +
-                            "Passwords, tokens and API keys are removed. Nothing is recorded while this is off, and nothing leaves the phone unless you share it.",
+                            "Logs can grow large; it's meant for tracing problems. Passwords, tokens and API keys are removed. " +
+                            "Nothing is recorded while this is off, and nothing leaves the phone unless you share it.",
                     )
                     androidx.compose.foundation.layout.FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),

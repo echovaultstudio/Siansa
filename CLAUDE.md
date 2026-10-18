@@ -12,8 +12,9 @@ Source: `app/src/main/java/app/musix/`. Unit tests: `app/src/test/`. Emulator te
   `### Added` / `### Changed`, written for the app's user in plain words. Don't edit `CHANGELOG.md` or
   `version.txt`: the release does that, so pull requests never conflict over them. Use `### Added` only for
   something new to the user: it makes the release a new feature version (0.1.x → 0.2.0).
-- Log what matters for tracing problems with `AppLog` (`i`, `w`, `e`; `d` for detail). Never log addresses,
-  passwords, tokens or API keys.
+- Log what matters for tracing problems with `AppLog` (`i`, `w`, `e`; `d` for detail). Never log passwords,
+  tokens or API keys (`AppLog.redact` removes them from addresses). Server addresses and IPs are logged: the log
+  is a debugging tool and every request is written in full while it's on (issue #180).
 - UI text: short, plain English, no jargon. Follow the existing Musix theme (`ui/Theme.kt`); test light and dark.
 - Visual changes: keep spacing even (the same gap above and below a row of chips, buttons or a badge) and add
   a check for it to `app/src/androidTest/java/app/musix/SpacingTest.kt`.
