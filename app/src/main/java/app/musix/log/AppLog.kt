@@ -16,7 +16,8 @@ import java.util.concurrent.Executors
  * Nothing is written while logging is off. Passwords, tokens and API keys are removed before writing.
  */
 object AppLog {
-    private const val MAX_BYTES = 5_000_000L
+    // Each part; with every request logged in full (issue #180), 5 MB lasted only minutes of browsing.
+    private const val MAX_BYTES = 15_000_000L
     private val writer = Executors.newSingleThreadExecutor { Thread(it, "musix-log").apply { isDaemon = true } }
     private val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.ROOT)
     private lateinit var dir: File
@@ -128,7 +129,7 @@ object AppLog {
     private fun stack(error: Throwable): String = StringWriter().also { error.printStackTrace(PrintWriter(it)) }.toString()
 
     private val secrets = listOf(
-        Regex("([?&](?:t|s|p|u|token|apiKey|api_key|password)=)[^&\\s\"]+", RegexOption.IGNORE_CASE),
+        Regex("([?&](?:t|s|p|u|sk|token|apiKey|api_key|api_sig|key|secret|password)=)[^&\\s\"]+", RegexOption.IGNORE_CASE),
         Regex("(Authorization:?\\s*(?:Bearer|Basic)\\s+)\\S+", RegexOption.IGNORE_CASE),
         Regex("(audiomuse_jwt=)[^;\\s]+"),
         Regex("(sk-or-[A-Za-z0-9-]{4})[A-Za-z0-9-]+"),
