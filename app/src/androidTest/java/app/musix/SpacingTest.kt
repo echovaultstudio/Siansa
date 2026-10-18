@@ -108,4 +108,15 @@ class SpacingTest {
         val card = compose.onNodeWithTag("source-card").getBoundsInRoot()
         assertEven("Source card libraries", chipBox.top - name.bottom, card.bottom - chipBox.bottom)
     }
+
+    /** Themes: the rows of colour swatches are one even gap apart (issue #148). */
+    @Test fun themeSwatchRowsAreEvenlySpaced() {
+        compose.setContent { MusixTheme { app.musix.ui.SwatchGridForTest() } }
+        val first = compose.onNodeWithText("Musix").getBoundsInRoot()
+        val second = compose.onNodeWithText("Sunset").getBoundsInRoot()
+        val grid = compose.onNodeWithTag("swatches").getBoundsInRoot()
+        assertEven("Swatch rows", second.top - first.bottom, app.musix.ui.SWATCH_GAP, tolerance = 1.dp)
+        // The grid ends with the second row: no gap left below it.
+        assertEven("Swatch grid end", grid.bottom - second.bottom, 0.dp, tolerance = 1.dp)
+    }
 }

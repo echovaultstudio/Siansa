@@ -381,7 +381,7 @@ private fun LibraryHeader(
     ) {
         Box(
             Modifier.size(36.dp).clip(CircleShape)
-                .background(Brush.linearGradient(listOf(Brand.Amber, Brand.VioletDeep)))
+                .background(Brush.linearGradient(BrandGradient))
                 .clickable(onClick = onAvatar),
             contentAlignment = Alignment.Center,
         ) { Text(initial, color = Color.White, fontWeight = FontWeight.Bold) }
@@ -623,7 +623,7 @@ private fun PinButton(pinned: Boolean, onClick: () -> Unit, modifier: Modifier =
         onClick = onClick,
         shape = RoundedCornerShape(50),
         color = if (pinned) MaterialTheme.colorScheme.surface else Accent,
-        contentColor = if (pinned) MaterialTheme.colorScheme.onSurface else Color(0xFF2A1700),
+        contentColor = if (pinned) MaterialTheme.colorScheme.onSurface else OnAccent,
         modifier = modifier,
     ) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {

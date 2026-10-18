@@ -777,9 +777,9 @@ fun SwipeToQueue(song: Song, enabled: Boolean, onQueued: () -> Unit, content: @C
                 horizontalArrangement = Arrangement.End,
             ) {
                 if (swiping) {
-                    Text("Add to queue", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color(0xFF2A1700))
+                    Text("Add to queue", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = OnAccent)
                     Spacer(Modifier.width(10.dp))
-                    Icon(Icons.AutoMirrored.Rounded.QueueMusic, null, tint = Color(0xFF2A1700))
+                    Icon(Icons.AutoMirrored.Rounded.QueueMusic, null, tint = OnAccent)
                 }
             }
         },
