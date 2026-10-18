@@ -54,6 +54,34 @@ class ServerSeekPlayer(
 
     override fun getContentDuration(): Long = duration
 
+    // A converted stream has no length, so the player itself says it can't seek in it, and the app's controller
+    // would then drop a seek before it got here. Seeking is done by Navidrome, so it's offered.
+    private fun withSeek(commands: Player.Commands): Player.Commands {
+        val id = exo.currentMediaItem?.mediaId ?: return commands
+        if (!converted(id)) return commands
+        return commands.buildUpon()
+            .addAll(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM, Player.COMMAND_SEEK_BACK, Player.COMMAND_SEEK_FORWARD, Player.COMMAND_SEEK_TO_DEFAULT_POSITION)
+            .build()
+    }
+
+    override fun getAvailableCommands(): Player.Commands = withSeek(exo.availableCommands)
+    override fun isCommandAvailable(command: Int): Boolean = availableCommands.contains(command)
+
+    private val wrapped = HashMap<Player.Listener, Player.Listener>()
+
+    override fun addListener(listener: Player.Listener) {
+        val seekAware = object : Player.Listener by listener {
+            override fun onAvailableCommandsChanged(availableCommands: Player.Commands) =
+                listener.onAvailableCommandsChanged(withSeek(availableCommands))
+        }
+        wrapped[listener] = seekAware
+        super.addListener(seekAware)
+    }
+
+    override fun removeListener(listener: Player.Listener) {
+        super.removeListener(wrapped.remove(listener) ?: listener)
+    }
+
     override fun isCurrentMediaItemSeekable(): Boolean =
         exo.currentMediaItem?.mediaId?.let(converted) == true || exo.isCurrentMediaItemSeekable
 
