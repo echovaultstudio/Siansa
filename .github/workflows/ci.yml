@@ -1,18 +1,17 @@
 name: CI
 
-# Every push and pull request must compile, pass Android Lint, the unit tests and the secret scan; a
-# release is published from main when those pass. The emulator tests against a real Navidrome run after
-# each merge to main and nightly. They report problems (with screenshots) but don't hold back releases:
-# their slow, throttled emulator makes timing results unreliable.
+# Every push and pull request must compile, pass Android Lint, the unit tests, the secret scan and the
+# emulator tests against a real Navidrome; a release is published from main only when all of those pass.
+# The emulator tests also run weekly, so they keep watching main on quiet weeks.
 on:
   push:
     branches: [main]
   pull_request:
   # Actions → CI → Run workflow: builds, checks and releases main on demand.
   workflow_dispatch:
-  # Nightly, so the emulator tests keep watching main even on quiet days.
+  # Weekly (Mondays), so the emulator tests keep watching main even on quiet weeks.
   schedule:
-    - cron: "17 1 * * *"
+    - cron: "17 1 * * 1"
 
 permissions:
   contents: write
@@ -20,9 +19,9 @@ permissions:
   pull-requests: read
 
 concurrency:
-  # The nightly run has a group of its own: GitHub often starts it hours late, and in the shared group it
+  # The scheduled run has a group of its own: GitHub often starts it hours late, and in the shared group it
   # cancelled the run of a merge to main that was about to publish the release.
-  group: ci-${{ github.ref }}${{ github.event_name == 'schedule' && '-nightly' || '' }}
+  group: ci-${{ github.ref }}${{ github.event_name == 'schedule' && '-scheduled' || '' }}
   cancel-in-progress: true
 
 env:
@@ -169,8 +168,8 @@ jobs:
   device-tests:
     name: Emulator tests against Navidrome
     needs: checks
-    # Not on pull requests (20 minutes each); after merges to main, nightly, and on demand.
-    if: github.event_name != 'pull_request'
+    # On every pull request and push, weekly, and on demand. A required check: pull requests aren't merged and
+    # releases aren't published unless it passes.
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -277,7 +276,7 @@ jobs:
 
   release:
     name: Publish release
-    needs: [checks, security]
+    needs: [checks, security, device-tests]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
