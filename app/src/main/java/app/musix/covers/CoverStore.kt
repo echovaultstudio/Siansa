@@ -12,6 +12,7 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.asResponseBody
+import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.buffer
 import okio.sink
 import okio.source
@@ -156,7 +157,7 @@ object CoverStore {
     }
 
     private fun fetch(chain: Interceptor.Chain, clean: Request, id: String, size: Int?, wantsAnimation: Boolean): Response {
-        val response = chain.proceed(clean)
+        val response = withoutServerError(chain, clean, id, size)
         if (!response.isSuccessful) return response
         val head = runCatching { response.peekBody(32).bytes() }.getOrNull() ?: return response
         val image = sniff(head) ?: return response
@@ -194,6 +195,43 @@ object CoverStore {
                 "Animated covers on the phone: ${mb(sizeBytes())}",
         )
         return local(key)?.let { serve(clean, it, wantsAnimation) } ?: throw IOException("Cover $id couldn't be saved")
+    }
+
+    /**
+     * Navidrome sometimes answers a cover request with an error message (`{"subsonic-response": … "failed"}`,
+     * HTTP 200) instead of a picture, e.g. when making a small copy of a big GIF fails. The image cache kept
+     * that message as the cover, so the cover stayed blank until the cache was cleared (issue #162). Such an
+     * answer is logged with Navidrome's reason, asked for once more, and if it fails again passed on as a
+     * failure, which is never cached, so the next look tries again.
+     */
+    private fun withoutServerError(chain: Interceptor.Chain, request: Request, id: String, size: Int?): Response {
+        var attempt = 0
+        while (true) {
+            val response = chain.proceed(request)
+            val reason = serverError(response) ?: return response
+            response.close()
+            AppLog.w("Cover", "Navidrome sent an error instead of cover $id (size ${size ?: "original"}): $reason" + if (attempt == 0) "; asking again" else "")
+            if (++attempt >= 2) {
+                return Response.Builder()
+                    .request(request)
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(502)
+                    .message("Navidrome couldn't send this cover")
+                    .body("".toResponseBody(null))
+                    .build()
+            }
+            Thread.sleep(700)
+        }
+    }
+
+    /** Navidrome's error message when [response] is one instead of a picture, else null. */
+    private fun serverError(response: Response): String? {
+        if (!response.isSuccessful) return null
+        val type = response.header("Content-Type").orEmpty()
+        val head = runCatching { response.peekBody(512).string() }.getOrNull() ?: return null
+        if (!type.contains("json") && !type.contains("xml") && !head.trimStart().startsWith("{") && !head.trimStart().startsWith("<")) return null
+        if (!head.contains("subsonic-response")) return null
+        return Regex(""""message"\s*:\s*"([^"]*)"""").find(head)?.groupValues?.get(1) ?: "status not ok"
     }
 
     private fun waitFor(future: CompletableFuture<Boolean>) {
