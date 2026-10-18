@@ -21,6 +21,7 @@ import app.musix.data.SettingsRepository
 import app.musix.data.SyncPhase
 import app.musix.data.TopSongs
 import app.musix.log.AppLog
+import app.musix.log.NetLog
 import app.musix.mix.MixGenerator
 import app.musix.mix.Radios
 import app.musix.mix.Insights
@@ -120,23 +121,27 @@ class AppGraph(val app: Application) {
                 chain.proceed(request)
             }
         }
-        // Request log (only while logging is on). Cover images are left out to keep the log readable.
+        // Request log (only while logging is on): one line per request, covers included (issue #180). The
+        // full detail of what went over the network (IP address, parameters, headers, size) is NetLog's.
         .addInterceptor { chain ->
             val request = chain.request()
-            if (!AppLog.enabled || request.url.encodedPath.endsWith("/getCoverArt")) return@addInterceptor chain.proceed(request)
+            if (!AppLog.enabled) return@addInterceptor chain.proceed(request)
             val started = System.nanoTime()
             val where = request.url.host + request.url.encodedPath
             try {
                 val response = chain.proceed(request)
                 val ms = (System.nanoTime() - started) / 1_000_000
-                if (response.isSuccessful) AppLog.i("Http", "${request.method} $where → ${response.code} in ${ms}ms")
-                else AppLog.w("Http", "${request.method} ${AppLog.redact(request.url.toString())} → ${response.code} in ${ms}ms")
+                // Answered by Musix itself (an animated cover kept on the phone) rather than the server.
+                val local = if (response.networkResponse == null && response.cacheResponse == null) " (from the phone)" else ""
+                if (response.isSuccessful) AppLog.i("Http", "${request.method} $where → ${response.code} in ${ms}ms$local")
+                else AppLog.w("Http", "${request.method} ${AppLog.redact(request.url.toString())} → ${response.code} in ${ms}ms$local")
                 response
             } catch (e: Exception) {
-                AppLog.w("Http", "${request.method} $where failed: ${e.javaClass.simpleName}: ${e.message}")
+                AppLog.w("Http", "${request.method} ${AppLog.redact(request.url.toString())} failed: ${e.javaClass.simpleName}: ${e.message}")
                 throw e
             }
         }
+        .addNetworkInterceptor(NetLog.interceptor)
         .build()
 
     /**
