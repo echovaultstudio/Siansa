@@ -32,6 +32,8 @@ import app.musix.data.Users
 import app.musix.log.AppLog
 import org.junit.Assert.fail
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.performScrollToNode
@@ -281,7 +283,7 @@ class AppTourTest {
                 tab("Search")
                 idle(800)
                 val typed = compose.onAllNodesWithTag("searchField").fetchSemanticsNodes().firstOrNull()
-                    ?.config?.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.EditableText)?.text.orEmpty()
+                    ?.config?.getOrNull(SemanticsProperties.EditableText)?.text.orEmpty()
                 if (typed.isNotEmpty()) problems += "Search tapped again kept \"$typed\" in the box"
                 shot("16b-search-again")
             }
