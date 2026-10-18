@@ -3,6 +3,13 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.7.2beta — 2026-10-18
+
+### Fixed
+- **Lyrics timed by syllable now light up as they're sung.** Navidrome 0.63 and later send word and syllable
+  timings only to apps that ask for them; Musix now asks, so lyrics that work word by word in Symfonium do
+  in Musix too. A lyrics offset set in the file also moves the lyrics the right way now.
+
 ## 0.7.1beta — 2026-10-18
 
 ### Changed
