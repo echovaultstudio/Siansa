@@ -55,7 +55,8 @@ class SpacingTest {
             }
         }
         val song = compose.onNodeWithTag("song").getBoundsInRoot()
-        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Singles"))).getBoundsInRoot()
+        // The chip's label can sit in the unmerged tree only, depending on how the chip merges it.
+        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Singles")), useUnmergedTree = true).getBoundsInRoot()
         val title = compose.onNodeWithText("Discography").getBoundsInRoot()
         assertEven("Release-type chips", chip.top - (song.bottom - 6.dp), title.top - chip.bottom)
     }
