@@ -293,6 +293,53 @@ class Insights(private val graph: AppGraph) {
         )
     }
 
+    // ---------------- Time machine (issue #186) ----------------
+
+    /**
+     * Your most played songs in [month] of [year] (or the whole year when [month] is null): from Koito and
+     * Last.fm, whichever are set up (both: the higher count for each song), else Musix's own history. Only
+     * songs in your library, up to [limit].
+     */
+    suspend fun timeMachine(year: Int, month: Int?, limit: Int = 50): TimeMachine = coroutineScope {
+        val s = graph.settings.current
+        val window = timeWindow(year, month)
+        val fromSec = window.from.atStartOfDay(zone).toEpochSecond()
+        val toSec = window.to.atStartOfDay(zone).toEpochSecond()
+        // More than shown, as songs not in your library are left out.
+        val fetch = limit * 3
+        val koitoOn = s.listenBrainzReady && graph.historyApi.isKoito(s.listenBrainzUrl)
+        val lastFmOn = s.lastFmEnabled && s.lastFmApiKey.isNotBlank() && s.lastFmUser.isNotBlank()
+        val koito = async {
+            if (!koitoOn) null
+            else runCatching { graph.historyApi.koitoTop(s.listenBrainzUrl, s.listenBrainzToken, "tracks", fromSec, toSec, fetch) }
+                .onFailure { AppLog.w("TimeMachine", "Koito failed: ${it.message}") }.getOrNull()
+        }
+        val lastFm = async {
+            if (!lastFmOn) null
+            else runCatching { graph.historyApi.lastFmTracks(s.lastFmApiKey, s.lastFmUser, fromSec, toSec, fetch) }
+                .onFailure { AppLog.w("TimeMachine", "Last.fm failed: ${it.message}") }.getOrNull()
+        }
+        val fromKoito = koito.await()
+        val fromLastFm = lastFm.await()
+        val used = listOfNotNull("Koito".takeIf { fromKoito != null }, "Last.fm".takeIf { fromLastFm != null })
+        val result = if (used.isNotEmpty()) {
+            val plays = mergePlays(fromKoito.orEmpty(), fromLastFm.orEmpty())
+            val tracks = keepInLibrary(plays, limit) { matchSong(it.artist, it.title.orEmpty()) }
+                .map { (p, song) -> RankedTrack(p.title.orEmpty(), p.artist, p.count, song) }
+            TimeMachine(window.label, tracks, "From ${used.joinToString(" and ")}, songs in your library only")
+        } else {
+            val events = graph.history.all().filter { it.at / 1000 in fromSec until toSec && !it.skipped }
+            val songs = graph.library.songs(events.map { it.id }.distinct()).associateBy { it.id }
+            val tracks = events.groupBy { it.id }.entries.filter { songs[it.key] != null }
+                .sortedByDescending { it.value.size }.take(limit)
+                .map { (id, list) -> RankedTrack(list.first().title, list.first().artist, list.size.toLong(), songs[id]) }
+            val why = if (koitoOn || lastFmOn) "Koito and Last.fm couldn't be reached" else "Set up Koito or Last.fm under Scrobbling for your full history"
+            TimeMachine(window.label, tracks, "From Musix's own history. $why")
+        }
+        AppLog.i("TimeMachine", "${window.label}: ${result.tracks.size} songs in the library · ${result.source}")
+        result
+    }
+
     private fun hours(timesMs: List<Long>): IntArray {
         val counts = IntArray(24)
         timesMs.forEach { counts[Instant.ofEpochMilli(it).atZone(zone).hour]++ }
