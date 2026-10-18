@@ -3,6 +3,15 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.10.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.10.0beta) — 2026-10-18
+
+- [#179](https://github.com/Musix-Industreez/musix/pull/179) Release history: try a failed gh call again (@Th3K1ngP1n)
+- [#182](https://github.com/Musix-Industreez/musix/pull/182) Lyrics: lines to come readable on every cover (@Th3K1ngP1n)
+- [#183](https://github.com/Musix-Industreez/musix/pull/183) Search: recent searches under the search box (@Th3K1ngP1n)
+- [#184](https://github.com/Musix-Industreez/musix/pull/184) Log: every request in full while logging is on (@Th3K1ngP1n)
+- [#185](https://github.com/Musix-Industreez/musix/pull/185) Themes: opacity for Your colour (@Th3K1ngP1n)
+- [#187](https://github.com/Musix-Industreez/musix/pull/187) Time machine: your most played songs from any month or year (@Th3K1ngP1n)
+
 ## [0.9.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.9.0beta) — 2026-10-18
 
 - [#163](https://github.com/Musix-Industreez/musix/pull/163) Themes: Your colour from one seed colour (#148, step 2) (@Th3K1ngP1n)
