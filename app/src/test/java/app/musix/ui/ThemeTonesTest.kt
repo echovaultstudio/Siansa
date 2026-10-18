@@ -57,3 +57,59 @@ class ThemeTonesTest {
         assertEquals(21.0, ThemeTones.contrast(0xFF000000.toInt(), 0xFFFFFFFF.toInt()), 0.01)
     }
 }
+
+/** "Your colour" (issue #148, step 2): any picked colour gives a readable theme. */
+class YourColourTest {
+    private fun readable(what: String, fg: Int, bg: Int, min: Double) {
+        val ratio = ThemeTones.contrast(fg, bg)
+        assertTrue("$what: contrast %.2f is below %.1f".format(ratio, min), ratio >= min)
+    }
+
+    /** Every hue around the slider, the quick picks, and awkward picks: pure yellow, near black, near white, grey. */
+    private val seeds = (0 until 360 step 15).map { ThemeTones.fromHue(it.toDouble()) } + QUICK_COLOURS +
+        listOf(0xFFFFFF00, 0xFF050505, 0xFFFAFAFA, 0xFF808080, 0xFF00FF00, 0xFF0000FF).map { it.toInt() }
+
+    @Test fun anyPickedColourGivesReadableText() {
+        for (seed in seeds) for ((dark, black) in listOf(false to false, true to false, true to true)) {
+            val r = ThemeTones.scheme(seed, dark, mono = ThemeTones.isGrey(seed), black = black)
+            val name = "${ThemeTones.toHex(seed)} ${if (black) "pure black" else if (dark) "dark" else "light"}"
+            readable("$name text", r.onSurface, r.surface, 7.0)
+            readable("$name text on cards", r.onSurface, r.containerHighest, 4.5)
+            readable("$name second text", r.onSurfaceVariant, r.surface, 4.5)
+            readable("$name buttons", r.onPrimary, r.primary, 4.5)
+            readable("$name chips", r.onSecondaryContainer, r.secondaryContainer, 4.5)
+            readable("$name accent", r.primary, r.surface, 3.0)
+        }
+    }
+
+    @Test fun hexCodesReadAndWrite() {
+        assertEquals(0xFF0E9AA7.toInt(), ThemeTones.parseHex("#0E9AA7"))
+        assertEquals(0xFF0E9AA7.toInt(), ThemeTones.parseHex(" 0e9aa7 "))
+        assertEquals(0xFF0099AA.toInt(), ThemeTones.parseHex("#09A"))
+        assertEquals(null, ThemeTones.parseHex("#0E9AA"))
+        assertEquals(null, ThemeTones.parseHex("teal"))
+        assertEquals(null, ThemeTones.parseHex(""))
+        assertEquals("#0E9AA7", ThemeTones.toHex(0xFF0E9AA7.toInt()))
+        for (seed in seeds) assertEquals(seed, ThemeTones.parseHex(ThemeTones.toHex(seed)))
+    }
+
+    @Test fun hueSliderGoesRoundTheColourWheel() {
+        for (h in (0 until 360 step 30)) {
+            val back = ThemeTones.hueOf(ThemeTones.fromHue(h.toDouble()))
+            val diff = minOf(abs(back - h), 360 - abs(back - h))
+            assertTrue("hue $h came back as $back", diff < 6)
+        }
+    }
+
+    @Test fun greyPicksGiveAGreyTheme() {
+        assertTrue(ThemeTones.isGrey(0xFF808080.toInt()))
+        assertTrue(!ThemeTones.isGrey(0xFF0E9AA7.toInt()))
+        val r = ThemeTones.scheme(0xFF808080.toInt(), dark = false, mono = true)
+        assertTrue(abs((r.primary shr 16 and 0xFF) - (r.primary and 0xFF)) <= 1)
+    }
+
+    @Test fun yourColourIsOfferedAfterThePresets() {
+        assertEquals(ThemeColours.YOURS, ThemeColours.entries.last())
+        assertEquals(null, ThemeColours.YOURS.seed)
+    }
+}
