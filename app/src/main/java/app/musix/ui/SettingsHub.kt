@@ -70,11 +70,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.musix.covers.CoverDownload
 import app.musix.covers.CoverStore
+import app.musix.data.AppSettings
 import app.musix.data.ReplayGainMode
 import app.musix.data.SyncPhase
 import app.musix.data.Users
 import app.musix.log.AppLog
+import app.musix.playback.CrossfadeMode
 import app.musix.playback.EqSettings
+import app.musix.playback.LoudnessSource
 import app.musix.log.problemsForClipboard
 import app.musix.log.logEntries
 import coil3.SingletonImageLoader
@@ -129,7 +132,7 @@ fun SettingsHub(nav: NavController) {
             HubRow(
                 Icons.Rounded.Equalizer,
                 "Playback",
-                "ReplayGain ${settings.replayGain.label.lowercase()} · " + eqSummary(eq) + " · Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}",
+                "ReplayGain ${settings.replayGain.label.lowercase()} · " + eqSummary(eq) + " · " + crossfadeSummary(settings).substringBefore(" · ").lowercase() + " · Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}",
             ) { nav.navigate("settings/playback") }
             val theme = themeChoiceOf(settings)
             HubRow(
@@ -198,6 +201,16 @@ private fun HubRow(icon: ImageVector, title: String, subtitle: String, onClick: 
     }
 }
 
+/** "Crossfade 6 s · Lumae plugin", "Smart crossfade up to 8 s · song tags", "No crossfade · song tags". */
+internal fun crossfadeSummary(s: AppSettings): String {
+    val fade = when (s.crossfade) {
+        CrossfadeMode.OFF -> "No crossfade"
+        CrossfadeMode.FIXED -> "Crossfade ${s.crossfadeSeconds} s"
+        CrossfadeMode.SMART -> "Smart crossfade up to ${s.crossfadeSeconds} s"
+    }
+    return fade + " · " + s.loudnessSource.label.let { if (s.loudnessSource == LoudnessSource.TAGS) it.lowercase() else it }
+}
+
 private fun eqSummary(eq: EqSettings): String = if (eq.enabled) "equaliser ${eq.preset.label.lowercase()}" else "equaliser off"
 
 private fun imageLimit(mb: Int): String = if (mb <= 0) "without a limit" else "up to ${formatMb(mb)}"
@@ -226,6 +239,17 @@ fun PlaybackSettingsScreen(nav: NavController) {
                 Column(Modifier.weight(1f)) {
                     Heading("Equaliser and ReplayGain")
                     Hint((if (eq.enabled) "On · ${eq.preset.label}" else "Equaliser off") + " · ReplayGain ${settings.replayGain.label.lowercase()}")
+                }
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
+            }
+            HorizontalDivider()
+            Row(
+                Modifier.fillMaxWidth().clickable { nav.navigate("settings/crossfade") }.padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Heading("Crossfade and loudness")
+                    Hint(crossfadeSummary(settings))
                 }
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
             }
