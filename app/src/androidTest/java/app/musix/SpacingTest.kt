@@ -108,4 +108,17 @@ class SpacingTest {
         val card = compose.onNodeWithTag("source-card").getBoundsInRoot()
         assertEven("Source card libraries", chipBox.top - name.bottom, card.bottom - chipBox.bottom)
     }
+
+    /** Home: the one settings button sits centred on the greeting's line (issue #152). */
+    @Test fun homeButtonSitsOnTheGreetingLine() {
+        compose.setContent {
+            MusixTheme {
+                app.musix.ui.HomeHeader("Good evening") { Box(Modifier.height(48.dp).fillMaxWidth(0.12f).testTag("button")) }
+            }
+        }
+        val title = compose.onNodeWithText("Good evening").getBoundsInRoot()
+        val button = compose.onNodeWithTag("button").getBoundsInRoot()
+        // Centred on one line: as far past the greeting's top as past its bottom.
+        assertEven("Home button against the greeting", title.top - button.top, button.bottom - title.bottom, tolerance = 2.dp)
+    }
 }
