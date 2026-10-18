@@ -235,18 +235,14 @@ class SubsonicApi(
         // Navidrome reads lyrics from the file's tags and from .lrc / .txt files next to it, sometimes several
         // (languages, or both synced and plain). Each is read in whatever format it's in (LRC, enhanced LRC
         // with word times, TTML, SRT…), and the most detailed one is used.
-        val structured = runCatching { call("getLyricsBySongId", mapOf("id" to song.id)) }.getOrNull()
+        // enhanced=true asks for word and syllable timings (OpenSubsonic songLyrics v2, Navidrome 0.63+);
+        // servers without it ignore the extra parameter, and if one refuses it, the plain request follows.
+        val structured = runCatching { call("getLyricsBySongId", mapOf("id" to song.id, "enhanced" to "true")) }
+            .recoverCatching { call("getLyricsBySongId", mapOf("id" to song.id)) }
+            .getOrNull()
         val sets = structured?.obj("lyricsList")?.arr("structuredLyrics").orEmpty()
-        val options = sets.map { set ->
-            val synced = set.bool("synced") == true
-            val offset = set.long("offset") ?: 0L
-            val lines = set.arr("line").map { line ->
-                LyricLine(
-                    startMs = if (synced) line.long("start")?.let { it + offset } else null,
-                    text = line.str("value").orEmpty(),
-                )
-            }
-            set.str("lang") to LyricsFormats.normalize(Lyrics(synced, lines))
+        val options = sets.mapNotNull { set ->
+            structuredLyrics(set)?.let { (lang, lyrics) -> lang to LyricsFormats.normalize(lyrics) }
         }
         LyricsFormats.best(options, java.util.Locale.getDefault().language)?.let { picked ->
             AppLog.d("Lyrics", "Song ${song.id}: ${options.size} lyrics, using " + when {
