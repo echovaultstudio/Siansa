@@ -249,23 +249,15 @@ class AppTourTest {
                 libraryAll()
                 click("Your listening")
                 idle(800)
-                // What the Your listening list shows (the step couldn't open Time machine on CI; see the PR).
                 shot("14b-your-listening-list")
-                println("Tour: listening list: " + onScreenTexts())
-                runCatching {
-                    compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Time machine"))
-                }.onFailure { println("Tour: scroll to Time machine failed: $it") }
-                idle(400)
-                println("Tour: after scrolling: " + onScreenTexts())
-                tapRow("Time machine")
-                idle(1500)
-                shot("14c-after-tapping-time-machine")
+                // "Time machine" is also a filter chip above the list: open the entry by its own subtitle.
+                tapRow("Your listening · Any month or year")
                 waitText("Whole year")
                 idle(2500)
-                shot("14d-time-machine")
+                shot("14c-time-machine")
                 click("Whole year")
                 idle(2500)
-                shot("14e-time-machine-year")
+                shot("14d-time-machine-year")
                 back()
             }
             step("other artists you might like") {
