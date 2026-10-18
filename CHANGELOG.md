@@ -3,6 +3,14 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.11.0beta — 2026-10-18
+
+### Fixed
+- **Your listening reports looked stuck when switching between This month, Last month, This year and This time last year.** The loading circle now shows straight away while the new report loads.
+
+### Added
+- **Copy whole log**, next to Copy problems in Settings → Logs: copies the entire log, ready to paste into a message or an issue. If the log is too big for the clipboard, the newest part that fits is copied and the first line says so; Save logs still has all of it.
+
 ## 0.10.2beta — 2026-10-18
 
 ### Fixed
