@@ -52,9 +52,13 @@ data class GuestMusic(
             playlists = music.playlists.distinctBy { it.id }.filter { it.id !in knownPlaylists },
         )
 
-        private val COVER = Regex("^(?:al|ar|mf|pl)-([^_]+)(?:_.*)?$")
+        // Disc covers (issue #226) are "dc-<album id>:<disc>", sometimes with "_<stamp>" too.
+        private val COVER = Regex("^(?:al|ar|mf|pl|dc)-([^_:]+)(?:[_:].*)?$")
 
-        /** The item a cover id belongs to: "al-123_6543" → "123". Null when it isn't a cover id. */
+        /**
+         * The item a cover id belongs to: "al-123_6543" → "123", a disc cover "dc-123:2" → album "123". Null
+         * when it isn't a cover id.
+         */
         fun itemOfCover(id: String): String? = COVER.find(id)?.groupValues?.get(1)
     }
 }
