@@ -81,7 +81,7 @@ class LibrarySync(
                 _progress.update { it.copy(phase = SyncPhase.FAILED, error = "Sync was stopped") }
                 throw e
             } catch (e: Exception) {
-                AppLog.e("Sync", "Failed", e)
+                AppLog.e("Sync", "Failed", e, event = "sync.failed", fields = mapOf("full" to full))
                 _progress.update { it.copy(phase = SyncPhase.FAILED, error = e.message ?: e.javaClass.simpleName) }
             } finally {
                 library.refreshStatus()
@@ -106,7 +106,8 @@ class LibrarySync(
         val synced = library.meta(LibraryRepository.META_SYNCED_AT) != null
         val sameFolders = library.meta(LibraryRepository.META_FOLDERS) == folderKey
         val lastScan = runCatching { api.lastScan() }.getOrNull()
-        AppLog.i("Sync", "Start full=$forceFull quiet=$quiet lastScan=$lastScan folders=$folderKey")
+        AppLog.i("Sync", "Start full=$forceFull quiet=$quiet lastScan=$lastScan folders=$folderKey", event = "sync.started",
+            fields = mapOf("full" to forceFull, "quiet" to quiet, "last_scan" to lastScan, "folders" to folderKey))
 
         if (!forceFull && synced && sameFolders && lastScan != null && lastScan != "scanning" &&
             lastScan == library.meta(LibraryRepository.META_LAST_SCAN)
@@ -114,7 +115,7 @@ class LibrarySync(
             // Navidrome hasn't scanned since: the music is the same. Refresh what changes without a scan.
             refreshExtras()
             library.putMeta(LibraryRepository.META_SYNCED_AT, System.currentTimeMillis().toString())
-            AppLog.i("Sync", "No scan since last sync, library unchanged")
+            AppLog.i("Sync", "No scan since last sync, library unchanged", event = "sync.completed", fields = mapOf("changed_albums" to 0, "up_to_date" to true))
             _progress.update { it.copy(phase = SyncPhase.DONE, upToDate = true, changedAlbums = 0) }
             return
         }
@@ -144,7 +145,8 @@ class LibrarySync(
         val changed = albums.values.filter { known[it.id] != it.signature() }
         val removed = stored.keys - albums.keys
         val full = forceFull || !synced || !sameFolders || changed.size > maxOf(300, albums.size / 3)
-        AppLog.i("Sync", "${albums.size} albums on server, ${changed.size} new or changed, ${removed.size} removed, full=$full")
+        AppLog.i("Sync", "${albums.size} albums on server, ${changed.size} new or changed, ${removed.size} removed, full=$full", event = "sync.progress",
+            fields = mapOf("albums_on_server" to albums.size, "changed" to changed.size, "removed" to removed.size, "full" to full))
 
         if (full) {
             val expected = albums.values.sumOf { it.songCount }
@@ -193,7 +195,8 @@ class LibrarySync(
         library.putMeta(LibraryRepository.META_SYNCED_AT, System.currentTimeMillis().toString())
         library.refreshStatus()
         val status = library.status.value
-        AppLog.i("Sync", "Done: ${status?.artists} artists, ${status?.albums} albums, ${status?.songs} songs, $merged merged")
+        AppLog.i("Sync", "Done: ${status?.artists} artists, ${status?.albums} albums, ${status?.songs} songs, $merged merged", event = "sync.completed",
+            fields = mapOf("artists" to status?.artists, "albums" to status?.albums, "songs" to status?.songs, "merged" to merged))
         _progress.update {
             it.copy(
                 phase = SyncPhase.DONE,

@@ -522,8 +522,28 @@ fun LogsScreen(nav: NavController) {
                             "every download and cache read, cover downloads, slow screen frames and freezes (with what the app was doing), " +
                             "audio format, phone memory, temperature and battery saver, errors and crashes. " +
                             "Logs can grow large; it's meant for tracing problems. Passwords, tokens and API keys are removed. " +
-                            "Nothing is recorded while this is off, and nothing leaves the phone unless you share it.",
+                            "Nothing is recorded while this is off, and nothing leaves the phone unless you share it. " +
+                            "If the app crashes, its last few hundred steps are kept on the phone so the crash can be looked into. " +
+                            "Share sends a ZIP with the log, the same entries as data for tools, and what's in it.",
                     )
+                    // Detail per part of the app (issue #237): leave out what isn't needed to keep the log small.
+                    Text("Detail for", style = MaterialTheme.typography.titleSmall)
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+                        verticalArrangement = Arrangement.spacedBy(Space.Small),
+                    ) {
+                        LOG_DETAIL.forEach { (component, label) ->
+                            FilterChip(
+                                selected = component !in settings.logQuiet,
+                                onClick = {
+                                    val quiet = if (component in settings.logQuiet) settings.logQuiet - component else settings.logQuiet + component
+                                    graph.settings.setLogQuiet(quiet)
+                                    AppLog.quiet = quiet
+                                },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
                     androidx.compose.foundation.layout.FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(Space.Small),
                         verticalArrangement = Arrangement.spacedBy(Space.Small),
@@ -536,7 +556,7 @@ fun LogsScreen(nav: NavController) {
                             Spacer(Modifier.width(Space.Small))
                             Text("Save logs")
                         }
-                        OutlinedButton(onClick = { shareLogs(context) }) {
+                        OutlinedButton(onClick = { scope.launch { shareLogs(context) } }) {
                             Icon(Icons.Rounded.Share, null)
                             Spacer(Modifier.width(Space.Small))
                             Text("Share")
@@ -632,11 +652,24 @@ fun LogsScreen(nav: NavController) {
     }
 }
 
-private fun shareLogs(context: Context) {
-    val file = AppLog.export(File(context.cacheDir, "logs/musix-logs.txt"))
+/** Parts of the app with detailed entries, and their names under Settings › Logs › Detail for (issue #237). */
+private val LOG_DETAIL = listOf(
+    "Net" to "Requests",
+    "Load" to "Streaming",
+    "Audio" to "Audio",
+    "Player" to "Player",
+    "Downloads" to "Downloads",
+    "Frames" to "Screen speed",
+    "Phone" to "Phone state",
+    "App" to "App and screens",
+)
+
+/** Shares the diagnostics ZIP (issue #237): log, events, recent steps, last crash and a manifest. */
+private suspend fun shareLogs(context: Context) {
+    val file = withContext(Dispatchers.IO) { AppLog.exportArchive(File(context.cacheDir, "logs/musix-diagnostics.zip")) }
     val uri = FileProvider.getUriForFile(context, context.packageName + ".files", file)
     val send = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
+        type = "application/zip"
         putExtra(Intent.EXTRA_STREAM, uri)
         putExtra(Intent.EXTRA_SUBJECT, "Musix logs")
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
