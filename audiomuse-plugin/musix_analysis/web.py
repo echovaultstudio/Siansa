@@ -22,7 +22,7 @@ from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url,
 from . import generations, jobs, lumae_import, similarity, status, store
 
 PLUGIN_ID = "musix_analysis"
-VERSION = "0.1.2"
+VERSION = "0.1.2.1"
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
