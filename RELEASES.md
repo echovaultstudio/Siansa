@@ -3,6 +3,11 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.15.3beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.15.3beta) — 2026-10-19
+
+- [#239](https://github.com/Musix-Industreez/musix/pull/239) Find similar albums: waveform icon with an "A" (@Th3K1ngP1n)
+- [#240](https://github.com/Musix-Industreez/musix/pull/240) More room under the big Play button (spacing policy) (@Th3K1ngP1n)
+
 ## [0.15.2beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.15.2beta) — 2026-10-19
 
 - [#230](https://github.com/Musix-Industreez/musix/pull/230) Album pages: playing song marked, find similar beside Shuffle, plain back arrow (@Th3K1ngP1n)
