@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -278,7 +279,7 @@ internal fun ActionButtons(
     onShuffle: () -> Unit,
     onPlay: () -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    PlayButtonRow {
         IconButton(onClick = onQueue, enabled = enabled) {
             Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add all to queue", Modifier.size(28.dp))
         }
@@ -294,16 +295,36 @@ internal fun ActionButtons(
             Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
         }
         Spacer(Modifier.width(Space.Small))
-        Box(
-            Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(if (enabled) Accent else Accent.copy(alpha = 0.4f))
-                .clickable(enabled = enabled, onClick = onPlay),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Rounded.PlayArrow, "Play", tint = OnAccent, modifier = Modifier.size(32.dp))
-        }
+        BigPlayButton(enabled, onPlay)
+    }
+}
+
+/**
+ * A row of buttons ending in the big round Play button, with [Space.BelowPlayButton] under it (the spacing
+ * policy), so the first song below, marked when it's playing, never touches the button.
+ */
+@Composable
+fun PlayButtonRow(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
+    Row(
+        modifier.fillMaxWidth().padding(bottom = Space.BelowPlayButton),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content,
+    )
+}
+
+/** The big round Play button of album, playlist, mix and artist pages. Only ever inside a [PlayButtonRow]. */
+@Composable
+fun BigPlayButton(enabled: Boolean, onPlay: () -> Unit) {
+    Box(
+        Modifier
+            .size(56.dp)
+            .clip(CircleShape)
+            .background(if (enabled) Accent else Accent.copy(alpha = 0.4f))
+            .clickable(enabled = enabled, onClick = onPlay)
+            .testTag("bigPlay"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Rounded.PlayArrow, "Play", tint = OnAccent, modifier = Modifier.size(32.dp))
     }
 }
 
