@@ -3,6 +3,12 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.13.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.13.0beta) — 2026-10-19
+
+- [#210](https://github.com/Musix-Industreez/musix/pull/210) Combined release: AudioMuse compatibility (#208), equaliser loudness (#159), song path queue (#212), branch cleanup (@Th3K1ngP1n)
+- [#211](https://github.com/Musix-Industreez/musix/pull/211) Equaliser: same loudness when switched on, changes glide in, clearer log (@Th3K1ngP1n)
+- [#213](https://github.com/Musix-Industreez/musix/pull/213) Song path from now playing is queued after the song; the queue marks the song playing now (@Th3K1ngP1n)
+
 ## [0.12.2beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.12.2beta) — 2026-10-19
 
 - [#209](https://github.com/Musix-Industreez/musix/pull/209) Navidrome compatibility upgrade (#206 items 1–6) (@Th3K1ngP1n)
