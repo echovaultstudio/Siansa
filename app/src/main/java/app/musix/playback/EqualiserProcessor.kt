@@ -8,6 +8,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
 import app.musix.log.AppLog
 import java.nio.ByteBuffer
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
@@ -64,8 +65,14 @@ class EqFilterBank(val design: EqDesign, val channels: Int) {
  */
 @OptIn(UnstableApi::class)
 class EqualiserProcessor(private val settings: () -> EqSettings) : BaseAudioProcessor() {
+    // The setting heard now (null = off, sound passes untouched) and its filters.
     private var applied: EqSettings? = null
     private var bank: EqFilterBank? = null
+    private var started = false
+    // While a change glides in: the sound as it was (null = untouched), and how many frames are left.
+    private var fadeFrom: EqFilterBank? = null
+    private var fadeLeft = 0
+    private var fadeFrames = 1
     private var limiter: PeakLimiter? = null
     private var frame = DoubleArray(0)
     private var framesSinceReport = 0L
@@ -87,13 +94,27 @@ class EqualiserProcessor(private val settings: () -> EqSettings) : BaseAudioProc
         val outBytes = Util.getPcmFrameSize(outputAudioFormat.encoding, channels)
         val frames = inputBuffer.remaining() / inBytes
         val output = replaceOutputBuffer(frames * outBytes)
-        val filters = currentBank(format)
+        follow(format)
+        val filters = bank
         val limiter = limiter ?: PeakLimiter(format.sampleRate, channels, ceilingFor(format.encoding)).also { limiter = it }
         if (frame.size != channels) frame = DoubleArray(channels)
         repeat(frames) {
-            for (c in 0 until channels) {
-                val x = read(inputBuffer, format.encoding)
-                frame[c] = filters?.process(x, c) ?: x
+            if (fadeLeft > 0) {
+                // Glide from the old sound to the new, so switching never jumps in level or clicks.
+                val t = 1.0 - fadeLeft.toDouble() / fadeFrames
+                val old = fadeFrom
+                for (c in 0 until channels) {
+                    val x = read(inputBuffer, format.encoding)
+                    val now = filters?.process(x, c) ?: x
+                    val before = old?.process(x, c) ?: x
+                    frame[c] = before + (now - before) * t
+                }
+                if (--fadeLeft == 0) fadeFrom = null
+            } else {
+                for (c in 0 until channels) {
+                    val x = read(inputBuffer, format.encoding)
+                    frame[c] = filters?.process(x, c) ?: x
+                }
             }
             limiter.process(frame)
             for (c in 0 until channels) write(output, frame[c])
@@ -103,23 +124,43 @@ class EqualiserProcessor(private val settings: () -> EqSettings) : BaseAudioProc
         if (framesSinceReport >= format.sampleRate * REPORT_SECONDS) report()
     }
 
-    /** The filters for the current setting, or null while the equaliser is off. */
-    private fun currentBank(format: AudioProcessor.AudioFormat): EqFilterBank? {
+    /**
+     * Picks up a change of setting: the new filters carry on from the old ones' memory, and the change glides
+     * in over [GLIDE_MS] (issue #159). At the start of a song or after a seek it applies at once.
+     */
+    private fun follow(format: AudioProcessor.AudioFormat) {
         val current = settings()
-        if (!current.active) {
-            applied = null
-            bank = null
-            return null
+        val wanted = current.takeIf { it.active }
+        if (started && wanted == applied) return
+        val previous = bank
+        val design = wanted?.let { EqDesign.of(it, format.sampleRate) }
+        bank = design?.let { d -> EqFilterBank(d, format.channelCount).also { new -> previous?.let { new.continueFrom(it) } } }
+        if (started) {
+            fadeFrom = previous
+            fadeFrames = max(1, format.sampleRate * GLIDE_MS / 1_000)
+            fadeLeft = fadeFrames
+            describe(applied, wanted, design)
+        } else if (wanted != null && design != null) {
+            AppLog.d("Equaliser", "Playing with ${summary(wanted, design)}")
         }
-        if (current != applied || bank == null) {
-            val previous = bank
-            bank = EqFilterBank(EqDesign.of(current, format.sampleRate), format.channelCount).also { new ->
-                previous?.let { new.continueFrom(it) }
-            }
-            applied = current
-        }
-        return bank
+        applied = wanted
+        started = true
     }
+
+    /** One line in the log for each change: on, off, or what changed, with the level it ends up at. */
+    private fun describe(before: EqSettings?, after: EqSettings?, design: EqDesign?) {
+        when {
+            after == null -> AppLog.i("Equaliser", "Off")
+            before == null -> AppLog.i("Equaliser", "On: ${summary(after, design!!)}")
+            // Moving a slider changes the setting many times a second: those go in the detailed log only.
+            else -> AppLog.d("Equaliser", "Changed: ${summary(after, design!!)}")
+        }
+    }
+
+    private fun summary(eq: EqSettings, design: EqDesign): String =
+        "${eq.preset.label} [${eq.gains.joinToString(" ") { "%+.0f".format(it) }}] dB, pre-amp ${"%+.1f".format(eq.preampDb)} dB · " +
+            "curve ${"%+.1f".format(design.loudnessDb)} dB louder overall (highest point ${"%+.1f".format(design.peakDb)} dB), " +
+            "so turned down by ${"%.1f".format(design.turnDownDb)} dB · ${design.sampleRate} Hz"
 
     private fun read(buffer: ByteBuffer, encoding: Int): Double = when (encoding) {
         C.ENCODING_PCM_16BIT -> buffer.getShort() / 32_768.0
@@ -145,7 +186,18 @@ class EqualiserProcessor(private val settings: () -> EqSettings) : BaseAudioProc
     private fun report() {
         framesSinceReport = 0
         val db = limiter?.takeDeepestDb() ?: return
-        if (db < -0.5) AppLog.i("Equaliser", "Limiter turned peaks down by up to ${"%.1f".format(-db)} dB")
+        if (db < -0.5) AppLog.d("Equaliser", "Limiter turned peaks down by up to ${"%.1f".format(-db)} dB")
+    }
+
+    /** At the end of a song (or a seek): how much the limiter worked, so a too-loud setting shows in the log. */
+    private fun reportSong() {
+        val (share, db) = limiter?.takeSongStats() ?: return
+        if (share <= 0.0) return
+        AppLog.i(
+            "Equaliser",
+            "Limiter worked ${"%.1f".format(share * 100)}% of the time, peaks down by up to ${"%.1f".format(-db)} dB" +
+                (applied?.let { " (equaliser ${it.preset.label})" } ?: " (equaliser off)"),
+        )
     }
 
     override fun onQueueEndOfStream() {
@@ -162,26 +214,36 @@ class EqualiserProcessor(private val settings: () -> EqSettings) : BaseAudioProc
         }
         output.flip()
         report()
+        reportSong()
         limiter.reset()
     }
 
     // After a seek or a new song: start clean, sized for the (possibly new) sample rate and channels.
     override fun onFlush(streamMetadata: AudioProcessor.StreamMetadata) {
-        applied = null
-        bank = null
-        limiter = null
+        reportSong()
+        clear()
     }
 
     override fun onReset() {
+        reportSong()
+        clear()
+        framesSinceReport = 0
+    }
+
+    private fun clear() {
         applied = null
         bank = null
+        started = false
+        fadeFrom = null
+        fadeLeft = 0
         limiter = null
-        framesSinceReport = 0
     }
 
     private fun ceilingFor(encoding: Int) = if (encoding == C.ENCODING_PCM_16BIT) 32_767 / 32_768.0 else 1.0
 
-    private companion object {
+    internal companion object {
         const val REPORT_SECONDS = 10
+        /** How long a change of setting takes to glide in. */
+        const val GLIDE_MS = 50
     }
 }
