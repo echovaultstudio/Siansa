@@ -11,6 +11,7 @@ import app.musix.data.Selector
 import app.musix.data.Song
 import app.musix.log.AppLog
 import app.musix.net.ClapHit
+import app.musix.net.Steer
 import app.musix.net.str
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -45,7 +46,14 @@ fun mayFetchUnsynced(syncedFolders: String?): Boolean = syncedFolders == null ||
 class MixGenerator(private val graph: AppGraph) {
     private val mutex = Mutex()
 
-    private data class Plan(val title: String, val query: String, val description: String, val ai: Boolean)
+    private data class Plan(
+        val title: String,
+        val query: String,
+        val description: String,
+        val ai: Boolean,
+        /** Concepts the AI chose to steer the search with (issue #208). */
+        val steering: List<Steer> = emptyList(),
+    )
 
     suspend fun currentSelector(): Selector? {
         val hour = LocalDateTime.now().hour
@@ -70,8 +78,8 @@ class MixGenerator(private val graph: AppGraph) {
     }
 
     /** A one-off sound search, used by the Search screen. */
-    suspend fun soundSearch(query: String, limit: Int = 50): List<Song> {
-        val hits = graph.audioMuse.textSearch(query, limit)
+    suspend fun soundSearch(query: String, limit: Int = 50, steering: List<Steer> = emptyList()): List<Song> {
+        val hits = graph.audioMuse.textSearch(query, limit, steering)
         return resolve(hits.map { it.id })
     }
 
@@ -87,10 +95,10 @@ class MixGenerator(private val graph: AppGraph) {
         } else {
             fallbackPlan(selector)
         }
-        AppLog.i("Mix", "${selector.name}: \"${plan.title}\" · search \"${plan.query}\" · ai=${plan.ai}")
+        AppLog.i("Mix", "${selector.name}: \"${plan.title}\" · search \"${plan.query}\" · steer ${plan.steering.joinToString { (if (it.more) "+" else "-") + it.term }.ifEmpty { "none" }} · ai=${plan.ai}")
 
         val pool = LinkedHashMap<String, ClapHit>()
-        graph.audioMuse.textSearch(plan.query, selector.length * 5).forEach { pool.putIfAbsent(it.id, it) }
+        graph.audioMuse.textSearch(plan.query, selector.length * 5, plan.steering).forEach { pool.putIfAbsent(it.id, it) }
         val base = selector.baseQuery.ifBlank { selector.guidance }
         if (pool.size < selector.length * 2 && base.isNotBlank() && base != plan.query) {
             graph.audioMuse.textSearch(base, selector.length * 4)
@@ -201,8 +209,11 @@ class MixGenerator(private val graph: AppGraph) {
         val broken = selector.avoid.map { it.trim().lowercase() }.filter { it.isNotEmpty() && text.contains(it) }
         if (broken.isNotEmpty()) throw MixException("The AI used a forbidden word: ${broken.first()}")
 
-        return Plan(title, query, description.ifBlank { selector.guidance }, ai = true)
+        return Plan(title, query, description.ifBlank { selector.guidance }, ai = true, steering = steeringOf(obj, concepts))
     }
+
+    private fun steeringOf(obj: kotlinx.serialization.json.JsonObject, concepts: List<String>): List<Steer> =
+        parseSteering(obj["steer"], concepts)
 
     private suspend fun taste(): TasteProfile? =
         runCatching { graph.taste.profile() }.onFailure { AppLog.w("Taste", "Couldn't build the taste profile: ${it.message}") }.getOrNull()
@@ -265,8 +276,8 @@ class MixGenerator(private val graph: AppGraph) {
     }
 
     /**
-     * New to you: songs that sound like your favourites (keeping their mood), leaning away from
-     * what you already play a lot.
+     * New to you: songs that sound like your favourites, leaning away from what you already play a lot.
+     * Mood and duplicates follow AudioMuse's (or the Navidrome plugin's) own settings (issue #208).
      */
     private suspend fun discoverMix(taste: TasteProfile?, skipped: Set<String>): Pair<List<Song>, String> {
         val s = graph.settings.current
@@ -280,7 +291,7 @@ class MixGenerator(private val graph: AppGraph) {
         if (seeds.isEmpty()) return emptyList<Song>() to ""
         val pool = LinkedHashMap<String, Pair<ClapHit, Double>>()
         coroutineScope {
-            seeds.map { seed -> async { runCatching { graph.audioMuse.similarTracks(seed, 30, sameMood = true) }.getOrDefault(emptyList()) } }
+            seeds.map { seed -> async { runCatching { graph.sonic.similar(seed, 30) }.getOrDefault(emptyList()) } }
                 .awaitAll()
         }.flatten().forEach { hit ->
             if (hit.id in heard || hit.id in skipped || hit.id in seeds) return@forEach
@@ -315,7 +326,7 @@ class MixGenerator(private val graph: AppGraph) {
                 .onFailure { AppLog.w("Mood", "AI couldn't interpret the mood, searching the words directly: ${it.message}") }
         }
         AppLog.i("Mood", "\"$text\" → \"${plan.title}\" · search \"${plan.query}\" · ai=${plan.ai}")
-        val hits = graph.audioMuse.textSearch(plan.query, size * 3)
+        val hits = graph.audioMuse.textSearch(plan.query, size * 3, plan.steering)
         if (hits.isEmpty()) throw MixException("AudioMuse found nothing for that mood")
         val ranked = hits
             .map { it to it.similarity * (0.85 + Random.nextDouble() * 0.15) }
@@ -352,7 +363,7 @@ class MixGenerator(private val graph: AppGraph) {
         val query = obj.str("query")?.trim()?.take(300).orEmpty()
         val description = obj.str("description")?.trim()?.take(200).orEmpty()
         if (title.isEmpty() || query.length < 3) throw MixException("The AI's answer was incomplete")
-        return Plan(title, query, description.ifBlank { "Made from your mood" }, ai = true)
+        return Plan(title, query, description.ifBlank { "Made from your mood" }, ai = true, steering = steeringOf(obj, concepts))
     }
 
     /** Songs for AudioMuse ids, from the synced library where possible. */
@@ -398,11 +409,13 @@ class MixGenerator(private val graph: AppGraph) {
         val SYSTEM_PROMPT = """
             You plan one playlist for a personal music player. A text-to-audio search model (CLAP) will find tracks
             in the listener's own library from your search text, so describe how the music should SOUND.
-            Reply with only a JSON object: {"title": string, "query": string, "description": string}.
+            Reply with only a JSON object: {"title": string, "query": string, "description": string, "steer": [...]}.
             - title: 2 to 6 words, natural and specific, like "Mellow electronic for the drive". No emoji.
             - query: 6 to 16 words for the audio search: genres, mood, energy, tempo, instruments, vocals.
               No artist or song names. Prefer the listed sound concepts where they fit.
             - description: one short friendly sentence for the listener.
+            - steer: optional, up to 3 of the listed sound concepts to push the search towards or away from, as
+              {"term": concept, "direction": "more" or "less"}. Only concepts from the list; leave it empty if none fit.
             Follow the time slot's guidance strictly and never use any forbidden word in the title or query.
             Use the listening device as context (a car's Bluetooth suggests driving).
             Stay close to the listener's recent taste and what they usually play at this time, but don't repeat a
@@ -424,4 +437,18 @@ class MixGenerator(private val graph: AppGraph) {
             return "phone speaker"
         }
     }
+}
+
+/**
+ * The AI's "steer" list as concepts to steer the search with: only terms AudioMuse listed (so the search never
+ * refuses one), at most 3, each once (issue #208).
+ */
+fun parseSteering(element: kotlinx.serialization.json.JsonElement?, concepts: List<String>): List<Steer> {
+    val known = concepts.associateBy { it.lowercase() }
+    val list = element as? kotlinx.serialization.json.JsonArray ?: return emptyList()
+    return list.mapNotNull { e ->
+        val o = e as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
+        val term = o.str("term")?.trim()?.lowercase()?.let { known[it] } ?: return@mapNotNull null
+        Steer(term, o.str("direction")?.lowercase() != "less")
+    }.distinctBy { it.term }.take(3)
 }

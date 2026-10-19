@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import androidx.compose.material.icons.rounded.AutoAwesome
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -317,6 +318,15 @@ fun PlaylistMenuButton(
                                 .onFailure { notify(it.message?.takeIf { m -> m.isNotBlank() } ?: "Couldn't send it") }
                         }
                     },
+                )
+            }
+            // Song Alchemy (issue #208): new songs that sound like the whole playlist blended together.
+            if (graph.settings.current.audioMuseReady) {
+                val nav = LocalNav.current
+                DropdownMenuItem(
+                    text = { Text("More like this playlist") },
+                    leadingIcon = { Icon(Icons.Rounded.AutoAwesome, null) },
+                    onClick = { menu = false; nav.navigate("blend/${Uri.encode(playlist.id)}") },
                 )
             }
             DropdownMenuItem(

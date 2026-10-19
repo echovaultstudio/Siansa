@@ -274,6 +274,8 @@ class AppGraph(val app: Application) {
         isOffline = { connection.current.offline },
         moved = { localId, made -> downloads.moveItem(OfflineItem.key(OfflineKind.PLAYLIST, localId), made.offlineItem()) },
     )
+    /** "Sounds like" from Navidrome's sonic similarity or AudioMuse (issue #208). */
+    val sonic = app.musix.mix.Sonic(this)
     val songRadio = SongRadio(this)
     val songPath = SongPath(this)
     val sleepTimer = SleepTimer()

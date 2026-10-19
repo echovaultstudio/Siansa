@@ -296,6 +296,24 @@ class SubsonicApi(
         call("getSimilarSongs", mapOf("id" to songId, "count" to "$count"))
             .obj("similarSongs")?.arr("song").orEmpty().map(::parseSong)
 
+    /**
+     * Songs that sound like this one through Navidrome's own sonic similarity (OpenSubsonic `sonicSimilarity`,
+     * the AudioMuse-AI Navidrome plugin), with their similarity (1 = the same song). Issue #208.
+     */
+    suspend fun sonicSimilar(songId: String, count: Int): List<Pair<Song, Double>> =
+        parseSonicMatches(call("getSonicSimilarTracks", mapOf("id" to songId, "count" to "$count")))
+
+    /** A song path through Navidrome's sonic similarity (`findSonicPath`), both ends included. */
+    suspend fun sonicPath(startId: String, endId: String, count: Int): List<Song> =
+        parseSonicMatches(call("findSonicPath", mapOf("startSongId" to startId, "endSongId" to endId, "count" to "$count")))
+            .map { it.first }
+
+    private fun parseSonicMatches(root: JsonObject): List<Pair<Song, Double>> =
+        root.arr("sonicMatch").mapNotNull { m ->
+            val entry = m.obj("entry") ?: return@mapNotNull null
+            parseSong(entry) to (m.dbl("similarity") ?: 0.0)
+        }.filter { it.first.id.isNotEmpty() }
+
     /** Songs by this artist and similar artists. */
     suspend fun artistRadio(artistId: String, count: Int = 50): List<Song> =
         call("getSimilarSongs2", mapOf("id" to artistId, "count" to "$count"))
