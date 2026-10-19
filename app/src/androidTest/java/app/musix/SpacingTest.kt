@@ -1,5 +1,13 @@
 package app.musix
 
+import app.musix.ui.LyricsSwitchRow
+import app.musix.ui.PathMoodPicker
+import app.musix.ui.SteeringChips
+import app.musix.ui.Space
+import androidx.compose.material3.Text
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -196,5 +204,40 @@ class SpacingTest {
         val text = compose.onNodeWithText("bonobo", useUnmergedTree = true).getBoundsInRoot()
         val row = rows[1]
         assertEven("Words in the row", text.top - dp(row.top), dp(row.bottom) - text.bottom)
+    }
+
+    /** Sound search: the "more / less" concept chips sit evenly under the Library / Sound chips (issue #208). */
+    @Test fun steeringChipsAreEvenlySpaced() {
+        compose.setContent {
+            MusixTheme {
+                Column {
+                    Row(Modifier.padding(horizontal = Space.Page, vertical = Space.Small)) {
+                        FilterChip(selected = true, onClick = {}, label = { Text("Sound") }, modifier = Modifier.testTag("modeChip"))
+                    }
+                    SteeringChips(listOf("piano", "vocals"), mapOf("piano" to true)) { }
+                    Box(Modifier.fillMaxWidth().height(40.dp).testTag("results"))
+                }
+            }
+        }
+        val mode = compose.onNodeWithTag("modeChip").getBoundsInRoot()
+        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("More piano")), useUnmergedTree = true).getBoundsInRoot()
+        val results = compose.onNodeWithTag("results").getBoundsInRoot()
+        assertEven("Steering chips", chip.top - mode.bottom, results.top - chip.bottom)
+    }
+
+    /** Song path: the mood chips sit evenly between their label and the "Follow the lyrics" row (issue #208). */
+    @Test fun pathMoodChipsAreEvenlySpaced() {
+        compose.setContent {
+            MusixTheme {
+                Column {
+                    PathMoodPicker(toHere = false) { }
+                    LyricsSwitchRow(false) { }
+                }
+            }
+        }
+        val label = compose.onNodeWithTag("pathMoodLabel").getBoundsInRoot()
+        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Happy")), useUnmergedTree = true).getBoundsInRoot()
+        val lyrics = compose.onNodeWithTag("lyricsTitle", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Path mood chips", chip.top - label.bottom, lyrics.top - chip.bottom)
     }
 }

@@ -94,11 +94,7 @@ class SongRadio(private val graph: AppGraph) {
     }
 
     private suspend fun find(song: Song, count: Int): List<Song> {
-        val ids = if (graph.settings.current.audioMuseReady) {
-            graph.audioMuse.similarTracks(song.id, count + 10).map { it.id }
-        } else {
-            graph.subsonic.similarSongs(song.id, count + 10).map { it.id }
-        }
+        val ids = graph.sonic.similar(song.id, count + 10).map { it.id }
         return graph.generator.resolveSongs(ids.filter { it != song.id && it !in heard }).take(count)
     }
 }

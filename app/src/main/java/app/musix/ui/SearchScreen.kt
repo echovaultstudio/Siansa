@@ -1,5 +1,8 @@
 package app.musix.ui
 
+import app.musix.net.Steer
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -49,6 +52,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import app.musix.data.RecentSearch
+import app.musix.net.AudioMuseApi
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -139,15 +143,22 @@ fun SearchScreen(nav: NavController) {
 
     val aiProblem = rememberAiProblem()
 
+    // Concepts to steer the Sound search with (issue #208): each tap goes more → less → off.
+    val concepts by loadState("sound-concepts-$soundMode") {
+        if (soundMode && graph.settings.current.audioMuseReady) runCatching { graph.audioMuse.concepts() }.getOrDefault(emptyList()).take(40) else emptyList()
+    }
+    var steering by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
+
     fun runSound() {
         val q = query.trim()
         if (q.length < 3 || aiProblem != null) return
         keepSearch()
+        val steer = steering.map { (term, more) -> Steer(term, more) }
         scope.launch {
             busy = true
             error = null
             try {
-                soundSongs = graph.generator.soundSearch(q)
+                soundSongs = graph.generator.soundSearch(q, steering = steer)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -200,6 +211,13 @@ fun SearchScreen(nav: NavController) {
             Row(Modifier.padding(horizontal = Space.Page, vertical = Space.Small), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 FilterChip(selected = !soundMode, onClick = { soundMode = false }, label = { Text("Library") })
                 FilterChip(selected = soundMode, onClick = { soundMode = true }, label = { Text("Sound") })
+            }
+            val terms = concepts.valueOrNull().orEmpty()
+            if (soundMode && aiProblem == null && terms.isNotEmpty()) {
+                SteeringChips(terms, steering) { term ->
+                    steering = nextSteering(steering, term)
+                    if (soundSongs != null) runSound()
+                }
             }
             if (busy) {
                 Box(Modifier.fillMaxWidth().padding(Space.Page), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -306,6 +324,10 @@ private fun BrowseGrid(nav: NavController) {
     val version by graph.library.version.collectAsStateWithLifecycle()
     val genreList by loadState(version to "browse-genres") { if (graph.library.isSynced) graph.library.genres(30) else emptyList() }
     val genres = genreList.valueOrNull().orEmpty()
+    val centreList by loadState("browse-centres") {
+        if (graph.settings.current.audioMuseReady) runCatching { graph.audioMuse.moodCentres() }.getOrDefault(emptyList()) else emptyList()
+    }
+    val centres = centreList.valueOrNull().orEmpty()
     LazyVerticalGrid(
         columns = GridCells.Adaptive(160.dp),
         contentPadding = PaddingValues(start = Space.Page, end = Space.Page, bottom = bottomBarPadding(Space.Section)),
@@ -319,6 +341,17 @@ private fun BrowseGrid(nav: NavController) {
         }
         items(moodRadios, key = { "mood-" + it.id }) { radio ->
             BrowseTile(radio.name, Color(radio.colors.first) to Color(radio.colors.second)) { nav.openMoodRadio(radio.id) }
+        }
+        // AudioMuse's own mood centres, found in your library's sound (issue #208).
+        if (centres.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Text("Moods in your library", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = Space.Small))
+            }
+            items(centres, key = { "centre-" + AudioMuseApi.centreKey(it) }) { centre ->
+                BrowseTile(AudioMuseApi.centreTitle(centre), tileColors("centre-" + AudioMuseApi.centreKey(centre))) {
+                    nav.openCentreRadio(AudioMuseApi.centreKey(centre))
+                }
+            }
         }
         if (genres.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -386,6 +419,34 @@ internal fun RecentSearchList(
                 )
                 IconButton(onClick = { onRemove(search) }) { Icon(Icons.Rounded.Close, "Remove ${search.query}") }
             }
+        }
+    }
+}
+
+/** One tap on a concept: off → more → less → off (issue #208). */
+fun nextSteering(steering: Map<String, Boolean>, term: String): Map<String, Boolean> = when (steering[term]) {
+    null -> steering + (term to true)
+    true -> steering + (term to false)
+    false -> steering - term
+}
+
+/**
+ * "More piano", "less vocals": AudioMuse's concepts as chips that steer the Sound search. Sits under the
+ * Library / Sound chips with the same gap below as above.
+ */
+@Composable
+internal fun SteeringChips(terms: List<String>, steering: Map<String, Boolean>, onTap: (String) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = Space.Page, end = Space.Page, bottom = Space.Small).testTag("steering"),
+        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+    ) {
+        terms.forEach { term ->
+            val state = steering[term]
+            FilterChip(
+                selected = state != null,
+                onClick = { onTap(term) },
+                label = { Text(when (state) { true -> "More $term"; false -> "Less $term"; null -> term }) },
+            )
         }
     }
 }
