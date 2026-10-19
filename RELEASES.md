@@ -3,6 +3,11 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.15.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.15.0beta) — 2026-10-19
+
+- [#222](https://github.com/Musix-Industreez/musix/pull/222) Own AudioMuse-AI plugin (musix_analysis); app no longer uses Lumae (@Th3K1ngP1n)
+- [#224](https://github.com/Musix-Industreez/musix/pull/224) Similar songs, similar albums and sound-alike artists (@Th3K1ngP1n)
+
 ## [0.14.1beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.14.1beta) — 2026-10-19
 
 - [#221](https://github.com/Musix-Industreez/musix/pull/221) Source filter: Sync shows its progress and result (@Th3K1ngP1n)
