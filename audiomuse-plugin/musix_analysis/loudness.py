@@ -21,6 +21,8 @@ RATE = 48_000
 LUFS_OFFSET = -0.691
 ABSOLUTE_GATE = -70.0
 RELATIVE_GATE = -10.0
+MAX_BAD_PACKETS = 20  # damaged packets a song may have before it counts as unreadable…
+MAX_BAD_SHARE = 0.02  # …and at most this share of all packets
 BLOCK_CHUNKS = 4  # a 400 ms gating block is four 100 ms chunks, stepped by one (75 % overlap)
 
 
@@ -73,6 +75,7 @@ class Meter:
         self.partial = 0.0
         self.filled = 0
         self.frames = 0
+        self.skipped_packets = 0
 
     def add(self, block):
         block = np.asarray(block, dtype=np.float64)
@@ -105,7 +108,9 @@ class Meter:
             self.energy.append(self.partial / self.filled)
             self.partial = 0.0
             self.filled = 0
-        return Measurement(self.energy, int(round(self.frames * 1000 / self.rate)))
+        result = Measurement(self.energy, int(round(self.frames * 1000 / self.rate)))
+        result.skipped_packets = self.skipped_packets
+        return result
 
 
 class Measurement:
@@ -113,6 +118,7 @@ class Measurement:
 
     def __init__(self, chunk_energy, duration_ms):
         self.chunk_energy = list(chunk_energy)
+        self.skipped_packets = 0
         self.duration_ms = duration_ms
         self.lufs = integrated(self.chunk_energy)
 
@@ -178,9 +184,25 @@ def measure_file(path, deadline_seconds=120.0):
                 if out is not None and out.samples:
                     meter.add(out.to_ndarray().reshape(channels, -1))
 
-        for frame in container.decode(stream):
-            feed(resampler.resample(frame))
+        # Packet by packet, so one damaged packet (common in ripped or edited files) is skipped, as players
+        # do, instead of failing the song. Only a file that is mostly unreadable fails.
+        bad_error = getattr(getattr(av, "error", None), "InvalidDataError", ValueError)
+        packets = bad = 0
+        for packet in container.demux(stream):
+            packets += 1
+            try:
+                frames = packet.decode()
+            except bad_error:
+                bad += 1
+                if bad > MAX_BAD_PACKETS and bad > packets * MAX_BAD_SHARE:
+                    raise ValueError(f"too much of the file can't be read ({bad} of {packets} packets so far)")
+                continue
+            for frame in frames:
+                feed(resampler.resample(frame))
             if time.monotonic() - started > deadline_seconds:
                 raise TimeoutError(f"measuring took longer than {deadline_seconds:.0f} s")
         feed(resampler.resample(None))
+        if meter.frames == 0:
+            raise ValueError("no audio could be read from the file")
+        meter.skipped_packets = bad
     return meter.finish()
