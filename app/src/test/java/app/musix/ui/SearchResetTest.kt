@@ -29,4 +29,12 @@ class SearchResetTest {
         // After the app was restarted the count starts again from 0: an old, higher one isn't a new request.
         assertFalse(searchResetPending(0, 3))
     }
+
+    /** Issue #203: back returns to the search page while a search is under way, and leaves Search otherwise. */
+    @Test fun backReturnsToTheSearchPageWhileSearching() {
+        assertTrue(searchIsActive(focused = true, query = "", soundResults = false))
+        assertTrue(searchIsActive(focused = false, query = "phoeb", soundResults = false))
+        assertTrue(searchIsActive(focused = false, query = "", soundResults = true))
+        assertFalse(searchIsActive(focused = false, query = "", soundResults = false))
+    }
 }
