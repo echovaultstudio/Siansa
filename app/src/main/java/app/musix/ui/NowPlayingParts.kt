@@ -33,7 +33,9 @@ import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.AltRoute
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
@@ -129,6 +131,8 @@ fun PlayerMenu(
     onOpenLyrics: () -> Unit,
     onOpenDetails: () -> Unit,
     onOpenSongPath: () -> Unit,
+    onOpenSimilarSongs: () -> Unit,
+    onOpenSimilarAlbums: () -> Unit,
     onOpenSleepTimer: () -> Unit,
     notify: (String) -> Unit,
 ) {
@@ -180,6 +184,10 @@ fun PlayerMenu(
                 }
                 if (graph.settings.current.audioMuseReady) {
                     MenuRow(Icons.Rounded.AltRoute, "Song path…") { onDismiss(); onOpenSongPath() }
+                }
+                MenuRow(Icons.Rounded.GraphicEq, "Similar songs") { onDismiss(); onOpenSimilarSongs() }
+                if (graph.settings.current.audioMuseReady && song.albumId != null) {
+                    MenuRow(Icons.Rounded.LibraryMusic, "Similar albums") { onDismiss(); onOpenSimilarAlbums() }
                 }
                 MenuDivider()
                 MenuRow(Icons.Rounded.Subtitles, "Lyrics") { onDismiss(); onOpenLyrics() }

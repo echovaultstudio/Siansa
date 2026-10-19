@@ -190,6 +190,18 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
         nav.openSongDetails(id)
     }
 
+    fun openSimilarSongs() {
+        val id = song?.id ?: return
+        onClose()
+        nav.openSimilarSongs(id)
+    }
+
+    fun openSimilarAlbums() {
+        val id = song?.id ?: return
+        onClose()
+        nav.openSimilarAlbums(id)
+    }
+
     fun openSongPath() {
         val id = song?.id ?: return
         onClose()
@@ -375,6 +387,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                     onOpenLyrics = { lyricsOpen = true },
                     onOpenDetails = ::openDetails,
                     onOpenSongPath = ::openSongPath,
+                    onOpenSimilarSongs = ::openSimilarSongs,
+                    onOpenSimilarAlbums = ::openSimilarAlbums,
                     onOpenSleepTimer = { sleepOpen = true },
                     notify = { message -> scope.launch { snack.showSnackbar(message) } },
                 )
