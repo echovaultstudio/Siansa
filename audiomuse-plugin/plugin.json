@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.1.2",
+      "min_core_version": "3.6.4",
+      "changelog": "Import from Lumae: a one-time copy of the volume and fade profiles Lumae already measured (removed again in 0.1.3).",
+      "imageUrl": ""
+    },
+    {
       "version": "0.1.1",
       "min_core_version": "3.6.4",
       "changelog": "Measure all songs at once (with a warning), shorter rounds so AudioMuse can start its own jobs, and reloading the settings page no longer starts a job again.",

@@ -19,10 +19,10 @@ from flask import Blueprint, jsonify, redirect, request, url_for
 
 from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url, render_page, set_setting
 
-from . import generations, jobs, similarity, status, store
+from . import generations, jobs, lumae_import, similarity, status, store
 
 PLUGIN_ID = "musix_analysis"
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
@@ -34,8 +34,8 @@ bp = Blueprint(PLUGIN_ID, __name__)
 def collect(db):
     """Every part's state, in one place for the page and the API."""
     inputs = generations.Inputs.from_json(store.get_state("inputs", {}, db))
-    songs, ready, failed, wanted = store.profile_counts(db)
-    counts = status.profile_counts(songs, ready, failed, wanted)
+    songs, ready, failed, wanted, imported = store.profile_counts(db)
+    counts = status.profile_counts(songs, ready, failed, wanted, imported)
     profiles_job = store.get_state("profiles_job", {}, db) or {}
     similar_job = store.get_state("similar_job", {}, db) or {}
     built = store.get_state("similar_built", {}, db) or {}
@@ -226,7 +226,7 @@ def render_settings(state, batch_size, message=""):
       {status.ALL_ROUND_SECONDS // 60} minutes every 15 minutes until all are done. While a round runs, AudioMuse
       waits with its own jobs (analysis, clustering, scheduled tasks).
       <form method="post" class="mx-actions"><button type="submit" name="action" value="stop_all">Stop measuring all</button></form></div>"""
-    elif counts["to_measure"]:
+    elif counts["to_measure"] or counts["imported"]:
         warning = ("Measuring every song downloads each one from your music server and reads it in full. "
                    "With a large library this takes hours or days and keeps the AudioMuse worker busy. "
                    "While a round runs (12 of every 15 minutes), AudioMuse waits with its own jobs such as "
@@ -234,10 +234,20 @@ def render_settings(state, batch_size, message=""):
         all_block = f"""<div class="mx-warning"><strong>Measure all songs at once</strong>
       <p class="mx-help">{escape(warning)}</p>
       <form method="post" class="mx-actions" onsubmit="return confirm({escape(json.dumps(warning + ' Start now?'))});">
-        <button type="submit" name="action" value="measure_all"{busy}>Measure all {counts['to_measure']:,} songs</button>
+        <button type="submit" name="action" value="measure_all"{busy}>Measure all {counts['to_measure'] + counts['imported']:,} songs</button>
       </form></div>"""
     else:
         all_block = ""
+    # TEMPORARY until plugin 0.1.3 (issue #225): the one-time import from the Lumae plugin.
+    lumae_block = ""
+    if state.get("lumae"):
+        lumae_block = f"""<div class="mx-warning"><strong>Import from Lumae</strong>
+      <p class="mx-help">The Lumae plugin has measured {int(state['lumae']):,} songs. Import them to skip
+        measuring those again: it takes a moment and only fills in songs not measured here yet. Imported
+        songs are marked, and "Measure all songs" measures them again here if you want.</p>
+      <form method="post" class="mx-actions"><button type="submit" name="action" value="import_lumae"{busy}>Import from Lumae</button></form></div>"""
+    imported_line = (f'<p class="mx-help">{counts["imported"]:,} of them imported from Lumae.</p>'
+                     if counts["imported"] else "")
     similar_error = state["similar_job"].get("error")
     return f"""{_STYLE}{refresh}{note}
 <section class="mx-section" aria-label="Library">
@@ -256,6 +266,7 @@ def render_settings(state, batch_size, message=""):
     they don't wait for it.</p>
   {f'<p class="mx-help mx-attention">Last run: {escape(profiles_error)}</p>' if profiles_error else ''}
   {failures}
+  {imported_line}
   {left_line}
   <form method="post" class="mx-actions">
     <label>Songs per run <input name="batch_size" value="{int(batch_size)}" inputmode="numeric"></label>
@@ -263,6 +274,7 @@ def render_settings(state, batch_size, message=""):
     <button type="submit" name="action" value="measure"{busy}>Measure missing songs now</button>
   </form>
   {all_block}
+  {lumae_block}
 </section>
 
 <section class="mx-section" aria-label="Similar albums and artists">
@@ -293,6 +305,8 @@ MESSAGES = {
     "stopped": "Stopped. The songs measured so far are kept; the rest are measured a batch at a time again.",
     "building": "Build started. This page updates by itself.",
     "busy": "Another AudioMuse job is running, so this waits for the next round (within 15 minutes).",
+    "imported": "Imported {n} songs from Lumae.",
+    "import_failed": "The import from Lumae failed; the AudioMuse log says why.",
 }
 
 
@@ -328,6 +342,13 @@ def settings():
             note = "stopped"
         elif action == "rebuild":
             note = "building" if _start(jobs.rebuild_now) else "busy"
+        elif action == "import_lumae":  # TEMPORARY until plugin 0.1.3 (issue #225)
+            try:
+                count = lumae_import.run(db)
+                return redirect(url_for(f"{PLUGIN_ID}.settings", note="imported", n=count))
+            except Exception as e:
+                logger.exception("musix_analysis Lumae import failed")
+                note = "import_failed"
         elif action == "save":
             return redirect(manage_plugins_url())
         return redirect(url_for(f"{PLUGIN_ID}.settings", note=note))
@@ -341,5 +362,7 @@ def settings():
     state["failures"] = store.recent_failures(db)
     state["measure_all"] = bool((store.get_state("measure_all", {}, db) or {}).get("on"))
     state["rate"] = store.get_state("profiles_rate", {}, db) or {}
-    body = render_settings(state, get_setting("batch_size", jobs.DEFAULT_BATCH), MESSAGES.get(request.args.get("note", ""), ""))
+    state["lumae"] = lumae_import.available(db)  # TEMPORARY until plugin 0.1.3 (issue #225)
+    note = MESSAGES.get(request.args.get("note", ""), "").replace("{n}", f"{request.args.get('n', 0, type=int):,}")
+    body = render_settings(state, get_setting("batch_size", jobs.DEFAULT_BATCH), note)
     return render_page(body, title="Musix Analysis")
