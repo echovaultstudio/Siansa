@@ -23,6 +23,7 @@ import app.musix.data.TopSongs
 import app.musix.log.AppLog
 import app.musix.log.NetLog
 import app.musix.mix.Sonic
+import app.musix.mix.SonicFingerprint
 import app.musix.mix.MixGenerator
 import app.musix.mix.Radios
 import app.musix.mix.Insights
@@ -277,6 +278,8 @@ class AppGraph(val app: Application) {
     )
     /** "Sounds like" from Navidrome's sonic similarity or AudioMuse (issue #208). */
     val sonic = Sonic(this)
+    /** Your sonic fingerprint on Home (issue #216). */
+    val fingerprint = SonicFingerprint(this)
     val songRadio = SongRadio(this)
     val songPath = SongPath(this)
     val sleepTimer = SleepTimer()

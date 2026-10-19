@@ -6,6 +6,7 @@ enum class HomeSection(val id: String, val label: String) {
     TODAY("today", "Today's mix"),
     MOOD("mood", "How are you feeling?"),
     MADE_FOR_YOU("made", "Made for you"),
+    FINGERPRINT("fingerprint", "Your sonic fingerprint"),
     REDISCOVER("rediscover", "Rediscover"),
     RADIOS("radios", "Radios"),
     PLAYLISTS("playlists", "Your playlists"),

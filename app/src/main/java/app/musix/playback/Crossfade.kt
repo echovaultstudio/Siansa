@@ -106,17 +106,46 @@ object Levelling {
         return 10.0.pow(gainDb / 20.0).toFloat().coerceIn(0f, 1f)
     }
 
+    /** What evens out a song's loudness (issue #214): one of these, never two at once. */
+    enum class Source { NONE, LUMAE, REPLAYGAIN }
+
     /**
-     * The player volume for [song]: ReplayGain's setting (Track, Album or Off) still decides whether levelling
-     * is on. With measured loudness ([profile], when the source is the Lumae plugin) each song is levelled from
-     * its own measurement; Album mode keeps the album's tags when the song has them, since the plugin measures
-     * songs one by one. Songs without a measurement use their tags as before.
+     * How [song] is levelled: by the Lumae plugin's measurement or by its ReplayGain tags, never both, and
+     * the player volume that gives. [why] says in plain words why that one was picked.
      */
-    fun songVolume(song: Song?, settings: AppSettings, profile: TrackProfile?): Float {
-        if (song == null || settings.replayGain == ReplayGainMode.OFF) return 1f
-        val measured = profile?.takeIf { settings.loudnessSource == LoudnessSource.LUMAE && it.trackId == song.id }
-        val albumTags = settings.replayGain == ReplayGainMode.ALBUM && song.albumGain != null
-        if (measured != null && !albumTags) volume(measured, settings.loudnessTarget)?.let { return it }
-        return replayGainVolume(song, settings)
+    data class Decision(val source: Source, val volume: Float, val why: String) {
+        /** The change in level, in dB (0 when nothing is applied). */
+        val gainDb: Double get() = if (volume <= 0f) -96.0 else 20 * kotlin.math.log10(volume.toDouble())
     }
+
+    /**
+     * Picks the one thing that levels [song]. Levelling (Off, Track or Album) decides whether it's on. With
+     * the Lumae plugin as the source, a song it has measured is levelled from that measurement alone; Album
+     * mode keeps the album's tags when the song has them, since the plugin measures songs one by one. Every
+     * other song uses its ReplayGain tags alone.
+     */
+    fun decide(song: Song?, settings: AppSettings, profile: TrackProfile?): Decision {
+        if (song == null) return Decision(Source.NONE, 1f, "nothing playing")
+        if (settings.replayGain == ReplayGainMode.OFF) return Decision(Source.NONE, 1f, "levelling is off")
+        val lumae = settings.loudnessSource == LoudnessSource.LUMAE
+        val measured = profile?.takeIf { lumae && it.trackId == song.id }
+        val albumTags = settings.replayGain == ReplayGainMode.ALBUM && song.albumGain != null
+        if (measured != null && !albumTags) {
+            volume(measured, settings.loudnessTarget)?.let { v ->
+                return Decision(Source.LUMAE, v, "measured by Lumae at ${"%.1f".format(measured.refLufs)} LUFS, brought to ${settings.loudnessTarget} LUFS")
+            }
+        }
+        val hasTags = song.trackGain != null || song.albumGain != null
+        val why = when {
+            !lumae -> "ReplayGain ${settings.replayGain.label.lowercase()} tags"
+            albumTags -> "album mode keeps the album's ReplayGain tags"
+            measured != null -> "Lumae has no loudness for this song, so its ReplayGain tags"
+            else -> "Lumae hasn't measured this song yet, so its ReplayGain tags"
+        }
+        if (!hasTags) return Decision(Source.NONE, 1f, "$why: the song has none")
+        return Decision(Source.REPLAYGAIN, replayGainVolume(song, settings), why)
+    }
+
+    /** The player volume for [song]: from [decide], so Lumae and ReplayGain never both apply. */
+    fun songVolume(song: Song?, settings: AppSettings, profile: TrackProfile?): Float = decide(song, settings, profile).volume
 }
