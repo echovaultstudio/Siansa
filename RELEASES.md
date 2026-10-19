@@ -3,6 +3,10 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.12.1beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.12.1beta) — 2026-10-19
+
+- [#207](https://github.com/Musix-Industreez/musix/pull/207) Download all covers: a VPN to the home network over Wi-Fi counts as home (@Th3K1ngP1n)
+
 ## [0.12.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.12.0beta) — 2026-10-19
 
 - [#202](https://github.com/Musix-Industreez/musix/pull/202) Cover download: also fetch song and disc covers, as Navidrome sends them (@Th3K1ngP1n)
