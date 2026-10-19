@@ -3,6 +3,21 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.15.2beta — 2026-10-19
+
+### Fixed
+- **Sound search follows the chips better.** Chips set to "more" (such as Female vocals or Sad) now also count as
+  words of the search, so "sad songs" with Female vocals and More acoustic finds acoustic songs with female vocals
+  instead of reordering pop songs.
+
+### Changed
+- **The song playing now always stands out on album pages** (and playlists and mixes), with "Now playing" under its
+  title, even when the album is in more than one of your libraries.
+- **Find similar albums is a button beside Shuffle** on an album page, instead of a ⋮ menu.
+- **The back arrow on album, playlist and artist pages has no dark circle behind it any more.**
+- **Sound searches are written to the log** (when logging is on) with the words and concepts searched for and the
+  best results AudioMuse found, so a search that finds the wrong music can be looked into.
+
 ## 0.15.1beta — 2026-10-19
 
 ### Fixed
