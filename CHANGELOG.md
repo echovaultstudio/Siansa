@@ -3,6 +3,26 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.13.0beta — 2026-10-19
+
+### Fixed
+- **Switching the equaliser on or off no longer drops the volume** (#159). It used to turn the whole song down by the biggest boost (8 dB for a +8 dB band), so the music got noticeably quieter. Now it keeps the same loudness and only changes the sound's colour, and changes glide in smoothly instead of jumping. The log now says what each equaliser setting does, and how hard the limiter worked for each song.
+- Clearer messages when AudioMuse can't help, for example when its analysis hasn't run yet or a song isn't analysed.
+- **A song path started from now playing is queued straight after the song.** The song keeps playing and the path follows, instead of you having to press Play, which started the first song again.
+- **The song playing now stands out in the queue**, with a band behind it and "Now playing" under its title.
+
+### Added
+- **More from AudioMuse:**
+  - **Steer the Sound search** with chips like "More piano" or "Less vocals". AI mixes can use them too.
+  - **Song paths can end, or start, on a mood**, and can follow what the lyrics are about.
+  - **Mood radios from your library's own sound** on the Search page.
+  - **"More like this playlist"** in a playlist's ⋮ menu: new songs that sound like the whole playlist blended together.
+
+### Changed
+- Song radios and "Discover for you" use Navidrome's own sonic similarity when the AudioMuse-AI plugin is installed there. Otherwise Musix asks AudioMuse directly.
+- Similar songs follow the duplicate and mood settings you made in AudioMuse, instead of Musix's own.
+- Song paths are now exactly the length you pick.
+
 ## 0.12.2beta — 2026-10-19
 
 ### Fixed
