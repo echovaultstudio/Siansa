@@ -3,6 +3,12 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.15.1beta — 2026-10-19
+
+### Fixed
+- **Grey disc covers in another user's music.** With a second user's music shown, songs with a cover of their own disc
+  showed grey squares. Those covers are now asked for with that user's login, like every other cover of theirs.
+
 ## 0.15.0beta — 2026-10-19
 
 ### Added
