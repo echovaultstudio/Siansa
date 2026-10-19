@@ -109,6 +109,11 @@ class MixStore(context: Context) {
             .toSet()
     }
 
+    /** The artists of this vibe's last mix before [excludeId] (issue #236), lower case. */
+    suspend fun lastArtists(selectorId: String, excludeId: String): Set<String> =
+        all().filter { it.selectorId == selectorId && it.id != excludeId }.maxByOrNull { it.createdAt }
+            ?.songs?.mapTo(HashSet()) { it.artist.lowercase() }.orEmpty()
+
     suspend fun recentTitles(count: Int): List<String> =
         all().sortedByDescending { it.createdAt }.take(count).map { it.title }
 }

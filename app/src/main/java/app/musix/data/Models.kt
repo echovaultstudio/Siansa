@@ -134,6 +134,10 @@ data class Selector(
     val repeatDays: Int = 3,
     val useAi: Boolean = true,
     val enabled: Boolean = true,
+    /** Your this many most played songs never come in (issue #236); up to 80 are known. */
+    val leaveOutTopPlayed: Int = 50,
+    /** This share of the mix (percent) comes from outside your usual artists and sound (issue #236). */
+    val surprise: Int = 30,
 ) {
     fun covers(hour: Int): Boolean = when {
         startHour == endHour -> true

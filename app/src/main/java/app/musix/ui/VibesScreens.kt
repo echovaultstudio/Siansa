@@ -203,6 +203,8 @@ fun SelectorEditor(nav: NavController, id: String) {
     var avoid by remember { mutableStateOf("") }
     var length by remember { mutableStateOf(40f) }
     var repeatDays by remember { mutableStateOf("3") }
+    var leaveOut by remember { mutableStateOf(50f) }
+    var surprise by remember { mutableStateOf(30f) }
     var useAi by remember { mutableStateOf(true) }
     var enabled by remember { mutableStateOf(true) }
     var problem by remember { mutableStateOf<String?>(null) }
@@ -218,6 +220,8 @@ fun SelectorEditor(nav: NavController, id: String) {
             avoid = existing.avoid.joinToString(", ")
             length = existing.length.toFloat()
             repeatDays = existing.repeatDays.toString()
+            leaveOut = existing.leaveOutTopPlayed.toFloat()
+            surprise = existing.surprise.toFloat()
             useAi = existing.useAi
             enabled = existing.enabled
         } else {
@@ -247,6 +251,8 @@ fun SelectorEditor(nav: NavController, id: String) {
             avoid = avoid.split(',').map { it.trim() }.filter { it.isNotEmpty() },
             length = length.roundToInt(),
             repeatDays = repeatDays.trim().toIntOrNull()?.coerceIn(0, 30) ?: 3,
+            leaveOutTopPlayed = leaveOut.roundToInt(),
+            surprise = surprise.roundToInt(),
             useAi = useAi,
             enabled = enabled,
         )
@@ -328,6 +334,15 @@ fun SelectorEditor(nav: NavController, id: String) {
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
             )
+            // Less of what you always hear (issue #236).
+            Text(
+                if (leaveOut.roundToInt() == 0) "Leave out your most played songs: off" else "Leave out your ${leaveOut.roundToInt()} most played songs",
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Slider(value = leaveOut, onValueChange = { leaveOut = it }, valueRange = 0f..80f, steps = 7)
+            Text("Surprise: ${surprise.roundToInt()}% from outside your usual artists", style = MaterialTheme.typography.bodyLarge)
+            Slider(value = surprise, onValueChange = { surprise = it }, valueRange = 0f..60f, steps = 11)
+            Hint("The surprise part blends the vibe's sound away from your most played songs, so each day brings artists you don't hear often.")
             SwitchRow("AI title and sound search", useAi) { useAi = it }
             SwitchRow("Enabled", enabled) { enabled = it }
             problem?.let { ErrorText(it, Modifier) }
