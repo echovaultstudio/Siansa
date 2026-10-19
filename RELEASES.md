@@ -3,6 +3,14 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.16.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.16.0beta) — 2026-10-19
+
+- [#242](https://github.com/Musix-Industreez/musix/pull/242) Phone playlists don't download by themselves; stop all downloads (@Th3K1ngP1n)
+- [#243](https://github.com/Musix-Industreez/musix/pull/243) Emulator tests only when the app changed (@Th3K1ngP1n)
+- [#244](https://github.com/Musix-Industreez/musix/pull/244) Structured diagnostic log: events, trace ids, rotation, crash steps, ZIP (@Th3K1ngP1n)
+- [#245](https://github.com/Musix-Industreez/musix/pull/245) Today's mix: less bias, more surprise, better names (@Th3K1ngP1n)
+- [#246](https://github.com/Musix-Industreez/musix/pull/246) SpacingTest: neighbouring icon buttons are 8 dp apart (@Th3K1ngP1n)
+
 ## [0.15.3beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.15.3beta) — 2026-10-19
 
 - [#239](https://github.com/Musix-Industreez/musix/pull/239) Find similar albums: waveform icon with an "A" (@Th3K1ngP1n)
