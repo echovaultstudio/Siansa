@@ -11,6 +11,50 @@ from .generations import rebuild_reason
 
 READY, WORKING, ATTENTION = "ready", "working", "attention"
 
+# How long one round of measuring may run. AudioMuse-AI starts none of its own jobs (analysis, clustering,
+# scheduled tasks) while a plugin job runs, so every round ends well before the next 15-minute tick.
+TICK_SECONDS = 15 * 60
+NORMAL_ROUND_SECONDS = 4 * 60
+ALL_ROUND_SECONDS = 12 * 60
+
+
+def round_seconds(measure_all):
+    return ALL_ROUND_SECONDS if measure_all else NORMAL_ROUND_SECONDS
+
+
+def next_rate(rate, songs, seconds, keep=500):
+    """The running time per song, over about the last ``keep`` songs."""
+    total_songs = float((rate or {}).get("songs") or 0) + songs
+    total_seconds = float((rate or {}).get("seconds") or 0) + seconds
+    if total_songs > keep:
+        scale = keep / total_songs
+        total_songs, total_seconds = keep, total_seconds * scale
+    return {"songs": round(total_songs, 2), "seconds": round(total_seconds, 2)}
+
+
+def duration_text(seconds):
+    """"about 40 minutes", "about 3 hours", "about 2 days"."""
+    minutes = max(1, int(round(seconds / 60)))
+    if minutes < 90:
+        return f"about {minutes} minute{'s' if minutes != 1 else ''}"
+    hours = int(round(minutes / 60))
+    if hours < 48:
+        return f"about {hours} hours"
+    return f"about {int(round(hours / 24))} days"
+
+
+def time_left(to_measure, rate, measure_all, batch):
+    """How long measuring every song still takes, in words, or ``None`` before anything was timed."""
+    rate = rate or {}
+    if to_measure <= 0 or not rate.get("songs"):
+        return None
+    per_song = float(rate["seconds"]) / float(rate["songs"])
+    if measure_all:
+        # Rounds of ALL_ROUND_SECONDS, one per tick.
+        return duration_text(to_measure * per_song * TICK_SECONDS / ALL_ROUND_SECONDS)
+    per_tick = max(1, min(batch, int(NORMAL_ROUND_SECONDS // max(per_song, 0.1))))
+    return duration_text(to_measure / per_tick * TICK_SECONDS)
+
 
 @dataclass
 class Status:
