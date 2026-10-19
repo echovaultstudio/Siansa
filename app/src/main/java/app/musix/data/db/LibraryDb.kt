@@ -174,6 +174,9 @@ interface LibraryDao {
     @Query("SELECT * FROM albums WHERE id = :id")
     suspend fun album(id: String): AlbumEntity?
 
+    @Query("SELECT coverArt FROM albums WHERE id = :id")
+    suspend fun albumCoverArt(id: String): String?
+
     @Query("SELECT id FROM albums WHERE id IN (:ids)")
     suspend fun knownAlbumIds(ids: List<String>): List<String>
 

@@ -328,7 +328,7 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
                 Modifier.fillMaxWidth().testTag("miniPlayer").clickable(onClick = onOpen).padding(horizontal = Space.Small, vertical = Space.Small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Cover(song.cover, 150, Modifier.size(44.dp), RoundedCornerShape(6.dp))
+                Cover(song.cover, 150, Modifier.size(44.dp), RoundedCornerShape(6.dp), albumId = song.albumId)
                 Spacer(Modifier.width(Space.Medium))
                 Column(Modifier.weight(1f)) {
                     Text(song.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)

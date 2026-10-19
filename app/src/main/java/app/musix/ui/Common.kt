@@ -80,7 +80,9 @@ import app.musix.data.LocalPlaylists
 import app.musix.data.Song
 import app.musix.log.AppLog
 import coil3.compose.AsyncImage
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
+import coil3.request.SuccessResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -288,6 +290,31 @@ fun coverRequest(context: android.content.Context, graph: app.musix.AppGraph, id
 }
 
 /**
+ * Whether a song's cover can stand in with its album's while it loads: Navidrome gives songs their disc's
+ * cover (`dc-<album>:<disc>`), which the cover download doesn't fetch, so without this every song list
+ * showed grey squares until each disc cover came over the network, even with all album covers on the phone.
+ */
+internal fun albumCanStandIn(coverId: String, albumCover: String?): Boolean = albumCover != null && albumCover != coverId
+
+/** The album's cover from the phone (memory or the downloaded covers), never the network; null when it isn't there. */
+private suspend fun albumStandIn(
+    context: android.content.Context,
+    graph: app.musix.AppGraph,
+    coverId: String,
+    albumId: String,
+    size: Int?,
+): coil3.Image? {
+    val album = graph.library.albumCover(albumId.removePrefix("al-")) ?: return null
+    if (!albumCanStandIn(coverId, album)) return null
+    val loader = SingletonImageLoader.get(context)
+    (listOf(coverMemoryKey(album, size)) + coverFallbackKeys(album, size)).forEach { key ->
+        loader.memoryCache?.get(MemoryCache.Key(key))?.image?.let { return it }
+    }
+    val request = coverRequest(context, graph, album, size).newBuilder().networkCachePolicy(CachePolicy.DISABLED).build()
+    return (loader.execute(request) as? SuccessResult)?.image
+}
+
+/**
  * Album art from Navidrome. size = null would ask for the original file; screens use [LARGE_COVER] instead.
  * The cache key leaves out the per-session login token, so covers are reused from disk across app starts.
  * Always a still picture (the first frame of an animated cover); [BigCover] shows animations.
@@ -301,6 +328,8 @@ fun Cover(
     size: Int?,
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(8.dp),
+    /** A song's album: its cover, if it's on the phone, shows while the song's own loads. */
+    albumId: String? = null,
 ) {
     val graph = LocalGraph.current
     val context = LocalContext.current
@@ -312,6 +341,11 @@ fun Cover(
     val standIn = remember(coverId, size, cached) {
         if (cached != null || coverId == null) null
         else coverFallbackKeys(coverId, size).firstNotNullOfOrNull { loader.memoryCache?.get(MemoryCache.Key(it))?.image }
+    }
+    val albumImage by produceState<coil3.Image?>(null, coverId, size, albumId) {
+        if (cached == null && standIn == null && coverId != null && albumId != null) {
+            value = runCatching { albumStandIn(context, graph, coverId, albumId, size) }.getOrNull()
+        }
     }
     val request = remember(coverId, size) { coverId?.let { coverRequest(context, graph, it, size) } }
     Box(
@@ -326,9 +360,10 @@ fun Cover(
                 modifier = Modifier.fillMaxSize(),
             )
             request != null -> {
-                if (standIn != null) {
+                val shown = standIn ?: albumImage
+                if (shown != null) {
                     Image(
-                        painter = remember(standIn) { standIn.asPainter(context) },
+                        painter = remember(shown) { shown.asPainter(context) },
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
@@ -466,7 +501,7 @@ fun SongRow(
                 )
             }
             if (showCover) {
-                Cover(song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
+                Cover(song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp), albumId = song.albumId)
                 Spacer(Modifier.width(Space.Medium))
             }
             Column(Modifier.weight(1f)) {

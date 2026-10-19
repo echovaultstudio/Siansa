@@ -52,7 +52,7 @@ fun SongDetailsScreen(nav: NavController, songId: String) {
         LoadBox(page, Modifier.padding(padding)) { p ->
             Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
                 Row(Modifier.fillMaxWidth().padding(Space.Page), verticalAlignment = Alignment.CenterVertically) {
-                    Cover(p.song.cover, 300, Modifier.size(72.dp), RoundedCornerShape(8.dp))
+                    Cover(p.song.cover, 300, Modifier.size(72.dp), RoundedCornerShape(8.dp), albumId = p.song.albumId)
                     Spacer(Modifier.width(Space.Page))
                     Column(Modifier.weight(1f)) {
                         Text(

@@ -88,7 +88,11 @@ class LibraryRepository(context: Context) {
         _status.value = syncedAt?.let { LibraryStatus(it, dao.artistCount(), dao.albumCount(), dao.songCount()) }
     }
 
+    private val albumCovers = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     fun bump() {
+        // A sync may have changed albums' covers.
+        albumCovers.clear()
         _version.value++
     }
 
@@ -97,6 +101,13 @@ class LibraryRepository(context: Context) {
     suspend fun song(id: String): Song? = dao.song(id)?.toSong()
 
     suspend fun albumCoverOfSongCover(songCover: String): String? = dao.albumCoverOfSongCover(songCover)
+
+    /**
+     * An album's cover id as the library has it (`al-<id>_<last change>`), which is what the cover download
+     * saves under. Remembered, since every song row asks while its own cover loads.
+     */
+    suspend fun albumCover(albumId: String): String? = albumCovers[albumId]
+        ?: withContext(Dispatchers.IO) { dao.albumCoverArt(albumId) }?.also { albumCovers[albumId] = it }
 
     /** Songs by id, in the order asked for; ids the library doesn't have are left out. */
     /** Every song's id, title and artist, for matching many songs from other services at once. */
