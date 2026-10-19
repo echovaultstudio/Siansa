@@ -148,8 +148,9 @@ private fun SectionLabel(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
 }
 
+/** The sync as it runs and how it ended: artists, albums and songs (also on Home → Source filter, issue #220). */
 @Composable
-private fun ProgressCard(p: SyncProgress) {
+internal fun ProgressCard(p: SyncProgress) {
     val n = NumberFormat.getIntegerInstance()
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
