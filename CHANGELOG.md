@@ -3,6 +3,27 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.16.0beta — 2026-10-19
+
+### Fixed
+- **Playlists made on the phone no longer download by themselves.** Making one just makes the playlist; use its
+  download button to keep it on the phone.
+
+### Added
+- **Stop all downloads:** a ✕ beside the download progress on the Downloads page stops every song still waiting,
+  after asking. Songs already downloaded stay.
+
+### Changed
+- **Today's mixes surprise more.** Your most played songs stay out (50 by default), part of each mix (30%) comes from
+  artists you don't hear often, blended by AudioMuse from the vibe's sound, and artists from yesterday's mix come up
+  less. Both can be set per vibe.
+- **Mix names are more specific.** Worn-out words like "unwind", "chill" or "vibes" and names close to earlier ones
+  are rejected, and the AI is asked once more.
+- **The log is now also kept as data for tools.** Share under Settings › Logs sends one ZIP with the readable log,
+  the same entries as JSON (what happened, when, and which song it was about), the last steps before a crash, and a
+  list of what's inside. Passwords, tokens and keys are still removed.
+- **Choose which parts of the app add detail to the log** (Settings › Logs › Detail for), to keep it smaller.
+
 ## 0.15.3beta — 2026-10-19
 
 ### Fixed
