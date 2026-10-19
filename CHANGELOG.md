@@ -3,6 +3,14 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.12.0beta — 2026-10-19
+
+### Fixed
+- **Song covers flashed grey in the Time machine and other song lists**, even with every cover downloaded. "Download covers" now also fetches the covers songs show (each disc's, or a song's own), just as Navidrome sends them, so song lists show them from the phone.
+
+### Added
+- **A back arrow in the search box.** While typing or looking at results, it takes you back to the search page. The phone's back gesture does the same, instead of jumping to Home.
+
 ## 0.11.1beta — 2026-10-19
 
 ### Fixed
