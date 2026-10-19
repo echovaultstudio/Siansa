@@ -110,42 +110,30 @@ class MixGenerator(private val graph: AppGraph) {
         val taste = taste()
         val recent = graph.history.playedSince(System.currentTimeMillis() - selector.repeatDays * dayMs) +
             graph.mixes.recentSongIds(selector.id, selector.repeatDays, excludeId = id)
-        val skipped = taste?.skipped.orEmpty()
-        val fresh = pool.values.filter { it.id !in recent && it.id !in skipped }
-        val candidates = if (fresh.size >= selector.length) fresh else pool.values.filter { it.id !in skipped }.ifEmpty { pool.values.toList() }
-
-        // Mostly by match strength, nudged towards artists you play (and play at this time of day),
-        // with a little shuffle so two days never come out identical.
-        // Each track gets one score up front: a sort whose keys change mid-sort fails on Android.
-        val hourArtists = taste?.hourArtists.orEmpty().map { it.lowercase() }.toSet()
-        val ranked = candidates
-            .map { hit ->
-                val liked = taste?.affinity(hit.artist) ?: 0.0
-                val habit = if (hit.artist.lowercase() in hourArtists) 0.12 else 0.0
-                hit to hit.similarity * (0.8 + Random.nextDouble() * 0.2) * (1 + 0.3 * liked + habit)
-            }
-            .sortedByDescending { it.second }
-            .map { it.first }
-        val maxPerArtist = max(2, selector.length / 8)
-        val perArtist = HashMap<String, Int>()
-        val picked = ArrayList<ClapHit>()
-        for (hit in ranked) {
-            if (picked.size >= selector.length) break
-            val key = hit.artist.lowercase()
-            val count = perArtist[key] ?: 0
-            if (count >= maxPerArtist) continue
-            perArtist[key] = count + 1
-            picked += hit
-        }
-        if (picked.size < selector.length) {
-            for (hit in ranked) {
-                if (picked.size >= selector.length) break
-                if (hit !in picked) picked += hit
-            }
-        }
+        // Less of what you always hear (issue #236): your most played songs stay out, and part of the mix comes
+        // from AudioMuse's alchemy, the vibe's sound blended away from your most played.
+        val leaveOut = taste?.favouriteSongs.orEmpty().take(selector.leaveOutTopPlayed.coerceAtLeast(0)).toSet()
+        val surprise = if (selector.surprise <= 0) emptyList() else runCatching {
+            val anchors = pool.values.filter { it.id !in leaveOut }.take(15).shuffled().take(3).map { it.id }
+            if (anchors.isEmpty()) emptyList()
+            else graph.audioMuse.alchemy(anchors, avoid = leaveOut.take(5).toList(), count = selector.length * 3)
+        }.onFailure { AppLog.w("Mix", "Alchemy for the surprise part failed: ${it.message}") }.getOrDefault(emptyList())
+        val picker = MixPicker(
+            length = selector.length,
+            surprisePercent = selector.surprise,
+            leaveOut = leaveOut,
+            recent = recent,
+            skipped = taste?.skipped.orEmpty(),
+            familiar = { artist -> taste?.affinity(artist) ?: 0.0 },
+            lastArtists = graph.mixes.lastArtists(selector.id, excludeId = id),
+        )
+        val picked = picker.pick(pool.values.toList(), surprise)
+        val fresh = picked.count { it.id !in recent }
+        AppLog.i("Mix", "${selector.name}: ${pool.size} matches, ${surprise.size} from alchemy, left out ${leaveOut.size} most played, " +
+            "picked ${picked.size} (${picked.count { s -> surprise.any { it.id == s.id } }} surprise, $fresh not heard lately)")
 
         val songs = resolve(picked.map { it.id })
-        AppLog.i("Mix", "${pool.size} matches, ${fresh.size} not played recently, picked ${picked.size}, resolved ${songs.size}")
+        AppLog.i("Mix", "Resolved ${songs.size} of ${picked.size}")
         if (songs.isEmpty()) {
             throw MixException("Navidrome didn't recognise AudioMuse's tracks. Check both use the same library.")
         }
@@ -185,21 +173,21 @@ class MixGenerator(private val graph: AppGraph) {
             appendLine("Now: $day %02d:%02d".format(now.hour, now.minute))
             appendLine("Listening on: ${describeOutput(graph.app)}")
             if (recent.isNotEmpty()) appendLine("Recently played: ${recent.joinToString("; ")}")
+            // Genres only, no favourite artists: the mix should surprise, not repeat them (issue #236).
             taste()?.let { t ->
-                if (t.topArtists.isNotEmpty()) appendLine("Favourite artists lately: ${t.topArtists.take(10).joinToString(", ")}")
-                if (t.hourArtists.isNotEmpty() || t.hourGenres.isNotEmpty()) {
-                    appendLine("Usually played around this time: " + (t.hourGenres + t.hourArtists.take(5)).joinToString(", "))
-                }
+                if (t.hourGenres.isNotEmpty()) appendLine("Genres usually played around this time: ${t.hourGenres.joinToString(", ")}")
             }
             if (previousTitles.isNotEmpty()) appendLine("Previous mix titles: ${previousTitles.joinToString("; ")}")
             if (concepts.isNotEmpty()) appendLine("Sound concepts the search understands well: ${concepts.joinToString(", ")}")
         }
 
-        val raw = graph.openRouter.complete(SYSTEM_PROMPT, user)
-        val start = raw.indexOf('{')
-        val end = raw.lastIndexOf('}')
-        if (start < 0 || end <= start) throw MixException("The AI didn't answer with JSON")
-        val obj = AppJson.parseToJsonElement(raw.substring(start, end + 1)).jsonObject
+        var obj = askPlan(user)
+        // A title that says little or echoes an earlier one gets one more try, with the reason (issue #236).
+        MixTitles.problem(obj.str("title").orEmpty(), previousTitles)?.let { why ->
+            AppLog.i("Mix", "AI title \"${obj.str("title")}\" rejected: $why; asking once more")
+            runCatching { askPlan(user + "\nYour title \"${obj.str("title")}\" was rejected: $why. Give a different, more specific title.") }
+                .onSuccess { obj = it }
+        }
         val title = obj.str("title")?.trim()?.trim('"')?.take(60).orEmpty()
         val query = obj.str("query")?.trim()?.take(300).orEmpty()
         val description = obj.str("description")?.trim()?.take(200).orEmpty()
@@ -210,6 +198,14 @@ class MixGenerator(private val graph: AppGraph) {
         if (broken.isNotEmpty()) throw MixException("The AI used a forbidden word: ${broken.first()}")
 
         return Plan(title, query, description.ifBlank { selector.guidance }, ai = true, steering = steeringOf(obj, concepts))
+    }
+
+    private suspend fun askPlan(user: String): kotlinx.serialization.json.JsonObject {
+        val raw = graph.openRouter.complete(SYSTEM_PROMPT, user)
+        val start = raw.indexOf('{')
+        val end = raw.lastIndexOf('}')
+        if (start < 0 || end <= start) throw MixException("The AI didn't answer with JSON")
+        return AppJson.parseToJsonElement(raw.substring(start, end + 1)).jsonObject
     }
 
     private fun steeringOf(obj: kotlinx.serialization.json.JsonObject, concepts: List<String>): List<Steer> =
@@ -410,7 +406,9 @@ class MixGenerator(private val graph: AppGraph) {
             You plan one playlist for a personal music player. A text-to-audio search model (CLAP) will find tracks
             in the listener's own library from your search text, so describe how the music should SOUND.
             Reply with only a JSON object: {"title": string, "query": string, "description": string, "steer": [...]}.
-            - title: 2 to 6 words, natural and specific, like "Mellow electronic for the drive". No emoji.
+            - title: 2 to 5 words, specific and a little unexpected: a concrete image, place or moment, like
+              "Neon puddles after midnight" or "Coffee before the storm". Never generic words such as unwind, chill,
+              vibes, beats, mellow, relax, groove, journey or playlist. No emoji.
             - query: 6 to 16 words for the audio search: genres, mood, energy, tempo, instruments, vocals.
               No artist or song names. Prefer the listed sound concepts where they fit.
             - description: one short friendly sentence for the listener.
@@ -418,8 +416,8 @@ class MixGenerator(private val graph: AppGraph) {
               {"term": concept, "direction": "more" or "less"}. Only concepts from the list; leave it empty if none fit.
             Follow the time slot's guidance strictly and never use any forbidden word in the title or query.
             Use the listening device as context (a car's Bluetooth suggests driving).
-            Stay close to the listener's recent taste and what they usually play at this time, but don't repeat a
-            previous mix title. Favourite artists are only a hint for the sound: never name them.
+            Fit the time slot, but surprise the listener: don't just describe what they played recently, take the
+            sound somewhere a little new each day. Never repeat or echo a previous mix title.
         """.trimIndent()
 
         fun describeOutput(context: Context): String {
