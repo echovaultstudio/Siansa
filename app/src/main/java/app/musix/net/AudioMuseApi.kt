@@ -10,6 +10,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
@@ -17,6 +18,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.util.Locale
 import okhttp3.RequestBody.Companion.toRequestBody
 
 /** One group of steering concepts (Genre, Instrument, Vocals, Mood, Production, Tempo, Era), best-understood first. */
@@ -175,7 +177,7 @@ class AudioMuseApi(
             }
         }.toString()
         val root = execute { request("/api/clap/search").post(payload.toRequestBody(JSON_TYPE)).build() }
-        return root.arr("results").mapNotNull { r ->
+        val hits = root.arr("results").mapNotNull { r ->
             val id = r.str("item_id") ?: return@mapNotNull null
             ClapHit(
                 id = id,
@@ -185,6 +187,10 @@ class AudioMuseApi(
                 similarity = r.dbl("similarity") ?: 0.0,
             )
         }
+        // What was asked and what came back (issue #229), so a search that finds the wrong music can be traced to
+        // the request or to AudioMuse's ranking.
+        AppLog.i("Sound", searchSummary(query, steering, hits, warningsOf(root)))
+        return hits
     }
 
     /**
@@ -337,6 +343,19 @@ class AudioMuseApi(
     }
 
     internal companion object {
+        /** AudioMuse's notes about concepts it couldn't use (an unknown term is dropped, not refused). */
+        fun warningsOf(root: JsonObject): List<String> =
+            (root["steering_warnings"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content }
+
+        /** One log line for a sound search: words, concepts, how many came back, the best few with their score. */
+        fun searchSummary(query: String, steering: List<Steer>, hits: List<ClapHit>, warnings: List<String>, top: Int = 5): String {
+            val steer = steering.joinToString(", ") { (if (it.more) "+" else "−") + it.term }.ifEmpty { "none" }
+            val best = hits.take(top).joinToString("; ") { "${it.title} – ${it.artist} (${"%.3f".format(Locale.ROOT, it.similarity)})" }
+            return "Search \"$query\" · concepts $steer · ${hits.size} songs" +
+                (if (best.isNotEmpty()) " · best: $best" else "") +
+                (if (warnings.isNotEmpty()) " · AudioMuse: ${warnings.joinToString("; ")}" else "")
+        }
+
         val JSON_TYPE = "application/json".toMediaType()
         const val SYNC_BATCH = 500
 
