@@ -141,7 +141,7 @@ fun <T> loadStateFresh(key: Any?, block: suspend () -> T): State<Load<T>> =
 @Composable
 fun <T> LoadBox(load: Load<T>, modifier: Modifier = Modifier, content: @Composable (T) -> Unit) {
     when (load) {
-        is Load.Loading -> Box(modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+        is Load.Loading -> Box(modifier.fillMaxWidth().padding(Space.Large), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
         is Load.Err -> ErrorText(load.message, modifier)
@@ -155,7 +155,7 @@ fun ErrorText(message: String, modifier: Modifier = Modifier) {
         message,
         color = MaterialTheme.colorScheme.error,
         style = MaterialTheme.typography.bodyMedium,
-        modifier = modifier.padding(16.dp),
+        modifier = modifier.padding(Space.Page),
     )
 }
 
@@ -402,12 +402,12 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier, top: Dp = SECTION_
         text,
         style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Bold,
-        modifier = modifier.padding(start = 16.dp, end = 16.dp, top = top, bottom = 10.dp),
+        modifier = modifier.padding(start = Space.Page, end = Space.Page, top = top, bottom = Space.Medium),
     )
 }
 
 /** The space above a section's heading: between one section's last row and the next heading. */
-val SECTION_GAP = 24.dp
+val SECTION_GAP = Space.Section
 
 fun formatDuration(seconds: Long): String {
     val s = seconds.coerceAtLeast(0)
@@ -454,7 +454,7 @@ fun SongRow(
                 .then(rowBackground)
                 .alpha(if (unavailable) 0.38f else 1f)
                 .clickable(onClick = onClick)
-                .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                .padding(start = Space.Page, end = Space.Tight, top = Space.Small, bottom = Space.Small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (leading != null) {
@@ -467,7 +467,7 @@ fun SongRow(
             }
             if (showCover) {
                 Cover(song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Space.Medium))
             }
             Column(Modifier.weight(1f)) {
                 Text(
@@ -569,7 +569,7 @@ fun AlbumTile(
     modifier: Modifier = Modifier,
     round: Boolean = false,
 ) {
-    Column(modifier.clickable(onClick = onClick).padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier.clickable(onClick = onClick).padding(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
         Cover(
             coverArt,
             300,
@@ -628,7 +628,7 @@ fun GradientTile(
                 Cover(
                     coverArt,
                     300,
-                    Modifier.size(size * 0.45f).align(Alignment.BottomEnd).padding(10.dp),
+                    Modifier.size(size * 0.45f).align(Alignment.BottomEnd).padding(Space.Small),
                     RoundedCornerShape(6.dp),
                 )
             }
@@ -639,18 +639,18 @@ fun GradientTile(
                 color = Color.White,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
+                modifier = Modifier.align(Alignment.TopStart).padding(Space.Medium),
             )
             if (busy) {
                 CircularProgressIndicator(
-                    Modifier.size(22.dp).align(Alignment.BottomStart).padding(2.dp),
+                    Modifier.size(22.dp).align(Alignment.BottomStart).padding(2.dp),  // spacing: exact (the badge's inset)
                     color = Color.White,
                     strokeWidth = 2.dp,
                 )
             }
         }
         if (subtitle != null) {
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(Space.Small))
             Text(subtitle, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (caption != null) {
@@ -701,7 +701,7 @@ fun QuickTile(
             fontWeight = FontWeight.SemiBold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 10.dp),
+            modifier = Modifier.padding(horizontal = Space.Medium),
         )
     }
 }
@@ -725,7 +725,7 @@ fun <T> Shelf(
                 Modifier
                     .fillMaxWidth()
                     .clickable(onClickLabel = "Show all", onClick = onOpenAll)
-                    .padding(start = 16.dp, end = 12.dp, top = 24.dp, bottom = 10.dp),
+                    .padding(start = Space.Page, end = Space.Medium, top = Space.Section, bottom = Space.Medium),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -739,14 +739,14 @@ fun <T> Shelf(
                 Icon(
                     Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                     contentDescription = null,
-                    modifier = Modifier.padding(start = 4.dp).size(26.dp),
+                    modifier = Modifier.padding(start = Space.Tight).size(26.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         } else {
             SectionTitle(title)
         }
-        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyRow(contentPadding = PaddingValues(horizontal = Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
             items(items, key = key) { content(it) }
         }
     }
@@ -792,13 +792,13 @@ fun SwipeToQueue(song: Song, enabled: Boolean, onQueued: () -> Unit, content: @C
         enableDismissFromStartToEnd = false,
         backgroundContent = {
             Row(
-                Modifier.fillMaxSize().background(if (swiping) Accent else Color.Transparent).padding(horizontal = 24.dp),
+                Modifier.fillMaxSize().background(if (swiping) Accent else Color.Transparent).padding(horizontal = Space.Section),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End,
             ) {
                 if (swiping) {
                     Text("Add to queue", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = OnAccent)
-                    Spacer(Modifier.width(10.dp))
+                    Spacer(Modifier.width(Space.Medium))
                     Icon(Icons.AutoMirrored.Rounded.QueueMusic, null, tint = OnAccent)
                 }
             }
@@ -862,9 +862,9 @@ fun AiUnavailable(problem: String?, modifier: Modifier = Modifier, onDark: Boole
     if (problem == null) return
     val text = if (onDark) Color.White else MaterialTheme.colorScheme.onSurface
     val subtle = if (onDark) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
-    Row(modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier.fillMaxWidth().padding(vertical = Space.Small), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Rounded.SentimentDissatisfied, null, tint = subtle, modifier = Modifier.size(28.dp))
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(Space.Medium))
         Column {
             Text("AI backend is currently not available :(", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = text)
             Text(problem, style = MaterialTheme.typography.bodySmall, color = subtle)

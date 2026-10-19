@@ -16,6 +16,11 @@ Source: `app/src/main/java/app/musix/`. Unit tests: `app/src/test/`. Emulator te
   tokens or API keys (`AppLog.redact` removes them from addresses). Server addresses and IPs are logged: the log
   is a debugging tool and every request is written in full while it's on (issue #180).
 - UI text: short, plain English, no jargon. Follow the existing Musix theme (`ui/Theme.kt`); test light and dark.
+- Spacing: every gap and padding is a step of the scale in `ui/Spacing.kt` (`Space.Tight` 4, `Small` 8,
+  `Medium` 12, `Page` 16, `Section` 24, `Large` 32 dp), picked by what the space is for (see its comment).
+  No raw dp numbers in `padding`, `spacedBy`, `PaddingValues` or `Spacer`: `SpacingPolicyTest` fails on them.
+  Pixel-exact drawing that isn't spacing (a ring, a hairline, an offset) may say `// spacing: exact` on its line.
+  Pages use `Space.Page` at their left and right edges and `Space.Section` between sections.
 - Visual changes: keep spacing even (the same gap above and below a row of chips, buttons or a badge) and add
   a check for it to `app/src/androidTest/java/app/musix/SpacingTest.kt`.
 - Navigate and change screen state only on the main thread.

@@ -64,7 +64,7 @@ import app.musix.log.AppLog
  */
 
 /** The gap between a user's name and their libraries, and between the libraries and the card's edge. */
-internal val SOURCE_CARD_GAP = 12.dp
+internal val SOURCE_CARD_GAP = Space.Medium
 
 /** The Sources tab of the Home settings panel. */
 @Composable
@@ -78,7 +78,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
     val users = remember { Users.all(context) }
     var hidingActive by remember { mutableStateOf<UserEntry?>(null) }
 
-    Column(modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+    Column(modifier.verticalScroll(rememberScrollState()).padding(horizontal = Space.Page)) {
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
             Row(
                 Modifier
@@ -87,7 +87,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                         AppLog.i("Sources", "Only downloaded music: $on")
                         graph.settings.setDownloadedOnly(on)
                     }
-                    .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp),
+                    .padding(start = Space.Page, end = Space.Page, top = Space.Page, bottom = Space.Page),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
@@ -98,13 +98,13 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Space.Medium))
                 Switch(checked = settings.downloadedOnly, onCheckedChange = null)
             }
         }
 
         PanelLabel("Users and libraries")
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
             users.forEach { user ->
                 val inUse = user.id == Users.active
                 val isShown = user.id in shown
@@ -166,7 +166,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
             else "Add another user in Settings → Users to show their music here too.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 10.dp, bottom = 16.dp, start = 4.dp, end = 4.dp),
+            modifier = Modifier.padding(top = Space.Medium, bottom = Space.Page, start = Space.Tight, end = Space.Tight),
         )
     }
 
@@ -214,7 +214,7 @@ internal fun SourceCard(
         color = if (shown) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth().testTag("source-card"),
     ) {
-        Column(Modifier.padding(start = 4.dp, end = 12.dp, top = 4.dp, bottom = if (libraries.isEmpty()) 4.dp else SOURCE_CARD_GAP)) {
+        Column(Modifier.padding(start = Space.Tight, end = Space.Medium, top = Space.Tight, bottom = if (libraries.isEmpty()) Space.Tight else SOURCE_CARD_GAP)) {
             Row(Modifier.fillMaxWidth().testTag("source-name"), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onToggle, enabled = canToggle) {
                     Icon(
@@ -223,21 +223,21 @@ internal fun SourceCard(
                         tint = if (shown) Accent else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Column(Modifier.weight(1f).alpha(if (shown) 1f else 0.6f).padding(vertical = 8.dp)) {
+                Column(Modifier.weight(1f).alpha(if (shown) 1f else 0.6f).padding(vertical = Space.Small)) {
                     Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
                 }
                 if (shown) {
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(Space.Small))
                     OutlinedButton(onClick = onSync, enabled = !syncing) { Text(if (syncing) "Syncing" else "Sync") }
                 }
             }
             if (libraries.isNotEmpty()) {
                 Spacer(Modifier.height(SOURCE_CARD_GAP))
                 FlowRow(
-                    Modifier.padding(start = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    Modifier.padding(start = Space.Medium),
+                    horizontalArrangement = Arrangement.spacedBy(Space.Small),
+                    verticalArrangement = Arrangement.spacedBy(Space.Small),
                 ) {
                     libraries.forEachIndexed { i, (library, on) ->
                         LibraryChip(library, on, enabled = !syncing) { onLibrary(i) }
@@ -259,13 +259,13 @@ private fun LibraryChip(name: String, on: Boolean, enabled: Boolean, onClick: ()
             .border(1.dp, if (on) Accent.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant, shape)
             .toggleable(on, enabled = enabled, role = Role.Checkbox) { onClick() }
             .height(36.dp)
-            .padding(horizontal = 12.dp)
+            .padding(horizontal = Space.Medium)
             .alpha(if (enabled) 1f else 0.6f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (on) {
             Icon(Icons.Rounded.Check, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(Space.Small))
         }
         Text(
             name,
@@ -281,7 +281,7 @@ private fun PanelLabel(text: String) {
         text,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = 4.dp, top = 20.dp, bottom = 10.dp),
+        modifier = Modifier.padding(start = Space.Tight, top = Space.Section, bottom = Space.Medium),
     )
 }
 
@@ -299,19 +299,19 @@ internal fun SourceChips(onOpen: () -> Unit) {
     val shelf by graph.downloads.shelf.collectAsStateWithLifecycle()
     val chips = sourceChipLabels(settings.downloadedOnly, shown.size)
     if (chips.isEmpty() && !(connection.offline && !shelf.isEmpty)) return
-    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Tight, bottom = Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
         if (chips.isNotEmpty()) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                 chips.forEach { label ->
                     Surface(onClick = onOpen, shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
-                        Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.padding(horizontal = Space.Medium, vertical = Space.Small), verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 if (label == DOWNLOADED_CHIP) Icons.Rounded.DownloadForOffline else Icons.Rounded.Group,
                                 null,
                                 Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
                             )
-                            Spacer(Modifier.width(6.dp))
+                            Spacer(Modifier.width(Space.Small))
                             Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
                         }
                     }
@@ -320,9 +320,9 @@ internal fun SourceChips(onOpen: () -> Unit) {
         }
         if (connection.offline && !settings.downloadedOnly && !shelf.isEmpty) {
             Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Small, top = Space.Tight, bottom = Space.Tight), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.CloudOff, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(Space.Medium))
                     Text("You're offline. Show only downloaded music?", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                     TextButton(onClick = {
                         AppLog.i("Sources", "Only downloaded music: on (offered while offline)")

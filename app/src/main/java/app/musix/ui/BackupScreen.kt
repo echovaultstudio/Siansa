@@ -93,28 +93,28 @@ fun BackupScreen(nav: NavController) {
 
     Screen(title = "Backup", nav = nav) { padding ->
         Column(
-            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
+            verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             Hint(
                 "A backup holds your settings, vibes, mixes, play history, Home and library layout, and anything else " +
                     "you set up in Musix. Passwords, tokens and API keys are never included: after restoring on a new phone, " +
                     "enter them again under Connections. Your library comes back with the next sync.",
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 Button(enabled = !busy, onClick = { saver.launch("musix-backup-${stamp()}.json") }) {
                     Icon(Icons.Rounded.Save, null)
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(Space.Small))
                     Text("Save backup")
                 }
                 OutlinedButton(enabled = !busy, onClick = { opener.launch(arrayOf("application/json", "application/octet-stream", "text/plain")) }) {
                     Icon(Icons.Rounded.Restore, null)
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(Space.Small))
                     Text("Restore")
                 }
             }
 
-            Text("Automatic backup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
+            Text("Automatic backup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = Space.Medium))
             Hint(
                 "Once a day, Musix saves a backup to a folder you choose and keeps the last 7. " +
                     "To back up to your NAS, choose a folder from an app that shows it in the file picker " +
@@ -132,7 +132,7 @@ fun BackupScreen(nav: NavController) {
                 }
                 Hint(last)
                 lastError?.let { Text("Last try failed: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                     Button(enabled = !busy, onClick = {
                         busy = true
                         scope.launch {
@@ -151,7 +151,7 @@ fun BackupScreen(nav: NavController) {
             } else {
                 OutlinedButton(enabled = !busy, onClick = { folderPicker.launch(null) }) {
                     Icon(Icons.Rounded.Folder, null)
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(Space.Small))
                     Text("Choose a folder")
                 }
             }

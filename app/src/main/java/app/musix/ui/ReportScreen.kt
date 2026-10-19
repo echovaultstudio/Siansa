@@ -73,33 +73,13 @@ private fun ReportPage(nav: NavController, rangeId: String) {
     val report by loadStateFresh(range) { graph.insights.report(range) }
 
     Box(Modifier.fillMaxSize().background(Brand.Plum)) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(32.dp))) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(Brush.verticalGradient(listOf(Brand.VioletDeep, Brand.AmberDeep.copy(alpha = 0.55f), Brand.Plum)))
-                        .statusBarsPadding()
-                        .padding(bottom = 20.dp),
-                ) {
-                    IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White) }
-                    val r = report.valueOrNull()
-                    Text(
-                        r?.title ?: "Your listening",
-                        style = MaterialTheme.typography.displaySmall,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 20.dp),
-                    )
-                    Text(
-                        r?.subtitle.orEmpty(),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                    )
+                val r = report.valueOrNull()
+                ListeningHeader(nav, r?.title ?: "Your listening", r?.subtitle.orEmpty()) {
                     Row(
-                        Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Space.Page).padding(top = Space.Medium),
+                        horizontalArrangement = Arrangement.spacedBy(Space.Small),
                     ) {
                         listOf(
                             ReportRange.THIS_MONTH to "This month",
@@ -127,19 +107,19 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
         Text(
             "Nothing played in this period.",
             style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Large),
         )
         return
     }
     val n = NumberFormat.getIntegerInstance()
 
     // The big numbers.
-    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.padding(horizontal = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
             Stat(n.format(r.minutes), "minutes listened", "${n.format(r.minutes / 60)} hours", Modifier.weight(1f), Brand.AmberDeep)
             Stat(n.format(r.plays), "plays", null, Modifier.weight(1f), Brand.VioletDeep)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
             Stat(n.format(r.artistCount), "artists", r.newArtists?.let { "$it new to you" }, Modifier.weight(1f), Brand.PlumHigh)
             Stat(n.format(r.trackCount), "different songs", null, Modifier.weight(1f), Brand.PlumHigh)
         }
@@ -153,11 +133,11 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
             Modifier
                 .fillMaxWidth()
                 .clickable(enabled = top.artist != null) { top.artist?.let { nav.navigate("artist/${it.id}") } }
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = Space.Page, vertical = Space.Small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ArtistPhoto(top, 104)
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(Space.Page))
             Column {
                 Text("#1", style = MaterialTheme.typography.titleMedium, color = Accent, fontWeight = FontWeight.Bold)
                 Text(top.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -169,15 +149,15 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
                 Modifier
                     .fillMaxWidth()
                     .clickable(enabled = a.artist != null) { a.artist?.let { nav.navigate("artist/${it.id}") } }
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                    .padding(horizontal = Space.Page, vertical = Space.Small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("${i + 2}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp))
                 ArtistPhoto(a, 44)
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Space.Medium))
                 Column(Modifier.weight(1f)) {
                     Text(a.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.1f))) {
+                    Box(Modifier.padding(top = Space.Tight).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.1f))) {
                         Box(
                             Modifier
                                 .fillMaxWidth((a.plays.toFloat() / top.plays.coerceAtLeast(1)).coerceIn(0.05f, 1f))
@@ -186,7 +166,7 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
                         )
                     }
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Space.Medium))
                 Text(n.format(a.plays), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -194,7 +174,7 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
 
     // Top songs, playable as a list.
     if (r.topTracks.isNotEmpty()) {
-        Row(Modifier.fillMaxWidth().padding(end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(end = Space.Page), verticalAlignment = Alignment.CenterVertically) {
             SectionTitle("Top songs", Modifier.weight(1f))
             val playable = r.topTracks.mapNotNull { it.song }
             if (playable.isNotEmpty()) {
@@ -203,7 +183,7 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
                     colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = OnAccent),
                 ) {
                     Icon(Icons.Rounded.PlayArrow, null)
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(Space.Tight))
                     Text("Play")
                 }
             }
@@ -213,7 +193,7 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
             if (song != null) {
                 SongRow(song = song, onClick = { graph.player.play(r.topTracks.mapNotNull { it.song }, r.topTracks.take(i).count { it.song != null }) }, leading = "${i + 1}")
             } else {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Medium), verticalAlignment = Alignment.CenterVertically) {
                     Text("${i + 1}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.width(28.dp))
                     Column(Modifier.weight(1f)) {
                         Text(t.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -227,7 +207,7 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
 
     if (r.topAlbums.isNotEmpty()) {
         SectionTitle("Top albums")
-        LazyRow(contentPadding = PaddingValues(horizontal = 12.dp)) {
+        LazyRow(contentPadding = PaddingValues(horizontal = Space.Small)) {
             items(r.topAlbums) { a ->
                 AlbumTile(
                     name = a.title,
@@ -247,14 +227,14 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
         SectionTitle("How your taste moved")
         if (r.rising.isNotEmpty()) {
             Label(Icons.AutoMirrored.Rounded.TrendingUp, "New in your rotation", Accent)
-            LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            LazyRow(contentPadding = PaddingValues(horizontal = Space.Medium), horizontalArrangement = Arrangement.spacedBy(Space.Tight)) {
                 items(r.rising) { a ->
                     Column(
-                        Modifier.width(96.dp).clickable(enabled = a.artist != null) { a.artist?.let { nav.navigate("artist/${it.id}") } }.padding(4.dp),
+                        Modifier.width(96.dp).clickable(enabled = a.artist != null) { a.artist?.let { nav.navigate("artist/${it.id}") } }.padding(Space.Tight),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         ArtistPhoto(a, 80)
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(Space.Tight))
                         Text(a.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
@@ -274,7 +254,7 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
         r.source,
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp),
+        modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Section),
     )
 }
 
@@ -284,7 +264,7 @@ private fun Stat(value: String, label: String, extra: String?, modifier: Modifie
         modifier
             .clip(RoundedCornerShape(16.dp))
             .background(Brush.linearGradient(listOf(color, color.copy(alpha = 0.55f))))
-            .padding(16.dp),
+            .padding(Space.Page),
     ) {
         Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = Color.White)
         Text(label, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
@@ -324,13 +304,13 @@ private fun ListeningClock(byHour: IntArray, peak: Int?) {
             "$persona · most plays around %02d:00".format(peak),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = Space.Page),
         )
     }
     val max = byHour.maxOrNull()?.coerceAtLeast(1) ?: 1
     val faint = Color.White.copy(alpha = 0.18f)
     val accent = Accent
-    Canvas(Modifier.fillMaxWidth().height(120.dp).padding(horizontal = 16.dp, vertical = 12.dp)) {
+    Canvas(Modifier.fillMaxWidth().height(120.dp).padding(horizontal = Space.Page, vertical = Space.Medium)) {
         val gap = 3.dp.toPx()
         val barWidth = (size.width - gap * 23) / 24
         byHour.forEachIndexed { hour, count ->
@@ -343,7 +323,7 @@ private fun ListeningClock(byHour: IntArray, peak: Int?) {
             )
         }
     }
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = Space.Page)) {
         listOf("00", "06", "12", "18", "23").forEachIndexed { i, label ->
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (i < 4) Spacer(Modifier.weight(1f))
@@ -353,9 +333,9 @@ private fun ListeningClock(byHour: IntArray, peak: Int?) {
 
 @Composable
 private fun Label(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, tint: Color) {
-    Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.padding(horizontal = Space.Page, vertical = Space.Small), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, tint = tint, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(Space.Small))
         Text(text, style = MaterialTheme.typography.labelLarge, color = tint)
     }
 }
@@ -364,15 +344,15 @@ private fun Label(icon: androidx.compose.ui.graphics.vector.ImageVector, text: S
 @Composable
 private fun Chips(items: List<String>, background: Color) {
     FlowRow(
-        Modifier.padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        Modifier.padding(horizontal = Space.Page),
+        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+        verticalArrangement = Arrangement.spacedBy(Space.Small),
     ) {
         items.forEach { text ->
             Text(
                 text,
                 style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(background).padding(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(background).padding(horizontal = Space.Medium, vertical = Space.Small),
             )
         }
     }

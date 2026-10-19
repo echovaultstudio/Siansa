@@ -84,11 +84,11 @@ fun SongPathPicker(nav: NavController, songId: String) {
                     "Pick a second song. Musix builds a queue that moves smoothly from the sound of one to the other.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
                 )
             }
             item {
-                Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Tight, top = Space.Small), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(
                             if (toHere) "Ends with" else "Starts with",
@@ -96,9 +96,9 @@ fun SongPathPicker(nav: NavController, songId: String) {
                             color = Accent,
                         )
                         val s = song.valueOrNull()
-                        Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.padding(top = Space.Small), verticalAlignment = Alignment.CenterVertically) {
                             Cover(s?.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
-                            Spacer(Modifier.width(12.dp))
+                            Spacer(Modifier.width(Space.Medium))
                             Column {
                                 Text(s?.title ?: "…", style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(
@@ -118,8 +118,8 @@ fun SongPathPicker(nav: NavController, songId: String) {
             }
             item {
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Medium),
+                    horizontalArrangement = Arrangement.spacedBy(Space.Small),
                 ) {
                     songPathLengths.forEach { n ->
                         FilterChip(selected = length == n, onClick = { length = n }, label = { Text("$n songs") })
@@ -134,9 +134,9 @@ fun SongPathPicker(nav: NavController, songId: String) {
                     leadingIcon = { Icon(Icons.Rounded.Search, null) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Space.Page),
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(Space.Small))
             }
             val found = results.valueOrNull().orEmpty()
             if (results is Load.Err) item { ErrorText((results as Load.Err).message) }
@@ -146,17 +146,17 @@ fun SongPathPicker(nav: NavController, songId: String) {
                         "No songs found",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(Space.Page),
                     )
                 }
             }
             items(found, key = { it.id }) { other ->
                 Row(
-                    Modifier.fillMaxWidth().clickable { go(other) }.padding(horizontal = 16.dp, vertical = 6.dp),
+                    Modifier.fillMaxWidth().clickable { go(other) }.padding(horizontal = Space.Page, vertical = Space.Small),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Cover(other.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(Space.Medium))
                     Column(Modifier.weight(1f)) {
                         Text(other.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
@@ -216,7 +216,7 @@ fun SongPathScreen(nav: NavController, fromId: String, toId: String, length: Int
                         },
                     ) {
                         Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, null)
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(Space.Tight))
                         Text(if (saved) "Saved" else "Save as playlist", fontWeight = FontWeight.Medium)
                     }
                 }

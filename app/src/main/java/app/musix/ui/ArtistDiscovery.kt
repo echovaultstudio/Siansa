@@ -60,14 +60,17 @@ object DiscoveryMap {
     data class Graph(val seeds: List<Node>, val suggestions: List<Node>, val edges: List<Edge>)
 
     const val SEED_RING = 0.24f
-    const val OUTER_RING = 0.42f
+    const val OUTER_RING = 0.40f
 
     /**
      * [suggestions] with the artists they're like, and how much you play each of your artists
      * ([plays], by display name). Only your artists that some suggestion is like are shown.
      */
-    fun build(suggestions: List<SuggestedArtist>, plays: Map<String, Int>): Graph {
-        val seedNames = suggestions.flatMap { it.because }.distinctBy(::normalizeKey)
+    fun build(suggestions: List<SuggestedArtist>, plays: Map<String, Int>, maxSeeds: Int = Int.MAX_VALUE): Graph {
+        val allSeeds = suggestions.flatMap { it.because }.distinctBy(::normalizeKey)
+        // With too many of your artists for the map, the ones you play most (in their original order).
+        val keep = allSeeds.sortedByDescending { plays[it] ?: 0 }.take(maxSeeds).map(::normalizeKey).toSet()
+        val seedNames = allSeeds.filter { normalizeKey(it) in keep }
         if (seedNames.isEmpty()) return Graph(emptyList(), emptyList(), emptyList())
         val most = seedNames.maxOf { plays[it] ?: 0 }.coerceAtLeast(1)
         val seeds = seedNames.mapIndexed { i, name ->
@@ -121,6 +124,61 @@ object DiscoveryMap {
         return out
     }
 
+    /**
+     * How many suggestions and of your artists fit on a map [widthDp] wide without their photos and names
+     * overlapping (worked out for maps 264 to 520 dp wide): 8 and 6, or 6 and 5 on narrow phones. The cards
+     * below the map list every suggestion.
+     */
+    fun limits(widthDp: Float): Pair<Int, Int> = if (widthDp >= 312f) 8 to 6 else 6 to 5
+
+    /** A label on the map: its centre and size (in dp), and whether it may move ("You" stays put). */
+    data class Box(val cx: Float, val cy: Float, val w: Float, val h: Float, val fixed: Boolean = false)
+
+    /**
+     * [boxes] moved apart until none overlap (with [gap] between them), all inside a [width] by [height]
+     * area. Each overlapping pair is pushed apart along the axis it overlaps least on, or the other axis when
+     * the card's edge stops that, and a fixed box doesn't move. Spreading by angle alone, as before, let
+     * photos and names pile up when there were many suggestions.
+     */
+    fun separate(boxes: List<Box>, width: Float, height: Float, gap: Float, rounds: Int = 400): List<Box> {
+        val out = boxes.toMutableList()
+        fun clamp(b: Box) = if (b.fixed) b else b.copy(
+            cx = b.cx.coerceIn(b.w / 2, (width - b.w / 2).coerceAtLeast(b.w / 2)),
+            cy = b.cy.coerceIn(b.h / 2, (height - b.h / 2).coerceAtLeast(b.h / 2)),
+        )
+        for (i in out.indices) out[i] = clamp(out[i])
+        repeat(rounds) {
+            var moved = false
+            for (i in out.indices) for (j in i + 1 until out.size) {
+                val a = out[i]
+                val b = out[j]
+                if (a.fixed && b.fixed) continue
+                val overlapX = (a.w + b.w) / 2 + gap - abs(b.cx - a.cx)
+                val overlapY = (a.h + b.h) / 2 + gap - abs(b.cy - a.cy)
+                if (overlapX <= 0f || overlapY <= 0f) continue
+                moved = true
+                val shareA = if (a.fixed) 0f else if (b.fixed) 1f else 0.5f
+                val shareB = 1f - shareA
+                // The pair after pushing along one axis, and how much they still overlap on it.
+                fun pushed(alongX: Boolean): Triple<Box, Box, Float> {
+                    val d = if (alongX) b.cx - a.cx else b.cy - a.cy
+                    val sign = if (d > 0f) 1f else if (d < 0f) -1f else if ((i + j) % 2 == 0) 1f else -1f
+                    val push = if (alongX) overlapX else overlapY
+                    val na = clamp(if (alongX) a.copy(cx = a.cx - sign * push * shareA) else a.copy(cy = a.cy - sign * push * shareA))
+                    val nb = clamp(if (alongX) b.copy(cx = b.cx + sign * push * shareB) else b.copy(cy = b.cy + sign * push * shareB))
+                    val left = if (alongX) (a.w + b.w) / 2 + gap - abs(nb.cx - na.cx) else (a.h + b.h) / 2 + gap - abs(nb.cy - na.cy)
+                    return Triple(na, nb, left)
+                }
+                var best = pushed(overlapX < overlapY)
+                if (best.third > 0.5f) pushed(overlapX >= overlapY).let { if (it.third < best.third) best = it }
+                out[i] = best.first
+                out[j] = best.second
+            }
+            if (!moved) return out
+        }
+        return out
+    }
+
     /** How sure a suggestion is, for its card: how many of your artists it's like, and how much you play them. */
     fun reasons(s: SuggestedArtist, plays: Map<String, Int>): List<String> = buildList {
         similarToText(s.because)?.let(::add)
@@ -134,9 +192,15 @@ object DiscoveryMap {
 /**
  * "Other artists you might like", under Your Library → Your listening: a map of how each suggested artist
  * connects to the ones you play, and a card per artist with why. Tap an artist for more and a Deezer link.
+ * Dark, with the same header as the other Your listening pages.
  */
 @Composable
 fun ArtistDiscoveryScreen(nav: NavController) {
+    MusixDarkTheme { DiscoveryPage(nav) }
+}
+
+@Composable
+private fun DiscoveryPage(nav: NavController) {
     val graph = LocalGraph.current
     val data by loadState("discovery") {
         val suggestions = graph.suggestions.today()
@@ -149,76 +213,113 @@ fun ArtistDiscoveryScreen(nav: NavController) {
         suggestions to counts
     }
     var open by remember { mutableStateOf<SuggestedArtist?>(null) }
-    Screen(title = "Other artists you might like", nav = nav) { padding ->
-        LoadBox(data, Modifier.padding(padding)) { (suggestions, plays) ->
-            if (suggestions.isEmpty()) {
-                Text(
-                    "Nothing yet. Suggestions are made once a day from the artists you play most, after a library sync.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = padding.calculateTopPadding()).padding(16.dp),
-                )
-                return@LoadBox
-            }
-            val map = remember(suggestions, plays) { DiscoveryMap.build(suggestions, plays) }
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = bottomBarPadding(24.dp)),
-            ) {
-                item {
-                    Text(
-                        "Artists you don't have yet, like the ones you play most. Lines join each one to your artists it's like; the brighter the line, the more you play that artist.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
+    Box(Modifier.fillMaxSize().background(Brand.Plum)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
+            item { ListeningHeader(nav, "Other artists you might like", "Like the artists you play most. New ones each day.") }
+            item {
+                LoadBox(data) { (suggestions, plays) ->
+                    if (suggestions.isEmpty()) {
+                        Text(
+                            "Nothing yet. Suggestions are made once a day from the artists you play most, after a library sync.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Large),
+                        )
+                        return@LoadBox
+                    }
+                    Column {
+                        Text(
+                            "Lines join each artist to the ones you play that it's like. The thicker the line, the more you play that artist.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Space.Page),
+                        )
+                        Spacer(Modifier.height(Space.Medium))
+                        ConnectionMap(suggestions, plays) { open = it }
+                        SectionTitle("Why you might like them")
+                        Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                            suggestions.forEach { s -> ReasonCard(s, DiscoveryMap.reasons(s, plays)) { open = s } }
+                        }
+                    }
                 }
-                item { ConnectionMap(map, suggestions) { open = it } }
-                item { SectionTitle("Why you might like them") }
-                items(suggestions, key = { it.name }) { s -> ReasonCard(s, DiscoveryMap.reasons(s, plays)) { open = s } }
             }
         }
     }
     open?.let { SuggestedArtistDialog(it) { open = null } }
 }
 
+/** Sizes on the map, in dp: "You", one of your artists (dot and name) and a suggestion (photo and name). */
+private const val YOU_DP = 56f
+private const val SEED_W = 80f
+private const val SEED_H = 34f
+private const val SUGGESTION_W = 72f
+private const val SUGGESTION_H = 58f
+private const val PHOTO_DP = 40f
+/** The space kept between any two of them. */
+private const val MAP_GAP = 4f
+
 @Composable
-private fun ConnectionMap(map: DiscoveryMap.Graph, suggestions: List<SuggestedArtist>, onOpen: (SuggestedArtist) -> Unit) {
+private fun ConnectionMap(all: List<SuggestedArtist>, plays: Map<String, Int>, onOpen: (SuggestedArtist) -> Unit) {
     val line = MaterialTheme.colorScheme.secondary
     val you = Accent
     BoxWithConstraints(
         Modifier
-            .padding(horizontal = 12.dp)
+            .padding(horizontal = Space.Page)
             .fillMaxWidth()
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(Space.Page))
             .background(MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        val w = maxWidth
+        val w = maxWidth.value
+        // As many as fit this wide a map; the cards below list them all.
+        val (maxSuggestions, maxSeeds) = DiscoveryMap.limits(w)
+        val suggestions = remember(all, maxSuggestions) { all.take(maxSuggestions) }
+        val map = remember(suggestions, plays, maxSeeds) { DiscoveryMap.build(suggestions, plays, maxSeeds) }
+        // Every name and photo as a box, moved apart so none overlap and all stay inside the card.
+        val placed = remember(map, w) {
+            val boxes = buildList {
+                add(DiscoveryMap.Box(w / 2, w / 2, YOU_DP, YOU_DP, fixed = true))
+                map.seeds.forEach { add(DiscoveryMap.Box(it.x * w, it.y * w + SEED_H / 2 - 8f, SEED_W, SEED_H)) }
+                map.suggestions.forEach { add(DiscoveryMap.Box(it.x * w, it.y * w + SUGGESTION_H / 2 - PHOTO_DP / 2, SUGGESTION_W, SUGGESTION_H)) }
+            }
+            DiscoveryMap.separate(boxes, w, w, MAP_GAP)
+        }
+        val seedBoxes = placed.subList(1, 1 + map.seeds.size)
+        val suggestionBoxes = placed.subList(1 + map.seeds.size, placed.size)
+        // Where lines meet each one: a seed's dot (top of its box), a suggestion's photo (its middle).
+        fun seedDot(b: DiscoveryMap.Box) = Offset(b.cx, b.cy - b.h / 2 + 8f)
+        fun photo(b: DiscoveryMap.Box) = Offset(b.cx, b.cy - b.h / 2 + PHOTO_DP / 2)
+        val seedAt = map.seeds.indices.associate { map.seeds[it].name to seedDot(seedBoxes[it]) }
+        val suggestionAt = map.suggestions.indices.associate { map.suggestions[it].name to photo(suggestionBoxes[it]) }
         Canvas(Modifier.fillMaxSize()) {
-            fun at(n: DiscoveryMap.Node) = Offset(n.x * size.width, n.y * size.height)
+            val k = size.width / w
+            fun px(o: Offset) = Offset(o.x * k, o.y * k)
             val centre = Offset(size.width / 2, size.height / 2)
             // You → your artists: thicker the more you play them.
-            map.seeds.forEach { s -> drawLine(you.copy(alpha = 0.25f + 0.5f * s.weight), centre, at(s), strokeWidth = 2f + 6f * s.weight) }
+            map.seeds.forEach { s ->
+                val at = seedAt[s.name] ?: return@forEach
+                drawLine(you.copy(alpha = 0.25f + 0.5f * s.weight), centre, px(at), strokeWidth = (1.5f + 4f * s.weight) * k)
+            }
             // Your artists → the suggestions they lead to.
             map.edges.forEach { e ->
-                val from = map.seeds.firstOrNull { it.name == e.from } ?: return@forEach
-                val to = map.suggestions.firstOrNull { it.name == e.to } ?: return@forEach
-                drawLine(line.copy(alpha = 0.2f + 0.6f * e.weight), at(from), at(to), strokeWidth = 1.5f + 3f * e.weight)
+                val from = seedAt[e.from] ?: return@forEach
+                val to = suggestionAt[e.to] ?: return@forEach
+                drawLine(line.copy(alpha = 0.2f + 0.6f * e.weight), px(from), px(to), strokeWidth = (1f + 2f * e.weight) * k)
             }
-            map.seeds.forEach { s -> drawCircle(you, radius = 7f + 9f * s.weight, center = at(s)) }
-            drawCircle(you, radius = 26f, center = centre)
+            map.seeds.forEach { s -> seedAt[s.name]?.let { drawCircle(you, radius = (4f + 4f * s.weight) * k, center = px(it)) } }
+            drawCircle(you, radius = YOU_DP / 2 * k, center = centre)
         }
-        // Labels and photos over the drawing, so they're sharp and tappable.
+        // Names and photos over the drawing, so they're sharp and tappable.
         Text(
             "You",
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
             color = OnAccent,
             textAlign = TextAlign.Center,
-            modifier = Modifier.width(48.dp).offset(x = w * 0.5f - 24.dp, y = w * 0.5f - 9.dp),
+            modifier = Modifier.width(YOU_DP.dp).offset(x = (w / 2 - YOU_DP / 2).dp, y = (w / 2 - 9f).dp),
         )
-        map.seeds.forEach { s ->
+        map.seeds.forEachIndexed { i, s ->
+            val b = seedBoxes[i]
             Text(
                 s.name,
                 style = MaterialTheme.typography.labelSmall,
@@ -226,37 +327,50 @@ private fun ConnectionMap(map: DiscoveryMap.Graph, suggestions: List<SuggestedAr
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.width(84.dp).offset(x = w * s.x - 42.dp, y = w * s.y + 12.dp),
+                modifier = Modifier.width(b.w.dp).offset(x = (b.cx - b.w / 2).dp, y = (b.cy - b.h / 2 + 16f).dp),
             )
         }
-        map.suggestions.forEach { n ->
-            val artist = suggestions.firstOrNull { it.name == n.name } ?: return@forEach
+        map.suggestions.forEachIndexed { i, n ->
+            val artist = suggestions.firstOrNull { it.name == n.name } ?: return@forEachIndexed
+            val b = suggestionBoxes[i]
             Column(
-                Modifier.width(76.dp).offset(x = w * n.x - 38.dp, y = w * n.y - 22.dp).clickable { onOpen(artist) },
+                Modifier
+                    .width(b.w.dp)
+                    .offset(x = (b.cx - b.w / 2).dp, y = (b.cy - b.h / 2).dp)
+                    .clip(RoundedCornerShape(Space.Small))
+                    .clickable { onOpen(artist) },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 AsyncImage(
                     model = artist.photo,
                     contentDescription = artist.name,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(40.dp).clip(CircleShape).border(2.dp, line, CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.size(PHOTO_DP.dp).clip(CircleShape).border(2.dp, line, CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),
                 )
-                Text(artist.name, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                Text(
+                    artist.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = Space.Tight),
+                )
             }
         }
     }
 }
 
+/** One suggested artist and why, as a card on the page's edges. */
 @Composable
 private fun ReasonCard(artist: SuggestedArtist, reasons: List<String>, onClick: () -> Unit) {
     Row(
         Modifier
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = Space.Page)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(Space.Medium))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .clickable(onClick = onClick)
-            .padding(12.dp),
+            .padding(Space.Medium),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
@@ -265,13 +379,13 @@ private fun ReasonCard(artist: SuggestedArtist, reasons: List<String>, onClick: 
             contentScale = ContentScale.Crop,
             modifier = Modifier.size(64.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),
         )
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Spacer(Modifier.width(Space.Medium))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
             Text(artist.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             reasons.forEach { r ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(5.dp).clip(CircleShape).background(Accent))
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(Space.Small))
                     Text(r, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }

@@ -59,7 +59,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 /** The even gap between the parts of the "Your colour" picker. */
-internal val PICKER_GAP = 16.dp
+internal val PICKER_GAP = Space.Page
 
 /** Quick picks under the hue slider: red, orange, yellow, green, teal, indigo, purple and pink. */
 internal val QUICK_COLOURS = listOf(
@@ -74,7 +74,7 @@ internal val QUICK_COLOURS = listOf(
 @Composable
 fun YourColourSheet(start: Int, onDismiss: () -> Unit, onUse: (Int) -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        YourColourPicker(start, onCancel = onDismiss, onUse = onUse, modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp))
+        YourColourPicker(start, onCancel = onDismiss, onUse = onUse, modifier = Modifier.padding(horizontal = Space.Page).padding(bottom = Space.Section))
     }
 }
 
@@ -96,7 +96,7 @@ internal fun YourColourPicker(start: Int, onCancel: () -> Unit, onUse: (Int) -> 
                 "Pick one colour. Musix makes the rest of the theme from it, in light and dark.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = Space.Tight),
             )
         }
 
@@ -108,7 +108,7 @@ internal fun YourColourPicker(start: Int, onCancel: () -> Unit, onUse: (Int) -> 
                 Box(
                     Modifier
                         .size(34.dp)
-                        .then(if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape).padding(3.dp) else Modifier)
+                        .then(if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape).padding(3.dp) else Modifier)  // spacing: exact (the ring around the chosen colour)
                         .clip(CircleShape)
                         .background(Color(c))
                         .selectable(selected, role = Role.RadioButton) { pick(c) }
@@ -133,14 +133,14 @@ internal fun YourColourPicker(start: Int, onCancel: () -> Unit, onUse: (Int) -> 
 
         OpacitySlider(seed, onChange = { seed = ThemeTones.withOpacity(seed, it) }, Modifier.testTag("opacity"))
 
-        Row(Modifier.fillMaxWidth().testTag("previews"), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth().testTag("previews"), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
             ColourPreview(seed, dark = false, Modifier.weight(1f))
             ColourPreview(seed, dark = true, Modifier.weight(1f))
         }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onCancel) { Text("Cancel") }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Space.Small))
             Button(
                 onClick = { onUse(seed) },
                 colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = OnAccent),
@@ -173,7 +173,7 @@ private fun HueSlider(hue: Double, onHue: (Double) -> Unit, modifier: Modifier =
                 .size(thumb)
                 .clip(CircleShape)
                 .background(Color.White)
-                .padding(3.dp)
+                .padding(3.dp)  // spacing: exact (the hue thumb's white ring)
                 .clip(CircleShape)
                 .background(Color(ThemeTones.fromHue(hue))),
         )
@@ -189,26 +189,27 @@ private fun ColourPreview(seed: Int, dark: Boolean, modifier: Modifier) {
         color = scheme.surface,
         modifier = modifier.border(1.dp, scheme.outlineVariant, RoundedCornerShape(14.dp)),
     ) {
-        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // A miniature of the app, so the small steps: with the full-size ones its song name didn't fit.
+        Column(Modifier.padding(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
             Text(if (dark) "Dark" else "Light", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(scheme.surfaceContainerHighest).padding(6.dp),
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(scheme.surfaceContainerHighest).padding(Space.Tight),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.size(28.dp).clip(RoundedCornerShape(5.dp)).background(Brush.linearGradient(listOf(Color(0xFF6B4FA8), Color(0xFF2B6AA8)))))
                 Text("Midnight City", style = MaterialTheme.typography.labelMedium, color = scheme.onSurface, maxLines = 1,
-                    modifier = Modifier.weight(1f).padding(horizontal = 6.dp))
+                    modifier = Modifier.weight(1f).padding(horizontal = Space.Tight))
                 Box(Modifier.size(26.dp).clip(CircleShape).background(scheme.primary), contentAlignment = Alignment.Center) {
                     Icon(Icons.Rounded.PlayArrow, null, Modifier.size(16.dp), tint = scheme.onPrimary)
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 listOf("Chill", "Focus").forEach {
                     Text(
                         it,
                         style = MaterialTheme.typography.labelMedium,
                         color = scheme.onSecondaryContainer,
-                        modifier = Modifier.clip(CircleShape).background(scheme.secondaryContainer).padding(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.clip(CircleShape).background(scheme.secondaryContainer).padding(horizontal = Space.Medium, vertical = Space.Tight),
                     )
                 }
             }

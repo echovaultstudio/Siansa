@@ -81,7 +81,7 @@ fun RadioScreen(nav: NavController, kind: String, key: String) {
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { round++ }) {
                     Icon(Icons.Rounded.Refresh, null)
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(Space.Tight))
                     Text("New picks")
                 }
             }
@@ -110,14 +110,14 @@ fun MoodScreen(nav: NavController, text: String) {
         header = {
             if (r != null) {
                 Text(r.description, style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(Space.Small))
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CollectionByline(null, null, null, "From “$text”" + (r?.let { " · ${it.songs.size} songs" } ?: ""))
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { round++ }) {
                     Icon(Icons.Rounded.Refresh, null)
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(Space.Tight))
                     Text("Again")
                 }
             }
@@ -139,13 +139,13 @@ fun MoodBox(nav: NavController, modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(Brush.linearGradient(listOf(lerp(colors.first, Color.Black, 0.2f), lerp(colors.second, Color.Black, 0.35f))))
-            .padding(14.dp),
+            .padding(Space.Page),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.AutoAwesome, null, tint = Color.White, modifier = Modifier.padding(end = 8.dp))
+            Icon(Icons.Rounded.AutoAwesome, null, tint = Color.White, modifier = Modifier.padding(end = Space.Small))
             Text("How are you feeling?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(Space.Small))
         if (aiProblem != null) {
             // No box to type into while AudioMuse can't be reached: it would only make an empty playlist.
             AiUnavailable(aiProblem, onDark = true)

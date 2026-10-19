@@ -61,7 +61,7 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 /** The even gap between the time machine's year, months and buttons. */
-internal val TIME_MACHINE_GAP: Dp = 12.dp
+internal val TIME_MACHINE_GAP: Dp = Space.Medium
 
 /**
  * The time machine (issue #186), under Your listening: pick a year and a month (or the whole year) and see
@@ -85,30 +85,10 @@ private fun TimeMachinePage(nav: NavController) {
     var creating by rememberSaveable { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().background(Brand.Plum)) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(32.dp))) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(Brush.verticalGradient(listOf(Brand.VioletDeep, Brand.AmberDeep.copy(alpha = 0.45f), Brand.Plum)))
-                        .statusBarsPadding()
-                        .padding(bottom = 16.dp),
-                ) {
-                    IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White) }
-                    Text(
-                        "Time machine",
-                        style = MaterialTheme.typography.displaySmall,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 20.dp),
-                    )
-                    Text(
-                        "The songs you played most, any month or year.",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                    )
-                    Spacer(Modifier.height(TIME_MACHINE_GAP / 2))
+                ListeningHeader(nav, "Time machine", "The songs you played most, any month or year.") {
+                    Spacer(Modifier.height(Space.Small))
                     TimePicker(
                         year = year,
                         month = month,
@@ -137,7 +117,7 @@ private fun TimeMachinePage(nav: NavController) {
                         tm.source,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp),
+                        modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Section),
                     )
                 }
             }
@@ -152,7 +132,7 @@ private fun TimeMachinePage(nav: NavController) {
 @Composable
 internal fun TimePicker(year: Int, month: Int?, today: LocalDate, onYear: (Int) -> Unit, onMonth: (Int?) -> Unit) {
     Column(Modifier.fillMaxWidth().testTag("timePicker"), verticalArrangement = Arrangement.spacedBy(TIME_MACHINE_GAP)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp).testTag("year"), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = Space.Small).testTag("year"), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { onYear(year - 1) }, enabled = year > TIME_MACHINE_FIRST_YEAR) {
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, "Year before", tint = Color.White)
             }
@@ -170,8 +150,8 @@ internal fun TimePicker(year: Int, month: Int?, today: LocalDate, onYear: (Int) 
         }
         val available = monthsAvailable(year, today)
         Row(
-            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp).testTag("months"),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Space.Page).testTag("months"),
+            horizontalArrangement = Arrangement.spacedBy(Space.Small),
         ) {
             FilterChip(selected = month == null, onClick = { onMonth(null) }, label = { Text("Whole year") })
             for (m in available) {
@@ -187,16 +167,16 @@ internal fun TimePicker(year: Int, month: Int?, today: LocalDate, onYear: (Int) 
 private fun TimeMachineSongs(tm: TimeMachine, onCreate: () -> Unit) {
     val graph = LocalGraph.current
     if (tm.tracks.isEmpty()) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Large), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
             Text("Nothing from your library was played in ${tm.label}.", style = MaterialTheme.typography.bodyLarge)
             Text(tm.source, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
     }
-    Column(Modifier.padding(top = 8.dp)) {
+    Column(Modifier.padding(top = Space.Small)) {
         SectionTitle("Top songs of ${tm.label}", top = 8.dp)
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = TIME_MACHINE_GAP).testTag("memoryButtons"),
+            Modifier.fillMaxWidth().padding(horizontal = Space.Page).padding(bottom = TIME_MACHINE_GAP).testTag("memoryButtons"),
             horizontalArrangement = Arrangement.spacedBy(TIME_MACHINE_GAP),
         ) {
             Button(
@@ -204,12 +184,12 @@ private fun TimeMachineSongs(tm: TimeMachine, onCreate: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = OnAccent),
             ) {
                 Icon(Icons.Rounded.PlayArrow, null)
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(Space.Tight))
                 Text("Play")
             }
             OutlinedButton(onClick = onCreate) {
                 Icon(Icons.Rounded.AutoAwesome, null)
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(Space.Small))
                 Text("Create memory")
             }
         }

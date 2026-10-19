@@ -284,14 +284,14 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         Modifier
                             .height(pageHeight)
                             .statusBarsPadding()
-                            .padding(horizontal = 24.dp),
+                            .padding(horizontal = Space.Section),
                     ) {
                         // A gap above the header that suits the screen's height, so the top of the player
                         // isn't pressed against the status bar.
                         Spacer(Modifier.height(playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp))
                         TopRow(song, onClose = onClose, onAlbum = ::openAlbum, onMenu = { menuOpen = true }, onSleep = { sleepOpen = true })
 
-                        Box(Modifier.weight(1f).fillMaxWidth().padding(top = 16.dp, bottom = 12.dp), contentAlignment = Alignment.Center) {
+                        Box(Modifier.weight(1f).fillMaxWidth().padding(top = Space.Page, bottom = Space.Medium), contentAlignment = Alignment.Center) {
                             SwipeCover(song, onTap = ::openAlbum)
                         }
 
@@ -302,7 +302,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         Controls(state)
                         // Like Spotify: where the music plays bottom left (with the TV, speaker or headphones'
                         // name), and the queue bottom right: tap it, or swipe up from it.
-                        Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().padding(top = Space.Medium, bottom = Space.Small), verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                                 CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
                             }
@@ -322,12 +322,12 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                     }
                     if (song != null) {
                         LyricsPreviewCard(song, tint) { lyricsOpen = true }
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(Space.Medium))
                         AboutArtistCard(song) { openArtist(song) }
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(Space.Medium))
                         AboutSongCard(song, onOpenDetails = ::openDetails)
                     }
-                    Spacer(Modifier.height(24.dp + navBar))
+                    Spacer(Modifier.height(Space.Section + navBar))
                 }
 
                 // Once the cards are in view, a small header keeps the song and play/pause at hand.
@@ -453,7 +453,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         Modifier
                             .fillMaxWidth()
                             .clickable { queueOpen = false }
-                            .padding(vertical = 12.dp),
+                            .padding(vertical = Space.Medium),
                         contentAlignment = Alignment.Center,
                     ) {
                         Box(Modifier.size(width = 40.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.5f)))
@@ -523,7 +523,7 @@ private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit, onMenu
     val timerRunning = LocalGraph.current.sleepTimer.state.collectAsStateWithLifecycle().value != null
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onClose) { Icon(Icons.Rounded.KeyboardArrowDown, "Close", Modifier.size(32.dp)) }
-        if (timerRunning) Spacer(Modifier.size(48.dp))
+        if (timerRunning) Spacer(Modifier.size(48.dp))  // spacing: exact (the width of the button it balances)
         Column(Modifier.weight(1f).clickable(enabled = song?.albumId != null, onClick = onAlbum), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("PLAYING FROM ALBUM", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
             Text(
@@ -617,7 +617,7 @@ private fun SeekBar(state: PlayerState) {
         graph.player.seekTo(ms)
     }
     val thumb by animateDpAsState(if (dragging != null) 16.dp else 11.dp, tween(100), label = "thumb")
-    Column(Modifier.padding(top = 10.dp)) {
+    Column(Modifier.padding(top = Space.Medium)) {
         BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
@@ -671,7 +671,7 @@ private fun SeekBar(state: PlayerState) {
 private fun Controls(state: PlayerState) {
     val graph = LocalGraph.current
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        Modifier.fillMaxWidth().padding(vertical = Space.Small),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -730,9 +730,9 @@ private fun QueueView(state: PlayerState) {
             "Up next · ${state.queue.size - state.index - 1} of ${state.queue.size}",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(Space.Page),
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(Space.Tight))
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             itemsIndexed(state.queue, key = { i, s -> "$i-${s.id}" }) { index, song ->
                 SongRow(song = song, onClick = { graph.player.skipTo(index) }, highlighted = index == state.index, swipeToQueue = false)

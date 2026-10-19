@@ -112,12 +112,12 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
                     Box(Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
                         Icon(Icons.Rounded.Add, null)
                     }
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(Space.Medium))
                     Text("New playlist", style = MaterialTheme.typography.bodyLarge)
                 }
                 LoadBox(playlists) { list ->
                     if (list.isEmpty()) {
-                        Text("You have no playlists of your own yet.", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+                        Text("You have no playlists of your own yet.", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = Space.Small))
                     } else {
                         LazyColumn(Modifier.height(320.dp)) {
                             items(list, key = { it.id }) { playlist ->
@@ -132,7 +132,7 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
                                     }
                                 }) {
                                     Cover(playlist.coverArt, 150, Modifier.size(40.dp), RoundedCornerShape(4.dp))
-                                    Spacer(Modifier.width(12.dp))
+                                    Spacer(Modifier.width(Space.Medium))
                                     Column(Modifier.weight(1f)) {
                                         Text(playlist.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text(if (LocalPlaylists.isLocal(playlist.id)) "${playlist.songCount} songs · On this phone" else "${playlist.songCount} songs", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -152,7 +152,7 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
 @Composable
 private fun PickerRow(onClick: () -> Unit, content: @Composable RowScope.() -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = 8.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) { content() }
 }
@@ -203,7 +203,7 @@ private fun NameDialog(
                     modifier = Modifier.fillMaxWidth().focusRequester(focus),
                 )
                 if (askWhere) {
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(Space.Medium))
                     WhereOption("On Navidrome", "Syncs with your server and your other apps.", selected = !onPhone) { onPhone = false }
                     WhereOption("On this phone only", "Its songs download to this phone so it works offline. Only this phone has it.", selected = onPhone) { onPhone = true }
                 }
@@ -217,11 +217,11 @@ private fun NameDialog(
 @Composable
 private fun WhereOption(label: String, detail: String, selected: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).selectable(selected = selected, role = Role.RadioButton, onClick = onClick).padding(vertical = 6.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).selectable(selected = selected, role = Role.RadioButton, onClick = onClick).padding(vertical = Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(selected = selected, onClick = null)
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(Space.Small))
         Column {
             Text(label, style = MaterialTheme.typography.bodyLarge)
             Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -384,7 +384,7 @@ fun ImportPlaylistsDialog(onDone: (String?) -> Unit) {
                                 onDone("Imported ${playlist.name}")
                             }) {
                                 Cover(playlist.coverArt, 150, Modifier.size(40.dp), RoundedCornerShape(4.dp))
-                                Spacer(Modifier.width(12.dp))
+                                Spacer(Modifier.width(Space.Medium))
                                 Column(Modifier.weight(1f)) {
                                     Text(playlist.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     Text(playlistSubtitle(playlist, fallbackOwner = "Navidrome"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
