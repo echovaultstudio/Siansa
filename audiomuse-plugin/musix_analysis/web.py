@@ -12,16 +12,17 @@ Song ids may be the music server's ids or AudioMuse-AI's own; answers use the id
 the default music server's ids for songs in the similar lists.
 """
 
+import json
 from html import escape
 
-from flask import Blueprint, jsonify, redirect, request
+from flask import Blueprint, jsonify, redirect, request, url_for
 
 from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url, render_page, set_setting
 
 from . import generations, jobs, similarity, status, store
 
 PLUGIN_ID = "musix_analysis"
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
@@ -185,6 +186,8 @@ _STYLE = """
   .mx-help { opacity: .8; font-size: .92em; margin: 8px 0; }
   .mx-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
   .mx-actions input { width: 6em; }
+  .mx-warning { margin-top: 16px; padding: 12px; border-radius: 8px; border: 1px solid #b8860b88; background: #b8860b14; }
+  .mx-warning .mx-actions { margin-top: 8px; }
   @media (prefers-color-scheme: dark) { .mx-ready { color: #5fd38a; } .mx-working { color: #f0c04a; } .mx-attention { color: #ff8a7a; } }
 </style>
 """
@@ -213,6 +216,28 @@ def render_settings(state, batch_size, message=""):
             for i, t, a, e, n in state["failures"])
         failures = f"<details><summary>Songs that couldn't be read</summary><ul>{items}</ul></details>"
     profiles_error = state["profiles_job"].get("error")
+    measure_all = bool(state.get("measure_all"))
+    profiles_running = state["profiles_job"].get("status") == "running"
+    busy = " disabled" if profiles_running else ""
+    left = status.time_left(counts["to_measure"], state.get("rate"), measure_all, int(batch_size))
+    left_line = f'<p class="mx-help">At this pace, every song is measured in {escape(left)}.</p>' if left else ""
+    if measure_all:
+        all_block = f"""<div class="mx-warning" role="status"><strong>Measuring every song.</strong> Rounds of
+      {status.ALL_ROUND_SECONDS // 60} minutes every 15 minutes until all are done. While a round runs, AudioMuse
+      waits with its own jobs (analysis, clustering, scheduled tasks).
+      <form method="post" class="mx-actions"><button type="submit" name="action" value="stop_all">Stop measuring all</button></form></div>"""
+    elif counts["to_measure"]:
+        warning = ("Measuring every song downloads each one from your music server and reads it in full. "
+                   "With a large library this takes hours or days and keeps the AudioMuse worker busy. "
+                   "While a round runs (12 of every 15 minutes), AudioMuse waits with its own jobs such as "
+                   "analysis, clustering and scheduled tasks. You can stop at any time; measured songs are kept.")
+        all_block = f"""<div class="mx-warning"><strong>Measure all songs at once</strong>
+      <p class="mx-help">{escape(warning)}</p>
+      <form method="post" class="mx-actions" onsubmit="return confirm({escape(json.dumps(warning + ' Start now?'))});">
+        <button type="submit" name="action" value="measure_all"{busy}>Measure all {counts['to_measure']:,} songs</button>
+      </form></div>"""
+    else:
+        all_block = ""
     similar_error = state["similar_job"].get("error")
     return f"""{_STYLE}{refresh}{note}
 <section class="mx-section" aria-label="Library">
@@ -231,11 +256,13 @@ def render_settings(state, batch_size, message=""):
     they don't wait for it.</p>
   {f'<p class="mx-help mx-attention">Last run: {escape(profiles_error)}</p>' if profiles_error else ''}
   {failures}
+  {left_line}
   <form method="post" class="mx-actions">
     <label>Songs per run <input name="batch_size" value="{int(batch_size)}" inputmode="numeric"></label>
     <button type="submit" name="action" value="save">Save</button>
-    <button type="submit" name="action" value="measure">Measure missing songs now</button>
+    <button type="submit" name="action" value="measure"{busy}>Measure missing songs now</button>
   </form>
+  {all_block}
 </section>
 
 <section class="mx-section" aria-label="Similar albums and artists">
@@ -252,30 +279,58 @@ def render_settings(state, batch_size, message=""):
       {escape(str(built.get('finished_at') or 'Not built yet'))}.</p>
   </details>
   <form method="post" class="mx-actions">
-    <button type="submit" name="action" value="rebuild">Build now</button>
+    <button type="submit" name="action" value="rebuild"{" disabled" if state["similar_job"].get("status") == "running" else ""}>Build now</button>
   </form>
 </section>
 """
 
 
+MESSAGES = {
+    "saved": "Saved.",
+    "measuring": "Measuring started. This page updates by itself.",
+    "all": "Measuring every song. It goes on in rounds until all are done; you can stop it here.",
+    "all_waiting": "Measuring every song starts with the next round, within 15 minutes: another AudioMuse job is running.",
+    "stopped": "Stopped. The songs measured so far are kept; the rest are measured a batch at a time again.",
+    "building": "Build started. This page updates by itself.",
+    "busy": "Another AudioMuse job is running, so this waits for the next round (within 15 minutes).",
+}
+
+
+def _start(func):
+    """Queues a job; ``False`` when AudioMuse-AI is busy with another job (it refuses to start one then)."""
+    try:
+        enqueue(func, queue="high")
+        return True
+    except Exception as e:  # AudioMuse's "Another queue job is already running"
+        logger.info("musix_analysis job not started now: %s", e)
+        return False
+
+
 @bp.route("/settings", methods=["GET", "POST"])
 def settings():
-    message = ""
     if request.method == "POST":
+        # Post, then redirect: reloading the page (it reloads itself while working) never sends the form again.
         action = request.form.get("action")
+        note = "saved"
         if action in ("save", "measure"):
             try:
                 set_setting("batch_size", max(1, min(int(request.form.get("batch_size", jobs.DEFAULT_BATCH)), 500)))
             except ValueError:
                 pass
+        db = get_db()
         if action == "measure":
-            enqueue(jobs.prepare_now, queue="high")
-            message = "Measuring started. This page updates by itself."
+            note = "measuring" if _start(jobs.prepare_now) else "busy"
+        elif action == "measure_all":
+            store.set_state("measure_all", {"on": True, "started_at": jobs.now_iso()}, db)
+            note = "all" if _start(jobs.prepare_now) else "all_waiting"
+        elif action == "stop_all":
+            store.set_state("measure_all", {"on": False, "stopped_at": jobs.now_iso()}, db)
+            note = "stopped"
         elif action == "rebuild":
-            enqueue(jobs.rebuild_now, queue="high")
-            message = "Build started. This page updates by itself."
+            note = "building" if _start(jobs.rebuild_now) else "busy"
         elif action == "save":
             return redirect(manage_plugins_url())
+        return redirect(url_for(f"{PLUGIN_ID}.settings", note=note))
     db = get_db()
     try:
         jobs.refresh_inputs(db)  # cheap: two digests; keeps the generations shown here current
@@ -284,5 +339,7 @@ def settings():
         logger.warning("musix_analysis couldn't read the inputs", exc_info=True)
     state = collect(db)
     state["failures"] = store.recent_failures(db)
-    body = render_settings(state, get_setting("batch_size", jobs.DEFAULT_BATCH), message)
+    state["measure_all"] = bool((store.get_state("measure_all", {}, db) or {}).get("on"))
+    state["rate"] = store.get_state("profiles_rate", {}, db) or {}
+    body = render_settings(state, get_setting("batch_size", jobs.DEFAULT_BATCH), MESSAGES.get(request.args.get("note", ""), ""))
     return render_page(body, title="Musix Analysis")
