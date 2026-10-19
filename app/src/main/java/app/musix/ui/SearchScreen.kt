@@ -161,7 +161,7 @@ fun SearchScreen(nav: NavController) {
             busy = true
             error = null
             try {
-                soundSongs = graph.generator.soundSearch(q, steering = steer)
+                soundSongs = graph.generator.soundSearch(soundQuery(q, steering), steering = steer)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -435,6 +435,22 @@ internal fun RecentSearchList(
 }
 
 /** One tap on a concept: off → more → less → off (issue #208); no new one beyond [max] at once (#216). */
+/**
+ * The words sent for a sound search (issue #232). AudioMuse picks songs by the words and only re-ranks them by the
+ * concepts, so the concepts set to "more" are added as words too: "sad songs" with Female vocals and Sad becomes
+ * "sad songs, female vocals, sad". "Less" concepts stay out of the words: the model doesn't understand "not X".
+ * Words already typed aren't added twice.
+ */
+internal fun soundQuery(typed: String, steering: Map<String, Boolean>): String {
+    val words = typed.trim()
+    val have = words.lowercase()
+    val extra = steering.filterValues { it }.keys
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && !Regex("\\b" + Regex.escape(it.lowercase()) + "\\b").containsMatchIn(have) }
+        .distinctBy { it.lowercase() }
+    return if (extra.isEmpty()) words else (listOf(words) + extra).joinToString(", ")
+}
+
 fun nextSteering(steering: Map<String, Boolean>, term: String, max: Int = Int.MAX_VALUE): Map<String, Boolean> = when (steering[term]) {
     null -> if (steering.size >= max) steering else steering + (term to true)
     true -> steering + (term to false)
