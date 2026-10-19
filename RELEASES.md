@@ -3,6 +3,11 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.11.1beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.11.1beta) — 2026-10-19
+
+- [#199](https://github.com/Musix-Industreez/musix/pull/199) Tour: open Time machine by its entry, not the filter chip of the same name (@Th3K1ngP1n)
+- [#200](https://github.com/Musix-Industreez/musix/pull/200) Spacing policy: one scale, enforced, every page swept; Other artists you might like reworked (@Th3K1ngP1n)
+
 ## [0.11.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.11.0beta) — 2026-10-18
 
 - [#195](https://github.com/Musix-Industreez/musix/pull/195) Logs: Copy whole log (@Th3K1ngP1n)
