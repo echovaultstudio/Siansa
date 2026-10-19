@@ -68,7 +68,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -83,7 +82,6 @@ import app.musix.data.cover
 import app.musix.net.formatSampleRate
 import app.musix.playback.leftMs
 import app.musix.playback.sleepTimeShort
-import coil3.compose.AsyncImage
 import kotlin.math.max
 
 // ---- Pure parts, unit tested ----
@@ -293,14 +291,10 @@ fun AboutArtistCard(song: Song, onOpenArtist: () -> Unit) {
     val info by loadState("info-$artistId") { graph.subsonic.artistInfo(artistId) }
     val artist = local.valueOrNull()
     val name = artist?.first?.name ?: song.artists.firstOrNull()?.name ?: song.artist
-    val photo = info.valueOrNull()?.imageUrl ?: artist?.first?.imageUrl
     Column(Modifier.padding(horizontal = Space.Page).fillMaxWidth().clip(CardShape).background(CardSurface).clickable(onClick = onOpenArtist)) {
         Box(Modifier.fillMaxWidth().height(170.dp)) {
-            if (photo != null) {
-                AsyncImage(model = photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            } else {
-                Cover(artist?.first?.coverArt ?: song.cover, 600, Modifier.fillMaxSize(), RoundedCornerShape(0.dp))
-            }
+            // Navidrome's artist image through its cover endpoint (issue #206).
+            Cover(artist?.first?.coverArt ?: "ar-$artistId", LARGE_COVER, Modifier.fillMaxSize(), RoundedCornerShape(0.dp))
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.55f), 0.45f to Color.Transparent, 1f to CardSurface),
