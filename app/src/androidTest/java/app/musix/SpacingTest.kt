@@ -159,7 +159,7 @@ class SpacingTest {
         assertEven("Opacity to previews", previews.top - opacity.bottom, gap, tolerance = 1.dp)
     }
 
-    /** Crossfade and loudness: the source and crossfade chips sit evenly between their heading and the hint below (issue #60). */
+    /** Crossfade and levelling: the source and crossfade chips sit evenly between their heading and the hint below (issue #60). */
     @Test fun crossfadeChipsAreEvenlySpaced() {
         compose.setContent {
             MusixTheme {
@@ -239,5 +239,22 @@ class SpacingTest {
         val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Happy")), useUnmergedTree = true).getBoundsInRoot()
         val lyrics = compose.onNodeWithTag("lyricsTitle", useUnmergedTree = true).getBoundsInRoot()
         assertEven("Path mood chips", chip.top - label.bottom, lyrics.top - chip.bottom)
+    }
+
+    /** Crossfade and levelling: the Off / Track / Album chips sit evenly between their heading and hint (issue #214). */
+    @Test fun levellingChipsAreEvenlySpaced() {
+        compose.setContent {
+            MusixTheme {
+                Column(verticalArrangement = Arrangement.spacedBy(app.musix.ui.CROSSFADE_GAP)) {
+                    Box(Modifier.fillMaxWidth().height(24.dp).testTag("heading"))
+                    app.musix.ui.ReplayGainRow(app.musix.data.ReplayGainMode.TRACK) { }
+                    Box(Modifier.fillMaxWidth().height(16.dp).testTag("hint"))
+                }
+            }
+        }
+        val heading = compose.onNodeWithTag("heading").getBoundsInRoot()
+        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Album")), useUnmergedTree = true).getBoundsInRoot()
+        val hint = compose.onNodeWithTag("hint").getBoundsInRoot()
+        assertEven("Levelling chips", chip.top - heading.bottom, hint.top - chip.bottom)
     }
 }

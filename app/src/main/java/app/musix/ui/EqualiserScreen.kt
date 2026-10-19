@@ -28,7 +28,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import app.musix.data.ReplayGainMode
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.musix.playback.EqDesign
@@ -39,31 +38,18 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
- * Settings › Playback › Equaliser and ReplayGain: ReplayGain (evens out loudness), the equaliser's on/off,
- * presets and ten bands, and the one pre-amp.
+ * Settings › Playback › Equaliser: on/off, presets, ten bands and the one pre-amp. Levelling (ReplayGain) is
+ * under Crossfade and levelling (issue #214).
  */
 @Composable
 fun EqualiserScreen(nav: NavController) {
     val graph = LocalGraph.current
     val eq by graph.equaliser.state.collectAsStateWithLifecycle()
-    val settings by graph.settings.state.collectAsStateWithLifecycle()
-    Screen(title = "Equaliser and ReplayGain", nav = nav) { padding ->
+    Screen(title = "Equaliser", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
-            Heading("ReplayGain")
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                ReplayGainMode.entries.forEach { mode ->
-                    FilterChip(
-                        selected = settings.replayGain == mode,
-                        onClick = { graph.settings.save(graph.settings.current.copy(replayGain = mode)) },
-                        label = { Text(mode.label) },
-                    )
-                }
-            }
-            Hint("Evens out loudness. Track: every song at the same level. Album: an album's loud and quiet songs keep their difference. To make everything louder, use the pre-amp below.")
-            HorizontalDivider()
             SwitchRow("Equaliser", eq.enabled) { graph.equaliser.set(eq.copy(enabled = it)) }
             Hint("Shapes the sound of everything this phone plays, for example more bass or clearer vocals. Not used while casting to a TV or speaker.")
             EqCurve(eq)
@@ -95,7 +81,7 @@ fun EqualiserScreen(nav: NavController) {
                 onChange = { graph.equaliser.set(graph.equaliser.state.value.copy(preampDb = it, enabled = true), save = false) },
                 onDone = { graph.equaliser.set(graph.equaliser.state.value) },
             )
-            Hint("Boosting bands turns the whole sound down by the same amount, so loud songs don't distort. Raise the pre-amp to make up for it; too much can distort.")
+            Hint("Songs stay as loud as with the equaliser off; the pre-amp makes everything louder or quieter on top. Peaks that would distort are smoothed.")
         }
     }
 }

@@ -361,22 +361,26 @@ class AppTourTest {
                     idle(800)
                 }
             }
-            step("equaliser and ReplayGain") {
+            step("equaliser") {
                 tab("Settings")
                 click("Playback")
-                click("Equaliser and ReplayGain")
+                click("Equaliser")
                 idle(1200)
                 shot("19b-equaliser")
                 back()
                 back()
             }
-            step("crossfade and loudness") {
+            step("crossfade and levelling") {
                 try {
                     tab("Settings")
                     click("Playback")
-                    click("Crossfade and loudness")
+                    click("Crossfade and levelling")
                     idle(1000)
                     shot("19j-crossfade")
+                    // Issue #214: levelling (ReplayGain) lives here now, with what levels the song playing now.
+                    if (compose.onAllNodesWithText("Album").fetchSemanticsNodes().isEmpty()) problems += "Levelling chips missing on Crossfade and levelling"
+                    val now = compose.onAllNodesWithTag("levelling-now", useUnmergedTree = true).fetchSemanticsNodes()
+                    if (now.isEmpty()) problems += "No 'levelled by' line on Crossfade and levelling"
                     graph.settings.setLoudness(LoudnessSource.LUMAE)
                     graph.settings.setCrossfade(CrossfadeMode.SMART, 8)
                     idle(800)
