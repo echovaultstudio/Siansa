@@ -3,6 +3,18 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.15.0beta — 2026-10-19
+
+### Added
+- **Similar songs and similar albums.** Find them from the now playing ⋮ menu and any song's ⋮ menu; albums also from the
+  new ⋮ menu on an album page. Similar albums need the Musix plugin on your AudioMuse server.
+- **Fans also like** on an artist page now includes artists that sound alike, found by the Musix plugin.
+
+### Changed
+- **Levelling and smooth crossfades now come from the Musix plugin.** Musix has its own plugin for AudioMuse-AI
+  (in `audiomuse-plugin/`), which measures each song's loudness and how it starts and ends. Install it on your
+  AudioMuse server in place of the plugin used before. Your choice under Crossfade and levelling carries over.
+
 ## 0.14.1beta — 2026-10-19
 
 ### Fixed
