@@ -202,7 +202,7 @@ private fun HubRow(icon: ImageVector, title: String, subtitle: String, onClick: 
     }
 }
 
-/** "Crossfade 6 s · levelling track by Lumae", "No crossfade · levelling album by ReplayGain tags", "… · no levelling". */
+/** "Crossfade 6 s · levelling track by the Musix plugin", "No crossfade · levelling album by ReplayGain tags", "… · no levelling". */
 internal fun crossfadeSummary(s: AppSettings): String {
     val fade = when (s.crossfade) {
         CrossfadeMode.OFF -> "No crossfade"
@@ -210,7 +210,7 @@ internal fun crossfadeSummary(s: AppSettings): String {
         CrossfadeMode.SMART -> "Smart crossfade up to ${s.crossfadeSeconds} s"
     }
     val levelling = if (s.replayGain == ReplayGainMode.OFF) "no levelling" else
-        "levelling ${s.replayGain.label.lowercase()} by " + if (s.loudnessSource == LoudnessSource.LUMAE) "Lumae" else "ReplayGain tags"
+        "levelling ${s.replayGain.label.lowercase()} by " + if (s.loudnessSource == LoudnessSource.PLUGIN) "the Musix plugin" else "ReplayGain tags"
     return "$fade · $levelling"
 }
 

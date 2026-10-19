@@ -52,7 +52,7 @@ internal val CROSSFADE_GAP = Space.Medium
 
 /**
  * Settings › Playback › Crossfade and levelling (issues #60, #214): where song loudness and fade shapes come
- * from, levelling (Off, Track, Album: ReplayGain tags or the Lumae plugin's measurement, never both) with what
+ * from, levelling (Off, Track, Album: ReplayGain tags or the Musix plugin's measurement, never both) with what
  * levels the song playing now, and crossfades.
  */
 @Composable
@@ -72,7 +72,7 @@ fun CrossfadeScreen(nav: NavController) {
                 graph.settings.setLoudness(source = it)
             }
             Hint(settings.loudnessSource.detail + ".")
-            if (settings.loudnessSource == LoudnessSource.LUMAE) {
+            if (settings.loudnessSource == LoudnessSource.PLUGIN) {
                 if (!settings.audioMuseReady) {
                     Hint("Set up AudioMuse in Settings › Connections first. Until then, song tags are used.")
                 } else {
@@ -87,7 +87,7 @@ fun CrossfadeScreen(nav: NavController) {
                         test?.let {
                             Text(
                                 it,
-                                modifier = Modifier.weight(1f).testTag("lumae-test"),
+                                modifier = Modifier.weight(1f).testTag("plugin-test"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (it.startsWith("✗")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -101,7 +101,7 @@ fun CrossfadeScreen(nav: NavController) {
             Heading("Levelling")
             ReplayGainRow(settings.replayGain) { graph.settings.save(graph.settings.current.copy(replayGain = it)) }
             Hint("Evens out loudness. Track: every song at the same level. Album: an album's loud and quiet songs keep their difference. Off: songs play as they are.")
-            if (settings.loudnessSource == LoudnessSource.LUMAE) {
+            if (settings.loudnessSource == LoudnessSource.PLUGIN) {
                 LoudnessTargetRow(settings.loudnessTarget) { graph.settings.setLoudness(target = it) }
                 Hint("How loud songs are brought to. −18 matches ReplayGain and leaves room for loud songs. −14 is louder, like Spotify, but quiet songs can't be raised to it.")
             }
@@ -122,9 +122,9 @@ fun CrossfadeScreen(nav: NavController) {
 
 private fun levellingHint(s: AppSettings): String = when {
     s.replayGain == ReplayGainMode.OFF -> "Levelling is off: songs play at their own loudness."
-    s.loudnessSource == LoudnessSource.LUMAE && s.replayGain == ReplayGainMode.ALBUM ->
+    s.loudnessSource == LoudnessSource.PLUGIN && s.replayGain == ReplayGainMode.ALBUM ->
         "Each song is levelled one way only: songs with album tags keep them, the rest by the plugin's measurement."
-    s.loudnessSource == LoudnessSource.LUMAE ->
+    s.loudnessSource == LoudnessSource.PLUGIN ->
         "Each song is levelled one way only: by the plugin's measurement, or by its ReplayGain tags until the plugin has measured it."
     else -> "Uses the songs' ReplayGain tags (${s.replayGain.label.lowercase()})."
 }
@@ -132,10 +132,10 @@ private fun levellingHint(s: AppSettings): String = when {
 private fun crossfadeHint(s: AppSettings): String = when (s.crossfade) {
     CrossfadeMode.OFF -> "Songs play back to back, with no gap."
     CrossfadeMode.FIXED -> "Each song fades into the next over the length below."
-    CrossfadeMode.SMART -> "Songs on one album that run straight on stay gapless. " + if (s.loudnessSource == LoudnessSource.LUMAE) {
+    CrossfadeMode.SMART -> "Songs on one album that run straight on stay gapless. " + if (s.loudnessSource == LoudnessSource.PLUGIN) {
         "Other fades start where a song goes quiet and last as long as the two songs need, up to the length below."
     } else {
-        "Other fades use the length below; with the Lumae plugin they follow how each song ends and starts."
+        "Other fades use the length below; with the Musix plugin they follow how each song ends and starts."
     }
 }
 
@@ -197,7 +197,7 @@ internal fun ReplayGainRow(selected: ReplayGainMode, onPick: (ReplayGainMode) ->
 }
 
 /**
- * What levels the song playing now (issue #214): the Lumae plugin's measurement, its ReplayGain tags, or
+ * What levels the song playing now (issue #214): the Musix plugin's measurement, its ReplayGain tags, or
  * nothing, and by how much. Looks again every few seconds, since the plugin's measurement can arrive after
  * the song starts.
  */
@@ -223,19 +223,19 @@ internal fun LevellingNow(settings: AppSettings) {
         Icon(
             icon,
             null,
-            tint = if (decision.source == Levelling.Source.LUMAE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = if (decision.source == Levelling.Source.PLUGIN) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
-/** The line [LevellingNow] shows, and its icon: a tick when the Lumae plugin levels the song. */
+/** The line [LevellingNow] shows, and its icon: a tick when the Musix plugin levels the song. */
 internal fun levellingNowText(title: String?, d: Levelling.Decision): Pair<androidx.compose.ui.graphics.vector.ImageVector, String> {
     if (title == null) return Icons.Rounded.MusicOff to "Nothing playing right now."
     val db = "%+.1f dB".format(d.gainDb)
     return when (d.source) {
-        Levelling.Source.LUMAE -> Icons.Rounded.CheckCircle to "Now playing \"$title\": levelled by the Lumae plugin, $db."
-        Levelling.Source.REPLAYGAIN -> Icons.Rounded.Info to "Now playing \"$title\": levelled by its ReplayGain tags, $db, not by Lumae (${d.why})."
+        Levelling.Source.PLUGIN -> Icons.Rounded.CheckCircle to "Now playing \"$title\": levelled by the Musix plugin, $db."
+        Levelling.Source.REPLAYGAIN -> Icons.Rounded.Info to "Now playing \"$title\": levelled by its ReplayGain tags, $db, not by the Musix plugin (${d.why})."
         Levelling.Source.NONE -> Icons.Rounded.Info to "Now playing \"$title\": not levelled (${d.why})."
     }
 }
