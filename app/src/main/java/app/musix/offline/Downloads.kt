@@ -134,6 +134,12 @@ object OfflinePlan {
      * album, playlist and artist that had them (one left with no songs goes too) and aren't downloaded again
      * when a playlist is checked for new songs.
      */
+    /**
+     * "Stop all downloads" (issue #235): every song still waiting is dropped and won't come back by itself,
+     * as if removed by hand; songs already downloaded stay. Albums and playlists left with no songs go.
+     */
+    fun stopAll(list: DownloadList): DownloadList = removeSongs(list, list.waiting.mapTo(HashSet()) { it.id })
+
     fun removeSongs(list: DownloadList, ids: Set<String>): DownloadList {
         if (ids.isEmpty()) return list
         val items = list.items
@@ -143,34 +149,35 @@ object OfflinePlan {
     }
 
     /**
-     * [list] with every phone-only playlist ([phone], each with its songs) kept on the phone, so they play
-     * offline (issue #147): songs added to one download, songs taken out go unless something else wants
-     * them, and a playlist deleted (or sent to Navidrome) goes with its songs. Songs removed by hand from
-     * Downloaded songs stay out, unless they're added to the playlist again: [previous] is each playlist's
-     * songs at the last sync (null when the app has just started, so nothing counts as added).
+     * [list] with the phone-only playlists ([phone], each with its songs) you chose to download kept up to
+     * date (issue #147): songs added to one download, songs taken out go unless something else wants them,
+     * and a playlist deleted (or sent to Navidrome) goes with its songs. A phone playlist you haven't chosen
+     * to download isn't downloaded by itself (issue #235): making one just makes the playlist. Songs removed
+     * by hand from Downloaded songs stay out, unless they're added to the playlist again: [previous] is each
+     * playlist's songs at the last sync (null when the app has just started, so nothing counts as added).
      */
     fun syncPhonePlaylists(
         list: DownloadList,
         phone: List<Pair<OfflineItem, List<Song>>>,
         previous: Map<String, Set<String>>?,
-        now: Long,
     ): DownloadList {
         val keys = phone.mapTo(HashSet()) { it.first.key }
         var result = list.items
             .filter { it.kind == OfflineKind.PLAYLIST && LocalPlaylists.isLocal(it.id) && it.key !in keys }
             .fold(list) { l, gone -> drop(l, gone.key) }
         for ((item, songs) in phone) {
-            val old = result.items.firstOrNull { it.key == item.key }
+            // Only playlists already chosen for download (issue #235).
+            val old = result.items.firstOrNull { it.key == item.key } ?: continue
             if (songs.isEmpty()) {
-                if (old != null) result = drop(result, item.key)
+                result = drop(result, item.key)
                 continue
             }
             val ids = songs.mapTo(HashSet()) { it.id }
             val added = if (previous == null) emptySet() else ids - previous[item.key].orEmpty()
             val skipped = result.skipped - added
             val wanted = songs.filter { it.id !in skipped }.map { it.id }.distinct()
-            if (old != null && old.songIds == wanted && old.name == item.name && old.cover == item.cover) continue
-            result = choose(result.copy(skipped = skipped), item.copy(addedAt = old?.addedAt ?: now), songs, explicit = false)
+            if (old.songIds == wanted && old.name == item.name && old.cover == item.cover) continue
+            result = choose(result.copy(skipped = skipped), item.copy(addedAt = old.addedAt), songs, explicit = false)
         }
         return result
     }
@@ -363,15 +370,15 @@ class Downloads(
         }
     }
 
-    /** Keeps every phone-only playlist downloaded; called whenever they change. */
+    /** Keeps the phone-only playlists you chose to download up to date; called whenever they change. */
     suspend fun syncPhonePlaylists(playlists: List<LocalPlaylist>) {
         val phone = playlists.map { it.offlineItem() to it.songs }
         val previous = lastPhone
         lastPhone = phone.associate { (item, songs) -> item.key to songs.mapTo(HashSet()) { it.id } }
         // Nothing to do (the usual case): leave the file alone.
-        if (OfflinePlan.syncPhonePlaylists(_list.value, phone, previous, 0) == _list.value) return
+        if (OfflinePlan.syncPhonePlaylists(_list.value, phone, previous) == _list.value) return
         val before = _list.value.waiting.size
-        change { OfflinePlan.syncPhonePlaylists(it, phone, previous, System.currentTimeMillis()) }
+        change { OfflinePlan.syncPhonePlaylists(it, phone, previous) }
         val waiting = _list.value.waiting.size
         if (waiting != before) AppLog.i("Downloads", "Phone playlists synced (${playlists.size}), $waiting waiting")
         if (waiting > 0) start("phone playlists")
@@ -456,6 +463,18 @@ class Downloads(
         gone.forEach { id -> File(dir, OfflinePlan.fileName(id)).delete() }
         AppLog.i("Downloads", "Deleted ${gone.size} songs no longer chosen")
         if (stopCurrent && after.waiting.isNotEmpty()) start("carrying on")
+    }
+
+    /** Stops every download still waiting (the ✕ beside the progress, issue #235); what's downloaded stays. */
+    fun stopAll() {
+        scope.launch {
+            val waiting = _list.value.waiting.size
+            job?.cancelAndJoin()
+            _progress.value.current?.let { File(dir, OfflinePlan.fileName(it.id) + PART).delete() }
+            change { OfflinePlan.stopAll(it) }
+            _progress.value = Progress(note = "Stopped")
+            AppLog.i("Downloads", "Stopped all downloads: $waiting songs won't download")
+        }
     }
 
     /** Pauses the downloads (the Pause button); they carry on with [retry] or when more is chosen. */
