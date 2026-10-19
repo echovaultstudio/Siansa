@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.height
@@ -35,6 +36,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Search
@@ -156,6 +158,20 @@ fun SearchScreen(nav: NavController) {
         }
     }
 
+    // Typing or looking at results: the back arrow in the box, or the phone's back gesture, returns to the
+    // search page (genres and radios) instead of leaving Search for Home (issue #203).
+    val active = searchIsActive(focused, query, soundSongs != null)
+    fun leaveSearch() {
+        query = ""
+        results = null
+        soundSongs = null
+        error = null
+        focusManager.clearFocus()
+    }
+    // Not while now playing is open over it: back closes that first.
+    val sheet = LocalPlayerSheet.current
+    BackHandler(enabled = active && !sheet.isOpen) { leaveSearch() }
+
     Screen(title = "Search", nav = null) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize()) {
             OutlinedTextField(
@@ -165,7 +181,15 @@ fun SearchScreen(nav: NavController) {
                 placeholder = {
                     Text(if (soundMode) "Describe a sound, e.g. rainy jazz piano" else "Artists, albums, songs")
                 },
-                leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                leadingIcon = {
+                    if (active) {
+                        IconButton(onClick = { leaveSearch() }, modifier = Modifier.testTag("searchBack")) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back")
+                        }
+                    } else {
+                        Icon(Icons.Rounded.Search, null)
+                    }
+                },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = {
