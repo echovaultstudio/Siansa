@@ -13,6 +13,10 @@ import androidx.compose.ui.unit.dp
  * - [Section] 24 dp: between the sections of a page.
  * - [Large] 32 dp: around empty states and loading, and big headers.
  *
+ * One named place: [BelowPlayButton], the room under a row with the big round Play button before the songs it
+ * plays, so the first song (marked when it's playing) never touches the button. That row is always
+ * [PlayButtonRow], which leaves this room; `SpacingPolicyTest` fails on a big Play button drawn anywhere else.
+ *
  * `SpacingPolicyTest` fails on a raw dp number in `padding`, `spacedBy`, `PaddingValues` or `Spacer` in the
  * UI code. Pixel-exact drawing that isn't spacing (a ring around a selected swatch, a hairline, a thumb's
  * offset) can say so with `// spacing: exact` on that line.
@@ -24,4 +28,7 @@ object Space {
     val Page = 16.dp
     val Section = 24.dp
     val Large = 32.dp
+
+    /** Under a row with the big round Play button, before what it plays: [Page]. */
+    val BelowPlayButton = Page
 }

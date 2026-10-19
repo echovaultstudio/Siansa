@@ -29,7 +29,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.IconButton
@@ -182,7 +181,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(Space.Medium))
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    PlayButtonRow {
                         OutlinedButton(onClick = {
                             launch.progressive("${p.artist.name} radio", { graph.radios.artistStart(p.artist) }) {
                                 graph.radios.artistMore(p.artist, it)
@@ -198,12 +197,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                                 Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
                             }
                             Spacer(Modifier.width(Space.Small))
-                            Box(
-                                Modifier.size(56.dp).clip(CircleShape).background(Accent).clickable { graph.player.play(p.songs) },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(Icons.Rounded.PlayArrow, "Play", tint = OnAccent, modifier = Modifier.size(32.dp))
-                            }
+                            BigPlayButton(enabled = true) { graph.player.play(p.songs) }
                         }
                     }
                 }
