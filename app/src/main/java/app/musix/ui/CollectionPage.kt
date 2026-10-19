@@ -29,6 +29,9 @@ import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
+import app.musix.data.normalizeKey
+import androidx.compose.ui.platform.testTag
+import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -81,6 +84,8 @@ fun CollectionPage(
     offline: OfflineItem? = null,
     // Buttons at the right of the title bar (a playlist's ⋮ menu).
     actions: @Composable () -> Unit = {},
+    // "Find similar albums" beside Shuffle (album pages, issue #228); null shows no button.
+    onSimilar: (() -> Unit)? = null,
     // Extra items in a song's ⋮ menu, by its position in [songs].
     songMenu: (@Composable (index: Int, song: Song, close: () -> Unit) -> Unit)? = null,
     footer: LazyListScope.() -> Unit = {},
@@ -138,7 +143,7 @@ fun CollectionPage(
                     Spacer(Modifier.height(Space.Small))
                     header()
                     Spacer(Modifier.height(Space.Tight))
-                    ActionRow(songs.orEmpty(), offline)
+                    ActionRow(songs.orEmpty(), offline, onSimilar)
                 }
             }
             when {
@@ -149,20 +154,31 @@ fun CollectionPage(
                 songs != null -> {
                     // Albums with several discs get a heading above each disc (its title, or "Disc 2").
                     val discs = if (numbered) discHeaders(songs, discTitles) else emptyMap()
+                    // The song playing now is always marked, even when the page lists another copy of it (issue #228).
+                    val playing = playingIndex(songs, player.current)
                     songs.forEachIndexed { index, song ->
                         discs[index]?.let { header ->
                             item(key = "disc-$index-${header.disc}", contentType = "disc") { DiscHeading(header.label, color) }
                         }
                         item(key = "$index-${song.id}", contentType = "song") {
-                            SongRow(
-                                song = song,
-                                onClick = { graph.player.play(songs, index) },
-                                leading = if (numbered) song.track?.toString() ?: "${index + 1}" else null,
-                                highlighted = song.id == player.current?.id,
-                                showCover = showCovers,
-                                subtitle = if (subtitleOf != null) subtitleOf(song) else artistAndAlbum(song),
-                                extraMenu = { close -> songMenu?.invoke(index, song, close) },
-                            )
+                            val now = index == playing
+                            val subtitle = if (subtitleOf != null) subtitleOf(song) else artistAndAlbum(song)
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .background(if (now) MaterialTheme.colorScheme.primary.copy(alpha = NOW_PLAYING_BAND) else Color.Transparent)
+                                    .testTag(if (now) "collectionNowPlaying" else "collectionRow"),
+                            ) {
+                                SongRow(
+                                    song = song,
+                                    onClick = { graph.player.play(songs, index) },
+                                    leading = if (numbered) song.track?.toString() ?: "${index + 1}" else null,
+                                    highlighted = now,
+                                    showCover = showCovers,
+                                    subtitle = if (now) listOfNotNull("Now playing", subtitle?.ifBlank { null }).joinToString(" · ") else subtitle,
+                                    extraMenu = { close -> songMenu?.invoke(index, song, close) },
+                                )
+                            }
                         }
                     }
                 }
@@ -179,10 +195,8 @@ fun CollectionPage(
                 .padding(horizontal = Space.Tight, vertical = Space.Tight),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(
-                onClick = { nav.popBackStack() },
-                modifier = Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.3f * (1f - barAlpha))),
-            ) {
+            // No shading behind the arrow (issue #228).
+            IconButton(onClick = { nav.popBackStack() }) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White)
             }
             Spacer(Modifier.width(Space.Small))
@@ -240,17 +254,43 @@ private fun DiscHeading(label: String, cover: Color) {
     }
 }
 
-/** Queue all and download on the left; shuffle and the big round play button on the right. */
+/** Queue all and download on the left; find similar albums, shuffle and the big round play button on the right. */
 @Composable
-private fun ActionRow(songs: List<Song>, offline: OfflineItem?) {
+private fun ActionRow(songs: List<Song>, offline: OfflineItem?, onSimilar: (() -> Unit)?) {
     val graph = LocalGraph.current
+    ActionButtons(
+        enabled = songs.isNotEmpty(),
+        onQueue = { songs.forEach { graph.player.addToQueue(it) } },
+        download = { if (offline != null) DownloadButton(offline, songs) },
+        onSimilar = onSimilar,
+        onShuffle = { graph.player.play(songs, shuffle = true) },
+        onPlay = { graph.player.play(songs) },
+    )
+}
+
+/** The buttons of [ActionRow], without the player, so their layout can be checked on its own (SpacingTest). */
+@Composable
+internal fun ActionButtons(
+    enabled: Boolean,
+    onQueue: () -> Unit,
+    download: @Composable () -> Unit,
+    onSimilar: (() -> Unit)?,
+    onShuffle: () -> Unit,
+    onPlay: () -> Unit,
+) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = { songs.forEach { graph.player.addToQueue(it) } }, enabled = songs.isNotEmpty()) {
+        IconButton(onClick = onQueue, enabled = enabled) {
             Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add all to queue", Modifier.size(28.dp))
         }
-        if (offline != null) DownloadButton(offline, songs)
+        download()
         Spacer(Modifier.weight(1f))
-        IconButton(onClick = { graph.player.play(songs, shuffle = true) }, enabled = songs.isNotEmpty()) {
+        if (onSimilar != null) {
+            // The icon "Similar albums" has in the now playing menu.
+            IconButton(onClick = onSimilar, modifier = Modifier.testTag("findSimilarAlbums")) {
+                Icon(Icons.Rounded.LibraryMusic, "Find similar albums", tint = Accent, modifier = Modifier.size(28.dp))
+            }
+        }
+        IconButton(onClick = onShuffle, enabled = enabled, modifier = Modifier.testTag("shuffleAll")) {
             Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
         }
         Spacer(Modifier.width(Space.Small))
@@ -258,13 +298,29 @@ private fun ActionRow(songs: List<Song>, offline: OfflineItem?) {
             Modifier
                 .size(56.dp)
                 .clip(CircleShape)
-                .background(if (songs.isNotEmpty()) Accent else Accent.copy(alpha = 0.4f))
-                .clickable(enabled = songs.isNotEmpty()) { graph.player.play(songs) },
+                .background(if (enabled) Accent else Accent.copy(alpha = 0.4f))
+                .clickable(enabled = enabled, onClick = onPlay),
             contentAlignment = Alignment.Center,
         ) {
             Icon(Icons.Rounded.PlayArrow, "Play", tint = OnAccent, modifier = Modifier.size(32.dp))
         }
     }
+}
+
+/** How strongly the song playing now is marked in a song list: the queue's band, in the theme's colour. */
+private const val NOW_PLAYING_BAND = 0.12f
+
+/**
+ * Which of [songs] is playing now, or null. By id, or else the same title, album and disc and track: an album
+ * that lives in several libraries lists one copy, which may not be the copy that plays (issue #228).
+ */
+internal fun playingIndex(songs: List<Song>, current: Song?): Int? {
+    if (current == null) return null
+    songs.indexOfFirst { it.id == current.id }.takeIf { it >= 0 }?.let { return it }
+    val key = listOf(normalizeKey(current.title), normalizeKey(current.album), (current.disc ?: 1).toString(), current.track?.toString())
+    return songs.indexOfFirst {
+        listOf(normalizeKey(it.title), normalizeKey(it.album), (it.disc ?: 1).toString(), it.track?.toString()) == key
+    }.takeIf { it >= 0 }
 }
 
 /** A small "meta" line under the title: artist avatar and name, then details. */

@@ -9,19 +9,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -104,25 +95,6 @@ fun SimilarAlbumsScreen(nav: NavController, songId: String) {
                     }
                 }
             }
-        }
-    }
-}
-
-/** The ⋮ menu at the top of an album page (issue #223): similar albums, through any of its songs. */
-@Composable
-fun AlbumMenuButton(nav: NavController, firstSongId: String?) {
-    val graph = LocalGraph.current
-    if (firstSongId == null || !graph.settings.current.audioMuseReady) return
-    var open by remember { mutableStateOf(false) }
-    Box {
-        IconButton(onClick = { open = true }, modifier = Modifier.testTag("album-menu")) {
-            Icon(Icons.Rounded.MoreVert, "Album options")
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(text = { Text("Similar albums") }, onClick = {
-                open = false
-                nav.openSimilarAlbums(firstSongId)
-            })
         }
     }
 }

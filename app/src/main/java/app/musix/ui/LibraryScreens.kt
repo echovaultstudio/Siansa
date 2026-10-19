@@ -278,7 +278,8 @@ fun AlbumScreen(nav: NavController, id: String) {
             }
         },
         offline = d?.album?.offlineItem(),
-        actions = { AlbumMenuButton(nav, d?.songs?.firstOrNull()?.id) },
+        // "Find similar albums" beside Shuffle (issue #228), through any of its songs; needs AudioMuse.
+        onSimilar = d?.songs?.firstOrNull()?.id?.takeIf { graph.settings.current.audioMuseReady }?.let { id -> { nav.openSimilarAlbums(id) } },
     )
 }
 
