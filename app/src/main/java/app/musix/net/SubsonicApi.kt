@@ -24,27 +24,37 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.net.URLEncoder
 import java.security.MessageDigest
 import java.security.SecureRandom
 
-/** Navidrome through the Subsonic / OpenSubsonic API, with token authentication. */
+/**
+ * Navidrome through the Subsonic / OpenSubsonic API (issue #206):
+ * - Asks the server once which OpenSubsonic extensions it has ([extensions]) and only uses those.
+ * - Token login with a new salt for every API call. Song and cover addresses keep one salt per app run, since
+ *   players, the cast receiver and the image cache hold on to them (their cache keys leave the login out).
+ * - When Navidrome refuses token login for the user (error 41 or 42, e.g. LDAP or reverse-proxy users), the
+ *   password is sent hex-encoded instead (`p=enc:…`), as the spec says to retry with another method.
+ * - Long requests (playlists with many songs) go as a form POST when the server has `formPost`.
+ * - Navidrome's error codes become plain messages ([SubsonicErrors]).
+ */
 class SubsonicApi(
     private val http: OkHttpClient,
     private val settings: () -> AppSettings,
 ) {
-    // One salt per app run keeps cover URLs stable, so images stay cached while scrolling.
-    private val salt: String = ByteArray(8).also { SecureRandom().nextBytes(it) }.toHex()
-    private var tokenFor: Pair<String, String>? = null
+    // Song and cover addresses: one salt per app run (see above).
+    private val mediaSalt: String = newSalt()
+    private var mediaToken: Pair<String, String>? = null
 
-    private fun token(password: String): String {
-        tokenFor?.let { if (it.first == password) return it.second }
-        val token = md5(password + salt)
-        tokenFor = password to token
-        return token
-    }
+    /**
+     * The libraries chosen in Settings → Library sync, empty for all. Only the app's own login sets it; lists
+     * asked for straight from Navidrome are then kept to those libraries, like the synced library (issue #206).
+     */
+    @Volatile var chosenFolders: () -> Set<String> = { emptySet() }
 
     /**
      * The login for a request about an item (by its id) when the item is another shown user's (issue #141):
@@ -52,19 +62,44 @@ class SubsonicApi(
      */
     @Volatile var loginFor: (String?) -> AppSettings? = { null }
 
-    fun url(endpoint: String, params: Map<String, String?> = emptyMap(), repeated: List<Pair<String, String>> = emptyList()): String {
-        val s = loginFor(params["id"] ?: params["playlistId"]) ?: settings()
-        val sb = StringBuilder(s.navidromeUrl)
-            .append("/rest/").append(endpoint)
-            .append("?u=").append(enc(s.navidromeUser))
-            .append("&t=").append(token(s.navidromePassword))
-            .append("&s=").append(salt)
-            .append("&v=1.16.1&c=musix&f=json")
-        for ((key, value) in params) {
-            if (value != null) sb.append('&').append(enc(key)).append('=').append(enc(value))
+    /** Servers (address + user) that refused token login, so the password is sent instead. */
+    private val passwordLogin = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    private fun loginKey(s: AppSettings) = s.navidromeUrl.trimEnd('/') + "|" + s.navidromeUser
+
+    private fun newSalt(): String = ByteArray(8).also { SecureRandom().nextBytes(it) }.toHex()
+
+    /** md5(password + salt); the media salt's token is kept, since covers ask for it all the time. */
+    private fun token(password: String, salt: String): String {
+        if (salt != mediaSalt) return md5(password + salt)
+        mediaToken?.let { if (it.first == password) return it.second }
+        return md5(password + salt).also { mediaToken = password to it }
+    }
+
+    /** The login parameters: u plus t and s, or p=enc: when this server refused tokens. */
+    private fun auth(s: AppSettings, salt: String): String = buildString {
+        append("u=").append(enc(s.navidromeUser))
+        if (loginKey(s) in passwordLogin) {
+            append("&p=enc:").append(s.navidromePassword.toByteArray(Charsets.UTF_8).toHex())
+        } else {
+            append("&t=").append(token(s.navidromePassword, salt)).append("&s=").append(salt)
         }
-        for ((key, value) in repeated) sb.append('&').append(enc(key)).append('=').append(enc(value))
-        return sb.toString()
+        append("&v=1.16.1&c=musix&f=json")
+    }
+
+    private fun query(params: Map<String, String?>, repeated: List<Pair<String, String>>): String = buildString {
+        for ((key, value) in params) {
+            if (value != null) append('&').append(enc(key)).append('=').append(enc(value))
+        }
+        for ((key, value) in repeated) append('&').append(enc(key)).append('=').append(enc(value))
+    }
+
+    private fun loginOf(params: Map<String, String?>) = loginFor(params["id"] ?: params["playlistId"]) ?: settings()
+
+    /** A song or cover address (one salt per app run, see above). */
+    fun url(endpoint: String, params: Map<String, String?> = emptyMap(), repeated: List<Pair<String, String>> = emptyList()): String {
+        val s = loginOf(params)
+        return s.navidromeUrl.trimEnd('/') + "/rest/" + endpoint + "?" + auth(s, mediaSalt) + query(params, repeated)
     }
 
     /** The untouched original file (format=raw), whatever Navidrome's own transcoding defaults say. */
@@ -73,31 +108,96 @@ class SubsonicApi(
     fun coverUrl(id: String, size: Int?): String =
         url("getCoverArt", mapOf("id" to id, "size" to size?.toString()))
 
+    // ---- OpenSubsonic extensions ----
+
+    /** Each server's extensions (name → versions), asked once per app run. */
+    private val known = java.util.concurrent.ConcurrentHashMap<String, Map<String, List<Int>>>()
+
+    /**
+     * The OpenSubsonic extensions this server has, by name with their versions; empty for a plain Subsonic
+     * server or when it couldn't be asked (then nothing optional is used).
+     */
+    suspend fun extensions(): Map<String, List<Int>> {
+        val s = settings()
+        val key = s.navidromeUrl.trimEnd('/')
+        known[key]?.let { return it }
+        val found = try {
+            parseExtensions(call("getOpenSubsonicExtensions"))
+        } catch (e: ApiException) {
+            // Navidrome answered, but without the list: a plain Subsonic server.
+            AppLog.w("Server", "No OpenSubsonic extensions: ${e.message}")
+            emptyMap()
+        } catch (e: java.io.IOException) {
+            // Not reachable now: ask again next time.
+            return emptyMap()
+        }
+        known[key] = found
+        AppLog.i("Server", "OpenSubsonic extensions: " + found.entries.joinToString(", ") { "${it.key} ${it.value.joinToString("/")}" }.ifEmpty { "none" })
+        return found
+    }
+
+    suspend fun supports(name: String, version: Int = 1): Boolean = extensions()[name]?.contains(version) == true
+
+    // ---- Calls ----
+
     private suspend fun call(
         endpoint: String,
         params: Map<String, String?> = emptyMap(),
         repeated: List<Pair<String, String>> = emptyList(),
-    ): JsonObject =
-        withContext(Dispatchers.IO) {
-            if (settings().navidromeUrl.isBlank()) throw ApiException("Navidrome isn't set up yet")
-            val request = Request.Builder().url(url(endpoint, params, repeated)).build()
-            http.newCall(request).execute().use { response ->
-                val body = response.body?.string().orEmpty()
-                if (response.code == 401 || response.code == 407) {
-                    throw ApiException("The server asked for a login (HTTP ${response.code}). Fill in the proxy login in Settings.")
-                }
-                if (!response.isSuccessful) throw ApiException("Navidrome answered HTTP ${response.code}")
-                val root = try {
-                    AppJson.parseToJsonElement(body).jsonObject["subsonic-response"]?.jsonObject
-                } catch (e: Exception) {
-                    null
-                } ?: throw ApiException("That address doesn't look like a Navidrome server")
-                if (root.str("status") != "ok") {
-                    throw ApiException(root.obj("error")?.str("message") ?: "Navidrome refused the request")
-                }
-                root
-            }
+    ): JsonObject {
+        if (settings().navidromeUrl.isBlank()) throw ApiException("Navidrome isn't set up yet")
+        // A long list of songs as a form POST, so the address doesn't get too long for proxies.
+        val post = repeated.size > POST_OVER && endpoint != "getOpenSubsonicExtensions" && supports("formPost")
+        return try {
+            send(endpoint, params, repeated, post)
+        } catch (e: ApiException) {
+            val s = loginOf(params)
+            if (e.code != 41 && e.code != 42 || loginKey(s) in passwordLogin) throw e
+            // Token login refused for this user: the spec's next method is the (hex-encoded) password.
+            AppLog.w("Server", "Navidrome refused token login (error ${e.code}); sending the password instead")
+            passwordLogin += loginKey(s)
+            send(endpoint, params, repeated, post)
         }
+    }
+
+    private suspend fun send(
+        endpoint: String,
+        params: Map<String, String?>,
+        repeated: List<Pair<String, String>>,
+        post: Boolean,
+    ): JsonObject = withContext(Dispatchers.IO) {
+        val s = loginOf(params)
+        val base = s.navidromeUrl.trimEnd('/') + "/rest/" + endpoint
+        // A new salt for every call, as the spec asks.
+        val fields = auth(s, newSalt()) + query(params, repeated)
+        val request = if (post) {
+            Request.Builder().url(base)
+                .post(fields.toRequestBody("application/x-www-form-urlencoded".toMediaType()))
+                .build()
+        } else {
+            Request.Builder().url("$base?$fields").build()
+        }
+        http.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (response.code == 401 || response.code == 407) {
+                throw ApiException("The server asked for a login (HTTP ${response.code}). Fill in the proxy login in Settings.")
+            }
+            if (!response.isSuccessful) throw ApiException("Navidrome answered HTTP ${response.code}")
+            val root = try {
+                AppJson.parseToJsonElement(body).jsonObject["subsonic-response"]?.jsonObject
+            } catch (e: Exception) {
+                null
+            } ?: throw ApiException("That address doesn't look like a Navidrome server")
+            if (root.str("status") != "ok") {
+                val error = root.obj("error")
+                val code = error?.int("code")
+                val message = error?.str("message")
+                AppLog.w("Server", "$endpoint failed: error ${code ?: "?"} ${message.orEmpty()}".trim())
+                throw ApiException(SubsonicErrors.message(code, message), code)
+            }
+            root
+        }
+    }
 
     /** When Navidrome last scanned the music folders (Navidrome's lastScan), to skip syncs with no changes. */
     suspend fun lastScan(): String? {
@@ -121,11 +221,19 @@ class SubsonicApi(
         }
 
     /** type: alphabeticalByName, newest, frequent, recent, random, starred… */
-    suspend fun albums(type: String, size: Int, offset: Int, folderId: String? = null): List<Album> =
+    suspend fun albums(type: String, size: Int, offset: Int, folderId: String?): List<Album> =
         call(
             "getAlbumList2",
             mapOf("type" to type, "size" to "$size", "offset" to "$offset", "musicFolderId" to folderId),
         ).obj("albumList2")?.arr("album").orEmpty().map(::parseAlbum)
+
+    /** Albums of the libraries chosen in Settings (all when none are): one call per chosen library, merged. */
+    suspend fun albums(type: String, size: Int, offset: Int): List<Album> {
+        val folders = chosenFolders()
+        if (folders.size <= 1) return albums(type, size, offset, folders.firstOrNull())
+        val all = folders.flatMap { albums(type, size + offset, 0, it) }.distinctBy { it.id }
+        return mergeAlbumLists(type, all).drop(offset).take(size)
+    }
 
     suspend fun album(id: String): AlbumDetail {
         val album = call("getAlbum", mapOf("id" to id)).obj("album") ?: throw ApiException("Album not found")
@@ -219,27 +327,35 @@ class SubsonicApi(
         ).obj("searchResult3")?.arr("song").orEmpty().map(::parseSong)
 
     suspend fun search(query: String): SearchResults {
-        val result = call(
-            "search3",
-            mapOf("query" to query, "artistCount" to "20", "albumCount" to "30", "songCount" to "60"),
-        ).obj("searchResult3")
+        val parts = folderPasses().map { folder ->
+            call(
+                "search3",
+                mapOf("query" to query, "artistCount" to "20", "albumCount" to "30", "songCount" to "60", "musicFolderId" to folder),
+            ).obj("searchResult3")
+        }
         return SearchResults(
-            artists = result?.arr("artist").orEmpty().map(::parseArtist),
-            albums = result?.arr("album").orEmpty().map(::parseAlbum),
-            songs = result?.arr("song").orEmpty().map(::parseSong),
+            artists = parts.flatMap { it?.arr("artist").orEmpty() }.map(::parseArtist).distinctBy { it.id },
+            albums = parts.flatMap { it?.arr("album").orEmpty() }.map(::parseAlbum).distinctBy { it.id },
+            songs = parts.flatMap { it?.arr("song").orEmpty() }.map(::parseSong).distinctBy { it.id },
         )
     }
+
+    /** One pass per chosen library, or a single pass over all of them (null). */
+    private fun folderPasses(): List<String?> = chosenFolders().toList().ifEmpty { listOf(null) }
 
     /** Synced lyrics from the OpenSubsonic extension when available, plain lyrics otherwise. */
     suspend fun lyrics(song: Song): Lyrics? {
         // Navidrome reads lyrics from the file's tags and from .lrc / .txt files next to it, sometimes several
         // (languages, or both synced and plain). Each is read in whatever format it's in (LRC, enhanced LRC
         // with word times, TTML, SRT…), and the most detailed one is used.
-        // enhanced=true asks for word and syllable timings (OpenSubsonic songLyrics v2, Navidrome 0.63+);
-        // servers without it ignore the extra parameter, and if one refuses it, the plain request follows.
-        val structured = runCatching { call("getLyricsBySongId", mapOf("id" to song.id, "enhanced" to "true")) }
-            .recoverCatching { call("getLyricsBySongId", mapOf("id" to song.id)) }
-            .getOrNull()
+        // Only what the server says it has (issue #206): enhanced=true (word and syllable timings) with songLyrics
+        // version 2, the structured lyrics with version 1, otherwise only Subsonic's plain getLyrics.
+        val versions = extensions()["songLyrics"].orEmpty()
+        val structured = when {
+            2 in versions -> runCatching { call("getLyricsBySongId", mapOf("id" to song.id, "enhanced" to "true")) }.getOrNull()
+            versions.isNotEmpty() -> runCatching { call("getLyricsBySongId", mapOf("id" to song.id)) }.getOrNull()
+            else -> null
+        }
         val sets = structured?.obj("lyricsList")?.arr("structuredLyrics").orEmpty()
         val options = sets.mapNotNull { set ->
             structuredLyrics(set)?.let { (lang, lyrics) -> lang to LyricsFormats.normalize(lyrics) }
@@ -292,7 +408,9 @@ class SubsonicApi(
 
     /** Liked (starred) songs. */
     suspend fun starredSongs(): List<Song> =
-        call("getStarred2").obj("starred2")?.arr("song").orEmpty().map(::parseSong)
+        folderPasses().flatMap { folder ->
+            call("getStarred2", mapOf("musicFolderId" to folder)).obj("starred2")?.arr("song").orEmpty().map(::parseSong)
+        }.distinctBy { it.id }
 
     private fun parseSong(o: JsonObject): Song {
         val gain = o.obj("replayGain")
@@ -358,7 +476,29 @@ class SubsonicApi(
         imageUrl = o.str("artistImageUrl"),
     )
 
-    private companion object {
+    internal companion object {
+        /** More repeated parameters than this (songs in a playlist call) go as a form POST when possible. */
+        const val POST_OVER = 20
+
+        /** `openSubsonicExtensions: [{name, versions: [1, 2]}]` as name → versions. */
+        fun parseExtensions(root: JsonObject): Map<String, List<Int>> =
+            root.arr("openSubsonicExtensions").mapNotNull { e ->
+                val name = e.str("name") ?: return@mapNotNull null
+                val versions = (e["versions"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content?.toIntOrNull() }.orEmpty()
+                name to versions
+            }.toMap()
+
+        /** Albums from several libraries in the order [type] asks for (the server sorted each library's own). */
+        fun mergeAlbumLists(type: String, albums: List<Album>): List<Album> = when (type) {
+            "newest" -> albums.sortedByDescending { it.created.orEmpty() }
+            "recent" -> albums.sortedByDescending { it.played.orEmpty() }
+            "frequent" -> albums.sortedByDescending { it.playCount }
+            "random" -> albums.shuffled()
+            "alphabeticalByName" -> albums.sortedBy { it.name.lowercase() }
+            "alphabeticalByArtist" -> albums.sortedBy { it.artist.lowercase() }
+            else -> albums
+        }
+
         fun enc(value: String): String = URLEncoder.encode(value, "UTF-8")
         fun md5(value: String): String =
             MessageDigest.getInstance("MD5").digest(value.toByteArray(Charsets.UTF_8)).toHex()

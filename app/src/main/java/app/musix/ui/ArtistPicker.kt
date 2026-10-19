@@ -1,6 +1,5 @@
 package app.musix.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,8 +21,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -34,7 +31,6 @@ import app.musix.data.Song
 import app.musix.data.normalizeKey
 import app.musix.data.splitArtists
 import app.musix.log.AppLog
-import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 
 
@@ -96,20 +92,10 @@ fun rememberArtistOpener(beforeOpen: () -> Unit = {}): (Song) -> Unit {
     }
 }
 
-/** A small round artist photo: Navidrome's artist image, or the artist's cover art. */
+/** A small round artist photo: Navidrome's artist image through its cover endpoint (issue #206). */
 @Composable
 fun ArtistCircle(artist: Artist, modifier: Modifier) {
-    val photo = artist.imageUrl
-    if (photo != null) {
-        AsyncImage(
-            model = photo,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = modifier.clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),
-        )
-    } else {
-        Cover(artist.coverArt ?: "ar-${artist.id}", 150, modifier, CircleShape)
-    }
+    Cover(artist.coverArt ?: "ar-${artist.id}", 150, modifier, CircleShape)
 }
 
 /** Every artist on the song, as artists in the library where possible. */

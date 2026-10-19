@@ -140,12 +140,9 @@ fun ArtistScreen(nav: NavController, id: String) {
             }
         },
         image = { modifier ->
-            val photo = artistInfo?.imageUrl ?: p?.artist?.imageUrl
-            if (photo != null) {
-                AsyncImage(model = photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier)
-            } else {
-                Cover(p?.artist?.coverArt, LARGE_COVER, modifier, RectangleShape)
-            }
+            // Navidrome's artist image through its cover endpoint (ND_ARTISTARTPRIORITY), cached and downloaded
+            // like every cover (issue #206).
+            Cover(p?.artist?.coverArt ?: "ar-$id", LARGE_COVER, modifier, RectangleShape)
         },
     ) { cardModifier ->
         if (p == null) {
@@ -395,7 +392,10 @@ private fun SimilarRow(similar: List<SimilarArtist>, nav: NavController) {
                     .padding(Space.Tight),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                val photo = artist.imageUrl ?: local?.imageUrl
+                // In the library: Navidrome's artist image through its cover endpoint (issue #206). Not in the
+                // library: only the picture the similar-artists list links to.
+                val coverId = local?.let { it.coverArt ?: "ar-${it.id}" } ?: artist.id?.let { artist.coverArt ?: "ar-$it" }
+                val photo = if (coverId == null) artist.imageUrl else null
                 if (photo != null) {
                     AsyncImage(
                         model = photo,
@@ -404,7 +404,7 @@ private fun SimilarRow(similar: List<SimilarArtist>, nav: NavController) {
                         modifier = Modifier.size(96.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),
                     )
                 } else {
-                    Cover(artist.coverArt ?: local?.coverArt, 150, Modifier.size(96.dp), CircleShape)
+                    Cover(coverId, 150, Modifier.size(96.dp), CircleShape)
                 }
                 Spacer(Modifier.height(Space.Tight))
                 Text(artist.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
