@@ -73,8 +73,8 @@ fun ScrobblingScreen(nav: NavController) {
                 .fillMaxSize()
                 .aboveKeyboard()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(Space.Page),
+            verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             Hint("A song counts as listened after half its length or four minutes, whichever comes first. Listens made offline are sent later.")
 
@@ -94,7 +94,7 @@ fun ScrobblingScreen(nav: NavController) {
             Secret("Shared secret", lfmSecret) { lfmSecret = it }
             Field("Last.fm username", lfmUser) { lfmUser = it }
             Secret("Last.fm password (used once to sign in, not stored)", lfmPassword) { lfmPassword = it }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                 Button(onClick = {
                     result({ lfmStatus = it }) {
                         val session = graph.lastFm.mobileSession(lfmKey.trim(), lfmSecret.trim(), lfmUser.trim(), lfmPassword)
@@ -129,7 +129,7 @@ fun ScrobblingScreen(nav: NavController) {
             Hint("For Koito, enter its address (e.g. https://koito.example.com) and an API key from Koito's settings → API Keys. Leave the address empty for listenbrainz.org.")
             Field("Server address", lbUrl, placeholder = "https://koito.example.com") { lbUrl = it }
             Secret("Token / API key", lbToken) { lbToken = it }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                 Button(onClick = {
                     result({ lbStatus = it }) {
                         val message = graph.listenBrainz.validate(lbUrl, lbToken.trim())

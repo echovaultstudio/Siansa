@@ -98,8 +98,8 @@ fun ArrangeHomeSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(Modifier.navigationBarsPadding().padding(bottom = 8.dp)) {
-            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.navigationBarsPadding().padding(bottom = Space.Small)) {
+            Row(Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Small), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(if (sources) "Source filter" else "Arrange Home", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
@@ -123,7 +123,7 @@ fun ArrangeHomeSheet(
                 ) { Text("Reset") }
             }
             SheetTabs(sources) { sources = it }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Space.Medium))
             if (sources) {
                 SourcesPanel()
                 return@Column
@@ -142,7 +142,7 @@ fun ArrangeHomeSheet(
                             )
                             .zIndex(if (lifted) 1f else 0f)
                             .graphicsLayer { translationY = if (lifted) offset else 0f }
-                            .padding(horizontal = 16.dp, vertical = 3.dp)
+                            .padding(horizontal = Space.Page, vertical = Space.Tight)
                             .then(if (lifted) Modifier.shadow(6.dp, RoundedCornerShape(12.dp)) else Modifier)
                             .fillMaxWidth()
                             .pointerInput(section) {
@@ -154,7 +154,7 @@ fun ArrangeHomeSheet(
                                 )
                             },
                     ) {
-                        Row(Modifier.height(52.dp).padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.height(52.dp).padding(start = Space.Page), verticalAlignment = Alignment.CenterVertically) {
                             // Hidden rows stay in the list, dimmed, so they keep their place and can come back.
                             Text(
                                 section.label,
@@ -186,7 +186,7 @@ fun ArrangeHomeSheet(
                                             onDragCancel = { end() },
                                         )
                                     }
-                                    .padding(horizontal = 16.dp, vertical = 14.dp)
+                                    .padding(horizontal = Space.Page, vertical = Space.Page)
                                     .size(24.dp),
                             )
                         }
@@ -203,9 +203,9 @@ private fun SheetTabs(sources: Boolean, onSources: (Boolean) -> Unit) {
     Surface(
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Page, top = Space.Medium),
     ) {
-        Row(Modifier.padding(3.dp)) {
+        Row(Modifier.padding(3.dp)) {  // spacing: exact (the segmented control's inset)
             listOf(true to "Sources", false to "Arrange").forEach { (isSources, label) ->
                 val on = sources == isSources
                 Surface(
@@ -219,7 +219,7 @@ private fun SheetTabs(sources: Boolean, onSources: (Boolean) -> Unit) {
                         label,
                         style = MaterialTheme.typography.labelLarge,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier.padding(vertical = 9.dp),
+                        modifier = Modifier.padding(vertical = Space.Small),
                     )
                 }
             }

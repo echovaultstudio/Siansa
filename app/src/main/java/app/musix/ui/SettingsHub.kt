@@ -190,11 +190,11 @@ fun SettingsHub(nav: NavController) {
 @Composable
 private fun HubRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Space.Page, vertical = Space.Page),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
-        Column(Modifier.weight(1f).padding(start = 16.dp)) {
+        Column(Modifier.weight(1f).padding(start = Space.Page)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -230,11 +230,11 @@ fun PlaybackSettingsScreen(nav: NavController) {
     val eq by graph.equaliser.state.collectAsStateWithLifecycle()
     Screen(title = "Playback", nav = nav) { padding ->
         Column(
-            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
+            verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             Row(
-                Modifier.fillMaxWidth().clickable { nav.navigate("settings/equaliser") }.padding(vertical = 4.dp),
+                Modifier.fillMaxWidth().clickable { nav.navigate("settings/equaliser") }.padding(vertical = Space.Tight),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
@@ -245,7 +245,7 @@ fun PlaybackSettingsScreen(nav: NavController) {
             }
             HorizontalDivider()
             Row(
-                Modifier.fillMaxWidth().clickable { nav.navigate("settings/crossfade") }.padding(vertical = 4.dp),
+                Modifier.fillMaxWidth().clickable { nav.navigate("settings/crossfade") }.padding(vertical = Space.Tight),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
@@ -271,7 +271,7 @@ private fun qualityLabel(kbps: Int) = if (kbps <= 0) "original" else "Opus $kbps
 @Composable
 private fun QualityRow(label: String, value: Int, onPick: (Int) -> Unit) {
     Text(label, style = MaterialTheme.typography.bodyLarge)
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         qualities.forEach { kbps ->
             FilterChip(
                 selected = value == kbps,
@@ -312,13 +312,13 @@ fun StorageScreen(nav: NavController) {
 
     Screen(title = "Storage", nav = nav) { padding ->
         Column(
-            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
+            verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             Heading("Downloads")
             Hint("Music you chose to keep on the phone isn't part of the song cache and is never removed by itself.")
             usage.valueOrNull()?.let { u -> Text("In use: ${formatBytes(u.downloads)}", style = MaterialTheme.typography.bodyLarge) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 OutlinedButton(onClick = { nav.navigate("downloads") }) { Text("Manage downloads") }
                 OutlinedButton(onClick = { nav.navigate("downloads/songs") }) { Text("Downloaded songs") }
             }
@@ -330,7 +330,7 @@ fun StorageScreen(nav: NavController) {
                 Text("In use: ${formatBytes(u.songs)} of ${formatMb(settings.songCacheMb)}", style = MaterialTheme.typography.bodyLarge)
             }
             Text("Maximum size", style = MaterialTheme.typography.bodyLarge)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 songCacheSizes.forEach { mb ->
                     FilterChip(
                         selected = settings.songCacheMb == mb,
@@ -361,7 +361,7 @@ fun StorageScreen(nav: NavController) {
                 )
             }
             Text("Maximum size", style = MaterialTheme.typography.bodyLarge)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 cacheSizes.forEach { mb ->
                     FilterChip(
                         selected = settings.imageCacheMb == mb,
@@ -442,7 +442,7 @@ fun StorageScreen(nav: NavController) {
 
             if (settings.imageCacheMb != imagesAtStart || settings.songCacheMb != songsAtStart) {
                 Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(Modifier.padding(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                         Text("New cache sizes apply after the app restarts.", style = MaterialTheme.typography.bodyMedium)
                         Button(onClick = { restartApp(context) }) { Text("Restart now") }
                     }
@@ -503,11 +503,11 @@ fun LogsScreen(nav: NavController) {
     ) { padding ->
         LazyColumn(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            contentPadding = PaddingValues(Space.Page),
+            verticalArrangement = Arrangement.spacedBy(Space.Tight),
         ) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
                     SwitchRow("Keep a log", settings.logging) { on ->
                         graph.settings.setLogging(on)
                         AppLog.setEnabled(on)
@@ -523,20 +523,20 @@ fun LogsScreen(nav: NavController) {
                             "Nothing is recorded while this is off, and nothing leaves the phone unless you share it.",
                     )
                     androidx.compose.foundation.layout.FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+                        verticalArrangement = Arrangement.spacedBy(Space.Small),
                     ) {
                         Button(onClick = {
                             val stamp = java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.ROOT).format(Date())
                             saver.launch("musix-logs-$stamp.txt")
                         }) {
                             Icon(Icons.Rounded.Download, null)
-                            Spacer(Modifier.width(6.dp))
+                            Spacer(Modifier.width(Space.Small))
                             Text("Save logs")
                         }
                         OutlinedButton(onClick = { shareLogs(context) }) {
                             Icon(Icons.Rounded.Share, null)
-                            Spacer(Modifier.width(6.dp))
+                            Spacer(Modifier.width(Space.Small))
                             Text("Share")
                         }
                         OutlinedButton(onClick = {
@@ -562,7 +562,7 @@ fun LogsScreen(nav: NavController) {
                             }
                         }) {
                             Icon(Icons.Rounded.ContentCopy, null)
-                            Spacer(Modifier.width(6.dp))
+                            Spacer(Modifier.width(Space.Small))
                             Text("Copy problems")
                         }
                         // The whole log, ready to paste; the newest part when it's too big for the clipboard.
@@ -590,14 +590,14 @@ fun LogsScreen(nav: NavController) {
                             }
                         }) {
                             Icon(Icons.Rounded.ContentCopy, null)
-                            Spacer(Modifier.width(6.dp))
+                            Spacer(Modifier.width(Space.Small))
                             Text("Copy whole log")
                         }
                     }
                     val all = entries.valueOrNull().orEmpty()
                     val errors = all.count { it.level == "E" }
                     val warnings = all.count { it.level == "W" }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                         FilterChip(selected = !problemsOnly, onClick = { problemsOnly = false }, label = { Text("Everything") })
                         FilterChip(
                             selected = problemsOnly,

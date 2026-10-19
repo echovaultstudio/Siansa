@@ -34,11 +34,11 @@ import java.util.Locale
 @Composable
 fun SuggestedArtistTile(artist: SuggestedArtist, onClick: () -> Unit) {
     Column(
-        Modifier.width(130.dp).clickable(onClick = onClick).padding(vertical = 4.dp),
+        Modifier.width(130.dp).clickable(onClick = onClick).padding(vertical = Space.Tight),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         ArtistPhoto(artist, 120)
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(Space.Small))
         Text(artist.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         artist.because.firstOrNull()?.let {
             Text(
@@ -60,7 +60,7 @@ fun SuggestedArtistDialog(artist: SuggestedArtist, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         title = { Text(artist.name, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) },
         text = {
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                 ArtistPhoto(artist, 160)
                 artistFacts(artist)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center) }
                 similarToText(artist.because)?.let {

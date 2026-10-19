@@ -175,7 +175,7 @@ fun PlaylistScreen(nav: NavController, id: String) {
         header = {
             d?.playlist?.comment?.takeIf { it.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(Space.Small))
             }
             CollectionByline(
                 if (onPhone) "On this phone" else d?.playlist?.owner,
@@ -202,9 +202,9 @@ fun PlaylistScreen(nav: NavController, id: String) {
 fun SyncPrompt(nav: NavController) {
     val graph = LocalGraph.current
     Column(
-        Modifier.fillMaxWidth().padding(32.dp),
+        Modifier.fillMaxWidth().padding(Space.Large),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Space.Medium),
     ) {
         Text("Your library isn't on the phone yet", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         Text(
@@ -218,7 +218,7 @@ fun SyncPrompt(nav: NavController) {
             nav.navigate("sync")
         }) {
             Icon(Icons.Rounded.Sync, null)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Space.Small))
             Text("Sync library")
         }
     }
@@ -304,15 +304,15 @@ private suspend fun discTitlesOf(graph: AppGraph, detail: AlbumDetail): Map<Int,
 @Composable
 fun PlayButtons(songs: List<Song>) {
     val graph = LocalGraph.current
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         Button(onClick = { graph.player.play(songs) }, enabled = songs.isNotEmpty()) {
             Icon(Icons.Rounded.PlayArrow, null)
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(Space.Tight))
             Text("Play")
         }
         FilledTonalButton(onClick = { graph.player.play(songs, shuffle = true) }, enabled = songs.isNotEmpty()) {
             Icon(Icons.Rounded.Shuffle, null)
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(Space.Tight))
             Text("Shuffle")
         }
     }
@@ -334,7 +334,7 @@ fun MixScreen(nav: NavController, id: String) {
             if (m != null) {
                 if (m.description.isNotBlank()) {
                     Text(m.description, style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(Space.Small))
                 }
                 CollectionByline(null, null, null, "Made for you · ${m.songs.size} songs · sound search: ${m.query}")
             }

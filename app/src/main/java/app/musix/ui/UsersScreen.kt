@@ -52,7 +52,7 @@ fun UsersScreen(nav: NavController) {
                 "Each user has their own library, history and settings. Tap a user to switch; Musix restarts. To show several users' music together, use the filter button on Home.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
             )
             users.forEach { user ->
                 val inUse = user.id == Users.active
@@ -60,7 +60,7 @@ fun UsersScreen(nav: NavController) {
                     Modifier
                         .fillMaxWidth()
                         .clickable(enabled = !inUse) { Users.switchTo(context, user.id) }
-                        .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                        .padding(start = Space.Page, end = Space.Tight, top = Space.Small, bottom = Space.Small),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
@@ -68,7 +68,7 @@ fun UsersScreen(nav: NavController) {
                         null,
                         tint = if (inUse) Accent else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Column(Modifier.weight(1f).padding(start = 16.dp, top = 8.dp, bottom = 8.dp)) {
+                    Column(Modifier.weight(1f).padding(start = Space.Page, top = Space.Small, bottom = Space.Small)) {
                         Text(user.label, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             if (inUse) "In use" else "Tap to switch",
@@ -82,11 +82,11 @@ fun UsersScreen(nav: NavController) {
                 }
             }
             Row(
-                Modifier.fillMaxWidth().clickable { Users.addAndSwitch(context) }.padding(horizontal = 16.dp, vertical = 14.dp),
+                Modifier.fillMaxWidth().clickable { Users.addAndSwitch(context) }.padding(horizontal = Space.Page, vertical = Space.Page),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Icons.Rounded.Add, null, tint = MaterialTheme.colorScheme.primary)
-                Column(Modifier.weight(1f).padding(start = 16.dp)) {
+                Column(Modifier.weight(1f).padding(start = Space.Page)) {
                     Text("Add another user", style = MaterialTheme.typography.bodyLarge)
                     Text(
                         "Another login on this server or a different one. Musix restarts and asks for it.",

@@ -70,7 +70,7 @@ fun HomeSectionScreen(nav: NavController, id: String) {
     val section = HomeSection.byId(id)
     if (section == null) {
         AppLog.w("Home", "Unknown home section: $id")
-        Screen("Not found", nav) { padding -> ErrorText("This page doesn't exist.", Modifier.padding(padding).padding(16.dp)) }
+        Screen("Not found", nav) { padding -> ErrorText("This page doesn't exist.", Modifier.padding(padding).padding(Space.Page)) }
         return
     }
     val graph = LocalGraph.current
@@ -83,10 +83,10 @@ fun HomeSectionScreen(nav: NavController, id: String) {
         Box(Modifier.padding(padding)) {
             LoadBox(items) { list ->
                 if (list.isEmpty()) {
-                    Text("Nothing here yet.", Modifier.padding(16.dp))
+                    Text("Nothing here yet.", Modifier.padding(Space.Page))
                 } else if (section == HomeSection.Playlists) {
                     // Playlists read as a list, like Spotify, not as big album tiles.
-                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)) {
+                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = Space.Tight, bottom = Space.Section)) {
                         items(list.filterIsInstance<SectionItem.PlaylistItem>(), key = { it.key }) { item ->
                             PlaylistRow(item.playlist, onClick = { nav.navigate("playlist/${item.playlist.id}") })
                         }
@@ -95,9 +95,9 @@ fun HomeSectionScreen(nav: NavController, id: String) {
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(150.dp),
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        contentPadding = PaddingValues(start = Space.Small, end = Space.Small, top = Space.Tight, bottom = Space.Section),
+                        verticalArrangement = Arrangement.spacedBy(Space.Small),
+                        horizontalArrangement = Arrangement.spacedBy(Space.Tight),
                     ) {
                         items(list, key = { it.key }) { item -> SectionTile(item, nav, launch, graph) }
                     }
@@ -166,7 +166,7 @@ private fun SectionTile(item: SectionItem, nav: NavController, launch: PlayLaunc
                 round = true,
             )
         }
-        is SectionItem.Radio -> BoxWithConstraints(fill.padding(8.dp)) {
+        is SectionItem.Radio -> BoxWithConstraints(fill.padding(Space.Small)) {
             GradientTile(
                 title = item.radio.name,
                 colors = Color(item.radio.colors.first) to Color(item.radio.colors.second),
@@ -175,7 +175,7 @@ private fun SectionTile(item: SectionItem, nav: NavController, launch: PlayLaunc
                 onClick = { nav.openMoodRadio(item.radio.id) },
             )
         }
-        is SectionItem.GenreItem -> BoxWithConstraints(fill.padding(8.dp)) {
+        is SectionItem.GenreItem -> BoxWithConstraints(fill.padding(Space.Small)) {
             GradientTile(
                 title = item.genre.name,
                 colors = tileColors(item.genre.name),

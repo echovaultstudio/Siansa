@@ -60,20 +60,20 @@ fun rememberArtistOpener(beforeOpen: () -> Unit = {}): (Song) -> Unit {
     if (choices.size > 1) {
         Dialog(onDismissRequest = { choices = emptyList() }) {
             Surface(shape = RoundedCornerShape(20.dp), tonalElevation = 6.dp) {
-                Column(Modifier.padding(vertical = 16.dp)) {
+                Column(Modifier.padding(vertical = Space.Page)) {
                     Text(
                         "Choose artist",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
                     )
                     choices.forEach { artist ->
                         Row(
-                            Modifier.fillMaxWidth().clickable { go(artist) }.padding(horizontal = 20.dp, vertical = 8.dp),
+                            Modifier.fillMaxWidth().clickable { go(artist) }.padding(horizontal = Space.Page, vertical = Space.Small),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             ArtistCircle(artist, Modifier.size(48.dp))
-                            Spacer(Modifier.width(14.dp))
+                            Spacer(Modifier.width(Space.Medium))
                             Text(artist.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }

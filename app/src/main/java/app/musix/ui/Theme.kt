@@ -209,7 +209,13 @@ fun MusixTheme(choice: ThemeChoice = ThemeChoice(), content: @Composable () -> U
 fun MusixDarkTheme(content: @Composable () -> Unit) {
     val choice = LocalChoice.current
     val scheme = themeScheme(choice.colours, true, seed = choice.seed)
-    CompositionLocalProvider(LocalAccent provides accentOf(choice.colours, scheme), LocalOnAccent provides onAccentOf(choice.colours, scheme)) {
+    CompositionLocalProvider(
+        LocalAccent provides accentOf(choice.colours, scheme),
+        LocalOnAccent provides onAccentOf(choice.colours, scheme),
+        // Text on these pages is light, also when the phone is in light mode: before, text without a colour
+        // of its own took the light theme's dark one and all but vanished ("Top artists" on Your month).
+        androidx.compose.material3.LocalContentColor provides scheme.onSurface,
+    ) {
         MaterialTheme(colorScheme = scheme, content = content)
     }
 }

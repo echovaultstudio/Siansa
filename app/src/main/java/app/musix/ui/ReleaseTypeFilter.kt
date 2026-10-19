@@ -46,7 +46,7 @@ fun <T> onlyReleaseType(groups: List<Pair<AlbumCategory, T>>, type: AlbumCategor
     if (type == null) groups else groups.filter { it.first == type }
 
 /** The space above and below the release-type chips, so they sit evenly between Popular and the discography. */
-val CHIPS_GAP = 20.dp
+val CHIPS_GAP = Space.Section
 
 /** The chosen release type's name, kept while the page is open (also across rotation), never saved for good. */
 @Composable
@@ -69,9 +69,9 @@ fun ReleaseTypeRow(
     }
     Row(
         // The same space above the chips (after Popular) as below them (before the first heading). The
-        // song row above already has 6 dp of its own below its cover, so less is added here.
-        modifier.fillMaxWidth().padding(top = CHIPS_GAP - 6.dp).horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        // song row above already has Space.Small of its own below its cover, so less is added here.
+        modifier.fillMaxWidth().padding(top = CHIPS_GAP - Space.Small).horizontalScroll(rememberScrollState()).padding(horizontal = Space.Page),
+        horizontalArrangement = Arrangement.spacedBy(Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (selected == null) {
@@ -96,6 +96,6 @@ private fun TypePill(text: String, active: Boolean, onClick: () -> Unit) {
         color = if (active) Accent else MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
     ) {
-        Text(text, style = MaterialTheme.typography.labelLarge, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        Text(text, style = MaterialTheme.typography.labelLarge, fontSize = 14.sp, modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small))
     }
 }

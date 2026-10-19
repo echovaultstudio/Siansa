@@ -197,7 +197,7 @@ fun HomeScreen(nav: NavController) {
     // bottom bar is behind it, so the list needn't leave room for the bar.
     LazyColumn(
         Modifier.fillMaxSize().aboveKeyboard(),
-        contentPadding = PaddingValues(bottom = if (keyboardOpen()) 16.dp else bottomBarPadding(24.dp)),
+        contentPadding = PaddingValues(bottom = if (keyboardOpen()) Space.Page else bottomBarPadding(Space.Section)),
     ) {
         item {
             // One button for the source filter and arranging Home (issue #152): both are tabs of one panel.
@@ -206,7 +206,7 @@ fun HomeScreen(nav: NavController) {
         item(key = "sources") { SourceChips { arranging = true } }
 
         if (loaded && !synced) {
-            item(key = "sync") { Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { SyncPrompt(nav) } }
+            item(key = "sync") { Card(Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Small)) { SyncPrompt(nav) } }
         }
 
         // The rest in the order chosen under Arrange Home, without the hidden ones.
@@ -222,9 +222,9 @@ fun HomeScreen(nav: NavController) {
                             recentAlbums.valueOrNull().orEmpty().take(6).forEach { a -> add(Triple(a.name, a.coverArt) { nav.navigate("album/${a.id}") }) }
                         }.take(6)
                         if (quick.isNotEmpty()) {
-                            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                                 quick.chunked(2).forEach { row ->
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                                         row.forEach { (title, cover, open) ->
                                             val liked = title == "Liked songs" && cover == null
                                             val colors = if (liked) Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(title)
@@ -253,14 +253,14 @@ fun HomeScreen(nav: NavController) {
                                 onRegenerate = { build(null, force = true, open = false) },
                             )
                             busySelector == "current" -> BuildingCard()
-                            aiProblem != null -> AiUnavailable(aiProblem, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                            aiProblem != null -> AiUnavailable(aiProblem, Modifier.padding(horizontal = Space.Page, vertical = Space.Small))
                             else -> Unit
                         }
                     }
                     // Without AudioMuse (or while it can't be reached) the card above says so; no error and Try again as well.
                     error?.takeIf { aiProblem == null }?.let { message ->
                         item(key = "today_error") {
-                            Column(Modifier.padding(horizontal = 16.dp)) {
+                            Column(Modifier.padding(horizontal = Space.Page)) {
                                 ErrorText(message, Modifier)
                                 TextButton(onClick = { build(null, force = false, open = false) }) { Text("Try again") }
                             }
@@ -268,7 +268,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.MOOD -> {
-                    item(key = "mood") { MoodBox(nav, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+                    item(key = "mood") { MoodBox(nav, Modifier.padding(horizontal = Space.Page, vertical = Space.Small)) }
                 }
                 HomeSection.MADE_FOR_YOU -> {
                     // Made for you: the vibe for this hour, then mixes from your own listening.
@@ -460,20 +460,20 @@ private fun HeroMix(
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = Space.Page, vertical = Space.Small)
             .clip(RoundedCornerShape(16.dp))
             .background(Brush.linearGradient(listOf(colors.first, colors.second)))
             .clickable(onClick = onOpen),
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(Space.Page)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CoverMosaic(mix, Modifier.size(104.dp))
-                Spacer(Modifier.width(16.dp))
+                Spacer(Modifier.width(Space.Page))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (mix.aiNamed) {
                             Icon(Icons.Rounded.AutoAwesome, null, Modifier.size(14.dp), tint = Color.White)
-                            Spacer(Modifier.width(4.dp))
+                            Spacer(Modifier.width(Space.Tight))
                         }
                         Text("Today's mix", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.85f))
                     }
@@ -489,10 +489,10 @@ private fun HeroMix(
                 }
             }
             if (mix.description.isNotBlank()) {
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(Space.Medium))
                 Text(mix.description, style = MaterialTheme.typography.bodyMedium, color = Color.White)
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Space.Medium))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (busy) {
                     CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
@@ -515,10 +515,10 @@ private fun HeroMix(
 
 @Composable
 private fun BuildingCard() {
-    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+    Card(Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Small)) {
+        Row(Modifier.padding(Space.Page), verticalAlignment = Alignment.CenterVertically) {
             CircularProgressIndicator(Modifier.size(28.dp))
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(Space.Page))
             Text("Picking today's mix…", style = MaterialTheme.typography.bodyLarge)
         }
     }
@@ -551,11 +551,11 @@ fun CoverMosaic(mix: Mix, modifier: Modifier = Modifier) {
 @Composable
 fun MixRow(mix: Mix, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Space.Page, vertical = Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CoverMosaic(mix, Modifier.size(56.dp))
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(Space.Medium))
         Column(Modifier.weight(1f)) {
             Text(mix.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
@@ -571,7 +571,7 @@ fun MixRow(mix: Mix, onClick: () -> Unit) {
 @Composable
 internal fun HomeHeader(title: String, modifier: Modifier = Modifier, action: @Composable () -> Unit) {
     Row(
-        modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 12.dp),
+        modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Tight, top = Space.Medium),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))

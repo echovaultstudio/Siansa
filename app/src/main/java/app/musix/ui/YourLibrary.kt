@@ -266,7 +266,7 @@ fun YourLibraryScreen(nav: NavController) {
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
                 ),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Tight),
             )
         }
         FilterRow(
@@ -294,7 +294,7 @@ fun YourLibraryScreen(nav: NavController) {
                             // A little narrower with the bar, so it still fits as many tiles across.
                             columns = GridCells.Adaptive(if (letterStarts != null) 100.dp else 110.dp),
                             state = gridState,
-                            contentPadding = PaddingValues(start = 10.dp, end = if (letterStarts != null) AlphabetBarWidth + 4.dp else 10.dp, bottom = bottomBarPadding(16.dp)),
+                            contentPadding = PaddingValues(start = Space.Small, end = if (letterStarts != null) AlphabetBarWidth + Space.Tight else Space.Small, bottom = bottomBarPadding(Space.Page)),
                             modifier = Modifier.fillMaxSize(),
                         ) {
                             item(span = { GridItemSpan(maxLineSpan) }) { sortBar() }
@@ -310,7 +310,7 @@ fun YourLibraryScreen(nav: NavController) {
                     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
                     PrefetchCovers(listState.firstVisibleItemIndex, listState.layoutInfo.visibleItemsInfo.size, covers, 150)
                     Box(Modifier.fillMaxSize()) {
-                        LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(end = if (letterStarts != null) AlphabetBarWidth else 0.dp, bottom = bottomBarPadding(16.dp))) {
+                        LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(end = if (letterStarts != null) AlphabetBarWidth else 0.dp, bottom = bottomBarPadding(Space.Page))) {
                             item { sortBar() }
                             items(shown, key = { it.key }) { e ->
                                 RowEntry(e, pinned = e.alwaysPinned || e.key in pinned, held = held == e.key, onClick = { open(e) }, onHold = { held = e.key }, onTogglePin = { togglePin(e) })
@@ -321,7 +321,7 @@ fun YourLibraryScreen(nav: NavController) {
                                         if (query.isNotBlank()) "Nothing in your library matches “$query”." else "Nothing here yet.",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(16.dp),
+                                        modifier = Modifier.padding(Space.Page),
                                     )
                                 }
                             }
@@ -358,7 +358,7 @@ private fun BoxScope.LibraryAlphabetBar(
         current = current,
         // The first letter goes right to the top, so the sort row and pinned items stay in view.
         onPick = { letter -> AlphabetIndex.target(letter, starts)?.let { scrollTo(if (it == starts.values.min()) 0 else it + 1) } },
-        modifier = Modifier.align(Alignment.TopEnd).padding(top = 56.dp, bottom = bottomBarPadding(8.dp)),
+        modifier = Modifier.align(Alignment.TopEnd).padding(top = 56.dp, bottom = bottomBarPadding(Space.Small)),  // spacing: exact (below the top bar)
     )
 }
 
@@ -376,7 +376,7 @@ private fun LibraryHeader(
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 8.dp),
+        Modifier.fillMaxWidth().statusBarsPadding().padding(start = Space.Page, end = Space.Tight, top = Space.Medium, bottom = Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -385,7 +385,7 @@ private fun LibraryHeader(
                 .clickable(onClick = onAvatar),
             contentAlignment = Alignment.Center,
         ) { Text(initial, color = Color.White, fontWeight = FontWeight.Bold) }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(Space.Medium))
         Text(
             "Your Library",
             style = MaterialTheme.typography.headlineSmall,
@@ -426,8 +426,8 @@ private fun LibraryHeader(
 @Composable
 private fun FilterRow(selected: Kind?, sub: String?, subFilters: List<String>, onKind: (Kind?) -> Unit, onSub: (String) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Space.Page, vertical = Space.Small),
+        horizontalArrangement = Arrangement.spacedBy(Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (selected == null) {
@@ -453,7 +453,7 @@ private fun Pill(text: String, active: Boolean, onClick: () -> Unit) {
         color = if (active) Accent else MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
     ) {
-        Text(text, style = MaterialTheme.typography.labelLarge, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        Text(text, style = MaterialTheme.typography.labelLarge, fontSize = 14.sp, modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small))
     }
 }
 
@@ -461,16 +461,16 @@ private fun Pill(text: String, active: Boolean, onClick: () -> Unit) {
 private fun SortBar(sort: Sort, grid: Boolean, onSort: (Sort) -> Unit, onGrid: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().padding(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+        Modifier.fillMaxWidth().padding(start = Space.Small, end = Space.Tight, top = Space.Tight, bottom = Space.Tight),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.weight(1f)) {
             Row(
-                Modifier.clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(8.dp),
+                Modifier.clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(Space.Small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Icons.Rounded.SwapVert, null, Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Space.Small))
                 Text(sort.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             }
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
@@ -478,7 +478,7 @@ private fun SortBar(sort: Sort, grid: Boolean, onSort: (Sort) -> Unit, onGrid: (
                     "Sort by",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
                 )
                 Sort.entries.forEach { s ->
                     DropdownMenuItem(
@@ -511,7 +511,7 @@ private fun EntryCover(e: Entry, modifier: Modifier, big: Boolean) {
                     fontSize = if (big) 16.sp else 11.sp,
                     lineHeight = if (big) 18.sp else 12.sp,
                     maxLines = 3,
-                    modifier = Modifier.padding(6.dp),
+                    modifier = Modifier.padding(Space.Small),
                 )
                 e.kind == Kind.LISTENING -> Icon(Icons.AutoMirrored.Rounded.ShowChart, null, tint = Color.White)
             }
@@ -526,7 +526,7 @@ private fun Subtitle(e: Entry, pinned: Boolean, modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         if (pinned) {
             Icon(Icons.Rounded.PushPin, "Pinned", tint = Accent, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(Space.Tight))
         }
         Text(
             e.subtitle,
@@ -546,19 +546,19 @@ private fun RowEntry(e: Entry, pinned: Boolean, held: Boolean, onClick: () -> Un
             .fillMaxWidth()
             .background(if (held) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
             .holdToReveal(e, onClick, onHold)
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = Space.Page, vertical = Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         EntryCover(e, Modifier.size(64.dp), big = false)
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(Space.Medium))
         // Takes what's left, so a long title shortens to make room for the pin button.
         Column(Modifier.weight(1f)) {
             Text(e.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(Space.Tight))
             Subtitle(e, pinned)
         }
         if (held) {
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Space.Small))
             PinButton(pinned, onTogglePin)
         }
     }
@@ -572,14 +572,14 @@ private fun GridEntry(e: Entry, pinned: Boolean, held: Boolean, onClick: () -> U
             .clip(RoundedCornerShape(8.dp))
             .background(if (held) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
             .holdToReveal(e, onClick, onHold)
-            .padding(6.dp),
+            .padding(Space.Small),
         horizontalAlignment = if (e.round) Alignment.CenterHorizontally else Alignment.Start,
     ) {
         Box {
             EntryCover(e, Modifier.fillMaxWidth().aspectRatio(1f), big = true)
-            if (held) PinButton(pinned, onTogglePin, Modifier.align(Alignment.TopEnd).padding(4.dp))
+            if (held) PinButton(pinned, onTogglePin, Modifier.align(Alignment.TopEnd).padding(Space.Tight))
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(Space.Small))
         Text(e.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Subtitle(e, pinned)
     }
@@ -626,9 +626,9 @@ private fun PinButton(pinned: Boolean, onClick: () -> Unit, modifier: Modifier =
         contentColor = if (pinned) MaterialTheme.colorScheme.onSurface else OnAccent,
         modifier = modifier,
     ) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = Space.Medium, vertical = Space.Small), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.PushPin, null, Modifier.size(16.dp))
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(Space.Small))
             Text(if (pinned) "Unpin" else "Pin", style = MaterialTheme.typography.labelLarge)
         }
     }
