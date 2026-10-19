@@ -1,142 +1,254 @@
 package app.musix.log
 
+import android.app.Activity
+import android.app.Application
 import android.content.Context
 import android.os.Build
+import android.os.Bundle
+import android.os.SystemClock
 import android.util.Log
 import java.io.File
-import java.io.PrintWriter
-import java.io.StringWriter
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
-import java.util.concurrent.Executors
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 
 /**
- * An optional log kept in the app's private storage, for sharing when something goes wrong.
- * Nothing is written while logging is off. Passwords, tokens and API keys are removed before writing.
+ * The app's diagnostic log (issues #180, #237), kept in the app's private storage for sharing when something
+ * goes wrong. Each entry is one [LogEvent]: written as a readable line (musix.log, shown under Settings › Logs)
+ * and as a line of JSON (events.jsonl) with its component, event name, session and trace ids and fields.
+ *
+ * - Nothing is written while logging is off. The last [RECENT] events are always kept in memory, and if the
+ *   app crashes they're saved (crash-last.jsonl, on the phone only) so the crash can be looked into.
+ * - Writing happens on its own thread with a bounded queue, never on the caller's (the audio thread
+ *   included): when the queue is full, detail is dropped first and a count of what was dropped is logged.
+ * - Files rotate: the readable log and the events each keep a few parts of a set size.
+ * - Passwords, tokens and keys are removed ([Redactor]) before anything is written.
+ * - [detail] turns detailed entries (D) of a component on or off; [trace] entries (T) need it too.
  */
 object AppLog {
-    // Each part; with every request logged in full (issue #180), 5 MB lasted only minutes of browsing.
-    private const val MAX_BYTES = 15_000_000L
-    private val writer = Executors.newSingleThreadExecutor { Thread(it, "musix-log").apply { isDaemon = true } }
+    /** Each part of the readable log; with every request logged in full (issue #180), 5 MB lasted minutes. */
+    private const val TEXT_BYTES = 15_000_000L
+    private const val EVENT_BYTES = 10_000_000L
+    const val RECENT = 500
+
+    private val queue = ArrayBlockingQueue<Runnable>(5_000)
+    private val writer = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, queue) { r -> Thread(r, "musix-log").apply { isDaemon = true } }
+    private val dropped = AtomicLong(0)
     private val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.ROOT)
     private lateinit var dir: File
+    private lateinit var text: RotatingFile
+    private lateinit var events: RotatingFile
+
+    /** The last events, kept even while logging is off, for the crash file and the archive. */
+    val recent = RingBuffer<LogEvent>(RECENT)
+
     /** App version, Android version and phone model, at the top of shared logs. */
     var header = ""
+        private set
+
+    /** What the archive's manifest says about the app and phone. */
+    var about: Map<String, Any?> = emptyMap()
         private set
 
     @Volatile
     var enabled: Boolean = false
         private set
 
-
     /** The screen being shown, added to stutter reports. */
     @Volatile
     var screen: String = "-"
 
+    /** Components whose detailed entries are left out (Settings › Logs › Detail); empty = all detail kept. */
+    @Volatile
+    var quiet: Set<String> = emptySet()
+
     /** Everything is recorded while logging is on: frames, freezes, buffering, downloads, phone state. */
     val detailOn: Boolean get() = enabled
 
-    val current: File get() = File(dir, "musix.log")
-    private val previous: File get() = File(dir, "musix.1.log")
+    /** Whether detailed entries of [component] are written. */
+    fun detail(component: String): Boolean = enabled && component !in quiet
+
+    val current: File get() = text.current
+    val crashFile: File get() = File(dir, "crash-last.jsonl")
 
     fun init(context: Context, enabled: Boolean) {
         dir = File(context.filesDir, "logs").apply { mkdirs() }
-        val version = runCatching {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull() ?: "?"
+        text = RotatingFile(dir, "musix", "log", TEXT_BYTES, 2)
+        events = RotatingFile(dir, "events", "jsonl", EVENT_BYTES, 3)
+        val version = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "?"
         header = "Musix $version · Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT}) · ${Build.MANUFACTURER} ${Build.MODEL}"
+        about = linkedMapOf(
+            "app_version" to version,
+            "android" to Build.VERSION.RELEASE,
+            "sdk" to Build.VERSION.SDK_INT,
+            "device" to "${Build.MANUFACTURER} ${Build.MODEL}",
+            "session_id" to Trace.session,
+        )
         setEnabled(enabled)
 
         val system = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
-            if (this.enabled) writeNow("E", "Crash", "Uncaught in ${thread.name}\n" + stack(error))
+            // Written here, on the crashing thread: the writer thread may never get to it.
+            runCatching {
+                val crash = make(Level.FATAL, "Crash", "app.crash", "Uncaught in ${thread.name}", emptyMap(), error)
+                recent.add(crash)
+                crashFile.writeText(recent.snapshot().joinToString("\n", postfix = "\n") { it.toJson() })
+                if (this.enabled) {
+                    text.append(crash.toText(time))
+                    events.append(crash.toJson() + "\n")
+                }
+            }
             system?.uncaughtException(thread, error)
         }
+    }
+
+    /** Foreground and background, and the screens' activities coming and going (issue #237). */
+    fun watchLifecycle(app: Application) {
+        var visible = 0
+        app.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityStarted(activity: Activity) {
+                if (visible++ == 0) event(Level.INFO, "App", "app.foreground", "In the foreground")
+            }
+            override fun onActivityStopped(activity: Activity) {
+                if (--visible == 0) event(Level.INFO, "App", "app.background", "In the background")
+            }
+            override fun onActivityCreated(activity: Activity, state: Bundle?) =
+                event(Level.DEBUG, "App", "app.activity_created", "Screen opened", mapOf("restored" to (state != null)))
+            override fun onActivityDestroyed(activity: Activity) =
+                event(Level.DEBUG, "App", "app.activity_destroyed", "Screen closed", mapOf("finishing" to activity.isFinishing))
+            override fun onActivityResumed(activity: Activity) = Unit
+            override fun onActivityPaused(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, state: Bundle) = Unit
+        })
+        // From the process starting to here (the app's own setup), on Android 7+.
+        val startup = SystemClock.uptimeMillis() - android.os.Process.getStartUptimeMillis()
+        event(Level.INFO, "App", "app.start", "Started in $startup ms", mapOf("startup_ms" to startup))
     }
 
     fun setEnabled(on: Boolean) {
         val was = enabled
         enabled = on
-        if (on && !was) i("Log", "Logging on · $header")
+        if (on && !was) event(Level.INFO, "Log", "diagnostics.on", "Logging on · $header", about)
+        if (!on && was) event(Level.INFO, "Log", "diagnostics.off", "Logging off")
     }
 
-    /** Detailed entries (frames, downloads, phone state); written whenever logging is on. */
-    fun d(tag: String, message: String) {
-        if (detailOn) add("D", tag, message, null)
+    // ---- Writing ----
+
+    /** A detailed entry; written while logging is on and [component] isn't quiet. */
+    fun d(tag: String, message: String, event: String = "log", fields: Map<String, Any?> = emptyMap()) {
+        if (detail(tag)) add(Level.DEBUG, tag, event, message, fields, null)
     }
 
-    fun i(tag: String, message: String) = add("I", tag, message, null)
-    fun w(tag: String, message: String, error: Throwable? = null) = add("W", tag, message, error)
-    fun e(tag: String, message: String, error: Throwable? = null) = add("E", tag, message, error)
+    /** Very fine detail (e.g. every step of a decode); only while [component]'s detail is on. */
+    fun t(tag: String, message: String, event: String = "log", fields: Map<String, Any?> = emptyMap()) {
+        if (detail(tag)) add(Level.TRACE, tag, event, message, fields, null)
+    }
 
-    private fun add(level: String, tag: String, message: String, error: Throwable?) {
-        val text = redact(if (error != null) "$message\n${stack(error)}" else message)
+    fun i(tag: String, message: String, event: String = "log", fields: Map<String, Any?> = emptyMap()) =
+        add(Level.INFO, tag, event, message, fields, null)
+
+    fun w(tag: String, message: String, error: Throwable? = null, event: String = "log", fields: Map<String, Any?> = emptyMap()) =
+        add(Level.WARN, tag, event, message, fields, error)
+
+    fun e(tag: String, message: String, error: Throwable? = null, event: String = "log", fields: Map<String, Any?> = emptyMap()) =
+        add(Level.ERROR, tag, event, message, fields, error)
+
+    /** A named event with its fields (issue #237), e.g. event(INFO, "Player", "playback.first_audio", …). */
+    fun event(level: Level, component: String, event: String, message: String, fields: Map<String, Any?> = emptyMap(), error: Throwable? = null) {
+        if (level <= Level.DEBUG && !detail(component)) return
+        add(level, component, event, message, fields, error)
+    }
+
+    private fun make(level: Level, tag: String, event: String, message: String, fields: Map<String, Any?>, error: Throwable?) =
+        LogEvent(System.currentTimeMillis(), level, tag, event, Trace.session, Trace.current(), Thread.currentThread().name, message, fields, error)
+
+    private fun add(level: Level, tag: String, event: String, message: String, fields: Map<String, Any?>, error: Throwable?) {
+        val entry = make(level, tag, event, message, fields, error)
+        recent.add(entry)
         when (level) {
-            "E" -> Log.e("Musix/$tag", text)
-            "W" -> Log.w("Musix/$tag", text)
-            else -> Log.i("Musix/$tag", text)
+            Level.ERROR, Level.FATAL -> Log.e("Musix/$tag", Redactor.text(message), error)
+            Level.WARN -> Log.w("Musix/$tag", Redactor.text(message), error)
+            Level.INFO -> Log.i("Musix/$tag", Redactor.text(message))
+            else -> Unit
         }
-        if (!enabled) return
-        val line = "${time.format(Date())} $level/$tag: $text\n"
-        writer.execute { append(line) }
+        if (!enabled || !::text.isInitialized) return
+        submit(level) {
+            text.append(entry.toText(time))
+            events.append(entry.toJson() + "\n")
+        }
     }
 
-    private fun writeNow(level: String, tag: String, message: String) {
-        runCatching { append("${time.format(Date())} $level/$tag: ${redact(message)}\n") }
-    }
-
-    @Synchronized
-    private fun append(line: String) {
-        runCatching {
-            val file = current
-            if (file.length() > MAX_BYTES) {
-                previous.delete()
-                file.renameTo(previous)
+    /** Hands a write to the writer thread; when it's behind, detail is dropped first and counted. */
+    private fun submit(level: Level, write: () -> Unit) {
+        val important = level >= Level.WARN
+        if (!important && queue.remainingCapacity() < 500) {
+            dropped.incrementAndGet()
+            return
+        }
+        val skipped = dropped.getAndSet(0)
+        try {
+            writer.execute {
+                if (skipped > 0) {
+                    val note = make(Level.WARN, "Log", "diagnostics.dropped", "Left out $skipped detailed entries: the log couldn't keep up", mapOf("dropped" to skipped), null)
+                    text.append(note.toText(time))
+                    events.append(note.toJson() + "\n")
+                }
+                write()
             }
-            file.appendText(line)
+        } catch (e: java.util.concurrent.RejectedExecutionException) {
+            dropped.addAndGet(skipped + 1)
         }
     }
 
-    /** The recent part of the log for showing on screen. */
+    // ---- Reading and sharing ----
+
+    /** The recent part of the readable log for showing on screen. */
     fun tail(maxLines: Int): List<String> = runCatching {
         if (!current.exists()) emptyList() else current.readLines().takeLast(maxLines)
     }.getOrDefault(emptyList())
 
-    /** Both log parts' lines, oldest first. */
-    fun allLines(): List<String> = runCatching {
-        listOf(previous, current).filter { it.exists() }.flatMap { it.readLines() }
-    }.getOrDefault(emptyList())
+    /** Every part's lines, oldest first. */
+    fun allLines(): List<String> = runCatching { text.files().flatMap { it.readLines() } }.getOrDefault(emptyList())
 
-    /** One file with both log parts, for sharing. */
+    /** One file with the whole readable log, for sharing. */
     fun export(target: File): File {
         target.parentFile?.mkdirs()
         target.writeText("$header\n\n")
-        if (previous.exists()) target.appendText(previous.readText())
-        if (current.exists()) target.appendText(current.readText())
+        text.files().forEach { target.appendText(it.readText()) }
+        return target
+    }
+
+    /**
+     * The diagnostics archive (issue #237): readable log, structured events, the recent events kept in
+     * memory, the last crash's events if there was one, and a manifest. Everything is already redacted.
+     */
+    fun exportArchive(target: File): File {
+        val recentFile = File(target.parentFile, "recent.jsonl").apply {
+            parentFile?.mkdirs()
+            writeText(recent.snapshot().joinToString("\n", postfix = "\n") { it.toJson() })
+        }
+        val parts = text.files().map { DiagnosticZip.Part(it.name, it) } +
+            events.files().map { DiagnosticZip.Part(it.name, it) } +
+            listOf(DiagnosticZip.Part("recent.jsonl", recentFile)) +
+            listOfNotNull(crashFile.takeIf { it.exists() }?.let { DiagnosticZip.Part("crash-last.jsonl", it) })
+        DiagnosticZip.write(target, parts, about + mapOf("logging_on" to enabled, "quiet_components" to quiet.sorted()), System.currentTimeMillis())
+        recentFile.delete()
         return target
     }
 
     fun clear() {
         writer.execute {
-            previous.delete()
-            current.delete()
+            text.clear()
+            events.clear()
+            crashFile.delete()
         }
     }
 
-    fun sizeBytes(): Long = (if (current.exists()) current.length() else 0) + (if (previous.exists()) previous.length() else 0)
+    fun sizeBytes(): Long = if (!::text.isInitialized) 0 else text.sizeBytes() + events.sizeBytes()
 
-    private fun stack(error: Throwable): String = StringWriter().also { error.printStackTrace(PrintWriter(it)) }.toString()
-
-    private val secrets = listOf(
-        Regex("([?&](?:t|s|p|u|sk|token|apiKey|api_key|api_sig|key|secret|password)=)[^&\\s\"]+", RegexOption.IGNORE_CASE),
-        Regex("(Authorization:?\\s*(?:Bearer|Basic)\\s+)\\S+", RegexOption.IGNORE_CASE),
-        Regex("(audiomuse_jwt=)[^;\\s]+"),
-        Regex("(sk-or-[A-Za-z0-9-]{4})[A-Za-z0-9-]+"),
-        Regex("(://)[^/@\\s]+:[^/@\\s]+@"),
-    )
-
-    fun redact(text: String): String = secrets.fold(text) { acc, regex ->
-        regex.replace(acc) { m -> m.groupValues[1] + if (m.groupValues[1] == "://") "" else "•••" }
-    }
+    /** The text patterns of [Redactor], for code that builds its own lines. */
+    fun redact(text: String): String = Redactor.text(text)
 }
