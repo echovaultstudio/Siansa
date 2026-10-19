@@ -3,6 +3,10 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.15.1beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.15.1beta) — 2026-10-19
+
+- [#227](https://github.com/Musix-Industreez/musix/pull/227) Disc covers of another user's music use their login (@Th3K1ngP1n)
+
 ## [0.15.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.15.0beta) — 2026-10-19
 
 - [#222](https://github.com/Musix-Industreez/musix/pull/222) Own AudioMuse-AI plugin (musix_analysis); app no longer uses Lumae (@Th3K1ngP1n)
