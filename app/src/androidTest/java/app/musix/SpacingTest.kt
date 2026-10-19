@@ -276,7 +276,8 @@ class SpacingTest {
         val shuffle = compose.onNodeWithTag("shuffleAll").getBoundsInRoot()
         assertEven("Find similar and Shuffle, vertical centre", (similar.top + similar.bottom) / 2, (shuffle.top + shuffle.bottom) / 2, 1.dp)
         assertTrue("Find similar is left of Shuffle and doesn't overlap it", similar.right <= shuffle.left + 0.5.dp)
-        assertEven("Find similar right next to Shuffle", shuffle.left - similar.right, 0.dp, 1.dp)
+        // Icon buttons keep 4 dp of touch room on each side of their 40 dp, so neighbours sit 8 dp apart.
+        assertTrue("Find similar right next to Shuffle (${(shuffle.left - similar.right).value} dp)", shuffle.left - similar.right <= app.musix.ui.Space.Small + 0.5.dp)
     }
 
     /** Album page (issue #240): room under the big Play button before the first song, marked when it's playing. */
