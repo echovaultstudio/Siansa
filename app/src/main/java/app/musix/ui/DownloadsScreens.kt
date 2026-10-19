@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.DownloadForOffline
@@ -165,6 +166,7 @@ fun DownloadsScreen(nav: NavController) {
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     var removing by remember { mutableStateOf<OfflineItem?>(null) }
     var removeAll by remember { mutableStateOf(false) }
+    var stopAll by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { graph.downloads.refresh() }
 
     val used = list.done.sumOf { it.bytes }
@@ -193,10 +195,8 @@ fun DownloadsScreen(nav: NavController) {
                     }
                     if (progress.running) {
                         val song = progress.current
-                        LinearProgressIndicator(
-                            progress = { if (progress.total > 0) progress.bytes.toFloat() / progress.total else 0f },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        // ✕ stops every download still waiting, after asking (issue #235).
+                        ProgressWithStop(if (progress.total > 0) progress.bytes.toFloat() / progress.total else 0f) { stopAll = true }
                         Text(
                             "Downloading${song?.let { " ${it.title}" } ?: ""} · ${list.waiting.size} to go",
                             style = MaterialTheme.typography.bodyMedium,
@@ -204,10 +204,14 @@ fun DownloadsScreen(nav: NavController) {
                             overflow = TextOverflow.Ellipsis,
                         )
                     } else if (list.waiting.isNotEmpty()) {
-                        Text(
-                            "${list.waiting.size} songs to go" + (progress.note?.let { " · $it" } ?: ""),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "${list.waiting.size} songs to go" + (progress.note?.let { " · $it" } ?: ""),
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f),
+                            )
+                            StopAllButton { stopAll = true }
+                        }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                         FilledTonalButton(onClick = { nav.navigate("downloads/add") }) { Text("Add music") }
@@ -313,6 +317,15 @@ fun DownloadsScreen(nav: NavController) {
         }
     }
     removing?.let { item -> RemoveDialog(item.name, onDismiss = { removing = null }) { graph.downloads.drop(item.key) } }
+    if (stopAll) {
+        AlertDialog(
+            onDismissRequest = { stopAll = false },
+            title = { Text("Stop all downloads?") },
+            text = { Text("The ${list.waiting.size} songs still waiting won't download. Songs already downloaded stay. You can download anything again later.") },
+            confirmButton = { TextButton(onClick = { stopAll = false; graph.downloads.stopAll() }) { Text("Stop all") } },
+            dismissButton = { TextButton(onClick = { stopAll = false }) { Text("Keep going") } },
+        )
+    }
     if (removeAll) {
         AlertDialog(
             onDismissRequest = { removeAll = false },
@@ -588,6 +601,22 @@ private fun DownloadControl(icon: androidx.compose.ui.graphics.vector.ImageVecto
         Icon(icon, null, Modifier.size(18.dp), tint = Accent)
         Spacer(Modifier.width(Space.Small))
         Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** The progress line with the ✕ that stops every download still waiting (issue #235). */
+@Composable
+internal fun ProgressWithStop(progress: Float, onStop: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        LinearProgressIndicator(progress = { progress }, modifier = Modifier.weight(1f).testTag("downloadProgress"))
+        StopAllButton(onStop)
+    }
+}
+
+@Composable
+private fun StopAllButton(onStop: () -> Unit) {
+    IconButton(onClick = onStop, modifier = Modifier.testTag("stopAllDownloads")) {
+        Icon(Icons.Rounded.Close, "Stop all downloads")
     }
 }
 

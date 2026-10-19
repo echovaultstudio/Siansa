@@ -156,7 +156,7 @@ class OfflinePlanTest {
         assertTrue(OfflinePlan.shelf(DownloadList()).isEmpty)
     }
 
-    // Phone-only playlists (issue #147) are always kept downloaded.
+    // Phone-only playlists (issue #147): only once chosen for download are they kept up to date (issue #235).
     private fun phone(id: String) = OfflineItem(OfflineKind.PLAYLIST, "local-$id", "Phone $id")
 
     // Syncs [now] after [before] (the playlists at the last sync; null = the app just started).
@@ -164,39 +164,44 @@ class OfflinePlanTest {
         list: DownloadList,
         now: List<Pair<OfflineItem, List<app.musix.data.Song>>>,
         before: List<Pair<OfflineItem, List<app.musix.data.Song>>>? = emptyList(),
-        at: Long = 1,
-    ) = OfflinePlan.syncPhonePlaylists(list, now, before?.associate { (i, s) -> i.key to s.mapTo(HashSet()) { it.id } }, at)
+    ) = OfflinePlan.syncPhonePlaylists(list, now, before?.associate { (i, s) -> i.key to s.mapTo(HashSet()) { it.id } })
 
-    @Test fun phonePlaylistSongsDownload() {
-        val list = sync(DownloadList(), listOf(phone("a") to songs("1", "2")), at = 5)
-        assertEquals(listOf("1", "2"), list.waiting.map { it.id })
-        assertEquals(5L, list.items.single().addedAt)
+    // The playlists chosen for download with their download button, at [at].
+    private fun downloaded(playlists: List<Pair<OfflineItem, List<app.musix.data.Song>>>, at: Long = 1) =
+        playlists.fold(DownloadList()) { l, (item, songs) -> OfflinePlan.choose(l, item.copy(addedAt = at), songs) }
+
+    @Test fun aNewPhonePlaylistDoesNotDownloadByItself() {
+        val a = listOf(phone("a") to songs("1", "2"))
+        assertEquals(DownloadList(), sync(DownloadList(), a))
+        assertEquals(DownloadList(), sync(DownloadList(), a, before = null))
+        // Songs added later don't start it either.
+        assertEquals(DownloadList(), sync(DownloadList(), listOf(phone("a") to songs("1", "2", "3")), before = a))
     }
 
-    @Test fun phonePlaylistsDownloadWhenTheAppStarts() {
-        val list = sync(DownloadList(), listOf(phone("a") to songs("1")), before = null)
-        assertEquals(listOf("1"), list.waiting.map { it.id })
+    @Test fun aChosenPhonePlaylistKeepsItsSongs() {
+        val list = downloaded(listOf(phone("a") to songs("1", "2")), at = 5)
+        assertEquals(listOf("1", "2"), list.waiting.map { it.id })
+        assertEquals(list, sync(list, listOf(phone("a") to songs("1", "2")), before = null))
     }
 
     @Test fun songAddedToPhonePlaylistDownloads() {
         val a1 = listOf(phone("a") to songs("1"))
-        val first = sync(DownloadList(), a1, at = 5).doneAll()
-        val list = sync(first, listOf(phone("a") to songs("1", "2")), before = a1, at = 9)
+        val first = downloaded(a1, at = 5).doneAll()
+        val list = sync(first, listOf(phone("a") to songs("1", "2")), before = a1)
         assertEquals(listOf("2"), list.waiting.map { it.id })
         assertEquals(5L, list.items.single().addedAt)
     }
 
     @Test fun songTakenOutOfPhonePlaylistIsDeletedUnlessKeptElsewhere() {
-        val start = OfflinePlan.choose(DownloadList(), album("x"), songs("2"))
         val a = listOf(phone("a") to songs("1", "2", "3"))
-        val first = sync(start, a).doneAll()
+        val first = OfflinePlan.choose(downloaded(a), album("x"), songs("2")).doneAll()
         val list = sync(first, listOf(phone("a") to songs("3")), before = a)
         assertEquals(setOf("2", "3"), list.done.map { it.song.id }.toSet())
     }
 
     @Test fun deletedPhonePlaylistLosesItsDownloads() {
         val both = listOf(phone("a") to songs("1"), phone("b") to songs("2"))
-        val first = sync(DownloadList(), both).doneAll()
+        val first = downloaded(both).doneAll()
         val list = sync(first, both.drop(1), before = both)
         assertEquals(listOf("2"), list.done.map { it.song.id })
         assertEquals(listOf("local-b"), list.items.map { it.id })
@@ -204,7 +209,7 @@ class OfflinePlanTest {
 
     @Test fun emptyPhonePlaylistKeepsNothing() {
         val a = listOf(phone("a") to songs("1"))
-        val list = sync(sync(DownloadList(), a), listOf(phone("a") to emptyList()), before = a)
+        val list = sync(downloaded(a), listOf(phone("a") to emptyList()), before = a)
         assertTrue(list.items.isEmpty())
         assertTrue(list.waiting.isEmpty())
     }
@@ -216,13 +221,13 @@ class OfflinePlanTest {
 
     @Test fun unchangedPhonePlaylistChangesNothing() {
         val a = listOf(phone("a") to songs("1"))
-        val first = sync(DownloadList(), a)
-        assertEquals(first, sync(first, a, before = a, at = 2))
+        val first = downloaded(a)
+        assertEquals(first, sync(first, a, before = a))
     }
 
     @Test fun songRemovedByHandStaysOutUntilAddedAgain() {
         val a12 = listOf(phone("a") to songs("1", "2"))
-        val removed = OfflinePlan.removeSongs(sync(DownloadList(), a12).doneAll(), setOf("2"))
+        val removed = OfflinePlan.removeSongs(downloaded(a12).doneAll(), setOf("2"))
         val renamed = listOf(phone("a").copy(name = "New") to songs("1", "2"))
         val afterRename = sync(removed, renamed, before = a12)
         assertEquals(listOf("1"), afterRename.items.single().songIds)
@@ -231,5 +236,22 @@ class OfflinePlanTest {
         val a1 = listOf(phone("a") to songs("1"))
         val back = sync(sync(afterRename, a1, before = renamed), a12, before = a1)
         assertEquals(listOf("2"), back.waiting.map { it.id })
+    }
+
+    // ---- Stop all downloads (issue #235) ----
+
+    @Test fun stopAllDropsWhatIsWaitingAndKeepsWhatIsDownloaded() {
+        val list = OfflinePlan.choose(OfflinePlan.choose(DownloadList(), album("x"), songs("1", "2")).doneAll(), album("y"), songs("3", "4"))
+        val stopped = OfflinePlan.stopAll(list)
+        assertTrue(stopped.waiting.isEmpty())
+        assertEquals(setOf("1", "2"), stopped.done.map { it.song.id }.toSet())
+        // Album y had nothing yet, so it goes; the songs don't come back when it's checked again.
+        assertEquals(listOf("album:x"), stopped.items.map { it.key }.map { it.lowercase() })
+        assertEquals(setOf("3", "4"), stopped.skipped)
+    }
+
+    @Test fun stopAllWithNothingWaitingChangesNothing() {
+        val list = OfflinePlan.choose(DownloadList(), album("x"), songs("1")).doneAll()
+        assertEquals(list, OfflinePlan.stopAll(list))
     }
 }
