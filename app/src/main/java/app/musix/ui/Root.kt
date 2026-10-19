@@ -260,10 +260,16 @@ fun MusixRoot() {
                 }
                 composable("blend/{id}") { BlendScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("mood/{text}") { MoodScreen(nav, it.arguments?.getString("text").orEmpty()) }
-                composable("songpath/{id}") { SongPathPicker(nav, it.arguments?.getString("id").orEmpty()) }
                 composable(
-                    "songpath/{from}/{to}/{length}?lyrics={lyrics}",
-                    arguments = listOf(androidx.navigation.navArgument("lyrics") { defaultValue = "false" }),
+                    "songpath/{id}?live={live}",
+                    arguments = listOf(androidx.navigation.navArgument("live") { defaultValue = "false" }),
+                ) { SongPathPicker(nav, it.arguments?.getString("id").orEmpty(), it.arguments?.getString("live") == "true") }
+                composable(
+                    "songpath/{from}/{to}/{length}?lyrics={lyrics}&live={live}",
+                    arguments = listOf(
+                        androidx.navigation.navArgument("lyrics") { defaultValue = "false" },
+                        androidx.navigation.navArgument("live") { defaultValue = "false" },
+                    ),
                 ) {
                     val args = it.arguments
                     SongPathScreen(
@@ -272,6 +278,7 @@ fun MusixRoot() {
                         args?.getString("to").orEmpty(),
                         args?.getString("length")?.toIntOrNull() ?: 20,
                         args?.getString("lyrics") == "true",
+                        args?.getString("live") == "true",
                     )
                 }
                 composable("sync") { SyncScreen(nav) }

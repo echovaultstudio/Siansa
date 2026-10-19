@@ -7,6 +7,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.AssistChip
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
+import app.musix.mix.songPathUpNext
+import app.musix.log.AppLog
+import androidx.compose.runtime.LaunchedEffect
 import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -56,14 +59,16 @@ import app.musix.mix.songPathLengths
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-fun NavController.openSongPath(songId: String) = navigate("songpath/${Uri.encode(songId)}")
+/** [fromNowPlaying]: the song is playing, so the path is queued after it once ready instead of waiting for Play (#212). */
+fun NavController.openSongPath(songId: String, fromNowPlaying: Boolean = false) =
+    navigate("songpath/${Uri.encode(songId)}?live=$fromNowPlaying")
 
 /**
  * Song path, step one: the chosen song is one end; search for the other end and pick a length.
  * Swap makes the chosen song the end instead of the start.
  */
 @Composable
-fun SongPathPicker(nav: NavController, songId: String) {
+fun SongPathPicker(nav: NavController, songId: String, fromNowPlaying: Boolean = false) {
     val graph = LocalGraph.current
     val song by loadState(songId) {
         graph.library.songs(listOf(songId)).firstOrNull() ?: graph.subsonic.song(songId)
@@ -85,7 +90,7 @@ fun SongPathPicker(nav: NavController, songId: String) {
     /** The other end: a song id, or MOOD_END + a mood (issue #208). */
     fun go(otherId: String) {
         val (from, to) = if (toHere) otherId to songId else songId to otherId
-        nav.navigate("songpath/${Uri.encode(from)}/${Uri.encode(to)}/$length?lyrics=$lyrics")
+        nav.navigate("songpath/${Uri.encode(from)}/${Uri.encode(to)}/$length?lyrics=$lyrics&live=$fromNowPlaying")
     }
 
     Screen("Song path", nav) { padding ->
@@ -193,12 +198,23 @@ fun SongPathPicker(nav: NavController, songId: String) {
 
 /** Song path, step two: the path itself, ready to play or save as a playlist. */
 @Composable
-fun SongPathScreen(nav: NavController, fromId: String, toId: String, length: Int, lyrics: Boolean = false) {
+fun SongPathScreen(nav: NavController, fromId: String, toId: String, length: Int, lyrics: Boolean = false, fromNowPlaying: Boolean = false) {
     val graph = LocalGraph.current
     val snack = LocalSnack.current
     val scope = rememberCoroutineScope()
     val result by loadState(listOf(fromId, toId, length, lyrics)) { graph.songPath.build(fromId, toId, length, lyrics) }
     val songs = result.valueOrNull()
+    // Started from now playing (#212): once the path is ready, the song keeps playing and the rest of the path
+    // becomes the queue after it, instead of waiting for Play (which started the same song again).
+    var queued by rememberSaveable(fromId, toId, length, lyrics) { mutableStateOf(false) }
+    LaunchedEffect(songs) {
+        if (!fromNowPlaying || queued || songs == null) return@LaunchedEffect
+        val upcoming = songPathUpNext(songs.map { it.id }, graph.player.state.value.current?.id) ?: return@LaunchedEffect
+        graph.player.replaceUpcoming(songs.subList(songs.size - upcoming, songs.size))
+        queued = true
+        AppLog.i("SongPath", "Queued $upcoming path songs after the song playing now")
+        snack.showSnackbar("Song path queued after this song")
+    }
     val from = songs?.firstOrNull()
     val to = songs?.lastOrNull()
     val title = if (from != null && to != null) graph.songPath.name(from, to) else "Finding a path…"
@@ -214,7 +230,7 @@ fun SongPathScreen(nav: NavController, fromId: String, toId: String, length: Int
         cover = { m -> GeneratedCover(title, colors, m) },
         header = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CollectionByline(null, null, null, "Song path" + (songs?.let { " · ${it.size} songs" } ?: ""))
+                CollectionByline(null, null, null, "Song path" + (songs?.let { " · ${it.size} songs" } ?: "") + if (queued) " · queued" else "")
                 Spacer(Modifier.weight(1f))
                 if (songs != null && from != null && to != null) {
                     TextButton(
