@@ -432,12 +432,13 @@ fun nextSteering(steering: Map<String, Boolean>, term: String): Map<String, Bool
 
 /**
  * "More piano", "less vocals": AudioMuse's concepts as chips that steer the Sound search. Sits under the
- * Library / Sound chips with the same gap below as above.
+ * Library / Sound chips with the same gap below as above: those chips' row padding and both chips' touch
+ * margins above, so Space.Page below (SpacingTest.steeringChipsAreEvenlySpaced).
  */
 @Composable
 internal fun SteeringChips(terms: List<String>, steering: Map<String, Boolean>, onTap: (String) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = Space.Page, end = Space.Page, bottom = Space.Small).testTag("steering"),
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = Space.Page, end = Space.Page, bottom = Space.Page).testTag("steering"),
         horizontalArrangement = Arrangement.spacedBy(Space.Small),
     ) {
         terms.forEach { term ->
