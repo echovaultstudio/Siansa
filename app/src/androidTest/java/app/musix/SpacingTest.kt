@@ -264,4 +264,18 @@ class SpacingTest {
         val hint = compose.onNodeWithTag("hint").getBoundsInRoot()
         assertEven("Levelling chips", chip.top - heading.bottom, hint.top - chip.bottom)
     }
+
+    /** Album page (issue #228): "Find similar albums" sits on the line of Shuffle, the same gap from it as Shuffle from Play. */
+    @Test fun findSimilarSitsBesideShuffle() {
+        compose.setContent {
+            MusixTheme {
+                app.musix.ui.ActionButtons(enabled = true, onQueue = {}, download = {}, onSimilar = {}, onShuffle = {}, onPlay = {})
+            }
+        }
+        val similar = compose.onNodeWithTag("findSimilarAlbums").getBoundsInRoot()
+        val shuffle = compose.onNodeWithTag("shuffleAll").getBoundsInRoot()
+        assertEven("Find similar and Shuffle, vertical centre", (similar.top + similar.bottom) / 2, (shuffle.top + shuffle.bottom) / 2, 1.dp)
+        assertTrue("Find similar is left of Shuffle and doesn't overlap it", similar.right <= shuffle.left + 0.5.dp)
+        assertEven("Find similar right next to Shuffle", shuffle.left - similar.right, 0.dp, 1.dp)
+    }
 }
