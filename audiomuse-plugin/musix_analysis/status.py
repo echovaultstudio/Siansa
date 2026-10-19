@@ -73,7 +73,7 @@ def percent(part, whole):
     return max(0, min(100, int(part * 100 // whole)))
 
 
-def profile_counts(library_songs, ready, failed, wanted=0):
+def profile_counts(library_songs, ready, failed, wanted=0, imported=0):
     """Counts for the profiles part. ``failed`` songs are tried again later, so they still count as to do."""
     library_songs = max(int(library_songs), 0)
     ready = min(max(int(ready), 0), library_songs)
@@ -84,6 +84,7 @@ def profile_counts(library_songs, ready, failed, wanted=0):
         "failed": failed,
         "to_measure": library_songs - ready - failed,
         "asked_for": max(int(wanted), 0),
+        "imported": min(max(int(imported), 0), ready),
     }
 
 
