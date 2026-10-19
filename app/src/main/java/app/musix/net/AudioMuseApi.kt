@@ -150,7 +150,7 @@ class AudioMuseApi(
     }
 
     /**
-     * A GET to a plugin on the AudioMuse server ([pathAndQuery] after the address, e.g. the Lumae plugin's
+     * A GET to a plugin on the AudioMuse server ([pathAndQuery] after the address, e.g. the Musix plugin's
      * profiles), with the same login as the rest of AudioMuse.
      */
     suspend fun plugin(pathAndQuery: String): JsonElement = executeElement { request(pathAndQuery).get().build() }

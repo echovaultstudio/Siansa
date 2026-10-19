@@ -288,24 +288,24 @@ class RealServerTest {
     }
 
     /**
-     * Crossfade with measured loudness (issue #60), against a stand-in for the Lumae plugin on AudioMuse:
+     * Crossfade with measured loudness (issue #60), against a stand-in for the Musix plugin on AudioMuse:
      * every song measures −9 LUFS, gets going 1 s after it starts and is quiet for its last 3 s. Smart mode
      * should then start the next song 4 s before the end of the current one, fade it in, and level both
      * to −18 LUFS (a volume of 10^(−9/20) ≈ 0.355).
      */
     @Test
-    fun f_crossfadeBlendsSongsWithLumaeProfiles() {
-        val lumae = FakeLumae(lufs = -9.0, introChunks = 10, tailChunks = 30)
+    fun f_crossfadeBlendsSongsWithPluginProfiles() {
+        val plugin = FakePlugin(lufs = -9.0, introChunks = 10, tailChunks = 30)
         val before = graph.settings.current
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
             graph.settings.save(
                 graph.settings.current.copy(
-                    audioMuseUrl = lumae.url, audioMuseToken = "test", replayGain = ReplayGainMode.TRACK,
+                    audioMuseUrl = plugin.url, audioMuseToken = "test", replayGain = ReplayGainMode.TRACK,
                     transcodeWifiKbps = 0, transcodeMobileKbps = 0,
                 ),
             )
-            graph.settings.setLoudness(LoudnessSource.LUMAE, -18)
+            graph.settings.setLoudness(LoudnessSource.PLUGIN, -18)
             graph.settings.setCrossfade(CrossfadeMode.SMART, 8)
             val check = runBlocking { graph.profiles.check() }
             assertTrue("Plugin check: ${check.message}", check.ok)
@@ -347,7 +347,7 @@ class RealServerTest {
             println("Crossfade: first song left at ${lastFirst} ms; volumes after the switch: " + volumes.filterIndexed { i, _ -> i % 4 == 0 }.joinToString { "${it.first}ms=${"%.2f".format(it.second)}" })
             val log = AppLog.tail(400)
             assertTrue("The second song never started", switchedAt > 0)
-            assertTrue("Profiles weren't asked for", lumae.asked.any { it.contains("/api/profiles") && it.contains(first.id) })
+            assertTrue("Profiles weren't asked for", plugin.asked.any { it.contains("/api/profiles") && it.contains(first.id) })
             assertTrue("No fade was logged:\n" + log.takeLast(30).joinToString("\n"), log.any { "Fading ${first.id} into ${second.id}" in it })
             assertTrue("The fade wasn't ready in time", log.none { "wasn't ready to fade" in it })
             // The next song starts about 4 s before the end (30 s song, so near 26 s), not at the end.
@@ -366,7 +366,7 @@ class RealServerTest {
                 ),
             )
             scenario.close()
-            lumae.close()
+            plugin.close()
         }
     }
 
@@ -379,8 +379,8 @@ class RealServerTest {
         throw AssertionError("Waited ${ms / 1000} s for $what")
     }
 
-    /** A stand-in for the Lumae plugin's health and profiles endpoints, on the phone itself. */
-    private class FakeLumae(private val lufs: Double, private val introChunks: Int, private val tailChunks: Int) : AutoCloseable {
+    /** A stand-in for the Musix plugin's health and profiles endpoints, on the phone itself. */
+    private class FakePlugin(private val lufs: Double, private val introChunks: Int, private val tailChunks: Int) : AutoCloseable {
         private val server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
         val url = "http://127.0.0.1:${server.localPort}"
         val asked = CopyOnWriteArrayList<String>()
@@ -403,8 +403,8 @@ class RealServerTest {
             while (reader.readLine()?.isNotEmpty() == true) Unit
             asked += path
             val body = when {
-                path.startsWith("/plugins/lumae_analysis/api/health") -> """{"plugin":"lumae_analysis","plugin_version":"test","status":"ok"}"""
-                path.startsWith("/plugins/lumae_analysis/api/profiles") -> {
+                path.startsWith("/plugins/musix_analysis/api/health") -> """{"plugin":"musix_analysis","plugin_version":"test","status":"ok"}"""
+                path.startsWith("/plugins/musix_analysis/api/profiles") -> {
                     val ids = URLDecoder.decode(path.substringAfter("ids="), "UTF-8").split(",")
                     val profiles = ids.joinToString(",") { id ->
                         """{"track_id":"$id","source":"waveform","ref_lufs":$lufs,"start_ramp":"${ramp(-18, introChunks)}","end_ramp":"${ramp(-18, tailChunks)}"}"""
