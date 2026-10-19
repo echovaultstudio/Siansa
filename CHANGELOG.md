@@ -3,6 +3,17 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.14.0beta — 2026-10-19
+
+### Added
+- **See what levels the song playing now**, on Crossfade and levelling: the Lumae plugin's measurement, its ReplayGain tags, or nothing, and by how many dB.
+- **Your sonic fingerprint on Home**: what the music you play most sounds like, from AudioMuse. It shows its moods as bars (danceable, happy, party, relaxed, sad, aggressive), your leading genres and your typical tempo and key, with a button to play the songs. It's made once a day, and you can move or hide it under Arrange Home.
+- **More ways to steer the Sound search**: besides genres, you can now pick more or less of instruments, vocals, moods, production, tempo and era. Each group shows how many of its concepts you're using.
+
+### Changed
+- **Levelling (Off, Track, Album) moved from the equaliser to Crossfade and levelling**, next to where loudness comes from. The equaliser page is now just the equaliser.
+- Each song is levelled one way only: by the Lumae plugin or by its ReplayGain tags, never both. The log says which one, for every song.
+
 ## 0.13.0beta — 2026-10-19
 
 ### Fixed
