@@ -1,5 +1,15 @@
 package app.musix.ui
 
+import kotlinx.coroutines.delay
+import app.musix.playback.SongRegistry
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.MusicOff
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -41,8 +51,9 @@ import kotlin.math.roundToInt
 internal val CROSSFADE_GAP = Space.Medium
 
 /**
- * Settings › Playback › Crossfade and loudness (issue #60): where song loudness and fade shapes come from,
- * the loudness songs are levelled to, and crossfades.
+ * Settings › Playback › Crossfade and levelling (issues #60, #214): where song loudness and fade shapes come
+ * from, levelling (Off, Track, Album: ReplayGain tags or the Lumae plugin's measurement, never both) with what
+ * levels the song playing now, and crossfades.
  */
 @Composable
 fun CrossfadeScreen(nav: NavController) {
@@ -50,7 +61,7 @@ fun CrossfadeScreen(nav: NavController) {
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var test by remember { mutableStateOf<String?>(null) }
-    Screen(title = "Crossfade and loudness", nav = nav) { padding ->
+    Screen(title = "Crossfade and levelling", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP),
@@ -85,8 +96,11 @@ fun CrossfadeScreen(nav: NavController) {
                     Hint("Songs the plugin hasn't measured yet use their tags.")
                 }
             }
+            LevellingNow(settings)
             HorizontalDivider()
             Heading("Levelling")
+            ReplayGainRow(settings.replayGain) { graph.settings.save(graph.settings.current.copy(replayGain = it)) }
+            Hint("Evens out loudness. Track: every song at the same level. Album: an album's loud and quiet songs keep their difference. Off: songs play as they are.")
             if (settings.loudnessSource == LoudnessSource.LUMAE) {
                 LoudnessTargetRow(settings.loudnessTarget) { graph.settings.setLoudness(target = it) }
                 Hint("How loud songs are brought to. −18 matches ReplayGain and leaves room for loud songs. −14 is louder, like Spotify, but quiet songs can't be raised to it.")
@@ -107,11 +121,12 @@ fun CrossfadeScreen(nav: NavController) {
 }
 
 private fun levellingHint(s: AppSettings): String = when {
-    s.replayGain == ReplayGainMode.OFF -> "Off: ReplayGain is off in Equaliser and ReplayGain."
+    s.replayGain == ReplayGainMode.OFF -> "Levelling is off: songs play at their own loudness."
     s.loudnessSource == LoudnessSource.LUMAE && s.replayGain == ReplayGainMode.ALBUM ->
-        "ReplayGain is on Album: songs with album tags keep them, the rest are levelled from the plugin's measurement."
-    s.loudnessSource == LoudnessSource.LUMAE -> "On, from the plugin's measurement of each song. Turn it off with ReplayGain in Equaliser and ReplayGain."
-    else -> "Uses the ReplayGain tags (${s.replayGain.label.lowercase()}), set in Equaliser and ReplayGain."
+        "Each song is levelled one way only: songs with album tags keep them, the rest by the plugin's measurement."
+    s.loudnessSource == LoudnessSource.LUMAE ->
+        "Each song is levelled one way only: by the plugin's measurement, or by its ReplayGain tags until the plugin has measured it."
+    else -> "Uses the songs' ReplayGain tags (${s.replayGain.label.lowercase()})."
 }
 
 private fun crossfadeHint(s: AppSettings): String = when (s.crossfade) {
@@ -170,3 +185,59 @@ private fun CrossfadeLengthRow(seconds: Int, smart: Boolean, onDone: (Int) -> Un
         Text("${value.roundToInt()} s", style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End, modifier = Modifier.width(56.dp))
     }
 }
+
+/** Off, Track or Album: whether and how songs are levelled (moved here from the equaliser, issue #214). */
+@Composable
+internal fun ReplayGainRow(selected: ReplayGainMode, onPick: (ReplayGainMode) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        listOf(ReplayGainMode.OFF, ReplayGainMode.TRACK, ReplayGainMode.ALBUM).forEach { mode ->
+            FilterChip(selected = selected == mode, onClick = { onPick(mode) }, label = { Text(mode.label) })
+        }
+    }
+}
+
+/**
+ * What levels the song playing now (issue #214): the Lumae plugin's measurement, its ReplayGain tags, or
+ * nothing, and by how much. Looks again every few seconds, since the plugin's measurement can arrive after
+ * the song starts.
+ */
+@Composable
+internal fun LevellingNow(settings: AppSettings) {
+    val graph = LocalGraph.current
+    val player by graph.player.state.collectAsStateWithLifecycle()
+    var tick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(LEVELLING_REFRESH_MS)
+            tick++
+        }
+    }
+    val song = player.current?.let { SongRegistry.get(it.id) ?: it }
+    val decision = remember(song, settings, tick) { Levelling.decide(song, settings, song?.let { graph.profiles.cached(it.id) }) }
+    val (icon, text) = levellingNowText(song?.title, decision)
+    Row(
+        Modifier.fillMaxWidth().testTag("levelling-now"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+    ) {
+        Icon(
+            icon,
+            null,
+            tint = if (decision.source == Levelling.Source.LUMAE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** The line [LevellingNow] shows, and its icon: a tick when the Lumae plugin levels the song. */
+internal fun levellingNowText(title: String?, d: Levelling.Decision): Pair<androidx.compose.ui.graphics.vector.ImageVector, String> {
+    if (title == null) return Icons.Rounded.MusicOff to "Nothing playing right now."
+    val db = "%+.1f dB".format(d.gainDb)
+    return when (d.source) {
+        Levelling.Source.LUMAE -> Icons.Rounded.CheckCircle to "Now playing \"$title\": levelled by the Lumae plugin, $db."
+        Levelling.Source.REPLAYGAIN -> Icons.Rounded.Info to "Now playing \"$title\": levelled by its ReplayGain tags, $db, not by Lumae (${d.why})."
+        Levelling.Source.NONE -> Icons.Rounded.Info to "Now playing \"$title\": not levelled (${d.why})."
+    }
+}
+
+private const val LEVELLING_REFRESH_MS = 3_000L
