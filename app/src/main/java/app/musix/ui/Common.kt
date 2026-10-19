@@ -527,6 +527,18 @@ fun SongRow(
                             nav.openSongPath(song.id)
                         })
                     }
+                    DropdownMenuItem(text = { Text("Similar songs") }, onClick = {
+                        menu = false
+                        sheet.close()
+                        nav.openSimilarSongs(song.id)
+                    })
+                    if (graph.settings.current.audioMuseReady && song.albumId != null) {
+                        DropdownMenuItem(text = { Text("Similar albums") }, onClick = {
+                            menu = false
+                            sheet.close()
+                            nav.openSimilarAlbums(song.id)
+                        })
+                    }
                     song.albumId?.let { albumId ->
                         DropdownMenuItem(text = { Text("Go to album") }, onClick = {
                             menu = false

@@ -58,6 +58,7 @@ import androidx.navigation.NavController
 import app.musix.data.Album
 import app.musix.data.Artist
 import app.musix.data.SimilarArtist
+import app.musix.mix.SimilarPlugin
 import app.musix.data.Song
 import app.musix.data.category
 import app.musix.data.isTopSongsFresh
@@ -90,6 +91,11 @@ fun ArtistScreen(nav: NavController, id: String) {
         }
     }
     val info by loadState("info-$id") { graph.subsonic.artistInfo(id) }
+    // Artists that sound alike, from the Musix plugin (issue #223); nothing when it isn't there.
+    val soundsAlike by loadState("sounds-alike-$id") {
+        val name = snapshotFlow { page.valueOrNull() }.filterNotNull().first().artist.name
+        graph.similar.artists(name)
+    }
     // Popular songs: the saved list shows at once; Navidrome is asked again only when it's a few days old.
     // Started with the page, not after it, so the request runs alongside the rest.
     val top by produceState<List<Song>?>(null, id) {
@@ -259,7 +265,7 @@ fun ArtistScreen(nav: NavController, id: String) {
 
             artistInfo?.biography?.let { bio -> full { Biography(bio) } }
 
-            val similar = artistInfo?.similar.orEmpty()
+            val similar = SimilarPlugin.mergeArtists(p.artist.name, soundsAlike.valueOrNull().orEmpty(), artistInfo?.similar.orEmpty())
             if (similar.isNotEmpty()) {
                 full { SectionTitle("Fans also like") }
                 full { SimilarRow(similar, nav) }
