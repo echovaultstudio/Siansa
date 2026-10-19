@@ -170,12 +170,14 @@ object CoverDownload {
             return@withContext
         }
         val disk = SingletonImageLoader.get(context).diskCache ?: return@withContext
-        val ids = buildList {
+        val main = buildList {
             graph.library.albums("name").forEach { it.coverArt?.let(::add) }
             graph.library.artists().forEach { add(it.coverArt ?: "ar-${it.id}") }
             graph.library.playlists().forEach { it.coverArt?.let(::add) }
         }.distinctBy { CoverStore.canonical(it) }
-        AppLog.i("Covers", "Downloading covers: ${ids.size} albums, artists and playlists to check")
+        val songCovers = songCoversToFetch(graph.library.songCoverIds(), main)
+        val ids = main + songCovers
+        AppLog.i("Covers", "Downloading covers: ${main.size} albums, artists and playlists and ${songCovers.size} song and disc covers to check")
         update { Progress(running = true, total = ids.size) }
         val started = System.currentTimeMillis()
         val downloaded = AtomicInteger()
@@ -198,7 +200,7 @@ object CoverDownload {
                 permits.acquire()
                 launch {
                     try {
-                        when (one(graph, disk, id)) {
+                        when (one(graph, disk, id, listsOnly = index >= main.size)) {
                             Outcome.DOWNLOADED -> downloaded.incrementAndGet()
                             Outcome.FAILED -> failed.incrementAndGet()
                             Outcome.HAD -> Unit
@@ -232,11 +234,23 @@ object CoverDownload {
 
     private enum class Outcome { HAD, DOWNLOADED, FAILED }
 
-    private suspend fun one(graph: AppGraph, disk: DiskCache, id: String): Outcome {
+    /**
+     * The song and disc covers to download besides albums', exactly the ids Navidrome gives songs, so
+     * every song list shows them from the phone (issue #201). Which picture each one is stays Navidrome's
+     * choice (its cover art priority, disc art priority and media file cover art settings). Ids already in
+     * [others] are left out.
+     */
+    internal fun songCoversToFetch(songCovers: List<String>, others: List<String>): List<String> {
+        val have = others.mapTo(HashSet()) { CoverStore.canonical(it) }
+        return songCovers.filter { it.isNotEmpty() && have.add(CoverStore.canonical(it)) }
+    }
+
+    /** [listsOnly]: just the small size song lists use (song and disc covers); now playing starts from it while its big one loads. */
+    private suspend fun one(graph: AppGraph, disk: DiskCache, id: String, listsOnly: Boolean = false): Outcome {
         // An animated original kept on the phone answers every size already.
         if (CoverStore.has(id)) return Outcome.HAD
         var outcome = Outcome.HAD
-        for (size in listOf(SMALL_COVER, LARGE_COVER)) {
+        for (size in if (listsOnly) listOf(SMALL_COVER) else listOf(SMALL_COVER, LARGE_COVER)) {
             if (size == LARGE_COVER) {
                 // Big sizes of an animated GIF fail on Navidrome; the screens never ask for them.
                 val kind = AnimatedCovers.knownKind(id)

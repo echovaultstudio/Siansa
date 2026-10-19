@@ -123,6 +123,10 @@ interface LibraryDao {
     @Query("SELECT a.coverArt FROM songs s JOIN albums a ON a.id = s.albumId WHERE s.coverArt = :songCover LIMIT 1")
     suspend fun albumCoverOfSongCover(songCover: String): String?
 
+    /** Every cover id Navidrome gives songs (`dc-…` for a disc, `mf-…` for a song with its own picture). */
+    @Query("SELECT DISTINCT coverArt FROM songs WHERE coverArt IS NOT NULL")
+    suspend fun songCoverIds(): List<String>
+
     @Query("SELECT * FROM songs WHERE albumId IN (:albumIds)")
     suspend fun songsOfAlbums(albumIds: List<String>): List<SongEntity>
 
@@ -173,9 +177,6 @@ interface LibraryDao {
     // Albums
     @Query("SELECT * FROM albums WHERE id = :id")
     suspend fun album(id: String): AlbumEntity?
-
-    @Query("SELECT coverArt FROM albums WHERE id = :id")
-    suspend fun albumCoverArt(id: String): String?
 
     @Query("SELECT id FROM albums WHERE id IN (:ids)")
     suspend fun knownAlbumIds(ids: List<String>): List<String>

@@ -80,9 +80,7 @@ import app.musix.data.LocalPlaylists
 import app.musix.data.Song
 import app.musix.log.AppLog
 import coil3.compose.AsyncImage
-import coil3.request.CachePolicy
 import coil3.request.ImageRequest
-import coil3.request.SuccessResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -290,42 +288,7 @@ fun coverRequest(context: android.content.Context, graph: app.musix.AppGraph, id
 }
 
 /**
- * The album a cover id belongs to, from the id alone: Navidrome gives songs their disc's cover
- * (`dc-<album>:<disc>`), and a song without a cover id shows `al-<album>`. Null for anything else
- * (a song's own `mf-…` cover is looked up in the library; artists and playlists have no album).
- */
-internal fun albumIdOfCover(coverId: String): String? {
-    val own = coverId.substringBefore('_')
-    return when {
-        own.startsWith("dc-") -> own.removePrefix("dc-").substringBefore(':')
-        own.startsWith("al-") -> own.removePrefix("al-")
-        else -> null
-    }?.takeIf { it.isNotEmpty() }
-}
-
-/**
- * Whether the album's cover can stand in while this one loads. The cover download saves album covers
- * under the album's id (`al-<album>_<last change>`), but songs ask for their disc's cover, so without this
- * every song list showed grey squares until each one came over the network, even with all covers downloaded.
- */
-internal fun albumCanStandIn(coverId: String, albumCover: String?): Boolean = albumCover != null && albumCover != coverId
-
-/** The album's cover from the phone (memory or the downloaded covers), never the network; null when it isn't there. */
-private suspend fun albumStandIn(context: android.content.Context, graph: app.musix.AppGraph, coverId: String, size: Int?): coil3.Image? {
-    val album = albumIdOfCover(coverId)?.let { graph.library.albumCover(it) }
-        ?: if (coverId.startsWith("mf-")) graph.library.albumCoverOfSongCover(coverId) else null
-    if (album == null || !albumCanStandIn(coverId, album)) return null
-    val loader = SingletonImageLoader.get(context)
-    (listOf(coverMemoryKey(album, size)) + coverFallbackKeys(album, size)).forEach { key ->
-        loader.memoryCache?.get(MemoryCache.Key(key))?.image?.let { return it }
-    }
-    val request = coverRequest(context, graph, album, size).newBuilder().networkCachePolicy(CachePolicy.DISABLED).build()
-    return (loader.execute(request) as? SuccessResult)?.image
-}
-
-/**
  * Album art from Navidrome. size = null would ask for the original file; screens use [LARGE_COVER] instead.
- * A song's cover that isn't on the phone yet shows its album's meanwhile, so every page gets that by itself.
  * The cache key leaves out the per-session login token, so covers are reused from disk across app starts.
  * Always a still picture (the first frame of an animated cover); [BigCover] shows animations.
  *
@@ -350,12 +313,6 @@ fun Cover(
         if (cached != null || coverId == null) null
         else coverFallbackKeys(coverId, size).firstNotNullOfOrNull { loader.memoryCache?.get(MemoryCache.Key(it))?.image }
     }
-    // A song's or disc's cover not on the phone yet: its album's, if that is, until this one arrives.
-    val albumImage by produceState<coil3.Image?>(null, coverId, size) {
-        if (cached == null && standIn == null && coverId != null) {
-            value = runCatching { albumStandIn(context, graph, coverId, size) }.getOrNull()
-        }
-    }
     val request = remember(coverId, size) { coverId?.let { coverRequest(context, graph, it, size) } }
     Box(
         modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
@@ -369,10 +326,9 @@ fun Cover(
                 modifier = Modifier.fillMaxSize(),
             )
             request != null -> {
-                val shown = standIn ?: albumImage
-                if (shown != null) {
+                if (standIn != null) {
                     Image(
-                        painter = remember(shown) { shown.asPainter(context) },
+                        painter = remember(standIn) { standIn.asPainter(context) },
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
