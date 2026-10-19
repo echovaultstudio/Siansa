@@ -3,6 +3,11 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.12.1beta — 2026-10-19
+
+### Fixed
+- **"Download all covers" didn't run through a VPN to your home network.** On Wi-Fi, reaching Navidrome's home address through a VPN now counts as home. A VPN over mobile data still never downloads covers.
+
 ## 0.12.0beta — 2026-10-19
 
 ### Fixed
