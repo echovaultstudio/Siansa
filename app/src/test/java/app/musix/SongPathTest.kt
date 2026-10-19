@@ -30,4 +30,13 @@ class SongPathTest {
     @Test fun noStepsGivesJustTheTwoSongs() {
         assertEquals(listOf("a", "b"), songPathIds("a", "b", emptyList(), 20))
     }
+
+    /** #212: from now playing, everything after the song playing is queued; nothing starts again. */
+    @Test fun pathFromTheSongPlayingIsQueuedAfterIt() {
+        assertEquals(3, app.musix.mix.songPathUpNext(listOf("now", "x", "y", "b"), "now"))
+        // A path that ends with the song playing, or none playing, is left alone.
+        assertEquals(null, app.musix.mix.songPathUpNext(listOf("a", "x", "now"), "now"))
+        assertEquals(null, app.musix.mix.songPathUpNext(listOf("now", "x"), null))
+        assertEquals(null, app.musix.mix.songPathUpNext(listOf("now"), "now"))
+    }
 }
