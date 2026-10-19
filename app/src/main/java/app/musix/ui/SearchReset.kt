@@ -19,3 +19,10 @@ object SearchReset {
 
 /** Whether the search page should act on reset request [latest], having handled [handled] (issue #189). */
 fun searchResetPending(latest: Int, handled: Int): Boolean = latest > handled
+
+/**
+ * Whether a search is under way: typing in the box, something in it, or sound results showing. Then the back
+ * arrow and the phone's back gesture return to the search page rather than leaving Search (issue #203).
+ */
+fun searchIsActive(focused: Boolean, query: String, soundResults: Boolean): Boolean =
+    focused || query.isNotEmpty() || soundResults

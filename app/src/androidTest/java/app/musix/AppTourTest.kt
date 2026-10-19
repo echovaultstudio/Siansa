@@ -285,6 +285,20 @@ class AppTourTest {
                     ?.config?.getOrNull(SemanticsProperties.EditableText)?.text.orEmpty()
                 if (typed.isNotEmpty()) problems += "Search tapped again kept \"$typed\" in the box"
                 shot("16b-search-again")
+                // Issue #203: the back arrow, and then the back gesture, return to the search page, not Home.
+                compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("Long Song")
+                waitText("Long Song B")
+                shot("16c-search-back-arrow")
+                compose.onAllNodesWithTag("searchBack").onFirst().performClick()
+                idle(600)
+                if (compose.onAllNodesWithText("Radios").fetchSemanticsNodes().isEmpty()) problems += "Search's back arrow didn't return to the search page"
+                compose.onAllNodes(hasSetTextAction()).onFirst().performClick()
+                compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("Long Song")
+                waitText("Long Song B")
+                back()
+                idle(600)
+                if (compose.onAllNodesWithTag("searchField").fetchSemanticsNodes().isEmpty()) problems += "Back from a search left Search"
+                else if (compose.onAllNodesWithText("Radios").fetchSemanticsNodes().isEmpty()) problems += "Back from a search didn't return to the search page"
             }
             step("vibes") {
                 tab("Settings")
