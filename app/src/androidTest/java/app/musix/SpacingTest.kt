@@ -278,4 +278,19 @@ class SpacingTest {
         assertTrue("Find similar is left of Shuffle and doesn't overlap it", similar.right <= shuffle.left + 0.5.dp)
         assertEven("Find similar right next to Shuffle", shuffle.left - similar.right, 0.dp, 1.dp)
     }
+
+    /** Album page (issue #240): room under the big Play button before the first song, marked when it's playing. */
+    @Test fun roomBelowThePlayButton() {
+        compose.setContent {
+            MusixTheme {
+                Column {
+                    app.musix.ui.ActionButtons(enabled = true, onQueue = {}, download = {}, onSimilar = {}, onShuffle = {}, onPlay = {})
+                    Box(Modifier.fillMaxWidth().height(60.dp).testTag("firstSong"))
+                }
+            }
+        }
+        val play = compose.onNodeWithTag("bigPlay").getBoundsInRoot()
+        val song = compose.onNodeWithTag("firstSong").getBoundsInRoot()
+        assertTrue("Only ${(song.top - play.bottom).value} dp under the Play button", song.top - play.bottom >= app.musix.ui.Space.BelowPlayButton - 0.5.dp)
+    }
 }

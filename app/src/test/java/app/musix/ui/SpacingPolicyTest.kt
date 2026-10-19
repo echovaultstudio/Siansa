@@ -36,6 +36,21 @@ class SpacingPolicyTest {
         assertTrue("Named gaps must be Space.* steps:\n" + problems.joinToString("\n"), problems.isEmpty())
     }
 
+    /**
+     * The big round Play button is drawn only by [BigPlayButton], inside a [PlayButtonRow] that leaves
+     * Space.BelowPlayButton under it: a copy of the button elsewhere would miss that room (issue #240).
+     */
+    @Test fun bigPlayButtonOnlyFromItsRow() {
+        val root = roots.firstOrNull { it.isDirectory } ?: return fail("UI sources not found")
+        val button = Regex("""Icons\.Rounded\.PlayArrow,\s*"Play",\s*tint\s*=\s*OnAccent""")
+        val found = root.walkTopDown().filter { it.extension == "kt" }.flatMap { f ->
+            button.findAll(f.readText()).map { f.name }
+        }.toList()
+        assertTrue("The big Play button must come from BigPlayButton in CollectionPage.kt, found in: $found", found == listOf("CollectionPage.kt"))
+        val uses = root.walkTopDown().filter { it.extension == "kt" }.sumOf { f -> Regex("""BigPlayButton\(""").findAll(f.readText()).count() }
+        assertTrue("BigPlayButton is used on album and artist pages", uses >= 3)
+    }
+
     @Test fun theCheckerFindsRawNumbers() {
         val code = """
             Modifier.padding(16.dp)
