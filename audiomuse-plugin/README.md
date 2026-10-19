@@ -39,7 +39,7 @@ artist, so the app can open it on its own server.
 In AudioMuse-AI: Plugins › Repositories, add
 
 ```
-https://raw.githubusercontent.com/Th3K1ngP1n/Musix-Industreez-musix-audiomuse-plugin/main/manifest.json
+https://raw.githubusercontent.com/Musix-Industreez/musix-audiomuse-plugin/main/manifest.json
 ```
 
 then install Musix Analysis from the Catalog tab and apply the restart. AudioMuse-AI checks the catalog for
@@ -55,7 +55,7 @@ The code lives in the Musix repository (`audiomuse-plugin/`); the public reposit
 AudioMuse-AI installs from. To publish, add a new version at the top of `versions` in `plugin.json`, then:
 
 ```sh
-audiomuse-plugin/publish.sh ../Musix-Industreez-musix-audiomuse-plugin
+audiomuse-plugin/publish.sh ../musix-audiomuse-plugin
 ```
 
 and commit and push there. A published version's zip is never replaced, because installed copies check its

@@ -6,14 +6,14 @@
 #   plugins/MusixAnalysis/musix_analysis/            the source, for reading
 #   dist/musix_analysis-<version>.zip                the code AudioMuse-AI downloads
 #
-#   audiomuse-plugin/publish.sh ../musix-audiomuse-plugin [https://raw.githubusercontent.com/<owner>/<repo>/main]
+#   audiomuse-plugin/publish.sh ../musix-audiomuse-plugin [<raw address of the repository>]
 #
 # A version's zip is never replaced once published (installed copies check its checksum): bump the version
 # in plugin.json (a new entry at the top of "versions") for every change.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 target="$(cd "${1:?give the clone of the public plugin repository}" && pwd)"
-raw="${2:-https://raw.githubusercontent.com/Th3K1ngP1n/Musix-Industreez-musix-audiomuse-plugin/main}"
+raw="${2:-https://raw.githubusercontent.com/Musix-Industreez/musix-audiomuse-plugin/main}"
 raw="${raw%/}"
 python3 - "$here" "$target" "$raw" <<'PY'
 import hashlib, io, json, os, shutil, sys, zipfile
