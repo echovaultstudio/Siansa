@@ -34,6 +34,8 @@ def migrate(db):
             error TEXT,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )""")
+    # Where a profile came from: 'measured' here, or 'lumae' when imported (lumae_import.py, until 0.1.3).
+    cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'measured'")
     cur.execute(f"CREATE INDEX IF NOT EXISTS {table('profiles_status')} ON {table('profiles')} (status, analyzer_version)")
     cur.execute(f"""
         CREATE TABLE IF NOT EXISTS {table('wanted')} (
@@ -178,7 +180,7 @@ def save_profile(db, item_id, profile):
             status='ready', ref_lufs=EXCLUDED.ref_lufs, start_ramp=EXCLUDED.start_ramp,
             end_ramp=EXCLUDED.end_ramp, duration_ms=EXCLUDED.duration_ms,
             analyzer_version=EXCLUDED.analyzer_version, attempts=0, retry_after=NULL, error=NULL,
-            updated_at=now()""",
+            source='measured', updated_at=now()""",
         (item_id, profile["ref_lufs"], profile["start_ramp"], profile["end_ramp"], profile["duration_ms"],
          ANALYZER_VERSION))
     cur.execute(f"DELETE FROM {table('wanted')} WHERE item_id=%s", (item_id,))
@@ -236,21 +238,25 @@ def mark_wanted(db, item_ids):
 
 
 def profile_counts(db):
-    """``(songs, ready, failed, wanted)`` across the library."""
+    """``(songs, ready, failed, wanted, imported)`` across the library; ``imported`` are ready ones from Lumae."""
     cur = db.cursor()
     cur.execute(f"""
         SELECT (SELECT count(*) FROM score),
                count(*) FILTER (WHERE p.status='ready' AND p.analyzer_version=%s),
                count(*) FILTER (WHERE p.status='failed'),
-               (SELECT count(*) FROM {table('wanted')})
-          FROM {table('profiles')} p JOIN score s USING (item_id)""", (ANALYZER_VERSION,))
-    songs, ready, failed, wanted = cur.fetchone()
+               (SELECT count(*) FROM {table('wanted')}),
+               count(*) FILTER (WHERE p.status='ready' AND p.analyzer_version=%s AND p.source='lumae')
+          FROM {table('profiles')} p JOIN score s USING (item_id)""", (ANALYZER_VERSION, ANALYZER_VERSION))
+    songs, ready, failed, wanted, imported = cur.fetchone()
     cur.close()
-    return int(songs or 0), int(ready or 0), int(failed or 0), int(wanted or 0)
+    return int(songs or 0), int(ready or 0), int(failed or 0), int(wanted or 0), int(imported or 0)
 
 
-def songs_to_measure(db, limit):
-    """Up to ``limit`` songs without a current profile: asked-for songs first, then the newest."""
+def songs_to_measure(db, limit, include_imported=False):
+    """Up to ``limit`` songs without a current profile: asked-for songs first, then the newest.
+
+    ``include_imported`` also returns songs whose profile was imported from Lumae ("Measure all songs").
+    """
     cur = db.cursor()
     cur.execute(f"""
         SELECT s.item_id, s.title
@@ -259,9 +265,10 @@ def songs_to_measure(db, limit):
           LEFT JOIN {table('wanted')} w USING (item_id)
          WHERE (p.item_id IS NULL
                 OR (p.status='ready' AND p.analyzer_version <> %s)
-                OR (p.status='failed' AND (p.retry_after IS NULL OR p.retry_after <= now())))
-         ORDER BY w.asked_at DESC NULLS LAST, s.created_at DESC
-         LIMIT %s""", (ANALYZER_VERSION, int(limit)))
+                OR (p.status='failed' AND (p.retry_after IS NULL OR p.retry_after <= now()))
+                OR (%s AND p.status='ready' AND p.source='lumae'))
+         ORDER BY w.asked_at DESC NULLS LAST, (p.source='lumae') NULLS FIRST, s.created_at DESC
+         LIMIT %s""", (ANALYZER_VERSION, bool(include_imported), int(limit)))
     rows = cur.fetchall()
     cur.close()
     return rows
