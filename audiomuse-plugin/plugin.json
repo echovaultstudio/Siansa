@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.1.1",
+      "min_core_version": "3.6.4",
+      "changelog": "Measure all songs at once (with a warning), shorter rounds so AudioMuse can start its own jobs, and reloading the settings page no longer starts a job again.",
+      "imageUrl": ""
+    },
+    {
       "version": "0.1.0",
       "min_core_version": "3.6.4",
       "changelog": "First version: volume and fade profiles, similar albums and artists, each with its own progress.",

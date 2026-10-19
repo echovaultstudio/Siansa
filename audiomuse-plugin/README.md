@@ -10,6 +10,12 @@ It does two things, each with its own progress, so one never waits for the other
 | **Volume & fade profiles** | Each song's loudness (EBU R128 / BS.1770, in LUFS) for levelling, and how it starts and ends (the MixRamp idea) for SmoothFade crossfades. | A song is measured right after AudioMuse-AI analyses it, from the file it already has. Older songs and songs that failed are fetched and measured a batch at a time by the tick; songs the app asks for come first. |
 | **Similar albums & artists** | For an album or artist, the ones that sound most alike, from AudioMuse-AI's MusiCNN analysis. At most two albums per artist, other editions of the same album left out. | The library and the sound analysis each have a digest of exactly what the build reads, and a generation that goes up when it changes. A build remembers the generations it came from; when either moves on, the tick builds again and swaps the new lists in at once. The old lists stay in use until then. |
 
+To measure the whole library at once, use **Measure all songs** on the settings page. It runs in rounds
+of 12 minutes every 15 minutes until every song is measured, and can be stopped at any time. Each song is
+downloaded from the music server and read in full, so a large library takes hours or days; and while a
+round runs, AudioMuse-AI doesn't start its own jobs (analysis, clustering, scheduled tasks), which is why
+the rounds leave a gap. Without it, the tick measures one batch in at most 4 minutes.
+
 The **tick** is a scheduled task (`plugin.musix_analysis.tick`, every 15 minutes, set up when the plugin is
 installed). Change or switch it off under Administration › Scheduled Tasks. The settings page (Plugins ›
 Musix Analysis › Settings) shows the three sections, Library, Volume & fade profiles and Similar albums &
