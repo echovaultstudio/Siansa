@@ -186,4 +186,22 @@ class SubsonicComplianceTest {
         assertEquals(listOf("b", "a"), SubsonicApi.mergeAlbumLists("newest", listOf(a, b)).map { it.id })
         assertEquals(listOf("b", "a"), SubsonicApi.mergeAlbumLists("alphabeticalByName", listOf(a, b)).map { it.id })
     }
+
+    /** Navidrome's sonic similarity (OpenSubsonic sonicSimilarity), issue #208. */
+    @Test fun sonicMatchesFromNavidrome() = runBlocking {
+        val server = FakeServer { seen ->
+            when (seen.endpoint) {
+                "getSonicSimilarTracks" -> ok(""""sonicMatch":[{"entry":{"id":"s2","title":"Two","artist":"A"},"similarity":0.95},{"entry":{"id":"s3","title":"Three"},"similarity":0.5}]""")
+                "findSonicPath" -> ok(""""sonicMatch":[{"entry":{"id":"a","title":"A"},"similarity":1.0},{"entry":{"id":"m","title":"M"},"similarity":0.4},{"entry":{"id":"b","title":"B"},"similarity":0.0}]""")
+                else -> extensions("sonicSimilarity" to "1")
+            }
+        }
+        val api = api(server)
+        val similar = api.sonicSimilar("s1", 2)
+        assertEquals(listOf("s2" to 0.95, "s3" to 0.5), similar.map { it.first.id to it.second })
+        assertEquals("2", server.seen.single { it.endpoint == "getSonicSimilarTracks" }.one("count"))
+        assertEquals(listOf("a", "m", "b"), api.sonicPath("a", "b", 3).map { it.id })
+        val path = server.seen.single { it.endpoint == "findSonicPath" }
+        assertEquals(listOf("a", "b", "3"), listOf(path.one("startSongId"), path.one("endSongId"), path.one("count")))
+    }
 }

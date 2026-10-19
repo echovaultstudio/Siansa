@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import androidx.compose.ui.platform.testTag
 import android.os.SystemClock
 import app.musix.log.AppLog
 import app.musix.playback.SeekTracker
@@ -192,7 +193,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     fun openSongPath() {
         val id = song?.id ?: return
         onClose()
-        nav.openSongPath(id)
+        // From now playing, the path is queued straight after this song once it's ready (#212).
+        nav.openSongPath(id, fromNowPlaying = true)
     }
 
     // Dragging down (at the top of the page) moves the whole player with the finger; let go far or fast
@@ -735,7 +737,17 @@ private fun QueueView(state: PlayerState) {
         Spacer(Modifier.height(Space.Tight))
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             itemsIndexed(state.queue, key = { i, s -> "$i-${s.id}" }) { index, song ->
-                SongRow(song = song, onClick = { graph.player.skipTo(index) }, highlighted = index == state.index, swipeToQueue = false)
+                // The song playing now stands out: a band behind it and "Now playing" under its title (#212).
+                val playing = index == state.index
+                Box(Modifier.fillMaxWidth().background(if (playing) Color.White.copy(alpha = NOW_PLAYING_TINT) else Color.Transparent).testTag(if (playing) "queueNowPlaying" else "queueRow")) {
+                    SongRow(
+                        song = song,
+                        onClick = { graph.player.skipTo(index) },
+                        highlighted = playing,
+                        swipeToQueue = false,
+                        subtitle = if (playing) listOfNotNull("Now playing", artistAndAlbum(song)).joinToString(" · ") else artistAndAlbum(song),
+                    )
+                }
             }
         }
     }
@@ -744,6 +756,9 @@ private fun QueueView(state: PlayerState) {
 
 /** How much of the lyrics card shows under the player before scrolling. */
 private val PLAYER_PEEK = 44.dp
+
+/** How strongly the song playing now is marked in the queue (#212). */
+private const val NOW_PLAYING_TINT = 0.14f
 
 /** How far up the queue button has to be pulled to open the queue. */
 private const val QUEUE_PULL_PX = 40f

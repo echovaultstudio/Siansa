@@ -2,6 +2,7 @@ package app.musix.net
 
 import app.musix.data.AppJson
 import app.musix.data.AppSettings
+import app.musix.log.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -17,6 +18,21 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+
+/** One concept to steer the Sound search with (issue #208): [more] or less of it. */
+data class Steer(val term: String, val more: Boolean = true)
+
+/** One of AudioMuse's mood centres: [mood] (happy, relaxed…), its [index], and the tags that describe it. */
+data class MoodCentre(val mood: String, val index: Int, val tags: List<String>)
+
+/** The end of a song path that isn't a song: one of AudioMuse's moods (issue #208). */
+enum class PathMood(val id: String, val label: String) {
+    HAPPY("happy", "Happy"),
+    RELAXED("relaxed", "Relaxed"),
+    SAD("sad", "Sad"),
+    DANCEABLE("danceable", "Danceable"),
+    AGGRESSIVE("aggressive", "Aggressive"),
+}
 
 /** A track AudioMuse matched to a text description. For a single server, id is the Navidrome song id. */
 data class ClapHit(
@@ -107,13 +123,10 @@ class AudioMuseApi(
             val json = element as? JsonObject
             if (response.code == 401 || response.code == 403) throw Unauthorized()
             if (!response.isSuccessful) {
-                val reason = json?.str("error") ?: json?.str("message") ?: body.take(120).ifBlank { "no details" }
-                throw ApiException(
-                    when (response.code) {
-                        503 -> "AudioMuse's search index isn't loaded yet ($reason)"
-                        else -> "AudioMuse answered HTTP ${response.code}: $reason"
-                    }
-                )
+                val code = json?.int("error_code")
+                val reason = json?.str("error_message") ?: json?.str("error") ?: json?.str("message") ?: body.take(120).ifBlank { "no details" }
+                AppLog.w("AudioMuse", "${request.url.encodedPath} failed: HTTP ${response.code}, error ${code ?: "?"}: $reason")
+                throw ApiException(AudioMuseErrors.message(code, response.code, reason), code)
             }
             element ?: throw ApiException("AudioMuse sent something that isn't JSON. Is the address its API port?")
         }
@@ -125,10 +138,24 @@ class AudioMuseApi(
      */
     suspend fun plugin(pathAndQuery: String): JsonElement = executeElement { request(pathAndQuery).get().build() }
 
-    suspend fun textSearch(query: String, limit: Int): List<ClapHit> {
+    /**
+     * CLAP text-to-audio search. [steering] nudges it towards (or away from) concepts from [concepts]: AudioMuse
+     * snaps each weight to its own steps, so Musix leaves the weight to the server (issue #208).
+     */
+    suspend fun textSearch(query: String, limit: Int, steering: List<Steer> = emptyList()): List<ClapHit> {
         val payload = buildJsonObject {
             put("query", query)
             put("limit", limit)
+            if (steering.isNotEmpty()) {
+                put("steering", kotlinx.serialization.json.buildJsonArray {
+                    steering.take(10).forEach { s ->
+                        add(buildJsonObject {
+                            put("term", s.term)
+                            put("direction", if (s.more) "more" else "less")
+                        })
+                    }
+                })
+            }
         }.toString()
         val root = execute { request("/api/clap/search").post(payload.toRequestBody(JSON_TYPE)).build() }
         return root.arr("results").mapNotNull { r ->
@@ -144,19 +171,58 @@ class AudioMuseApi(
     }
 
     /**
-     * Tracks that sound like [itemId] (for a single server, the Navidrome song id). With
-     * [sameMood] AudioMuse also keeps the mood (danceable, relaxed, sad…) close, so a radio keeps the vibe.
+     * Tracks that sound like [itemId] (for a single server, the Navidrome song id). Duplicates, mood and radius
+     * follow AudioMuse's own settings (SIMILARITY_ELIMINATE_DUPLICATES_DEFAULT, its mood default,
+     * SIMILARITY_RADIUS_DEFAULT): Musix only sends [sameMood] when the listener chose it (issue #208).
      */
-    suspend fun similarTracks(itemId: String, count: Int, sameMood: Boolean = true): List<ClapHit> {
-        val s = settings()
-        val url = s.audioMuseUrl.toHttpUrl().newBuilder()
-            .addPathSegments("api/similar_tracks")
+    suspend fun similarTracks(itemId: String, count: Int, sameMood: Boolean? = null): List<ClapHit> {
+        val url = apiUrl("api/similar_tracks")
             .addQueryParameter("item_id", itemId)
             .addQueryParameter("n", count.toString())
-            .addQueryParameter("eliminate_duplicates", "true")
-            .addQueryParameter("mood_similarity", sameMood.toString())
+            .apply { sameMood?.let { addQueryParameter("mood_similarity", it.toString()) } }
             .build()
-        val root = executeElement { request("").url(url).get().build() }
+        return neighbours(executeElement { request("").url(url).get().build() })
+    }
+
+    /** AudioMuse's mood centres (happy, relaxed…), each with the tags that describe it (issue #208). */
+    suspend fun moodCentres(): List<MoodCentre> {
+        centres?.let { return it }
+        val root = execute { request("/api/mood_centroids").get().build() }
+        return parseMoodCentres(root).also { centres = it }
+    }
+
+    @Volatile private var centres: List<MoodCentre>? = null
+
+    /** Tracks around one of AudioMuse's mood centres: a radio for that mood (issue #208). */
+    suspend fun moodRadio(centre: MoodCentre, count: Int): List<ClapHit> {
+        val url = apiUrl("api/similar_tracks")
+            .addQueryParameter("mood", centre.mood)
+            .addQueryParameter("centroid_index", centre.index.toString())
+            .addQueryParameter("n", count.toString())
+            .build()
+        return neighbours(executeElement { request("").url(url).get().build() })
+    }
+
+    /**
+     * Song Alchemy: the songs closest to a blend of [blend] (and away from [avoid]), all song ids (issue #208).
+     * The count, temperature and distances follow AudioMuse's own settings unless [count] is given.
+     */
+    suspend fun alchemy(blend: List<String>, avoid: List<String> = emptyList(), count: Int? = null): List<ClapHit> {
+        val payload = buildJsonObject {
+            put("items", kotlinx.serialization.json.buildJsonArray {
+                blend.forEach { id -> add(buildJsonObject { put("id", id); put("op", "ADD"); put("type", "song") }) }
+                avoid.forEach { id -> add(buildJsonObject { put("id", id); put("op", "SUBTRACT"); put("type", "song") }) }
+            })
+            count?.let { put("n", it) }
+        }.toString()
+        val root = execute { request("/api/alchemy").post(payload.toRequestBody(JSON_TYPE)).build() }
+        return neighbours(root["results"] ?: JsonArray(emptyList()))
+    }
+
+    private fun apiUrl(path: String) = settings().audioMuseUrl.trimEnd('/').toHttpUrl().newBuilder().addPathSegments(path)
+
+    /** AudioMuse's track rows ({item_id, title, author, album, distance}); closer is a higher similarity. */
+    private fun neighbours(root: JsonElement): List<ClapHit> {
         val rows = (root as? JsonArray) ?: (root as? JsonObject)?.let { it["results"] as? JsonArray } ?: JsonArray(emptyList())
         return rows.mapNotNull { element ->
             val r = element as? JsonObject ?: return@mapNotNull null
@@ -185,16 +251,29 @@ class AudioMuseApi(
     }
 
     /**
-     * A song path: tracks that move step by step from the sound of [startId] to the sound of [endId]
-     * (AudioMuse's `find_path`), in order, normally including both ends. [maxSteps] limits its length.
+     * A song path (AudioMuse's `find_path`): tracks that move step by step from one end to the other, in order,
+     * both ends included. Each end is a song id, or one end a [PathMood]. [length] is the whole path, both ends
+     * counted, and is kept exactly (`path_fix_size`), so the path is as long as the listener picked (issue #208).
+     * [lyrics] builds it in the lyrics' meaning (SemGrove) instead of the sound alone.
      */
-    suspend fun findPath(startId: String, endId: String, maxSteps: Int): List<ClapHit> {
-        val s = settings()
-        val url = s.audioMuseUrl.toHttpUrl().newBuilder()
-            .addPathSegments("api/find_path")
-            .addQueryParameter("start_song_id", startId)
-            .addQueryParameter("end_song_id", endId)
-            .addQueryParameter("max_steps", maxSteps.toString())
+    suspend fun findPath(
+        startId: String?,
+        endId: String?,
+        length: Int,
+        startMood: PathMood? = null,
+        endMood: PathMood? = null,
+        lyrics: Boolean = false,
+    ): List<ClapHit> {
+        val url = apiUrl("api/find_path")
+            .apply {
+                startId?.let { addQueryParameter("start_song_id", it) }
+                endId?.let { addQueryParameter("end_song_id", it) }
+                startMood?.let { addQueryParameter("start_mood", it.id) }
+                endMood?.let { addQueryParameter("end_mood", it.id) }
+                if (lyrics) addQueryParameter("path_space", "lyrics")
+            }
+            .addQueryParameter("max_steps", length.toString())
+            .addQueryParameter("path_fix_size", "true")
             .build()
         val root = executeElement { request("").url(url).get().build() }
         val rows = (root as? JsonArray) ?: (root as? JsonObject)?.let { it["path"] as? JsonArray } ?: JsonArray(emptyList())
@@ -214,7 +293,24 @@ class AudioMuseApi(
             .distinct()
     }
 
-    private companion object {
+    internal companion object {
         val JSON_TYPE = "application/json".toMediaType()
+
+        /** `{"happy": [{"index": 0, "top_tags": ["pop", …]}, …], …}` as a flat list. */
+        /** The navigation key of a mood centre ("relaxed-2") and back. */
+        fun centreKey(c: MoodCentre) = "${c.mood}-${c.index}"
+
+        /** "Relaxed: piano, ambient": the mood and its first two tags. */
+        fun centreTitle(c: MoodCentre) =
+            c.mood.replaceFirstChar { it.uppercase() } + (c.tags.take(2).takeIf { it.isNotEmpty() }?.joinToString(", ", prefix = ": ") ?: "")
+
+        fun parseMoodCentres(root: JsonObject): List<MoodCentre> = root.entries.flatMap { (mood, list) ->
+            (list as? JsonArray).orEmpty().mapNotNull { e ->
+                val o = e as? JsonObject ?: return@mapNotNull null
+                val index = o.int("index") ?: return@mapNotNull null
+                val tags = (o["top_tags"] as? JsonArray)?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }.orEmpty()
+                MoodCentre(mood, index, tags)
+            }
+        }
     }
 }

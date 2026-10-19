@@ -22,6 +22,7 @@ import app.musix.data.SyncPhase
 import app.musix.data.TopSongs
 import app.musix.log.AppLog
 import app.musix.log.NetLog
+import app.musix.mix.Sonic
 import app.musix.mix.MixGenerator
 import app.musix.mix.Radios
 import app.musix.mix.Insights
@@ -274,6 +275,8 @@ class AppGraph(val app: Application) {
         isOffline = { connection.current.offline },
         moved = { localId, made -> downloads.moveItem(OfflineItem.key(OfflineKind.PLAYLIST, localId), made.offlineItem()) },
     )
+    /** "Sounds like" from Navidrome's sonic similarity or AudioMuse (issue #208). */
+    val sonic = Sonic(this)
     val songRadio = SongRadio(this)
     val songPath = SongPath(this)
     val sleepTimer = SleepTimer()
