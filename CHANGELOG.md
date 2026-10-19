@@ -3,6 +3,16 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.15.3beta — 2026-10-19
+
+### Fixed
+- **More room under the big Play button** on album, playlist, mix and artist pages, so the first song (marked when
+  it's playing) no longer touches it.
+
+### Changed
+- **New icon for Find similar albums:** the waveform of Similar songs with an "A" cut into it, on the album page and in
+  the now playing menu.
+
 ## 0.15.2beta — 2026-10-19
 
 ### Fixed
