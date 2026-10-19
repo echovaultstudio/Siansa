@@ -1,6 +1,8 @@
 package app.musix.ui
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -21,5 +23,17 @@ class CoverStandInTest {
     @Test fun notTheSameCoverOrNone() {
         assertFalse(albumCanStandIn("al-54xd1KWT9oO6pSAgFAvXBq_68f1a2b3", "al-54xd1KWT9oO6pSAgFAvXBq_68f1a2b3"))
         assertFalse(albumCanStandIn("dc-54xd1KWT9oO6pSAgFAvXBq:1", null))
+    }
+
+    /** The cover works out its album from the id alone, so every page gets the stand-in without passing anything. */
+    @Test fun theAlbumFromTheCoverId() {
+        assertEquals("2Fx2A0PG3R5jyL1lcv0uey", albumIdOfCover("dc-2Fx2A0PG3R5jyL1lcv0uey:1"))
+        assertEquals("4DgpLwJJp8eMyx6vZMBfdq", albumIdOfCover("dc-4DgpLwJJp8eMyx6vZMBfdq:3"))
+        assertEquals("54xd1KWT9oO6pSAgFAvXBq", albumIdOfCover("al-54xd1KWT9oO6pSAgFAvXBq"))
+        assertEquals("54xd1KWT9oO6pSAgFAvXBq", albumIdOfCover("al-54xd1KWT9oO6pSAgFAvXBq_68f1a2b3"))
+        assertNull(albumIdOfCover("mf-6u0xgGu8UpYMh4vYyxjdf9_68f1a2b3"))
+        assertNull(albumIdOfCover("ar-1MKHOmT1wKJxNgWWYZqzj6"))
+        assertNull(albumIdOfCover("pl-abc"))
+        assertNull(albumIdOfCover("dc-"))
     }
 }

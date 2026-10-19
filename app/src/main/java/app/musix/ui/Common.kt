@@ -290,22 +290,31 @@ fun coverRequest(context: android.content.Context, graph: app.musix.AppGraph, id
 }
 
 /**
- * Whether a song's cover can stand in with its album's while it loads: Navidrome gives songs their disc's
- * cover (`dc-<album>:<disc>`), which the cover download doesn't fetch, so without this every song list
- * showed grey squares until each disc cover came over the network, even with all album covers on the phone.
+ * The album a cover id belongs to, from the id alone: Navidrome gives songs their disc's cover
+ * (`dc-<album>:<disc>`), and a song without a cover id shows `al-<album>`. Null for anything else
+ * (a song's own `mf-…` cover is looked up in the library; artists and playlists have no album).
+ */
+internal fun albumIdOfCover(coverId: String): String? {
+    val own = coverId.substringBefore('_')
+    return when {
+        own.startsWith("dc-") -> own.removePrefix("dc-").substringBefore(':')
+        own.startsWith("al-") -> own.removePrefix("al-")
+        else -> null
+    }?.takeIf { it.isNotEmpty() }
+}
+
+/**
+ * Whether the album's cover can stand in while this one loads. The cover download saves album covers
+ * under the album's id (`al-<album>_<last change>`), but songs ask for their disc's cover, so without this
+ * every song list showed grey squares until each one came over the network, even with all covers downloaded.
  */
 internal fun albumCanStandIn(coverId: String, albumCover: String?): Boolean = albumCover != null && albumCover != coverId
 
 /** The album's cover from the phone (memory or the downloaded covers), never the network; null when it isn't there. */
-private suspend fun albumStandIn(
-    context: android.content.Context,
-    graph: app.musix.AppGraph,
-    coverId: String,
-    albumId: String,
-    size: Int?,
-): coil3.Image? {
-    val album = graph.library.albumCover(albumId.removePrefix("al-")) ?: return null
-    if (!albumCanStandIn(coverId, album)) return null
+private suspend fun albumStandIn(context: android.content.Context, graph: app.musix.AppGraph, coverId: String, size: Int?): coil3.Image? {
+    val album = albumIdOfCover(coverId)?.let { graph.library.albumCover(it) }
+        ?: if (coverId.startsWith("mf-")) graph.library.albumCoverOfSongCover(coverId) else null
+    if (album == null || !albumCanStandIn(coverId, album)) return null
     val loader = SingletonImageLoader.get(context)
     (listOf(coverMemoryKey(album, size)) + coverFallbackKeys(album, size)).forEach { key ->
         loader.memoryCache?.get(MemoryCache.Key(key))?.image?.let { return it }
@@ -316,6 +325,7 @@ private suspend fun albumStandIn(
 
 /**
  * Album art from Navidrome. size = null would ask for the original file; screens use [LARGE_COVER] instead.
+ * A song's cover that isn't on the phone yet shows its album's meanwhile, so every page gets that by itself.
  * The cache key leaves out the per-session login token, so covers are reused from disk across app starts.
  * Always a still picture (the first frame of an animated cover); [BigCover] shows animations.
  *
@@ -328,8 +338,6 @@ fun Cover(
     size: Int?,
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(8.dp),
-    /** A song's album: its cover, if it's on the phone, shows while the song's own loads. */
-    albumId: String? = null,
 ) {
     val graph = LocalGraph.current
     val context = LocalContext.current
@@ -342,9 +350,10 @@ fun Cover(
         if (cached != null || coverId == null) null
         else coverFallbackKeys(coverId, size).firstNotNullOfOrNull { loader.memoryCache?.get(MemoryCache.Key(it))?.image }
     }
-    val albumImage by produceState<coil3.Image?>(null, coverId, size, albumId) {
-        if (cached == null && standIn == null && coverId != null && albumId != null) {
-            value = runCatching { albumStandIn(context, graph, coverId, albumId, size) }.getOrNull()
+    // A song's or disc's cover not on the phone yet: its album's, if that is, until this one arrives.
+    val albumImage by produceState<coil3.Image?>(null, coverId, size) {
+        if (cached == null && standIn == null && coverId != null) {
+            value = runCatching { albumStandIn(context, graph, coverId, size) }.getOrNull()
         }
     }
     val request = remember(coverId, size) { coverId?.let { coverRequest(context, graph, it, size) } }
@@ -501,7 +510,7 @@ fun SongRow(
                 )
             }
             if (showCover) {
-                Cover(song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp), albumId = song.albumId)
+                Cover(song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
                 Spacer(Modifier.width(Space.Medium))
             }
             Column(Modifier.weight(1f)) {

@@ -145,7 +145,7 @@ fun PlayerMenu(
         ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
             Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = Space.Small)) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Tight), verticalAlignment = Alignment.CenterVertically) {
-                    Cover(song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(4.dp), albumId = song.albumId)
+                    Cover(song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(4.dp))
                     Spacer(Modifier.width(Space.Medium))
                     Column(Modifier.weight(1f)) {
                         Text(song.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
