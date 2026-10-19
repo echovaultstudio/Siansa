@@ -1,0 +1,2 @@
+Releases are on hold while this file is on main (see the release job in .github/workflows/ci.yml).
+Merges keep collecting notes in changelog.d/. Delete this file to publish them all as one release.
