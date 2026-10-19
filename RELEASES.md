@@ -3,6 +3,11 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.14.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.14.0beta) — 2026-10-19
+
+- [#215](https://github.com/Musix-Industreez/musix/pull/215) Levelling: ReplayGain under Crossfade and levelling, what levels the song playing now, never both (@Th3K1ngP1n)
+- [#217](https://github.com/Musix-Industreez/musix/pull/217) Release 0.14: your sonic fingerprint, all Sound search descriptors (#216), levelling on Crossfade and levelling (#214) (@Th3K1ngP1n)
+
 ## [0.13.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.13.0beta) — 2026-10-19
 
 - [#210](https://github.com/Musix-Industreez/musix/pull/210) Combined release: AudioMuse compatibility (#208), equaliser loudness (#159), song path queue (#212), branch cleanup (@Th3K1ngP1n)
