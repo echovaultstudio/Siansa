@@ -294,7 +294,12 @@ jobs:
         run: |
           VERSION=$(tr -d '[:space:]' < notes/version.txt)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then
+          # A file .release-hold on main holds releases back: merges keep collecting notes in changelog.d/,
+          # and deleting the file publishes them all as one release.
+          if [ -f .release-hold ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Releases are on hold (.release-hold on main); v$VERSION will be published once it's removed."
+          elif git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "::notice::v$VERSION is already released; nothing new to publish (no notes in changelog.d/)."
           elif [ ! -s "notes/$VERSION.md" ]; then
