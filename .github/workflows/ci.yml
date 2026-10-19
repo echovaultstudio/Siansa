@@ -31,7 +31,9 @@ env:
 jobs:
   checks:
     name: Build, lint and unit tests
-    runs-on: ubuntu-latest
+    # GitHub's runner, or a self-hosted one when the repository variable BUILD_RUNNER names it, e.g.
+    # ["self-hosted","musix","build"] (issue #218, ci/self-hosted/README.md). Delete the variable to go back.
+    runs-on: ${{ fromJSON(vars.BUILD_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -171,11 +173,14 @@ jobs:
     needs: checks
     # Not on pull requests (20 minutes each); after merges to main, nightly, and on demand.
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    # GitHub's runner, or a self-hosted one with KVM when the repository variable EMULATOR_RUNNER names it,
+    # e.g. ["self-hosted","musix","emulator"] (issue #218, ci/self-hosted/README.md).
+    runs-on: ${{ fromJSON(vars.EMULATOR_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 60
     steps:
-      # The emulator needs ~7.5 GB for its storage; the runner image leaves too little free.
+      # The emulator needs ~7.5 GB for its storage; GitHub's runner image leaves too little free.
       - name: Free disk space
+        if: runner.environment == 'github-hosted'
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /usr/share/swift /opt/hostedtoolcache/CodeQL /usr/local/lib/node_modules || true
           echo "::notice::Free disk: $(df -h / | awk 'NR==2{print $4}')"
@@ -191,13 +196,16 @@ jobs:
         with:
           gradle-version: "8.14.3"
 
+      # A self-hosted runner has it already (ci/self-hosted/setup.sh) and no sudo.
       - name: Install ffmpeg
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+        run: command -v ffmpeg > /dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null)
 
       - name: Start Navidrome with the test library
         run: scripts/test-server.sh
 
+      # A self-hosted runner's user is in the kvm group already.
       - name: Enable KVM
+        if: runner.environment == 'github-hosted'
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
@@ -264,6 +272,14 @@ jobs:
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
           git add -A && git commit -q -m "Tour screenshots for ${GITHUB_SHA::7}"
           git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-screens
+
+      # A self-hosted runner is reused: stop the test server and its proxy so the next run finds the ports free.
+      - name: Stop the test server
+        if: always() && runner.environment != 'github-hosted'
+        run: |
+          for f in "$RUNNER_TEMP"/navidrome-test/*.pid; do [ -f "$f" ] && kill "$(cat "$f")" 2>/dev/null || true; done
+          pkill -u "$(id -u)" -f "scripts/shape.py" || true
+          pkill -u "$(id -u)" -x navidrome || true
 
       - uses: actions/upload-artifact@v7
         if: always()
