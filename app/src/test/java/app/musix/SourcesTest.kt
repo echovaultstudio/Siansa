@@ -72,6 +72,10 @@ class SourcesTest {
         assertEquals("y", GuestMusic.itemOfCover("ar-y_1"))
         assertNull(GuestMusic.itemOfCover("abc123"))
         assertNull(GuestMusic.itemOfCover("xx-abc"))
+        // Issue #226: disc covers belong to their album, so they go out with the login of whoever's album it is.
+        assertEquals("5jL9UOlXosmr2imPANHgvl", GuestMusic.itemOfCover("dc-5jL9UOlXosmr2imPANHgvl:1"))
+        assertEquals("abc", GuestMusic.itemOfCover("dc-abc:12_6543fe"))
+        assertNull(GuestMusic.itemOfCover("dc-"))
     }
 
     // ---- Only downloaded music ----
