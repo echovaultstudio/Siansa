@@ -3,6 +3,10 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.14.1beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.14.1beta) — 2026-10-19
+
+- [#221](https://github.com/Musix-Industreez/musix/pull/221) Source filter: Sync shows its progress and result (@Th3K1ngP1n)
+
 ## [0.14.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.14.0beta) — 2026-10-19
 
 - [#215](https://github.com/Musix-Industreez/musix/pull/215) Levelling: ReplayGain under Crossfade and levelling, what levels the song playing now, never both (@Th3K1ngP1n)
