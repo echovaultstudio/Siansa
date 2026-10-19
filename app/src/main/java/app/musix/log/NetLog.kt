@@ -50,7 +50,7 @@ object NetLog {
         val headers = request.headers.names()
             .filterNot { it.lowercase().startsWith(OWN_PREFIX) }
             .map { name -> if (name.lowercase() in hidden) "$name: •••" else "$name: ${request.headers.values(name).joinToString(", ")}" }
-        val body = request.body?.contentLength()?.takeIf { it >= 0 }?.let { "  body ${size(it)}" }
+        val body = request.body?.contentLength()?.takeIf { it >= 0 }?.let { "  body ${size(it)}" + (form(request)?.let { f -> " · form ?$f" } ?: "") }
         return AppLog.redact(
             buildString {
                 append("→ ${request.method} ${request.url}")
@@ -59,6 +59,13 @@ object NetLog {
                 body?.let { append("\n").append(it) }
             }
         )
+    }
+
+    /** A form POST's fields (Navidrome calls with many songs, issue #206), so they're in the log like a GET's. */
+    private fun form(request: Request): String? {
+        val body = request.body ?: return null
+        if (body.contentType()?.subtype != "x-www-form-urlencoded" || body.contentLength() !in 0..64_000) return null
+        return runCatching { okio.Buffer().also { body.writeTo(it) }.readUtf8() }.getOrNull()
     }
 
     /** One entry for a request and its answer. */
