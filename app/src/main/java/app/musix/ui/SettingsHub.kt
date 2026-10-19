@@ -133,7 +133,7 @@ fun SettingsHub(nav: NavController) {
             HubRow(
                 Icons.Rounded.Equalizer,
                 "Playback",
-                "ReplayGain ${settings.replayGain.label.lowercase()} · " + eqSummary(eq) + " · " + crossfadeSummary(settings).substringBefore(" · ").lowercase() + " · Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}",
+                eqSummary(eq) + " · " + crossfadeSummary(settings).replaceFirstChar { it.lowercase() } + " · Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}",
             ) { nav.navigate("settings/playback") }
             val theme = themeChoiceOf(settings)
             HubRow(
@@ -202,14 +202,16 @@ private fun HubRow(icon: ImageVector, title: String, subtitle: String, onClick: 
     }
 }
 
-/** "Crossfade 6 s · Lumae plugin", "Smart crossfade up to 8 s · song tags", "No crossfade · song tags". */
+/** "Crossfade 6 s · levelling track by Lumae", "No crossfade · levelling album by ReplayGain tags", "… · no levelling". */
 internal fun crossfadeSummary(s: AppSettings): String {
     val fade = when (s.crossfade) {
         CrossfadeMode.OFF -> "No crossfade"
         CrossfadeMode.FIXED -> "Crossfade ${s.crossfadeSeconds} s"
         CrossfadeMode.SMART -> "Smart crossfade up to ${s.crossfadeSeconds} s"
     }
-    return fade + " · " + s.loudnessSource.label.let { if (s.loudnessSource == LoudnessSource.TAGS) it.lowercase() else it }
+    val levelling = if (s.replayGain == ReplayGainMode.OFF) "no levelling" else
+        "levelling ${s.replayGain.label.lowercase()} by " + if (s.loudnessSource == LoudnessSource.LUMAE) "Lumae" else "ReplayGain tags"
+    return "$fade · $levelling"
 }
 
 private fun eqSummary(eq: EqSettings): String = if (eq.enabled) "equaliser ${eq.preset.label.lowercase()}" else "equaliser off"
@@ -238,8 +240,8 @@ fun PlaybackSettingsScreen(nav: NavController) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Heading("Equaliser and ReplayGain")
-                    Hint((if (eq.enabled) "On · ${eq.preset.label}" else "Equaliser off") + " · ReplayGain ${settings.replayGain.label.lowercase()}")
+                    Heading("Equaliser")
+                    Hint(if (eq.enabled) "On · ${eq.preset.label}" else "Off")
                 }
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
             }
@@ -249,7 +251,7 @@ fun PlaybackSettingsScreen(nav: NavController) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Heading("Crossfade and loudness")
+                    Heading("Crossfade and levelling")
                     Hint(crossfadeSummary(settings))
                 }
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)

@@ -213,6 +213,48 @@ class LevellingTest {
     @Test fun replayGainOffMeansNoLevelling() {
         assertEquals(1f, Levelling.songVolume(tagged, lumae.copy(replayGain = ReplayGainMode.OFF), measured(-5.0)), 0f)
     }
+
+    /**
+     * Issue #214: a song is levelled by Lumae or by ReplayGain, never both. Across every setting and every
+     * kind of song, the volume is exactly Lumae's alone, ReplayGain's alone, or untouched: never the two
+     * multiplied together.
+     */
+    @Test fun neverLumaeAndReplayGainTogether() {
+        val songs = listOf(tagged, Song("s", "No tags"), Song("s", "Track only", trackGain = -3f), Song("s", "Album only", albumGain = -7f))
+        val profiles = listOf(null, measured(-10.0), measured(-30.0), measured(-10.0, id = "other"), TrackProfile("s", null, emptyList(), emptyList()))
+        for (mode in ReplayGainMode.entries) for (source in LoudnessSource.entries) for (target in Levelling.TARGETS) {
+            val settings = AppSettings(replayGain = mode, loudnessSource = source, loudnessTarget = target)
+            for (song in songs) for (profile in profiles) {
+                val d = Levelling.decide(song, settings, profile)
+                val lumaeOnly = Levelling.volume(profile, target)
+                val tagsOnly = replayGainVolume(song, settings)
+                val case = "$mode $source $target ${song.title} ${profile?.trackId}/${profile?.refLufs} → $d"
+                when (d.source) {
+                    Levelling.Source.LUMAE -> {
+                        assertEquals(case, lumaeOnly!!, d.volume, 0f)
+                        assertEquals(case, LoudnessSource.LUMAE, source)
+                    }
+                    Levelling.Source.REPLAYGAIN -> assertEquals(case, tagsOnly, d.volume, 0f)
+                    Levelling.Source.NONE -> assertEquals(case, 1f, d.volume, 0f)
+                }
+                // Both applied would be their product: never that (unless one of them changes nothing).
+                if (lumaeOnly != null && lumaeOnly < 1f && tagsOnly < 1f) {
+                    assertTrue(case, kotlin.math.abs(d.volume - lumaeOnly * tagsOnly) > 1e-6f)
+                }
+                assertEquals(case, d.volume, Levelling.songVolume(song, settings, profile), 0f)
+            }
+        }
+    }
+
+    @Test fun theDecisionSaysWhy() {
+        assertEquals(Levelling.Source.LUMAE, Levelling.decide(tagged, lumae, measured(-10.0)).source)
+        assertEquals(-8.0, Levelling.decide(tagged, lumae, measured(-10.0)).gainDb, 0.01)
+        val notYet = Levelling.decide(tagged, lumae, null)
+        assertEquals(Levelling.Source.REPLAYGAIN, notYet.source)
+        assertTrue(notYet.why, notYet.why.contains("hasn't measured"))
+        assertEquals(Levelling.Source.NONE, Levelling.decide(Song("s", "x"), lumae.copy(loudnessSource = LoudnessSource.TAGS), null).source)
+        assertEquals(Levelling.Source.NONE, Levelling.decide(null, lumae, null).source)
+    }
 }
 
 /** Fetching and keeping profiles (issue #60). */

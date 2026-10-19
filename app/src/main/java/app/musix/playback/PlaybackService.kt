@@ -579,7 +579,9 @@ class PlaybackService : MediaSessionService() {
             restarted = false
             resetProgressWatch()
             if (player.playWhenReady) armStartWatch()
-            baseVolume = Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id))
+            val level = Levelling.decide(song, graph.settings.current, graph.profiles.cached(song.id))
+            baseVolume = level.volume
+            AppLog.i("Loudness", "Song ${song.id} levelled by ${level.source.name.lowercase()}: ${"%+.1f".format(level.gainDb)} dB (${level.why})")
             if (onPhone) applyVolume(player)
             fetchProfiles(song)
             graph.scrobbler.nowPlaying(song)
@@ -591,9 +593,10 @@ class PlaybackService : MediaSessionService() {
         /** Levels the current song again, after a setting changed or its measured loudness arrived. */
         fun relevel(profile: TrackProfile? = null) {
             val song = current ?: return
-            val volume = Levelling.songVolume(song, graph.settings.current, profile ?: graph.profiles.cached(song.id))
+            val level = Levelling.decide(song, graph.settings.current, profile ?: graph.profiles.cached(song.id))
+            val volume = level.volume
             if (volume == baseVolume) return
-            AppLog.d("Loudness", "Song ${song.id} levelled to ${"%.2f".format(volume)} (was ${"%.2f".format(baseVolume)})")
+            AppLog.i("Loudness", "Song ${song.id} now levelled by ${level.source.name.lowercase()}: ${"%+.1f".format(level.gainDb)} dB (${level.why})")
             baseVolume = volume
             if (onPhone) applyVolume(player)
         }
