@@ -98,6 +98,9 @@ class LibraryRepository(context: Context) {
 
     suspend fun albumCoverOfSongCover(songCover: String): String? = dao.albumCoverOfSongCover(songCover)
 
+    /** The cover ids songs show, exactly as Navidrome sends them (its cover settings decide which picture). */
+    suspend fun songCoverIds(): List<String> = withContext(Dispatchers.IO) { dao.songCoverIds() }
+
     /** Songs by id, in the order asked for; ids the library doesn't have are left out. */
     /** Every song's id, title and artist, for matching many songs from other services at once. */
     suspend fun songTitles(): List<SongTitleRow> = withContext(Dispatchers.IO) { dao.songTitles() }
