@@ -3,6 +3,11 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.12.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.12.0beta) — 2026-10-19
+
+- [#202](https://github.com/Musix-Industreez/musix/pull/202) Cover download: also fetch song and disc covers, as Navidrome sends them (@Th3K1ngP1n)
+- [#204](https://github.com/Musix-Industreez/musix/pull/204) Search: back arrow in the box; back gesture returns to the search page (@Th3K1ngP1n)
+
 ## [0.11.1beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.11.1beta) — 2026-10-19
 
 - [#199](https://github.com/Musix-Industreez/musix/pull/199) Tour: open Time machine by its entry, not the filter chip of the same name (@Th3K1ngP1n)
