@@ -3,6 +3,11 @@
 # the whole connection to 4.3 Mbit/s (what a phone measured to a home server).
 #   Navidrome: http://127.0.0.1:4533   Test link: http://127.0.0.1:5533 (10.0.2.2:5533 from the emulator)
 set -euo pipefail
+# On a reused self-hosted runner, a test server left over from a cancelled run would hold the ports.
+if [ -z "${PREPARE_ONLY:-}" ] && [ "${RUNNER_ENVIRONMENT:-github-hosted}" != "github-hosted" ]; then
+  pkill -u "$(id -u)" -x navidrome 2>/dev/null || true
+  pkill -u "$(id -u)" -f "scripts/shape.py" 2>/dev/null || true
+fi
 ND_VERSION="${ND_VERSION:-0.64.2}"
 DIR="${RUNNER_TEMP:-/tmp}/navidrome-test"
 mkdir -p "$DIR" && cd "$DIR"
@@ -32,6 +37,8 @@ fi
 
 ND_MUSICFOLDER="$DIR/music" ND_DATAFOLDER="$DIR/data" ND_PORT=4533 ND_ADDRESS=127.0.0.1 ND_SCANNER_SCHEDULE=0 \
   ND_ENABLEEXTERNALSERVICES=false ND_LOGLEVEL=info nohup ./navidrome > "$DIR/navidrome.log" 2>&1 &
+# Kept so CI can stop it on a reused self-hosted runner (issue #218).
+echo $! > "$DIR/navidrome.pid"
 for i in $(seq 1 30); do curl -s localhost:4533/ping >/dev/null && break; sleep 1; done
 curl -s -X POST localhost:4533/auth/createAdmin -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin"}' >/dev/null
 A="u=admin&p=admin&v=1.16.1&c=ci&f=json"
@@ -43,5 +50,6 @@ done
 curl -s "localhost:4533/rest/getAlbumList2?type=alphabeticalByName&$A"; echo
 
 nohup python3 "$GITHUB_WORKSPACE/scripts/shape.py" 540000 5533 4533 > "$DIR/proxy.log" 2>&1 &
+echo $! > "$DIR/proxy.pid"
 sleep 1
 curl -s -o /dev/null -w "Test link check: %{http_code} in %{time_total}s\n" "localhost:5533/rest/ping?$A"
