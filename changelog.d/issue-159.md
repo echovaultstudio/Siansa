@@ -1,2 +1,0 @@
-### Fixed
-- **Switching the equaliser on or off no longer drops the volume** (#159). It used to turn the whole song down by the biggest boost (8 dB for a +8 dB band), so the music got noticeably quieter. Now it keeps the same loudness and only changes the sound's colour, and changes glide in smoothly instead of jumping. The log now says what each equaliser setting does, and how hard the limiter worked for each song.
