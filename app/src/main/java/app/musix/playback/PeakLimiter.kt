@@ -55,6 +55,8 @@ class PeakLimiter(sampleRate: Int, private val channels: Int, private val ceilin
         // Rounding in the running sum must never nudge untouched audio.
         val gain = (envelopeSum / window).let { if (it > 1 - 1e-9) 1.0 else it }
         deepest = min(deepest, gain)
+        framesSeen++
+        if (gain < LIMITING) framesLimited++
 
         // Swap in the frame from [lookahead] frames ago, scaled.
         val outSlot = (pos + 1) % window
@@ -67,7 +69,27 @@ class PeakLimiter(sampleRate: Int, private val channels: Int, private val ceilin
         pos = outSlot
     }
 
-    fun takeDeepestDb(): Double = (20 * log10(deepest)).also { deepest = 1.0 }
+    fun takeDeepestDb(): Double {
+        songDeepest = min(songDeepest, deepest)
+        return (20 * log10(deepest)).also { deepest = 1.0 }
+    }
+
+    // For the per-song note in the log (issue #159): how much of the time the limiter was turning sound down.
+    private var framesSeen = 0L
+    private var framesLimited = 0L
+    private var songDeepest = 1.0
+
+    /** Since the last call: the share of time spent turning peaks down (0..1), and the deepest it went, in dB. */
+    fun takeSongStats(): Pair<Double, Double>? {
+        songDeepest = min(songDeepest, deepest)
+        if (framesSeen == 0L) return null
+        val share = framesLimited.toDouble() / framesSeen
+        val db = 20 * log10(songDeepest)
+        framesSeen = 0
+        framesLimited = 0
+        songDeepest = 1.0
+        return share to db
+    }
 
     /** Forgets what is waiting, e.g. after a seek. */
     fun reset() {
@@ -87,5 +109,7 @@ class PeakLimiter(sampleRate: Int, private val channels: Int, private val ceilin
     companion object {
         const val LOOKAHEAD_MS = 2
         const val RELEASE_MS = 80
+        /** Below this gain (about -0.01 dB) the limiter counts as working. */
+        const val LIMITING = 0.999
     }
 }
