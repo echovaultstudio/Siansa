@@ -288,6 +288,7 @@ class AppTourTest {
                 // Issue #203: the back arrow, and then the back gesture, return to the search page, not Home.
                 compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("Long Song")
                 waitText("Long Song B")
+                idle(800)
                 shot("16c-search-back-arrow")
                 compose.onAllNodesWithTag("searchBack").onFirst().performClick()
                 idle(600)
