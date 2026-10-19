@@ -5,6 +5,14 @@ import app.musix.data.Song
 import app.musix.log.AppLog
 import app.musix.net.PathMood
 
+/**
+ * How many songs of a path to queue after the song playing now (#212): all but the first, when the path starts
+ * with the song playing (it keeps playing, nothing starts again). Null when it doesn't, e.g. a path that ends
+ * with the song playing: that one is left for the listener to play.
+ */
+fun songPathUpNext(pathIds: List<String>, playingId: String?): Int? =
+    if (playingId != null && pathIds.size > 1 && pathIds.first() == playingId) pathIds.size - 1 else null
+
 /** The lengths offered for a song path. */
 val songPathLengths = listOf(10, 20, 30)
 
