@@ -24,4 +24,5 @@ fun JsonObject.obj(key: String): JsonObject? = this[key] as? JsonObject
 fun JsonObject.arr(key: String): List<JsonObject> =
     (this[key] as? JsonArray)?.mapNotNull { it as? JsonObject } ?: emptyList()
 
-class ApiException(message: String) : Exception(message)
+/** A failed request; [code] is the Subsonic error code when Navidrome sent one (see [SubsonicErrors]). */
+class ApiException(message: String, val code: Int? = null) : Exception(message)

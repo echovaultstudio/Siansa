@@ -178,7 +178,11 @@ class AppGraph(val app: Application) {
         .addNetworkInterceptor(StreamStats.interceptor)
         .build()
 
-    val subsonic = SubsonicApi(http) { settings.current }.apply { loginFor = { id -> guests.loginFor(id) } }
+    val subsonic = SubsonicApi(http) { settings.current }.apply {
+        loginFor = { id -> guests.loginFor(id) }
+        // Lists asked for straight from Navidrome keep to the libraries chosen for the sync (issue #206).
+        chosenFolders = { settings.current.syncFolders }
+    }
     val audioMuse = AudioMuseApi(http) { settings.current }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
     val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
