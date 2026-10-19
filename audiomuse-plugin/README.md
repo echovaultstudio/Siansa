@@ -1,7 +1,7 @@
 # Musix Analysis: the AudioMuse-AI plugin for Musix
 
-Our own plugin for [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI), written for Musix (issue
-#188). It replaces the Lumae plugin Musix used until now and shares no code with it.
+Our own plugin for [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI), written for the Musix app
+(issue #188).
 
 It does two things, each with its own progress, so one never waits for the other:
 
@@ -36,20 +36,31 @@ artist, so the app can open it on its own server.
 
 ## Install
 
-The Musix repository is private, so AudioMuse-AI can't download the plugin from GitHub. Build it and serve
-it from a computer the AudioMuse-AI containers can reach:
+In AudioMuse-AI: Plugins › Repositories, add
 
-```sh
-audiomuse-plugin/build.sh http://192.168.1.20:8000
-cd audiomuse-plugin/dist && python3 -m http.server 8000
+```
+https://raw.githubusercontent.com/Th3K1ngP1n/Musix-Industreez-musix-audiomuse-plugin/main/manifest.json
 ```
 
-Then in AudioMuse-AI: Plugins › Repositories › add `http://192.168.1.20:8000/manifest.json`, install Musix
-Analysis from the Catalog tab and apply the restart. Only built-in libraries are used (numpy, scipy,
-PyAV), so it also works on the standalone builds. It needs AudioMuse-AI 3.6.4 or later.
+then install Musix Analysis from the Catalog tab and apply the restart. AudioMuse-AI checks the catalog for
+new versions by itself. Only built-in libraries are used (numpy, scipy, PyAV), so it also works on the
+standalone builds. It needs AudioMuse-AI 3.6.4 or later.
 
 Fetching songs for older ones works with Navidrome, Jellyfin, Emby and Lyrion; Plex songs are measured
 when AudioMuse-AI analyses them.
+
+## Publishing (for Musix development)
+
+The code lives in the Musix repository (`audiomuse-plugin/`); the public repository above is the catalog
+AudioMuse-AI installs from. To publish, add a new version at the top of `versions` in `plugin.json`, then:
+
+```sh
+audiomuse-plugin/publish.sh ../Musix-Industreez-musix-audiomuse-plugin
+```
+
+and commit and push there. A published version's zip is never replaced, because installed copies check its
+checksum. To try a build on the home network instead, `audiomuse-plugin/build.sh http://<lan-ip>:8000`
+makes a catalog to serve from any computer AudioMuse-AI can reach.
 
 ## Tests
 
