@@ -214,15 +214,22 @@ class SpacingTest {
                     Row(Modifier.padding(horizontal = Space.Page, vertical = Space.Small)) {
                         FilterChip(selected = true, onClick = {}, label = { Text("Sound") }, modifier = Modifier.testTag("modeChip"))
                     }
+                    app.musix.ui.ConceptGroupRow(
+                        listOf(app.musix.net.ConceptCategory("instrument", "Instrument", listOf("piano", "vocals"))),
+                        "instrument",
+                        mapOf("piano" to true),
+                    ) { }
                     SteeringChips(listOf("piano", "vocals"), mapOf("piano" to true)) { }
                     Box(Modifier.fillMaxWidth().height(40.dp).testTag("results"))
                 }
             }
         }
         val mode = compose.onNodeWithTag("modeChip").getBoundsInRoot()
+        val groupChip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Instrument · 1")), useUnmergedTree = true).getBoundsInRoot()
         val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("More piano")), useUnmergedTree = true).getBoundsInRoot()
         val results = compose.onNodeWithTag("results").getBoundsInRoot()
-        assertEven("Steering chips", chip.top - mode.bottom, results.top - chip.bottom)
+        // The group chips and the concept chips are one block: the same gap above it as below it.
+        assertEven("Steering block", groupChip.top - mode.bottom, results.top - chip.bottom)
     }
 
     /** Song path: the mood chips sit evenly between their label and the "Follow the lyrics" row (issue #208). */

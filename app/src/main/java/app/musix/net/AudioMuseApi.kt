@@ -19,6 +19,23 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
+/** One group of steering concepts (Genre, Instrument, Vocals, Mood, Production, Tempo, Era), best-understood first. */
+data class ConceptCategory(val id: String, val label: String, val terms: List<String>)
+
+/** All the concepts the Sound search can be steered by, and how many can be used at once. */
+data class ConceptCatalogue(val categories: List<ConceptCategory>, val maxTerms: Int)
+
+/** AudioMuse's analysis of one song: tempo (BPM), key, and its mood and genre scores (0..1). */
+data class TrackFeatures(
+    val id: String,
+    val artist: String,
+    val tempo: Double?,
+    val key: String?,
+    val scale: String?,
+    val moods: Map<String, Double>,
+    val genres: Map<String, Double>,
+)
+
 /** One concept to steer the Sound search with (issue #208): [more] or less of it. */
 data class Steer(val term: String, val more: Boolean = true)
 
@@ -284,6 +301,32 @@ class AudioMuseApi(
         }
     }
 
+    /**
+     * Every concept the Sound search can be steered by, in AudioMuse's own groups (genre, instrument, vocals,
+     * mood, production, tempo, era), each group's best-understood terms first (issue #216).
+     */
+    suspend fun conceptCatalogue(): ConceptCatalogue {
+        catalogue?.let { return it }
+        val root = execute { request("/api/clap/concepts").get().build() }
+        return parseCatalogue(root).also { if (it.categories.isNotEmpty()) catalogue = it }
+    }
+
+    @Volatile private var catalogue: ConceptCatalogue? = null
+
+    /**
+     * AudioMuse's analysis of songs (tempo, key, moods, genres) from its read-only export for apps
+     * (`/api/sync`), at most 500 at a time, without the large sound data (issue #216).
+     */
+    suspend fun features(ids: List<String>): List<TrackFeatures> = ids.distinct().chunked(SYNC_BATCH).flatMap { batch ->
+        val url = apiUrl("api/sync")
+            .addQueryParameter("ids", batch.joinToString(","))
+            .addQueryParameter("include_embeddings", "false")
+            .addQueryParameter("limit", batch.size.toString())
+            .build()
+        val root = execute { request("").url(url).get().build() }
+        root.arr("tracks").mapNotNull(::parseFeatures)
+    }
+
     /** Sound concepts this library's search understands well, to steer the AI's wording. */
     suspend fun concepts(): List<String> {
         val root = execute { request("/api/clap/concepts").get().build() }
@@ -295,6 +338,44 @@ class AudioMuseApi(
 
     internal companion object {
         val JSON_TYPE = "application/json".toMediaType()
+        const val SYNC_BATCH = 500
+
+        fun parseCatalogue(root: JsonObject): ConceptCatalogue {
+            if (root.bool("available") == false) return ConceptCatalogue(emptyList(), 0)
+            val categories = root.arr("categories").mapNotNull { c ->
+                val id = c.str("category") ?: return@mapNotNull null
+                val terms = c.arr("terms")
+                    .mapNotNull { t -> t.str("term")?.let { it to (t.dbl("grounding") ?: 0.0) } }
+                    .sortedByDescending { it.second }
+                    .map { it.first }
+                    .distinct()
+                if (terms.isEmpty()) null else ConceptCategory(id, c.str("label") ?: id.replaceFirstChar { it.uppercase() }, terms)
+            }
+            return ConceptCatalogue(categories, root.int("max_terms") ?: 10)
+        }
+
+        /** `"rock:0.53,pop:0.21"` (AudioMuse's packed scores) as a map; anything unreadable is left out. */
+        fun parseScores(packed: String?): Map<String, Double> {
+            if (packed.isNullOrBlank()) return emptyMap()
+            return packed.split(',').mapNotNull { part ->
+                val label = part.substringBefore(':').trim()
+                val value = part.substringAfter(':', "").trim().toDoubleOrNull()
+                if (label.isEmpty() || value == null) null else label to value
+            }.toMap()
+        }
+
+        fun parseFeatures(o: JsonObject): TrackFeatures? {
+            val id = o.str("id") ?: return null
+            return TrackFeatures(
+                id = id,
+                artist = o.str("artist").orEmpty(),
+                tempo = o.dbl("tempo"),
+                key = o.str("key"),
+                scale = o.str("scale"),
+                moods = parseScores(o.str("other_features")),
+                genres = parseScores(o.str("mood_vector")),
+            )
+        }
 
         /** `{"happy": [{"index": 0, "top_tags": ["pop", …]}, …], …}` as a flat list. */
         /** The navigation key of a mood centre ("relaxed-2") and back. */
