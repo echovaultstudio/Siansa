@@ -97,7 +97,7 @@ fun SongPathPicker(nav: NavController, songId: String) {
                         )
                         val s = song.valueOrNull()
                         Row(Modifier.padding(top = Space.Small), verticalAlignment = Alignment.CenterVertically) {
-                            Cover(s?.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
+                            Cover(s?.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp), albumId = s?.albumId)
                             Spacer(Modifier.width(Space.Medium))
                             Column {
                                 Text(s?.title ?: "…", style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -155,7 +155,7 @@ fun SongPathPicker(nav: NavController, songId: String) {
                     Modifier.fillMaxWidth().clickable { go(other) }.padding(horizontal = Space.Page, vertical = Space.Small),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Cover(other.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
+                    Cover(other.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp), albumId = other.albumId)
                     Spacer(Modifier.width(Space.Medium))
                     Column(Modifier.weight(1f)) {
                         Text(other.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)

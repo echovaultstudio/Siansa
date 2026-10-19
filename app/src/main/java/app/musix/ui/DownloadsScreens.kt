@@ -539,7 +539,7 @@ fun DownloadedSongsScreen(nav: NavController) {
                         Modifier.fillMaxWidth().clickable(onClick = toggle).padding(start = Space.Page, end = Space.Tight, top = Space.Small, bottom = Space.Small),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Cover(d.song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
+                        Cover(d.song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp), albumId = d.song.albumId)
                         Spacer(Modifier.width(Space.Medium))
                         Column(Modifier.weight(1f)) {
                             Text(d.song.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
