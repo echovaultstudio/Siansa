@@ -21,9 +21,8 @@ import numpy as np
 
 from plugin.api import active_server_id, get_db, get_setting, logger
 
-from . import generations, loudness, ramps, similarity, store
+from . import generations, loudness, ramps, similarity, status, store
 
-PROFILE_BUDGET_SECONDS = 600
 HOOK_BUDGET_SECONDS = 60
 DEFAULT_BATCH = 40
 
@@ -85,44 +84,75 @@ def _download(item_id, title, folder):
     return download_track(folder, item)
 
 
-def measure_missing(budget_seconds=PROFILE_BUDGET_SECONDS, batch=None):
-    """Measures songs without a profile until the batch or the time budget is used up."""
+def measure_all_on(db):
+    return bool((store.get_state("measure_all", {}, db) or {}).get("on"))
+
+
+def measure_missing(budget_seconds=None, batch=None):
+    """Measures songs without a profile, a round at a time.
+
+    A normal round measures one batch (the "Songs per run" setting) within :data:`status.NORMAL_ROUND_SECONDS`.
+    With "Measure all songs" on, a round goes on until :data:`status.ALL_ROUND_SECONDS`, and the scheduled tick
+    keeps starting rounds until every song is measured or it is stopped. The rounds end with a few minutes
+    free, because AudioMuse-AI doesn't start its own jobs (such as analysis) while a plugin job runs.
+    """
     db = get_db()
     if not store.try_lock(db, "profiles"):
         return {"status": "busy"}
     started = time.monotonic()
     measured = failed = skipped = 0
-    job = store.get_state("profiles_job", {}, db) or {}
+    all_on = measure_all_on(db)
+    budget = budget_seconds or status.round_seconds(all_on)
     folder = tempfile.mkdtemp(prefix="musix_analysis_")
+    rate = store.get_state("profiles_rate", {}, db) or {}
     try:
-        batch = int(batch or get_setting("batch_size", DEFAULT_BATCH) or DEFAULT_BATCH)
-        rows = store.songs_to_measure(db, max(1, min(batch, 500)))
-        store.set_state("profiles_job", {**job, "status": "running", "started_at": now_iso(), "error": None}, db)
-        for item_id, title in rows:
-            left = budget_seconds - (time.monotonic() - started)
-            if left <= 5:
+        limit = 10_000 if all_on else max(1, min(int(batch or get_setting("batch_size", DEFAULT_BATCH) or DEFAULT_BATCH), 500))
+        store.set_state("profiles_job", {"status": "running", "started_at": now_iso(), "all": all_on, "measured": 0,
+                                         "error": None}, db)
+        tried = set()
+        stopped = False
+        while len(tried) < limit and not stopped:
+            rows = [r for r in store.songs_to_measure(db, min(25, limit - len(tried)) + len(tried)) if r[0] not in tried]
+            if not rows:
                 break
-            path = None
-            try:
-                path = _download(item_id, title, folder)
-                if not path:
-                    raise RuntimeError("the music server didn't send the song")
-                store.save_profile(db, item_id, profile_of(loudness.measure_file(path, min(left, 180))))
-                measured += 1
-            except NotOnServer:
-                skipped += 1
-            except Exception as e:
-                db.rollback()
-                failed += 1
-                logger.info("musix_analysis couldn't measure %s: %s", item_id, e)
-                store.save_failure(db, item_id, e)
-            finally:
-                if path and os.path.exists(path):
-                    os.remove(path)
+            for item_id, title in rows:
+                left = budget - (time.monotonic() - started)
+                if left <= 5:
+                    stopped = True
+                    break
+                if all_on and not measure_all_on(db):  # "Stop" on the settings page
+                    all_on, stopped = False, True
+                    break
+                tried.add(item_id)
+                path = None
+                try:
+                    path = _download(item_id, title, folder)
+                    if not path:
+                        raise RuntimeError("the music server didn't send the song")
+                    store.save_profile(db, item_id, profile_of(loudness.measure_file(path, min(left, 180))))
+                    measured += 1
+                except NotOnServer:
+                    skipped += 1
+                except Exception as e:
+                    db.rollback()
+                    failed += 1
+                    logger.info("musix_analysis couldn't measure %s: %s", item_id, e)
+                    store.save_failure(db, item_id, e)
+                finally:
+                    if path and os.path.exists(path):
+                        os.remove(path)
+                if measured and measured % 10 == 0:
+                    store.set_state("profiles_job", {"status": "running", "started_at": now_iso(), "all": all_on,
+                                                     "measured": measured, "error": None}, db)
+        seconds = round(time.monotonic() - started, 1)
+        store.set_state("profiles_rate", status.next_rate(rate, measured + failed, seconds), db)
+        if all_on and not store.songs_to_measure(db, 1):
+            store.set_state("measure_all", {"on": False, "finished_at": now_iso()}, db)
+            logger.info("musix_analysis: every song is measured")
         result = {"status": "idle", "finished_at": now_iso(), "measured": measured, "failed": failed,
-                  "other_server": skipped, "seconds": round(time.monotonic() - started, 1), "error": None}
+                  "other_server": skipped, "seconds": seconds, "error": None}
         store.set_state("profiles_job", result, db)
-        logger.info("musix_analysis profiles: %s measured, %s failed in %.0f s", measured, failed, result["seconds"])
+        logger.info("musix_analysis profiles: %s measured, %s failed in %.0f s", measured, failed, seconds)
         return result
     except Exception as e:
         db.rollback()
