@@ -22,6 +22,7 @@ import app.musix.data.SyncPhase
 import app.musix.data.TopSongs
 import app.musix.log.AppLog
 import app.musix.log.NetLog
+import app.musix.mix.Similar
 import app.musix.mix.Sonic
 import app.musix.mix.SonicFingerprint
 import app.musix.mix.MixGenerator
@@ -278,6 +279,8 @@ class AppGraph(val app: Application) {
     )
     /** "Sounds like" from Navidrome's sonic similarity or AudioMuse (issue #208). */
     val sonic = Sonic(this)
+    /** Similar songs, albums and artists (issue #223). */
+    val similar = Similar(this)
     /** Your sonic fingerprint on Home (issue #216). */
     val fingerprint = SonicFingerprint(this)
     val songRadio = SongRadio(this)
