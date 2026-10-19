@@ -1,5 +1,8 @@
 package app.musix.ui
 
+import androidx.compose.foundation.layout.Box
+import app.musix.data.SyncPhase
+import app.musix.data.LibraryStatus
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -77,6 +80,9 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
     val users = remember { Users.all(context) }
     var hidingActive by remember { mutableStateOf<UserEntry?>(null) }
+    val libraryStatus by graph.library.status.collectAsStateWithLifecycle()
+    // A sync started from this sheet shows its progress and result here, like the Library sync page (#220).
+    var watching by remember { mutableStateOf(false) }
 
     Column(modifier.verticalScroll(rememberScrollState()).padding(horizontal = Space.Page)) {
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
@@ -122,8 +128,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                     name = user.label,
                     status = when {
                         !user.connected -> "Not connected yet. Set it up in Settings → Users."
-                        inUse && syncing -> "In use · syncing…"
-                        inUse -> "In use"
+                        inUse -> inUseStatus(syncing, libraryStatus)
                         !isShown -> "Hidden"
                         guest?.error != null -> "Couldn't load: ${guest.error}"
                         syncing -> "Loading their music… ${guest?.songs ?: 0} songs"
@@ -143,7 +148,14 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                             }
                         }
                     },
-                    onSync = { if (inUse) graph.sync.start() else graph.guests.sync(user.id, force = true) },
+                    onSync = {
+                        if (inUse) {
+                            watching = true
+                            graph.sync.start()
+                        } else {
+                            graph.guests.sync(user.id, force = true)
+                        }
+                    },
                     onLibrary = { index ->
                         val folder: MusicFolder = all[index]
                         val next = if (folder.id in chosen) chosen - folder.id else chosen + folder.id
@@ -152,6 +164,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                             AppLog.i("Sources", "User ${user.id + 1}: ${next.size} of ${all.size} libraries")
                             if (inUse) {
                                 graph.settings.setSyncFolders(next)
+                                watching = true
                                 graph.sync.start(quiet = true)
                             } else {
                                 graph.guests.setFolders(user.id, next)
@@ -159,6 +172,9 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                         }
                     },
                 )
+                if (inUse && watching && progress.phase != SyncPhase.IDLE) {
+                    Box(Modifier.testTag("source-sync-progress")) { ProgressCard(progress) }
+                }
             }
         }
         Text(
@@ -371,4 +387,19 @@ internal fun SourceCardForTest() {
         onSync = {},
         onLibrary = {},
     )
+}
+
+/**
+ * The status line of the user in use: syncing, or what's on the phone and when it was last synced, e.g.
+ * "In use · 878 artists · 2,361 albums · 41,942 songs · synced 15:43" (#220).
+ */
+internal fun inUseStatus(syncing: Boolean, status: LibraryStatus?, now: Long = System.currentTimeMillis()): String {
+    if (syncing) return "In use · syncing…"
+    if (status == null) return "In use · not synced yet"
+    val n = java.text.NumberFormat.getIntegerInstance()
+    val day = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.ROOT)
+    val sameDay = day.format(java.util.Date(now)) == day.format(java.util.Date(status.syncedAt))
+    val time = if (sameDay) java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(status.syncedAt))
+    else java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(status.syncedAt))
+    return "In use · ${n.format(status.artists)} artists · ${n.format(status.albums)} albums · ${n.format(status.songs)} songs · synced $time"
 }
