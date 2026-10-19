@@ -30,12 +30,49 @@ class EqualiserTest {
         assertFalse(EqSettings(enabled = true).active)
     }
 
-    @Test fun boostsAreTurnedDownOverallSoTheLoudestPointStaysAtZero() {
-        val design = EqDesign.of(EqSettings(enabled = true, preset = EqPreset.BASS), 44_100)
-        val peak = generateSequence(20.0) { it * 1.01 }.takeWhile { it < 20_000 }.maxOf { design.responseDb(it) }
-        assertEquals(0.0, peak, 0.1)
-        // ...and bass still stands out against the rest.
-        assertTrue(design.responseDb(60.0) - design.responseDb(5_000.0) > 6)
+    /** The loudness change across 100 Hz – 6 kHz after the turn-down, in dB (issue #159). */
+    private fun heardDb(design: EqDesign): Double {
+        var sum = 0.0
+        var n = 0
+        var hz = EqDesign.LOUDNESS_LOW
+        while (hz <= EqDesign.LOUDNESS_HIGH) {
+            sum += Math.pow(10.0, design.responseDb(hz) / 10)
+            n++
+            hz *= Math.pow(2.0, 1.0 / 12)
+        }
+        return 10 * kotlin.math.log10(sum / n)
+    }
+
+    /** Switching on keeps the same loudness for every preset that makes music louder (issue #159). */
+    @Test fun switchingOnKeepsTheLoudness() {
+        EqPreset.entries.filter { it.gains != null }.forEach { preset ->
+            val design = EqDesign.of(EqSettings(enabled = true, preset = preset), 44_100)
+            val heard = heardDb(design)
+            if (design.loudnessDb > 0) assertEquals(preset.label, 0.0, heard, 0.05)
+            else assertEquals(preset.label, design.loudnessDb, heard, 0.05)
+            assertTrue(preset.label, abs(heard) <= 1.0)
+        }
+    }
+
+    /** The curve from #159: one +8 dB band no longer turns the middle frequencies down by 8 dB. */
+    @Test fun oneBigBoostDoesntDuckTheRest() {
+        val eq = EqSettings(enabled = true, preset = EqPreset.CUSTOM, custom = EqSettings.parseCustom("6,5,4,2,0,0,0,0,8,0"))
+        val design = EqDesign.of(eq, 44_100)
+        assertEquals(8.0, design.peakDb, 0.2)
+        assertTrue("turned down by ${design.turnDownDb}", design.turnDownDb in 1.5..2.5)
+        listOf(500.0, 1_000.0, 2_000.0).forEach { hz ->
+            assertTrue("$hz Hz at ${design.responseDb(hz)} dB", design.responseDb(hz) > -3)
+        }
+        // ...and bass and 8 kHz still stand out against the middle.
+        assertTrue(design.responseDb(60.0) - design.responseDb(1_000.0) > 4)
+        assertTrue(design.responseDb(8_000.0) - design.responseDb(1_000.0) > 6)
+    }
+
+    @Test fun cutsAreNotMadeUpFor() {
+        val eq = EqSettings(enabled = true, preset = EqPreset.CUSTOM, custom = List(10) { -4f })
+        val design = EqDesign.of(eq, 44_100)
+        assertEquals(0.0, design.turnDownDb, 1e-9)
+        assertTrue(design.responseDb(1_000.0) < -3)
     }
 
     @Test fun preampRaisesTheWholeSound() {
