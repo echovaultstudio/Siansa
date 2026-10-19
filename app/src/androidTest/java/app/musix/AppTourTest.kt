@@ -1,5 +1,6 @@
 package app.musix
 
+import androidx.compose.ui.test.hasClickAction
 import android.Manifest
 import android.graphics.Bitmap
 import android.os.SystemClock
@@ -93,6 +94,17 @@ class AppTourTest {
                 idle(1200)
                 waitText("Only downloaded music")
                 shot("01b-source-filter", popups = true)
+                // Issue #220: Sync here shows the sync running and its result (artists, albums, songs).
+                compose.onAllNodes(hasText("Sync") and hasClickAction()).fetchSemanticsNodes().firstOrNull()?.let {
+                    compose.onAllNodes(hasText("Sync") and hasClickAction()).onFirst().performClick()
+                    val until = SystemClock.elapsedRealtime() + 30_000
+                    while (SystemClock.elapsedRealtime() < until && compose.onAllNodesWithTag("source-sync-progress").fetchSemanticsNodes().isEmpty()) SystemClock.sleep(200)
+                    if (compose.onAllNodesWithTag("source-sync-progress").fetchSemanticsNodes().isEmpty()) problems += "source filter: Sync showed no progress"
+                    while (SystemClock.elapsedRealtime() < until && graph.sync.progress.value.running) SystemClock.sleep(300)
+                    idle(500)
+                    shot("01b1-source-filter-synced", popups = true)
+                    if (compose.onAllNodesWithText("Artists", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) problems += "source filter: no artists, albums and songs after Sync"
+                } ?: run { problems += "source filter: no Sync button" }
                 // The same panel's other tab (issue #152).
                 click("Arrange")
                 idle(600)
