@@ -3,6 +3,12 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.15.2beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.15.2beta) — 2026-10-19
+
+- [#230](https://github.com/Musix-Industreez/musix/pull/230) Album pages: playing song marked, find similar beside Shuffle, plain back arrow (@Th3K1ngP1n)
+- [#231](https://github.com/Musix-Industreez/musix/pull/231) Log each sound search with what AudioMuse answered (@Th3K1ngP1n)
+- [#233](https://github.com/Musix-Industreez/musix/pull/233) Sound search: chips set to more are sent as words too (@Th3K1ngP1n)
+
 ## [0.15.1beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.15.1beta) — 2026-10-19
 
 - [#227](https://github.com/Musix-Industreez/musix/pull/227) Disc covers of another user's music use their login (@Th3K1ngP1n)
