@@ -24,6 +24,9 @@ A personal Android music player for **Navidrome**, with daily mixes built on the
    - **AudioMuse-AI**: address of its web/API port (e.g. `http://192.168.1.10:8000`) and its API token if authentication is on. Text search (CLAP) must be enabled.
    - **OpenRouter** (optional): API key and model id (default `google/gemini-2.5-flash`; any OpenRouter model id works).
 3. Use **Test** next to each section, then **Save**.
+4. Optional: install the **Musix plugin** on AudioMuse-AI (see [`audiomuse-plugin/`](audiomuse-plugin/README.md)) and choose it
+   under Settings › Crossfade and levelling. It measures each song's loudness and how it starts and ends, for
+   levelling and smooth crossfades, and finds similar albums and artists.
 
 Outside your home network the phone needs to reach both servers, for example over a VPN such as WireGuard or Tailscale.
 
@@ -37,6 +40,7 @@ Every push to `main` and every pull request runs `.github/workflows/ci.yml`:
 |---|---|
 | **Build** (`assembleRelease`) | Syntax and type errors; the release APK must compile and shrink with R8. |
 | **Unit tests** (`app/src/test`) | Mistakes in the app's own logic: server addresses, cover detection, ReplayGain, release types, name matching, the home-network check. Run in seconds, no phone needed. |
+| **Plugin tests** (`audiomuse-plugin/tests`) | Mistakes in the AudioMuse-AI plugin: loudness against the BS.1770 reference, fade shapes, the ramp layout the app reads, similar lists and when they rebuild. |
 | **Android Lint** | Likely crashes, wrong Android API use for older versions, and security issues. Errors appear as annotations on the commit. |
 | **Secret scan** (gitleaks, `.gitleaks.toml`) | Passwords, tokens or API keys committed anywhere in the history. |
 | **Emulator tests** (`app/src/androidTest`) | The app on an Android emulator against a real Navidrome behind a phone-speed link: animated covers downloaded once and shown as stills in lists, songs playing while covers load, and a tour of every page that plays songs from several of them. Screenshots of every page and the app's log go to the `ci-screens` branch. They run after each merge to main and nightly, not on pull requests, and report problems without holding back releases (song start times on the throttled emulator vary too much to fail on; slow starts are listed in the run). |

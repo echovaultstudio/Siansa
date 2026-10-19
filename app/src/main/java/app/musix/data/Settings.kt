@@ -66,7 +66,7 @@ data class AppSettings(
     val pureBlack: Boolean = false,
     /** The seed for "Your colour" (issue #148, step 2), as ARGB. */
     val themeSeed: Int = DEFAULT_THEME_SEED,
-    /** Where song loudness and fade shapes come from (issue #60): ReplayGain tags, or the Lumae plugin. */
+    /** Where song loudness and fade shapes come from (issue #60): ReplayGain tags, or the Musix plugin. */
     val loudnessSource: LoudnessSource = LoudnessSource.TAGS,
     /** The loudness, in LUFS, that measured levelling brings songs towards. */
     val loudnessTarget: Int = DEFAULT_LOUDNESS_TARGET,

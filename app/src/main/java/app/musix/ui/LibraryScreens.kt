@@ -278,6 +278,7 @@ fun AlbumScreen(nav: NavController, id: String) {
             }
         },
         offline = d?.album?.offlineItem(),
+        actions = { AlbumMenuButton(nav, d?.songs?.firstOrNull()?.id) },
     )
 }
 

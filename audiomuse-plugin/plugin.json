@@ -1,0 +1,33 @@
+{
+  "id": "musix_analysis",
+  "name": "Musix Analysis",
+  "author": "Musix",
+  "description": "For the Musix app: measures each song's loudness and how it starts and ends (levelling and SmoothFade), and finds similar albums and artists from AudioMuse-AI's sound analysis.",
+  "requirements": [],
+  "versions": [
+    {
+      "version": "0.1.2.1",
+      "min_core_version": "3.6.4",
+      "changelog": "Songs with a few damaged bits are measured instead of failing, and songs not on the music server are looked at once a day instead of every round.",
+      "imageUrl": ""
+    },
+    {
+      "version": "0.1.2",
+      "min_core_version": "3.6.4",
+      "changelog": "Import from Lumae: a one-time copy of the volume and fade profiles Lumae already measured (removed again in 0.1.3).",
+      "imageUrl": ""
+    },
+    {
+      "version": "0.1.1",
+      "min_core_version": "3.6.4",
+      "changelog": "Measure all songs at once (with a warning), shorter rounds so AudioMuse can start its own jobs, and reloading the settings page no longer starts a job again.",
+      "imageUrl": ""
+    },
+    {
+      "version": "0.1.0",
+      "min_core_version": "3.6.4",
+      "changelog": "First version: volume and fade profiles, similar albums and artists, each with its own progress.",
+      "imageUrl": ""
+    }
+  ]
+}

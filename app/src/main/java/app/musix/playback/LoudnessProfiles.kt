@@ -10,15 +10,17 @@ import java.net.URLEncoder
 import java.util.Base64
 
 /**
- * Where song loudness and fade-in/fade-out shapes come from (issue #60). One switch, so the source can change
- * later (our own AudioMuse plugin) without touching levelling or crossfade.
+ * Where song loudness and fade-in/fade-out shapes come from (issue #60): song tags, or the Musix plugin on the
+ * AudioMuse server (`audiomuse-plugin/` in this repository, issue #188).
  */
 enum class LoudnessSource(val label: String, val detail: String) {
     TAGS("Song tags", "ReplayGain tags in the files; plain crossfades"),
-    LUMAE("Lumae plugin", "Measured by the Lumae plugin on your AudioMuse server");
+    PLUGIN("Musix plugin", "Measured by the Musix plugin on your AudioMuse server");
 
     companion object {
-        fun parse(value: String?): LoudnessSource = entries.firstOrNull { it.name == value } ?: TAGS
+        /** The stored choice; "LUMAE", saved before issue #188, is the plugin it was replaced by. */
+        fun parse(value: String?): LoudnessSource =
+            if (value == "LUMAE") PLUGIN else entries.firstOrNull { it.name == value } ?: TAGS
     }
 }
 
@@ -47,7 +49,7 @@ data class TrackProfile(
     fun quietForLastMs(db: Int): Long? = endRamp.firstOrNull { it.db >= db }?.ms
 }
 
-/** The Lumae plugin's ramp blobs: up to 15 entries of (int8 dB, little-endian uint16 index of 100 ms chunks). */
+/** The Musix plugin's ramp blobs: up to 15 entries of (int8 dB, little-endian uint16 index of 100 ms chunks). */
 object RampCodec {
     const val CHUNK_MS = 100L
 
@@ -63,9 +65,9 @@ object RampCodec {
     }
 }
 
-/** Reading the Lumae plugin's `GET /plugins/lumae_analysis/api/profiles?ids=…` answers. */
-object LumaeProfiles {
-    const val PATH = "/plugins/lumae_analysis/api/profiles"
+/** Reading the Musix plugin's `GET /plugins/musix_analysis/api/profiles?ids=…` answers. */
+object PluginProfiles {
+    const val PATH = "/plugins/musix_analysis/api/profiles"
 
     /** The AudioMuse host rejects request lines over ~4 KB, and the plugin reads at most 500 ids. */
     const val URL_BUDGET_BYTES = 3_500

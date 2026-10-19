@@ -393,10 +393,10 @@ class AppTourTest {
                     if (compose.onAllNodesWithText("Album").fetchSemanticsNodes().isEmpty()) problems += "Levelling chips missing on Crossfade and levelling"
                     val now = compose.onAllNodesWithTag("levelling-now", useUnmergedTree = true).fetchSemanticsNodes()
                     if (now.isEmpty()) problems += "No 'levelled by' line on Crossfade and levelling"
-                    graph.settings.setLoudness(LoudnessSource.LUMAE)
+                    graph.settings.setLoudness(LoudnessSource.PLUGIN)
                     graph.settings.setCrossfade(CrossfadeMode.SMART, 8)
                     idle(800)
-                    shot("19k-crossfade-smart-lumae")
+                    shot("19k-crossfade-smart-plugin")
                     back()
                     back()
                 } finally {
