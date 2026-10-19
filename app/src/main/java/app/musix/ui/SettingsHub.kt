@@ -411,7 +411,7 @@ fun StorageScreen(nav: NavController) {
             }
             Hint(
                 if (settings.coverDownloadAnyWifi) "Downloads on any Wi-Fi network."
-                else "Home means the phone is on the same local network as Navidrome's address. If Navidrome is reached by a domain name, this can't be told apart; use any Wi-Fi instead.",
+                else "Home means the phone is on Wi-Fi and reaches Navidrome's address on that network, or through a VPN to your home network. If Navidrome is reached by a domain name, this can't be told apart; use any Wi-Fi instead.",
             )
             Text(
                 when (val n = network) {

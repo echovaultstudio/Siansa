@@ -3,6 +3,8 @@ package app.musix.covers
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.RouteInfo
+import android.os.Build
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -128,20 +130,92 @@ object CoverDownload {
     fun whyNot(context: Context, settings: AppSettings): String? {
         if (!settings.navidromeReady) return "Navidrome isn't set up"
         val cm = context.getSystemService(ConnectivityManager::class.java) ?: return "No network information"
-        // Wi-Fi or Ethernet, even when a VPN is on top of it.
-        val local = cm.allNetworks.mapNotNull { n -> cm.getNetworkCapabilities(n)?.let { n to it } }.filter { (_, caps) ->
-            (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) &&
-                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+        val nets = cm.allNetworks.mapNotNull { network ->
+            val caps = cm.getNetworkCapabilities(network) ?: return@mapNotNull null
+            val link = cm.getLinkProperties(network)
+            NetInfo(
+                vpn = caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN),
+                // Wi-Fi or Ethernet, not metered. A VPN reports the network it runs over (Android 9 and later).
+                wifi = (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) &&
+                    caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED),
+                cellular = caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR),
+                addresses = link?.linkAddresses.orEmpty().map { Prefix(it.address, it.prefixLength) },
+                routes = link?.routes.orEmpty()
+                    // Android 10 and later mark routes that lead nowhere (a VPN's blocking rules).
+                    .filter { Build.VERSION.SDK_INT < 29 || it.type == RouteInfo.RTN_UNICAST }
+                    .mapNotNull { r -> r.destination?.let { Prefix(it.address, it.prefixLength) } },
+            )
         }
-        if (local.isEmpty()) return "Not on Wi-Fi"
+        // Wi-Fi or Ethernet, even when a VPN is on top of it.
+        if (nets.none { it.wifi }) return "Not on Wi-Fi"
         if (settings.coverDownloadAnyWifi) return null
         val host = settings.navidromeUrl.toHttpUrlOrNull()?.host ?: return "Navidrome's address isn't valid"
         val addresses = runCatching { InetAddress.getAllByName(host).toList() }.getOrElse { return "Couldn't look up $host" }
-        val home = local.any { (network, _) ->
-            val link = cm.getLinkProperties(network) ?: return@any false
-            link.linkAddresses.any { la -> addresses.any { sameSubnet(la.address, la.prefixLength, it) } }
+        val how = homeRoute(nets, addresses)
+        if (how != null) {
+            if (lastHow != how) AppLog.i("Covers", "Navidrome ($host) counts as home: $how")
+            lastHow = how
+            return null
         }
-        return if (home) null else "Not on the same network as Navidrome ($host)"
+        lastHow = null
+        AppLog.i(
+            "Covers",
+            "Navidrome ($host, ${addresses.joinToString { it.hostAddress.orEmpty() }}) isn't on this Wi-Fi or a VPN over it: " +
+                nets.joinToString("; ") { it.describe() },
+        )
+        return "Not on the same network as Navidrome ($host)"
+    }
+
+    @Volatile private var lastHow: String? = null
+
+    /** An address and prefix length: a network's own address, or where one of its routes leads. */
+    data class Prefix(val address: InetAddress, val length: Int) {
+        override fun toString() = "${address.hostAddress}/$length"
+    }
+
+    /** What [homeRoute] needs to know about one of the phone's networks. */
+    data class NetInfo(
+        val vpn: Boolean,
+        val wifi: Boolean,
+        val cellular: Boolean,
+        val addresses: List<Prefix>,
+        val routes: List<Prefix> = emptyList(),
+    ) {
+        fun describe() = (if (vpn) "VPN" else if (wifi) "Wi-Fi" else if (cellular) "mobile" else "other") +
+            (if (vpn && wifi) " over Wi-Fi" else if (vpn && cellular) " over mobile" else "") +
+            " ${addresses.joinToString(",")} routes ${routes.joinToString(",")}"
+    }
+
+    /**
+     * How Navidrome is reached from home, or null when it isn't. Home is the phone on Wi-Fi or Ethernet with
+     * Navidrome either on that network or on a home network that a VPN reaches over that Wi-Fi (issue #205):
+     * a VPN route leading to Navidrome's private address (WireGuard's 192.168.1.0/24, or everything).
+     * A VPN over mobile data never counts, so covers never use mobile data.
+     */
+    fun homeRoute(nets: List<NetInfo>, server: List<InetAddress>): String? {
+        if (nets.none { it.wifi }) return null
+        for (net in nets.filter { it.wifi && !it.vpn }) for (a in net.addresses) for (s in server) {
+            if (sameSubnet(a.address, a.length, s)) return "on the same Wi-Fi ($a)"
+        }
+        // A VPN that says it runs over Wi-Fi, or one that doesn't say and isn't on mobile data.
+        val vpns = nets.filter { it.vpn && (it.wifi || !it.cellular) }
+        for (vpn in vpns) for (s in server.filter(::isPrivate)) {
+            for (r in vpn.routes) {
+                val sameFamily = (r.address is Inet4Address) == (s is Inet4Address)
+                if (r.length == 0 && sameFamily) return "through the VPN, which carries everything (${s.hostAddress})"
+                if (sameSubnet(r.address, r.length, s)) return "through the VPN's route $r"
+            }
+            for (a in vpn.addresses) if (sameSubnet(a.address, a.length, s)) return "on the VPN's network ($a)"
+        }
+        return null
+    }
+
+    /** A home network's address: 10/8, 172.16/12, 192.168/16, link-local, 100.64/10 (Tailscale) or IPv6 fc00::/7. */
+    fun isPrivate(address: InetAddress): Boolean {
+        if (address.isSiteLocalAddress || address.isLinkLocalAddress) return true
+        val b = address.address
+        if (address is Inet4Address) return (b[0].toInt() and 0xFF) == 100 && (b[1].toInt() and 0xC0) == 64
+        return (b[0].toInt() and 0xFE) == 0xFC
     }
 
     internal fun sameSubnet(mine: InetAddress, prefix: Int, other: InetAddress): Boolean {
