@@ -92,9 +92,24 @@ class Biquad(val b0: Double, val b1: Double, val b2: Double, val a1: Double, val
     }
 }
 
-/** The filters and level for one equaliser setting at one sample rate. */
-class EqDesign(val filters: List<Biquad>, val inputGain: Double, val sampleRate: Int) {
-    /** The equaliser's change in level at [hz], in dB, pre-amp and headroom included. */
+/**
+ * The filters and level for one equaliser setting at one sample rate.
+ *
+ * [turnDownDb] is how far the whole sound is turned down before the filters. It matches the curve's
+ * loudness ([loudnessDb]): switching the equaliser on keeps the music as loud as before, it only changes
+ * its colour. Turning down by the curve's highest point ([peakDb]) instead, as before, made a curve with one
+ * +8 dB band about 8 dB quieter in the middle frequencies, heard as a drop whenever it was switched on
+ * (issue #159). The few peaks that now go past full scale are caught by the [PeakLimiter].
+ */
+class EqDesign(
+    val filters: List<Biquad>,
+    val inputGain: Double,
+    val sampleRate: Int,
+    val turnDownDb: Double = 0.0,
+    val peakDb: Double = 0.0,
+    val loudnessDb: Double = 0.0,
+) {
+    /** The equaliser's change in level at [hz], in dB, pre-amp and turn-down included. */
     fun responseDb(hz: Double): Double = 20 * log10(inputGain) + filters.sumOf { it.responseDb(hz, sampleRate) }
 
     companion object {
@@ -104,10 +119,12 @@ class EqDesign(val filters: List<Biquad>, val inputGain: Double, val sampleRate:
             val filters = EqSettings.BANDS.zip(settings.gains)
                 .filter { (hz, _) -> hz < sampleRate * 0.45f }
                 .map { (hz, db) -> Biquad.peaking(hz.toDouble(), db.toDouble(), EqSettings.Q, sampleRate) }
-            // Boosting bands turns the whole sound down by the same amount, so loud songs don't distort.
-            val peak = max(0.0, peakDb(filters, sampleRate))
-            val inputGain = 10.0.pow((settings.preampDb - peak) / 20)
-            return EqDesign(filters, inputGain, sampleRate)
+            val loudness = loudnessDb(filters, sampleRate)
+            // A curve that makes the music louder is turned down by as much; one that makes it quieter is left
+            // as it is (the listener turned those bands down on purpose).
+            val turnDown = max(0.0, loudness)
+            val inputGain = 10.0.pow((settings.preampDb - turnDown) / 20)
+            return EqDesign(filters, inputGain, sampleRate, turnDown, peakDb(filters, sampleRate), loudness)
         }
 
         /** The highest level change across the audible range, checked at 1/12-octave steps. */
@@ -122,5 +139,27 @@ class EqDesign(val filters: List<Biquad>, val inputGain: Double, val sampleRate:
             }
             return peak
         }
+
+        /**
+         * How much louder (or quieter) the curve makes music, in dB: its power averaged at 1/12-octave steps
+         * over [LOUDNESS_LOW]–[LOUDNESS_HIGH] Hz, where most of what we hear as loudness is. Equal steps per
+         * octave weigh it like music's own spectrum (roughly pink).
+         */
+        fun loudnessDb(filters: List<Biquad>, sampleRate: Int): Double {
+            if (filters.isEmpty()) return 0.0
+            var sum = 0.0
+            var count = 0
+            var hz = LOUDNESS_LOW
+            val top = minOf(LOUDNESS_HIGH, sampleRate * 0.49)
+            while (hz <= top) {
+                sum += 10.0.pow(filters.sumOf { it.responseDb(hz, sampleRate) } / 10)
+                count++
+                hz *= 2.0.pow(1.0 / 12)
+            }
+            return 10 * log10(sum / count)
+        }
+
+        const val LOUDNESS_LOW = 100.0
+        const val LOUDNESS_HIGH = 6_000.0
     }
 }
