@@ -4,6 +4,7 @@ import app.musix.AppGraph
 import app.musix.data.Artist
 import app.musix.data.Song
 import app.musix.log.AppLog
+import app.musix.net.MoodCentre
 
 /** A ready-made mood radio: an AudioMuse sound search with its own tile colours. */
 data class MoodRadio(val id: String, val name: String, val query: String, val colors: Pair<Long, Long>)
@@ -23,6 +24,10 @@ val moodRadios = listOf(
 
 /** The sound search behind the sleep timer's wind down: like Chill, but slower and quieter. */
 const val WIND_DOWN_QUERY = "calm slow quiet soft gentle peaceful relaxing sleep music, ambient, soft piano, mellow acoustic"
+
+/** At most [max] of [items], spread evenly through the list. */
+fun <T> evenly(items: List<T>, max: Int): List<T> =
+    if (items.size <= max) items else List(max) { i -> items[i * items.size / max] }
 
 /** Builds radio queues. Every function returns songs ready to play, or throws with a readable reason. */
 class Radios(private val graph: AppGraph) {
@@ -49,11 +54,34 @@ class Radios(private val graph: AppGraph) {
         return varied(songs.shuffled(), 80)
     }
 
-    /** Songs similar to [song], from Navidrome (sonic matches when the AudioMuse plugin is installed). */
+    /** Songs similar to [song]: Navidrome's sonic similarity, AudioMuse, or Navidrome's similar songs (issue #208). */
     suspend fun songMore(song: Song): List<Song> {
         AppLog.i("Radio", "Song radio ${song.id} ${song.title}")
-        val similar = graph.subsonic.similarSongs(song.id, 60)
-        return local(similar).filter { it.id != song.id }
+        val ids = graph.sonic.similar(song.id, 60).map { it.id }.filter { it != song.id }
+        return graph.library.keepSyncedSongs(graph.generator.resolveSongs(ids), "Radio")
+    }
+
+    /** A radio around one of AudioMuse's own mood centres (issue #208). */
+    suspend fun centre(centre: MoodCentre): List<Song> {
+        AppLog.i("Radio", "Mood centre radio ${centre.mood} ${centre.index} (${centre.tags.joinToString()})")
+        val hits = graph.audioMuse.moodRadio(centre, 120)
+        val songs = graph.generator.resolveSongs(hits.map { it.id })
+        if (songs.isEmpty()) throw MixException("AudioMuse found nothing for this mood")
+        return varied(songs, 60)
+    }
+
+    /**
+     * Song Alchemy (issue #208): songs that sound like a blend of [songs] (at most 20 of them, picked evenly),
+     * leaving out the songs themselves.
+     */
+    suspend fun blend(songs: List<Song>): List<Song> {
+        val seeds = evenly(songs.map { it.id }.distinct(), 20)
+        if (seeds.isEmpty()) throw MixException("No songs to blend")
+        AppLog.i("Radio", "Song alchemy of ${seeds.size} songs")
+        val hits = graph.audioMuse.alchemy(seeds, count = 80).filter { it.id !in seeds }
+        val found = graph.generator.resolveSongs(hits.map { it.id })
+        if (found.isEmpty()) throw MixException("AudioMuse found nothing like these songs")
+        return varied(found, 60)
     }
 
     /** A few of the artist's own songs, from the phone, so the radio starts at once. */
