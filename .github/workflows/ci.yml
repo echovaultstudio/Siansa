@@ -183,11 +183,42 @@ jobs:
       - name: Build the plugin zip
         run: audiomuse-plugin/build.sh http://example.invalid
 
+  # Whether a push to main changed anything the emulator tests can see (issue #241). Screen changes count:
+  # the spacing checks and the tour run on the emulator. Notes, docs and the AudioMuse plugin don't.
+  changes:
+    name: What changed
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      app: ${{ steps.diff.outputs.app }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: App files changed?
+        id: diff
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "app=true" >> "$GITHUB_OUTPUT"; echo "No earlier commit to compare with: running the emulator tests"; exit 0
+          fi
+          changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
+          echo "$changed"
+          if echo "$changed" | python3 scripts/emulator_needed.py; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "app=false" >> "$GITHUB_OUTPUT"; echo "Only notes, docs or the plugin changed: no emulator tests"
+          fi
+
   device-tests:
     name: Emulator tests against Navidrome
-    needs: checks
-    # Not on pull requests (20 minutes each); after merges to main, nightly, and on demand.
-    if: github.event_name != 'pull_request'
+    needs: [checks, changes]
+    # Not on pull requests (20 minutes each); after merges to main that change the app, nightly, and on demand.
+    if: >-
+      always() && needs.checks.result == 'success' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.app == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
