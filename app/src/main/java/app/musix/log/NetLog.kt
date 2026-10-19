@@ -30,14 +30,31 @@ object NetLog {
         try {
             val response = chain.proceed(request)
             val ms = (System.nanoTime() - started) / 1_000_000
-            AppLog.d("Net", describe(request, response, address, protocol, ms))
+            AppLog.d("Net", describe(request, response, address, protocol, ms), event = "network.request", fields = fields(request, ms) + mapOf(
+                "status" to response.code,
+                "bytes" to response.header("Content-Length")?.toLongOrNull(),
+                "protocol" to protocol,
+            ))
             response
         } catch (e: IOException) {
             val ms = (System.nanoTime() - started) / 1_000_000
-            AppLog.d("Net", "${sent(request, address, protocol)}\n  ✗ ${e.javaClass.simpleName}: ${e.message} after ${ms}ms")
+            AppLog.d("Net", "${sent(request, address, protocol)}\n  ✗ ${e.javaClass.simpleName}: ${e.message} after ${ms}ms",
+                event = "network.failed", fields = fields(request, ms) + mapOf("error_type" to e.javaClass.simpleName, "error" to e.message))
             throw e
         }
     }
+
+    /**
+     * The structured fields of a request (issue #237): method, host, path and the names (not values) of its
+     * parameters, and how long it took. The full redacted address stays in the readable line.
+     */
+    fun fields(request: Request, ms: Long): Map<String, Any?> = mapOf(
+        "method" to request.method,
+        "host" to request.url.host,
+        "path" to request.url.encodedPath,
+        "params" to request.url.queryParameterNames.sorted(),
+        "duration_ms" to ms,
+    )
 
     private fun ip(a: InetSocketAddress): String {
         val host = a.address?.hostAddress ?: a.hostString

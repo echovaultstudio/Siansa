@@ -38,6 +38,8 @@ data class AppSettings(
     /** ...on any Wi-Fi, rather than only on the same local network as Navidrome. */
     val coverDownloadAnyWifi: Boolean = false,
     val logging: Boolean = false,
+    /** Parts of the app whose detailed log entries are left out (Settings › Logs › Detail, issue #237). */
+    val logQuiet: Set<String> = emptySet(),
     val scrobbleNavidrome: Boolean = true,
     val lastFmEnabled: Boolean = false,
     val lastFmApiKey: String = "",
@@ -168,6 +170,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         coverDownload = prefs.getBoolean("cover_download", false),
         coverDownloadAnyWifi = prefs.getBoolean("cover_download_any_wifi", false),
         logging = prefs.getBoolean("logging", false),
+        logQuiet = prefs.getString("log_quiet", "").orEmpty().split(',').filter { it.isNotBlank() }.toSet(),
         scrobbleNavidrome = prefs.getBoolean("scrobble_nd", true),
         lastFmEnabled = prefs.getBoolean("lfm_on", false),
         lastFmApiKey = prefs.getString("lfm_key", "") ?: "",
@@ -238,6 +241,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putStringSet("sync_folders", s.syncFolders)
             .putInt("image_cache_mb", s.imageCacheMb)
             .putBoolean("logging", s.logging)
+            .putString("log_quiet", s.logQuiet.sorted().joinToString(","))
             .putBoolean("scrobble_nd", s.scrobbleNavidrome)
             .putBoolean("lfm_on", s.lastFmEnabled)
             .putString("lfm_key", s.lastFmApiKey.trim())
@@ -283,6 +287,13 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         prefs.edit().putBoolean("logging", on).apply()
         _state.value = _state.value.copy(logging = on)
     }
+
+    /** Leaves out (or keeps) the detailed log entries of [component] (issue #237). */
+    fun setLogQuiet(quiet: Set<String>) {
+        prefs.edit().putString("log_quiet", quiet.sorted().joinToString(",")).apply()
+        _state.value = _state.value.copy(logQuiet = quiet)
+    }
+
 
     fun setHomeOrder(order: List<HomeSection>) {
         prefs.edit().putString("home_order", HomeSection.format(order)).apply()

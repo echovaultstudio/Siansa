@@ -14,6 +14,7 @@ import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.source.LoadEventInfo
 import androidx.media3.exoplayer.source.MediaLoadData
 import app.musix.log.AppLog
+import app.musix.log.Level
 import java.io.IOException
 
 /**
@@ -48,6 +49,8 @@ class PlaybackDiagnostics(
         AppLog.w(
             "Audio",
             "Underrun #$underruns (sound gap): audio buffer ${bufferSizeMs}ms, ${elapsedSinceLastFeedMs}ms since last fed · ${where(eventTime)}",
+            event = "audio.underrun",
+            fields = mapOf("count" to underruns, "buffer_ms" to bufferSizeMs, "since_fed_ms" to elapsedSinceLastFeedMs),
         )
     }
 
@@ -55,14 +58,16 @@ class PlaybackDiagnostics(
         when (state) {
             Player.STATE_BUFFERING -> {
                 bufferingSince = SystemClock.elapsedRealtime()
-                if (player.playWhenReady) AppLog.i("Audio", "Waiting for data · ${where(eventTime)}")
+                if (player.playWhenReady) AppLog.i("Audio", "Waiting for data · ${where(eventTime)}", event = "playback.buffering_started", fields = mapOf("position_ms" to eventTime.currentPlaybackPositionMs))
             }
             Player.STATE_READY -> if (bufferingSince != 0L) {
                 val waited = SystemClock.elapsedRealtime() - bufferingSince
                 bufferingSince = 0L
                 if (player.playWhenReady) {
-                    if (waited > 1500) AppLog.w("Audio", "Waited ${waited}ms for data before playing · ${where(eventTime)}")
-                    else AppLog.d("Audio", "Ready after ${waited}ms")
+                    // Every buffering's length (issue #237), so rebuffering can be counted and measured.
+                    AppLog.event(if (waited > 1500) Level.WARN else Level.INFO, "Audio", "playback.buffering_ended",
+                        if (waited > 1500) "Waited ${waited}ms for data before playing · ${where(eventTime)}" else "Ready after ${waited}ms",
+                        mapOf("duration_ms" to waited))
                 }
             }
             else -> Unit
@@ -88,7 +93,8 @@ class PlaybackDiagnostics(
     ) {
         if (wasCanceled) return
         val id = loadEventInfo.uri.getQueryParameter("id") ?: "?"
-        AppLog.w("Load", "Loading song $id failed after ${loadEventInfo.loadDurationMs}ms: ${error.javaClass.simpleName}: ${error.message} · ${where(eventTime)}")
+        AppLog.w("Load", "Loading song $id failed after ${loadEventInfo.loadDurationMs}ms: ${error.javaClass.simpleName}: ${error.message} · ${where(eventTime)}",
+            event = "stream.load_failed", fields = mapOf("song_id" to id, "duration_ms" to loadEventInfo.loadDurationMs, "error_type" to error.javaClass.simpleName))
     }
 
     // Why playback starts or stops: these explain a song that loads but doesn't play.
@@ -101,7 +107,9 @@ class PlaybackDiagnostics(
             Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM -> "end of song"
             else -> "reason $reason"
         }
-        AppLog.i("Audio", (if (playWhenReady) "Play" else "Pause") + ": $why · ${where(eventTime)}")
+        AppLog.i("Audio", (if (playWhenReady) "Play" else "Pause") + ": $why · ${where(eventTime)}",
+            event = if (playWhenReady) "playback.play" else "playback.pause",
+            fields = mapOf("reason" to why, "by_user" to (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)))
     }
 
     override fun onPlaybackSuppressionReasonChanged(eventTime: AnalyticsListener.EventTime, playbackSuppressionReason: Int) {
@@ -110,7 +118,7 @@ class PlaybackDiagnostics(
             Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS -> "another app has the audio for a moment (call, navigation, notification)"
             else -> "reason $playbackSuppressionReason"
         }
-        AppLog.w("Audio", "Playback held back: $why · ${where(eventTime)}")
+        AppLog.w("Audio", "Playback held back: $why · ${where(eventTime)}", event = "audio.interrupted", fields = mapOf("reason" to why))
     }
 
     override fun onIsPlayingChanged(eventTime: AnalyticsListener.EventTime, isPlaying: Boolean) {
@@ -130,11 +138,11 @@ class PlaybackDiagnostics(
     }
 
     override fun onAudioSinkError(eventTime: AnalyticsListener.EventTime, audioSinkError: Exception) {
-        AppLog.e("Audio", "Audio output error · ${where(eventTime)}", audioSinkError)
+        AppLog.e("Audio", "Audio output error · ${where(eventTime)}", audioSinkError, event = "audio.output_error")
     }
 
     override fun onAudioCodecError(eventTime: AnalyticsListener.EventTime, audioCodecError: Exception) {
-        AppLog.e("Audio", "Audio decoder error · ${where(eventTime)}", audioCodecError)
+        AppLog.e("Audio", "Audio decoder error · ${where(eventTime)}", audioCodecError, event = "playback.decoder_error")
     }
 
     override fun onPlayerError(eventTime: AnalyticsListener.EventTime, error: PlaybackException) {

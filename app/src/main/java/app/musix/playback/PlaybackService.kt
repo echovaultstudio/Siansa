@@ -38,6 +38,8 @@ import app.musix.MusixApp
 import app.musix.data.PlayEvent
 import app.musix.data.Song
 import app.musix.log.AppLog
+import app.musix.log.Level
+import app.musix.log.Trace
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.SessionManagerListener
 import com.google.common.util.concurrent.Futures
@@ -574,7 +576,12 @@ class PlaybackService : MediaSessionService() {
             startedAtMs = System.currentTimeMillis()
             listenedMs = 0
             playingSince = if (player.isPlaying) SystemClock.elapsedRealtime() else null
-            AppLog.i("Player", "Now playing ${song.id} \"${song.title}\"")
+            // A new playback operation: its buffering, requests and errors carry this trace id (issue #237).
+            Trace.start("song")
+            AppLog.i("Player", "Now playing ${song.id} \"${song.title}\"", event = "playback.track_started", fields = mapOf(
+                "song_id" to song.id, "duration_s" to song.durationSec,
+                "source" to if (graph.downloads.isDownloaded(song.id)) "offline" else "stream",
+            ))
             focusRescued = false
             restarted = false
             resetProgressWatch()
@@ -635,7 +642,9 @@ class PlaybackService : MediaSessionService() {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            AppLog.e("Player", "Playback error ${error.errorCodeName} on ${current?.id ?: "?"}", error)
+            AppLog.e("Player", "Playback error ${error.errorCodeName} on ${current?.id ?: "?"}", error, event = "playback.error", fields = mapOf(
+                "song_id" to current?.id, "code" to error.errorCodeName, "category" to errorCategory(error.errorCode),
+            ))
         }
 
         /**
@@ -659,14 +668,18 @@ class PlaybackService : MediaSessionService() {
             ).joinToString(" · ")
             val playable = audio.any { g -> (0 until g.length).any { g.isTrackSupported(it) } }
             if (playable) {
-                AppLog.i("Audio", "Format of ${item.mediaId}: $desc")
+                AppLog.i("Audio", "Format of ${item.mediaId}: $desc", event = "playback.format", fields = mapOf(
+                    "song_id" to item.mediaId, "container" to format.containerMimeType, "codec" to (format.codecs ?: format.sampleMimeType),
+                    "sample_rate" to format.sampleRate, "channels" to format.channelCount, "bitrate" to format.bitrate,
+                ))
                 return
             }
             if (chosenKbps[item.mediaId] == FALLBACK_KBPS) {
-                AppLog.e("Audio", "Can't play ${item.mediaId} even as Opus: $desc")
+                AppLog.e("Audio", "Can't play ${item.mediaId} even as Opus: $desc", event = "playback.unsupported_format", fields = mapOf("song_id" to item.mediaId, "format" to desc))
                 return
             }
-            AppLog.w("Audio", "This phone can't decode ${item.mediaId} ($desc); playing it as Opus $FALLBACK_KBPS kbit/s from Navidrome")
+            AppLog.w("Audio", "This phone can't decode ${item.mediaId} ($desc); playing it as Opus $FALLBACK_KBPS kbit/s from Navidrome",
+                event = "playback.recovery", fields = mapOf("song_id" to item.mediaId, "action" to "transcode_opus", "reason" to "unsupported_format", "format" to desc))
             chosenKbps[item.mediaId] = FALLBACK_KBPS
             val uri = item.localConfiguration?.uri ?: return
             player.replaceMediaItem(player.currentMediaItemIndex, item.buildUpon().setUri(Streaming.rewrite(uri, FALLBACK_KBPS)).build())
@@ -702,7 +715,8 @@ class PlaybackService : MediaSessionService() {
                 val sinceStart = SystemClock.elapsedRealtime() - startRequestedAt
                 if (sinceStart < 3_000 && !focusRescued) {
                     focusRescued = true
-                    AppLog.w("Player", "Audio focus lost ${sinceStart}ms after the song was chosen; asking for it again")
+                    AppLog.w("Player", "Audio focus lost ${sinceStart}ms after the song was chosen; asking for it again",
+                        event = "audio.focus_lost", fields = mapOf("since_start_ms" to sinceStart, "recovery" to "request_again"))
                     handler.postDelayed({ player.play() }, 300)
                 }
             }
@@ -816,7 +830,8 @@ class PlaybackService : MediaSessionService() {
                 val alreadyOpus = (chosenKbps[id] ?: 0) > 0
                 when {
                     !alreadyOpus -> {
-                        AppLog.w("Player", "Song $id stuck for 5 s with its data loaded ($where); playing the rest as Opus $FALLBACK_KBPS kbit/s from Navidrome")
+                        AppLog.w("Player", "Song $id stuck for 5 s with its data loaded ($where); playing the rest as Opus $FALLBACK_KBPS kbit/s from Navidrome",
+                            event = "playback.recovery", fields = mapOf("song_id" to id, "action" to "transcode_opus", "reason" to "stuck", "position_ms" to position))
                         chosenKbps[id] = FALLBACK_KBPS
                         val uri = item.localConfiguration?.uri ?: return
                         val index = player.currentMediaItemIndex
@@ -824,11 +839,13 @@ class PlaybackService : MediaSessionService() {
                         player.seekTo(index, position)
                     }
                     stuckRescues < 2 -> {
-                        AppLog.w("Player", "Song $id stuck for 5 s with its data loaded ($where); restarting the decoder")
+                        AppLog.w("Player", "Song $id stuck for 5 s with its data loaded ($where); restarting the decoder",
+                            event = "playback.recovery", fields = mapOf("song_id" to id, "action" to "restart_decoder", "reason" to "stuck", "attempt" to stuckRescues))
                         player.seekTo(player.currentMediaItemIndex, position)
                     }
                     else -> {
-                        AppLog.e("Player", "Song $id still stuck after ${stuckRescues} rescues ($where); giving up on it")
+                        AppLog.e("Player", "Song $id still stuck after ${stuckRescues} rescues ($where); giving up on it",
+                            event = "playback.recovery_failed", fields = mapOf("song_id" to id, "attempts" to stuckRescues))
                         handler.removeCallbacks(this)
                         return
                     }
@@ -843,8 +860,20 @@ class PlaybackService : MediaSessionService() {
             startRequestedAt = 0L
             lastBuffered = -1L
             handler.removeCallbacks(startWatch)
-            if (waited > 1500) AppLog.w("Player", "Started playing ${waited}ms after it was chosen")
-            else AppLog.d("Player", "Started playing ${waited}ms after it was chosen")
+            // Time to first audio (issue #237): always recorded as an event, a warning when slow.
+            AppLog.event(if (waited > 1500) Level.WARN else Level.INFO, "Player", "playback.first_audio",
+                "Started playing ${waited}ms after it was chosen", mapOf("latency_ms" to waited, "song_id" to current?.id))
         }
     }
+}
+
+/** The kind of a playback error, for the diagnostic log (issue #237). */
+internal fun errorCategory(code: Int): String = when (code) {
+    in 2000..2999 -> "network"
+    in 3000..3999 -> "format"
+    in 4000..4999 -> "decoder"
+    in 5000..5999 -> "audio_output"
+    in 6000..6999 -> "drm"
+    in 1000..1999 -> "player"
+    else -> "other"
 }
