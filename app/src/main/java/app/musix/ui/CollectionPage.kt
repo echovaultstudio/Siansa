@@ -31,7 +31,6 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
 import app.musix.data.normalizeKey
 import androidx.compose.ui.platform.testTag
-import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -285,9 +284,9 @@ internal fun ActionButtons(
         download()
         Spacer(Modifier.weight(1f))
         if (onSimilar != null) {
-            // The icon "Similar albums" has in the now playing menu.
+            // The waveform with an "A", as "Similar albums" in the now playing menu (issue #239).
             IconButton(onClick = onSimilar, modifier = Modifier.testTag("findSimilarAlbums")) {
-                Icon(Icons.Rounded.LibraryMusic, "Find similar albums", tint = Accent, modifier = Modifier.size(28.dp))
+                Icon(rememberSimilarAlbumsIcon(), "Find similar albums", tint = Accent, modifier = Modifier.size(28.dp))
             }
         }
         IconButton(onClick = onShuffle, enabled = enabled, modifier = Modifier.testTag("shuffleAll")) {

@@ -35,7 +35,6 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
@@ -69,7 +68,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -187,7 +188,7 @@ fun PlayerMenu(
                 }
                 MenuRow(Icons.Rounded.GraphicEq, "Similar songs") { onDismiss(); onOpenSimilarSongs() }
                 if (graph.settings.current.audioMuseReady && song.albumId != null) {
-                    MenuRow(Icons.Rounded.LibraryMusic, "Similar albums") { onDismiss(); onOpenSimilarAlbums() }
+                    MenuRow(rememberSimilarAlbumsIcon(), "Similar albums") { onDismiss(); onOpenSimilarAlbums() }
                 }
                 MenuDivider()
                 MenuRow(Icons.Rounded.Subtitles, "Lyrics") { onDismiss(); onOpenLyrics() }
@@ -213,7 +214,12 @@ fun PlayerMenu(
 }
 
 @Composable
-private fun MenuRow(icon: ImageVector, label: String, tint: Color? = null, enabled: Boolean = true, tag: String? = null, onClick: () -> Unit) {
+private fun MenuRow(icon: ImageVector, label: String, tint: Color? = null, enabled: Boolean = true, tag: String? = null, onClick: () -> Unit) =
+    MenuRow(rememberVectorPainter(icon), label, tint, enabled, tag, onClick)
+
+/** A row of the menu with a drawn icon, such as [SimilarAlbumsPainter]. */
+@Composable
+private fun MenuRow(icon: Painter, label: String, tint: Color? = null, enabled: Boolean = true, tag: String? = null, onClick: () -> Unit) {
     val color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
     Row(
         Modifier
