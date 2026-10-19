@@ -517,7 +517,8 @@ class Downloads(
                 return stopped("Waiting for Wi-Fi")
             }
             if (OfflinePlan.full(usedBytes(), s.downloadLimitMb)) {
-                AppLog.i("Downloads", "Storage limit of ${s.downloadLimitMb} MB reached, ${_list.value.waiting.size} still waiting")
+                AppLog.i("Downloads", "Storage limit of ${s.downloadLimitMb} MB reached, ${_list.value.waiting.size} still waiting", event = "download.storage_full",
+                    fields = mapOf("limit_mb" to s.downloadLimitMb, "waiting" to _list.value.waiting.size))
                 return stopped("Storage limit reached")
             }
             _progress.value = Progress(running = true, current = song)
@@ -525,7 +526,8 @@ class Downloads(
             val bytes = try {
                 download(song, kbps)
             } catch (e: IOException) {
-                AppLog.w("Downloads", "Download of ${song.id} stopped: ${e.javaClass.simpleName}: ${e.message}")
+                AppLog.w("Downloads", "Download of ${song.id} stopped: ${e.javaClass.simpleName}: ${e.message}", event = "download.failed",
+                    fields = mapOf("song_id" to song.id, "error_type" to e.javaClass.simpleName))
                 later(if (s.downloadWifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
                 return stopped("Couldn't reach Navidrome, will try again")
             }
@@ -538,7 +540,8 @@ class Downloads(
             publish(json.update { OfflinePlan.finished(it, song, bytes, System.currentTimeMillis(), kbps) })
         }
         val done = _list.value.done
-        AppLog.i("Downloads", "Downloads done: ${done.size} songs, ${done.sumOf { it.bytes } / 1_048_576} MB")
+        AppLog.i("Downloads", "Downloads done: ${done.size} songs, ${done.sumOf { it.bytes } / 1_048_576} MB", event = "download.batch_done",
+            fields = mapOf("songs" to done.size, "bytes" to done.sumOf { it.bytes }))
         _progress.value = Progress(note = null)
     }
 
@@ -553,7 +556,7 @@ class Downloads(
         try {
             call.execute().use { response ->
                 if (!response.isSuccessful) {
-                    AppLog.w("Downloads", "Song ${song.id}: HTTP ${response.code}")
+                    AppLog.w("Downloads", "Song ${song.id}: HTTP ${response.code}", event = "download.failed", fields = mapOf("song_id" to song.id, "status" to response.code))
                     if (response.code >= 500) throw IOException("HTTP ${response.code}")
                     return null
                 }

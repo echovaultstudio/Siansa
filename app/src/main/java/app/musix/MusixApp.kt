@@ -29,6 +29,8 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
         app.musix.data.Users.init(this)
         graph = AppGraph(this)
         AppLog.init(this, graph.settings.current.logging)
+        AppLog.quiet = graph.settings.current.logQuiet
+        AppLog.watchLifecycle(this)
         Diagnostics.start(this)
         // Each start: what the app is running on and with, then why it last closed.
         if (AppLog.enabled) AppLog.i("Session", sessionHeader())
