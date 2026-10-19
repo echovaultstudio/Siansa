@@ -134,6 +134,7 @@ def measure_missing(budget_seconds=None, batch=None):
                     measured += 1
                 except NotOnServer:
                     skipped += 1
+                    store.save_elsewhere(db, item_id)
                 except Exception as e:
                     db.rollback()
                     failed += 1

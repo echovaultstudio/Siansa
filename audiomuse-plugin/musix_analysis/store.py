@@ -207,6 +207,20 @@ def save_failure(db, item_id, error):
     db.commit()
 
 
+def save_elsewhere(db, item_id):
+    """Notes a song that isn't on the music server of this run (a song only on another server, or one AudioMuse
+    hasn't mapped yet). It is looked at again a day later, without counting as a failure."""
+    cur = db.cursor()
+    cur.execute(f"""
+        INSERT INTO {table('profiles')} (item_id, status, retry_after, error, updated_at)
+        VALUES (%s, 'elsewhere', now() + interval '1 day', 'not on this music server', now())
+        ON CONFLICT (item_id) DO UPDATE SET status='elsewhere', retry_after=EXCLUDED.retry_after,
+            error=EXCLUDED.error, updated_at=now()
+          WHERE {table('profiles')}.status <> 'ready'""", (item_id,))
+    cur.close()
+    db.commit()
+
+
 def profiles_for(db, item_ids):
     """Ready profiles of the given canonical ids, ``{item_id: row dict}``."""
     if not item_ids:
@@ -265,7 +279,7 @@ def songs_to_measure(db, limit, include_imported=False):
           LEFT JOIN {table('wanted')} w USING (item_id)
          WHERE (p.item_id IS NULL
                 OR (p.status='ready' AND p.analyzer_version <> %s)
-                OR (p.status='failed' AND (p.retry_after IS NULL OR p.retry_after <= now()))
+                OR (p.status IN ('failed', 'elsewhere') AND (p.retry_after IS NULL OR p.retry_after <= now()))
                 OR (%s AND p.status='ready' AND p.source='lumae'))
          ORDER BY w.asked_at DESC NULLS LAST, (p.source='lumae') NULLS FIRST, s.created_at DESC
          LIMIT %s""", (ANALYZER_VERSION, bool(include_imported), int(limit)))

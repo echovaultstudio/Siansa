@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.1.2.1",
+      "min_core_version": "3.6.4",
+      "changelog": "Songs with a few damaged bits are measured instead of failing, and songs not on the music server are looked at once a day instead of every round.",
+      "imageUrl": ""
+    },
+    {
       "version": "0.1.2",
       "min_core_version": "3.6.4",
       "changelog": "Import from Lumae: a one-time copy of the volume and fade profiles Lumae already measured (removed again in 0.1.3).",
