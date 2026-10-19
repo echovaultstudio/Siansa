@@ -293,4 +293,13 @@ class SpacingTest {
         val song = compose.onNodeWithTag("firstSong").getBoundsInRoot()
         assertTrue("Only ${(song.top - play.bottom).value} dp under the Play button", song.top - play.bottom >= app.musix.ui.Space.BelowPlayButton - 0.5.dp)
     }
+
+    /** Downloads (issue #235): the ✕ that stops all downloads sits on the progress line's centre. */
+    @Test fun stopAllSitsOnTheProgressLine() {
+        compose.setContent { MusixTheme { app.musix.ui.ProgressWithStop(0.4f) { } } }
+        val bar = compose.onNodeWithTag("downloadProgress").getBoundsInRoot()
+        val stop = compose.onNodeWithTag("stopAllDownloads").getBoundsInRoot()
+        assertEven("Stop all and the progress line, vertical centre", (bar.top + bar.bottom) / 2, (stop.top + stop.bottom) / 2, 1.dp)
+        assertTrue("Stop all is right of the line", stop.left >= bar.right - 0.5.dp)
+    }
 }
