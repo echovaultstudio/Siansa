@@ -24,6 +24,7 @@ import app.musix.log.AppLog
 import app.musix.log.NetLog
 import app.musix.mix.Similar
 import app.musix.mix.Sonic
+import app.musix.situation.SituationReader
 import app.musix.mix.SonicFingerprint
 import app.musix.mix.MixGenerator
 import app.musix.mix.Radios
@@ -279,6 +280,8 @@ class AppGraph(val app: Application) {
     )
     /** "Sounds like" from Navidrome's sonic similarity or AudioMuse (issue #208). */
     val sonic = Sonic(this)
+    /** The moment a vibe's mix is made in: weather, movement, light, charging (issue #247). */
+    val situation = SituationReader(app, http)
     /** Similar songs, albums and artists (issue #223). */
     val similar = Similar(this)
     /** Your sonic fingerprint on Home (issue #216). */

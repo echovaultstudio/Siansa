@@ -100,6 +100,7 @@ fun VibesScreen(nav: NavController) {
                     modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
                 )
             }
+            item { SituationPanel() }
             error?.let { item { ErrorText(it) } }
             items(selectors.orEmpty(), key = { it.id }) { selector ->
                 SelectorCard(
