@@ -1,5 +1,6 @@
 package app.musix
 
+import app.musix.mix.MixResume
 import app.musix.playback.ProfileStore
 import app.musix.covers.CoverStore
 import kotlinx.coroutines.runBlocking
@@ -300,6 +301,8 @@ class AppGraph(val app: Application) {
     /** Your sonic fingerprint on Home (issue #216). */
     val fingerprint = SonicFingerprint(this)
     val songRadio = SongRadio(this)
+    /** Today's mixes carry on where you left them (issue #269). */
+    val mixResume = MixResume(this, app)
     val songPath = SongPath(this)
     val sleepTimer = SleepTimer()
     val windDown = WindDown(this)
