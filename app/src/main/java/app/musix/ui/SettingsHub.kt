@@ -60,6 +60,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import app.musix.mix.RadioDrift
+import app.musix.playback.Preload
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import android.content.ClipData
@@ -269,6 +270,11 @@ fun PlaybackSettingsScreen(nav: NavController) {
             Hint("A song radio always starts with its song. How far may it wander from it?")
             RadioDriftChips(settings.radioDrift) { graph.settings.setRadioDrift(it) }
             Hint(settings.radioDrift.hint)
+            HorizontalDivider()
+            Heading("Load songs ahead")
+            Hint("While a song plays, Musix loads the next ones, one at a time, so they start at once and keep playing if the connection drops. Fewer means less data. Only original files are loaded ahead.")
+            PreloadRow("On Wi-Fi", settings.preloadWifi, "preload-wifi") { graph.settings.save(graph.settings.current.copy(preloadWifi = it)) }
+            PreloadRow("On mobile data", settings.preloadMobile, "preload-mobile") { graph.settings.save(graph.settings.current.copy(preloadMobile = it)) }
         }
     }
 }
@@ -283,6 +289,22 @@ internal fun RadioDriftChips(selected: RadioDrift, onPick: (RadioDrift) -> Unit)
                 onClick = { onPick(drift) },
                 label = { Text(drift.label) },
                 modifier = Modifier.testTag("radioDrift-${drift.name}"),
+            )
+        }
+    }
+}
+
+/** None to five songs loaded ahead (issue #254). */
+@Composable
+internal fun PreloadRow(label: String, value: Int, tag: String, onPick: (Int) -> Unit) {
+    Text(label, style = MaterialTheme.typography.bodyLarge)
+    Row(Modifier.horizontalScroll(rememberScrollState()).testTag(tag), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        Preload.CHOICES.forEach { n ->
+            FilterChip(
+                selected = value == n,
+                onClick = { onPick(n) },
+                label = { Text(if (n == 0) "None" else "$n") },
+                modifier = Modifier.testTag("$tag-$n"),
             )
         }
     }
