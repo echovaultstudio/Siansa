@@ -3,6 +3,12 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.22.4beta — 2026-10-20
+
+### Changed
+- **Your listening headers take the colours of your top artists.** Your month, Your year, This time last year, the Time machine and your sonic fingerprint now have a background of soft ribbons in the colours of that page's top three artists or songs, drifting very slowly. So each month looks different. Colours are toned so the title always stays readable.
+- **Artist pages show the 3 most popular songs**, with Show more under them for up to 6.
+
 ## 0.22.3beta — 2026-10-20
 
 ### Changed
