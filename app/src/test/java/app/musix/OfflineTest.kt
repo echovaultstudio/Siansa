@@ -4,6 +4,7 @@ import app.musix.data.AppSettings
 import app.musix.data.Song
 import app.musix.net.ConnectionState
 import app.musix.net.offlinePick
+import app.musix.net.retryDelayMs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -52,5 +53,9 @@ class OfflineTest {
         assertNull(ConnectionState(network = true, audioMuse = true).aiProblem(withAudioMuse))
         assertNull(ConnectionState(network = true, audioMuse = null).aiProblem(withAudioMuse))
         assertTrue(ConnectionState().aiProblem(AppSettings())!!.contains("isn't set up"))
+    }
+
+    @Test fun looksAgainSoonAfterTheConnectionIsLostThenEveryFewMinutes() {
+        assertEquals(listOf(5_000L, 15_000L, 30_000L, 180_000L, 180_000L), (0..4).map { retryDelayMs(it) })
     }
 }
