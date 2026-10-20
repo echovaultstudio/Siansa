@@ -92,14 +92,17 @@ import kotlinx.coroutines.launch
 fun LikedScreen(nav: NavController) {
     val graph = LocalGraph.current
     val changes by graph.favorites.changes.collectAsStateWithLifecycle()
-    val songs by loadState(changes) {
+    // Navidrome is asked again once it has saved a change, not only when the heart is tapped (issue #250).
+    val saved by graph.favorites.saved.collectAsStateWithLifecycle()
+    val songs by loadState(changes to saved) {
         runCatching { graph.subsonic.starredSongs() }
             .map { list ->
                 val local = graph.library.songs(list.map { it.id }).associateBy { it.id }
                 graph.library.keepSyncedSongs(list.map { local[it.id] ?: it }, "Liked songs")
             }
             .getOrElse { if (graph.library.isSynced) graph.library.starredSongs() else throw it }
-            .filter { graph.favorites.isLiked(it) }
+            // Songs liked just now show at the top even before Navidrome lists them; unliked ones go.
+            .let { graph.favorites.mergeLiked(it) }
     }
     val heart = Color(0xFF4B2BD6) to Color(0xFF8FD3C8)
     CollectionPage(
