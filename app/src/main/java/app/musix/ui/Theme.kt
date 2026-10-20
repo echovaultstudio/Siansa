@@ -58,6 +58,40 @@ enum class ThemeColours(val label: String, val seed: Long? = null) {
     }
 }
 
+/**
+ * The colour of selected and active items (issue #313): chosen chips, the current tab, the playing song.
+ * [THEME] takes the theme's accent (amber when the theme is grey); the others are fixed.
+ */
+enum class SelectionColour(val label: String, val argb: Long? = null) {
+    THEME("Theme"),
+    AMBER("Amber", 0xFFFFB547),
+    VIOLET("Violet", 0xFF9C7CFF),
+    BLUE("Blue", 0xFF4F8EF7),
+    TEAL("Teal", 0xFF2BB5A8),
+    GREEN("Green", 0xFF4CAF6A),
+    PINK("Pink", 0xFFE5508F),
+    RED("Red", 0xFFE5534B);
+
+    companion object {
+        fun parse(value: String?): SelectionColour = entries.firstOrNull { it.name == value } ?: THEME
+    }
+}
+
+/** Whether [c] is (nearly) grey: its channels hardly differ. */
+internal fun isGreyish(c: Color): Boolean = maxOf(c.red, c.green, c.blue) - minOf(c.red, c.green, c.blue) < 0.12f
+
+/** The colour for selected items: [choice]'s own, or the theme's [accent] (amber when that is grey). */
+internal fun selectionColourOf(choice: SelectionColour, accent: Color): Color =
+    choice.argb?.let { Color(it) } ?: if (isGreyish(accent)) Brand.Amber else accent
+
+/** Text and icons on [selected]: near black on light colours, white on dark ones. */
+internal fun onSelectionColourOf(selected: Color): Color =
+    if (0.2126f * selected.red + 0.7152f * selected.green + 0.0722f * selected.blue > 0.5f) Color(0xFF1A1400) else Color.White
+
+/** [this] with selected items in [selected]: Material's chips, tab bar and segmented buttons use the secondary container. */
+private fun ColorScheme.withSelection(selected: Color): ColorScheme =
+    copy(secondaryContainer = selected, onSecondaryContainer = onSelectionColourOf(selected))
+
 /** The chosen theme. */
 data class ThemeChoice(
     val mode: ThemeMode = ThemeMode.AUTO,
@@ -65,7 +99,17 @@ data class ThemeChoice(
     val pureBlack: Boolean = false,
     /** The seed for [ThemeColours.YOURS], as ARGB. */
     val seed: Int = app.musix.data.DEFAULT_THEME_SEED,
+    /** The colour of selected items (issue #313). */
+    val selection: SelectionColour = SelectionColour.THEME,
 )
+
+/** The colour of selected and active items (issue #313): set in Themes. */
+val Selected: Color
+    @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.secondaryContainer
+
+/** Text and icons on [Selected]. */
+val OnSelected: Color
+    @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.onSecondaryContainer
 
 /** The colour for play buttons, active controls, hearts and the playing song: the theme's main colour. */
 val Accent: Color
@@ -192,8 +236,10 @@ fun isDark(choice: ThemeChoice): Boolean = when (choice.mode) {
 @Composable
 fun MusixTheme(choice: ThemeChoice = ThemeChoice(), content: @Composable () -> Unit) {
     val dark = isDark(choice)
-    val scheme = themeScheme(choice.colours, dark, choice.pureBlack, choice.seed)
-    val darkScheme = if (dark) scheme else themeScheme(choice.colours, true, choice.pureBlack, choice.seed)
+    val plain = themeScheme(choice.colours, dark, choice.pureBlack, choice.seed)
+    val scheme = plain.withSelection(selectionColourOf(choice.selection, accentOf(choice.colours, plain)))
+    val darkPlain = if (dark) plain else themeScheme(choice.colours, true, choice.pureBlack, choice.seed)
+    val darkScheme = darkPlain.withSelection(selectionColourOf(choice.selection, accentOf(choice.colours, darkPlain)))
     CompositionLocalProvider(
         LocalChoice provides choice,
         LocalAccent provides accentOf(choice.colours, scheme),
@@ -208,7 +254,8 @@ fun MusixTheme(choice: ThemeChoice = ThemeChoice(), content: @Composable () -> U
 @Composable
 fun MusixDarkTheme(content: @Composable () -> Unit) {
     val choice = LocalChoice.current
-    val scheme = themeScheme(choice.colours, true, seed = choice.seed)
+    val plain = themeScheme(choice.colours, true, seed = choice.seed)
+    val scheme = plain.withSelection(selectionColourOf(choice.selection, accentOf(choice.colours, plain)))
     CompositionLocalProvider(
         LocalAccent provides accentOf(choice.colours, scheme),
         LocalOnAccent provides onAccentOf(choice.colours, scheme),
@@ -232,4 +279,5 @@ fun themeChoiceOf(settings: app.musix.data.AppSettings): ThemeChoice = ThemeChoi
     colours = ThemeColours.parse(settings.themeColours).let { if (it == ThemeColours.WALLPAPER && !ThemeColours.wallpaperAvailable) ThemeColours.MUSIX else it },
     pureBlack = settings.pureBlack,
     seed = settings.themeSeed,
+    selection = SelectionColour.parse(settings.themeSelection),
 )
