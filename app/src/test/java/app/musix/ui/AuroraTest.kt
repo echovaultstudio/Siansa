@@ -16,12 +16,13 @@ class AuroraTest {
     }
 
     @Test fun lightAndNeonColoursAreToned() {
+        // Colours are stored with 8 bits a channel, so allow about one step (0.01) either way.
         // A white cover: no lighter than 50 %, so white text stays readable on it.
-        assertTrue(toHsl(readableTone(Color.White)).third <= 0.5f + 1e-3f)
+        assertTrue(toHsl(readableTone(Color.White)).third <= 0.5f + 0.01f)
         // A near-black cover: still a visible colour.
-        assertTrue(toHsl(readableTone(Color(0xFF050505))).third >= 0.3f - 1e-3f)
+        assertTrue(toHsl(readableTone(Color(0xFF050505))).third >= 0.3f - 0.01f)
         // A neon green: saturation at most 80 %.
-        assertTrue(toHsl(readableTone(Color(0xFF00FF00))).second <= 0.8f + 1e-3f)
+        assertTrue(toHsl(readableTone(Color(0xFF00FF00))).second <= 0.8f + 0.01f)
     }
 
     @Test fun hslRoundTrips() {
