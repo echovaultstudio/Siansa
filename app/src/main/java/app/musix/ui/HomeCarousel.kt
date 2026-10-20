@@ -127,7 +127,8 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
     }
 
     val pager = rememberPagerState { carousel.usable.size }
-    Column(Modifier.fillMaxWidth().testTag("homeCarousel")) {
+    // Room under the dots before the next panel (issue #312): with that panel's own margin, a section's gap.
+    Column(Modifier.fillMaxWidth().padding(bottom = Space.Page).testTag("homeCarousel")) {
         SectionTitle(carousel.title)
         HorizontalPager(
             state = pager,
