@@ -6,6 +6,7 @@ import java.time.OffsetDateTime
 import java.util.concurrent.ConcurrentHashMap
 
 /** When a song was liked, added and last played, as Navidrome says (ISO dates), kept while the app runs. */
+@kotlinx.serialization.Serializable
 data class SongDates(val starred: String? = null, val created: String? = null, val played: String? = null)
 
 /**
