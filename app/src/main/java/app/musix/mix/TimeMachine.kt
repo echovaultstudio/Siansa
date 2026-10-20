@@ -18,6 +18,8 @@ data class TimeMachine(
     val source: String,
     /** False when a service that's set up couldn't be reached, so this isn't the full picture. */
     val complete: Boolean = true,
+    /** Services still being asked; their plays are added when they answer (issue #319). */
+    val pending: List<String> = emptyList(),
 ) {
     /** The songs that can play, in order: the ones in your library. */
     val songs get() = tracks.mapNotNull { it.song }
@@ -79,3 +81,10 @@ internal suspend fun <T, R : Any> rankWithMissing(plays: List<T>, limit: Int, fi
     }
     return ranked
 }
+
+/** A month or year that has ended: its plays never change, so they're kept on the phone for good (issue #319). */
+fun periodFinished(window: TimeWindow, today: LocalDate): Boolean = !window.to.isAfter(today)
+
+/** The line under the list: where the plays came from, and what's still being added (issue #319). */
+fun timeMachineSource(used: List<String>, pending: List<String>): String =
+    "From ${used.joinToString(" and ")}" + if (pending.isEmpty()) "" else " · adding plays from ${pending.joinToString(" and ")}…"

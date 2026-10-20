@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import androidx.compose.runtime.produceState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -90,8 +91,18 @@ private fun TimeMachinePage(nav: NavController) {
     // A year ago by default: the most likely time to want to go back to.
     var year by rememberSaveable { mutableIntStateOf(today.year - 1) }
     var month by rememberSaveable { mutableStateOf<Int?>(today.monthValue) }
-    // A new year or month shows the spinner straight away, not the last list (issue #189).
-    val result by loadStateFresh("timemachine-$year-$month") { graph.insights.timeMachine(year, month) }
+    // A new year or month shows the spinner straight away, not the last list (issue #189). Then what's already
+    // there shows, and each service's plays are added as they arrive (issue #319).
+    val result by produceState<Load<TimeMachine>>(Load.Loading, year, month) {
+        value = Load.Loading
+        try {
+            graph.insights.timeMachineUpdates(year, month).collect { value = Load.Ok(it) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (value !is Load.Ok) value = Load.Err(e.message ?: "Couldn't look back in time")
+        }
+    }
     var creating by rememberSaveable { mutableStateOf(false) }
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val showMissing = settings.timeMachineMissing
