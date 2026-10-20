@@ -332,4 +332,12 @@ class SpacingTest {
         val gaps = dots.zipWithNext().map { (a, b) -> with(compose.density) { (b.left - a.right).toDp() } }
         gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between carousel dots", a, b, 1.dp) }
     }
+
+    /** Settings › Scrobbling (issue #270): the share choices sit the same distance apart. */
+    @Test fun scrobblePercentChipsAreEvenlySpaced() {
+        compose.setContent { MusixTheme { app.musix.ui.ScrobblePercentChips(50) { } } }
+        val chips = app.musix.scrobble.SCROBBLE_PERCENTS.map { compose.onNodeWithTag("scrobblePercent-$it").getBoundsInRoot() }
+        val gaps = chips.zipWithNext().map { (a, b) -> b.left - a.right }
+        gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between scrobble choices", a, b, 1.dp) }
+    }
 }
