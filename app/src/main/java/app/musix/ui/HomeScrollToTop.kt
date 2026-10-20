@@ -4,10 +4,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Tapping Home while already in it (on the Home page, or an album or mix opened from it) goes back to the top of
- * the Home page. Coming to Home from another tab keeps the spot it was left at.
+ * Tapping Home while on the Home page itself goes back to the top of it. From an album or mix opened from Home, or
+ * from another tab, the tap only goes back to Home and keeps the spot it was left at.
  */
-fun tabTapScrollsHomeToTop(currentTab: String?, tapped: String): Boolean = tapped == "home" && currentTab == "home"
+fun tabTapScrollsHomeToTop(currentRoute: String?, tapped: String): Boolean = tapped == "home" && currentRoute == "home"
 
 /** Asks the Home page to scroll back to the top ([tabTapScrollsHomeToTop]). */
 object HomeScrollToTop {

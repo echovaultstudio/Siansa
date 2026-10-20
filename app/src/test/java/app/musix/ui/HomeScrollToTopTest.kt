@@ -5,9 +5,14 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Tapping Home again goes back to the top of Home; coming from another tab keeps the old spot. */
+/** Tapping Home on the Home page goes back to its top; coming from anywhere else keeps the old spot. */
 class HomeScrollToTopTest {
     @Test fun homeTappedAgainScrollsUp() = assertTrue(tabTapScrollsHomeToTop("home", "home"))
+
+    @Test fun comingBackFromAnAlbumKeepsTheSpot() {
+        assertFalse(tabTapScrollsHomeToTop("album/{id}", "home"))
+        assertFalse(tabTapScrollsHomeToTop("home/{section}", "home"))
+    }
 
     @Test fun comingFromAnotherTabKeepsTheSpot() {
         assertFalse(tabTapScrollsHomeToTop("search", "home"))
