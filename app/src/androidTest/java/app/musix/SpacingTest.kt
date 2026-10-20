@@ -303,4 +303,14 @@ class SpacingTest {
         assertEven("Stop all and the progress line, vertical centre", (bar.top + bar.bottom) / 2, (stop.top + stop.bottom) / 2, 1.dp)
         assertTrue("Stop all is right of the line", stop.left >= bar.right - 0.5.dp)
     }
+
+    /** Vibes panel (issue #247): the "Use the moment" switches are one height apart, each switch on its row's line. */
+    @Test fun situationSwitchesAreEvenlySpaced() {
+        compose.setContent {
+            MusixTheme { app.musix.ui.SituationSwitches(app.musix.situation.SituationOptions(weather = true)) { } }
+        }
+        val names = listOf("Weather", "Movement", "Light", "Charging", "Listening device")
+        val rows = names.map { compose.onNodeWithTag("situation-$it").getBoundsInRoot() }
+        rows.zipWithNext().forEach { (a, b) -> assertEven("Gap between switch rows", b.top - a.bottom, 0.dp, 1.dp) }
+    }
 }

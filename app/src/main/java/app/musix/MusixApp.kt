@@ -31,6 +31,19 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
         AppLog.init(this, graph.settings.current.logging)
         AppLog.quiet = graph.settings.current.logQuiet
         AppLog.watchLifecycle(this)
+        // A step count each time the app comes to the front, so the next mix can tell walking from sitting
+        // (issue #247): one reading, only while movement is switched on for the vibes.
+        registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityStarted(activity: android.app.Activity) {
+                if (graph.settings.current.situation.movement) graph.scope.launch { graph.situation.noteSteps() }
+            }
+            override fun onActivityCreated(activity: android.app.Activity, state: android.os.Bundle?) = Unit
+            override fun onActivityResumed(activity: android.app.Activity) = Unit
+            override fun onActivityPaused(activity: android.app.Activity) = Unit
+            override fun onActivityStopped(activity: android.app.Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: android.app.Activity, state: android.os.Bundle) = Unit
+            override fun onActivityDestroyed(activity: android.app.Activity) = Unit
+        })
         Diagnostics.start(this)
         // Each start: what the app is running on and with, then why it last closed.
         if (AppLog.enabled) AppLog.i("Session", sessionHeader())
