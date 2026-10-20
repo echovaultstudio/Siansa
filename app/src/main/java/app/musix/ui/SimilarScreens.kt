@@ -79,20 +79,8 @@ fun SimilarAlbumsScreen(nav: NavController, songId: String) {
                         modifier = Modifier.padding(Space.Page),
                     )
                 } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(150.dp),
-                        contentPadding = PaddingValues(horizontal = Space.Small, vertical = Space.Small),
-                        modifier = Modifier.fillMaxSize().testTag("similar-albums"),
-                    ) {
-                        items(found, key = { it.id }) { a ->
-                            AlbumTile(
-                                name = a.name,
-                                subtitle = listOfNotNull(a.artist.ifBlank { null }, a.year?.toString()).joinToString(" · "),
-                                coverArt = a.coverArt,
-                                onClick = { nav.navigate("album/${a.id}") },
-                            )
-                        }
-                    }
+                    // A grid of three or a list (issue #289).
+                    AlbumsGridOrList(found, page = "similar-albums", onOpen = { nav.navigate("album/${it.id}") }, modifier = Modifier.fillMaxSize().testTag("similar-albums"))
                 }
             }
         }

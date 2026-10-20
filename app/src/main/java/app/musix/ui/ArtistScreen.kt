@@ -162,10 +162,12 @@ fun ArtistScreen(nav: NavController, id: String) {
         val types = releaseTypeChoices(p.albums)
         val type = chosenReleaseType(typeName, types)
         val shownGroups = onlyReleaseType(groups, type)
+        var releasesGrid by rememberGridMode("artist")
 
         LazyVerticalGrid(
             state = gridState,
-            columns = GridCells.Adaptive(150.dp),
+            // Three across, or one release per row in the list (issue #289).
+            columns = GridCells.Fixed(GRID_COLUMNS),
             contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section)),
             modifier = Modifier.fillMaxSize().then(cardModifier),
         ) {
@@ -222,19 +224,28 @@ fun ArtistScreen(nav: NavController, id: String) {
             // Discography by release type: Albums, EPs, Singles, Live, Compilations, DJ-mixes…
             shownGroups.forEachIndexed { i, (category, albums) ->
                 full {
-                    SectionTitle(
-                        if (albums.size == 1) category.single else category.plural,
-                        top = if (i == 0 && types.isNotEmpty()) CHIPS_GAP else SECTION_GAP,
-                    )
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        SectionTitle(
+                            if (albums.size == 1) category.single else category.plural,
+                            Modifier.weight(1f),
+                            top = if (i == 0 && types.isNotEmpty()) CHIPS_GAP else SECTION_GAP,
+                        )
+                        // The grid / list switch beside the first heading (issue #289).
+                        if (i == 0) GridListToggle(releasesGrid, onToggle = { releasesGrid = !releasesGrid }, modifier = Modifier.padding(end = Space.Tight))
+                    }
                 }
-                items(albums, key = { "album-${it.id}" }) { album ->
-                    AlbumTile(
-                        name = album.name,
-                        subtitle = album.year?.toString() ?: "",
-                        coverArt = album.coverArt,
-                        onClick = { nav.navigate("album/${album.id}") },
-                        modifier = Modifier.padding(horizontal = Space.Tight),
-                    )
+                items(albums, key = { "album-${it.id}" }, span = { if (releasesGrid) GridItemSpan(1) else GridItemSpan(maxLineSpan) }) { album ->
+                    if (releasesGrid) {
+                        AlbumTile(
+                            name = album.name,
+                            subtitle = album.year?.toString() ?: "",
+                            coverArt = album.coverArt,
+                            onClick = { nav.navigate("album/${album.id}") },
+                            modifier = Modifier.padding(horizontal = Space.Tight),
+                        )
+                    } else {
+                        MediaRow(album.name, album.year?.toString() ?: "", album.coverArt, onClick = { nav.navigate("album/${album.id}") })
+                    }
                 }
             }
 
@@ -307,20 +318,8 @@ fun AppearsOnScreen(nav: NavController, id: String) {
                     modifier = Modifier.padding(Space.Page),
                 )
             } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(150.dp),
-                    contentPadding = PaddingValues(horizontal = Space.Small, vertical = Space.Small),
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    items(albums, key = { it.id }) { album ->
-                        AlbumTile(
-                            name = album.name,
-                            subtitle = listOfNotNull(album.artist.ifBlank { null }, album.year?.toString()).joinToString(" · "),
-                            coverArt = album.coverArt,
-                            onClick = { nav.navigate("album/${album.id}") },
-                        )
-                    }
-                }
+                // A grid of three or a list (issue #289).
+                AlbumsGridOrList(albums, page = "appears-on", onOpen = { nav.navigate("album/${it.id}") }, modifier = Modifier.fillMaxSize())
             }
           }
         }
