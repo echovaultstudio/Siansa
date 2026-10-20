@@ -78,13 +78,39 @@ class MixGenerator(private val graph: AppGraph) {
         mix
     }
 
+    /**
+     * Today's mix [index] of a home carousel (issue #253), made if it isn't yet. Songs already in the carousel's
+     * other mixes today stay out and their artists weigh less, so each mix differs. The mix keeps the name set
+     * in Vibes.
+     */
+    suspend fun ensureCarousel(carousel: app.musix.data.Carousel, index: Int, force: Boolean = false): Mix = mutex.withLock {
+        val selector = carousel.selectorFor(index)
+        val date = LocalDate.now().toString()
+        val id = "$date-${selector.id}"
+        if (!force) graph.mixes.get(id)?.let { return@withLock it }
+        val others = carousel.usable.indices.filter { it != index }
+            .mapNotNull { graph.mixes.get("$date-${carousel.selectorFor(it).id}") }
+        val taken = others.flatMapTo(HashSet()) { m -> m.songs.map { it.id } }
+        val artists = others.flatMapTo(HashSet()) { m -> m.songs.map { it.artist.lowercase() } }
+        val mix = generate(selector, date, id, exclude = taken, otherArtists = artists).copy(title = selector.name)
+        AppLog.i("Mix", "Carousel \"${carousel.title}\" mix ${index + 1} \"${selector.name}\": ${mix.songs.size} songs, ${taken.size} left out for the other mixes")
+        graph.mixes.save(mix)
+        mix
+    }
+
     /** A one-off sound search, used by the Search screen. */
     suspend fun soundSearch(query: String, limit: Int = 50, steering: List<Steer> = emptyList()): List<Song> {
         val hits = graph.audioMuse.textSearch(query, limit, steering)
         return resolve(hits.map { it.id })
     }
 
-    private suspend fun generate(selector: Selector, date: String, id: String): Mix {
+    private suspend fun generate(
+        selector: Selector,
+        date: String,
+        id: String,
+        exclude: Set<String> = emptySet(),
+        otherArtists: Set<String> = emptySet(),
+    ): Mix {
         val settings = graph.settings.current
         if (!settings.navidromeReady) throw MixException("Set up Navidrome in Settings first")
         if (!settings.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
@@ -107,6 +133,8 @@ class MixGenerator(private val graph: AppGraph) {
             graph.audioMuse.textSearch(base, selector.length * 4)
                 .forEach { pool.putIfAbsent(it.id, it.copy(similarity = it.similarity * 0.9)) }
         }
+        // Songs another mix of the same carousel has today stay out (issue #253).
+        pool.keys.removeAll(exclude)
         if (pool.isEmpty()) throw MixException("AudioMuse found no tracks for “${plan.query}”")
 
         val dayMs = 24L * 60 * 60 * 1000
@@ -124,11 +152,11 @@ class MixGenerator(private val graph: AppGraph) {
         val picker = MixPicker(
             length = selector.length,
             surprisePercent = selector.surprise,
-            leaveOut = leaveOut,
+            leaveOut = leaveOut + exclude,
             recent = recent,
             skipped = taste?.skipped.orEmpty(),
             familiar = { artist -> taste?.affinity(artist) ?: 0.0 },
-            lastArtists = graph.mixes.lastArtists(selector.id, excludeId = id),
+            lastArtists = graph.mixes.lastArtists(selector.id, excludeId = id) + otherArtists,
         )
         val picked = picker.pick(pool.values.toList(), surprise)
         val fresh = picked.count { it.id !in recent }

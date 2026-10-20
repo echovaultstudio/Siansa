@@ -267,6 +267,10 @@ fun HomeScreen(nav: NavController) {
                         }
                     }
                 }
+                HomeSection.CAROUSEL -> {
+                    // Your own mixes for this part of the day, set in Vibes (issue #253).
+                    if (homeSettings.audioMuseReady) item(key = "carousel") { HomeCarousel(nav, aiDown) }
+                }
                 HomeSection.MOOD -> {
                     item(key = "mood") { MoodBox(nav, Modifier.padding(horizontal = Space.Page, vertical = Space.Small)) }
                 }
