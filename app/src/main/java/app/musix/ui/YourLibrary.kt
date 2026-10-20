@@ -476,8 +476,8 @@ private fun Pill(text: String, active: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = CircleShape,
-        color = if (active) Accent else MaterialTheme.colorScheme.surfaceContainerHigh,
-        contentColor = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+        color = if (active) Selected else MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = if (active) OnSelected else MaterialTheme.colorScheme.onSurface,
     ) {
         Text(text, style = MaterialTheme.typography.labelLarge, fontSize = 14.sp, modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small))
     }
