@@ -109,10 +109,12 @@ fun SettingsHub(nav: NavController) {
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
             val hubContext = LocalContext.current
             val userCount = remember { Users.ids(hubContext).size }
+            // Library sync lives under Users now (issue #273): each user's library is their own.
             HubRow(
                 Icons.Rounded.People,
-                "Users",
-                if (userCount > 1) "$userCount users on this phone · switch with one tap" else "Add another Navidrome login",
+                "Users and library sync",
+                (if (userCount > 1) "$userCount users on this phone" else "Add another Navidrome login") + " · " +
+                    syncSummary(progress, library).replaceFirstChar { it.lowercase() },
             ) { nav.navigate("settings/users") }
             HubRow(
                 Icons.Rounded.Dns,
@@ -123,17 +125,6 @@ fun SettingsHub(nav: NavController) {
                     "OpenRouter".takeIf { settings.openRouterKey.isNotBlank() },
                 ).joinToString(" · ").ifEmpty { "Not set up" },
             ) { nav.navigate("settings/connections") }
-            HubRow(
-                Icons.Rounded.Sync,
-                "Library sync",
-                when {
-                    progress.running -> "Syncing… " + progress.phase.label
-                    progress.phase == SyncPhase.FAILED -> "Last sync failed"
-                    library != null -> "Last synced " + DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-                        .format(Date(library.syncedAt))
-                    else -> "Not synced yet"
-                },
-            ) { nav.navigate("sync") }
             HubRow(
                 Icons.Rounded.Equalizer,
                 "Playback",
@@ -189,6 +180,14 @@ fun SettingsHub(nav: NavController) {
             }
         }
     }
+}
+
+/** "Syncing… songs", "Last synced 20 Oct 2026, 07:26", "Not synced yet". */
+internal fun syncSummary(progress: app.musix.data.SyncProgress, library: app.musix.data.LibraryStatus?): String = when {
+    progress.running -> "Syncing… " + progress.phase.label
+    progress.phase == SyncPhase.FAILED -> "Last sync failed"
+    library != null -> "Last synced " + DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(library.syncedAt))
+    else -> "Not synced yet"
 }
 
 @Composable
