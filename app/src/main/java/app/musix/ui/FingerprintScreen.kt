@@ -49,6 +49,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.musix.data.cover
 import app.musix.mix.FingerprintProfile
 import kotlinx.coroutines.launch
 
@@ -80,7 +81,7 @@ private fun FingerprintPage(nav: NavController) {
     Box(Modifier.fillMaxSize().background(Brand.Plum)) {
         LazyColumn(Modifier.fillMaxSize().testTag("fingerprint"), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item {
-                ListeningHeader(nav, "Your sonic fingerprint", "What the music you play most sounds like. Made once a day.") {
+                ListeningHeader(nav, "Your sonic fingerprint", "What the music you play most sounds like. Made once a day.", covers = list.take(3).map { it.cover }) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = Space.Page).padding(top = Space.Page),
                         verticalAlignment = Alignment.CenterVertically,
