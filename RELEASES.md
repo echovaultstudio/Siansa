@@ -3,6 +3,14 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.22.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.22.0beta) — 2026-10-20
+
+- [#314](https://github.com/Musix-Industreez/musix/pull/314) Song rows: a gap after a long title, lengths lined up (@Th3K1ngP1n)
+- [#315](https://github.com/Musix-Industreez/musix/pull/315) Mini player: swipe to change song (@Th3K1ngP1n)
+- [#316](https://github.com/Musix-Industreez/musix/pull/316) Now playing: the device name fits (@Th3K1ngP1n)
+- [#317](https://github.com/Musix-Industreez/musix/pull/317) Home: more room between the panels (@Th3K1ngP1n)
+- [#318](https://github.com/Musix-Industreez/musix/pull/318) Selected items in their own colour, chosen in Themes (@Th3K1ngP1n)
+
 ## [0.21.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.21.0beta) — 2026-10-20
 
 - [#296](https://github.com/Musix-Industreez/musix/pull/296) Lyrics button in now playing, nothing peeking under the phone's buttons (@kimchiwithrice)
