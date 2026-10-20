@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.LibraryMusic
@@ -49,6 +50,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -63,6 +65,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.musix.covers.CoverDownload
 import app.musix.data.LocalPlaylists
 import app.musix.data.Song
 import app.musix.data.cover
@@ -72,6 +75,8 @@ import app.musix.offline.OfflinePlan
 import app.musix.offline.OfflineState
 import app.musix.offline.likedOfflineItem
 import app.musix.offline.offlineItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * The download button on an album or playlist page: an outlined arrow to keep it on the phone, a ring
@@ -316,6 +321,7 @@ fun DownloadsScreen(nav: NavController) {
                     if (list.items.isNotEmpty()) {
                         OutlinedButton(onClick = { removeAll = true }) { Text("Remove all downloads") }
                     }
+                    CoverDownloadSection()
                 }
             }
         }
@@ -627,3 +633,76 @@ private fun StopAllButton(onStop: () -> Unit) {
 /** The Pause control as it shows while downloading, for the spacing test. */
 @Composable
 internal fun DownloadControlForTest() = DownloadControl(Icons.Rounded.Pause, "Pause") { }
+
+/**
+ * Download all covers (issue #302, moved here from Storage), placed in the Settings column under the song
+ * download settings: the switch, when it may run, a network check, and its progress with Stop or Download covers now.
+ */
+@Composable
+private fun CoverDownloadSection() {
+    val graph = LocalGraph.current
+    val context = LocalContext.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    var refresh by remember { mutableIntStateOf(0) }
+    HorizontalDivider()
+    Heading("Download all covers")
+    Hint("Fetches every album, artist and playlist cover in the background, so browsing never waits for one. Runs after each library sync and once a day, and only fetches covers that aren't on the phone yet. Choose No limit in Storage › Image cache so none are removed again.")
+    val download by CoverDownload.progress.collectAsStateWithLifecycle()
+    // Check the network again once a download finishes.
+    var wasRunning by remember { mutableStateOf(false) }
+    LaunchedEffect(download.running) {
+        if (wasRunning && !download.running) refresh++
+        wasRunning = download.running
+    }
+    val network by loadState(refresh to settings.coverDownloadAnyWifi) {
+        withContext(Dispatchers.IO) { CoverDownload.whyNot(context, graph.settings.current) }
+    }
+    SwitchRow("Download all covers", settings.coverDownload) { on ->
+        graph.settings.setCoverDownload(on)
+        CoverDownload.schedule(context, graph.settings.current)
+        if (on) CoverDownload.startNow(context, graph) else CoverDownload.stop(context)
+    }
+    SwitchRow("Download on Wi-Fi only", settings.coverDownloadWifiOnly) { on ->
+        graph.settings.setCoverDownload(settings.coverDownload, wifiOnly = on)
+        refresh++
+    }
+    if (settings.coverDownloadWifiOnly) {
+        SwitchRow("On any Wi-Fi, not just at home", settings.coverDownloadAnyWifi) { on ->
+            graph.settings.setCoverDownload(settings.coverDownload, anyWifi = on)
+            refresh++
+        }
+    }
+    Hint(
+        when {
+            !settings.coverDownloadWifiOnly -> "Downloads on any connection, including mobile data and a VPN."
+            settings.coverDownloadAnyWifi -> "Downloads on any Wi-Fi network. A VPN counts as mobile data, so nothing downloads while one is on."
+            else -> "Home means the phone is on Wi-Fi and reaches Navidrome's address on that network. A VPN counts as mobile data, so nothing downloads while one is on. If Navidrome is reached by a domain name, this can't be told apart; use any Wi-Fi instead."
+        },
+    )
+    Text(
+        when (val n = network) {
+            is Load.Loading -> "Checking the network…"
+            is Load.Ok -> n.value?.let { "Not now: $it." } ?: "Covers can be downloaded on this network now."
+            is Load.Err -> "Couldn't check the network: ${n.message}"
+        },
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    if (download.running) {
+        LinearProgressIndicator(
+            progress = { if (download.total > 0) download.done.toFloat() / download.total else 0f },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            "Checked ${download.done} of ${download.total} · ${download.downloaded} downloaded" +
+                if (download.failed > 0) " · ${download.failed} failed" else "",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        OutlinedButton(onClick = { CoverDownload.stop(context) }) { Text("Stop") }
+    } else {
+        download.note?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+        OutlinedButton(onClick = {
+            CoverDownload.startNow(context, graph)
+            refresh++
+        }) { Text("Download covers now") }
+    }
+}
