@@ -34,15 +34,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.musix.mix.FingerprintProfile
@@ -128,12 +131,31 @@ internal fun FingerprintStats(p: FingerprintProfile) {
             Column(
                 Modifier.weight(1f).testTag("fingerprint-stat").clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.12f)).padding(Space.Medium),
             ) {
-                Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 1)
+                FitText(value, MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold, color = Color.White))
                 Text(label, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f))
             }
         }
     }
 }
+
+/** One line of [text] that shrinks until it fits its width (issue #307: "Danceable" and "Aggressive" were cut off). */
+@Composable
+private fun FitText(text: String, style: TextStyle) {
+    var size by remember(text, style) { mutableStateOf(style.fontSize) }
+    var fits by remember(text, style) { mutableStateOf(false) }
+    Text(
+        text,
+        style = style.copy(fontSize = size),
+        maxLines = 1,
+        softWrap = false,
+        modifier = Modifier.drawWithContent { if (fits) drawContent() },
+        onTextLayout = { layout ->
+            if (layout.hasVisualOverflow && size.value > MinFitSize) size *= 0.9f else fits = true
+        },
+    )
+}
+
+private const val MinFitSize = 12f
 
 @Composable
 private fun FingerprintBody(p: FingerprintProfile) {
