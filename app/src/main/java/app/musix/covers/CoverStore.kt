@@ -296,8 +296,14 @@ object CoverStore {
         val expected = body.contentLength()
         val tmp = File(dir, safe(key) + ".part")
         var written = 0L
-        body.source().use { source ->
-            tmp.sink().buffer().use { sink -> written = sink.writeAll(source) }
+        try {
+            body.source().use { source ->
+                tmp.sink().buffer().use { sink -> written = sink.writeAll(source) }
+            }
+        } catch (e: IOException) {
+            // Cut off (the download was stopped, or the connection dropped): nothing is kept, so it's fetched again.
+            tmp.delete()
+            throw e
         }
         if (expected >= 0 && written != expected) {
             tmp.delete()

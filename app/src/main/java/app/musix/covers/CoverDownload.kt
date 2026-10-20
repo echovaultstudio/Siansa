@@ -23,8 +23,12 @@ import app.musix.ui.LARGE_COVER
 import app.musix.ui.SMALL_COVER
 import coil3.SingletonImageLoader
 import coil3.disk.DiskCache
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +37,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import okhttp3.Call
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
 import java.net.Inet4Address
@@ -63,7 +68,7 @@ object CoverDownload {
     val progress: StateFlow<Progress> = _progress.asStateFlow()
 
     private const val NOW = "cover-download"
-    private const val DAILY = "cover-download-daily"
+    internal const val DAILY = "cover-download-daily"
 
     /**
      * Any connection: whether it's Wi-Fi at home is decided by [whyNot] when the run starts. Android's own
@@ -77,6 +82,10 @@ object CoverDownload {
      * so an old one can't hold up new ones; a run in progress carries on (see [runShared]).
      */
     fun start(context: Context) {
+        if (stoppedByUser) {
+            AppLog.i("Covers", "Cover download not started after the sync: it was stopped from Settings")
+            return
+        }
         val request = OneTimeWorkRequestBuilder<CoverDownloadWorker>().setConstraints(constraints()).build()
         WorkManager.getInstance(context).enqueueUniqueWork(NOW, ExistingWorkPolicy.REPLACE, request)
         AppLog.i("Covers", "Cover download requested")
@@ -88,6 +97,7 @@ object CoverDownload {
      */
     fun startNow(context: Context, graph: AppGraph) {
         AppLog.i("Covers", "Cover download requested from Settings")
+        stoppedByUser = false
         graph.scope.launch { runShared(context.applicationContext, graph, "from Settings") }
     }
 
@@ -100,6 +110,7 @@ object CoverDownload {
         }
         // The first daily run waits a day: switching it on already starts a run now.
         val request = PeriodicWorkRequestBuilder<CoverDownloadWorker>(1, TimeUnit.DAYS)
+            .addTag(DAILY)
             .setInitialDelay(1, TimeUnit.DAYS)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).build())
             .build()
@@ -107,14 +118,25 @@ object CoverDownload {
         work.enqueueUniquePeriodicWork(DAILY, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
-    /** Stops a run in progress (the Stop button). */
+    /**
+     * Stops a run in progress (the Stop button), straight away (issue #301): the covers downloading now are
+     * cancelled mid-file (a half-downloaded cover isn't kept, so the next run fetches it again) and the page
+     * shows it stopped at once. Runs after syncs stay off until the user starts one again; the daily run
+     * still goes.
+     */
     fun stop(context: Context) {
+        stoppedByUser = true
         WorkManager.getInstance(context).cancelUniqueWork(NOW)
-        job?.let {
+        job?.takeIf { it.isActive }?.let {
             AppLog.i("Covers", "Cover download stopped from Settings")
             it.cancel()
+            update { p -> p.copy(running = false, note = "Stopped after ${p.done} of ${p.total}") }
         }
     }
+
+    /** Stop was pressed: the runs after syncs wait until the user starts one again (or the app restarts). */
+    @Volatile var stoppedByUser = false
+        private set
 
     @Volatile private var job: kotlinx.coroutines.Job? = null
 
@@ -125,7 +147,11 @@ object CoverDownload {
      */
     internal suspend fun runShared(context: Context, graph: AppGraph, why: String) {
         val current = synchronized(this) {
-            job?.takeIf { it.isActive } ?: graph.scope.launch {
+            // A stopped run isn't active any more but may still be letting go of its last covers: the new run
+            // waits for it rather than running beside it (issue #301).
+            val previous = job
+            previous?.takeIf { it.isActive } ?: graph.scope.launch {
+                previous?.join()
                 AppLog.i("Covers", "Cover download starting ($why)")
                 try {
                     run(context.applicationContext, graph)
@@ -376,22 +402,25 @@ object CoverDownload {
 
     private val animatedSmall = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
 
-    /** Saves one size into the image cache. true = downloaded, false = nothing to save, null = failed. */
-    private fun fetch(graph: AppGraph, disk: DiskCache, id: String, size: Int, key: String): Boolean? = runCatching {
-        graph.imageHttp.newCall(Request.Builder().url(graph.subsonic.coverUrl(id, size)).build()).execute().use { response ->
+    /**
+     * Saves one size into the image cache. true = downloaded, false = nothing to save, null = failed.
+     * Stopping the download cancels the request mid-file; the half-written entry is thrown away.
+     */
+    private suspend fun fetch(graph: AppGraph, disk: DiskCache, id: String, size: Int, key: String): Boolean? = runCatching {
+        graph.imageHttp.newCall(Request.Builder().url(graph.subsonic.coverUrl(id, size)).build()).executeCancellable { response ->
             if (!response.isSuccessful) {
                 AppLog.w("Covers", "Cover $id ($size px): HTTP ${response.code}")
-                return@runCatching if (response.code == 404) false else null
+                return@executeCancellable if (response.code == 404) false else null
             }
-            val body = response.body ?: return@runCatching null
+            val body = response.body ?: return@executeCancellable null
             val head = response.peekBody(32).bytes()
             val image = CoverStore.sniff(head)
             if (image == null) {
                 // Navidrome answers a missing cover with an error message, not a picture.
-                return@runCatching false
+                return@executeCancellable false
             }
             if (image.animated) animatedSmall += key
-            val editor = disk.openEditor(key) ?: return@runCatching false
+            val editor = disk.openEditor(key) ?: return@executeCancellable false
             try {
                 disk.fileSystem.write(editor.data) { writeAll(body.source()) }
                 disk.fileSystem.write(editor.metadata) { }
@@ -402,12 +431,49 @@ object CoverDownload {
             }
             true
         }
-    }.onFailure { AppLog.w("Covers", "Cover $id ($size px) failed: ${it.javaClass.simpleName}: ${it.message}") }.getOrNull()
+    }.onFailure {
+        // Stopped: not a failure of this cover.
+        currentCoroutineContext().ensureActive()
+        AppLog.w("Covers", "Cover $id ($size px) failed: ${it.javaClass.simpleName}: ${it.message}")
+    }.getOrNull()
+}
+
+/**
+ * [Call.execute], but cancelling the coroutine cancels the request too, also while its body is being read
+ * (issue #301). A blocking OkHttp call doesn't notice a cancelled coroutine: Stop used to wait until the cover
+ * in hand had finished, ten minutes for a 130 MB animated one. Call from a thread pool (Dispatchers.IO), which
+ * runs the watcher on another thread while this one waits on the network.
+ */
+internal suspend fun <T> Call.executeCancellable(read: (okhttp3.Response) -> T): T = coroutineScope {
+    val call = this@executeCancellable
+    val finished = java.util.concurrent.atomic.AtomicBoolean(false)
+    // ATOMIC: even when cancelled before it starts, it still runs its finally and cancels the call.
+    val watcher = launch(Dispatchers.Default, start = CoroutineStart.ATOMIC) {
+        try {
+            awaitCancellation()
+        } finally {
+            if (!finished.get()) call.cancel()
+        }
+    }
+    try {
+        call.execute().use(read)
+    } catch (e: java.io.IOException) {
+        // Cut off because it was stopped: say so, rather than as a network failure.
+        ensureActive()
+        throw e
+    } finally {
+        finished.set(true)
+        watcher.cancel()
+    }
 }
 
 class CoverDownloadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val graph = (applicationContext as MusixApp).graph
+        if (CoverDownload.stoppedByUser && CoverDownload.DAILY !in tags) {
+            AppLog.i("Covers", "Cover download not started: it was stopped from Settings")
+            return Result.success()
+        }
         return try {
             CoverDownload.runShared(applicationContext, graph, "on Wi-Fi, run ${runAttemptCount + 1}")
             Result.success()
