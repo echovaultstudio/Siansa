@@ -3,6 +3,11 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.22.1beta — 2026-10-20
+
+### Fixed
+- **Long moods were cut off on Your sonic fingerprint.** "Danceable", "Aggressive" and "Relaxed" now shrink to fit their tile.
+
 ## 0.22.0beta — 2026-10-20
 
 ### Fixed
