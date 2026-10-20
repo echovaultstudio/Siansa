@@ -344,7 +344,13 @@ class SpacingTest {
     /** Every grid of albums is three across, evenly spaced (issue #289). */
     @Test fun albumGridsAreThreeAcrossAndEven() {
         val albums = (1..6).map { app.musix.data.Album("a$it", "Album $it", artist = "Artist") }
-        compose.setContent { MusixTheme { app.musix.ui.AlbumsGridOrList(albums, page = "spacing-test", onOpen = {}) } }
+        // The tiles show covers, which need the app's graph.
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MusixApp).graph
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(app.musix.ui.LocalGraph provides graph) {
+                MusixTheme { app.musix.ui.AlbumsGridOrList(albums, page = "spacing-test", onOpen = {}) }
+            }
+        }
         val titles = (1..4).map { compose.onNodeWithText("Album $it").getBoundsInRoot() }
         // Albums 1–3 share a row; album 4 starts the next one, under album 1.
         assertEven("Same row", titles[0].top - titles[1].top, titles[1].top - titles[2].top, 1.dp)
