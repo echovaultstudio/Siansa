@@ -217,7 +217,7 @@ fun MusixRoot() {
                                     selected = currentTab == tab.route,
                                     onClick = {
                                         if (tabTapClearsSearch(currentTab, tab.route)) SearchReset.request()
-                                        if (tabTapScrollsHomeToTop(currentTab, tab.route)) HomeScrollToTop.request()
+                                        if (tabTapScrollsHomeToTop(route, tab.route)) HomeScrollToTop.request()
                                         if (currentTab == tab.route) nav.backToTabTop(tab.route) else nav.switchTab(tab.route)
                                         currentTab = tab.route
                                     },
