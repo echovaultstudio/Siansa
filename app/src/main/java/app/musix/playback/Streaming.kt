@@ -12,12 +12,27 @@ import app.musix.data.AppSettings
  * Navidrome does the conversion with its own "opus" transcoding profile.
  */
 object Streaming {
+    /** Wi-Fi or Ethernet, without a VPN: a VPN counts as mobile data (issue #299). */
     fun isUnmetered(context: Context): Boolean {
         val cm = context.getSystemService(ConnectivityManager::class.java) ?: return true
         val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return true
-        return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ||
-            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+        return countsAsWifi(
+            vpn = caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN),
+            wifi = caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI),
+            ethernet = caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET),
+            notMetered = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED),
+        )
+    }
+
+    /** Whether a connection counts as Wi-Fi: Wi-Fi, Ethernet or unmetered, but never through a VPN (issue #299). */
+    fun countsAsWifi(vpn: Boolean, wifi: Boolean, ethernet: Boolean, notMetered: Boolean): Boolean =
+        !vpn && (wifi || ethernet || notMetered)
+
+    /** Whether a VPN is on, on any of the phone's networks (issue #299). */
+    fun vpnOn(context: Context): Boolean {
+        val cm = context.getSystemService(ConnectivityManager::class.java) ?: return false
+        @Suppress("DEPRECATION")
+        return cm.allNetworks.any { n -> cm.getNetworkCapabilities(n)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true }
     }
 
     /** Kbit/s for Opus on the current network, or 0 for the original file. */

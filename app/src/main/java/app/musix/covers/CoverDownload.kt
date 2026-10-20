@@ -164,9 +164,8 @@ object CoverDownload {
                     .mapNotNull { r -> r.destination?.let { Prefix(it.address, it.prefixLength) } },
             )
         }
-        // Wi-Fi or Ethernet, even when a VPN is on top of it.
-        if (nets.none { it.wifi }) return "Not on Wi-Fi"
-        if (settings.coverDownloadAnyWifi) return null
+        networkProblem(nets, settings.coverDownloadWifiOnly)?.let { return it }
+        if (!settings.coverDownloadWifiOnly || settings.coverDownloadAnyWifi) return null
         val host = settings.navidromeUrl.toHttpUrlOrNull()?.host ?: return "Navidrome's address isn't valid"
         val addresses = runCatching { InetAddress.getAllByName(host).toList() }.getOrElse { return "Couldn't look up $host" }
         val how = homeRoute(nets, addresses)
@@ -185,6 +184,19 @@ object CoverDownload {
     }
 
     @Volatile private var lastHow: String? = null
+
+    /**
+     * Why the phone's networks don't allow downloading covers, before asking where Navidrome is (issue #299):
+     * with Wi-Fi only, a VPN counts as mobile data, so any VPN stops it, as does having no Wi-Fi. Without
+     * Wi-Fi only, any connection will do.
+     */
+    fun networkProblem(nets: List<NetInfo>, wifiOnly: Boolean): String? = when {
+        nets.isEmpty() -> "No connection"
+        !wifiOnly -> null
+        nets.any { it.vpn } -> "A VPN is on, which counts as mobile data"
+        nets.none { it.wifi } -> "Not on Wi-Fi"
+        else -> null
+    }
 
     /** An address and prefix length: a network's own address, or where one of its routes leads. */
     data class Prefix(val address: InetAddress, val length: Int) {
