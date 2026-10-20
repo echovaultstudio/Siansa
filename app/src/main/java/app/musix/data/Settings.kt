@@ -56,6 +56,9 @@ data class AppSettings(
     val transcodeWifiKbps: Int = 0,
     val transcodeMobileKbps: Int = 0,
     val songCacheMb: Int = 2048,
+    /** Upcoming songs loaded ahead on Wi-Fi and on mobile data (issue #254, see [app.musix.playback.Preload]). */
+    val preloadWifi: Int = 2,
+    val preloadMobile: Int = 1,
     /** Downloads for offline listening wait for Wi-Fi. */
     val downloadWifiOnly: Boolean = true,
     /** Most space downloads may use, in MB; 0 = no limit. */
@@ -196,6 +199,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         transcodeWifiKbps = prefs.getInt("tc_wifi", 0),
         transcodeMobileKbps = prefs.getInt("tc_mobile", 0),
         songCacheMb = prefs.getInt("song_cache_mb", 2048),
+        preloadWifi = prefs.getInt("preload_wifi", 2),
+        preloadMobile = prefs.getInt("preload_mobile", 1),
         downloadWifiOnly = prefs.getBoolean("download_wifi_only", true),
         downloadLimitMb = prefs.getInt("download_limit_mb", 0),
         downloadKbps = prefs.getInt("download_kbps", 0),
@@ -273,6 +278,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putInt("tc_wifi", s.transcodeWifiKbps)
             .putInt("tc_mobile", s.transcodeMobileKbps)
             .putInt("song_cache_mb", s.songCacheMb)
+            .putInt("preload_wifi", s.preloadWifi)
+            .putInt("preload_mobile", s.preloadMobile)
             .apply()
         _state.value = s
     }
