@@ -1,6 +1,7 @@
 package app.musix.ui
 
 import app.musix.mix.resumeStart
+import app.musix.data.RecentPlay
 import app.musix.data.cover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -78,6 +79,8 @@ fun HomeScreen(nav: NavController) {
     val launch = rememberPlayLauncher()
     val mixes by graph.mixes.state.collectAsStateWithLifecycle()
     val resumePoints by graph.mixResume.points.collectAsStateWithLifecycle()
+    val recentPlays by graph.recentPlays.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { graph.recentPlays.all() }
     val selectors by graph.selectors.state.collectAsStateWithLifecycle()
     val status by graph.library.status.collectAsStateWithLifecycle()
     val loaded by graph.library.loaded.collectAsStateWithLifecycle()
@@ -216,14 +219,20 @@ fun HomeScreen(nav: NavController) {
         for (section in HomeSection.visible(homeOrder, homeHidden)) {
             when (section) {
                 HomeSection.QUICK -> {
-                    // Quick access, like the top grid in Spotify: today's mixes, playlists and recent albums.
+                    // Quick access, like the top grid in Spotify (issue #271): Liked songs always first, then what
+                    // you played last; until there's enough of that, today's mixes, playlists and recent albums.
                     item(key = "quick") {
+                        val mixIds = mixes.orEmpty().mapTo(HashSet()) { it.id }
+                        val fill = buildList {
+                            todaysMixes.take(2).forEach { m -> add(RecentPlay("mix/${m.id}", m.title, m.songs.firstOrNull()?.cover)) }
+                            playlists.valueOrNull().orEmpty().take(2).forEach { p -> add(RecentPlay("playlist/${p.id}", p.name, p.coverArt)) }
+                            recentAlbums.valueOrNull().orEmpty().take(8).forEach { a -> add(RecentPlay("album/${a.id}", a.name, a.coverArt)) }
+                        }
+                        val played = recentPlays.orEmpty().filter { !it.route.startsWith("mix/") || it.route.removePrefix("mix/") in mixIds }
                         val quick = buildList<Triple<String, String?, () -> Unit>> {
                             add(Triple("Liked songs", null) { nav.navigate("liked") })
-                            todaysMixes.take(2).forEach { m -> add(Triple(m.title, m.songs.firstOrNull()?.cover) { nav.navigate("mix/${m.id}") }) }
-                            playlists.valueOrNull().orEmpty().take(2).forEach { p -> add(Triple(p.name, p.coverArt) { nav.navigate("playlist/${p.id}") }) }
-                            recentAlbums.valueOrNull().orEmpty().take(6).forEach { a -> add(Triple(a.name, a.coverArt) { nav.navigate("album/${a.id}") }) }
-                        }.take(6)
+                            quickShortcuts(played, fill, QUICK_COUNT - 1).forEach { r -> add(Triple(r.title, r.cover) { nav.navigate(r.route) }) }
+                        }
                         if (quick.isNotEmpty()) {
                             Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                                 quick.chunked(2).forEach { row ->
@@ -251,8 +260,11 @@ fun HomeScreen(nav: NavController) {
                                 mix = mix,
                                 busy = busySelector == "current",
                                 onOpen = { nav.navigate("mix/${mix.id}") },
-                                // Carries on where the mix was left (issue #269).
-                                onPlay = { graph.mixResume.play(mix) },
+                                // Carries on where the mix was left (issue #269), and becomes a shortcut (issue #271).
+                                onPlay = {
+                                    graph.mixResume.play(mix)
+                                    graph.scope.launch { graph.recentPlays.note("mix/${mix.id}", mix.title, mix.songs.firstOrNull()?.cover) }
+                                },
                                 resume = resumeStart(mix.songs, resumePoints[mix.id])?.let { mix.songs[it.first] },
                                 onShuffle = { graph.player.play(mix.songs, shuffle = true) },
                                 onRegenerate = { build(null, force = true, open = false) },
@@ -595,3 +607,13 @@ internal fun HomeHeader(title: String, modifier: Modifier = Modifier, action: @C
         action()
     }
 }
+
+/** Shortcuts on Home in all, Liked songs included (issue #271). */
+internal const val QUICK_COUNT = 8
+
+/**
+ * The shortcuts after Liked songs: what was played last first, then [fill] (today's mixes, playlists, recent
+ * albums) until there are [count], each page once. Liked songs is never among them: it always comes first.
+ */
+internal fun quickShortcuts(played: List<RecentPlay>, fill: List<RecentPlay>, count: Int): List<RecentPlay> =
+    (played + fill).filter { it.route != "liked" }.distinctBy { it.route }.take(count)
