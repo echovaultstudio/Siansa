@@ -3,6 +3,13 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.21.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.21.0beta) — 2026-10-20
+
+- [#296](https://github.com/Musix-Industreez/musix/pull/296) Lyrics button in now playing, nothing peeking under the phone's buttons (@kimchiwithrice)
+- [#303](https://github.com/Musix-Industreez/musix/pull/303) Time machine: show songs not in your library (@kimchiwithrice)
+- [#304](https://github.com/Musix-Industreez/musix/pull/304) Move Download all covers to the Downloads page (@kimchiwithrice)
+- [#305](https://github.com/Musix-Industreez/musix/pull/305) Stop the cover download straight away (@kimchiwithrice)
+
 ## [0.20.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.20.0beta) — 2026-10-20
 
 - [#298](https://github.com/Musix-Industreez/musix/pull/298) Download all covers: start straight away, don't wait for an unmetered network (@Th3K1ngP1n)
