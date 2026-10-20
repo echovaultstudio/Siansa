@@ -4,6 +4,7 @@ import app.musix.data.LyricLine
 import app.musix.data.Lyrics
 import app.musix.data.Playlist
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -55,5 +56,12 @@ class NowPlayingPartsTest {
             Playlist("4", "Unknown owner"),
         )
         assertEquals(listOf("Alpha", "Unknown owner", "zeta"), editablePlaylists(lists, "max").map { it.name })
+    }
+
+    @Test fun lyricsButtonNeedsWords() {
+        assertTrue(hasLyrics(Lyrics(false, listOf(LyricLine(null, "hello")))))
+        assertFalse(hasLyrics(null))
+        assertFalse(hasLyrics(Lyrics(true, emptyList())))
+        assertFalse(hasLyrics(Lyrics(true, listOf(LyricLine(1_000, " "), LyricLine(2_000, "")))))
     }
 }

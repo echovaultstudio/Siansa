@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -43,6 +44,8 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Subtitles
 import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material.icons.rounded.ChatBubble
+import androidx.compose.material.icons.rounded.FormatQuote
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -101,6 +104,9 @@ fun lyricsPreview(lyrics: Lyrics, positionMs: Long, count: Int = 4): List<String
     val from = current.coerceAtMost(max(0, lines.size - count))
     return lines.drop(from).take(count).map { it.text }
 }
+
+/** Whether there are lyrics to show: at least one line with words (#294). */
+fun hasLyrics(lyrics: Lyrics?): Boolean = lyrics?.lines?.any { it.text.isNotBlank() } == true
 
 /** "12 albums · 148 songs in your library", or null when the artist isn't in the library. */
 fun artistLibraryLine(albums: Int, songs: Int): String? {
@@ -261,10 +267,8 @@ private val CardSurface = Color(0xFF1C1630)
 
 /** The lyrics preview card under the player, in a colour from the cover; hidden when the song has no lyrics. */
 @Composable
-fun LyricsPreviewCard(song: Song, tint: Color, onOpen: () -> Unit) {
-    val graph = LocalGraph.current
-    val lyrics by loadState("lyrics-${song.id}") { graph.subsonic.lyrics(song) }
-    val loaded = lyrics.valueOrNull() ?: return
+fun LyricsPreviewCard(lyrics: Lyrics?, tint: Color, onOpen: () -> Unit) {
+    val loaded = lyrics ?: return
     val position by rememberPosition()
     val lines = lyricsPreview(loaded, position)
     if (lines.isEmpty()) return
@@ -503,6 +507,29 @@ fun LyricsScreen(song: Song?, tint: Color, onClose: () -> Unit, menu: () -> Unit
 }
 
 /** A small round button with a circle behind it, for the queue at the bottom right of the player. */
+/**
+ * The lyrics button under the controls: a speech bubble with quote marks. Greyed out, and not tappable,
+ * when the song has no lyrics (#294).
+ */
+@Composable
+fun LyricsButton(enabled: Boolean, onClick: () -> Unit) {
+    val color = Color.White.copy(alpha = if (enabled) 0.9f else 0.3f)
+    Box(
+        Modifier.size(48.dp).clip(CircleShape).clickable(enabled = enabled, onClickLabel = "Show lyrics", onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Rounded.ChatBubble, if (enabled) "Lyrics" else "No lyrics for this song", tint = color)
+        // The quote marks, cut out of the bubble in the player's dark colour, a little above centre where the
+        // bubble's body is.
+        Icon(
+            Icons.Rounded.FormatQuote,
+            null,
+            tint = Color.Black.copy(alpha = 0.75f),
+            modifier = Modifier.size(14.dp).offset(y = (-2).dp), // spacing: exact
+        )
+    }
+}
+
 @Composable
 fun RoundIcon(icon: ImageVector, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(modifier.size(48.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
