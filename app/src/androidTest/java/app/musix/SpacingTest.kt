@@ -374,10 +374,11 @@ class SpacingTest {
                 MusixTheme { Column { app.musix.ui.SongRow(long, onClick = {}, leading = "1", showCover = false); app.musix.ui.SongRow(short, onClick = {}, leading = "2", showCover = false) } }
             }
         }
-        val lengths = compose.onAllNodesWithTag("songLength").fetchSemanticsNodes().map { it.boundsInRoot }
+        // The row is one clickable item, so its parts are only found in the unmerged tree.
+        val lengths = compose.onAllNodesWithTag("songLength", useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
         assertEquals(2, lengths.size)
         assertEven("Lengths line up", with(compose.density) { lengths[0].right.toDp() }, with(compose.density) { lengths[1].right.toDp() }, 1.dp)
-        val title = compose.onNodeWithText(long.title, substring = true).getBoundsInRoot()
+        val title = compose.onNodeWithText(long.title, substring = true, useUnmergedTree = true).getBoundsInRoot()
         assertTrue("A gap after the title: ${title.right} vs ${lengths[0].left}", title.right <= with(compose.density) { lengths[0].left.toDp() } - Space.Small + 1.dp)
     }
 
