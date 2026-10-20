@@ -1,7 +1,6 @@
 package app.musix.ui
 
 import androidx.compose.runtime.LaunchedEffect
-import app.musix.data.isFavouriteAlbum
 import app.musix.data.cover
 import app.musix.data.toPlaylist
 import android.content.Context
@@ -131,7 +130,7 @@ private data class Entry(
     /** Sub-filter tags this entry matches (e.g. "By you", "EPs", "Vibes"). */
     val tags: Set<String> = emptySet(),
     val alwaysPinned: Boolean = false,
-    /** Shown under the Favourites chip (issue #275): favourite albums and Liked songs. */
+    /** Shown under the Favourites chip (issues #275, #289): the Favourite albums card and Liked songs. */
     val favourite: Boolean = false,
 )
 
@@ -160,7 +159,8 @@ fun YourLibraryScreen(nav: NavController) {
     var kind by rememberSaveable { mutableStateOf<String?>(null) }
     var sub by rememberSaveable { mutableStateOf<String?>(null) }
     var sort by rememberSaveable { mutableStateOf(Sort.RECENTS.name) }
-    var grid by rememberSaveable { mutableStateOf(false) }
+    // Grid or list, kept for next time (issue #289).
+    var grid by rememberGridMode("library", default = false)
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var pinVersion by remember { mutableStateOf(0) }
@@ -299,8 +299,8 @@ fun YourLibraryScreen(nav: NavController) {
                     PrefetchCovers(gridState.firstVisibleItemIndex, gridState.layoutInfo.visibleItemsInfo.size, covers, 300)
                     Box(Modifier.fillMaxSize()) {
                         LazyVerticalGrid(
-                            // A little narrower with the bar, so it still fits as many tiles across.
-                            columns = GridCells.Adaptive(if (letterStarts != null) 100.dp else 110.dp),
+                            // Three across, like every grid (issue #289).
+                            columns = GridCells.Fixed(GRID_COLUMNS),
                             state = gridState,
                             contentPadding = PaddingValues(start = Space.Small, end = if (letterStarts != null) AlphabetBarWidth + Space.Tight else Space.Small, bottom = bottomBarPadding(Space.Page)),
                             modifier = Modifier.fillMaxSize(),
@@ -656,8 +656,6 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
     val now = LocalDate.now()
     // Favourite albums, from Navidrome (one request), or the phone's copy offline (issue #275).
     val favouriteAlbums = graph.favouriteAlbums.refresh()
-    val favouriteIds = graph.favouriteAlbums.ids.value
-    val favouriteShown = HashSet<String>()
 
     // What you've played: Musix's own history, and Navidrome's recently played albums (other apps too).
     val history = graph.history.all()
@@ -816,8 +814,6 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
     graph.library.albums("name").forEach { a ->
         val recent = a.allIds.maxOfOrNull { albumRecent[it] ?: 0L } ?: 0L
         val category = a.category
-        val favourite = isFavouriteAlbum(a, favouriteIds)
-        if (favourite) favouriteShown += a.allIds
         entries += Entry(
             key = "album-${a.id}",
             kind = Kind.ALBUM,
@@ -834,24 +830,24 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
                 if (recent > 0) add("Played")
                 if (a.playCount == 0L && recent == 0L) add("Not played yet")
             },
-            favourite = favourite,
         )
     }
-    // Favourite albums Navidrome knows that aren't in the synced library (another library, not synced yet).
-    favouriteAlbums.filter { a -> a.allIds.none { it in favouriteShown } }.forEach { a ->
-        entries += Entry(
-            key = "album-${a.id}",
-            kind = null,
-            title = a.name,
-            subtitle = "Album · " + a.artist,
-            route = "album/${a.id}",
-            coverArt = a.coverArt,
-            addedAt = parseTime(a.created),
-            plays = a.playCount,
-            creator = a.artist,
-            favourite = true,
-        )
-    }
+    // One card for all favourite albums (issue #289): its page lists them, as a grid or a list.
+    entries += Entry(
+        key = "favourite-albums",
+        kind = null,
+        title = "Favourite albums",
+        subtitle = "Albums · " + when (favouriteAlbums.size) {
+            0 -> "tap the heart on an album to add it"
+            1 -> "1 album"
+            else -> "${favouriteAlbums.size} albums"
+        },
+        route = "favourite-albums",
+        gradient = Color(0xFFB8336A) to Color(0xFFFFB547),
+        heart = true,
+        recentAt = System.currentTimeMillis() - 4,
+        favourite = true,
+    )
 
     // Artists.
     graph.library.artists().forEach { ar ->
