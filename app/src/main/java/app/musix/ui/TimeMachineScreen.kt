@@ -58,7 +58,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import app.musix.data.cover
 import app.musix.log.AppLog
 import app.musix.mix.RankedTrack
 import app.musix.mix.TIME_MACHINE_FIRST_YEAR
@@ -111,9 +110,7 @@ private fun TimeMachinePage(nav: NavController) {
     Box(Modifier.fillMaxSize().background(Brand.Plum)) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item {
-                // The colours of that time's top three songs (issue #327).
-                val covers = result.valueOrNull()?.songs.orEmpty().take(3).map { it.cover }
-                ListeningHeader(nav, "Time machine", "The songs you played most, any month or year.", covers = covers) {
+                ListeningHeader(nav, "Time machine", "The songs you played most, any month or year.") {
                     Spacer(Modifier.height(Space.Small))
                     TimePicker(
                         year = year,

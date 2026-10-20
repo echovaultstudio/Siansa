@@ -79,9 +79,7 @@ private fun ReportPage(nav: NavController, rangeId: String) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item {
                 val r = report.valueOrNull()
-                // The background mixes the colours of this period's top three artists (issue #327).
-                val covers = r?.topArtists.orEmpty().take(3).map { a -> a.artist?.let { it.coverArt ?: "ar-${it.id}" } }
-                ListeningHeader(nav, r?.title ?: "Your listening", r?.subtitle.orEmpty(), covers = covers) {
+                ListeningHeader(nav, r?.title ?: "Your listening", r?.subtitle.orEmpty()) {
                     Row(
                         Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Space.Page).padding(top = Space.Medium),
                         horizontalArrangement = Arrangement.spacedBy(Space.Small),

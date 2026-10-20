@@ -31,21 +31,10 @@ private val colorCache = ConcurrentHashMap<String, Int>()
  */
 @Composable
 fun rememberCoverColor(coverId: String?): Color {
-    val fallback = MaterialTheme.colorScheme.surfaceVariant
-    val found = rememberCoverColorOrNull(coverId)
-    val tone = lerp(found ?: fallback, Color.Black, 0.35f)
-    return animateColorAsState(tone, tween(350), label = "cover-color").value
-}
-
-/**
- * The picture's main colour as it is (vibrant, else dominant, else muted), or null until it's known or when
- * there's no picture: for colours that mix several covers (issue #327). Remembered for the rest of the session.
- */
-@Composable
-fun rememberCoverColorOrNull(coverId: String?): Color? {
     val graph = LocalGraph.current
     val context = LocalContext.current
-    var found by remember(coverId) { mutableStateOf(coverId?.let { colorCache[it] }?.let { Color(it) }) }
+    val fallback = MaterialTheme.colorScheme.surfaceVariant
+    var target by remember(coverId) { mutableStateOf(coverId?.let { colorCache[it] }?.let { Color(it) } ?: fallback) }
     LaunchedEffect(coverId) {
         if (coverId == null || colorCache.containsKey(coverId)) return@LaunchedEffect
         val argb = withContext(Dispatchers.IO) {
@@ -65,8 +54,9 @@ fun rememberCoverColorOrNull(coverId: String?): Color? {
         }
         if (argb != null) {
             colorCache[coverId] = argb
-            found = Color(argb)
+            target = Color(argb)
         }
     }
-    return found
+    val tone = lerp(target, Color.Black, 0.35f)
+    return animateColorAsState(tone, tween(350), label = "cover-color").value
 }
