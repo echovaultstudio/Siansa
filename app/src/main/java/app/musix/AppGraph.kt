@@ -199,6 +199,8 @@ class AppGraph(val app: Application) {
     val guests: Guests by lazy { Guests(app, http, library, scope) }
     val mixes = MixStore(app)
     val history = HistoryStore(app)
+    /** How Liked songs and playlists are sorted (issue #257). */
+    val listSort = app.musix.data.ListSortStore(app)
     val library = LibraryRepository(app)
     val topSongs = TopSongs(app, subsonic, library, scope)
 
