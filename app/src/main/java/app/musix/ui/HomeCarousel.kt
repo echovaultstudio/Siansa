@@ -149,7 +149,8 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
                 coverArt = mix?.songs?.firstOrNull()?.coverArt,
                 busy = selector.id in building,
                 onOpen = { if (mix != null) nav.navigate("mix/${mix.id}") else make(page, open = true) },
-                onPlay = if (mix != null) ({ graph.player.play(mix.songs) }) else null,
+                // Carries on where the mix was left (issue #269).
+                onPlay = if (mix != null) ({ graph.mixResume.play(mix) }) else null,
             )
         }
         CarouselDots(count = carousel.usable.size, current = pager.currentPage)
