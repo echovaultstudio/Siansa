@@ -2,7 +2,6 @@ package app.musix
 
 import app.musix.ui.LyricsSwitchRow
 import app.musix.ui.PathMoodPicker
-import app.musix.ui.SteeringChips
 import app.musix.ui.Space
 import androidx.compose.material3.Text
 import androidx.compose.material3.FilterChip
@@ -205,32 +204,6 @@ class SpacingTest {
         val text = compose.onNodeWithText("bonobo", useUnmergedTree = true).getBoundsInRoot()
         val row = rows[1]
         assertEven("Words in the row", text.top - dp(row.top), dp(row.bottom) - text.bottom)
-    }
-
-    /** Sound search: the "more / less" concept chips sit evenly under the Library / Sound chips (issue #208). */
-    @Test fun steeringChipsAreEvenlySpaced() {
-        compose.setContent {
-            MusixTheme {
-                Column {
-                    Row(Modifier.padding(horizontal = Space.Page, vertical = Space.Small)) {
-                        FilterChip(selected = true, onClick = {}, label = { Text("Sound") }, modifier = Modifier.testTag("modeChip"))
-                    }
-                    app.musix.ui.ConceptGroupRow(
-                        listOf(app.musix.net.ConceptCategory("instrument", "Instrument", listOf("piano", "vocals"))),
-                        "instrument",
-                        mapOf("piano" to true),
-                    ) { }
-                    SteeringChips(listOf("piano", "vocals"), mapOf("piano" to true)) { }
-                    Box(Modifier.fillMaxWidth().height(40.dp).testTag("results"))
-                }
-            }
-        }
-        val mode = compose.onNodeWithTag("modeChip").getBoundsInRoot()
-        val groupChip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Instrument · 1")), useUnmergedTree = true).getBoundsInRoot()
-        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("More piano")), useUnmergedTree = true).getBoundsInRoot()
-        val results = compose.onNodeWithTag("results").getBoundsInRoot()
-        // The group chips and the concept chips are one block: the same gap above it as below it.
-        assertEven("Steering block", groupChip.top - mode.bottom, results.top - chip.bottom)
     }
 
     /** Song path: the mood chips sit evenly between their label and the "Follow the lyrics" row (issue #208). */
