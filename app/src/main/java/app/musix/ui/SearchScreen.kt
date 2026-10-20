@@ -53,7 +53,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import app.musix.data.RecentSearch
-import app.musix.net.AudioMuseApi
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -335,10 +334,6 @@ private fun BrowseGrid(nav: NavController) {
     val version by graph.library.version.collectAsStateWithLifecycle()
     val genreList by loadState(version to "browse-genres") { if (graph.library.isSynced) graph.library.genres(30) else emptyList() }
     val genres = genreList.valueOrNull().orEmpty()
-    val centreList by loadState("browse-centres") {
-        if (graph.settings.current.audioMuseReady) runCatching { graph.audioMuse.moodCentres() }.getOrDefault(emptyList()) else emptyList()
-    }
-    val centres = centreList.valueOrNull().orEmpty()
     LazyVerticalGrid(
         columns = GridCells.Adaptive(160.dp),
         contentPadding = PaddingValues(start = Space.Page, end = Space.Page, bottom = bottomBarPadding(Space.Section)),
@@ -352,17 +347,6 @@ private fun BrowseGrid(nav: NavController) {
         }
         items(moodRadios, key = { "mood-" + it.id }) { radio ->
             BrowseTile(radio.name, Color(radio.colors.first) to Color(radio.colors.second)) { nav.openMoodRadio(radio.id) }
-        }
-        // AudioMuse's own mood centres, found in your library's sound (issue #208).
-        if (centres.isNotEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Text("Moods in your library", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = Space.Small))
-            }
-            items(centres, key = { "centre-" + AudioMuseApi.centreKey(it) }) { centre ->
-                BrowseTile(AudioMuseApi.centreTitle(centre), tileColors("centre-" + AudioMuseApi.centreKey(centre))) {
-                    nav.openCentreRadio(AudioMuseApi.centreKey(centre))
-                }
-            }
         }
         if (genres.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
