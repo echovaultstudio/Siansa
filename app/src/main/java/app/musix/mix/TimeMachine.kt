@@ -8,7 +8,7 @@ import java.util.Locale
 
 /**
  * The time machine (issue #186): your most played songs in any month or year, from Koito, Last.fm or
- * both, kept to songs in your library.
+ * both. Songs that aren't in your library are listed too, with no [RankedTrack.song] (issue #234).
  */
 data class TimeMachine(
     /** "March 2019", or "2019" for a whole year. */
@@ -18,7 +18,11 @@ data class TimeMachine(
     val source: String,
     /** False when a service that's set up couldn't be reached, so this isn't the full picture. */
     val complete: Boolean = true,
-)
+) {
+    /** The songs that can play, in order: the ones in your library. */
+    val songs get() = tracks.mapNotNull { it.song }
+    val missing get() = tracks.count { it.song == null }
+}
 
 /** The days a time machine covers: [from] inclusive, [to] exclusive. */
 data class TimeWindow(val from: LocalDate, val to: LocalDate, val label: String)
@@ -58,4 +62,20 @@ fun mergePlays(vararg lists: List<Played>): List<Played> {
         if (seen == null || p.count > seen.count) best[key] = (seen ?: p).copy(count = maxOf(p.count, seen?.count ?: 0))
     }
     return best.values.sortedByDescending { it.count }
+}
+
+/**
+ * [plays] in order, each with its library match or null when it isn't in the library (issue #234), until
+ * [limit] of them are in the library. So hiding the missing ones still leaves as many songs as before.
+ */
+internal suspend fun <T, R : Any> rankWithMissing(plays: List<T>, limit: Int, find: suspend (T) -> R?): List<Pair<T, R?>> {
+    val ranked = ArrayList<Pair<T, R?>>()
+    var found = 0
+    for (p in plays) {
+        if (found >= limit) break
+        val match = find(p)
+        if (match != null) found++
+        ranked += p to match
+    }
+    return ranked
 }
