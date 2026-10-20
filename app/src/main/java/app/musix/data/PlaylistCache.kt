@@ -20,12 +20,20 @@ data class CachedPlaylist(
     val comment: String? = null,
     val readonly: Boolean? = null,
     val songs: List<Song> = emptyList(),
+    /** The songs' dates, so a playlist from the phone still sorts by date added or last played (issue #257). */
+    val dates: Map<String, SongDates> = emptyMap(),
 ) {
-    fun toDetail() = PlaylistDetail(Playlist(id, name, songs.size, songs.sumOf { it.durationSec }, coverArt, owner, comment, changed, readonly), songs)
+    fun toDetail(): PlaylistDetail {
+        dates.forEach { (id, d) -> if (SongDatesCache[id] == null) SongDatesCache.remember(id, d) }
+        return detail()
+    }
+
+    private fun detail() = PlaylistDetail(Playlist(id, name, songs.size, songs.sumOf { it.durationSec }, coverArt, owner, comment, changed, readonly), songs)
 
     companion object {
         fun of(d: PlaylistDetail) = CachedPlaylist(
             d.playlist.id, d.playlist.name, d.playlist.changed, d.playlist.owner, d.playlist.coverArt, d.playlist.comment, d.playlist.readonly, d.songs,
+            d.songs.mapNotNull { s -> SongDatesCache[s.id]?.let { s.id to it } }.toMap(),
         )
     }
 }
