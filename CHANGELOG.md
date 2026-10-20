@@ -3,6 +3,17 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.20.0beta — 2026-10-20
+
+### Fixed
+- **Download all covers didn't start.** Tapping Download covers now did nothing, especially with a VPN on over Wi-Fi: Android treats most VPNs as metered, so the download kept waiting for an unmetered network. It now starts straight away, and if it can't run on this network it says why. Musix still only downloads on Wi-Fi at home (or any Wi-Fi, if you switch that on).
+
+### Added
+- **Download all covers has a Wi-Fi only switch**, like offline songs. With Wi-Fi only on, covers and offline songs never download over a VPN or mobile data. Turn it off to let them download on any connection, VPN included.
+
+### Changed
+- **A VPN counts as mobile data.** While a VPN is on, Musix uses your mobile data settings: streaming quality, how many songs load ahead, and downloads.
+
 ## 0.19.2beta — 2026-10-20
 
 ### Fixed
