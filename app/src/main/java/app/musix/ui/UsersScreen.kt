@@ -1,5 +1,10 @@
 package app.musix.ui
 
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.ui.platform.testTag
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,6 +50,8 @@ fun UsersScreen(nav: NavController) {
     var changes by remember { mutableIntStateOf(0) }
     val users = remember(changes) { Users.all(context) }
     var removing by remember { mutableStateOf<UserEntry?>(null) }
+    val progress by graph.sync.progress.collectAsStateWithLifecycle()
+    val library by graph.library.status.collectAsStateWithLifecycle()
 
     Screen(title = "Users", nav = nav) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -94,6 +101,23 @@ fun UsersScreen(nav: NavController) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+            // The library of the user in use, synced to the phone (issue #273, was on the Settings start page).
+            HorizontalDivider()
+            Row(
+                Modifier.fillMaxWidth().clickable { nav.navigate("sync") }.padding(horizontal = Space.Page, vertical = Space.Page).testTag("librarySync"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Rounded.Sync, null, tint = MaterialTheme.colorScheme.primary)
+                Column(Modifier.weight(1f).padding(start = Space.Page)) {
+                    Text("Library sync", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        syncSummary(progress, library) + " · for the user in use",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
             }
         }
     }
