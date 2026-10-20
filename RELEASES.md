@@ -3,6 +3,10 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.22.3beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.22.3beta) — 2026-10-20
+
+- [#326](https://github.com/Musix-Industreez/musix/pull/326) Your listening: equal stat tiles, and a more polished header (@Th3K1ngP1n)
+
 ## [0.22.2beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.22.2beta) — 2026-10-20
 
 - [#321](https://github.com/Musix-Industreez/musix/pull/321) Tapping Home on the Home page scrolls back to the top (@kimchiwithrice)
