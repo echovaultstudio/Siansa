@@ -712,6 +712,21 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
         tags = setOf("Time machine"),
     )
 
+    // Your sonic fingerprint (issue #255, was on Home): what you play most sounds like, with its numbers.
+    if (graph.settings.current.audioMuseReady) {
+        entries += Entry(
+            key = "sonic-fingerprint",
+            kind = Kind.LISTENING,
+            title = "Your sonic fingerprint",
+            subtitle = "Your listening · How your music sounds",
+            route = "fingerprint",
+            gradient = Brand.VioletDeep to Brand.Plum,
+            badge = "Sound",
+            recentAt = System.currentTimeMillis() - 3,
+            tags = setOf("Sound"),
+        )
+    }
+
     // Artists you don't have yet, like the ones you play most (made once a day), with why.
     entries += Entry(
         key = "discover-artists",
