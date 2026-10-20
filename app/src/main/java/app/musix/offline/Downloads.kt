@@ -515,9 +515,12 @@ class Downloads(
             val song = _list.value.waiting.firstOrNull() ?: break
             val s = settings.current
             if (!s.navidromeReady) return stopped("Navidrome isn't set up")
-            if (s.downloadWifiOnly && !Streaming.isUnmetered(context)) {
-                later(NetworkType.UNMETERED)
-                return stopped("Waiting for Wi-Fi")
+            // A VPN counts as mobile data (issue #299): with Wi-Fi only on, nothing downloads through one.
+            if (s.downloadWifiOnly && (!Streaming.isUnmetered(context) || Streaming.vpnOn(context))) {
+                val vpn = Streaming.vpnOn(context)
+                // Android may call a VPN unmetered and start the work again at once: look again in a while then.
+                later(NetworkType.UNMETERED, delayMinutes = if (vpn) 15 else 0)
+                return stopped(if (vpn) "Waiting for Wi-Fi without a VPN" else "Waiting for Wi-Fi")
             }
             if (OfflinePlan.full(usedBytes(), s.downloadLimitMb)) {
                 AppLog.i("Downloads", "Storage limit of ${s.downloadLimitMb} MB reached, ${_list.value.waiting.size} still waiting", event = "download.storage_full",
@@ -607,9 +610,10 @@ class Downloads(
     }
 
     /** Starts the downloads again once the phone has the right network. */
-    private fun later(network: NetworkType) {
+    private fun later(network: NetworkType, delayMinutes: Long = 0) {
         val request = OneTimeWorkRequestBuilder<DownloadWorker>()
             .setConstraints(Constraints.Builder().setRequiredNetworkType(network).build())
+            .setInitialDelay(delayMinutes, java.util.concurrent.TimeUnit.MINUTES)
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(WORK, ExistingWorkPolicy.REPLACE, request)
     }

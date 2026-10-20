@@ -444,7 +444,7 @@ fun StorageScreen(nav: NavController) {
 
             HorizontalDivider()
             Heading("Download all covers")
-            Hint("Fetches every album, artist and playlist cover in the background, so browsing never waits for one. Runs after each library sync and once a day, only on Wi-Fi, and only fetches covers that aren't on the phone yet. Choose No limit above so none are removed again.")
+            Hint("Fetches every album, artist and playlist cover in the background, so browsing never waits for one. Runs after each library sync and once a day, and only fetches covers that aren't on the phone yet. Choose No limit above so none are removed again.")
             val download by CoverDownload.progress.collectAsStateWithLifecycle()
             // Show the new space used once a download finishes.
             var wasRunning by remember { mutableStateOf(false) }
@@ -460,13 +460,22 @@ fun StorageScreen(nav: NavController) {
                 CoverDownload.schedule(context, graph.settings.current)
                 if (on) CoverDownload.startNow(context, graph) else CoverDownload.stop(context)
             }
-            SwitchRow("On any Wi-Fi, not just at home", settings.coverDownloadAnyWifi) { on ->
-                graph.settings.setCoverDownload(settings.coverDownload, anyWifi = on)
+            SwitchRow("Download on Wi-Fi only", settings.coverDownloadWifiOnly) { on ->
+                graph.settings.setCoverDownload(settings.coverDownload, wifiOnly = on)
                 refresh++
             }
+            if (settings.coverDownloadWifiOnly) {
+                SwitchRow("On any Wi-Fi, not just at home", settings.coverDownloadAnyWifi) { on ->
+                    graph.settings.setCoverDownload(settings.coverDownload, anyWifi = on)
+                    refresh++
+                }
+            }
             Hint(
-                if (settings.coverDownloadAnyWifi) "Downloads on any Wi-Fi network."
-                else "Home means the phone is on Wi-Fi and reaches Navidrome's address on that network, or through a VPN to your home network. If Navidrome is reached by a domain name, this can't be told apart; use any Wi-Fi instead.",
+                when {
+                    !settings.coverDownloadWifiOnly -> "Downloads on any connection, including mobile data and a VPN."
+                    settings.coverDownloadAnyWifi -> "Downloads on any Wi-Fi network. A VPN counts as mobile data, so nothing downloads while one is on."
+                    else -> "Home means the phone is on Wi-Fi and reaches Navidrome's address on that network. A VPN counts as mobile data, so nothing downloads while one is on. If Navidrome is reached by a domain name, this can't be told apart; use any Wi-Fi instead."
+                },
             )
             Text(
                 when (val n = network) {
