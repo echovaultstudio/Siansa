@@ -365,10 +365,11 @@ class SpacingTest {
         val long = app.musix.data.Song("1", "ID1 (from Hospital30: Hugh Hardie) a very long title that must be cut off", artist = "ID", durationSec = 153)
         val short = app.musix.data.Song("2", "Short", artist = "ID", durationSec = 89)
         compose.setContent {
-            // Song rows need the app's graph and a navigation controller (for their ⋮ menu).
+            // Song rows need the app's graph, a navigation controller (their ⋮ menu) and the snackbar ("Added to the queue").
             androidx.compose.runtime.CompositionLocalProvider(
                 app.musix.ui.LocalGraph provides graph,
                 app.musix.ui.LocalNav provides androidx.navigation.compose.rememberNavController(),
+                app.musix.ui.LocalSnack provides androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() },
             ) {
                 MusixTheme { Column { app.musix.ui.SongRow(long, onClick = {}, leading = "1", showCover = false); app.musix.ui.SongRow(short, onClick = {}, leading = "2", showCover = false) } }
             }
