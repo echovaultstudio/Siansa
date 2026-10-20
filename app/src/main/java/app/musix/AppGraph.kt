@@ -2,6 +2,7 @@ package app.musix
 
 import app.musix.mix.MixResume
 import app.musix.data.RecentPlays
+import app.musix.data.FavouriteAlbums
 import app.musix.playback.ProfileStore
 import app.musix.covers.CoverStore
 import kotlinx.coroutines.runBlocking
@@ -226,6 +227,8 @@ class AppGraph(val app: Application) {
     val listenBrainz = ListenBrainzApi(http)
     val scrobbler = Scrobbler(app, settings, subsonic, lastFm, listenBrainz, scope)
     val favorites = Favorites(subsonic, lastFm, settings, library, scope)
+    /** Favourite albums, starred in Navidrome (issue #275). */
+    val favouriteAlbums = FavouriteAlbums(app, subsonic, scope)
 
     /**
      * Songs kept on the phone as they play (and the next one in the queue), so replays start at once

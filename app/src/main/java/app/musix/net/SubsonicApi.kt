@@ -96,7 +96,7 @@ class SubsonicApi(
         for ((key, value) in repeated) append('&').append(enc(key)).append('=').append(enc(value))
     }
 
-    private fun loginOf(params: Map<String, String?>) = loginFor(params["id"] ?: params["playlistId"]) ?: settings()
+    private fun loginOf(params: Map<String, String?>) = loginFor(params["id"] ?: params["playlistId"] ?: params["albumId"]) ?: settings()
 
     /** A song or cover address (one salt per app run, see above). */
     fun url(endpoint: String, params: Map<String, String?> = emptyMap(), repeated: List<Pair<String, String>> = emptyList()): String {
@@ -425,6 +425,21 @@ class SubsonicApi(
     suspend fun unstar(id: String) {
         call("unstar", mapOf("id" to id))
     }
+
+    /** Marks an album as a favourite (Navidrome's star on the album, issue #275). */
+    suspend fun starAlbum(albumId: String) {
+        call("star", mapOf("albumId" to albumId))
+    }
+
+    suspend fun unstarAlbum(albumId: String) {
+        call("unstar", mapOf("albumId" to albumId))
+    }
+
+    /** Favourite (starred) albums. */
+    suspend fun starredAlbums(): List<Album> =
+        folderPasses().flatMap { folder ->
+            call("getStarred2", mapOf("musicFolderId" to folder)).obj("starred2")?.arr("album").orEmpty().map(::parseAlbum)
+        }.distinctBy { it.id }
 
     /** Liked (starred) songs. */
     suspend fun starredSongs(): List<Song> =
