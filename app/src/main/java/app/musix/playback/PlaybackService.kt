@@ -59,8 +59,6 @@ import java.util.Collections
 
 private const val FALLBACK_KBPS = 320
 
-/** How many songs ahead to fetch loudness and fade shapes for. */
-private const val PROFILES_AHEAD = 5
 
 /**
  * Background playback with a media notification, lock-screen controls, ReplayGain, transcoding and scrobbling.
@@ -295,25 +293,29 @@ class PlaybackService : MediaSessionService() {
         precacheWriter?.cancel()
         precacheJob?.cancel()
         precachedFor = player.currentMediaItem?.mediaId
-        val index = player.nextMediaItemIndex
-        if (index == C.INDEX_UNSET) return
-        val item = player.getMediaItemAt(index)
-        val uri = item.localConfiguration?.uri ?: return
-        if (kbpsFor(item.mediaId) > 0) return
-        if (graph.downloads.fileFor(item.mediaId) != null) return
+        // How many songs to load ahead, as set for Wi-Fi or mobile data (issue #254); 0 loads none.
+        val ahead = Preload.count(graph.settings.current, Streaming.isUnmetered(this))
+        if (ahead <= 0) return
         val factory = cacheFactory ?: return
-        val writer = CacheWriter(factory.createDataSourceForDownloading(), DataSpec(uri), null, null)
-        precacheWriter = writer
-        // Only called once the current song has fully loaded, so the two never share the connection.
-        AppLog.i("Cache", "Pre-caching next song ${item.mediaId}")
+        val items = upcomingIndices(player, ahead).drop(1).map { player.getMediaItemAt(it) }.filter { item ->
+            // Only originals are cached; downloaded songs are on the phone already.
+            item.localConfiguration?.uri != null && kbpsFor(item.mediaId) <= 0 && graph.downloads.fileFor(item.mediaId) == null
+        }
+        if (items.isEmpty()) return
+        // Only called once the current song has fully loaded, so they never share the connection; one at a time.
+        AppLog.i("Cache", "Pre-caching the next ${items.size} of $ahead song(s): ${items.joinToString { it.mediaId }}")
         precacheJob = scope.launch {
-            try {
-                writer.cache()
-                AppLog.i("Cache", "Pre-cached next song ${item.mediaId}")
-            } catch (e: InterruptedIOException) {
-                // Cancelled because the queue moved on.
-            } catch (e: Exception) {
-                AppLog.w("Cache", "Pre-caching ${item.mediaId} failed: ${e.message}")
+            for (item in items) {
+                val writer = CacheWriter(factory.createDataSourceForDownloading(), DataSpec(item.localConfiguration!!.uri), null, null)
+                precacheWriter = writer
+                try {
+                    writer.cache()
+                    AppLog.i("Cache", "Pre-cached song ${item.mediaId}")
+                } catch (e: InterruptedIOException) {
+                    return@launch // Cancelled because the queue moved on.
+                } catch (e: Exception) {
+                    AppLog.w("Cache", "Pre-caching ${item.mediaId} failed: ${e.message}")
+                }
             }
         }
     }
@@ -486,18 +488,22 @@ class PlaybackService : MediaSessionService() {
     }
 
     /** The current song and the next [ahead] in the order they will play. */
-    private fun upcomingIds(player: Player, ahead: Int): List<String> {
+    private fun upcomingIds(player: Player, ahead: Int): List<String> =
+        upcomingIndices(player, ahead).map { player.getMediaItemAt(it).mediaId }
+
+    /** The queue positions of the current song and the next [ahead], in the order they will play. */
+    private fun upcomingIndices(player: Player, ahead: Int): List<Int> {
         val count = player.mediaItemCount
         if (count == 0) return emptyList()
         val timeline = player.currentTimeline
         var index = player.currentMediaItemIndex.coerceIn(0, count - 1)
-        if (timeline.isEmpty) return listOf(player.getMediaItemAt(index).mediaId)
-        val ids = ArrayList<String>(ahead + 1)
-        while (index != C.INDEX_UNSET && index < count && ids.size <= ahead) {
-            ids += player.getMediaItemAt(index).mediaId
+        if (timeline.isEmpty) return listOf(index)
+        val indices = ArrayList<Int>(ahead + 1)
+        while (index != C.INDEX_UNSET && index < count && indices.size <= ahead) {
+            indices += index
             index = timeline.getNextWindowIndex(index, Player.REPEAT_MODE_OFF, player.shuffleModeEnabled)
         }
-        return ids
+        return indices
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
@@ -614,7 +620,7 @@ class PlaybackService : MediaSessionService() {
          */
         private fun fetchProfiles(song: Song) {
             if (!graph.profiles.active) return
-            val ids = upcomingIds(player, PROFILES_AHEAD)
+            val ids = upcomingIds(player, Preload.profilesAhead(graph.settings.current, Streaming.isUnmetered(this@PlaybackService)))
             scope.launch {
                 val found: Map<String, TrackProfile> = graph.profiles.fetch(ids)
                 val profile = found[song.id] ?: return@launch
