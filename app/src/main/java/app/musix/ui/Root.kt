@@ -295,6 +295,7 @@ fun MusixRoot() {
                 composable("playlist/{id}") { PlaylistScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("mix/{id}") { MixScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("selector/{id}") { SelectorEditor(nav, it.arguments?.getString("id").orEmpty()) }
+                composable("carousel/{id}") { CarouselEditor(nav, it.arguments?.getString("id").orEmpty()) }
             }
           }
         }

@@ -101,6 +101,7 @@ fun VibesScreen(nav: NavController) {
                 )
             }
             item { SituationPanel() }
+            item { CarouselPanel(nav) }
             error?.let { item { ErrorText(it) } }
             items(selectors.orEmpty(), key = { it.id }) { selector ->
                 SelectorCard(
