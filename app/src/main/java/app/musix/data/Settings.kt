@@ -39,6 +39,8 @@ data class AppSettings(
     val coverDownload: Boolean = false,
     /** ...on any Wi-Fi, rather than only on the same local network as Navidrome. */
     val coverDownloadAnyWifi: Boolean = false,
+    /** Covers only on Wi-Fi (never over a VPN or mobile data); off, on any connection (issue #299). */
+    val coverDownloadWifiOnly: Boolean = true,
     val logging: Boolean = false,
     /** What of the moment the vibes may use for today's mix (Vibes panel, issue #247). */
     val situation: SituationOptions = SituationOptions(),
@@ -180,6 +182,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         animatedCovers = prefs.getBoolean("animated_covers", true),
         coverDownload = prefs.getBoolean("cover_download", false),
         coverDownloadAnyWifi = prefs.getBoolean("cover_download_any_wifi", false),
+        coverDownloadWifiOnly = prefs.getBoolean("cover_download_wifi_only", true),
         logging = prefs.getBoolean("logging", false),
         logQuiet = prefs.getString("log_quiet", "").orEmpty().split(',').filter { it.isNotBlank() }.toSet(),
         situation = SituationOptions(
@@ -294,9 +297,14 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     }
 
 
-    fun setCoverDownload(on: Boolean, anyWifi: Boolean = _state.value.coverDownloadAnyWifi) {
-        prefs.edit().putBoolean("cover_download", on).putBoolean("cover_download_any_wifi", anyWifi).apply()
-        _state.value = _state.value.copy(coverDownload = on, coverDownloadAnyWifi = anyWifi)
+    fun setCoverDownload(
+        on: Boolean,
+        anyWifi: Boolean = _state.value.coverDownloadAnyWifi,
+        wifiOnly: Boolean = _state.value.coverDownloadWifiOnly,
+    ) {
+        prefs.edit().putBoolean("cover_download", on).putBoolean("cover_download_any_wifi", anyWifi)
+            .putBoolean("cover_download_wifi_only", wifiOnly).apply()
+        _state.value = _state.value.copy(coverDownload = on, coverDownloadAnyWifi = anyWifi, coverDownloadWifiOnly = wifiOnly)
     }
 
     fun setDownloads(
