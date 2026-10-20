@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import android.content.Context
@@ -147,7 +148,7 @@ fun AlbumsGridOrList(
         modifier = modifier.testTag("albumsGridOrList"),
     ) {
         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) { GridListHeader(title, grid) { grid = !grid } }
-        androidx.compose.foundation.lazy.grid.items(albums, key = { it.id }) { a ->
+        items(albums, key = { it.id }) { a ->
             if (grid) AlbumTile(a.name, subtitle(a), a.coverArt, onClick = { onOpen(a) })
             else MediaRow(a.name, subtitle(a), a.coverArt, onClick = { onOpen(a) })
         }
