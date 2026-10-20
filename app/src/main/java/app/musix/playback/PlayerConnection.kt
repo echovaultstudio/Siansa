@@ -118,7 +118,8 @@ class PlayerConnection(
         _notices.tryEmit(message)
     }
 
-    fun play(songs: List<Song>, startIndex: Int = 0, shuffle: Boolean = false) {
+    /** Plays [songs] from [startIndex]; [startMs] starts that song part-way (a mix carried on, issue #269). */
+    fun play(songs: List<Song>, startIndex: Int = 0, shuffle: Boolean = false, startMs: Long = 0L) {
         if (songs.isEmpty()) return
         val why = limited()
         if (why != null) {
@@ -133,17 +134,17 @@ class PlayerConnection(
                 return playNow(pick.songs, pick.start, shuffle)
             }
         }
-        playNow(songs, startIndex, shuffle)
+        playNow(songs, startIndex, shuffle, startMs)
     }
 
-    private fun playNow(songs: List<Song>, startIndex: Int, shuffle: Boolean) {
+    private fun playNow(songs: List<Song>, startIndex: Int, shuffle: Boolean, startMs: Long = 0L) {
         onNewQueue?.invoke()
         SongRegistry.register(songs)
         val items = songs.map { it.toMediaItem(api) }
         val start = if (shuffle) Random.nextInt(songs.size) else startIndex.coerceIn(0, songs.size - 1)
         withController { c ->
             c.shuffleModeEnabled = shuffle
-            c.setMediaItems(items, start, 0L)
+            c.setMediaItems(items, start, if (shuffle) 0L else startMs.coerceAtLeast(0L))
             c.prepare()
             c.play()
         }

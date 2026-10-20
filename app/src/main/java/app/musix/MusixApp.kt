@@ -31,6 +31,7 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
         AppLog.init(this, graph.settings.current.logging)
         AppLog.quiet = graph.settings.current.logQuiet
         AppLog.watchLifecycle(this)
+        graph.mixResume.watch()
         // A step count each time the app comes to the front, so the next mix can tell walking from sitting
         // (issue #247): one reading, only while movement is switched on for the vibes.
         registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {

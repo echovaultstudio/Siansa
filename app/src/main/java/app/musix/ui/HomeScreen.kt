@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import app.musix.mix.resumeStart
 import app.musix.data.cover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -56,6 +57,7 @@ import app.musix.data.Album
 import app.musix.data.HomeSection
 import app.musix.data.Artist
 import app.musix.data.Mix
+import app.musix.data.Song
 import app.musix.data.Playlist
 import app.musix.data.Selector
 import app.musix.log.AppLog
@@ -75,6 +77,7 @@ fun HomeScreen(nav: NavController) {
     val scope = rememberCoroutineScope()
     val launch = rememberPlayLauncher()
     val mixes by graph.mixes.state.collectAsStateWithLifecycle()
+    val resumePoints by graph.mixResume.points.collectAsStateWithLifecycle()
     val selectors by graph.selectors.state.collectAsStateWithLifecycle()
     val status by graph.library.status.collectAsStateWithLifecycle()
     val loaded by graph.library.loaded.collectAsStateWithLifecycle()
@@ -248,7 +251,9 @@ fun HomeScreen(nav: NavController) {
                                 mix = mix,
                                 busy = busySelector == "current",
                                 onOpen = { nav.navigate("mix/${mix.id}") },
-                                onPlay = { graph.player.play(mix.songs) },
+                                // Carries on where the mix was left (issue #269).
+                                onPlay = { graph.mixResume.play(mix) },
+                                resume = resumeStart(mix.songs, resumePoints[mix.id])?.let { mix.songs[it.first] },
                                 onShuffle = { graph.player.play(mix.songs, shuffle = true) },
                                 onRegenerate = { build(null, force = true, open = false) },
                             )
@@ -459,6 +464,8 @@ private fun HeroMix(
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
     onRegenerate: () -> Unit,
+    /** The song Play carries on from, when the mix was left part-way (issue #269). */
+    resume: Song? = null,
 ) {
     val colors = tileColors(mix.selectorId)
     Box(
@@ -489,7 +496,13 @@ private fun HeroMix(
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text("${mix.songs.size} tracks", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f))
+                    Text(
+                        if (resume != null) "${mix.songs.size} tracks · Play carries on from ${resume.title}" else "${mix.songs.size} tracks",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.85f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
             if (mix.description.isNotBlank()) {
