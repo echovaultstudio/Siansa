@@ -3,6 +3,11 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.23.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.23.0beta) — 2026-10-20
+
+- [#335](https://github.com/Musix-Industreez/musix/pull/335) Your listening header: back to the static 0.22.3 glow (@Th3K1ngP1n)
+- [#336](https://github.com/Musix-Industreez/musix/pull/336) Wind down: works without a timer, follows new music, ends cleanly (@Th3K1ngP1n)
+
 ## [0.22.4beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.22.4beta) — 2026-10-20
 
 - [#329](https://github.com/Musix-Industreez/musix/pull/329) Artist page: 3 popular songs, Show more for 6 (@Th3K1ngP1n)
