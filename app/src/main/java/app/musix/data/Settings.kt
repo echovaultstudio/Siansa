@@ -73,6 +73,8 @@ data class AppSettings(
     val homeHidden: Set<HomeSection> = emptySet(),
     /** Show only music on the phone, across the whole app (issue #141). */
     val downloadedOnly: Boolean = false,
+    /** The time machine lists songs that aren't in your library, marked (issue #234). */
+    val timeMachineMissing: Boolean = true,
     /** Theme (issue #148): "AUTO", "LIGHT" or "DARK"; colours by name ("MUSIX", "OCEAN"…); pure black when dark. */
     val themeMode: String = "AUTO",
     val themeColours: String = "MUSIX",
@@ -213,6 +215,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeOrder = HomeSection.parse(prefs.getString("home_order", null)),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
+        timeMachineMissing = prefs.getBoolean("time_machine_missing", true),
         themeMode = prefs.getString("theme_mode", "AUTO") ?: "AUTO",
         themeColours = prefs.getString("theme_colours", "MUSIX") ?: "MUSIX",
         pureBlack = prefs.getBoolean("pure_black", false),
@@ -314,6 +317,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     ) {
         prefs.edit().putBoolean("download_wifi_only", wifiOnly).putInt("download_limit_mb", limitMb).putInt("download_kbps", kbps).apply()
         _state.value = _state.value.copy(downloadWifiOnly = wifiOnly, downloadLimitMb = limitMb, downloadKbps = kbps)
+    }
+
+    fun setTimeMachineMissing(on: Boolean) {
+        prefs.edit().putBoolean("time_machine_missing", on).apply()
+        _state.value = _state.value.copy(timeMachineMissing = on)
     }
 
     fun setAnimatedCovers(on: Boolean) {

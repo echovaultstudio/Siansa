@@ -357,13 +357,18 @@ class Insights(private val graph: AppGraph) {
             val index = songIndex()
             val only = graph.library.onlyDownloaded()
             val allowed = only?.shelf?.songs
-            val matched = keepInLibrary(plays, limit) { p ->
-                index.find(p.artist, p.title.orEmpty())?.takeIf { allowed == null || it in allowed }
-            }.distinctBy { it.second }
-            val songs = graph.library.songs(matched.map { it.second }).associateBy { it.id }
-            val tracks = matched.mapNotNull { (p, id) -> songs[id]?.let { RankedTrack(p.title.orEmpty(), p.artist, p.count, it) } }
+            // With "downloaded only" on, songs in the library but not on the phone are left out, not marked missing.
+            val shown = if (allowed == null) plays else plays.filter { p -> index.find(p.artist, p.title.orEmpty())?.let { it in allowed } ?: true }
+            val seen = HashSet<String>()
+            val ranked = rankWithMissing(shown, limit) { p -> index.find(p.artist, p.title.orEmpty()) }
+                .filter { (_, id) -> id == null || seen.add(id) }
+            val songs = graph.library.songs(ranked.mapNotNull { it.second }).associateBy { it.id }
+            val tracks = ranked.mapNotNull { (p, id) ->
+                val song = id?.let { songs[it] ?: return@mapNotNull null }
+                RankedTrack(p.title.orEmpty(), p.artist, p.count, song)
+            }
             TimeMachine(
-                window.label, tracks, "From ${used.joinToString(" and ")}, songs in your library only",
+                window.label, tracks, "From ${used.joinToString(" and ")}",
                 complete = (fromKoito != null || !koitoOn) && (fromLastFm != null || !lastFmOn),
             )
         } else {
@@ -375,7 +380,7 @@ class Insights(private val graph: AppGraph) {
             val why = if (koitoOn || lastFmOn) "Koito and Last.fm couldn't be reached" else "Set up Koito or Last.fm under Scrobbling for your full history"
             TimeMachine(window.label, tracks, "From Musix's own history. $why", complete = !(koitoOn || lastFmOn))
         }
-        AppLog.i("TimeMachine", "${window.label}: ${result.tracks.size} songs in the library in ${System.currentTimeMillis() - started}ms · ${result.source}")
+        AppLog.i("TimeMachine", "${window.label}: ${result.tracks.size - result.missing} songs in the library, ${result.missing} not, in ${System.currentTimeMillis() - started}ms · ${result.source}")
         result
     }
 

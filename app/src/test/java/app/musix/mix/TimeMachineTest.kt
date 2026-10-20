@@ -3,6 +3,7 @@ package app.musix.mix
 import app.musix.net.Played
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.time.LocalDate
 import java.util.Locale
@@ -53,5 +54,19 @@ class TimeMachineTest {
 
     @Test fun artistsWithoutATitleAreLeftOut() {
         assertTrue(mergePlays(listOf(Played("Bonobo", null, 30))).isEmpty())
+    }
+
+    // Issue #234: songs not in the library stay in the list, at their place, with no match.
+    @Test fun missingSongsKeepTheirPlace() = runBlocking {
+        val library = mapOf("a" to 1, "c" to 3)
+        val ranked = rankWithMissing(listOf("a", "b", "c", "d"), 10) { library[it] }
+        assertEquals(listOf("a" to 1, "b" to null, "c" to 3, "d" to null), ranked)
+    }
+
+    // Hiding the missing ones still leaves as many library songs as before.
+    @Test fun stopsAfterEnoughLibrarySongs() = runBlocking {
+        val library = mapOf("a" to 1, "c" to 3, "e" to 5)
+        val ranked = rankWithMissing(listOf("a", "b", "c", "d", "e"), 2) { library[it] }
+        assertEquals(listOf("a", "b", "c"), ranked.map { it.first })
     }
 }
