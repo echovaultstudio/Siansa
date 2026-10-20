@@ -12,6 +12,7 @@ import app.musix.data.Song
 import app.musix.log.AppLog
 import app.musix.net.ClapHit
 import app.musix.net.Steer
+import app.musix.situation.Situation
 import app.musix.net.str
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -88,12 +89,14 @@ class MixGenerator(private val graph: AppGraph) {
         if (!settings.navidromeReady) throw MixException("Set up Navidrome in Settings first")
         if (!settings.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
 
+        // The moment the mix is made in, as far as the Vibes panel allows (issue #247): read once, here.
+        val situation = graph.situation.read(settings.situation)
         val plan = if (selector.useAi && settings.aiReady) {
-            runCatching { aiPlan(selector) }
+            runCatching { aiPlan(selector, situation) }
                 .onFailure { AppLog.w("Mix", "AI plan rejected, using the vibe's own search: ${it.message}") }
-                .getOrNull() ?: fallbackPlan(selector)
+                .getOrNull() ?: fallbackPlan(selector, situation)
         } else {
-            fallbackPlan(selector)
+            fallbackPlan(selector, situation)
         }
         AppLog.i("Mix", "${selector.name}: \"${plan.title}\" · search \"${plan.query}\" · steer ${plan.steering.joinToString { (if (it.more) "+" else "-") + it.term }.ifEmpty { "none" }} · ai=${plan.ai}")
 
@@ -150,14 +153,23 @@ class MixGenerator(private val graph: AppGraph) {
         )
     }
 
-    private fun fallbackPlan(selector: Selector) = Plan(
-        title = "${selector.name} mix",
-        query = selector.baseQuery.ifBlank { selector.guidance },
-        description = selector.guidance,
-        ai = false,
-    )
+    /**
+     * The vibe's own search, without AI. With something read from the moment, its concepts nudge the search
+     * (rain towards acoustic and calm, running towards energetic) and the description says why (issue #247).
+     */
+    private suspend fun fallbackPlan(selector: Selector, situation: Situation = Situation()): Plan {
+        val nudges = if (situation.isEmpty) emptyList() else situation.nudges(runCatching { graph.audioMuse.concepts() }.getOrDefault(emptyList()))
+        val label = situation.label()
+        return Plan(
+            title = "${selector.name} mix",
+            query = selector.baseQuery.ifBlank { selector.guidance },
+            description = if (label.isEmpty()) selector.guidance else "${selector.guidance} · $label",
+            ai = false,
+            steering = nudges,
+        )
+    }
 
-    private suspend fun aiPlan(selector: Selector): Plan {
+    private suspend fun aiPlan(selector: Selector, situation: Situation = Situation()): Plan {
         val now = LocalDateTime.now()
         val concepts = runCatching { graph.audioMuse.concepts() }.getOrDefault(emptyList()).take(80)
         val recent = graph.history.recent(20).map { play ->
@@ -171,7 +183,9 @@ class MixGenerator(private val graph: AppGraph) {
             appendLine("Guidance: ${selector.guidance}")
             if (selector.avoid.isNotEmpty()) appendLine("Forbidden words: ${selector.avoid.joinToString(", ")}")
             appendLine("Now: $day %02d:%02d".format(now.hour, now.minute))
-            appendLine("Listening on: ${describeOutput(graph.app)}")
+            if (graph.settings.current.situation.device) appendLine("Listening on: ${describeOutput(graph.app)}")
+            // Weather, movement, light, charging: what the Vibes panel allows (issue #247). Never a location.
+            if (!situation.isEmpty) appendLine("Right now: ${situation.describe()}")
             if (recent.isNotEmpty()) appendLine("Recently played: ${recent.joinToString("; ")}")
             // Genres only, no favourite artists: the mix should surprise, not repeat them (issue #236).
             taste()?.let { t ->
@@ -415,7 +429,9 @@ class MixGenerator(private val graph: AppGraph) {
             - steer: optional, up to 3 of the listed sound concepts to push the search towards or away from, as
               {"term": concept, "direction": "more" or "less"}. Only concepts from the list; leave it empty if none fit.
             Follow the time slot's guidance strictly and never use any forbidden word in the title or query.
-            Use the listening device as context (a car's Bluetooth suggests driving).
+            Use the listening device as context (a car's Bluetooth suggests driving), and "Right now" when given:
+            the weather, whether the listener is moving, the light and the phone's state should shape the sound
+            (rain and dark rooms softer, sun and running brighter) and may inspire the title.
             Fit the time slot, but surprise the listener: don't just describe what they played recently, take the
             sound somewhere a little new each day. Never repeat or echo a previous mix title.
         """.trimIndent()
