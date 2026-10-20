@@ -1,5 +1,6 @@
 package app.musix
 
+import app.musix.mix.windDownSongs
 import app.musix.playback.SLEEP_FADE_MS
 import app.musix.playback.SleepTimer
 import app.musix.playback.SleepTimerState
@@ -134,5 +135,53 @@ class SleepTimerTest {
         assertFalse(sleepPauseNow(onPhone = false, state = finishing, leftMs = 5_000))
         assertTrue(sleepPauseNow(onPhone = false, state = finishing, leftMs = 400))
         assertFalse(sleepPauseNow(onPhone = false, state = finishing, leftMs = -1))
+    }
+
+    @Test fun windDownWorksWithoutATimer() {
+        assertFalse(timer.windingDown())
+        timer.setWindDown(true)
+        assertTrue(timer.windDownAlone.value)
+        assertTrue(timer.windingDown())
+        timer.setWindDown(false)
+        assertFalse(timer.windDownAlone.value)
+        assertFalse(timer.windingDown())
+    }
+
+    @Test fun aTimerTakesOverAWindDownOnItsOwn() {
+        timer.setWindDown(true)
+        timer.start(30, windDown = true)
+        assertFalse(timer.windDownAlone.value)
+        assertTrue(timer.windingDown())
+        timer.timeUp(songLeftMs = 90_000)
+        assertFalse(timer.windingDown())
+    }
+
+    @Test fun windDownLengthFollowsTheTimerOrTheSetting() {
+        assertEquals(windDownLength(30 * min), windDownSongs(30 * min, alone = false, setting = 20))
+        assertEquals(21, windDownSongs(null, alone = true, setting = 20))
+        assertNull(windDownSongs(null, alone = false, setting = 20))
+    }
+
+    @Test fun aWindDownOnItsOwnEndsWithItsLastSong() {
+        timer.setWindDown(true)
+        timer.queueEnded()
+        assertFalse(timer.windDownAlone.value)
+        assertFalse(timer.windingDown())
+        assertFalse(timer.windDownChosen)
+    }
+
+    @Test fun theQueueEndingLeavesAWindDownWithATimerAlone() {
+        timer.start(30, windDown = true)
+        timer.queueEnded()
+        assertTrue(timer.windingDown())
+        assertTrue(timer.windDownChosen)
+    }
+
+    @Test fun switchingWindDownOffIsRememberedAfterTheTimerEnds() {
+        timer.start(30, windDown = true)
+        assertTrue(timer.windDownChosen)
+        timer.setWindDown(false)
+        timer.cancel()
+        assertFalse(timer.windDownChosen)
     }
 }

@@ -100,6 +100,10 @@ class PlayerConnection(
     /** Called when a new list starts playing (anything other than a radio topping itself up). */
     var onNewQueue: (() -> Unit)? = null
 
+    private val _newQueues = MutableSharedFlow<Song>(extraBufferCapacity = 4)
+    /** The first song of each new list that starts playing, so the sleep timer's wind down can follow it (issue #330). */
+    val newQueues: SharedFlow<Song> = _newQueues.asSharedFlow()
+
     /** True while music can only come from the phone (no network, or the server doesn't answer). */
     var isOffline: () -> Boolean = { false }
     /** True while "Only downloaded music" is on (issue #141): then too only downloaded songs play. */
@@ -148,6 +152,7 @@ class PlayerConnection(
             c.prepare()
             c.play()
         }
+        _newQueues.tryEmit(songs[start])
     }
 
     fun playNext(song: Song) {
