@@ -3,6 +3,15 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.19.1beta — 2026-10-20
+
+### Fixed
+- **Your Library's filter chips scroll back after you pick one.** Picking a chip far to the right, like Your listening, left the row scrolled, so the × to clear the filter was out of sight.
+
+### Changed
+- **One Favourite albums card.** In Your Library › Favourites, a single Favourite albums card opens a page with all your favourite albums, instead of each album being listed there.
+- **Grid or list everywhere, three across.** Your Library, the full lists behind Home's rows, Similar albums, Appears on, an artist's releases and Favourite albums all have a switch between grid and list. Grids show three across, and each page remembers your choice.
+
 ## 0.19.0beta — 2026-10-20
 
 ### Added
