@@ -176,7 +176,10 @@ fun YourLibraryScreen(nav: NavController) {
 
     val favouriteIds by graph.favouriteAlbums.ids.collectAsStateWithLifecycle()
     // From the phone straight away, then again once Navidrome has answered (issue #161).
-    val data by produceState<Load<LibraryData>>(Load.Loading, version, mixes?.size, settings.navidromeUser, favouriteIds) {
+    // Built again when the connection comes back, for what only Navidrome has.
+    val connection by graph.connection.state.collectAsStateWithLifecycle()
+    val online = !connection.offline
+    val data by produceState<Load<LibraryData>>(Load.Loading, version, mixes?.size, settings.navidromeUser, favouriteIds, online) {
         val me = settings.navidromeUser
         value = loadLibrary(graph, me)
         if (refreshFromServer(graph, me)) value = loadLibrary(graph, me)
