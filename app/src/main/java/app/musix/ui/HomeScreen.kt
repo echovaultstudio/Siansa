@@ -81,6 +81,8 @@ fun HomeScreen(nav: NavController) {
     val resumePoints by graph.mixResume.points.collectAsStateWithLifecycle()
     val recentPlays by graph.recentPlays.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { graph.recentPlays.all() }
+    val customCards by graph.cards.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { graph.cards.all() }
     val selectors by graph.selectors.state.collectAsStateWithLifecycle()
     val status by graph.library.status.collectAsStateWithLifecycle()
     val loaded by graph.library.loaded.collectAsStateWithLifecycle()
@@ -320,6 +322,18 @@ fun HomeScreen(nav: NavController) {
                                         caption = if (mix != null) "${mix.songs.size} tracks · ${mix.description}" else if (aiDown != null) "AI backend not available :(" else "Tap to make it",
                                         busy = personalBusy == kind.id,
                                         onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) },
+                                    )
+                                })
+                            }
+                            // Your own cards, added and named in Settings › Made for you cards (issue #274).
+                            customCards.orEmpty().forEach { card ->
+                                add(card.id to @Composable {
+                                    GradientTile(
+                                        title = card.title,
+                                        colors = tileColors(card.id),
+                                        subtitle = "For you",
+                                        caption = card.detail,
+                                        onClick = { nav.navigate("card/${card.id}") },
                                     )
                                 })
                             }

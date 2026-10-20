@@ -3,6 +3,7 @@ package app.musix
 import app.musix.mix.MixResume
 import app.musix.data.RecentPlays
 import app.musix.data.FavouriteAlbums
+import app.musix.mix.MadeForYouCards
 import app.musix.playback.ProfileStore
 import app.musix.covers.CoverStore
 import kotlinx.coroutines.runBlocking
@@ -309,6 +310,8 @@ class AppGraph(val app: Application) {
     val songRadio = SongRadio(this)
     /** Today's mixes carry on where you left them (issue #269). */
     val mixResume = MixResume(this, app)
+    /** Your own cards on Made for you (issue #274). */
+    val cards = MadeForYouCards(this, app)
     val songPath = SongPath(this)
     val sleepTimer = SleepTimer()
     val windDown = WindDown(this)
