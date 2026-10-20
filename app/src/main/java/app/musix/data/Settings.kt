@@ -81,6 +81,8 @@ data class AppSettings(
     val pureBlack: Boolean = false,
     /** The seed for "Your colour" (issue #148, step 2), as ARGB. */
     val themeSeed: Int = DEFAULT_THEME_SEED,
+    /** The colour of selected items, by name ("THEME", "AMBER"…), issue #313. */
+    val themeSelection: String = "THEME",
     /** Where song loudness and fade shapes come from (issue #60): ReplayGain tags, or the Musix plugin. */
     val loudnessSource: LoudnessSource = LoudnessSource.TAGS,
     /** The loudness, in LUFS, that measured levelling brings songs towards. */
@@ -220,6 +222,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         themeColours = prefs.getString("theme_colours", "MUSIX") ?: "MUSIX",
         pureBlack = prefs.getBoolean("pure_black", false),
         themeSeed = prefs.getInt("theme_seed", DEFAULT_THEME_SEED),
+        themeSelection = prefs.getString("theme_selection", "THEME") ?: "THEME",
         loudnessSource = LoudnessSource.parse(prefs.getString("loudness_source", null)),
         loudnessTarget = prefs.getInt("loudness_target", AppSettings.DEFAULT_LOUDNESS_TARGET),
         crossfade = CrossfadeMode.parse(prefs.getString("crossfade", null)),
@@ -376,6 +379,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setDownloadedOnly(on: Boolean) {
         prefs.edit().putBoolean("downloaded_only", on).apply()
         _state.value = _state.value.copy(downloadedOnly = on)
+    }
+
+    fun setSelectionColour(name: String) {
+        prefs.edit().putString("theme_selection", name).apply()
+        _state.value = _state.value.copy(themeSelection = name)
     }
 
     fun setTheme(
