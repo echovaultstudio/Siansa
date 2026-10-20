@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import app.musix.playback.CrossfadeMode
 import app.musix.playback.LoudnessSource
+import app.musix.mix.RadioDrift
 import app.musix.situation.SituationOptions
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.net.URLDecoder
@@ -76,6 +77,8 @@ data class AppSettings(
     /** The loudness, in LUFS, that measured levelling brings songs towards. */
     val loudnessTarget: Int = DEFAULT_LOUDNESS_TARGET,
     val crossfade: CrossfadeMode = CrossfadeMode.OFF,
+    /** How far a song radio may wander from its first song (issue #256). */
+    val radioDrift: RadioDrift = RadioDrift.SOME,
     /** The crossfade length; in smart mode, the longest a fade may be. */
     val crossfadeSeconds: Int = DEFAULT_CROSSFADE_SECONDS,
 ) {
@@ -206,6 +209,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         loudnessSource = LoudnessSource.parse(prefs.getString("loudness_source", null)),
         loudnessTarget = prefs.getInt("loudness_target", AppSettings.DEFAULT_LOUDNESS_TARGET),
         crossfade = CrossfadeMode.parse(prefs.getString("crossfade", null)),
+        radioDrift = RadioDrift.parse(prefs.getString("radio_drift", null)),
         crossfadeSeconds = prefs.getInt("crossfade_s", AppSettings.DEFAULT_CROSSFADE_SECONDS).coerceIn(AppSettings.CROSSFADE_SECONDS),
     )
 
@@ -304,6 +308,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     }
 
     /** What of the moment the vibes use (issue #247). */
+    fun setRadioDrift(drift: RadioDrift) {
+        prefs.edit().putString("radio_drift", drift.name).apply()
+        _state.value = _state.value.copy(radioDrift = drift)
+    }
+
     fun setSituation(options: SituationOptions) {
         prefs.edit()
             .putBoolean("situation_weather", options.weather)

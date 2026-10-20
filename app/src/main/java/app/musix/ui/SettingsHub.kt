@@ -58,6 +58,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import app.musix.mix.RadioDrift
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import android.content.ClipData
@@ -262,6 +264,26 @@ fun PlaybackSettingsScreen(nav: NavController) {
             QualityRow("On Wi-Fi", settings.transcodeWifiKbps) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
             QualityRow("On mobile data", settings.transcodeMobileKbps) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
             Hint("Musix always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
+            HorizontalDivider()
+            Heading("Song radio")
+            Hint("A song radio always starts with its song. How far may it wander from it?")
+            RadioDriftChips(settings.radioDrift) { graph.settings.setRadioDrift(it) }
+            Hint(settings.radioDrift.hint)
+        }
+    }
+}
+
+/** "Stay close", "A little", "Wander": how far a song radio may go from its song (issue #256). */
+@Composable
+internal fun RadioDriftChips(selected: RadioDrift, onPick: (RadioDrift) -> Unit) {
+    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("radioDrift"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        RadioDrift.entries.forEach { drift ->
+            FilterChip(
+                selected = selected == drift,
+                onClick = { onPick(drift) },
+                label = { Text(drift.label) },
+                modifier = Modifier.testTag("radioDrift-${drift.name}"),
+            )
         }
     }
 }
