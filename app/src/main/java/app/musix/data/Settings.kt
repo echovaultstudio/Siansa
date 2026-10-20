@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import app.musix.playback.CrossfadeMode
 import app.musix.playback.LoudnessSource
+import app.musix.situation.SituationOptions
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.net.URLDecoder
 
@@ -38,6 +39,8 @@ data class AppSettings(
     /** ...on any Wi-Fi, rather than only on the same local network as Navidrome. */
     val coverDownloadAnyWifi: Boolean = false,
     val logging: Boolean = false,
+    /** What of the moment the vibes may use for today's mix (Vibes panel, issue #247). */
+    val situation: SituationOptions = SituationOptions(),
     /** Parts of the app whose detailed log entries are left out (Settings › Logs › Detail, issue #237). */
     val logQuiet: Set<String> = emptySet(),
     val scrobbleNavidrome: Boolean = true,
@@ -171,6 +174,13 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         coverDownloadAnyWifi = prefs.getBoolean("cover_download_any_wifi", false),
         logging = prefs.getBoolean("logging", false),
         logQuiet = prefs.getString("log_quiet", "").orEmpty().split(',').filter { it.isNotBlank() }.toSet(),
+        situation = SituationOptions(
+            weather = prefs.getBoolean("situation_weather", false),
+            movement = prefs.getBoolean("situation_movement", false),
+            light = prefs.getBoolean("situation_light", false),
+            charging = prefs.getBoolean("situation_charging", false),
+            device = prefs.getBoolean("situation_device", true),
+        ),
         scrobbleNavidrome = prefs.getBoolean("scrobble_nd", true),
         lastFmEnabled = prefs.getBoolean("lfm_on", false),
         lastFmApiKey = prefs.getString("lfm_key", "") ?: "",
@@ -242,6 +252,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putInt("image_cache_mb", s.imageCacheMb)
             .putBoolean("logging", s.logging)
             .putString("log_quiet", s.logQuiet.sorted().joinToString(","))
+            .putBoolean("situation_weather", s.situation.weather)
+            .putBoolean("situation_movement", s.situation.movement)
+            .putBoolean("situation_light", s.situation.light)
+            .putBoolean("situation_charging", s.situation.charging)
+            .putBoolean("situation_device", s.situation.device)
             .putBoolean("scrobble_nd", s.scrobbleNavidrome)
             .putBoolean("lfm_on", s.lastFmEnabled)
             .putString("lfm_key", s.lastFmApiKey.trim())
@@ -286,6 +301,18 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setLogging(on: Boolean) {
         prefs.edit().putBoolean("logging", on).apply()
         _state.value = _state.value.copy(logging = on)
+    }
+
+    /** What of the moment the vibes use (issue #247). */
+    fun setSituation(options: SituationOptions) {
+        prefs.edit()
+            .putBoolean("situation_weather", options.weather)
+            .putBoolean("situation_movement", options.movement)
+            .putBoolean("situation_light", options.light)
+            .putBoolean("situation_charging", options.charging)
+            .putBoolean("situation_device", options.device)
+            .apply()
+        _state.value = _state.value.copy(situation = options)
     }
 
     /** Leaves out (or keeps) the detailed log entries of [component] (issue #237). */
