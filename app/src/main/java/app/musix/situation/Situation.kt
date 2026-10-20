@@ -109,7 +109,7 @@ data class Situation(
                 Sky.RAIN, Sky.DRIZZLE, Sky.FOG -> { add("acoustic" to true); add("calm" to true) }
                 Sky.STORM -> add("dark" to true)
                 Sky.SNOW -> add("calm" to true)
-                Sky.CLEAR -> if (weather.isDay && weather.celsius >= 18) add("happy" to true)
+                Sky.CLEAR -> if (weather?.isDay == true && weather.celsius >= 18) add("happy" to true)
                 else -> Unit
             }
             if (light == Light.DARK) add("calm" to true)
