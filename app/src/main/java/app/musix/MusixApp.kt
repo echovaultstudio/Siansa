@@ -53,6 +53,8 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
         graph.scope.launch {
             graph.library.load()
             graph.library.status.value?.let { AppLog.i("Session", "Library: ${it.artists} artists, ${it.albums} albums, ${it.songs} songs") }
+            // The time machine's song index, ready before it's opened (issue #319).
+            graph.insights.warmUp()
             if (graph.settings.current.navidromeReady) {
                 runCatching { AppLog.i("Server", graph.subsonic.ping()) }
             }
