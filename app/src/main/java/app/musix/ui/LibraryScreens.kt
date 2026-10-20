@@ -418,3 +418,41 @@ internal fun FavouriteAlbumButton(album: Album) {
         )
     }
 }
+
+/**
+ * All favourite albums (issue #289), from the Favourite albums card in Your Library › Favourites: those in the
+ * synced library with their merged copies, the rest as Navidrome sent them. As a grid or a list.
+ */
+@Composable
+fun FavouriteAlbumsScreen(nav: NavController) {
+    val graph = LocalGraph.current
+    val ids by graph.favouriteAlbums.ids.collectAsStateWithLifecycle()
+    val albums by loadState("favourite-albums-${ids.hashCode()}") {
+        val fresh = graph.favouriteAlbums.refresh()
+        // Only those still favourites (a heart taken off on an album page shows at once), the synced copy when there is one.
+        fresh.filter { isFavouriteAlbum(it, ids) }
+            .map { a -> graph.library.album(a.id) ?: a }
+            .distinctBy { it.id }
+            .sortedBy { normalizeKey(it.artist) + "|" + normalizeKey(it.name) }
+    }
+    Screen(title = "Favourite albums", nav = nav) { padding ->
+        LoadBox(albums, Modifier.padding(padding)) { list ->
+            if (list.isEmpty()) {
+                Text(
+                    "No favourite albums yet. Tap the heart at the top of an album's page to add it.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(padding).padding(Space.Page),
+                )
+            } else {
+                AlbumsGridOrList(
+                    list,
+                    page = "favourite-albums",
+                    onOpen = { nav.navigate("album/${it.id}") },
+                    modifier = Modifier.padding(padding).fillMaxSize(),
+                    title = "${list.size} ${if (list.size == 1) "album" else "albums"}",
+                )
+            }
+        }
+    }
+}

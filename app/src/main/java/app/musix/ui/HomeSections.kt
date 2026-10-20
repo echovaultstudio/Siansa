@@ -1,5 +1,7 @@
 package app.musix.ui
 
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -79,31 +81,43 @@ fun HomeSectionScreen(nav: NavController, id: String) {
     LaunchedEffect(section) { AppLog.i("Home", "Full list: ${section.id}") }
 
     val items by loadState(version to section) { loadSection(graph, section) }
+    // A grid of three or a list, switched at the top and kept per kind of page (issue #289). Playlists start
+    // as a list, like Spotify; the rest as a grid.
+    var grid by rememberGridMode("section-${section.id}", default = section != HomeSection.Playlists)
     Screen(section.title, nav) { padding ->
         Box(Modifier.padding(padding)) {
             LoadBox(items) { list ->
                 if (list.isEmpty()) {
                     Text("Nothing here yet.", Modifier.padding(Space.Page))
-                } else if (section == HomeSection.Playlists) {
-                    // Playlists read as a list, like Spotify, not as big album tiles.
-                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = Space.Tight, bottom = Space.Section)) {
-                        items(list.filterIsInstance<SectionItem.PlaylistItem>(), key = { it.key }) { item ->
-                            PlaylistRow(item.playlist, onClick = { nav.navigate("playlist/${item.playlist.id}") })
-                        }
-                    }
                 } else {
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(150.dp),
+                        columns = gridCells(grid),
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = Space.Small, end = Space.Small, top = Space.Tight, bottom = Space.Section),
-                        verticalArrangement = Arrangement.spacedBy(Space.Small),
-                        horizontalArrangement = Arrangement.spacedBy(Space.Tight),
+                        contentPadding = PaddingValues(start = if (grid) Space.Small else 0.dp, end = if (grid) Space.Small else 0.dp, bottom = Space.Section),
                     ) {
-                        items(list, key = { it.key }) { item -> SectionTile(item, nav, launch, graph) }
+                        item(span = { GridItemSpan(maxLineSpan) }) { GridListHeader("${list.size} ${if (list.size == 1) "item" else "items"}", grid) { grid = !grid } }
+                        items(list, key = { it.key }) { item -> if (grid) SectionTile(item, nav, launch, graph) else SectionRow(item, nav, launch, graph) }
                     }
                 }
             }
         }
+    }
+}
+
+/** One entry of a full list as a row (issue #289). */
+@Composable
+private fun SectionRow(item: SectionItem, nav: NavController, launch: PlayLauncher, graph: AppGraph) {
+    when (item) {
+        is SectionItem.AlbumItem -> MediaRow(item.album.name, item.subtitle, item.album.coverArt, onClick = { nav.navigate("album/${item.album.id}") })
+        is SectionItem.PlaylistItem -> PlaylistRow(item.playlist, onClick = { nav.navigate("playlist/${item.playlist.id}") })
+        is SectionItem.ArtistItem -> {
+            val artist = item.artist
+            MediaRow("${artist.name} radio", "With similar artists", artist.coverArt, round = true, onClick = {
+                launch.progressive("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
+            })
+        }
+        is SectionItem.Radio -> MediaRow(item.radio.name, "Sound radio", null, colors = Color(item.radio.colors.first) to Color(item.radio.colors.second), onClick = { nav.openMoodRadio(item.radio.id) })
+        is SectionItem.GenreItem -> MediaRow(item.genre.name, "${item.genre.songCount} songs", null, colors = tileColors(item.genre.name), onClick = { nav.openGenreRadio(item.genre.name) })
     }
 }
 
