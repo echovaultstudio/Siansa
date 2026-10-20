@@ -130,7 +130,7 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text("Sleep timer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
-                        timer?.let { timerStatus(it, now) } ?: "The song playing then finishes and fades out",
+                        timer?.let { timerStatus(it, now) } ?: "Music fades out when the time is up",
                         style = MaterialTheme.typography.bodySmall,
                         color = if (timer != null) Accent else SheetSubtle,
                     )
@@ -169,7 +169,7 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = audioMuse) { windDown = !windDown }
+                    .clickable(enabled = audioMuse) { windDown = !windDown; graph.sleepTimer.setWindDown(windDown) }
                     .padding(horizontal = Space.Section, vertical = Space.Medium),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -177,7 +177,7 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text("Wind down", style = MaterialTheme.typography.bodyLarge, color = if (audioMuse) SheetText else SheetSubtle)
                     Text(
-                        if (audioMuse) "Calmer, slower songs near the end" else "Needs AudioMuse, set it up in Settings",
+                        if (audioMuse) "From this song toward calmer, quieter ones" else "Needs AudioMuse, set it up in Settings",
                         style = MaterialTheme.typography.bodySmall,
                         color = SheetSubtle,
                     )
@@ -185,7 +185,7 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
                 Spacer(Modifier.width(Space.Medium))
                 Switch(
                     checked = windDown,
-                    onCheckedChange = { windDown = it },
+                    onCheckedChange = { windDown = it; graph.sleepTimer.setWindDown(it) },
                     enabled = audioMuse,
                     colors = SwitchDefaults.colors(checkedTrackColor = Accent, checkedThumbColor = OnAccent),
                 )

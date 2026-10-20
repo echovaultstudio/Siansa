@@ -9,10 +9,9 @@ import app.musix.playback.sleepFade
 import app.musix.playback.sleepPauseNow
 import app.musix.playback.sleepTimeLabel
 import app.musix.playback.sleepTimeShort
-import app.musix.playback.windDownFrom
+import app.musix.playback.windDownLength
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -34,23 +33,25 @@ class SleepTimerTest {
         assertTrue(s.isTimeUp(now))
     }
 
-    @Test fun timeUpFinishesTheSong() {
+    @Test fun timeUpFadesOutAtTheChosenTime() {
         timer.start(15, windDown = false)
         now += 15 * min
         timer.timeUp(songLeftMs = 90_000)
         val s = timer.state.value!!
         assertTrue(s.finishing)
-        assertNull("plays to the song's own end", s.cutAt)
+        assertEquals("fades out now, not at the song's end (issue #153)", now + SLEEP_FADE_MS, s.cutAt)
         assertNull(s.leftMs(now))
         assertFalse("not counted as up twice", s.isTimeUp(now))
     }
 
-    @Test fun veryLongOrUnknownSongFadesOutAtOnce() {
+    @Test fun songEndingWithinTheFadePlaysToItsEnd() {
         timer.start(15, windDown = false)
         now += 15 * min
-        timer.timeUp(songLeftMs = 25 * min)
-        assertEquals(now + SLEEP_FADE_MS, timer.state.value!!.cutAt)
+        timer.timeUp(songLeftMs = 5_000)
+        assertNull(timer.state.value!!.cutAt)
+    }
 
+    @Test fun unknownSongLengthFadesOutAtOnce() {
         timer.start(15, windDown = false)
         now += 15 * min
         timer.timeUp(songLeftMs = -1)
@@ -62,7 +63,7 @@ class SleepTimerTest {
         val s = timer.state.value!!
         assertTrue(s.finishing)
         assertNull(s.cutAt)
-        assertNull(s.windDownFrom())
+        assertFalse(s.windDown)
     }
 
     @Test fun turningOffAndFinishingClearIt() {
@@ -83,15 +84,26 @@ class SleepTimerTest {
         assertEquals("unknown time left keeps full volume", 1f, sleepFade(-1), 0f)
     }
 
-    @Test fun windDownCoversTheLastPart() {
-        fun from(minutes: Long, windDown: Boolean = true): Long? =
-            SleepTimerState(endsAt = minutes * min, totalMs = minutes * min, windDown = windDown).windDownFrom()
-        assertNull(from(60, windDown = false))
-        assertEquals("last third of an hour", 40 * min, from(60))
-        assertEquals("at most 20 minutes", 160 * min, from(180))
-        assertEquals("at least 5 minutes", 10 * min, from(15))
-        assertEquals("all of a short timer", 0L, from(3))
-        assertNotNull(from(5))
+    @Test fun windDownSwitchWorksOnItsOwn() {
+        timer.setWindDown(true)
+        assertTrue("remembered without starting a timer (issue #153)", timer.windDownChosen)
+        assertNull(timer.state.value)
+        timer.start(30, windDown = false)
+        timer.setWindDown(true)
+        assertTrue("applied to the running timer", timer.state.value!!.windDown)
+        assertEquals("the time is kept", now + 30 * min, timer.state.value!!.endsAt)
+        timer.setWindDown(false)
+        assertFalse(timer.state.value!!.windDown)
+        assertFalse(timer.windDownChosen)
+        timer.startEndOfSong()
+        timer.setWindDown(true)
+        assertFalse("not for the end of this song", timer.state.value!!.windDown)
+    }
+
+    @Test fun windDownPathFillsTheTimer() {
+        assertEquals("an hour of 4-minute songs after this one", 16, windDownLength(60 * min))
+        assertEquals("at least 3", 3, windDownLength(2 * min))
+        assertEquals("at most 30", 30, windDownLength(180 * min))
     }
 
     @Test fun timeLeftInWords() {
