@@ -90,6 +90,8 @@ data class AppSettings(
     val crossfade: CrossfadeMode = CrossfadeMode.OFF,
     /** How far a song radio may wander from its first song (issue #256). */
     val radioDrift: RadioDrift = RadioDrift.SOME,
+    /** How many calm songs the wind down queues when it's switched on without a sleep timer (issue #330). */
+    val windDownSongs: Int = DEFAULT_WIND_DOWN_SONGS,
     /** The crossfade length; in smart mode, the longest a fade may be. */
     val crossfadeSeconds: Int = DEFAULT_CROSSFADE_SECONDS,
 ) {
@@ -109,6 +111,8 @@ data class AppSettings(
         const val DEFAULT_LOUDNESS_TARGET = -18
         const val DEFAULT_CROSSFADE_SECONDS = 6
         val CROSSFADE_SECONDS = 1..12
+        const val DEFAULT_WIND_DOWN_SONGS = 20
+        val WIND_DOWN_CHOICES = listOf(10, 20, 30)
     }
 }
 
@@ -227,6 +231,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         loudnessTarget = prefs.getInt("loudness_target", AppSettings.DEFAULT_LOUDNESS_TARGET),
         crossfade = CrossfadeMode.parse(prefs.getString("crossfade", null)),
         radioDrift = RadioDrift.parse(prefs.getString("radio_drift", null)),
+        windDownSongs = prefs.getInt("wind_down_songs", AppSettings.DEFAULT_WIND_DOWN_SONGS)
+            .takeIf { it in AppSettings.WIND_DOWN_CHOICES } ?: AppSettings.DEFAULT_WIND_DOWN_SONGS,
         crossfadeSeconds = prefs.getInt("crossfade_s", AppSettings.DEFAULT_CROSSFADE_SECONDS).coerceIn(AppSettings.CROSSFADE_SECONDS),
     )
 
@@ -293,6 +299,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putInt("song_cache_mb", s.songCacheMb)
             .putInt("preload_wifi", s.preloadWifi)
             .putInt("preload_mobile", s.preloadMobile)
+            .putInt("wind_down_songs", s.windDownSongs)
             .apply()
         _state.value = s
     }

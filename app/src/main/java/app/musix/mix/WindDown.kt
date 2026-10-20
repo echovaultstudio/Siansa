@@ -4,7 +4,6 @@ import app.musix.AppGraph
 import app.musix.data.Song
 import app.musix.log.AppLog
 import app.musix.net.PathMood
-import app.musix.playback.SleepTimerState
 import app.musix.playback.leftMs
 import app.musix.playback.windDownLength
 import kotlinx.coroutines.Dispatchers
@@ -15,14 +14,23 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Whether a new list that starts playing should be steered toward calm songs: wind down is on and the time isn't up. */
-fun followsNewQueue(timer: SleepTimerState?): Boolean = timer != null && timer.windDown && !timer.finishing && timer.endsAt != null
+/**
+ * How long a wind down's song path is, the song playing included: enough to fill the timer's [timerLeftMs], or
+ * [setting] calm songs after it when the switch is on [alone], without a timer (issue #330). Null when neither applies.
+ */
+fun windDownSongs(timerLeftMs: Long?, alone: Boolean, setting: Int): Int? = when {
+    timerLeftMs != null -> windDownLength(timerLeftMs)
+    alone -> setting + 1
+    else -> null
+}
 
 /**
  * The sleep timer's wind down (issue #153): as soon as it's switched on, everything after the current song is
  * swapped for an AudioMuse song path from that song to its "relaxed" mood, long enough to fill the timer, so the
  * music gets calmer and quieter step by step as you fall asleep. Without a path, AudioMuse's calm sound search.
- * Playing something new while it's on steers again from that song; stopping playback switches it off (issue #330).
+ * The switch also works without a timer: then it queues the number of calm songs set in Settings › Playback, and the
+ * music ends with them. Playing something new while it's on steers again from that song; stopping playback switches
+ * it off (issue #330).
  */
 class WindDown(private val graph: AppGraph) {
     init {
@@ -34,10 +42,14 @@ class WindDown(private val graph: AppGraph) {
                 .collectLatest { endsAt -> if (endsAt != null) steer() }
         }
         graph.scope.launch {
+            // The switch on its own, without a timer: wind down straight away (issue #330).
+            graph.sleepTimer.windDownAlone.collectLatest { on -> if (on) steer() }
+        }
+        graph.scope.launch {
             // Playing something new while winding down keeps winding down: the calm songs follow the new song,
             // instead of the rest of the new list (issue #330).
             graph.player.newQueues.collectLatest { first ->
-                if (!followsNewQueue(graph.sleepTimer.state.value)) return@collectLatest
+                if (!graph.sleepTimer.windingDown()) return@collectLatest
                 AppLog.i("Sleep", "Wind down: something new is playing, steering again from ${first.title}")
                 steer(first)
             }
@@ -49,7 +61,7 @@ class WindDown(private val graph: AppGraph) {
                 .distinctUntilChanged()
                 .drop(1)
                 .collect { hasMedia ->
-                    if (!hasMedia && graph.sleepTimer.state.value?.windDown == true) {
+                    if (!hasMedia && graph.sleepTimer.windingDown()) {
                         AppLog.i("Sleep", "Wind down off: playback was stopped")
                         graph.sleepTimer.setWindDown(false)
                     }
@@ -67,11 +79,16 @@ class WindDown(private val graph: AppGraph) {
             AppLog.i("Sleep", "Wind down skipped: nothing is playing")
             return
         }
-        val left = graph.sleepTimer.state.value?.leftMs(graph.sleepTimer.now()) ?: return
-        val calm = calmPath(current, windDownLength(left)) ?: calmSearch(current)
+        val timer = graph.sleepTimer
+        val length = windDownSongs(
+            timerLeftMs = timer.state.value?.takeIf { it.windDown }?.leftMs(timer.now()),
+            alone = timer.windDownAlone.value,
+            setting = graph.settings.current.windDownSongs,
+        ) ?: return
+        val calm = calmPath(current, length) ?: calmSearch(current).take(length - 1)
         if (calm.isEmpty()) return
         // The switch may have been turned off while AudioMuse was searching.
-        if (graph.sleepTimer.state.value?.windDown != true) return
+        if (!timer.windingDown()) return
         AppLog.i("Sleep", "Wind down: ${calm.size} songs from ${current.title} toward calmer ones")
         withContext(Dispatchers.Main) {
             // A song radio would top the queue back up with songs like the old ones.

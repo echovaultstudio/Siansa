@@ -277,6 +277,10 @@ fun PlaybackSettingsScreen(nav: NavController) {
             RadioDriftChips(settings.radioDrift) { graph.settings.setRadioDrift(it) }
             Hint(settings.radioDrift.hint)
             HorizontalDivider()
+            Heading("Wind down")
+            Hint("With the sleep timer's Wind down switched on and no time picked, how many calmer songs play before the music ends?")
+            WindDownChips(settings.windDownSongs) { graph.settings.save(graph.settings.current.copy(windDownSongs = it)) }
+            HorizontalDivider()
             Heading("Load songs ahead")
             Hint("While a song plays, Musix loads the next ones, one at a time, so they start at once and keep playing if the connection drops. Fewer means less data. Only original files are loaded ahead.")
             PreloadRow("On Wi-Fi", settings.preloadWifi, "preload-wifi") { graph.settings.save(graph.settings.current.copy(preloadWifi = it)) }
@@ -295,6 +299,21 @@ internal fun RadioDriftChips(selected: RadioDrift, onPick: (RadioDrift) -> Unit)
                 onClick = { onPick(drift) },
                 label = { Text(drift.label) },
                 modifier = Modifier.testTag("radioDrift-${drift.name}"),
+            )
+        }
+    }
+}
+
+/** 10, 20 or 30 calm songs for a wind down without a timer (issue #330). */
+@Composable
+internal fun WindDownChips(selected: Int, onPick: (Int) -> Unit) {
+    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("windDownSongs"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        AppSettings.WIND_DOWN_CHOICES.forEach { n ->
+            FilterChip(
+                selected = selected == n,
+                onClick = { onPick(n) },
+                label = { Text("$n songs") },
+                modifier = Modifier.testTag("windDownSongs-$n"),
             )
         }
     }
