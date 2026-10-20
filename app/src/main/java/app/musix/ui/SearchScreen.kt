@@ -1,7 +1,5 @@
 package app.musix.ui
 
-import app.musix.net.ConceptCategory
-import app.musix.net.Steer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.activity.compose.BackHandler
@@ -143,24 +141,16 @@ fun SearchScreen(nav: NavController) {
 
     val aiProblem = rememberAiProblem()
 
-    // Concepts to steer the Sound search with (issues #208, #216): every group AudioMuse offers (genre, instrument,
-    // vocals, mood, production, tempo, era); each tap goes more → less → off.
-    val catalogue by loadState("sound-concepts-$soundMode") {
-        if (soundMode && graph.settings.current.audioMuseReady) runCatching { graph.audioMuse.conceptCatalogue() }.getOrNull() else null
-    }
-    var steering by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
-    var group by rememberSaveable { mutableStateOf<String?>(null) }
-
     fun runSound() {
         val q = query.trim()
         if (q.length < 3 || aiProblem != null) return
         keepSearch()
-        val steer = steering.map { (term, more) -> Steer(term, more) }
         scope.launch {
             busy = true
             error = null
             try {
-                soundSongs = graph.generator.soundSearch(soundQuery(q, steering), steering = steer)
+                // Words only (issue #272): the concept chips that steered it were taken out.
+                soundSongs = graph.generator.soundSearch(q)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -213,21 +203,6 @@ fun SearchScreen(nav: NavController) {
             Row(Modifier.padding(horizontal = Space.Page, vertical = Space.Small), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 FilterChip(selected = !soundMode, onClick = { soundMode = false }, label = { Text("Library") })
                 FilterChip(selected = soundMode, onClick = { soundMode = true }, label = { Text("Sound") })
-            }
-            val groups = catalogue.valueOrNull()?.categories.orEmpty()
-            if (soundMode && aiProblem == null && groups.isNotEmpty()) {
-                val shown = groups.firstOrNull { it.id == group } ?: groups.first()
-                ConceptGroupRow(groups, shown.id, steering) { group = it }
-                SteeringChips(shown.terms, steering) { term ->
-                    val next = nextSteering(steering, term, catalogue.valueOrNull()?.maxTerms ?: 10)
-                    if (next == steering) {
-                        error = "At most ${catalogue.valueOrNull()?.maxTerms ?: 10} at once. Tap one to take it off first."
-                    } else {
-                        error = null
-                        steering = next
-                        if (soundSongs != null) runSound()
-                    }
-                }
             }
             if (busy) {
                 Box(Modifier.fillMaxWidth().padding(Space.Page), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -414,72 +389,6 @@ internal fun RecentSearchList(
                 )
                 IconButton(onClick = { onRemove(search) }) { Icon(Icons.Rounded.Close, "Remove ${search.query}") }
             }
-        }
-    }
-}
-
-/** One tap on a concept: off → more → less → off (issue #208); no new one beyond [max] at once (#216). */
-/**
- * The words sent for a sound search (issue #232). AudioMuse picks songs by the words and only re-ranks them by the
- * concepts, so the concepts set to "more" are added as words too: "sad songs" with Female vocals and Sad becomes
- * "sad songs, female vocals, sad". "Less" concepts stay out of the words: the model doesn't understand "not X".
- * Words already typed aren't added twice.
- */
-internal fun soundQuery(typed: String, steering: Map<String, Boolean>): String {
-    val words = typed.trim()
-    val have = words.lowercase()
-    val extra = steering.filterValues { it }.keys
-        .map { it.trim() }
-        .filter { it.isNotEmpty() && !Regex("\\b" + Regex.escape(it.lowercase()) + "\\b").containsMatchIn(have) }
-        .distinctBy { it.lowercase() }
-    return if (extra.isEmpty()) words else (listOf(words) + extra).joinToString(", ")
-}
-
-fun nextSteering(steering: Map<String, Boolean>, term: String, max: Int = Int.MAX_VALUE): Map<String, Boolean> = when (steering[term]) {
-    null -> if (steering.size >= max) steering else steering + (term to true)
-    true -> steering + (term to false)
-    false -> steering - term
-}
-
-/**
- * The groups of concepts (Genre, Instrument, Vocals, Mood, Production, Tempo, Era), one shown at a time. A
- * group with concepts in use says how many, so they aren't forgotten while another group shows (issue #216).
- */
-@Composable
-internal fun ConceptGroupRow(groups: List<ConceptCategory>, selected: String, steering: Map<String, Boolean>, onPick: (String) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Space.Page).testTag("conceptGroups"),
-        horizontalArrangement = Arrangement.spacedBy(Space.Small),
-    ) {
-        groups.forEach { g ->
-            val used = g.terms.count { it in steering }
-            FilterChip(
-                selected = g.id == selected,
-                onClick = { onPick(g.id) },
-                label = { Text(if (used > 0) "${g.label} · $used" else g.label) },
-            )
-        }
-    }
-}
-
-/**
- * "More piano", "less vocals": the concepts of one group as chips that steer the Sound search. With the group
- * chips above them they form one block, with the same gap above it (the Library / Sound row's padding and the
- * chips' touch margins) as below it: Space.Page (SpacingTest.steeringChipsAreEvenlySpaced).
- */
-@Composable
-internal fun SteeringChips(terms: List<String>, steering: Map<String, Boolean>, onTap: (String) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = Space.Page, end = Space.Page, bottom = Space.Page).testTag("steering"),
-        horizontalArrangement = Arrangement.spacedBy(Space.Small),
-    ) {
-        terms.forEach { term ->
-            val state = steering[term]
-            FilterChip(
-                selected = state != null,
-                onClick = { onTap(term) },
-                label = { Text(when (state) { true -> "More $term"; false -> "Less $term"; null -> term }) },
-            )
         }
     }
 }
