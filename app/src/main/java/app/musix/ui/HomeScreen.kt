@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
@@ -42,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -203,8 +205,21 @@ fun HomeScreen(nav: NavController) {
 
     // The keyboard shrinks the list, so the "How are you feeling?" box scrolls up above it. While it shows, the
     // bottom bar is behind it, so the list needn't leave room for the bar.
+    // The Home tab tapped again: glide back to the top. From far down, jump most of the way first so it's quick.
+    val listState = rememberLazyListState()
+    val scrollRequests by HomeScrollToTop.requests.collectAsStateWithLifecycle()
+    var handledScroll by rememberSaveable { mutableStateOf(scrollRequests) }
+    LaunchedEffect(scrollRequests) {
+        val pending = homeScrollPending(scrollRequests, handledScroll)
+        handledScroll = scrollRequests
+        if (!pending) return@LaunchedEffect
+        if (listState.firstVisibleItemIndex > 4) listState.scrollToItem(4)
+        listState.animateScrollToItem(0)
+    }
+
     LazyColumn(
         Modifier.fillMaxSize().aboveKeyboard(),
+        state = listState,
         contentPadding = PaddingValues(bottom = if (keyboardOpen()) Space.Page else bottomBarPadding(Space.Section)),
     ) {
         item {
