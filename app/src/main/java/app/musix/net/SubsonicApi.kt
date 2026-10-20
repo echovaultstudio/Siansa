@@ -1,5 +1,7 @@
 package app.musix.net
 
+import app.musix.data.SongDates
+import app.musix.data.SongDatesCache
 import app.musix.data.Album
 import app.musix.data.AlbumDetail
 import app.musix.data.AppJson
@@ -432,6 +434,8 @@ class SubsonicApi(
 
     private fun parseSong(o: JsonObject): Song {
         val gain = o.obj("replayGain")
+        // Kept aside for sorting lists by date liked, added or played (issue #257).
+        o.str("id")?.let { SongDatesCache.remember(it, SongDates(o.str("starred"), o.str("created"), o.str("played"))) }
         return Song(
             id = o.str("id").orEmpty(),
             title = o.str("title") ?: "Unknown title",

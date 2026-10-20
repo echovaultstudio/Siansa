@@ -342,4 +342,12 @@ class SpacingTest {
         val gaps = chips.zipWithNext().map { (a, b) -> b.left - a.right }
         gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between preload choices", a, b, 1.dp) }
     }
+
+    /** Liked songs and playlists (issue #257): the sort chips sit the same distance apart. */
+    @Test fun sortChipsAreEvenlySpaced() {
+        compose.setContent { MusixTheme { androidx.compose.foundation.layout.Column { app.musix.ui.SortChips(app.musix.data.ListSort.DEFAULT, "Recently liked") { } } } }
+        val chips = listOf("DEFAULT", "PLAYED", "ADDED").map { compose.onNodeWithTag("sort-$it").getBoundsInRoot() }
+        val gaps = chips.zipWithNext().map { (a, b) -> b.left - a.right }
+        gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between sort chips", a, b, 1.dp) }
+    }
 }
