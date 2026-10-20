@@ -64,6 +64,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -85,9 +86,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.musix.data.Album
 import app.musix.data.AlbumCategory
 import app.musix.data.category
+import app.musix.log.AppLog
 import app.musix.mix.MixGenerator
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -169,7 +175,12 @@ fun YourLibraryScreen(nav: NavController) {
     val pinned = remember(pinVersion) { pins(context).getStringSet("keys", emptySet()).orEmpty() }
 
     val favouriteIds by graph.favouriteAlbums.ids.collectAsStateWithLifecycle()
-    val data by loadState(listOf(version, mixes?.size, settings.navidromeUser, favouriteIds)) { buildLibrary(graph, settings.navidromeUser) }
+    // From the phone straight away, then again once Navidrome has answered (issue #161).
+    val data by produceState<Load<LibraryData>>(Load.Loading, version, mixes?.size, settings.navidromeUser, favouriteIds) {
+        val me = settings.navidromeUser
+        value = loadLibrary(graph, me)
+        if (refreshFromServer(graph, me)) value = loadLibrary(graph, me)
+    }
 
     val selectedKind = kind?.let { runCatching { Kind.valueOf(it) }.getOrNull() }
     val selectedSort = runCatching { Sort.valueOf(sort) }.getOrDefault(Sort.RECENTS)
@@ -651,11 +662,45 @@ private fun PinButton(pinned: Boolean, onClick: () -> Unit, modifier: Modifier =
 private fun parseTime(text: String?): Long =
     text?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: 0L
 
+/**
+ * Navidrome's recently played albums (other apps too) from its last answer, for whose they are. The list
+ * never waits for Navidrome: offline, each request took up to 15 seconds to give up (issue #161).
+ */
+@Volatile private var lastRecent: Pair<String, List<Album>>? = null
+
+private suspend fun loadLibrary(graph: app.musix.AppGraph, me: String): Load<LibraryData> = try {
+    Load.Ok(buildLibrary(graph, me))
+} catch (e: CancellationException) {
+    throw e
+} catch (e: Exception) {
+    AppLog.w("Library", "Loading the library failed: ${e.message}")
+    Load.Err(e.message ?: e.javaClass.simpleName)
+}
+
+/**
+ * Asks Navidrome for recently played albums, fresh playlists (stored with the library) and favourite albums, all at once.
+ * False when offline, so nothing changed and the list needn't be built again.
+ */
+private suspend fun refreshFromServer(graph: app.musix.AppGraph, me: String): Boolean {
+    if (graph.connection.current.offline) return false
+    val started = System.currentTimeMillis()
+    val recentOk = coroutineScope {
+        val recent = async { runCatching { graph.subsonic.albums("recent", 100, 0) }.getOrNull() }
+        val playlists = async { runCatching { graph.library.refreshPlaylists { graph.subsonic.playlists() } } }
+        val favourites = async { graph.favouriteAlbums.refresh() }
+        playlists.await()
+        favourites.await()
+        recent.await()?.also { lastRecent = me to it } != null
+    }
+    AppLog.d("Library", "Navidrome part of the library ${if (recentOk) "fetched" else "not reachable"} in ${System.currentTimeMillis() - started} ms")
+    return true
+}
+
 private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): LibraryData {
     val entries = ArrayList<Entry>()
     val now = LocalDate.now()
-    // Favourite albums, from Navidrome (one request), or the phone's copy offline (issue #275).
-    val favouriteAlbums = graph.favouriteAlbums.refresh()
+    // Favourite albums as Navidrome last sent them (refreshed in refreshFromServer), or the phone's copy (issue #275).
+    val favouriteAlbums = graph.favouriteAlbums.albums
 
     // What you've played: Musix's own history, and Navidrome's recently played albums (other apps too).
     val history = graph.history.all()
@@ -670,7 +715,8 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
         artistRecent.merge(artistKey, ev.at) { a, b -> maxOf(a, b) }
         if (!ev.skipped) artistPlays.merge(artistKey, 1L) { a, b -> a + b }
     }
-    graph.library.keepSyncedAlbums(runCatching { graph.subsonic.albums("recent", 100, 0) }.getOrDefault(emptyList()), "Recently played").forEach { a ->
+    val recentAlbums = lastRecent?.takeIf { it.first == me }?.second.orEmpty()
+    graph.library.keepSyncedAlbums(recentAlbums, "Recently played").forEach { a ->
         val at = parseTime(a.played)
         if (at > 0) a.allIds.forEach { id -> albumRecent.merge(id, at) { x, y -> maxOf(x, y) } }
     }
@@ -773,8 +819,7 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
     }
 
     // Playlists from Navidrome.
-    val playlists = runCatching { graph.library.refreshPlaylists { graph.subsonic.playlists() } }.getOrElse { graph.library.playlists() }
-        .let(graph.playlists.removed::visible)
+    val playlists = graph.library.playlists().let(graph.playlists.removed::visible)
     playlists.forEach { p ->
         val mine = me.isNotBlank() && p.owner.equals(me, ignoreCase = true)
         entries += Entry(
