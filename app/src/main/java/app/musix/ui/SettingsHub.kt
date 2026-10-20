@@ -458,7 +458,7 @@ fun StorageScreen(nav: NavController) {
             SwitchRow("Download all covers", settings.coverDownload) { on ->
                 graph.settings.setCoverDownload(on)
                 CoverDownload.schedule(context, graph.settings.current)
-                if (on) CoverDownload.start(context) else CoverDownload.stop(context)
+                if (on) CoverDownload.startNow(context, graph) else CoverDownload.stop(context)
             }
             SwitchRow("On any Wi-Fi, not just at home", settings.coverDownloadAnyWifi) { on ->
                 graph.settings.setCoverDownload(settings.coverDownload, anyWifi = on)
@@ -490,7 +490,7 @@ fun StorageScreen(nav: NavController) {
             } else {
                 download.note?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                 OutlinedButton(onClick = {
-                    CoverDownload.start(context)
+                    CoverDownload.startNow(context, graph)
                     refresh++
                 }) { Text("Download covers now") }
             }
