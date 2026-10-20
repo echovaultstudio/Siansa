@@ -67,6 +67,9 @@ internal fun rememberTimerNow(running: Boolean): Long {
     return now
 }
 
+/** What a wind down without a timer is doing, in words (issue #330). */
+internal fun windDownAloneStatus(songs: Int): String = "Winding down: $songs calmer songs, then the music stops"
+
 /** What the timer is doing, in words. */
 private fun timerStatus(timer: SleepTimerState, now: Long): String {
     val left = timer.leftMs(now) ?: return "Music stops after this song"
@@ -78,22 +81,30 @@ private fun timerStatus(timer: SleepTimerState, now: Long): String {
 fun SleepTimerButton(onClick: () -> Unit) {
     val graph = LocalGraph.current
     val timer by graph.sleepTimer.state.collectAsStateWithLifecycle()
+    val windingAlone by graph.sleepTimer.windDownAlone.collectAsStateWithLifecycle()
     val now = rememberTimerNow(timer != null)
     val active = timer
     val left = active?.leftMs(now)
+    val songs = graph.settings.current.windDownSongs
     Box(
         Modifier
             .size(48.dp)
             .clip(CircleShape)
             .clickable(onClick = onClick)
-            .semantics { contentDescription = if (active == null) "Sleep timer" else "Sleep timer: ${timerStatus(active, now)}" },
+            .semantics {
+                contentDescription = when {
+                    active != null -> "Sleep timer: ${timerStatus(active, now)}"
+                    windingAlone -> "Sleep timer: ${windDownAloneStatus(songs)}"
+                    else -> "Sleep timer"
+                }
+            },
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
                 Icons.Rounded.Bedtime,
                 null,
-                tint = if (active != null) Accent else Color.White.copy(alpha = 0.8f),
+                tint = if (active != null || windingAlone) Accent else Color.White.copy(alpha = 0.8f),
                 modifier = Modifier.size(if (left != null) 18.dp else 22.dp),
             )
             if (left != null) {
@@ -108,6 +119,7 @@ fun SleepTimerButton(onClick: () -> Unit) {
 fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
     val graph = LocalGraph.current
     val timer by graph.sleepTimer.state.collectAsStateWithLifecycle()
+    val windingAlone by graph.sleepTimer.windDownAlone.collectAsStateWithLifecycle()
     val now = rememberTimerNow(timer != null)
     val audioMuse = graph.settings.current.audioMuseReady
     var windDown by remember { mutableStateOf(graph.sleepTimer.windDownChosen && audioMuse) }
@@ -130,9 +142,10 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text("Sleep timer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
-                        timer?.let { timerStatus(it, now) } ?: "Music fades out when the time is up",
+                        timer?.let { timerStatus(it, now) }
+                            ?: if (windingAlone) windDownAloneStatus(graph.settings.current.windDownSongs) else "Music fades out when the time is up",
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (timer != null) Accent else SheetSubtle,
+                        color = if (timer != null || windingAlone) Accent else SheetSubtle,
                     )
                 }
                 if (timer != null) {
@@ -177,7 +190,7 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text("Wind down", style = MaterialTheme.typography.bodyLarge, color = if (audioMuse) SheetText else SheetSubtle)
                     Text(
-                        if (audioMuse) "From this song toward calmer, quieter ones" else "Needs AudioMuse, set it up in Settings",
+                        if (audioMuse) "From this song toward calmer, quieter ones. Without a time, the music stops after them" else "Needs AudioMuse, set it up in Settings",
                         style = MaterialTheme.typography.bodySmall,
                         color = SheetSubtle,
                     )

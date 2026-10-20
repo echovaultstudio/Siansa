@@ -516,6 +516,8 @@ class PlaybackService : MediaSessionService() {
     override fun onDestroy() {
         handler.removeCallbacks(sleepTick)
         mainScope.cancel()
+        // Closing the player session ends the wind down too, so the sleep sheet opens with it off (issue #330).
+        graph.sleepTimer.setWindDown(false)
         graph.sleepTimer.cancel()
         events?.stopWatches()
         precacheWriter?.cancel()
@@ -694,6 +696,8 @@ class PlaybackService : MediaSessionService() {
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_ENDED) {
                 finishCurrent()
+                // A wind down without a timer ends with its last calm song (issue #330).
+                graph.sleepTimer.queueEnded()
                 // The queue ran out while the sleep timer was finishing its song.
                 if (graph.sleepTimer.state.value?.finishing == true) graph.sleepTimer.done()
             }
