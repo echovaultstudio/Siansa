@@ -516,6 +516,8 @@ class PlaybackService : MediaSessionService() {
     override fun onDestroy() {
         handler.removeCallbacks(sleepTick)
         mainScope.cancel()
+        // Closing the player session ends the wind down too, so the sleep sheet opens with it off (issue #330).
+        graph.sleepTimer.setWindDown(false)
         graph.sleepTimer.cancel()
         events?.stopWatches()
         precacheWriter?.cancel()
