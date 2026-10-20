@@ -379,4 +379,14 @@ class SpacingTest {
         val title = compose.onNodeWithText(long.title, substring = true).getBoundsInRoot()
         assertTrue("A gap after the title: ${title.right} vs ${lengths[0].left}", title.right <= with(compose.density) { lengths[0].left.toDp() } - Space.Small + 1.dp)
     }
+
+    /** Themes › Selected items (issue #313): the colours sit in even columns, four to a row. */
+    @Test fun selectionSwatchesAreEven() {
+        compose.setContent { MusixTheme { app.musix.ui.SelectionSwatches(app.musix.ui.SelectionColour.THEME, onPick = {}) } }
+        val names = listOf("THEME", "AMBER", "VIOLET", "BLUE", "TEAL")
+        val b = names.map { compose.onNodeWithTag("selection-$it").getBoundsInRoot() }
+        assertEven("Even columns", b[1].left - b[0].left, b[2].left - b[1].left, 1.dp)
+        assertEven("Fifth under first", b[4].left - b[0].left, 0.dp, 1.dp)
+        assertTrue("fifth on the next row", b[4].top > b[0].top)
+    }
 }

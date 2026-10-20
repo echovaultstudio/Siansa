@@ -146,6 +146,19 @@ fun ThemesScreen(nav: NavController) {
                 "Album, artist and now playing pages keep their colours from the cover.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = SWATCH_GAP),
+            )
+
+            // The colour of selected items everywhere (issue #313).
+            ThemeLabel("Selected items")
+            SelectionSwatches(choice.selection, onPick = { pick ->
+                AppLog.i("Themes", "Selected items: ${pick.label}")
+                graph.settings.setSelectionColour(pick.name)
+            }, modifier = Modifier.padding(horizontal = Space.Page))
+            Text(
+                "Chosen chips, the current tab and the playing song. Theme uses the theme's own colour.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = SWATCH_GAP, bottom = Space.Section),
             )
         }
@@ -285,4 +298,42 @@ internal fun SwatchGridForTest() {
         dark = false,
         onPick = {},
     )
+}
+
+/** The colours for selected items, as circles four to a row (issue #313); "Theme" shows the theme's own. */
+@Composable
+internal fun SelectionSwatches(selected: SelectionColour, onPick: (SelectionColour) -> Unit, modifier: Modifier = Modifier) {
+    val themeColour = selectionColourOf(SelectionColour.THEME, Accent)
+    Column(modifier.testTag("selectionSwatches"), verticalArrangement = Arrangement.spacedBy(SWATCH_GAP)) {
+        SelectionColour.entries.chunked(4).forEach { row ->
+            Row(Modifier.fillMaxWidth()) {
+                row.forEach { option ->
+                    val colour = option.argb?.let { Color(it) } ?: themeColour
+                    Column(
+                        Modifier.weight(1f).selectable(option == selected, role = Role.RadioButton) { onPick(option) }.testTag("selection-${option.name}"),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Box(
+                            Modifier
+                                .size(44.dp)
+                                .then(if (option == selected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape).padding(4.dp) else Modifier) // spacing: exact (the ring around the chosen colour)
+                                .clip(CircleShape)
+                                .background(colour),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (option == selected) Icon(Icons.Rounded.Check, null, tint = onSelectionColourOf(colour))
+                        }
+                        Text(
+                            option.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = Space.Small),
+                        )
+                    }
+                }
+                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
 }

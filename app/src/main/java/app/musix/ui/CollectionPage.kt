@@ -174,7 +174,7 @@ fun CollectionPage(
                             Box(
                                 Modifier
                                     .fillMaxWidth()
-                                    .background(if (now) MaterialTheme.colorScheme.primary.copy(alpha = NOW_PLAYING_BAND) else Color.Transparent)
+                                    .background(if (now) Selected.copy(alpha = NOW_PLAYING_BAND) else Color.Transparent)
                                     .testTag(if (now) "collectionNowPlaying" else "collectionRow"),
                             ) {
                                 SongRow(
@@ -336,7 +336,7 @@ fun BigPlayButton(enabled: Boolean, onPlay: () -> Unit) {
 }
 
 /** How strongly the song playing now is marked in a song list: the queue's band, in the theme's colour. */
-private const val NOW_PLAYING_BAND = 0.12f
+private const val NOW_PLAYING_BAND = 0.18f
 
 /**
  * Which of [songs] is playing now, or null. By id, or else the same title, album and disc and track: an album
