@@ -170,7 +170,7 @@ fun PlaylistScreen(nav: NavController, id: String) {
     val heard by loadState("heard-at-playlist") { lastHeard(graph) }
     // The playlist's positions in the order shown, so "Remove" still removes the right one when sorted.
     val order = remember(d, sort, heard) {
-        d?.songs?.indices?.toList()?.let { idx -> sortSongs(idx, sort, { d.songs[it] }, { SongDatesCache[it] }, { heard.valueOrNull()?.get(it) }) }
+        d?.let { pl -> sortSongs(pl.songs.indices.toList(), sort, { pl.songs[it] }, { SongDatesCache[it] }, { heard.valueOrNull()?.get(it) }) }
     }
     val editable = d != null && PlaylistEditor.canEdit(d.playlist, graph.settings.current.navidromeUser)
     val removeFromPlaylist: @Composable (Int, Song, () -> Unit) -> Unit = { index, song, close ->
