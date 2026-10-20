@@ -26,6 +26,7 @@ import app.musix.AppGraph
 import app.musix.log.AppLog
 import android.os.Build
 import app.musix.covers.CoverStore
+import app.musix.covers.executeCancellable
 import coil3.SingletonImageLoader
 import coil3.asDrawable
 import coil3.decode.Decoder
@@ -211,13 +212,13 @@ object AnimatedCovers {
         val client = graph.imageHttp.newBuilder().callTimeout(40, TimeUnit.SECONDS).build()
         val call = client.newCall(Request.Builder().url(graph.subsonic.coverUrl(id, size)).header(CoverStore.PEEK, "1").build())
         runCatching {
-            call.execute().use { response ->
+            call.executeCancellable { response ->
                 val ms = System.currentTimeMillis() - started
-                if (!response.isSuccessful) return@use Peek(false, "HTTP ${response.code}", 0, ms)
+                if (!response.isSuccessful) return@executeCancellable Peek(false, "HTTP ${response.code}", 0, ms)
                 val length = response.header("Content-Length")?.toLongOrNull() ?: -1
                 val head = ByteArray(32)
                 var read = 0
-                val stream = response.body?.byteStream() ?: return@use Peek(false, "empty", 0, ms)
+                val stream = response.body?.byteStream() ?: return@executeCancellable Peek(false, "empty", 0, ms)
                 while (read < head.size) {
                     val n = stream.read(head, read, head.size - read)
                     if (n < 0) break
@@ -227,7 +228,7 @@ object AnimatedCovers {
                 val image = CoverStore.sniff(head.copyOf(read))
                 if (image == null) {
                     val kind = if (read > 0 && head[0] == '{'.code.toByte()) "an error message" else "unknown"
-                    return@use Peek(false, kind, length, ms)
+                    return@executeCancellable Peek(false, kind, length, ms)
                 }
                 val shrunk = size != null && image.width in 1..(size * 5 / 4) && image.height in 1..(size * 5 / 4)
                 Peek(image.animated, image.kind, length, ms, "${image.width}×${image.height}", shrunk)
