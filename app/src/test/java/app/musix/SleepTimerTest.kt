@@ -1,6 +1,6 @@
 package app.musix
 
-import app.musix.mix.followsNewQueue
+import app.musix.mix.windDownSongs
 import app.musix.playback.SLEEP_FADE_MS
 import app.musix.playback.SleepTimer
 import app.musix.playback.SleepTimerState
@@ -137,16 +137,29 @@ class SleepTimerTest {
         assertFalse(sleepPauseNow(onPhone = false, state = finishing, leftMs = -1))
     }
 
-    @Test fun newMusicIsSteeredOnlyWhileWindingDown() {
-        assertFalse(followsNewQueue(null))
-        timer.start(30, windDown = false)
-        assertFalse(followsNewQueue(timer.state.value))
+    @Test fun windDownWorksWithoutATimer() {
+        assertFalse(timer.windingDown())
         timer.setWindDown(true)
-        assertTrue(followsNewQueue(timer.state.value))
+        assertTrue(timer.windDownAlone.value)
+        assertTrue(timer.windingDown())
+        timer.setWindDown(false)
+        assertFalse(timer.windDownAlone.value)
+        assertFalse(timer.windingDown())
+    }
+
+    @Test fun aTimerTakesOverAWindDownOnItsOwn() {
+        timer.setWindDown(true)
+        timer.start(30, windDown = true)
+        assertFalse(timer.windDownAlone.value)
+        assertTrue(timer.windingDown())
         timer.timeUp(songLeftMs = 90_000)
-        assertFalse(followsNewQueue(timer.state.value))
-        timer.startEndOfSong()
-        assertFalse(followsNewQueue(timer.state.value))
+        assertFalse(timer.windingDown())
+    }
+
+    @Test fun windDownLengthFollowsTheTimerOrTheSetting() {
+        assertEquals(windDownLength(30 * min), windDownSongs(30 * min, alone = false, setting = 20))
+        assertEquals(21, windDownSongs(null, alone = true, setting = 20))
+        assertNull(windDownSongs(null, alone = false, setting = 20))
     }
 
     @Test fun switchingWindDownOffIsRememberedAfterTheTimerEnds() {

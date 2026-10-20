@@ -38,11 +38,20 @@ class SleepTimer(private val clock: () -> Long = { SystemClock.elapsedRealtime()
     @Volatile var windDownChosen = false
         private set
 
+    private val _windDownAlone = MutableStateFlow(false)
+    /** Wind down switched on without a timer running: the queue winds down by itself and ends (issue #330). */
+    val windDownAlone: StateFlow<Boolean> = _windDownAlone.asStateFlow()
+
+    /** Whether the music is winding down now, with or without a timer. */
+    fun windingDown(): Boolean = _windDownAlone.value || _state.value?.let { it.windDown && !it.finishing && it.endsAt != null } == true
+
     fun now(): Long = clock()
 
     fun start(minutes: Int, windDown: Boolean) {
         val total = minutes.coerceAtLeast(1) * 60_000L
         windDownChosen = windDown
+        // A timer takes over a wind down that was running on its own, so it fills the time instead.
+        _windDownAlone.value = false
         _state.value = SleepTimerState(endsAt = clock() + total, totalMs = total, windDown = windDown)
         AppLog.i("Sleep", "Timer set for $minutes min${if (windDown) " with wind down" else ""}")
     }
@@ -56,8 +65,15 @@ class SleepTimer(private val clock: () -> Long = { SystemClock.elapsedRealtime()
     /** The wind-down switch: remembered straight away, and applied to a timer that's already running (issue #153). */
     fun setWindDown(on: Boolean) {
         windDownChosen = on
-        val s = _state.value ?: return
-        if (s.endsAt == null || s.finishing || s.windDown == on) return
+        val s = _state.value
+        if (s == null || s.endsAt == null || s.finishing) {
+            // No timer to follow: the switch alone winds the queue down (issue #330).
+            if (_windDownAlone.value != on) AppLog.i("Sleep", "Wind down turned ${if (on) "on" else "off"} without a timer")
+            _windDownAlone.value = on
+            return
+        }
+        _windDownAlone.value = false
+        if (s.windDown == on) return
         _state.value = s.copy(windDown = on)
         AppLog.i("Sleep", "Wind down turned ${if (on) "on" else "off"}")
     }
