@@ -78,6 +78,16 @@ class SleepTimer(private val clock: () -> Long = { SystemClock.elapsedRealtime()
         AppLog.i("Sleep", "Wind down turned ${if (on) "on" else "off"}")
     }
 
+    /**
+     * The queue played to its end. A wind down without a timer is then over: the music has ended with its calm
+     * songs, so the next thing played isn't swapped for calm songs again (issue #330).
+     */
+    fun queueEnded() {
+        if (!_windDownAlone.value) return
+        AppLog.i("Sleep", "Wind down done: the calm songs have ended")
+        setWindDown(false)
+    }
+
     fun cancel() {
         if (_state.value != null) AppLog.i("Sleep", "Timer turned off")
         _state.value = null

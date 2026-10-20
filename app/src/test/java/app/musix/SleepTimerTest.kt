@@ -162,6 +162,21 @@ class SleepTimerTest {
         assertNull(windDownSongs(null, alone = false, setting = 20))
     }
 
+    @Test fun aWindDownOnItsOwnEndsWithItsLastSong() {
+        timer.setWindDown(true)
+        timer.queueEnded()
+        assertFalse(timer.windDownAlone.value)
+        assertFalse(timer.windingDown())
+        assertFalse(timer.windDownChosen)
+    }
+
+    @Test fun theQueueEndingLeavesAWindDownWithATimerAlone() {
+        timer.start(30, windDown = true)
+        timer.queueEnded()
+        assertTrue(timer.windingDown())
+        assertTrue(timer.windDownChosen)
+    }
+
     @Test fun switchingWindDownOffIsRememberedAfterTheTimerEnds() {
         timer.start(30, windDown = true)
         assertTrue(timer.windDownChosen)
