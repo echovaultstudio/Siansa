@@ -1,5 +1,8 @@
 package app.musix.ui
 
+import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.Image
 import coil3.compose.asPainter
@@ -408,6 +411,9 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier, top: Dp = SECTION_
 /** The space above a section's heading: between one section's last row and the next heading. */
 val SECTION_GAP = Space.Section
 
+/** Room for a song length up to "59:59", so the lengths in a list line up (issue #309). */
+internal val DURATION_WIDTH = 36.dp
+
 fun formatDuration(seconds: Long): String {
     val s = seconds.coerceAtLeast(0)
     return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, (s % 3600) / 60, s % 60)
@@ -488,10 +494,14 @@ fun SongRow(
             }
             DownloadedMark(song.id)
             if (song.durationSec > 0) {
+                // A gap after a long title, and the same width for every length so they line up (issue #309).
                 Text(
                     formatDuration(song.durationSec.toLong()),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                    modifier = Modifier.padding(start = Space.Small).widthIn(min = DURATION_WIDTH).testTag("songLength"),
                 )
             }
             Box {
