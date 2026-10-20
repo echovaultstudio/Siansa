@@ -238,6 +238,8 @@ fun MusixRoot() {
                 composable("search") { SearchScreen(nav) }
                 composable("library") { YourLibraryScreen(nav) }
                 composable("vibes") { VibesScreen(nav) }
+                composable("settings/cards") { CardsSettingsScreen(nav) }
+                composable("card/{id}") { CardScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("settings") { SettingsHub(nav) }
                 composable("settings/connections") { ConnectionsScreen(nav) }
                 composable("settings/users") { UsersScreen(nav) }
