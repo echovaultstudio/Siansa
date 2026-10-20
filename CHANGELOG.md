@@ -3,6 +3,17 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.19.2beta — 2026-10-20
+
+### Fixed
+- **The sleep timer waited for the song to end.** Music now fades out at the time you chose. "End of this song" still finishes the song.
+- **The wind down switch didn't stay on.** It now keeps its setting and can be switched on or off while a timer runs.
+- **Wind down didn't follow what you were playing.** It now starts from the song playing and moves step by step to calmer, quieter songs (AudioMuse song path).
+- **The Library took 15 to 20 seconds to show when offline.** It now shows straight away from what's on the
+  phone, and fills in Navidrome's recently played albums, playlists and favourites once the server answers.
+- **Musix stayed offline after the connection came back.** It now notices within seconds, instead of up to
+  three minutes later.
+
 ## 0.19.1beta — 2026-10-20
 
 ### Fixed
