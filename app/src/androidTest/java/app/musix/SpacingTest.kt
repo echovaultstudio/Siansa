@@ -334,4 +334,12 @@ class SpacingTest {
         val gaps = chips.zipWithNext().map { (a, b) -> b.left - a.right }
         gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between drift chips", a, b, 1.dp) }
     }
+
+    /** Settings › Playback › Load songs ahead (issue #254): the choices sit the same distance apart. */
+    @Test fun preloadChipsAreEvenlySpaced() {
+        compose.setContent { MusixTheme { androidx.compose.foundation.layout.Column { app.musix.ui.PreloadRow("On Wi-Fi", 2, "preload-wifi") { } } } }
+        val chips = app.musix.playback.Preload.CHOICES.map { compose.onNodeWithTag("preload-wifi-$it").getBoundsInRoot() }
+        val gaps = chips.zipWithNext().map { (a, b) -> b.left - a.right }
+        gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between preload choices", a, b, 1.dp) }
+    }
 }
