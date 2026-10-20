@@ -1,5 +1,7 @@
 package app.musix.ui
 
+import androidx.compose.ui.platform.testTag
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -163,6 +165,7 @@ fun ArtistScreen(nav: NavController, id: String) {
         val type = chosenReleaseType(typeName, types)
         val shownGroups = onlyReleaseType(groups, type)
         var releasesGrid by rememberGridMode("artist")
+        var topExpanded by rememberSaveable(id) { mutableStateOf(false) }
 
         LazyVerticalGrid(
             state = gridState,
@@ -209,11 +212,20 @@ fun ArtistScreen(nav: NavController, id: String) {
             if (topSongs == null) {
                 // Keeps the section's place while the first answer comes in, so the page doesn't jump.
                 full { SectionTitle("Popular") }
-                items(TOP_ROWS, key = { "top-wait-$it" }, span = { GridItemSpan(maxLineSpan) }) { SongRowPlaceholder() }
+                items(TOP_ROWS_SHORT, key = { "top-wait-$it" }, span = { GridItemSpan(maxLineSpan) }) { SongRowPlaceholder() }
             } else if (topSongs.isNotEmpty()) {
                 full { SectionTitle("Popular") }
-                itemsIndexed(topSongs.take(TOP_ROWS), key = { i, s -> "top-$i-${s.id}" }, span = { _, _ -> GridItemSpan(maxLineSpan) }) { index, song ->
+                // Three, and "Show more" for up to six (issue #328).
+                itemsIndexed(topSongs.take(topRowsShown(topSongs.size, topExpanded)), key = { i, s -> "top-$i-${s.id}" }, span = { _, _ -> GridItemSpan(maxLineSpan) }) { index, song ->
                     SongRow(song = song, onClick = { graph.player.play(topSongs, index) }, leading = "${index + 1}")
+                }
+                if (topSongs.size > TOP_ROWS_SHORT) {
+                    full {
+                        TextButton(
+                            onClick = { topExpanded = !topExpanded },
+                            modifier = Modifier.padding(start = Space.Small).testTag("topSongsMore"),
+                        ) { Text(if (topExpanded) "Show less" else "Show more") }
+                    }
                 }
             }
 
@@ -330,7 +342,12 @@ private fun LazyGridScope.full(content: @Composable () -> Unit) {
     item(span = { GridItemSpan(maxLineSpan) }) { content() }
 }
 
-private const val TOP_ROWS = 5
+/** Popular songs shown on an artist's page, and with Show more (issue #328). */
+private const val TOP_ROWS_SHORT = 3
+private const val TOP_ROWS_MORE = 6
+
+/** How many popular songs show: three, or up to six once Show more is tapped. */
+internal fun topRowsShown(available: Int, expanded: Boolean): Int = minOf(available, if (expanded) TOP_ROWS_MORE else TOP_ROWS_SHORT)
 
 /** A grey stand-in the size of a song row, shown while popular songs load. */
 @Composable
