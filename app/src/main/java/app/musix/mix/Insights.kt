@@ -386,15 +386,15 @@ class Insights(private val graph: AppGraph) {
         sources.forEach { src -> kept(src, year, month, finished)?.let { got[src] = it; times[src] = "from the phone" } }
         val emitLock = kotlinx.coroutines.sync.Mutex()
         suspend fun show(final: Boolean) = emitLock.withLock {
-            val used = sources.filter { it in got }
-            val waiting = if (final) emptyList() else sources.filter { it !in got && it !in failed }
+            val used = sources.filter { got.containsKey(it) }
+            val waiting = if (final) emptyList() else sources.filter { !got.containsKey(it) && it !in failed }
             if (used.isEmpty()) {
                 if (final) send(fromHistory(window, fromSec, toSec, limit, "Koito and Last.fm couldn't be reached", complete = false))
                 return@withLock
             }
             send(matched(window, mergePlays(*used.map { got.getValue(it) }.toTypedArray()), limit, used, waiting, complete = failed.isEmpty()))
         }
-        val missing = sources.filter { it !in got }
+        val missing = sources.filter { !got.containsKey(it) }
         if (missing.isNotEmpty()) {
             // What's already on the phone first.
             if (got.isNotEmpty()) show(final = false)
@@ -412,7 +412,7 @@ class Insights(private val graph: AppGraph) {
                             keep(src, year, month, finished, plays)
                         }
                         // Another service still on its way: show this one's plays now.
-                        if (plays != null && missing.any { it !in got && it !in failed }) show(final = false)
+                        if (plays != null && missing.any { !got.containsKey(it) && it !in failed }) show(final = false)
                     }
                 }
             }
