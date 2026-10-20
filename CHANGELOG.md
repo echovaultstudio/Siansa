@@ -3,6 +3,19 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.22.0beta — 2026-10-20
+
+### Fixed
+- **Song lengths no longer touch long titles.** On album pages and other song lists, a long title now stops short of the song's length, and the lengths line up.
+- **The speaker or TV name on now playing fits.** It now gets the room between the lyrics and queue buttons, and shrinks to fit before it's cut off.
+
+### Added
+- **Swipe the mini player to change song.** Swipe it left for the next song, right for the previous one.
+- **Selected items stand out in a colour of their own.** Chosen chips, the current tab, the playing song in a list and other selected or active items now use one clear colour. Pick it in Settings › Themes › Selected items: Theme (the theme's own colour, amber for grey themes), Amber, Violet, Blue, Teal, Green, Pink or Red.
+
+### Changed
+- **More room between the panels on Home.** The carousel, Today's mix and the mood box are no longer squeezed together.
+
 ## 0.21.0beta — 2026-10-20
 
 ### Fixed
