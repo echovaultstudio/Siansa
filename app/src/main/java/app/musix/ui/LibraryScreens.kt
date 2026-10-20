@@ -152,7 +152,9 @@ fun PlaylistScreen(nav: NavController, id: String) {
             val local = graph.localPlaylists.get(id) ?: throw IllegalStateException("This playlist isn't on this phone any more")
             PlaylistDetail(local.toPlaylist(), local.songs)
         } else try {
-            graph.subsonic.playlist(id)
+            // Kept on the phone while Navidrome's playlist list says it hasn't changed (issue #251); after a
+            // change made here ([version]), read again.
+            graph.playlistCache.get(id, force = version > 0)
         } catch (e: Exception) {
             // Without a connection, a downloaded playlist still opens with its songs on the phone.
             val key = OfflineItem.key(OfflineKind.PLAYLIST, id)

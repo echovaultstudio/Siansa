@@ -271,6 +271,10 @@ class AppGraph(val app: Application) {
                 .collect { downloads.syncPhonePlaylists(it) }
         }
     }
+    /** Every Navidrome playlist's songs kept on the phone (issue #251). */
+    val playlistCache = app.musix.data.PlaylistCache(app, subsonic, library).also { cache ->
+        downloads.playlistSongs = { id -> cache.get(id).songs }
+    }
     val playlists = PlaylistEditor(
         subsonic,
         NavidromeNativeApi(http) { settings.current },
@@ -279,6 +283,8 @@ class AppGraph(val app: Application) {
         RemovedPlaylists(app),
         isOffline = { connection.current.offline },
         moved = { localId, made -> downloads.moveItem(OfflineItem.key(OfflineKind.PLAYLIST, localId), made.offlineItem()) },
+        changed = { id -> playlistCache.refresh(id) },
+        forgotten = { id -> playlistCache.forget(id) },
     )
     /** "Sounds like" from Navidrome's sonic similarity or AudioMuse (issue #208). */
     val sonic = Sonic(this)
