@@ -4,19 +4,25 @@ import app.musix.AppGraph
 import app.musix.data.Song
 import app.musix.log.AppLog
 import app.musix.net.PathMood
+import app.musix.playback.SleepTimerState
 import app.musix.playback.leftMs
 import app.musix.playback.windDownLength
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** Whether a new list that starts playing should be steered toward calm songs: wind down is on and the time isn't up. */
+fun followsNewQueue(timer: SleepTimerState?): Boolean = timer != null && timer.windDown && !timer.finishing && timer.endsAt != null
 
 /**
  * The sleep timer's wind down (issue #153): as soon as it's switched on, everything after the current song is
  * swapped for an AudioMuse song path from that song to its "relaxed" mood, long enough to fill the timer, so the
  * music gets calmer and quieter step by step as you fall asleep. Without a path, AudioMuse's calm sound search.
+ * Playing something new while it's on steers again from that song; stopping playback switches it off (issue #330).
  */
 class WindDown(private val graph: AppGraph) {
     init {
@@ -27,14 +33,36 @@ class WindDown(private val graph: AppGraph) {
                 .distinctUntilChanged()
                 .collectLatest { endsAt -> if (endsAt != null) steer() }
         }
+        graph.scope.launch {
+            // Playing something new while winding down keeps winding down: the calm songs follow the new song,
+            // instead of the rest of the new list (issue #330).
+            graph.player.newQueues.collectLatest { first ->
+                if (!followsNewQueue(graph.sleepTimer.state.value)) return@collectLatest
+                AppLog.i("Sleep", "Wind down: something new is playing, steering again from ${first.title}")
+                steer(first)
+            }
+        }
+        graph.scope.launch {
+            // Stopping playback altogether (the queue emptied) ends the wind down too (issue #330).
+            graph.player.state
+                .map { it.hasMedia }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { hasMedia ->
+                    if (!hasMedia && graph.sleepTimer.state.value?.windDown == true) {
+                        AppLog.i("Sleep", "Wind down off: playback was stopped")
+                        graph.sleepTimer.setWindDown(false)
+                    }
+                }
+        }
     }
 
-    private suspend fun steer() {
+    private suspend fun steer(seed: Song? = null) {
         if (!graph.settings.current.audioMuseReady) {
             AppLog.w("Sleep", "Wind down skipped: AudioMuse isn't set up")
             return
         }
-        val current = graph.player.state.value.current
+        val current = seed ?: graph.player.state.value.current
         if (current == null) {
             AppLog.i("Sleep", "Wind down skipped: nothing is playing")
             return
