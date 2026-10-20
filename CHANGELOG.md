@@ -3,6 +3,12 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.22.2beta — 2026-10-20
+
+### Changed
+- **Tapping Home while on the Home page takes you back to its top.** Coming back to Home from another page or tab still keeps your place.
+- **The time machine shows its list straight away.** Your plays from Koito (or Musix's own history) appear first, and Last.fm's are added in place when they arrive, instead of everything waiting a few seconds for Last.fm. Months and years that have ended are kept on the phone, so going back to one needs no waiting at all.
+
 ## 0.22.1beta — 2026-10-20
 
 ### Fixed
