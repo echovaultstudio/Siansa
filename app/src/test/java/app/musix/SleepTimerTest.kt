@@ -148,4 +148,12 @@ class SleepTimerTest {
         timer.startEndOfSong()
         assertFalse(followsNewQueue(timer.state.value))
     }
+
+    @Test fun switchingWindDownOffIsRememberedAfterTheTimerEnds() {
+        timer.start(30, windDown = true)
+        assertTrue(timer.windDownChosen)
+        timer.setWindDown(false)
+        timer.cancel()
+        assertFalse(timer.windDownChosen)
+    }
 }
