@@ -166,8 +166,10 @@ class AppTourTest {
                 compose.onAllNodesWithContentDescription("Show as list").onFirst().performClick()
                 // Back to all, then the other filters
                 compose.onAllNodesWithContentDescription("Clear filter").onFirst().performClick()
-                for (chip in listOf("Playlists", "Mixes", "Artists", "Your listening")) {
-                    click(chip)
+                // The chip row scrolls sideways (Favourites came first, issue #275): bring each chip into view first.
+                for (chip in listOf("Favourites", "Playlists", "Mixes", "Artists", "Your listening")) {
+                    node(chip).performScrollTo().performClick()
+                    idle()
                     idle(600)
                     shot("06-library-" + chip.lowercase().replace(' ', '-'))
                     compose.onAllNodesWithContentDescription("Clear filter").onFirst().performClick()
