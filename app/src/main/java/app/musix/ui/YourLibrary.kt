@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import app.musix.data.isFavouriteAlbum
 import app.musix.data.cover
 import app.musix.data.toPlaylist
 import android.content.Context
@@ -102,7 +103,7 @@ import java.util.Locale
  */
 
 private enum class Kind(val label: String) {
-    PLAYLIST("Playlists"), MIX("Mixes"), ALBUM("Albums"), ARTIST("Artists"), LISTENING("Your listening")
+    FAVOURITES("Favourites"), PLAYLIST("Playlists"), MIX("Mixes"), ALBUM("Albums"), ARTIST("Artists"), LISTENING("Your listening")
 }
 
 private enum class Sort(val label: String) {
@@ -129,6 +130,8 @@ private data class Entry(
     /** Sub-filter tags this entry matches (e.g. "By you", "EPs", "Vibes"). */
     val tags: Set<String> = emptySet(),
     val alwaysPinned: Boolean = false,
+    /** Shown under the Favourites chip (issue #275): favourite albums and Liked songs. */
+    val favourite: Boolean = false,
 )
 
 private class LibraryData(val entries: List<Entry>, val subFilters: Map<Kind, List<String>>)
@@ -164,14 +167,18 @@ fun YourLibraryScreen(nav: NavController) {
     var held by remember { mutableStateOf<String?>(null) }
     val pinned = remember(pinVersion) { pins(context).getStringSet("keys", emptySet()).orEmpty() }
 
-    val data by loadState(Triple(version, mixes?.size, settings.navidromeUser)) { buildLibrary(graph, settings.navidromeUser) }
+    val favouriteIds by graph.favouriteAlbums.ids.collectAsStateWithLifecycle()
+    val data by loadState(listOf(version, mixes?.size, settings.navidromeUser, favouriteIds)) { buildLibrary(graph, settings.navidromeUser) }
 
     val selectedKind = kind?.let { runCatching { Kind.valueOf(it) }.getOrNull() }
     val selectedSort = runCatching { Sort.valueOf(sort) }.getOrDefault(Sort.RECENTS)
     val all = data.valueOrNull()
     val ordered = remember(all, selectedKind, sub, selectedSort, query, pinned) {
         val list = all?.entries.orEmpty()
-            .filter { selectedKind == null || it.kind == selectedKind || (it.alwaysPinned && selectedKind == Kind.PLAYLIST && it.heart) }
+            .filter {
+                selectedKind == null || it.kind == selectedKind || (it.alwaysPinned && selectedKind == Kind.PLAYLIST && it.heart) ||
+                    (selectedKind == Kind.FAVOURITES && it.favourite)
+            }
             .filter { e -> sub.let { it == null || it in e.tags } }
             .filter { query.isBlank() || it.title.contains(query, true) || it.subtitle.contains(query, true) }
         val sorted = when (selectedSort) {
@@ -642,6 +649,10 @@ private fun parseTime(text: String?): Long =
 private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): LibraryData {
     val entries = ArrayList<Entry>()
     val now = LocalDate.now()
+    // Favourite albums, from Navidrome (one request), or the phone's copy offline (issue #275).
+    val favouriteAlbums = graph.favouriteAlbums.refresh()
+    val favouriteIds = graph.favouriteAlbums.ids.value
+    val favouriteShown = HashSet<String>()
 
     // What you've played: Musix's own history, and Navidrome's recently played albums (other apps too).
     val history = graph.history.all()
@@ -672,6 +683,7 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
         heart = true,
         alwaysPinned = true,
         tags = setOf("By you"),
+        favourite = true,
     )
 
     // Your listening: this month pinned in the full list; all of them under their own filter.
@@ -799,6 +811,8 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
     graph.library.albums("name").forEach { a ->
         val recent = a.allIds.maxOfOrNull { albumRecent[it] ?: 0L } ?: 0L
         val category = a.category
+        val favourite = isFavouriteAlbum(a, favouriteIds)
+        if (favourite) favouriteShown += a.allIds
         entries += Entry(
             key = "album-${a.id}",
             kind = Kind.ALBUM,
@@ -815,6 +829,22 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
                 if (recent > 0) add("Played")
                 if (a.playCount == 0L && recent == 0L) add("Not played yet")
             },
+            favourite = favourite,
+        )
+    }
+    // Favourite albums Navidrome knows that aren't in the synced library (another library, not synced yet).
+    favouriteAlbums.filter { a -> a.allIds.none { it in favouriteShown } }.forEach { a ->
+        entries += Entry(
+            key = "album-${a.id}",
+            kind = null,
+            title = a.name,
+            subtitle = "Album · " + a.artist,
+            route = "album/${a.id}",
+            coverArt = a.coverArt,
+            addedAt = parseTime(a.created),
+            plays = a.playCount,
+            creator = a.artist,
+            favourite = true,
         )
     }
 
