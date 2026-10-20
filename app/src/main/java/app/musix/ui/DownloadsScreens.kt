@@ -284,6 +284,10 @@ fun DownloadsScreen(nav: NavController) {
                         graph.settings.setDownloads(wifiOnly = on)
                         graph.downloads.retry()
                     }
+                    Hint(
+                        if (settings.downloadWifiOnly) "A VPN counts as mobile data, so nothing downloads while one is on."
+                        else "Downloads on any connection, including mobile data and a VPN.",
+                    )
                     Text("Download quality", style = MaterialTheme.typography.bodyLarge)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                         downloadQualities.forEach { kbps ->
