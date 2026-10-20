@@ -3,6 +3,11 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.22.3beta — 2026-10-20
+
+### Changed
+- **Your listening looks more polished.** The stat tiles at the top of Your month, Your year and This time last year are now all the same size. The headers of these pages, the Time machine and your sonic fingerprint have a richer background: soft violet, rose and amber light that fades smoothly into the page.
+
 ## 0.22.2beta — 2026-10-20
 
 ### Changed
