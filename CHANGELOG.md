@@ -3,6 +3,11 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.18.1beta — 2026-10-20
+
+### Fixed
+- **Even gaps between the Load songs ahead choices.** The one-digit choices were spaced further apart than the others.
+
 ## 0.18.0beta — 2026-10-20
 
 ### Fixed
