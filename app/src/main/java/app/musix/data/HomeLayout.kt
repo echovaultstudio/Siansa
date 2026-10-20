@@ -4,6 +4,7 @@ package app.musix.data
 enum class HomeSection(val id: String, val label: String) {
     QUICK("quick", "Shortcuts"),
     TODAY("today", "Today's mix"),
+    CAROUSEL("carousel", "Your mixes carousel"),
     MOOD("mood", "How are you feeling?"),
     MADE_FOR_YOU("made", "Made for you"),
     REDISCOVER("rediscover", "Rediscover"),
