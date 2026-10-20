@@ -326,4 +326,12 @@ class SpacingTest {
         val gaps = tiles.zipWithNext().map { (a, b) -> with(compose.density) { (b.left - a.right).toDp() } }
         gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between fingerprint tiles", a, b, 1.dp) }
     }
+
+    /** Settings › Playback › Song radio (issue #256): the three drift chips sit the same distance apart. */
+    @Test fun radioDriftChipsAreEvenlySpaced() {
+        compose.setContent { MusixTheme { app.musix.ui.RadioDriftChips(app.musix.mix.RadioDrift.SOME) { } } }
+        val chips = app.musix.mix.RadioDrift.entries.map { compose.onNodeWithTag("radioDrift-${it.name}").getBoundsInRoot() }
+        val gaps = chips.zipWithNext().map { (a, b) -> b.left - a.right }
+        gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between drift chips", a, b, 1.dp) }
+    }
 }

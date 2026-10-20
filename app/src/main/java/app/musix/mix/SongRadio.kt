@@ -15,10 +15,44 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * A song radio that keeps going: AudioMuse finds songs that sound like the seed and share its mood,
- * and whenever only a few songs are left, more are found from the song playing at that moment, so
- * the radio drifts naturally while keeping the vibe. Without AudioMuse, Navidrome's similar songs are used.
- * Playing anything else ends the radio.
+ * How far a song radio may wander from the song it started from (issue #256), set in Settings › Playback.
+ */
+enum class RadioDrift(val label: String, val hint: String) {
+    CLOSE("Stay close", "Every song is like the one the radio started from."),
+    SOME("A little", "Mostly like the first song, with a few steps away from it."),
+    FREE("Wander", "Each new batch follows the song playing, so the radio drifts.");
+
+    companion object {
+        fun parse(name: String?): RadioDrift = entries.firstOrNull { it.name == name } ?: SOME
+    }
+}
+
+/** Where a top-up looks for songs: like the first song, like the one playing, or like the one playing but kept near the first. */
+enum class RadioAnchor { SEED, CURRENT, CURRENT_NEAR_SEED }
+
+/** The anchor for the [topUp]th top-up (0 first): "A little" alternates, starting from the first song. */
+fun radioAnchor(drift: RadioDrift, topUp: Int): RadioAnchor = when (drift) {
+    RadioDrift.CLOSE -> RadioAnchor.SEED
+    RadioDrift.SOME -> if (topUp % 2 == 0) RadioAnchor.SEED else RadioAnchor.CURRENT_NEAR_SEED
+    RadioDrift.FREE -> RadioAnchor.CURRENT
+}
+
+/**
+ * Songs like the one playing that are also among the songs like the first one, in the order they're like the one
+ * playing, leaving out ones already heard. Null when fewer than [atLeast] are left, so the caller goes back to the
+ * first song.
+ */
+fun nearSeed(likeCurrent: List<String>, likeSeed: Collection<String>, heard: Set<String>, count: Int, atLeast: Int = 5): List<String>? {
+    val seedSet = likeSeed.toHashSet()
+    val kept = likeCurrent.filter { it in seedSet && it !in heard }.distinct().take(count)
+    return kept.takeIf { it.size >= atLeast }
+}
+
+/**
+ * A song radio that keeps going: AudioMuse finds songs that sound like the seed and share its mood. The
+ * seed always plays first. Whenever only a few songs are left, more are found, from the seed or the song
+ * playing, as far as [RadioDrift] allows. Without AudioMuse, Navidrome's similar songs are used. Playing
+ * anything else ends the radio.
  */
 class SongRadio(private val graph: AppGraph) {
     private val _seed = MutableStateFlow<Song?>(null)
@@ -28,6 +62,7 @@ class SongRadio(private val graph: AppGraph) {
     private var watcher: Job? = null
     private val heard = LinkedHashSet<String>()
     private var topping = false
+    private var topUps = 0
 
     init {
         graph.player.onNewQueue = { stop() }
@@ -54,6 +89,7 @@ class SongRadio(private val graph: AppGraph) {
                     graph.player.play(listOf(song) + similar)
                 }
                 heard.clear()
+                topUps = 0
                 heard += song.id
                 heard += similar.map { it.id }
                 _seed.value = song
@@ -80,8 +116,15 @@ class SongRadio(private val graph: AppGraph) {
                     if (left > 3 || current == null || topping || _seed.value == null) return@collectLatest
                     topping = true
                     try {
-                        val more = find(current, 20).filter { it.id !in heard }
-                        AppLog.i("SongRadio", "Topped up with ${more.size} songs like \"${current.title}\"")
+                        val seed = _seed.value ?: return@collectLatest
+                        val drift = graph.settings.current.radioDrift
+                        val anchor = radioAnchor(drift, topUps++)
+                        val more = topUp(seed, current, anchor).filter { it.id !in heard }
+                        AppLog.i(
+                            "SongRadio",
+                            "Topped up with ${more.size} songs (${drift.label.lowercase()}, ${anchor.name.lowercase()}) " +
+                                "like \"${if (anchor == RadioAnchor.SEED) seed.title else current.title}\"",
+                        )
                         heard += more.map { it.id }
                         if (more.isNotEmpty()) withContext(Dispatchers.Main) { graph.player.addAll(more) }
                     } catch (e: Exception) {
@@ -93,8 +136,28 @@ class SongRadio(private val graph: AppGraph) {
         }
     }
 
+    /** The next songs, by [anchor]; when the playing song has little left near the first, the first song's. */
+    private suspend fun topUp(seed: Song, current: Song, anchor: RadioAnchor): List<Song> = when (anchor) {
+        RadioAnchor.CURRENT -> find(current, TOP_UP)
+        // Everything like the first song heard already: carry on from the one playing rather than stop.
+        RadioAnchor.SEED -> find(seed, TOP_UP).ifEmpty { find(current, TOP_UP) }
+        RadioAnchor.CURRENT_NEAR_SEED -> {
+            // Wide enough around the first song to still find new ones after a long listen.
+            val likeSeed = graph.sonic.similar(seed.id, (heard.size + 200).coerceAtMost(MAX_POOL)).map { it.id }
+            val likeCurrent = graph.sonic.similar(current.id, 80).map { it.id }
+            val ids = nearSeed(likeCurrent, likeSeed, heard + current.id, TOP_UP)
+            if (ids != null) graph.generator.resolveSongs(ids) else find(seed, TOP_UP)
+        }
+    }
+
     private suspend fun find(song: Song, count: Int): List<Song> {
-        val ids = graph.sonic.similar(song.id, count + 10).map { it.id }
+        // Asks for enough to have [count] left after leaving out what's been heard (the seed's list repeats).
+        val ids = graph.sonic.similar(song.id, (count + 10 + heard.size).coerceAtMost(MAX_POOL)).map { it.id }
         return graph.generator.resolveSongs(ids.filter { it != song.id && it !in heard }).take(count)
+    }
+
+    private companion object {
+        const val TOP_UP = 20
+        const val MAX_POOL = 500
     }
 }
