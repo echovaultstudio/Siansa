@@ -1,5 +1,8 @@
 package app.musix.ui
 
+import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -115,13 +118,14 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
 
     // The big numbers.
     Column(Modifier.padding(horizontal = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-            Stat(n.format(r.minutes), "minutes listened", "${n.format(r.minutes / 60)} hours", Modifier.weight(1f), Brand.AmberDeep)
-            Stat(n.format(r.plays), "plays", null, Modifier.weight(1f), Brand.VioletDeep)
+        // Every tile the same size, with or without a line under its label (issue #325).
+        Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+            StatTile(n.format(r.minutes), "minutes listened", "${n.format(r.minutes / 60)} hours", Modifier.weight(1f).fillMaxHeight(), Brand.AmberDeep)
+            StatTile(n.format(r.plays), "plays", null, Modifier.weight(1f).fillMaxHeight(), Brand.VioletDeep)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-            Stat(n.format(r.artistCount), "artists", r.newArtists?.let { "$it new to you" }, Modifier.weight(1f), Brand.PlumHigh)
-            Stat(n.format(r.trackCount), "different songs", null, Modifier.weight(1f), Brand.PlumHigh)
+        Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+            StatTile(n.format(r.artistCount), "artists", r.newArtists?.let { "$it new to you" }, Modifier.weight(1f).fillMaxHeight(), Brand.PlumHigh)
+            StatTile(n.format(r.trackCount), "different songs", null, Modifier.weight(1f).fillMaxHeight(), Brand.PlumHigh)
         }
     }
 
@@ -258,17 +262,22 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
     )
 }
 
+/**
+ * One big number (issue #325): every tile has room for a line under its label, kept empty when there's none, so
+ * tiles side by side and row under row are all the same size.
+ */
 @Composable
-private fun Stat(value: String, label: String, extra: String?, modifier: Modifier, color: Color) {
+internal fun StatTile(value: String, label: String, extra: String?, modifier: Modifier, color: Color) {
     Column(
         modifier
             .clip(RoundedCornerShape(16.dp))
             .background(Brush.linearGradient(listOf(color, color.copy(alpha = 0.55f))))
-            .padding(Space.Page),
+            .padding(Space.Page)
+            .testTag("statTile"),
     ) {
-        Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = Color.White)
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
-        if (extra != null) Text(extra, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f))
+        Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(extra.orEmpty(), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
