@@ -291,7 +291,7 @@ fun HomeScreen(nav: NavController) {
                     if (homeSettings.audioMuseReady) item(key = "carousel") { HomeCarousel(nav, aiDown) }
                 }
                 HomeSection.MOOD -> {
-                    item(key = "mood") { MoodBox(nav, Modifier.padding(horizontal = Space.Page, vertical = Space.Small)) }
+                    item(key = "mood") { MoodBox(nav, Modifier.padding(horizontal = Space.Page, vertical = Space.Medium)) }
                 }
                 HomeSection.MADE_FOR_YOU -> {
                     // Made for you: the vibe for this hour, then mixes from your own listening.
@@ -497,7 +497,8 @@ private fun HeroMix(
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = Space.Page, vertical = Space.Small)
+            // Panels on Home keep a little more room around them (issue #312).
+            .padding(horizontal = Space.Page, vertical = Space.Medium)
             .clip(RoundedCornerShape(16.dp))
             .background(Brush.linearGradient(listOf(colors.first, colors.second)))
             .clickable(onClick = onOpen),
