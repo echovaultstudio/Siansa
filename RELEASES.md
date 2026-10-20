@@ -3,6 +3,12 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.19.2beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.19.2beta) — 2026-10-20
+
+- [#292](https://github.com/Musix-Industreez/musix/pull/292) Your Library shows straight away offline, and Musix notices when the connection is back (#161) (@kimchiwithrice)
+- [#293](https://github.com/Musix-Industreez/musix/pull/293) Sleep timer: stop at the chosen time, wind down that sticks and starts from your song (@kimchiwithrice)
+- [#295](https://github.com/Musix-Industreez/musix/pull/295) Spacing test for grids: provide the app graph (@Th3K1ngP1n)
+
 ## [0.19.1beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.19.1beta) — 2026-10-20
 
 - [#286](https://github.com/Musix-Industreez/musix/pull/286) Tour: scroll Your Library's chips into view before tapping (@Th3K1ngP1n)
