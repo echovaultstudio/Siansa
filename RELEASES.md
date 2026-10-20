@@ -3,6 +3,10 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.18.1beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.18.1beta) — 2026-10-20
+
+- [#267](https://github.com/Musix-Industreez/musix/pull/267) Load songs ahead: even gaps between the choices (@Th3K1ngP1n)
+
 ## [0.18.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.18.0beta) — 2026-10-20
 
 - [#249](https://github.com/Musix-Industreez/musix/pull/249) Fix the Use-the-moment spacing check (@Th3K1ngP1n)
