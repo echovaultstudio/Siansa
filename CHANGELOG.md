@@ -3,6 +3,20 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.21.0beta — 2026-10-20
+
+### Fixed
+- **Stop didn't stop Download all covers.** It kept going until the cover it was on had finished, up to 10 minutes for a huge animated one, and could start again on its own. Stop now ends it straight away, a half-downloaded cover is thrown away so the next run fetches it again, and it doesn't restart after a sync until you start it again.
+
+### Added
+- **Time machine shows songs that aren't in your library.** Your Last.fm and Koito top songs now all appear, with the ones you don't have greyed out and marked "Not in your library". A switch above the list hides them again.
+
+### Changed
+- **Lyrics have their own button in now playing.** It sits bottom left, next to where the music plays and the
+  queue, and is greyed out when a song has no lyrics. The cards below the player (lyrics, the artist, the
+  song) no longer peek in under the phone's buttons; scroll down to see them.
+- **Download all covers moved to Settings › Downloads**, next to the other download settings. Storage now only shows space used.
+
 ## 0.20.0beta — 2026-10-20
 
 ### Fixed
