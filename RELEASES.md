@@ -3,6 +3,13 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.19.1beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.19.1beta) — 2026-10-20
+
+- [#286](https://github.com/Musix-Industreez/musix/pull/286) Tour: scroll Your Library's chips into view before tapping (@Th3K1ngP1n)
+- [#288](https://github.com/Musix-Industreez/musix/pull/288) Your Library: scroll the filter chips back so × stays in view (@Th3K1ngP1n)
+- [#290](https://github.com/Musix-Industreez/musix/pull/290) Favourite albums as one card; grid/list switch on every list, 3 across (@Th3K1ngP1n)
+- [#291](https://github.com/Musix-Industreez/musix/pull/291) Grid or list: import the grid items function (@Th3K1ngP1n)
+
 ## [0.19.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.19.0beta) — 2026-10-20
 
 - [#276](https://github.com/Musix-Industreez/musix/pull/276) Home: remove the show-all arrow beside section titles (@Th3K1ngP1n)
