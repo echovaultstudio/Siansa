@@ -10,14 +10,11 @@ import kotlin.math.ceil
 /** How long the last song fades out before playback pauses. */
 const val SLEEP_FADE_MS = 8_000L
 
-/** When the time is up and the song still has longer than this to go, it fades out at once instead. */
-const val SLEEP_MAX_FINISH_MS = 10 * 60_000L
-
 /**
  * A running sleep timer.
  * @property endsAt when the time is up ([SystemClock.elapsedRealtime]); null for "end of this song".
  * @property totalMs the length that was chosen (0 for "end of this song").
- * @property windDown steer the queue toward calmer songs during the last part of the timer.
+ * @property windDown steer the queue from the song playing toward calmer songs (switched on and off on its own).
  * @property finishing the time is up and the current song is being finished, fading out at its end.
  * @property cutAt when finishing a very long song: when its fade ends, instead of the song's own end.
  */
@@ -37,8 +34,9 @@ class SleepTimer(private val clock: () -> Long = { SystemClock.elapsedRealtime()
     private val _state = MutableStateFlow<SleepTimerState?>(null)
     val state: StateFlow<SleepTimerState?> = _state.asStateFlow()
 
-    /** Whether the wind-down switch was last on, so the sheet opens the way it was left. */
+    /** Whether the wind-down switch was last on, so the sheet opens the way it was left (issue #153). */
     @Volatile var windDownChosen = false
+        private set
 
     fun now(): Long = clock()
 
@@ -55,20 +53,29 @@ class SleepTimer(private val clock: () -> Long = { SystemClock.elapsedRealtime()
         AppLog.i("Sleep", "Timer set for the end of this song")
     }
 
+    /** The wind-down switch: remembered straight away, and applied to a timer that's already running (issue #153). */
+    fun setWindDown(on: Boolean) {
+        windDownChosen = on
+        val s = _state.value ?: return
+        if (s.endsAt == null || s.finishing || s.windDown == on) return
+        _state.value = s.copy(windDown = on)
+        AppLog.i("Sleep", "Wind down turned ${if (on) "on" else "off"}")
+    }
+
     fun cancel() {
         if (_state.value != null) AppLog.i("Sleep", "Timer turned off")
         _state.value = null
     }
 
     /**
-     * The time is up: finish the current song, which has [songLeftMs] to go (negative when unknown).
-     * A song that still has very long to go, or of unknown length, fades out now instead.
+     * The time is up: fade out now and pause at the chosen time (issue #153). Only a song that ends within the
+     * fade anyway (it has [songLeftMs] to go, negative when unknown) is played to its own end.
      */
     fun timeUp(songLeftMs: Long) {
         val s = _state.value ?: return
         if (s.finishing) return
-        val cut = if (songLeftMs < 0 || songLeftMs > SLEEP_MAX_FINISH_MS) clock() + SLEEP_FADE_MS else null
-        AppLog.i("Sleep", if (cut == null) "Time is up; finishing this song (${songLeftMs / 1000}s left)" else "Time is up; fading out now")
+        val cut = if (songLeftMs in 0..SLEEP_FADE_MS) null else clock() + SLEEP_FADE_MS
+        AppLog.i("Sleep", if (cut == null) "Time is up; this song ends in ${songLeftMs / 1000}s" else "Time is up; fading out now")
         _state.value = s.copy(finishing = true, cutAt = cut)
     }
 
@@ -85,15 +92,14 @@ fun SleepTimerState.leftMs(now: Long): Long? = if (finishing || endsAt == null) 
 /** The time is up and the song should now be finished. */
 fun SleepTimerState.isTimeUp(now: Long): Boolean = !finishing && endsAt != null && now >= endsAt
 
+/** A typical song's length, to size the wind down's song path. */
+private const val WIND_DOWN_SONG_MS = 4 * 60_000L
+
 /**
- * When the wind down begins: the last third of the timer, at most 20 minutes and at least 5
- * (or the whole timer when it's shorter than that). Null when wind down is off.
+ * How many songs the wind down's path holds, the song playing included: enough to fill the [leftMs] still on
+ * the timer, at least 3 and at most 30 (the longest song path).
  */
-fun SleepTimerState.windDownFrom(): Long? {
-    if (!windDown || endsAt == null) return null
-    val length = (totalMs / 3).coerceIn(5 * 60_000L, 20 * 60_000L).coerceAtMost(totalMs)
-    return endsAt - length
-}
+fun windDownLength(leftMs: Long): Int = (1 + ceil(leftMs.coerceAtLeast(0) / WIND_DOWN_SONG_MS.toDouble()).toInt()).coerceIn(3, 30)
 
 /**
  * How loud the finishing song plays (0 to 1) with [leftMs] to go before the pause: full until the
