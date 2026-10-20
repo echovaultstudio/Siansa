@@ -3,6 +3,19 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.18.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.18.0beta) — 2026-10-20
+
+- [#249](https://github.com/Musix-Industreez/musix/pull/249) Fix the Use-the-moment spacing check (@Th3K1ngP1n)
+- [#258](https://github.com/Musix-Industreez/musix/pull/258) Remove Moods in your library from Search (@Th3K1ngP1n)
+- [#259](https://github.com/Musix-Industreez/musix/pull/259) Move Sonic fingerprint from Home to its own page in Your listening (@Th3K1ngP1n)
+- [#260](https://github.com/Musix-Industreez/musix/pull/260) Song radio: start with its song and keep near it, with a drift setting (@Th3K1ngP1n)
+- [#261](https://github.com/Musix-Industreez/musix/pull/261) Choose how many songs load ahead, on Wi-Fi and on mobile data (@Th3K1ngP1n)
+- [#262](https://github.com/Musix-Industreez/musix/pull/262) Liked songs: show new likes at once and check Navidrome saved them (@Th3K1ngP1n)
+- [#263](https://github.com/Musix-Industreez/musix/pull/263) Sort Liked songs and playlists (@Th3K1ngP1n)
+- [#264](https://github.com/Musix-Industreez/musix/pull/264) Keep playlists' songs on the phone (@Th3K1ngP1n)
+- [#265](https://github.com/Musix-Industreez/musix/pull/265) Home carousel of 3–4 mixes of your own, set in Vibes (@Th3K1ngP1n)
+- [#266](https://github.com/Musix-Industreez/musix/pull/266) Fix the build: import the new stores in AppGraph (@Th3K1ngP1n)
+
 ## [0.17.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.17.0beta) — 2026-10-20
 
 - [#248](https://github.com/Musix-Industreez/musix/pull/248) Let today's mixes fit the moment: weather, movement, light, charging (each switchable) (@Th3K1ngP1n)
