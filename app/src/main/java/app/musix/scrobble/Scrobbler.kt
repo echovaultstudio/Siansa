@@ -50,9 +50,10 @@ class Scrobbler(
     /** Called when a song stops being the current one, with how long it was actually heard. */
     fun finished(song: Song, startedAtMs: Long, listenedMs: Long) {
         val durationMs = song.durationSec * 1000L
-        val needed = minOf(durationMs / 2, 240_000L)
+        val percent = settings.current.scrobblePercent
+        val needed = scrobbleNeededMs(durationMs, percent)
         if (durationMs in 1..30_000 || listenedMs < needed || listenedMs < 10_000) {
-            AppLog.i("Scrobble", "Not counted: ${song.title} (heard ${listenedMs / 1000}s of ${song.durationSec}s)")
+            AppLog.i("Scrobble", "Not counted: ${song.title} (heard ${listenedMs / 1000}s of ${song.durationSec}s, needs $percent% or 4 min)")
             return
         }
         val s = settings.current
@@ -105,3 +106,13 @@ class Scrobbler(
         const val LISTENBRAINZ = "listenbrainz"
     }
 }
+
+/** The choices for how much of a song must be heard before it counts (issue #270). */
+val SCROBBLE_PERCENTS = listOf(25, 40, 50, 60, 75, 90)
+
+/**
+ * How long a song of [durationMs] must be heard to be scrobbled: [percent] of it (10–100), or four minutes,
+ * whichever comes first, as Last.fm asks.
+ */
+fun scrobbleNeededMs(durationMs: Long, percent: Int): Long =
+    minOf(durationMs * percent.coerceIn(10, 100) / 100, 240_000L)
