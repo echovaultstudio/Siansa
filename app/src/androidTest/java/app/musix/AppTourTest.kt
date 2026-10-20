@@ -333,6 +333,16 @@ class AppTourTest {
                     back()
                     idle(400)
                 }
+                // Issue #302: Download all covers sits at the bottom of Downloads, under the song download settings.
+                tab("Settings")
+                click("Downloads")
+                idle(800)
+                compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Download all covers"))
+                idle(600)
+                if (!exists("Download all covers")) problems += "Download all covers isn't on the Downloads page"
+                shot("19-settings-downloads-covers")
+                back()
+                idle(400)
             }
             step("themes") {
                 // Two presets shown on Home and on the Themes page, then back to Musix colours.

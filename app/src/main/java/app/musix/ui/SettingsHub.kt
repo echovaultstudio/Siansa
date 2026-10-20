@@ -45,7 +45,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
@@ -73,7 +72,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import app.musix.covers.CoverDownload
 import app.musix.covers.CoverStore
 import app.musix.data.AppSettings
 import app.musix.data.ReplayGainMode
@@ -166,11 +164,11 @@ fun SettingsHub(nav: NavController) {
             HubRow(
                 Icons.Rounded.DownloadForOffline,
                 "Downloads",
-                if (downloads.items.isEmpty()) "Keep music on the phone for listening offline"
-                else "${downloads.done.size} songs on the phone" + if (downloads.waiting.isNotEmpty()) " · ${downloads.waiting.size} to go" else "",
+                (if (downloads.items.isEmpty()) "Keep music on the phone for listening offline"
+                else "${downloads.done.size} songs on the phone" + if (downloads.waiting.isNotEmpty()) " · ${downloads.waiting.size} to go" else "") +
+                    if (settings.coverDownload) " · all covers downloaded" else "",
             ) { nav.navigate("downloads") }
-            HubRow(Icons.Rounded.Storage, "Storage", "Songs up to ${formatMb(settings.songCacheMb)} · images ${imageLimit(settings.imageCacheMb)}" +
-                    if (settings.coverDownload) " · all covers downloaded" else "") {
+            HubRow(Icons.Rounded.Storage, "Storage", "Songs up to ${formatMb(settings.songCacheMb)} · images ${imageLimit(settings.imageCacheMb)}") {
                 nav.navigate("settings/storage")
             }
             HubRow(Icons.Rounded.Backup, "Backup", "Save or restore your settings, vibes and history") {
@@ -373,10 +371,7 @@ fun StorageScreen(nav: NavController) {
             Heading("Downloads")
             Hint("Music you chose to keep on the phone isn't part of the song cache and is never removed by itself.")
             usage.valueOrNull()?.let { u -> Text("In use: ${formatBytes(u.downloads)}", style = MaterialTheme.typography.bodyLarge) }
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                OutlinedButton(onClick = { nav.navigate("downloads") }) { Text("Manage downloads") }
-                OutlinedButton(onClick = { nav.navigate("downloads/songs") }) { Text("Downloaded songs") }
-            }
+            OutlinedButton(onClick = { nav.navigate("downloads") }) { Text("Manage downloads") }
 
             HorizontalDivider()
             Heading("Song cache")
@@ -441,68 +436,6 @@ fun StorageScreen(nav: NavController) {
 
             SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
             Hint("When an album folder has an animated cover (cover.gif or cover.webp), it moves on the album page and in now playing; lists show its first frame. Navidrome can't shrink an animated WebP, so it's downloaded once in full and kept on the phone.")
-
-            HorizontalDivider()
-            Heading("Download all covers")
-            Hint("Fetches every album, artist and playlist cover in the background, so browsing never waits for one. Runs after each library sync and once a day, and only fetches covers that aren't on the phone yet. Choose No limit above so none are removed again.")
-            val download by CoverDownload.progress.collectAsStateWithLifecycle()
-            // Show the new space used once a download finishes.
-            var wasRunning by remember { mutableStateOf(false) }
-            LaunchedEffect(download.running) {
-                if (wasRunning && !download.running) refresh++
-                wasRunning = download.running
-            }
-            val network by loadState(refresh to settings.coverDownloadAnyWifi) {
-                withContext(Dispatchers.IO) { CoverDownload.whyNot(context, graph.settings.current) }
-            }
-            SwitchRow("Download all covers", settings.coverDownload) { on ->
-                graph.settings.setCoverDownload(on)
-                CoverDownload.schedule(context, graph.settings.current)
-                if (on) CoverDownload.startNow(context, graph) else CoverDownload.stop(context)
-            }
-            SwitchRow("Download on Wi-Fi only", settings.coverDownloadWifiOnly) { on ->
-                graph.settings.setCoverDownload(settings.coverDownload, wifiOnly = on)
-                refresh++
-            }
-            if (settings.coverDownloadWifiOnly) {
-                SwitchRow("On any Wi-Fi, not just at home", settings.coverDownloadAnyWifi) { on ->
-                    graph.settings.setCoverDownload(settings.coverDownload, anyWifi = on)
-                    refresh++
-                }
-            }
-            Hint(
-                when {
-                    !settings.coverDownloadWifiOnly -> "Downloads on any connection, including mobile data and a VPN."
-                    settings.coverDownloadAnyWifi -> "Downloads on any Wi-Fi network. A VPN counts as mobile data, so nothing downloads while one is on."
-                    else -> "Home means the phone is on Wi-Fi and reaches Navidrome's address on that network. A VPN counts as mobile data, so nothing downloads while one is on. If Navidrome is reached by a domain name, this can't be told apart; use any Wi-Fi instead."
-                },
-            )
-            Text(
-                when (val n = network) {
-                    is Load.Loading -> "Checking the network…"
-                    is Load.Ok -> n.value?.let { "Not now: $it." } ?: "Covers can be downloaded on this network now."
-                    is Load.Err -> "Couldn't check the network: ${n.message}"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            if (download.running) {
-                LinearProgressIndicator(
-                    progress = { if (download.total > 0) download.done.toFloat() / download.total else 0f },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    "Checked ${download.done} of ${download.total} · ${download.downloaded} downloaded" +
-                        if (download.failed > 0) " · ${download.failed} failed" else "",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                OutlinedButton(onClick = { CoverDownload.stop(context) }) { Text("Stop") }
-            } else {
-                download.note?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                OutlinedButton(onClick = {
-                    CoverDownload.startNow(context, graph)
-                    refresh++
-                }) { Text("Download covers now") }
-            }
 
             if (settings.imageCacheMb != imagesAtStart || settings.songCacheMb != songsAtStart) {
                 Card(Modifier.fillMaxWidth()) {
