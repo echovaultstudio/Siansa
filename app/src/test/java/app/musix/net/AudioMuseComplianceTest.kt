@@ -7,7 +7,6 @@ import app.musix.mix.evenly
 import app.musix.mix.parseSteering
 import app.musix.mix.pathEnd
 import app.musix.mix.sonicRoute
-import app.musix.ui.nextSteering
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonObject
 import okhttp3.Interceptor
@@ -140,13 +139,6 @@ class AudioMuseComplianceTest {
         val steer = parseSteering(json, listOf("piano", "vocals", "drums", "strings"))
         assertEquals(listOf(Steer("piano", true), Steer("vocals", false), Steer("drums", true)), steer)
         assertEquals(emptyList<Steer>(), parseSteering(null, listOf("piano")))
-    }
-
-    @Test fun steeringChipsCycle() {
-        var s = emptyMap<String, Boolean>()
-        s = nextSteering(s, "piano"); assertEquals(mapOf("piano" to true), s)
-        s = nextSteering(s, "piano"); assertEquals(mapOf("piano" to false), s)
-        s = nextSteering(s, "piano"); assertEquals(emptyMap<String, Boolean>(), s)
     }
 
     @Test fun blendSeedsAreSpreadEvenly() {

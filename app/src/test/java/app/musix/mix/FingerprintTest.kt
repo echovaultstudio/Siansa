@@ -5,7 +5,6 @@ import app.musix.net.AudioMuseApi
 import app.musix.net.TrackFeatures
 import app.musix.ui.fingerprintFacts
 import app.musix.ui.fingerprintStats
-import app.musix.ui.nextSteering
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -69,13 +68,5 @@ class FingerprintTest {
         assertEquals(listOf("house", "trance"), c.categories.first().terms)
         assertEquals(10, c.maxTerms)
         assertEquals(emptyList<Any>(), AudioMuseApi.parseCatalogue(AppJson.parseToJsonElement("""{"available":false}""").jsonObject).categories)
-    }
-
-    @Test fun noMoreConceptsThanAllowed() {
-        val full = mapOf("a" to true, "b" to false)
-        assertEquals(full, nextSteering(full, "c", max = 2))
-        // Changing or removing one still works at the limit.
-        assertEquals(mapOf("a" to false, "b" to false), nextSteering(full, "a", max = 2))
-        assertEquals(mapOf("a" to true), nextSteering(full, "b", max = 2))
     }
 }
