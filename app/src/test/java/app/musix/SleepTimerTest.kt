@@ -1,5 +1,6 @@
 package app.musix
 
+import app.musix.mix.followsNewQueue
 import app.musix.playback.SLEEP_FADE_MS
 import app.musix.playback.SleepTimer
 import app.musix.playback.SleepTimerState
@@ -134,5 +135,17 @@ class SleepTimerTest {
         assertFalse(sleepPauseNow(onPhone = false, state = finishing, leftMs = 5_000))
         assertTrue(sleepPauseNow(onPhone = false, state = finishing, leftMs = 400))
         assertFalse(sleepPauseNow(onPhone = false, state = finishing, leftMs = -1))
+    }
+
+    @Test fun newMusicIsSteeredOnlyWhileWindingDown() {
+        assertFalse(followsNewQueue(null))
+        timer.start(30, windDown = false)
+        assertFalse(followsNewQueue(timer.state.value))
+        timer.setWindDown(true)
+        assertTrue(followsNewQueue(timer.state.value))
+        timer.timeUp(songLeftMs = 90_000)
+        assertFalse(followsNewQueue(timer.state.value))
+        timer.startEndOfSong()
+        assertFalse(followsNewQueue(timer.state.value))
     }
 }
