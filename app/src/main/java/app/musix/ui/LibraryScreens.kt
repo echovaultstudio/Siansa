@@ -63,6 +63,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,7 +79,11 @@ import app.musix.data.PlaylistDetail
 import app.musix.data.LocalPlaylists
 import app.musix.data.PlaylistEditor
 import app.musix.data.toPlaylist
+import app.musix.data.ListSort
 import app.musix.data.Song
+import app.musix.data.SongDatesCache
+import app.musix.data.isoMillis
+import app.musix.data.sortSongs
 import app.musix.offline.OfflineItem
 import app.musix.offline.OfflineKind
 import app.musix.offline.likedOfflineItem
@@ -94,7 +99,9 @@ fun LikedScreen(nav: NavController) {
     val changes by graph.favorites.changes.collectAsStateWithLifecycle()
     // Navidrome is asked again once it has saved a change, not only when the heart is tapped (issue #250).
     val saved by graph.favorites.saved.collectAsStateWithLifecycle()
-    val songs by loadState(changes to saved) {
+    var sort by remember { mutableStateOf(graph.listSort.get("liked")) }
+    val heard by loadState("heard-at" to saved) { lastHeard(graph) }
+    val loaded by loadState(changes to saved) {
         runCatching { graph.subsonic.starredSongs() }
             .map { list ->
                 val local = graph.library.songs(list.map { it.id }).associateBy { it.id }
@@ -103,6 +110,12 @@ fun LikedScreen(nav: NavController) {
             .getOrElse { if (graph.library.isSynced) graph.library.starredSongs() else throw it }
             // Songs liked just now show at the top even before Navidrome lists them; unliked ones go.
             .let { graph.favorites.mergeLiked(it) }
+            // Newest liked first; songs liked just now (no date from Navidrome yet) at the very top.
+            .sortedByDescending { isoMillis(SongDatesCache[it.id]?.starred) ?: Long.MAX_VALUE }
+    }
+    val songs = when (val l = loaded) {
+        is Load.Ok -> Load.Ok(sortSongs(l.value, sort, { it }, { SongDatesCache[it] }, { heard.valueOrNull()?.get(it) }))
+        else -> l
     }
     val heart = Color(0xFF4B2BD6) to Color(0xFF8FD3C8)
     CollectionPage(
@@ -116,7 +129,10 @@ fun LikedScreen(nav: NavController) {
                 Icon(Icons.Rounded.Favorite, null, tint = Color.White, modifier = Modifier.size(72.dp))
             }
         },
-        header = { CollectionByline(null, null, null, "${songs.valueOrNull()?.size ?: 0} songs") },
+        header = {
+            CollectionByline(null, null, null, "${songs.valueOrNull()?.size ?: 0} songs")
+            SortChips(sort, defaultLabel = "Recently liked") { sort = it; graph.listSort.set("liked", it) }
+        },
         offline = remember { likedOfflineItem() },
     )
 }
@@ -150,6 +166,12 @@ fun PlaylistScreen(nav: NavController, id: String) {
     var last by remember { mutableStateOf<PlaylistDetail?>(null) }
     LaunchedEffect(detail) { detail.valueOrNull()?.let { last = it } }
     val d = detail.valueOrNull() ?: last
+    var sort by remember { mutableStateOf(graph.listSort.get("playlist")) }
+    val heard by loadState("heard-at-playlist") { lastHeard(graph) }
+    // The playlist's positions in the order shown, so "Remove" still removes the right one when sorted.
+    val order = remember(d, sort, heard) {
+        d?.songs?.indices?.toList()?.let { idx -> sortSongs(idx, sort, { d.songs[it] }, { SongDatesCache[it] }, { heard.valueOrNull()?.get(it) }) }
+    }
     val editable = d != null && PlaylistEditor.canEdit(d.playlist, graph.settings.current.navidromeUser)
     val removeFromPlaylist: @Composable (Int, Song, () -> Unit) -> Unit = { index, song, close ->
         DropdownMenuItem(text = { Text("Remove from this playlist") }, onClick = {
@@ -160,7 +182,7 @@ fun PlaylistScreen(nav: NavController, id: String) {
             else {
                 removing = true
                 scope.launch {
-                    graph.playlists.remove(playlist.id, index)
+                    graph.playlists.remove(playlist.id, order?.getOrNull(index) ?: index)
                         .onSuccess { launcher.notify("Removed ${song.title}"); version++ }
                         .onFailure { launcher.notify(it.message?.takeIf { m -> m.isNotBlank() } ?: "Couldn't remove it") }
                     removing = false
@@ -172,7 +194,7 @@ fun PlaylistScreen(nav: NavController, id: String) {
         nav = nav,
         title = d?.playlist?.name ?: "Playlist",
         color = rememberCoverColor(d?.playlist?.coverArt),
-        songs = d?.songs,
+        songs = d?.let { pl -> order?.map { pl.songs[it] } ?: pl.songs },
         error = (detail as? Load.Err)?.message,
         cover = { m -> Cover(d?.playlist?.coverArt, LARGE_COVER, m, RoundedCornerShape(6.dp)) },
         header = {
@@ -186,6 +208,7 @@ fun PlaylistScreen(nav: NavController, id: String) {
                 null,
                 if (d == null) "" else "Playlist · ${d.songs.size} songs · ${formatDuration(d.songs.sumOf { it.durationSec.toLong() })}",
             )
+            SortChips(sort, defaultLabel = "Playlist order") { sort = it; graph.listSort.set("playlist", it) }
         },
         // A phone playlist's songs download one by one (from their ⋮ menu); Downloads keeps Navidrome's playlists.
         offline = if (onPhone) null else d?.playlist?.offlineItem(),
@@ -345,4 +368,29 @@ fun MixScreen(nav: NavController, id: String) {
             }
         },
     )
+}
+
+/** When each song was last heard in Musix, from the play history (issue #257). */
+private suspend fun lastHeard(graph: app.musix.AppGraph): Map<String, Long> {
+    val at = HashMap<String, Long>()
+    graph.history.all().forEach { e -> if ((at[e.id] ?: 0L) < e.at) at[e.id] = e.at }
+    return at
+}
+
+/** "Recently liked · Last played · Date added · Title · Artist" as chips under a list's title (issue #257). */
+@Composable
+internal fun SortChips(selected: ListSort, defaultLabel: String, onPick: (ListSort) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = Space.Small).testTag("sortChips"),
+        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+    ) {
+        ListSort.entries.forEach { sort ->
+            FilterChip(
+                selected = selected == sort,
+                onClick = { onPick(sort) },
+                label = { Text(if (sort == ListSort.DEFAULT) defaultLabel else sort.label) },
+                modifier = Modifier.testTag("sort-${sort.name}"),
+            )
+        }
+    }
 }
