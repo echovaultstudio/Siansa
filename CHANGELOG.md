@@ -3,6 +3,22 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.18.0beta — 2026-10-20
+
+### Fixed
+- **Songs you like now show in Liked songs straight away.** The list asked Navidrome too early, before it had saved the like, so new likes only showed up later. Musix now also checks that Navidrome really saved each like, and says which user it went to in the log.
+
+### Added
+- **A carousel of your own mixes on Home.** Swipe through 3 or 4 mixes for the time of day, like Your morning with Wake up, Caffeine kick, Mellow morning and Sunny start. They are made each day, sound different and never share songs. Change their names, sounds and hours in Vibes › Home carousel, or hide the carousel with Arrange Home.
+- **Choose how many songs load ahead.** In Settings › Playback › Load songs ahead, pick none to five songs, apart for Wi-Fi and mobile data (2 and 1 to start). Fewer saves data; more keeps music playing through a dropped connection.
+- **Song radio stays close to its song.** It always starts with the song you picked, and in Settings › Playback › Song radio you choose how far it may wander: Stay close, A little (the default) or Wander, which is how it worked before.
+- **Sort Liked songs and playlists.** Chips under the title sort them by when you liked them (Liked songs) or the playlist's own order, last played, date added, title or artist. Each list remembers its choice, and Play and Shuffle follow it.
+
+### Changed
+- **Playlists open and play faster.** Musix keeps each playlist's songs on the phone and only asks Navidrome again when the playlist has changed there. Songs you add or remove still go to Navidrome straight away, and an unreachable server falls back to the songs kept on the phone.
+- **Search no longer shows "Moods in your library".** The Radios and Genres to browse stay.
+- **Your sonic fingerprint moved from Home to Your Library › Your listening**, on a page of its own. It shows its numbers (tempo, key, top mood, songs) as tiles above the mood bars, with the songs listed underneath to play.
+
 ## 0.17.0beta — 2026-10-20
 
 ### Added
