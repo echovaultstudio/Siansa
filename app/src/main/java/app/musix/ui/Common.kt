@@ -26,7 +26,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.CircularProgressIndicator
@@ -720,7 +719,7 @@ fun QuickTile(
 
 /**
  * A horizontal shelf of tiles under a section title. With [onOpenAll], a shelf with more than a handful of
- * items gets a tappable title with an arrow that opens the full list.
+ * items gets a tappable title that opens the full list (no arrow, issue #268).
  */
 @Composable
 fun <T> Shelf(
@@ -737,7 +736,7 @@ fun <T> Shelf(
                 Modifier
                     .fillMaxWidth()
                     .clickable(onClickLabel = "Show all", onClick = onOpenAll)
-                    .padding(start = Space.Page, end = Space.Medium, top = Space.Section, bottom = Space.Medium),
+                    .padding(start = Space.Page, end = Space.Page, top = Space.Section, bottom = Space.Medium),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -748,12 +747,7 @@ fun <T> Shelf(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                Icon(
-                    Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                    contentDescription = null,
-                    modifier = Modifier.padding(start = Space.Tight).size(26.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                // No arrow beside the title (issue #268); tapping the title still opens the full list.
             }
         } else {
             SectionTitle(title)
