@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import androidx.compose.runtime.LaunchedEffect
 import app.musix.data.isFavouriteAlbum
 import app.musix.data.cover
 import app.musix.data.toPlaylist
@@ -432,8 +433,12 @@ private fun LibraryHeader(
 /** Spotify's chip row: all kinds, or ✕ + the chosen kind + its own sub-filters. */
 @Composable
 private fun FilterRow(selected: Kind?, sub: String?, subFilters: List<String>, onKind: (Kind?) -> Unit, onSub: (String) -> Unit) {
+    // Back to the start when the filter changes, so the clear (×) chip at the left is in view (a chip far to the
+    // right, like Your listening, otherwise left the row scrolled with × out of sight).
+    val scroll = rememberScrollState()
+    LaunchedEffect(selected) { scroll.scrollTo(0) }
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Space.Page, vertical = Space.Small),
+        Modifier.fillMaxWidth().horizontalScroll(scroll).padding(horizontal = Space.Page, vertical = Space.Small),
         horizontalArrangement = Arrangement.spacedBy(Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
