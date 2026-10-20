@@ -3,6 +3,11 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.20.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.20.0beta) — 2026-10-20
+
+- [#298](https://github.com/Musix-Industreez/musix/pull/298) Download all covers: start straight away, don't wait for an unmetered network (@Th3K1ngP1n)
+- [#300](https://github.com/Musix-Industreez/musix/pull/300) Treat a VPN as mobile data; Wi-Fi only switch for covers and songs (@Th3K1ngP1n)
+
 ## [0.19.2beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.19.2beta) — 2026-10-20
 
 - [#292](https://github.com/Musix-Industreez/musix/pull/292) Your Library shows straight away offline, and Musix notices when the connection is back (#161) (@kimchiwithrice)
