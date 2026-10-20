@@ -1,5 +1,7 @@
 package app.musix.ui
 
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
@@ -136,14 +138,7 @@ fun CastDeviceButton(tint: Color, modifier: Modifier = Modifier) {
         Icon(icon, if (label == null) "Play on a TV or speaker" else null, tint = color, modifier = Modifier.size(22.dp))
         if (label != null) {
             Spacer(Modifier.width(Space.Small))
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = color,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            FittedText(label, MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold), color, Modifier.testTag("castDeviceName"))
         }
     }
     if (open) CastSheet(onDismiss = { open = false })
@@ -276,3 +271,34 @@ private fun TargetRow(icon: ImageVector, name: String, detail: String?, selected
         if (selected) Icon(Icons.Rounded.Check, null, tint = Accent)
     }
 }
+
+/**
+ * One line of text that gets smaller, down to [minScale] of its size, until it fits; only then is it cut off with
+ * "…" (issue #311: "JBL Bar 500" was cut to "JBL BA…").
+ */
+@Composable
+internal fun FittedText(text: String, style: androidx.compose.ui.text.TextStyle, color: Color, modifier: Modifier = Modifier, minScale: Float = 0.7f) {
+    var scale by remember(text) { mutableStateOf(1f) }
+    var fitted by remember(text) { mutableStateOf(false) }
+    Text(
+        text,
+        style = style.copy(fontSize = style.fontSize * scale),
+        color = color,
+        maxLines = 1,
+        softWrap = false,
+        overflow = if (fitted) TextOverflow.Ellipsis else TextOverflow.Clip,
+        onTextLayout = { layout ->
+            if (fitted) return@Text
+            when {
+                !layout.hasVisualOverflow -> fitted = true
+                scale > minScale -> scale = nextFitScale(scale, minScale)
+                else -> fitted = true
+            }
+        },
+        // Drawn only once it fits, so the steps in between don't flicker.
+        modifier = modifier.drawWithContent { if (fitted) drawContent() },
+    )
+}
+
+/** The next, smaller size to try: 8% smaller, never below [minScale]. */
+internal fun nextFitScale(scale: Float, minScale: Float): Float = (scale * 0.92f).coerceAtLeast(minScale)

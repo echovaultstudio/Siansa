@@ -324,13 +324,14 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         // the middle (with the TV, speaker or headphones' name), and the queue bottom right: tap
                         // it, or swipe up from it (#294).
                         Row(Modifier.fillMaxWidth().padding(top = Space.Medium, bottom = Space.Small), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            // The device name gets all the room between the two buttons (issue #311).
+                            Box(Modifier.width(SIDE_BUTTON_WIDTH), contentAlignment = Alignment.Center) {
                                 LyricsButton(enabled = hasLyrics(songLyrics)) { lyricsOpen = true }
                             }
                             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                                 CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
                             }
-                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            Box(Modifier.width(SIDE_BUTTON_WIDTH), contentAlignment = Alignment.Center) {
                                 RoundIcon(
                                     Icons.AutoMirrored.Rounded.QueueMusic,
                                     "Queue",
@@ -785,3 +786,6 @@ private const val NOW_PLAYING_TINT = 0.14f
 
 /** How far up the queue button has to be pulled to open the queue. */
 private const val QUEUE_PULL_PX = 40f
+
+/** The lyrics and queue buttons' width under the controls; the device name gets the rest (issue #311). */
+private val SIDE_BUTTON_WIDTH = 72.dp
