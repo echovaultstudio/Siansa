@@ -139,7 +139,8 @@ class SongRadio(private val graph: AppGraph) {
     /** The next songs, by [anchor]; when the playing song has little left near the first, the first song's. */
     private suspend fun topUp(seed: Song, current: Song, anchor: RadioAnchor): List<Song> = when (anchor) {
         RadioAnchor.CURRENT -> find(current, TOP_UP)
-        RadioAnchor.SEED -> find(seed, TOP_UP)
+        // Everything like the first song heard already: carry on from the one playing rather than stop.
+        RadioAnchor.SEED -> find(seed, TOP_UP).ifEmpty { find(current, TOP_UP) }
         RadioAnchor.CURRENT_NEAR_SEED -> {
             // Wide enough around the first song to still find new ones after a long listen.
             val likeSeed = graph.sonic.similar(seed.id, (heard.size + 200).coerceAtMost(MAX_POOL)).map { it.id }
