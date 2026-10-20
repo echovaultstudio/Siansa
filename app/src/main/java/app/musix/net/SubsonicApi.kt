@@ -346,6 +346,24 @@ class SubsonicApi(
             ),
         ).obj("searchResult3")?.arr("song").orEmpty().map(::parseSong)
 
+    /** Random songs, optionally of a genre or between two years (Navidrome's getRandomSongs), from the chosen libraries. */
+    suspend fun randomSongs(size: Int, genre: String? = null, fromYear: Int? = null, toYear: Int? = null): List<Song> {
+        val folders = folderPasses()
+        val each = (size + folders.size - 1) / folders.size
+        return folders.flatMap { folder ->
+            call(
+                "getRandomSongs",
+                mapOf(
+                    "size" to "$each",
+                    "genre" to genre,
+                    "fromYear" to fromYear?.toString(),
+                    "toYear" to toYear?.toString(),
+                    "musicFolderId" to folder,
+                ),
+            ).obj("randomSongs")?.arr("song").orEmpty().map(::parseSong)
+        }.distinctBy { it.id }.shuffled().take(size)
+    }
+
     suspend fun search(query: String): SearchResults {
         val parts = folderPasses().map { folder ->
             call(

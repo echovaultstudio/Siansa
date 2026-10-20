@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import androidx.compose.material.icons.rounded.Dashboard
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -154,6 +155,13 @@ fun SettingsHub(nav: NavController) {
                 "Vibes",
                 vibes?.let { "${it.size} ${if (it.size == 1) "vibe" else "vibes"} for your daily mixes" } ?: "Times of day for your daily mixes",
             ) { nav.navigate("vibes") }
+            val cards by graph.cards.state.collectAsStateWithLifecycle()
+            LaunchedEffect(Unit) { graph.cards.all() }
+            HubRow(
+                Icons.Rounded.Dashboard,
+                "Made for you cards",
+                cards.orEmpty().let { if (it.isEmpty()) "Add your own cards to Home, like songs you haven't played in a while" else it.joinToString(" · ") { c -> c.title } },
+            ) { nav.navigate("settings/cards") }
             val downloads by graph.downloads.list.collectAsStateWithLifecycle()
             HubRow(
                 Icons.Rounded.DownloadForOffline,
