@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import kotlinx.coroutines.launch
 import app.musix.data.cover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -92,6 +93,13 @@ fun CollectionPage(
 ) {
     val graph = LocalGraph.current
     val player by graph.player.state.collectAsStateWithLifecycle()
+    // This page as Home's shortcuts open it again (issue #271): its route with the ids filled in.
+    val route = remember(nav.currentBackStackEntry) { nav.currentBackStackEntry?.let { routeOf(it.destination.route, it.arguments) } }
+    fun notePlayed() {
+        val r = route ?: return
+        val cover = songs?.firstOrNull()?.cover
+        graph.scope.launch { graph.recentPlays.note(r, title, cover) }
+    }
     val listState = rememberLazyListState()
     val density = LocalDensity.current
     val coverSize = (LocalConfiguration.current.screenWidthDp * 0.62f).dp
@@ -143,7 +151,7 @@ fun CollectionPage(
                     Spacer(Modifier.height(Space.Small))
                     header()
                     Spacer(Modifier.height(Space.Tight))
-                    ActionRow(songs.orEmpty(), offline, onSimilar)
+                    ActionRow(songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed)
                 }
             }
             when {
@@ -171,7 +179,7 @@ fun CollectionPage(
                             ) {
                                 SongRow(
                                     song = song,
-                                    onClick = { graph.player.play(songs, index) },
+                                    onClick = { graph.player.play(songs, index); notePlayed() },
                                     leading = if (numbered) song.track?.toString() ?: "${index + 1}" else null,
                                     highlighted = now,
                                     showCover = showCovers,
@@ -256,15 +264,15 @@ private fun DiscHeading(label: String, cover: Color) {
 
 /** Queue all and download on the left; find similar albums, shuffle and the big round play button on the right. */
 @Composable
-private fun ActionRow(songs: List<Song>, offline: OfflineItem?, onSimilar: (() -> Unit)?) {
+private fun ActionRow(songs: List<Song>, offline: OfflineItem?, onSimilar: (() -> Unit)?, onPlayed: () -> Unit = {}) {
     val graph = LocalGraph.current
     ActionButtons(
         enabled = songs.isNotEmpty(),
         onQueue = { songs.forEach { graph.player.addToQueue(it) } },
         download = { if (offline != null) DownloadButton(offline, songs) },
         onSimilar = onSimilar,
-        onShuffle = { graph.player.play(songs, shuffle = true) },
-        onPlay = { graph.player.play(songs) },
+        onShuffle = { graph.player.play(songs, shuffle = true); onPlayed() },
+        onPlay = { graph.player.play(songs); onPlayed() },
     )
 }
 
@@ -382,4 +390,20 @@ fun GeneratedCover(title: String, colors: Pair<Color, Color>, modifier: Modifier
             modifier = Modifier.align(Alignment.BottomStart).padding(Space.Page),
         )
     }
+}
+
+/** "album/{id}" with its arguments → "album/42" (issue #271); null when an argument is missing. */
+@Suppress("DEPRECATION")
+internal fun routeOf(pattern: String?, args: android.os.Bundle?): String? =
+    fillRoute(pattern) { name -> args?.get(name)?.toString() }
+
+/** [pattern] with each "{name}" replaced by [value] (encoded for a route), or null when one has no value. */
+internal fun fillRoute(pattern: String?, value: (String) -> String?): String? {
+    pattern ?: return null
+    var missing = false
+    val filled = Regex("\\{([^}]+)\\}").replace(pattern) { m ->
+        val v = value(m.groupValues[1])
+        if (v == null) { missing = true; "" } else java.net.URLEncoder.encode(v, "UTF-8").replace("+", "%20")
+    }
+    return filled.takeUnless { missing }
 }
