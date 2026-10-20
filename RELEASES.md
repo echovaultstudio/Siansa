@@ -3,6 +3,13 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.22.2beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.22.2beta) — 2026-10-20
+
+- [#321](https://github.com/Musix-Industreez/musix/pull/321) Tapping Home on the Home page scrolls back to the top (@kimchiwithrice)
+- [#322](https://github.com/Musix-Industreez/musix/pull/322) Spacing test for song rows: look in the unmerged tree (@Th3K1ngP1n)
+- [#323](https://github.com/Musix-Industreez/musix/pull/323) Time machine: show what's there at once, add Last.fm when it arrives (@Th3K1ngP1n)
+- [#324](https://github.com/Musix-Industreez/musix/pull/324) Time machine: look up services by key (@Th3K1ngP1n)
+
 ## [0.22.1beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.22.1beta) — 2026-10-20
 
 - [#308](https://github.com/Musix-Industreez/musix/pull/308) Long moods fit their tile on Your sonic fingerprint (@kimchiwithrice)
