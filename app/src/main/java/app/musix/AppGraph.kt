@@ -5,6 +5,9 @@ import app.musix.covers.CoverStore
 import kotlinx.coroutines.runBlocking
 
 import android.app.Application
+import app.musix.data.CarouselStore
+import app.musix.data.ListSortStore
+import app.musix.data.PlaylistCache
 import app.musix.data.EqualiserRepository
 import app.musix.data.Favorites
 import app.musix.data.Guests
@@ -195,14 +198,14 @@ class AppGraph(val app: Application) {
 
     val selectors = SelectorStore(app)
     /** The home carousels set in Vibes (issue #253). */
-    val carousels = app.musix.data.CarouselStore(app)
+    val carousels = CarouselStore(app)
     val searchHistory = SearchHistory(app)
     /** Other users' music shown alongside the user in use's (issue #141). */
     val guests: Guests by lazy { Guests(app, http, library, scope) }
     val mixes = MixStore(app)
     val history = HistoryStore(app)
     /** How Liked songs and playlists are sorted (issue #257). */
-    val listSort = app.musix.data.ListSortStore(app)
+    val listSort = ListSortStore(app)
     val library = LibraryRepository(app)
     val topSongs = TopSongs(app, subsonic, library, scope)
 
@@ -274,7 +277,7 @@ class AppGraph(val app: Application) {
         }
     }
     /** Every Navidrome playlist's songs kept on the phone (issue #251). */
-    val playlistCache = app.musix.data.PlaylistCache(app, subsonic, library).also { cache ->
+    val playlistCache = PlaylistCache(app, subsonic, library).also { cache ->
         downloads.playlistSongs = { id -> cache.get(id).songs }
     }
     val playlists = PlaylistEditor(
