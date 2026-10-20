@@ -148,7 +148,8 @@ private fun playerColors() = darkColorScheme(
  * Now playing, in the style of Spotify: the cover blurred into the background, a large cover that
  * opens its album, title and artist with a heart, the controls, where the music plays (bottom left) and
  * the queue (bottom right). The ⋮ menu has everything else. Scrolling down shows the lyrics, the artist
- * and the song's details on cards.
+ * and the song's details on cards; they stay out of sight until then (#294), and the lyrics have their own
+ * button, bottom left.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -176,6 +177,10 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     val scroll = rememberScrollState()
     // The cover's colour, for the lyrics card and the lyrics screen.
     val tint = rememberCoverColor(song?.cover)
+    // The song's lyrics, for the lyrics button and the preview card. Cleared as the song changes, so the
+    // button doesn't stay lit for a song without lyrics.
+    val lyrics by loadStateFresh("lyrics-${song?.id}") { song?.let { graph.subsonic.lyrics(it) } }
+    val songLyrics = lyrics.valueOrNull()
     val close by rememberUpdatedState(onClose)
 
     fun openAlbum() {
@@ -289,16 +294,17 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
 
             val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             BoxWithConstraints(Modifier.fillMaxSize()) {
-                // The player fills the screen except for the top of the lyrics card peeking in at the bottom,
-                // as in Spotify, to show there's more below.
-                val pageHeight = maxHeight - PLAYER_PEEK - navBar
+                // The player fills the screen; the cards below only come into view when scrolling, so none
+                // sits under the phone's own buttons (#294).
+                val pageHeight = maxHeight
                 val pageHeightPx = with(LocalDensity.current) { pageHeight.toPx() }
                 Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
                     Column(
                         Modifier
                             .height(pageHeight)
                             .statusBarsPadding()
-                            .padding(horizontal = Space.Section),
+                            .padding(horizontal = Space.Section)
+                            .padding(bottom = navBar),
                     ) {
                         // A gap above the header that suits the screen's height, so the top of the player
                         // isn't pressed against the status bar.
@@ -314,28 +320,34 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         }
                         SeekBar(state)
                         Controls(state)
-                        // Like Spotify: where the music plays bottom left (with the TV, speaker or headphones'
-                        // name), and the queue bottom right: tap it, or swipe up from it.
+                        // The lyrics bottom left (greyed out when the song has none), where the music plays in
+                        // the middle (with the TV, speaker or headphones' name), and the queue bottom right: tap
+                        // it, or swipe up from it (#294).
                         Row(Modifier.fillMaxWidth().padding(top = Space.Medium, bottom = Space.Small), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                LyricsButton(enabled = hasLyrics(songLyrics)) { lyricsOpen = true }
+                            }
+                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                                 CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
                             }
-                            RoundIcon(
-                                Icons.AutoMirrored.Rounded.QueueMusic,
-                                "Queue",
-                                Modifier.pointerInput(Unit) {
-                                    var pulled = 0f
-                                    detectVerticalDragGestures(onDragStart = { pulled = 0f }) { change, dy ->
-                                        change.consume()
-                                        pulled += dy
-                                        if (pulled < -QUEUE_PULL_PX) queueOpen = true
-                                    }
-                                },
-                            ) { queueOpen = true }
+                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                RoundIcon(
+                                    Icons.AutoMirrored.Rounded.QueueMusic,
+                                    "Queue",
+                                    Modifier.pointerInput(Unit) {
+                                        var pulled = 0f
+                                        detectVerticalDragGestures(onDragStart = { pulled = 0f }) { change, dy ->
+                                            change.consume()
+                                            pulled += dy
+                                            if (pulled < -QUEUE_PULL_PX) queueOpen = true
+                                        }
+                                    },
+                                ) { queueOpen = true }
+                            }
                         }
                     }
                     if (song != null) {
-                        LyricsPreviewCard(song, tint) { lyricsOpen = true }
+                        LyricsPreviewCard(songLyrics, tint) { lyricsOpen = true }
                         Spacer(Modifier.height(Space.Medium))
                         AboutArtistCard(song) { openArtist(song) }
                         Spacer(Modifier.height(Space.Medium))
@@ -767,9 +779,6 @@ private fun QueueView(state: PlayerState) {
     }
 }
 
-
-/** How much of the lyrics card shows under the player before scrolling. */
-private val PLAYER_PEEK = 44.dp
 
 /** How strongly the song playing now is marked in the queue (#212). */
 private const val NOW_PLAYING_TINT = 0.14f
