@@ -1,5 +1,10 @@
 package app.musix.ui
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.FilterChip
+import androidx.compose.ui.platform.testTag
+import app.musix.scrobble.SCROBBLE_PERCENTS
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -76,7 +81,11 @@ fun ScrobblingScreen(nav: NavController) {
                 .padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
-            Hint("A song counts as listened after half its length or four minutes, whichever comes first. Listens made offline are sent later.")
+            Heading("When a song counts")
+            ScrobblePercentChips(settings.scrobblePercent) { graph.settings.save(graph.settings.current.copy(scrobblePercent = it)) }
+            Hint("A song is sent once more than ${settings.scrobblePercent}% of it has played, or four minutes, whichever comes first. Songs under 30 seconds never count. Listens made offline are sent later.")
+
+            HorizontalDivider()
 
             Heading("Navidrome")
             SwitchRow("Record plays in Navidrome", settings.scrobbleNavidrome) {
@@ -178,4 +187,19 @@ private fun Secret(label: String, value: String, onChange: (String) -> Unit) {
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         modifier = Modifier.fillMaxWidth(),
     )
+}
+
+/** "25%" … "90%": how much of a song must be heard before it's sent (issue #270). */
+@Composable
+internal fun ScrobblePercentChips(selected: Int, onPick: (Int) -> Unit) {
+    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("scrobblePercent"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        SCROBBLE_PERCENTS.forEach { p ->
+            FilterChip(
+                selected = selected == p,
+                onClick = { onPick(p) },
+                label = { Text("$p%") },
+                modifier = Modifier.widthIn(min = 48.dp).testTag("scrobblePercent-$p"),
+            )
+        }
+    }
 }

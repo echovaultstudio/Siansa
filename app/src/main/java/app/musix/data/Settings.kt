@@ -45,6 +45,8 @@ data class AppSettings(
     /** Parts of the app whose detailed log entries are left out (Settings › Logs › Detail, issue #237). */
     val logQuiet: Set<String> = emptySet(),
     val scrobbleNavidrome: Boolean = true,
+    /** How much of a song must be heard, in percent, before it's scrobbled (issue #270). */
+    val scrobblePercent: Int = 50,
     val lastFmEnabled: Boolean = false,
     val lastFmApiKey: String = "",
     val lastFmSecret: String = "",
@@ -188,6 +190,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             device = prefs.getBoolean("situation_device", true),
         ),
         scrobbleNavidrome = prefs.getBoolean("scrobble_nd", true),
+        scrobblePercent = prefs.getInt("scrobble_pct", 50),
         lastFmEnabled = prefs.getBoolean("lfm_on", false),
         lastFmApiKey = prefs.getString("lfm_key", "") ?: "",
         lastFmSecret = secret("lfm_secret"),
@@ -267,6 +270,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putBoolean("situation_charging", s.situation.charging)
             .putBoolean("situation_device", s.situation.device)
             .putBoolean("scrobble_nd", s.scrobbleNavidrome)
+            .putInt("scrobble_pct", s.scrobblePercent)
             .putBoolean("lfm_on", s.lastFmEnabled)
             .putString("lfm_key", s.lastFmApiKey.trim())
             .putString("lfm_secret", SecretBox.encrypt(s.lastFmSecret.trim()))
