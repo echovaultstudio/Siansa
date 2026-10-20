@@ -3,6 +3,11 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.22.1beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.22.1beta) — 2026-10-20
+
+- [#308](https://github.com/Musix-Industreez/musix/pull/308) Long moods fit their tile on Your sonic fingerprint (@kimchiwithrice)
+- [#320](https://github.com/Musix-Industreez/musix/pull/320) Spacing test for song rows: provide the snackbar (@Th3K1ngP1n)
+
 ## [0.22.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.22.0beta) — 2026-10-20
 
 - [#314](https://github.com/Musix-Industreez/musix/pull/314) Song rows: a gap after a long title, lengths lined up (@Th3K1ngP1n)
