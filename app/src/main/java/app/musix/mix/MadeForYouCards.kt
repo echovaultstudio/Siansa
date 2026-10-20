@@ -52,7 +52,7 @@ data class CustomCard(
             kind = kind,
             title = when (kind) {
                 CardKind.GENRE -> genre?.let { "Your $it" } ?: kind.label
-                CardKind.YEARS -> if (fromYear != null && toYear != null && fromYear % 10 == 0 && toYear == fromYear + 9) "Your ${fromYear % 100}s" else kind.label
+                CardKind.YEARS -> if (fromYear != null && toYear != null && fromYear % 10 == 0 && toYear == fromYear + 9) "Your %02ds".format(fromYear % 100) else kind.label
                 else -> kind.label
             },
             genre = genre,
