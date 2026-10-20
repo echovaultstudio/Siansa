@@ -438,9 +438,12 @@ class Downloads(
         }
     }
 
+    /** A playlist's songs, from the copy kept on the phone while it's unchanged (issue #251); set by AppGraph. */
+    @Volatile var playlistSongs: (suspend (String) -> List<Song>)? = null
+
     private suspend fun songsOf(item: OfflineItem): List<Song> = when (item.kind) {
         OfflineKind.ALBUM -> library.album(item.id)?.let { library.songsOf(it) }.orEmpty().ifEmpty { subsonic.album(item.id).songs }
-        OfflineKind.PLAYLIST -> library.keepSyncedSongs(subsonic.playlist(item.id).songs, "downloads")
+        OfflineKind.PLAYLIST -> library.keepSyncedSongs(playlistSongs?.invoke(item.id) ?: subsonic.playlist(item.id).songs, "downloads")
         OfflineKind.ARTIST -> library.artist(item.id)?.let { library.songsOf(it) }.orEmpty()
         OfflineKind.LIKED -> runCatching { subsonic.starredSongs() }
             .map { list ->
