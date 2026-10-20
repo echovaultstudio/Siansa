@@ -194,6 +194,8 @@ class AppGraph(val app: Application) {
     val deezer = DeezerApi(http)
 
     val selectors = SelectorStore(app)
+    /** The home carousels set in Vibes (issue #253). */
+    val carousels = app.musix.data.CarouselStore(app)
     val searchHistory = SearchHistory(app)
     /** Other users' music shown alongside the user in use's (issue #141). */
     val guests: Guests by lazy { Guests(app, http, library, scope) }

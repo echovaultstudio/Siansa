@@ -350,4 +350,13 @@ class SpacingTest {
         val gaps = chips.zipWithNext().map { (a, b) -> b.left - a.right }
         gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between sort chips", a, b, 1.dp) }
     }
+
+    /** Home carousel (issue #253): the dots under the cards sit the same distance apart. */
+    @Test fun carouselDotsAreEvenlySpaced() {
+        compose.setContent { MusixTheme { app.musix.ui.CarouselDots(count = 4, current = 1) } }
+        val dots = compose.onAllNodesWithTag("carouselDot").fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(4, dots.size)
+        val gaps = dots.zipWithNext().map { (a, b) -> with(compose.density) { (b.left - a.right).toDp() } }
+        gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between carousel dots", a, b, 1.dp) }
+    }
 }
