@@ -1,6 +1,7 @@
 package app.musix
 
 import app.musix.mix.MixResume
+import app.musix.data.RecentPlays
 import app.musix.playback.ProfileStore
 import app.musix.covers.CoverStore
 import kotlinx.coroutines.runBlocking
@@ -205,6 +206,8 @@ class AppGraph(val app: Application) {
     val guests: Guests by lazy { Guests(app, http, library, scope) }
     val mixes = MixStore(app)
     val history = HistoryStore(app)
+    /** What was last played as a whole, for Home's shortcuts (issue #271). */
+    val recentPlays = RecentPlays(app)
     /** How Liked songs and playlists are sorted (issue #257). */
     val listSort = ListSortStore(app)
     val library = LibraryRepository(app)
