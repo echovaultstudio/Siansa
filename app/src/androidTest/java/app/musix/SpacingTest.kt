@@ -358,4 +358,25 @@ class SpacingTest {
         assertEven("Even columns", titles[1].left - titles[0].left, titles[2].left - titles[1].left, 1.dp)
         assertEven("Fourth under first", titles[3].left - titles[0].left, 0.dp, 1.dp)
     }
+
+    /** Song rows (issue #309): a long title stops a gap short of the song's length, and lengths line up. */
+    @Test fun songLengthKeepsAGapAfterALongTitle() {
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MusixApp).graph
+        val long = app.musix.data.Song("1", "ID1 (from Hospital30: Hugh Hardie) a very long title that must be cut off", artist = "ID", durationSec = 153)
+        val short = app.musix.data.Song("2", "Short", artist = "ID", durationSec = 89)
+        compose.setContent {
+            // Song rows need the app's graph and a navigation controller (for their ⋮ menu).
+            androidx.compose.runtime.CompositionLocalProvider(
+                app.musix.ui.LocalGraph provides graph,
+                app.musix.ui.LocalNav provides androidx.navigation.compose.rememberNavController(),
+            ) {
+                MusixTheme { Column { app.musix.ui.SongRow(long, onClick = {}, leading = "1", showCover = false); app.musix.ui.SongRow(short, onClick = {}, leading = "2", showCover = false) } }
+            }
+        }
+        val lengths = compose.onAllNodesWithTag("songLength").fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(2, lengths.size)
+        assertEven("Lengths line up", with(compose.density) { lengths[0].right.toDp() }, with(compose.density) { lengths[1].right.toDp() }, 1.dp)
+        val title = compose.onNodeWithText(long.title, substring = true).getBoundsInRoot()
+        assertTrue("A gap after the title: ${title.right} vs ${lengths[0].left}", title.right <= with(compose.density) { lengths[0].left.toDp() } - Space.Small + 1.dp)
+    }
 }
