@@ -118,7 +118,7 @@ fun BlendScreen(nav: NavController, playlistId: String) {
             val local = graph.localPlaylists.get(playlistId) ?: throw IllegalStateException("This playlist isn't on this phone any more")
             local.name to local.songs
         } else {
-            val detail = graph.subsonic.playlist(playlistId)
+            val detail = graph.playlistCache.get(playlistId)
             detail.playlist.name to detail.songs
         }
     }

@@ -22,6 +22,10 @@ class PlaylistEditor(
     private val isOffline: () -> Boolean,
     /** Called when a phone playlist moved to Navidrome as the new playlist, to keep its downloads. */
     private val moved: suspend (localId: String, made: Playlist) -> Unit = { _, _ -> },
+    /** A Navidrome playlist changed from Musix: the phone's copy of its songs is read again (issue #251). */
+    private val changed: suspend (playlistId: String) -> Unit = {},
+    /** A Navidrome playlist was taken out of Musix: its kept songs are let go. */
+    private val forgotten: suspend (playlistId: String) -> Unit = {},
 ) {
     /** The new playlist, or null when Navidrome didn't send it back (it was still made). */
     suspend fun create(name: String, songs: List<Song> = emptyList(), onPhone: Boolean = false): Result<Playlist?> =
@@ -63,6 +67,7 @@ class PlaylistEditor(
             AppLog.i("Playlist", "Deleted phone playlist $playlistId")
         } else {
             removed.remove(playlistId)
+            runCatching { forgotten(playlistId) }
             AppLog.i("Playlist", "Removed playlist $playlistId from Musix (kept on Navidrome)")
         }
         library.bump()
@@ -107,7 +112,16 @@ class PlaylistEditor(
     }
 
     private suspend fun edit(playlistId: String, what: String, onPhone: suspend () -> Unit, onServer: suspend () -> Unit): Result<Unit> =
-        if (LocalPlaylists.isLocal(playlistId)) onThePhone(what) { onPhone() } else onTheServer(what) { onServer() }
+        if (LocalPlaylists.isLocal(playlistId)) {
+            onThePhone(what) { onPhone() }
+        } else {
+            // Sent to Navidrome first; only then is the phone's copy read again, so the two never disagree.
+            onTheServer(what) { onServer() }.also { result ->
+                if (result.isSuccess) {
+                    runCatching { changed(playlistId) }.onFailure { AppLog.w("Playlist", "Kept songs of $playlistId not refreshed: ${it.message}") }
+                }
+            }
+        }
 
     private suspend fun <T> onThePhone(what: String, block: suspend () -> T): Result<T> {
         val result = attempt(what, block)
