@@ -65,13 +65,30 @@ object CoverDownload {
     private const val NOW = "cover-download"
     private const val DAILY = "cover-download-daily"
 
-    private fun constraints() = Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
+    /**
+     * Any connection: whether it's Wi-Fi at home is decided by [whyNot] when the run starts. Android's own
+     * "unmetered" condition was never met with a VPN on top of Wi-Fi (Android counts most VPNs as metered), so
+     * the download waited forever (issue #297).
+     */
+    private fun constraints() = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
-    /** Runs now (or as soon as the phone is on Wi-Fi). */
+    /**
+     * In the background, as soon as there's a connection (after a sync). Replaces a request still waiting,
+     * so an old one can't hold up new ones; a run in progress carries on (see [runShared]).
+     */
     fun start(context: Context) {
         val request = OneTimeWorkRequestBuilder<CoverDownloadWorker>().setConstraints(constraints()).build()
-        WorkManager.getInstance(context).enqueueUniqueWork(NOW, ExistingWorkPolicy.KEEP, request)
+        WorkManager.getInstance(context).enqueueUniqueWork(NOW, ExistingWorkPolicy.REPLACE, request)
         AppLog.i("Covers", "Cover download requested")
+    }
+
+    /**
+     * Straight away, from Settings (issue #297): the Download covers now button and switching it on. Says at once
+     * why it can't run on this network, instead of waiting for Android to start it.
+     */
+    fun startNow(context: Context, graph: AppGraph) {
+        AppLog.i("Covers", "Cover download requested from Settings")
+        graph.scope.launch { runShared(context.applicationContext, graph, "from Settings") }
     }
 
     /** Daily runs on, or off, to match the setting. */
@@ -84,9 +101,10 @@ object CoverDownload {
         // The first daily run waits a day: switching it on already starts a run now.
         val request = PeriodicWorkRequestBuilder<CoverDownloadWorker>(1, TimeUnit.DAYS)
             .setInitialDelay(1, TimeUnit.DAYS)
-            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).setRequiresBatteryNotLow(true).build())
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).build())
             .build()
-        work.enqueueUniquePeriodicWork(DAILY, ExistingPeriodicWorkPolicy.KEEP, request)
+        // UPDATE: a daily run scheduled by an older version with the "unmetered" condition takes the new one.
+        work.enqueueUniquePeriodicWork(DAILY, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
     /** Stops a run in progress (the Stop button). */
