@@ -3,6 +3,20 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.19.0beta — 2026-10-20
+
+### Added
+- **Today's mixes carry on where you left them.** Press Play on a mix on Home again and it picks up at the same spot in the same song. A song that had almost ended moves on to the next one. The mix card says which song it will carry on from, and Shuffle still starts afresh.
+- **Choose when a song counts as listened.** Settings › Scrobbling › When a song counts sets how much of a song must play before it's sent: 25% to 90% (50% as before), or four minutes, whichever comes first.
+- **Your own cards on Made for you.** Settings › Made for you cards lets you add cards to Home such as Not played in a while, a genre, a stretch of years (like the 90s), Recently added, Top rated, Most played, From favourite albums or Random songs. Each card gets new songs every day, and you can rename, reorder or remove it.
+- **Favourite albums.** Tap the heart on an album's page to make it a favourite. It's saved in Navidrome too, so other apps see it. Your Library has a new Favourites chip that shows your favourite albums together with Liked songs.
+
+### Changed
+- **No arrow beside Home's section titles.** Tapping a title still opens the full list.
+- **Home's shortcuts show what you played last.** Liked songs is always first, followed by the albums, playlists and mixes you last played from. There are now 8 shortcuts instead of 6.
+- **Sound search is text only.** The concept chips under it (more piano, less vocals…) were unreliable and are gone. Describe the sound in words instead, e.g. "sad acoustic songs with female vocals".
+- **Library sync is now under Settings › Users and library sync.** Each user has their own library, so its sync sits with the users.
+
 ## 0.18.1beta — 2026-10-20
 
 ### Fixed
