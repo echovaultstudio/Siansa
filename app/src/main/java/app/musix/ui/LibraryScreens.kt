@@ -1,5 +1,9 @@
 package app.musix.ui
 
+import app.musix.data.isFavouriteAlbum
+import app.musix.data.Album
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material3.LocalContentColor
 import app.musix.data.extraArtists
 import app.musix.data.normalizeKey
 import androidx.compose.foundation.clickable
@@ -306,6 +310,8 @@ fun AlbumScreen(nav: NavController, id: String) {
             }
         },
         offline = d?.album?.offlineItem(),
+        // A heart for favourite albums, starred in Navidrome (issue #275).
+        actions = { d?.album?.let { FavouriteAlbumButton(it) } },
         // "Find similar albums" beside Shuffle (issue #228), through any of its songs; needs AudioMuse.
         onSimilar = d?.songs?.firstOrNull()?.id?.takeIf { graph.settings.current.audioMuseReady }?.let { id -> { nav.openSimilarAlbums(id) } },
     )
@@ -394,5 +400,21 @@ internal fun SortChips(selected: ListSort, defaultLabel: String, onPick: (ListSo
                 modifier = Modifier.testTag("sort-${sort.name}"),
             )
         }
+    }
+}
+
+/** The heart on an album page (issue #275): marks it as a favourite, in Navidrome too. */
+@Composable
+internal fun FavouriteAlbumButton(album: Album) {
+    val graph = LocalGraph.current
+    val launcher = rememberPlayLauncher()
+    val ids by graph.favouriteAlbums.ids.collectAsStateWithLifecycle()
+    val on = isFavouriteAlbum(album, ids)
+    IconButton(onClick = { graph.favouriteAlbums.toggle(album) { launcher.notify(it) } }, modifier = Modifier.testTag("favouriteAlbum")) {
+        Icon(
+            if (on) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+            if (on) "Remove from favourite albums" else "Add to favourite albums",
+            tint = if (on) Accent else LocalContentColor.current,
+        )
     }
 }
