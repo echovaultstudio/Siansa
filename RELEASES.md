@@ -3,6 +3,10 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.17.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.17.0beta) — 2026-10-20
+
+- [#248](https://github.com/Musix-Industreez/musix/pull/248) Let today's mixes fit the moment: weather, movement, light, charging (each switchable) (@Th3K1ngP1n)
+
 ## [0.16.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.16.0beta) — 2026-10-19
 
 - [#242](https://github.com/Musix-Industreez/musix/pull/242) Phone playlists don't download by themselves; stop all downloads (@Th3K1ngP1n)
