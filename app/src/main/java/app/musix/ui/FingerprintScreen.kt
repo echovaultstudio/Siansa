@@ -109,7 +109,7 @@ private fun FingerprintPage(nav: NavController) {
                 }
             }
             if (list.isNotEmpty()) {
-                item { SectionTitle("The songs", Modifier.padding(horizontal = Space.Page)) }
+                item { SectionTitle("The songs") }
                 itemsIndexed(list, key = { i, s -> "$i-${s.id}" }) { i, song ->
                     SongRow(song = song, onClick = { graph.player.play(list, i) }, leading = "${i + 1}")
                 }
