@@ -1,5 +1,6 @@
 package app.musix
 
+import androidx.compose.foundation.layout.fillMaxHeight
 import app.musix.ui.LyricsSwitchRow
 import app.musix.ui.PathMoodPicker
 import app.musix.ui.Space
@@ -390,5 +391,27 @@ class SpacingTest {
         assertEven("Even columns", b[1].left - b[0].left, b[2].left - b[1].left, 1.dp)
         assertEven("Fifth under first", b[4].left - b[0].left, 0.dp, 1.dp)
         assertTrue("fifth on the next row", b[4].top > b[0].top)
+    }
+
+    /** Your listening's stat tiles (issue #325): the same height with or without a line under the label. */
+    @Test fun statTilesAreTheSameSize() {
+        compose.setContent {
+            MusixTheme {
+                Column {
+                    Row(Modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+                        app.musix.ui.StatTile("2,241", "minutes listened", "37 hours", Modifier.weight(1f).fillMaxHeight(), app.musix.ui.Brand.AmberDeep)
+                        app.musix.ui.StatTile("585", "plays", null, Modifier.weight(1f).fillMaxHeight(), app.musix.ui.Brand.VioletDeep)
+                    }
+                    Row(Modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+                        app.musix.ui.StatTile("430", "artists", "95 new to you", Modifier.weight(1f).fillMaxHeight(), app.musix.ui.Brand.PlumHigh)
+                        app.musix.ui.StatTile("471", "different songs", null, Modifier.weight(1f).fillMaxHeight(), app.musix.ui.Brand.PlumHigh)
+                    }
+                }
+            }
+        }
+        val tiles = compose.onAllNodesWithTag("statTile").fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(4, tiles.size)
+        val heights = tiles.map { with(compose.density) { it.height.toDp() } }
+        heights.drop(1).forEach { assertEven("Tile heights", heights[0], it, 1.dp) }
     }
 }

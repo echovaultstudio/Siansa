@@ -1,5 +1,7 @@
 package app.musix.ui
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -21,7 +23,7 @@ import androidx.navigation.NavController
 
 /**
  * The top of every Your listening page (Your month, Time machine, Other artists you might like), so they
- * look like one family: Musix's violet fading into the page, back, a big title and a line under it, then
+ * look like one family: soft violet, rose and amber light fading into the page (issue #325), back, a big title and a line under it, then
  * the page's own controls ([extra]: range chips, the year and months), all on the page's edges.
  */
 @Composable
@@ -29,7 +31,7 @@ fun ListeningHeader(nav: NavController, title: String, subtitle: String, extra: 
     Column(
         Modifier
             .fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Brand.VioletDeep, Brand.AmberDeep.copy(alpha = 0.5f), Brand.Plum)))
+            .listeningBackdrop()
             .statusBarsPadding()
             .padding(bottom = Space.Page),
     ) {
@@ -51,4 +53,21 @@ fun ListeningHeader(nav: NavController, title: String, subtitle: String, extra: 
         }
         extra()
     }
+}
+
+/**
+ * The Your listening header's background (issue #325): deep plum lit by soft glows, a violet one from the top
+ * left, a warm amber one from the right and a hint of rose between them, fading smoothly into the page at the
+ * bottom so there's no edge. Like a stage light on a dark backdrop, instead of one flat band of colour.
+ */
+fun Modifier.listeningBackdrop(): Modifier = drawBehind {
+    val w = size.width
+    val h = size.height
+    drawRect(Brand.Plum)
+    drawRect(Brush.radialGradient(listOf(Brand.VioletDeep.copy(alpha = 0.95f), Color.Transparent), center = Offset(w * 0.12f, h * 0.05f), radius = w * 1.05f))
+    drawRect(Brush.radialGradient(listOf(Color(0xFFE5508F).copy(alpha = 0.38f), Color.Transparent), center = Offset(w * 0.62f, h * 0.18f), radius = w * 0.62f))
+    drawRect(Brush.radialGradient(listOf(Brand.Amber.copy(alpha = 0.42f), Color.Transparent), center = Offset(w * 1.02f, h * 0.48f), radius = w * 0.78f))
+    // A faint light along the top edge, then into the page's own colour at the bottom.
+    drawRect(Brush.verticalGradient(0f to Color.White.copy(alpha = 0.06f), 0.35f to Color.Transparent))
+    drawRect(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Brand.Plum))
 }

@@ -1,5 +1,6 @@
 package app.musix.ui
 
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -126,10 +127,11 @@ private fun FingerprintPage(nav: NavController) {
 internal fun FingerprintStats(p: FingerprintProfile) {
     val tiles = fingerprintStats(p)
     if (tiles.isEmpty()) return
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    // The same height side by side, whatever their words (issue #325).
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         tiles.forEach { (value, label) ->
             Column(
-                Modifier.weight(1f).testTag("fingerprint-stat").clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.12f)).padding(Space.Medium),
+                Modifier.weight(1f).fillMaxHeight().testTag("fingerprint-stat").clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.12f)).padding(Space.Medium),
             ) {
                 FitText(value, MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold, color = Color.White))
                 Text(label, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f))
