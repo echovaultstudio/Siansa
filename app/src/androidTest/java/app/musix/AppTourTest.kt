@@ -323,7 +323,7 @@ class AppTourTest {
                 tab("Settings")
                 idle(800)
                 shot("18-settings")
-                listOf("Connections", "Library sync", "Playback", "Themes", "Downloads", "Scrobbling", "Storage", "Logs").forEachIndexed { i, page ->
+                listOf("Users and library sync", "Connections", "Playback", "Themes", "Downloads", "Scrobbling", "Storage", "Logs").forEachIndexed { i, page ->
                     tab("Settings")
                     click(page)
                     idle(1200)
