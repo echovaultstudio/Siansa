@@ -1,5 +1,11 @@
 package app.musix.mix
 
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.serialization.builtins.serializer
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.last
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.Flow
 import app.musix.AppGraph
 import app.musix.data.Album
 import app.musix.data.Artist
@@ -115,6 +121,11 @@ internal suspend fun <T, R : Any> keepInLibrary(items: List<T>, limit: Int, find
 }
 
 class Insights(private val graph: AppGraph) {
+    private companion object {
+        const val KOITO = "Koito"
+        const val LAST_FM = "Last.fm"
+    }
+
     private val zone: ZoneId get() = ZoneId.systemDefault()
 
     // ---------------- Rediscover ----------------
@@ -311,24 +322,49 @@ class Insights(private val graph: AppGraph) {
         }
     }
 
-    /** Months already looked at, so going back to one is instant. Kept 15 minutes, and until the library changes. */
-    private val timeMachineCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, TimeMachine>>()
-
-    /**
-     * Your most played songs in [month] of [year] (or the whole year when [month] is null): from Koito and
-     * Last.fm, whichever are set up (both: the higher count for each song), else Musix's own history. Only
-     * songs in your library, up to [limit].
-     */
-    suspend fun timeMachine(year: Int, month: Int?, limit: Int = 50): TimeMachine {
-        val key = "$year-${month ?: "all"}-$limit-${graph.library.version.value}"
-        timeMachineCache[key]?.takeIf { System.currentTimeMillis() - it.first < 15 * 60_000L }?.let { return it.second }
-        val result = lookUpTimeMachine(year, month, limit)
-        // Not kept when Koito or Last.fm couldn't be reached: the next look tries them again.
-        if (result.complete) timeMachineCache[key] = System.currentTimeMillis() to result
-        return result
+    /** Builds the song index in the background once the library is loaded, so the time machine needn't (issue #319). */
+    fun warmUp() {
+        graph.scope.launch {
+            // Again after each change to the library, a moment after it settles.
+            graph.library.version.collectLatest {
+                kotlinx.coroutines.delay(2_000)
+                runCatching { songIndex() }
+            }
+        }
     }
 
-    private suspend fun lookUpTimeMachine(year: Int, month: Int?, limit: Int): TimeMachine = coroutineScope {
+    // Plays per service and period (issue #319). Finished months and years are kept on the phone for good: they
+    // never change. The current one is asked again after 15 minutes. The library may change in between; the plays
+    // are matched against it again each time, which takes a few ms with the index built.
+    private val recentPlays = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Played>>>()
+    private val keptPlays = app.musix.data.JsonFile(
+        java.io.File(graph.app.filesDir, app.musix.data.Users.scoped("time_machine_plays.json")),
+        kotlinx.serialization.builtins.MapSerializer(String.serializer(), kotlinx.serialization.builtins.ListSerializer(Played.serializer())),
+    ) { emptyMap() }
+
+    private fun playsKey(source: String, year: Int, month: Int?) = "$source|$year-${month ?: "all"}"
+
+    private suspend fun kept(source: String, year: Int, month: Int?, finished: Boolean): List<Played>? {
+        val key = playsKey(source, year, month)
+        if (finished) keptPlays.read()[key]?.let { return it }
+        return recentPlays[key]?.takeIf { System.currentTimeMillis() - it.first < 15 * 60_000L }?.second
+    }
+
+    private suspend fun keep(source: String, year: Int, month: Int?, finished: Boolean, plays: List<Played>) {
+        val key = playsKey(source, year, month)
+        if (finished) keptPlays.update { it + (key to plays) } else recentPlays[key] = System.currentTimeMillis() to plays
+    }
+
+    /** The finished list for [month] of [year]; [timeMachineUpdates] shows it as it comes in. */
+    suspend fun timeMachine(year: Int, month: Int?, limit: Int = 50): TimeMachine = timeMachineUpdates(year, month, limit).last()
+
+    /**
+     * Your most played songs in [month] of [year] (or the whole year when [month] is null), as they come in
+     * (issue #319): what's already on the phone and the first service to answer show at once, then each further
+     * service's plays are added (the higher count for each song). From Koito and Last.fm, whichever are set up,
+     * else Musix's own history. Songs not in your library are listed without a song (issue #234), up to [limit] in it.
+     */
+    fun timeMachineUpdates(year: Int, month: Int?, limit: Int = 50): Flow<TimeMachine> = channelFlow {
         val started = System.currentTimeMillis()
         val s = graph.settings.current
         val window = timeWindow(year, month)
@@ -338,50 +374,87 @@ class Insights(private val graph: AppGraph) {
         val fetch = limit * 3
         val koitoOn = s.listenBrainzReady && graph.historyApi.isKoito(s.listenBrainzUrl)
         val lastFmOn = s.lastFmEnabled && s.lastFmApiKey.isNotBlank() && s.lastFmUser.isNotBlank()
-        val koito = async {
-            if (!koitoOn) null
-            else runCatching { graph.historyApi.koitoTop(s.listenBrainzUrl, s.listenBrainzToken, "tracks", fromSec, toSec, fetch) }
-                .onFailure { AppLog.w("TimeMachine", "Koito failed: ${it.message}") }.getOrNull()
+        val sources = listOfNotNull(KOITO.takeIf { koitoOn }, LAST_FM.takeIf { lastFmOn })
+        val finished = periodFinished(window, LocalDate.now())
+        val times = java.util.concurrent.ConcurrentHashMap<String, String>()
+        if (sources.isEmpty()) {
+            send(fromHistory(window, fromSec, toSec, limit, "Set up Koito or Last.fm under Scrobbling for your full history", complete = true))
+            return@channelFlow
         }
-        val lastFm = async {
-            if (!lastFmOn) null
-            else runCatching { graph.historyApi.lastFmTracks(s.lastFmApiKey, s.lastFmUser, fromSec, toSec, fetch) }
-                .onFailure { AppLog.w("TimeMachine", "Last.fm failed: ${it.message}") }.getOrNull()
-        }
-        val fromKoito = koito.await()
-        val fromLastFm = lastFm.await()
-        val used = listOfNotNull("Koito".takeIf { fromKoito != null }, "Last.fm".takeIf { fromLastFm != null })
-        val result = if (used.isNotEmpty()) {
-            val plays = mergePlays(fromKoito.orEmpty(), fromLastFm.orEmpty())
-            // All of them against one index of the library, then the matched songs in one read.
-            val index = songIndex()
-            val only = graph.library.onlyDownloaded()
-            val allowed = only?.shelf?.songs
-            // With "downloaded only" on, songs in the library but not on the phone are left out, not marked missing.
-            val shown = if (allowed == null) plays else plays.filter { p -> index.find(p.artist, p.title.orEmpty())?.let { it in allowed } ?: true }
-            val seen = HashSet<String>()
-            val ranked = rankWithMissing(shown, limit) { p -> index.find(p.artist, p.title.orEmpty()) }
-                .filter { (_, id) -> id == null || seen.add(id) }
-            val songs = graph.library.songs(ranked.mapNotNull { it.second }).associateBy { it.id }
-            val tracks = ranked.mapNotNull { (p, id) ->
-                val song = id?.let { songs[it] ?: return@mapNotNull null }
-                RankedTrack(p.title.orEmpty(), p.artist, p.count, song)
+        val got = java.util.concurrent.ConcurrentHashMap<String, List<Played>>()
+        val failed = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+        sources.forEach { src -> kept(src, year, month, finished)?.let { got[src] = it; times[src] = "from the phone" } }
+        val emitLock = kotlinx.coroutines.sync.Mutex()
+        suspend fun show(final: Boolean) = emitLock.withLock {
+            val used = sources.filter { it in got }
+            val waiting = if (final) emptyList() else sources.filter { it !in got && it !in failed }
+            if (used.isEmpty()) {
+                if (final) send(fromHistory(window, fromSec, toSec, limit, "Koito and Last.fm couldn't be reached", complete = false))
+                return@withLock
             }
-            TimeMachine(
-                window.label, tracks, "From ${used.joinToString(" and ")}",
-                complete = (fromKoito != null || !koitoOn) && (fromLastFm != null || !lastFmOn),
-            )
-        } else {
-            val events = graph.history.all().filter { it.at / 1000 in fromSec until toSec && !it.skipped }
-            val songs = graph.library.songs(events.map { it.id }.distinct()).associateBy { it.id }
-            val tracks = events.groupBy { it.id }.entries.filter { songs[it.key] != null }
-                .sortedByDescending { it.value.size }.take(limit)
-                .map { (id, list) -> RankedTrack(list.first().title, list.first().artist, list.size.toLong(), songs[id]) }
-            val why = if (koitoOn || lastFmOn) "Koito and Last.fm couldn't be reached" else "Set up Koito or Last.fm under Scrobbling for your full history"
-            TimeMachine(window.label, tracks, "From Musix's own history. $why", complete = !(koitoOn || lastFmOn))
+            send(matched(window, mergePlays(*used.map { got.getValue(it) }.toTypedArray()), limit, used, waiting, complete = failed.isEmpty()))
         }
-        AppLog.i("TimeMachine", "${window.label}: ${result.tracks.size - result.missing} songs in the library, ${result.missing} not, in ${System.currentTimeMillis() - started}ms · ${result.source}")
-        result
+        val missing = sources.filter { it !in got }
+        if (missing.isNotEmpty()) {
+            // What's already on the phone first.
+            if (got.isNotEmpty()) show(final = false)
+            coroutineScope {
+                missing.forEach { src ->
+                    launch {
+                        val askStarted = System.currentTimeMillis()
+                        val plays = runCatching {
+                            if (src == KOITO) graph.historyApi.koitoTop(s.listenBrainzUrl, s.listenBrainzToken, "tracks", fromSec, toSec, fetch)
+                            else graph.historyApi.lastFmTracks(s.lastFmApiKey, s.lastFmUser, fromSec, toSec, fetch)
+                        }.onFailure { AppLog.w("TimeMachine", "$src failed: ${it.message}") }.getOrNull()
+                        times[src] = "${System.currentTimeMillis() - askStarted}ms"
+                        if (plays == null) failed += src else {
+                            got[src] = plays
+                            keep(src, year, month, finished, plays)
+                        }
+                        // Another service still on its way: show this one's plays now.
+                        if (plays != null && missing.any { it !in got && it !in failed }) show(final = false)
+                    }
+                }
+            }
+        }
+        show(final = true)
+        AppLog.i(
+            "TimeMachine",
+            "${window.label} in ${System.currentTimeMillis() - started}ms · " + sources.joinToString { "$it ${times[it] ?: "-"}" } +
+                if (failed.isNotEmpty()) " · failed: ${failed.joinToString()}" else "",
+        )
+    }
+
+    /** [plays] matched against the library: the songs in it, and the ones not (issue #234). */
+    private suspend fun matched(window: TimeWindow, plays: List<Played>, limit: Int, used: List<String>, pending: List<String>, complete: Boolean): TimeMachine {
+        val started = System.currentTimeMillis()
+        // All of them against one index of the library, then the matched songs in one read.
+        val index = songIndex()
+        val only = graph.library.onlyDownloaded()
+        val allowed = only?.shelf?.songs
+        // With "downloaded only" on, songs in the library but not on the phone are left out, not marked missing.
+        val shown = if (allowed == null) plays else plays.filter { p -> index.find(p.artist, p.title.orEmpty())?.let { it in allowed } ?: true }
+        val seen = HashSet<String>()
+        val ranked = rankWithMissing(shown, limit) { p -> index.find(p.artist, p.title.orEmpty()) }
+            .filter { (_, id) -> id == null || seen.add(id) }
+        val songs = graph.library.songs(ranked.mapNotNull { it.second }).associateBy { it.id }
+        val tracks = ranked.mapNotNull { (p, id) ->
+            val song = id?.let { songs[it] ?: return@mapNotNull null }
+            RankedTrack(p.title.orEmpty(), p.artist, p.count, song)
+        }
+        val tm = TimeMachine(window.label, tracks, timeMachineSource(used, pending), complete = complete, pending = pending)
+        AppLog.d("TimeMachine", "${window.label}: ${tm.tracks.size - tm.missing} songs in the library, ${tm.missing} not, matched in ${System.currentTimeMillis() - started}ms · ${tm.source}")
+        return tm
+    }
+
+    /** From Musix's own history, when Koito and Last.fm aren't set up or couldn't be reached. */
+    private suspend fun fromHistory(window: TimeWindow, fromSec: Long, toSec: Long, limit: Int, why: String, complete: Boolean): TimeMachine {
+        val events = graph.history.all().filter { it.at / 1000 in fromSec until toSec && !it.skipped }
+        val songs = graph.library.songs(events.map { it.id }.distinct()).associateBy { it.id }
+        val tracks = events.groupBy { it.id }.entries.filter { songs[it.key] != null }
+            .sortedByDescending { it.value.size }.take(limit)
+            .map { (id, list) -> RankedTrack(list.first().title, list.first().artist, list.size.toLong(), songs[id]) }
+        return TimeMachine(window.label, tracks, "From Musix's own history. $why", complete = complete)
     }
 
     private fun hours(timesMs: List<Long>): IntArray {

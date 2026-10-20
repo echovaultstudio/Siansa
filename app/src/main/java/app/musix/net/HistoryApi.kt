@@ -10,7 +10,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 /** An artist or track and how often it was played, from a listening-history service. */
-data class Played(val artist: String, val title: String?, val count: Long)
+@kotlinx.serialization.Serializable
+data class Played(val artist: String, val title: String? = null, val count: Long = 0)
 
 /**
  * Reads what you've been listening to most from the services Musix scrobbles to: Koito (its web API,
