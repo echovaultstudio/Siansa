@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -88,7 +89,10 @@ class Connection(
             cm?.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) = changed()
                 override fun onLost(network: Network) = changed()
-                override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) = Unit
+                // Wi-Fi often only works a moment after it's back: look again once it's validated.
+                override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                    if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) && _state.value.offline) changed()
+                }
             })
         }.onFailure { AppLog.w("Connection", "Can't follow network changes: ${it.javaClass.simpleName}") }
         check("start")
@@ -105,11 +109,18 @@ class Connection(
         val network = hasNetwork()
         if (network != _state.value.network) AppLog.i("Connection", if (network) "Network back" else "No network")
         _state.update { it.copy(network = network, server = if (network) it.server else false, audioMuse = if (network) it.audioMuse else false) }
-        check("network changed")
+        // A check waiting minutes to look again mustn't keep the app offline now the network is back.
+        checking?.cancel()
+        check("network changed", attempt = 0)
     }
 
-    /** Checks the server and AudioMuse again (for example after a request to them failed). */
-    fun check(why: String) {
+    /**
+     * Checks the server and AudioMuse again (for example after a request to them failed). While one can't be
+     * reached it looks again soon at first, then every few minutes ([retryDelayMs]).
+     */
+    fun check(why: String) = check(why, attempt = 0)
+
+    private fun check(why: String, attempt: Int) {
         if (checking?.isActive == true) return
         checking = scope.launch(Dispatchers.IO) {
             if (!hasNetwork()) {
@@ -119,16 +130,18 @@ class Connection(
             val s = settings()
             val server = if (s.navidromeUrl.isBlank()) null else answers(s.navidromeUrl.trimEnd('/') + "/rest/ping.view")
             val audioMuse = if (s.audioMuseUrl.isBlank()) null else answers(s.audioMuseUrl.trimEnd('/') + "/")
+            // Replaced by a newer check while asking (the network changed): that one has the answer.
+            ensureActive()
             val before = _state.value
             _state.update { it.copy(network = true, server = server, audioMuse = audioMuse) }
             if (before.server != server || before.audioMuse != audioMuse) {
                 AppLog.i("Connection", "Checked ($why): server ${label(server)}, AudioMuse ${label(audioMuse)}")
             }
-            // While something can't be reached, look again every few minutes.
+            // While something can't be reached, look again: soon at first, then every few minutes.
             if (server == false || audioMuse == false) {
-                delay(RECHECK_MS)
+                delay(retryDelayMs(attempt))
                 checking = null
-                check("retry")
+                check("retry", attempt + 1)
             }
         }
     }
@@ -140,7 +153,12 @@ class Connection(
 
     private fun label(ok: Boolean?) = when (ok) { true -> "reachable"; false -> "not reachable"; null -> "not set up" }
 
-    private companion object {
-        const val RECHECK_MS = 3 * 60_000L
-    }
+}
+
+/** How long to wait before looking again after [attempt] checks that couldn't reach the server or AudioMuse. */
+internal fun retryDelayMs(attempt: Int): Long = when (attempt) {
+    0 -> 5_000L
+    1 -> 15_000L
+    2 -> 30_000L
+    else -> 3 * 60_000L
 }
