@@ -3,6 +3,18 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.19.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.19.0beta) — 2026-10-20
+
+- [#276](https://github.com/Musix-Industreez/musix/pull/276) Home: remove the show-all arrow beside section titles (@Th3K1ngP1n)
+- [#277](https://github.com/Musix-Industreez/musix/pull/277) Sound search: text only, no concept chips (@Th3K1ngP1n)
+- [#278](https://github.com/Musix-Industreez/musix/pull/278) Settings: move Library sync under Users (@Th3K1ngP1n)
+- [#279](https://github.com/Musix-Industreez/musix/pull/279) Scrobbling: choose how much of a song must be heard (@Th3K1ngP1n)
+- [#280](https://github.com/Musix-Industreez/musix/pull/280) Home: carry on a generated mix where you left off (@Th3K1ngP1n)
+- [#281](https://github.com/Musix-Industreez/musix/pull/281) Home shortcuts: Liked songs first, then what you played last, 8 in all (@Th3K1ngP1n)
+- [#282](https://github.com/Musix-Industreez/musix/pull/282) Favourite albums and a Favourites chip in Your Library (@Th3K1ngP1n)
+- [#283](https://github.com/Musix-Industreez/musix/pull/283) Made for you: add your own cards and rename them (@Th3K1ngP1n)
+- [#284](https://github.com/Musix-Industreez/musix/pull/284) Made for you cards: name the 2000s "Your 00s" (@Th3K1ngP1n)
+
 ## [0.18.1beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.18.1beta) — 2026-10-20
 
 - [#267](https://github.com/Musix-Industreez/musix/pull/267) Load songs ahead: even gaps between the choices (@Th3K1ngP1n)
