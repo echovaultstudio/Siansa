@@ -1,5 +1,13 @@
 package app.musix.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.testTag
 import app.musix.data.cover
 import android.Manifest
@@ -343,10 +351,47 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
     Box(Modifier.padding(horizontal = Space.Small, vertical = Space.Tight)) {
       CompositionLocalProvider(LocalContentColor provides Color.White) {
         Column(Modifier.clip(RoundedCornerShape(10.dp)).background(background)) {
+            // Swipe the song left for the next one, right for the one before (issue #310): it follows the finger,
+            // and springs back when let go short of a quarter of the bar.
+            val scope = rememberCoroutineScope()
+            val drag = remember(song.id) { Animatable(0f) }
+            var barWidth by remember { mutableIntStateOf(1) }
             Row(
-                Modifier.fillMaxWidth().testTag("miniPlayer").clickable(onClick = onOpen).padding(horizontal = Space.Small, vertical = Space.Small),
+                Modifier
+                    .fillMaxWidth()
+                    .testTag("miniPlayer")
+                    .onSizeChanged { barWidth = it.width.coerceAtLeast(1) }
+                    .pointerInput(song.id) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                val moved = drag.value
+                                scope.launch {
+                                    when (miniSwipe(moved, barWidth)) {
+                                        MiniSwipe.NEXT -> { drag.animateTo(-barWidth.toFloat()); graph.player.next() }
+                                        MiniSwipe.PREVIOUS -> { drag.animateTo(barWidth.toFloat()); graph.player.previousTrack() }
+                                        MiniSwipe.NONE -> drag.animateTo(0f)
+                                    }
+                                }
+                            },
+                            onDragCancel = { scope.launch { drag.animateTo(0f) } },
+                        ) { change, dx ->
+                            change.consume()
+                            scope.launch { drag.snapTo(drag.value + dx) }
+                        }
+                    }
+                    .clickable(onClick = onOpen)
+                    .padding(horizontal = Space.Small, vertical = Space.Small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+              Row(
+                  Modifier
+                      .weight(1f)
+                      .graphicsLayer {
+                          translationX = drag.value
+                          alpha = 1f - (kotlin.math.abs(drag.value) / barWidth).coerceIn(0f, 0.7f)
+                      },
+                  verticalAlignment = Alignment.CenterVertically,
+              ) {
                 Cover(song.cover, 150, Modifier.size(44.dp), RoundedCornerShape(6.dp))
                 Spacer(Modifier.width(Space.Medium))
                 Column(Modifier.weight(1f)) {
@@ -359,6 +404,7 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+              }
                 // Tap to play or pause; press and hold to stop and clear the queue.
                 Box(
                     Modifier
@@ -401,4 +447,14 @@ private fun AskForNotifications() {
     if (Build.VERSION.SDK_INT < 33) return
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) { launcher.launch(Manifest.permission.POST_NOTIFICATIONS) }
+}
+
+/** What a swipe on the mini player does (issue #310). */
+enum class MiniSwipe { NEXT, PREVIOUS, NONE }
+
+/** A swipe of [moved] px on a bar [width] px wide: past a quarter left is the next song, right the one before. */
+fun miniSwipe(moved: Float, width: Int): MiniSwipe = when {
+    moved < -width * 0.25f -> MiniSwipe.NEXT
+    moved > width * 0.25f -> MiniSwipe.PREVIOUS
+    else -> MiniSwipe.NONE
 }
