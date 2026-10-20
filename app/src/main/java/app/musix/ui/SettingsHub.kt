@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -304,7 +305,8 @@ internal fun PreloadRow(label: String, value: Int, tag: String, onPick: (Int) ->
                 selected = value == n,
                 onClick = { onPick(n) },
                 label = { Text(if (n == 0) "None" else "$n") },
-                modifier = Modifier.testTag("$tag-$n"),
+                // At least touch-size wide, so a one-digit chip gets no invisible touch margin and the gaps stay even.
+                modifier = Modifier.widthIn(min = 48.dp).testTag("$tag-$n"),
             )
         }
     }
