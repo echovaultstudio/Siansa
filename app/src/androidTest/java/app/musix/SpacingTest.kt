@@ -33,6 +33,7 @@ import app.musix.ui.EqPresetRow
 import app.musix.ui.MusixTheme
 import app.musix.ui.ReleaseTypeRow
 import app.musix.ui.SectionTitle
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -314,5 +315,15 @@ class SpacingTest {
         // The tag sits inside each row's padding, so the gaps are the padding: the same between every pair of rows.
         val gaps = rows.zipWithNext().map { (a, b) -> b.top - a.bottom }
         gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between switch rows", a, b, 1.dp) }
+    }
+
+    /** Your sonic fingerprint's own page (issue #255): its stat tiles sit the same distance apart. */
+    @Test fun fingerprintStatTilesAreEvenlySpaced() {
+        val p = app.musix.mix.FingerprintProfile("d", listOf("happy" to 0.6), emptyList(), 120, "minor", listOf("1", "2"))
+        compose.setContent { MusixTheme { app.musix.ui.FingerprintStats(p) } }
+        val tiles = compose.onAllNodesWithTag("fingerprint-stat").fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(4, tiles.size)
+        val gaps = tiles.zipWithNext().map { (a, b) -> with(compose.density) { (b.left - a.right).toDp() } }
+        gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between fingerprint tiles", a, b, 1.dp) }
     }
 }

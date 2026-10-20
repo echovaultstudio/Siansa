@@ -4,6 +4,7 @@ import app.musix.data.AppJson
 import app.musix.net.AudioMuseApi
 import app.musix.net.TrackFeatures
 import app.musix.ui.fingerprintFacts
+import app.musix.ui.fingerprintStats
 import app.musix.ui.nextSteering
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
@@ -35,6 +36,8 @@ class FingerprintTest {
         assertEquals(120, p.bpm)
         assertEquals("minor", p.scale)
         assertEquals("Around 120 BPM · mostly minor keys · 3 songs", fingerprintFacts(p))
+        // Its own page under Your listening (issue #255) shows these as tiles.
+        assertEquals(listOf("120" to "BPM", "Minor" to "Key", "Danceable" to "Top mood", "3" to "Songs"), fingerprintStats(p))
     }
 
     @Test fun noClearScaleAndNothingAnalysed() {
@@ -44,6 +47,7 @@ class FingerprintTest {
         assertNull(empty.bpm)
         assertEquals(emptyList<String>(), empty.genres)
         assertNull(fingerprintFacts(empty))
+        assertEquals(emptyList<Pair<String, String>>(), fingerprintStats(empty))
     }
 
     @Test fun theProfileIsSavedAndReadBack() {

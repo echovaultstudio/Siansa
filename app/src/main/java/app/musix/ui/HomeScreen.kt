@@ -306,9 +306,6 @@ fun HomeScreen(nav: NavController) {
                         Shelf("Made for you", tiles, key = { it.first }) { it.second() }
                     }
                 }
-                HomeSection.FINGERPRINT -> {
-                    if (graph.settings.current.audioMuseReady) item(key = "fingerprint") { FingerprintCard() }
-                }
                 HomeSection.REDISCOVER -> {
                     // Albums you loved a while ago but haven't played since.
                     item(key = "rediscover") {
