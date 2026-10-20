@@ -3,6 +3,12 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.22.4beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.22.4beta) — 2026-10-20
+
+- [#329](https://github.com/Musix-Industreez/musix/pull/329) Artist page: 3 popular songs, Show more for 6 (@Th3K1ngP1n)
+- [#331](https://github.com/Musix-Industreez/musix/pull/331) Your listening: aurora header from your top artists' colours (@Th3K1ngP1n)
+- [#332](https://github.com/Musix-Industreez/musix/pull/332) Aurora test: allow one 8-bit colour step (@Th3K1ngP1n)
+
 ## [0.22.3beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.22.3beta) — 2026-10-20
 
 - [#326](https://github.com/Musix-Industreez/musix/pull/326) Your listening: equal stat tiles, and a more polished header (@Th3K1ngP1n)
