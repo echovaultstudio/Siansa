@@ -3,6 +3,11 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.24.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.24.0beta) — 2026-10-21
+
+- [#340](https://github.com/Musix-Industreez/musix/pull/340) Home: Made for you tiles show title and track count, tighter tile text (@Th3K1ngP1n)
+- [#341](https://github.com/Musix-Industreez/musix/pull/341) Keep playing: top up the queue when it's about to end (Steady or DJ) (@Th3K1ngP1n)
+
 ## [0.23.0beta](https://github.com/Musix-Industreez/musix/releases/tag/v0.23.0beta) — 2026-10-20
 
 - [#335](https://github.com/Musix-Industreez/musix/pull/335) Your listening header: back to the static 0.22.3 glow (@Th3K1ngP1n)
