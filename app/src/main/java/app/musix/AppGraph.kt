@@ -39,6 +39,7 @@ import app.musix.mix.Insights
 import app.musix.mix.ArtistSuggestions
 import app.musix.mix.SongPath
 import app.musix.mix.SongRadio
+import app.musix.mix.ContinuousPlay
 import app.musix.mix.WindDown
 import app.musix.mix.Taste
 import app.musix.net.AudioMuseApi
@@ -316,7 +317,7 @@ class AppGraph(val app: Application) {
     val sleepTimer = SleepTimer()
     val windDown = WindDown(this)
     /** Keep playing: songs added when the queue is about to end (issue #337). */
-    val continuousPlay = app.musix.mix.ContinuousPlay(this)
+    val continuousPlay = ContinuousPlay(this)
 }
 
 /**
