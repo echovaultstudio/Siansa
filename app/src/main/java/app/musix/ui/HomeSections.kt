@@ -185,7 +185,6 @@ private fun SectionTile(item: SectionItem, nav: NavController, launch: PlayLaunc
                 title = item.radio.name,
                 colors = Color(item.radio.colors.first) to Color(item.radio.colors.second),
                 size = maxWidth,
-                caption = "Sound radio",
                 onClick = { nav.openMoodRadio(item.radio.id) },
             )
         }
@@ -194,7 +193,6 @@ private fun SectionTile(item: SectionItem, nav: NavController, launch: PlayLaunc
                 title = item.genre.name,
                 colors = tileColors(item.genre.name),
                 size = maxWidth,
-                caption = "${item.genre.songCount} songs",
                 onClick = { nav.openGenreRadio(item.genre.name) },
             )
         }

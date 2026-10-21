@@ -590,13 +590,16 @@ fun AlbumTile(
     modifier: Modifier = Modifier,
     round: Boolean = false,
 ) {
-    Column(modifier.clickable(onClick = onClick).padding(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+    // The name sits a step under the cover, and the subtitle straight under the name, as one block (issue #338):
+    // an even gap between all three left the artist floating away from the album name.
+    Column(modifier.clickable(onClick = onClick).padding(Space.Small)) {
         Cover(
             coverArt,
             300,
             Modifier.fillMaxWidth().aspectRatio(1f),
             if (round) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(8.dp),
         )
+        Spacer(Modifier.height(Space.Small))
         Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (subtitle.isNotBlank()) {
             Text(
@@ -642,6 +645,7 @@ fun GradientTile(
         Box(
             Modifier
                 .size(size)
+                .testTag("gradientTileArt")
                 .clip(RoundedCornerShape(10.dp))
                 .background(Brush.linearGradient(listOf(colors.first, colors.second))),
         ) {
@@ -670,8 +674,9 @@ fun GradientTile(
                 )
             }
         }
+        // The same step under the tile whichever line comes first (issue #338: Made for you shows only the count).
+        if (subtitle != null || caption != null) Spacer(Modifier.height(Space.Small))
         if (subtitle != null) {
-            Spacer(Modifier.height(Space.Small))
             Text(subtitle, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (caption != null) {
