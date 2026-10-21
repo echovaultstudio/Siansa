@@ -315,12 +315,12 @@ fun HomeScreen(nav: NavController) {
                             applicable.forEach { selector ->
                                 add(selector.id to @Composable {
                                     val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
+                                    // Just the title and track count (issue #338): the description is on the mix's page.
                                     GradientTile(
                                         title = mix?.title ?: "${selector.name} mix",
                                         colors = tileColors(selector.id),
                                         coverArt = mix?.songs?.firstOrNull()?.coverArt,
-                                        subtitle = selector.name,
-                                        caption = if (mix != null) "${mix.songs.size} tracks · until %02d:00".format(selector.endHour) else if (aiDown != null) "AI backend not available :(" else "Tap to make today's mix",
+                                        caption = madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make today's mix"),
                                         busy = busySelector == selector.id,
                                         onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) },
                                     )
@@ -333,8 +333,7 @@ fun HomeScreen(nav: NavController) {
                                         title = kind.title,
                                         colors = tileColors(kind.id),
                                         coverArt = mix?.songs?.firstOrNull()?.coverArt,
-                                        subtitle = "For you",
-                                        caption = if (mix != null) "${mix.songs.size} tracks · ${mix.description}" else if (aiDown != null) "AI backend not available :(" else "Tap to make it",
+                                        caption = madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make it"),
                                         busy = personalBusy == kind.id,
                                         onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) },
                                     )
@@ -346,8 +345,6 @@ fun HomeScreen(nav: NavController) {
                                     GradientTile(
                                         title = card.title,
                                         colors = tileColors(card.id),
-                                        subtitle = "For you",
-                                        caption = card.detail,
                                         onClick = { nav.navigate("card/${card.id}") },
                                     )
                                 })
@@ -377,7 +374,7 @@ fun HomeScreen(nav: NavController) {
                                 title = radio.name,
                                 colors = Color(radio.colors.first) to Color(radio.colors.second),
                                 size = 140.dp,
-                                caption = "Sound radio",
+                                // Just the tile (issue #338).
                                 onClick = { nav.openMoodRadio(radio.id) },
                             )
                         }
@@ -427,7 +424,7 @@ fun HomeScreen(nav: NavController) {
                                 title = genre.name,
                                 colors = tileColors(genre.name),
                                 size = 130.dp,
-                                caption = "${genre.songCount} songs",
+                                // Just the tile (issue #338).
                                 onClick = { nav.openGenreRadio(genre.name) },
                             )
                         }
@@ -636,6 +633,16 @@ internal fun HomeHeader(title: String, modifier: Modifier = Modifier, action: @C
         Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         action()
     }
+}
+
+/**
+ * The line under a Made for you tile (issue #338): the track count once the mix is made, otherwise what a
+ * tap does ([prompt]) or why it can't be made now. Never the mix's description: that's on its own page.
+ */
+internal fun madeForYouCaption(trackCount: Int?, aiDown: Boolean, prompt: String): String = when {
+    trackCount != null -> if (trackCount == 1) "1 track" else "$trackCount tracks"
+    aiDown -> "AI backend not available :("
+    else -> prompt
 }
 
 /** Shortcuts on Home in all, Liked songs included (issue #271). */
