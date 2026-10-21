@@ -37,6 +37,8 @@ data class PlayerState(
     val codec: String? = null,
     /** Opus kbit/s while Navidrome converts the current song, or 0 when the original file plays. */
     val transcodeKbps: Int = 0,
+    /** Songs still to come after this one, in the order they'll play (shuffle included), for keep playing (issue #337). */
+    val left: Int = 0,
 )
 
 /** The app's side of playback: a MediaController talking to [PlaybackService]. */
@@ -207,6 +209,25 @@ class PlayerConnection(
         withController { c -> c.addMediaItems(songs.map { it.toMediaItem(api) }) }
     }
 
+    /**
+     * Adds [songs] after the queue for keep playing (issue #337). If the queue already ran out (the last song
+     * ended before they were found), the first of them starts playing, unless playback was paused (the sleep timer).
+     */
+    fun continueWith(songs: List<Song>) {
+        if (songs.isEmpty()) return
+        SongRegistry.register(songs)
+        withController { c ->
+            val ended = c.playbackState == Player.STATE_ENDED && c.playWhenReady
+            val first = c.mediaItemCount
+            c.addMediaItems(songs.map { it.toMediaItem(api) })
+            if (ended) {
+                c.seekTo(first, 0L)
+                c.prepare()
+                c.play()
+            }
+        }
+    }
+
     fun togglePlay() = withController { c ->
         if (c.isPlaying) {
             c.pause()
@@ -289,7 +310,22 @@ class PlayerConnection(
             transcodeKbps = c.sessionExtras
                 .takeIf { it.getString(StreamQuality.EXTRA_SONG_ID) == current?.id }
                 ?.getInt(StreamQuality.EXTRA_KBPS, 0) ?: 0,
+            left = leftInPlayOrder(c),
         )
+    }
+
+    /** How many songs come after the current one in play order, without repeat; shuffle follows its own order. */
+    private fun leftInPlayOrder(c: MediaController): Int {
+        val timeline = c.currentTimeline
+        if (timeline.isEmpty || c.currentMediaItemIndex == C.INDEX_UNSET) return 0
+        var index = c.currentMediaItemIndex
+        var count = 0
+        while (count < timeline.windowCount) {
+            index = timeline.getNextWindowIndex(index, Player.REPEAT_MODE_OFF, c.shuffleModeEnabled)
+            if (index == C.INDEX_UNSET) break
+            count++
+        }
+        return count
     }
 
     private fun audioCodec(tracks: Tracks): String? {

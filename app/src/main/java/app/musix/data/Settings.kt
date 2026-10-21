@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import app.musix.playback.CrossfadeMode
 import app.musix.playback.LoudnessSource
+import app.musix.mix.ContinuousMode
 import app.musix.mix.RadioDrift
 import app.musix.situation.SituationOptions
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -90,6 +91,8 @@ data class AppSettings(
     val crossfade: CrossfadeMode = CrossfadeMode.OFF,
     /** How far a song radio may wander from its first song (issue #256). */
     val radioDrift: RadioDrift = RadioDrift.SOME,
+    /** What plays when the queue is about to end (issue #337): nothing, songs like the last one, or a DJ-ordered set. */
+    val continuousPlay: ContinuousMode = ContinuousMode.OFF,
     /** How many calm songs the wind down queues when it's switched on without a sleep timer (issue #330). */
     val windDownSongs: Int = DEFAULT_WIND_DOWN_SONGS,
     /** The crossfade length; in smart mode, the longest a fade may be. */
@@ -231,6 +234,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         loudnessTarget = prefs.getInt("loudness_target", AppSettings.DEFAULT_LOUDNESS_TARGET),
         crossfade = CrossfadeMode.parse(prefs.getString("crossfade", null)),
         radioDrift = RadioDrift.parse(prefs.getString("radio_drift", null)),
+        continuousPlay = ContinuousMode.parse(prefs.getString("continuous_play", null)),
         windDownSongs = prefs.getInt("wind_down_songs", AppSettings.DEFAULT_WIND_DOWN_SONGS)
             .takeIf { it in AppSettings.WIND_DOWN_CHOICES } ?: AppSettings.DEFAULT_WIND_DOWN_SONGS,
         crossfadeSeconds = prefs.getInt("crossfade_s", AppSettings.DEFAULT_CROSSFADE_SECONDS).coerceIn(AppSettings.CROSSFADE_SECONDS),
@@ -348,6 +352,12 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setRadioDrift(drift: RadioDrift) {
         prefs.edit().putString("radio_drift", drift.name).apply()
         _state.value = _state.value.copy(radioDrift = drift)
+    }
+
+    /** Keep playing when the queue ends (issue #337). */
+    fun setContinuousPlay(mode: ContinuousMode) {
+        prefs.edit().putString("continuous_play", mode.name).apply()
+        _state.value = _state.value.copy(continuousPlay = mode)
     }
 
     fun setSituation(options: SituationOptions) {
