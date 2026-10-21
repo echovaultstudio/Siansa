@@ -393,6 +393,42 @@ class SpacingTest {
         assertTrue("fifth on the next row", b[4].top > b[0].top)
     }
 
+    /** Album tiles (issue #338): the artist sits straight under the album name, a step under the cover. */
+    @Test fun albumTileKeepsTheArtistUnderTheName() {
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MusixApp).graph
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(app.musix.ui.LocalGraph provides graph) {
+                MusixTheme {
+                    app.musix.ui.AlbumTile("Spacing album", "Spacing artist", null, onClick = {}, modifier = Modifier.padding(Space.Page))
+                }
+            }
+        }
+        val name = compose.onNodeWithText("Spacing album", useUnmergedTree = true).getBoundsInRoot()
+        val artist = compose.onNodeWithText("Spacing artist", useUnmergedTree = true).getBoundsInRoot()
+        val gap = artist.top - name.bottom
+        assertTrue("Artist ${gap.value} dp under the name", gap.value >= -1f && gap.value <= Space.Tight.value)
+    }
+
+    /** Made for you tiles (issue #338): with only the track count, it sits the same step under the tile. */
+    @Test fun gradientTileCaptionSitsAStepUnderTheTile() {
+        compose.setContent {
+            MusixTheme {
+                Column {
+                    app.musix.ui.GradientTile("Count only", app.musix.ui.Brand.AmberDeep to app.musix.ui.Brand.VioletDeep, onClick = {}, caption = "25 tracks")
+                    app.musix.ui.GradientTile("With subtitle", app.musix.ui.Brand.AmberDeep to app.musix.ui.Brand.VioletDeep, onClick = {}, subtitle = "For you")
+                }
+            }
+        }
+        val tiles = compose.onAllNodesWithTag("gradientTileArt", useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(2, tiles.size)
+        val caption = compose.onNodeWithText("25 tracks", useUnmergedTree = true).getBoundsInRoot()
+        val subtitle = compose.onNodeWithText("For you", useUnmergedTree = true).getBoundsInRoot()
+        val captionGap = caption.top - with(compose.density) { tiles[0].bottom.toDp() }
+        val subtitleGap = subtitle.top - with(compose.density) { tiles[1].bottom.toDp() }
+        assertEven("Gap under the tile", captionGap, subtitleGap, 1.dp)
+        assertEven("Gap under the tile", captionGap, Space.Small, 1.dp)
+    }
+
     /** Your listening's stat tiles (issue #325): the same height with or without a line under the label. */
     @Test fun statTilesAreTheSameSize() {
         compose.setContent {
