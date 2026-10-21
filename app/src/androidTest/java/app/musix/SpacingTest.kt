@@ -309,6 +309,14 @@ class SpacingTest {
         gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between drift chips", a, b, 1.dp) }
     }
 
+    /** Settings › Playback › Keep playing (issue #337): Off, Steady and DJ sit the same distance apart. */
+    @Test fun keepPlayingChipsAreEvenlySpaced() {
+        compose.setContent { MusixTheme { app.musix.ui.ContinuousChips(app.musix.mix.ContinuousMode.STEADY) { } } }
+        val chips = app.musix.mix.ContinuousMode.entries.map { compose.onNodeWithTag("continuousPlay-${it.name}").getBoundsInRoot() }
+        val gaps = chips.zipWithNext().map { (a, b) -> b.left - a.right }
+        gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between keep playing chips", a, b, 1.dp) }
+    }
+
     /** Settings › Playback › Load songs ahead (issue #254): the choices sit the same distance apart. */
     @Test fun preloadChipsAreEvenlySpaced() {
         compose.setContent { MusixTheme { androidx.compose.foundation.layout.Column { app.musix.ui.PreloadRow("On Wi-Fi", 2, "preload-wifi") { } } } }

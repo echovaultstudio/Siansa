@@ -60,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import app.musix.mix.ContinuousMode
 import app.musix.mix.RadioDrift
 import app.musix.playback.Preload
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -277,6 +278,11 @@ fun PlaybackSettingsScreen(nav: NavController) {
             RadioDriftChips(settings.radioDrift) { graph.settings.setRadioDrift(it) }
             Hint(settings.radioDrift.hint)
             HorizontalDivider()
+            Heading("Keep playing")
+            Hint("When the queue is about to end, should Musix add more songs?")
+            ContinuousChips(settings.continuousPlay) { graph.settings.setContinuousPlay(it) }
+            Hint(continuousHint(settings.continuousPlay, settings.audioMuseReady))
+            HorizontalDivider()
             Heading("Wind down")
             Hint("With the sleep timer's Wind down switched on and no time picked, how many calmer songs play before the music ends?")
             WindDownChips(settings.windDownSongs) { graph.settings.save(graph.settings.current.copy(windDownSongs = it)) }
@@ -303,6 +309,25 @@ internal fun RadioDriftChips(selected: RadioDrift, onPick: (RadioDrift) -> Unit)
         }
     }
 }
+
+/** Off, Steady or DJ: what plays when the queue is about to end (issue #337). */
+@Composable
+internal fun ContinuousChips(selected: ContinuousMode, onPick: (ContinuousMode) -> Unit) {
+    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("continuousPlay"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        ContinuousMode.entries.forEach { mode ->
+            FilterChip(
+                selected = selected == mode,
+                onClick = { onPick(mode) },
+                label = { Text(mode.label) },
+                modifier = Modifier.testTag("continuousPlay-${mode.name}"),
+            )
+        }
+    }
+}
+
+/** The line under the keep playing choices; DJ says when it can't order songs without AudioMuse. */
+internal fun continuousHint(mode: ContinuousMode, audioMuseReady: Boolean): String =
+    if (mode == ContinuousMode.DJ && !audioMuseReady) "${mode.hint} AudioMuse isn't set up, so songs are added as in Steady." else mode.hint
 
 /** 10, 20 or 30 calm songs for a wind down without a timer (issue #330). */
 @Composable

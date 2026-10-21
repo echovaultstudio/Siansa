@@ -315,6 +315,8 @@ class AppGraph(val app: Application) {
     val songPath = SongPath(this)
     val sleepTimer = SleepTimer()
     val windDown = WindDown(this)
+    /** Keep playing: songs added when the queue is about to end (issue #337). */
+    val continuousPlay = app.musix.mix.ContinuousPlay(this)
 }
 
 /**
