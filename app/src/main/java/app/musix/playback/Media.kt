@@ -23,14 +23,19 @@ object SongRegistry {
 
 private const val SONG_EXTRA = "musix.song"
 private const val QUEUED_EXTRA = "musix.queued"
+private const val AUTO_EXTRA = "musix.auto"
 
-/** [queued] marks a song added with "Add to queue", so the next one added goes after it (see [queueInsertIndex]). */
-fun Song.toMediaItem(api: SubsonicApi, queued: Boolean = false): MediaItem {
+/**
+ * [queued] marks a song added with "Add to queue", so the next one added goes after it (see [queueInsertIndex]).
+ * [auto] marks a song AudioMuse added by itself (keep playing, a song radio), shown in the queue (issue #337).
+ */
+fun Song.toMediaItem(api: SubsonicApi, queued: Boolean = false, auto: Boolean = false): MediaItem {
     val uri = Uri.parse(api.streamUrl(id))
     // The whole song travels with the item, so its details survive the trip through the media session.
     val extras = Bundle().apply {
         putString(SONG_EXTRA, AppJson.encodeToString(Song.serializer(), this@toMediaItem))
         if (queued) putBoolean(QUEUED_EXTRA, true)
+        if (auto) putBoolean(AUTO_EXTRA, true)
     }
     val metadata = MediaMetadata.Builder()
         .setTitle(title)
@@ -78,6 +83,9 @@ fun replayGainVolume(song: Song?, settings: AppSettings): Float {
     if (peak != null && peak > 0f) volume = min(volume, 1f / peak)
     return volume.coerceIn(0f, 1f)
 }
+
+/** Whether this queue item was added by keep playing or a song radio rather than chosen (issue #337). */
+fun MediaItem.isAuto(): Boolean = mediaMetadata.extras?.getBoolean(AUTO_EXTRA, false) == true
 
 /** Whether this queue item was added with "Add to queue". */
 fun MediaItem.isQueued(): Boolean = mediaMetadata.extras?.getBoolean(QUEUED_EXTRA, false) == true

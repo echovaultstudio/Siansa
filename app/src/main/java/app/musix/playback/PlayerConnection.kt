@@ -39,6 +39,8 @@ data class PlayerState(
     val transcodeKbps: Int = 0,
     /** Songs still to come after this one, in the order they'll play (shuffle included), for keep playing (issue #337). */
     val left: Int = 0,
+    /** Positions in [queue] of songs keep playing or a song radio added by itself (issue #337). */
+    val auto: Set<Int> = emptySet(),
 )
 
 /** The app's side of playback: a MediaController talking to [PlaybackService]. */
@@ -193,20 +195,22 @@ class PlayerConnection(
     }
 
     /** Keeps the current song playing and swaps everything after it for [songs]. */
-    fun replaceUpcoming(songs: List<Song>) {
+    /** [auto]: the songs were picked by a song radio, not chosen, and the queue marks them (issue #337). */
+    fun replaceUpcoming(songs: List<Song>, auto: Boolean = false) {
         SongRegistry.register(songs)
         withController { c ->
             val keep = c.currentMediaItemIndex + 1
             if (c.mediaItemCount > keep) c.removeMediaItems(keep, c.mediaItemCount)
             c.shuffleModeEnabled = false
-            c.addMediaItems(songs.map { it.toMediaItem(api) })
+            c.addMediaItems(songs.map { it.toMediaItem(api, auto = auto) })
         }
     }
 
-    fun addAll(songs: List<Song>) {
+    /** [auto]: the songs were picked by a song radio, not chosen, and the queue marks them (issue #337). */
+    fun addAll(songs: List<Song>, auto: Boolean = false) {
         if (songs.isEmpty()) return
         SongRegistry.register(songs)
-        withController { c -> c.addMediaItems(songs.map { it.toMediaItem(api) }) }
+        withController { c -> c.addMediaItems(songs.map { it.toMediaItem(api, auto = auto) }) }
     }
 
     /**
@@ -219,7 +223,8 @@ class PlayerConnection(
         withController { c ->
             val ended = c.playbackState == Player.STATE_ENDED && c.playWhenReady
             val first = c.mediaItemCount
-            c.addMediaItems(songs.map { it.toMediaItem(api) })
+            // Keep playing picked these itself: the queue marks them (issue #337).
+            c.addMediaItems(songs.map { it.toMediaItem(api, auto = true) })
             if (ended) {
                 c.seekTo(first, 0L)
                 c.prepare()
@@ -311,6 +316,7 @@ class PlayerConnection(
                 .takeIf { it.getString(StreamQuality.EXTRA_SONG_ID) == current?.id }
                 ?.getInt(StreamQuality.EXTRA_KBPS, 0) ?: 0,
             left = leftInPlayOrder(c),
+            auto = (0 until c.mediaItemCount).filter { c.getMediaItemAt(it).isAuto() }.toSet(),
         )
     }
 

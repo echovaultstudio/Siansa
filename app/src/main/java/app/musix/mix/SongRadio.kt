@@ -59,6 +59,10 @@ class SongRadio(private val graph: AppGraph) {
     /** The song the radio started from, or null when no radio is on. */
     val seed: StateFlow<Song?> = _seed.asStateFlow()
 
+    /** How the radio picks (issue #337): Steady, songs in the order they're alike; DJ, ordered for smooth changes. */
+    @Volatile var mode: ContinuousMode = ContinuousMode.STEADY
+        private set
+
     private var watcher: Job? = null
     private val heard = LinkedHashSet<String>()
     private var topping = false
@@ -68,26 +72,37 @@ class SongRadio(private val graph: AppGraph) {
         graph.player.onNewQueue = { stop() }
     }
 
-    /** Starts from [song]: if it's playing, it keeps playing and the radio follows; otherwise it plays first. */
-    fun start(song: Song, onError: (String) -> Unit = {}) {
+    /**
+     * Starts from [song] in [mode] (Steady or DJ, issue #337): if it's playing, it keeps playing and the radio
+     * follows; otherwise it plays first. Only the radio's songs follow it, marked in the queue as added by the
+     * radio, and more are added as it nears the end, so the music doesn't stop.
+     */
+    fun start(song: Song, mode: ContinuousMode = ContinuousMode.STEADY, onError: (String) -> Unit = {}) {
         stop()
+        val picked = if (mode == ContinuousMode.OFF) ContinuousMode.STEADY else mode
         graph.scope.launch {
             val started = System.currentTimeMillis()
-            val similar = runCatching { find(song, 30) }
+            val similar = runCatching { arrange(picked, song, find(song, 30)) }
                 .onFailure { AppLog.w("SongRadio", "Couldn't find similar songs: ${it.message}") }
                 .getOrDefault(emptyList())
             if (similar.isEmpty()) {
                 withContext(Dispatchers.Main) { onError("No similar songs found for ${song.title}") }
                 return@launch
             }
-            AppLog.i("SongRadio", "Started from ${song.id} \"${song.title}\" with ${similar.size} songs in ${System.currentTimeMillis() - started}ms")
+            AppLog.i(
+                "SongRadio",
+                "Started (${picked.label}) from ${song.id} \"${song.title}\" with ${similar.size} songs in ${System.currentTimeMillis() - started}ms",
+            )
             withContext(Dispatchers.Main) {
                 val playingSeed = graph.player.state.value.current?.id == song.id
                 if (playingSeed) {
-                    graph.player.replaceUpcoming(similar)
+                    graph.player.replaceUpcoming(similar, auto = true)
                 } else {
-                    graph.player.play(listOf(song) + similar)
+                    // The first song as chosen, then the radio's picks, marked as such in the queue.
+                    graph.player.play(listOf(song))
+                    graph.player.addAll(similar, auto = true)
                 }
+                mode = picked
                 heard.clear()
                 topUps = 0
                 heard += song.id
@@ -119,14 +134,17 @@ class SongRadio(private val graph: AppGraph) {
                         val seed = _seed.value ?: return@collectLatest
                         val drift = graph.settings.current.radioDrift
                         val anchor = radioAnchor(drift, topUps++)
-                        val more = topUp(seed, current, anchor).filter { it.id !in heard }
+                        val found = topUp(seed, current, anchor).filter { it.id !in heard }
+                        // DJ carries on from the last song queued, for a smooth change into the new ones.
+                        val tail = graph.player.state.value.queue.lastOrNull() ?: current
+                        val more = arrange(mode, tail, found)
                         AppLog.i(
                             "SongRadio",
                             "Topped up with ${more.size} songs (${drift.label.lowercase()}, ${anchor.name.lowercase()}) " +
                                 "like \"${if (anchor == RadioAnchor.SEED) seed.title else current.title}\"",
                         )
                         heard += more.map { it.id }
-                        if (more.isNotEmpty()) withContext(Dispatchers.Main) { graph.player.addAll(more) }
+                        if (more.isNotEmpty()) withContext(Dispatchers.Main) { graph.player.addAll(more, auto = true) }
                     } catch (e: Exception) {
                         AppLog.w("SongRadio", "Top-up failed: ${e.message}")
                     } finally {
@@ -149,6 +167,10 @@ class SongRadio(private val graph: AppGraph) {
             if (ids != null) graph.generator.resolveSongs(ids) else find(seed, TOP_UP)
         }
     }
+
+    /** [songs] in DJ order after [after] when the radio is in DJ mode; otherwise as found (most alike first). */
+    private suspend fun arrange(mode: ContinuousMode, after: Song, songs: List<Song>): List<Song> =
+        if (mode == ContinuousMode.DJ) graph.continuousPlay.djArrange(after, songs) else songs
 
     private suspend fun find(song: Song, count: Int): List<Song> {
         // Asks for enough to have [count] left after leaving out what's been heard (the seed's list repeats).
