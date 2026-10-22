@@ -3,6 +3,41 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.25.0beta — 2026-10-22
+
+### Fixed
+- **Now playing showed the album cover for songs with a cover of their own.** Songs on compilations and
+  discs with their own artwork now show their own cover. When a song's cover is just the album's again, an
+  animated album cover still plays.
+- **Several artists tagged in one name showed as one artist.** A name like "Rudimental, Orginal Koffee & Winny"
+  is now shown as its own artists when Musix can tell them apart: each artist's page includes those songs and
+  albums, and Go to artist lets you pick one. Musix now keeps each artist's MusicBrainz ID to check this, and
+  never splits an artist that has its own (like "Earth, Wind & Fire"). It takes effect after the next sync.
+
+### Added
+- **Dscvr, a new tab between Your Library and Settings.** "Describe your Aura" (it used to be "How are you
+  feeling?" on Home) makes a vibe from your words. Under it, set sliders for energy, tempo, familiar or niche
+  artists and a few sounds, then Generate a custom vibe. On a vibe you can save it as a playlist, pin it to
+  Home's carousel, or tune the sliders again: the songs are picked again when you let go. Your recent vibes are
+  listed on the tab.
+- **Search makes vibes too.** Type anything and pick "Make a vibe from …" above the results.
+- **Style in Settings.** Themes moved here as "Theme", next to three new pages:
+  - **Now Playing Style:** turn the lyrics button off to get the earlier look back, with the lyrics card
+    peeking in below the player.
+  - **Mini Player:** drag the buttons into the order you like, hide them, or add Lyrics, Add to playlist and
+    Like (up to four).
+  - **Nav Bar:** drag the tabs into the order you like and hide the ones you don't use. Settings always stays.
+
+### Changed
+- **Start song radio asks Steady or DJ.** Steady plays songs like the one you picked, the most alike first. DJ
+  orders them for smooth changes in tempo and key. Only the radio's songs follow, and more are added as it nears
+  the end, so the music doesn't stop.
+- **Songs added by themselves are marked in the queue.** A small star shows next to songs that a song radio or
+  Keep playing added for you.
+- **Vibes in Settings is now "Daily Vibe settings".**
+- **The song playing now in the queue and on album pages no longer says "Now playing".** It's still highlighted.
+  Tap its cover (or its number on an album page) to pause, and again to play on.
+
 ## 0.24.0beta — 2026-10-21
 
 ### Added
