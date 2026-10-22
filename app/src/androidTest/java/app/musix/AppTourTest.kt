@@ -325,7 +325,7 @@ class AppTourTest {
                 tab("Settings")
                 idle(800)
                 shot("18-settings")
-                listOf("Users and library sync", "Connections", "Playback", "Themes", "Downloads", "Scrobbling", "Storage", "Logs").forEachIndexed { i, page ->
+                listOf("Users and library sync", "Connections", "Playback", "Style", "Downloads", "Scrobbling", "Storage", "Logs").forEachIndexed { i, page ->
                     tab("Settings")
                     click(page)
                     idle(1200)
@@ -355,7 +355,10 @@ class AppTourTest {
                     idle(1200)
                     shot("19d-home-sunset-pure-black")
                     tab("Settings")
-                    click("Themes")
+                    // Themes is inside Style since issue #346.
+                    click("Style")
+                    waitText("Theme")
+                    click("Theme")
                     waitText("Pure black")
                     idle(800)
                     shot("19e-themes-sunset-dark")

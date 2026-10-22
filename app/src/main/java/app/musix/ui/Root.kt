@@ -1,5 +1,13 @@
 package app.musix.ui
 
+import app.musix.data.MiniButton
+import androidx.compose.material.icons.rounded.ChatBubble
+import androidx.compose.material.icons.rounded.AddCircleOutline
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
+
+import app.musix.data.NavTab
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -100,14 +108,20 @@ import app.musix.playback.PlayerState
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
-private val tabs = listOf(
-    Tab("home", "Home", Icons.Rounded.Home),
-    Tab("search", "Search", Icons.Rounded.Search),
-    Tab("library", "Your Library", Icons.Rounded.LibraryMusic),
-    // Describe your aura or tune a vibe (issue #339); between Your Library and Settings.
-    Tab("dscvr", "Dscvr", DscvrStars),
-    Tab("settings", "Settings", Icons.Rounded.Settings),
-)
+/** A bottom-bar tab's look; which tabs show, and in what order, is set in Settings › Style › Nav Bar (issue #346). */
+internal fun NavTab.icon(): ImageVector = when (this) {
+    NavTab.HOME -> Icons.Rounded.Home
+    NavTab.SEARCH -> Icons.Rounded.Search
+    NavTab.LIBRARY -> Icons.Rounded.LibraryMusic
+    // Describe your aura or tune a vibe (issue #339).
+    NavTab.DSCVR -> DscvrStars
+    NavTab.SETTINGS -> Icons.Rounded.Settings
+}
+
+private fun tabsOf(shown: List<NavTab>): List<Tab> = shown.map { Tab(it.route, it.label, it.icon()) }
+
+/** Every route that's a tab, shown or not, so the bar knows which tab a page belongs to. */
+private val allTabRoutes = NavTab.entries.map { it.route }.toSet()
 
 /** Height of the see-through bottom bar (mini player + tabs), so scrolling pages can end above it. */
 val LocalBottomBarPadding = compositionLocalOf { 0.dp }
@@ -160,13 +174,15 @@ fun MusixRoot() {
     val route = entry?.destination?.route
     // The tab the user is "in", which stays lit while they browse deeper (album, artist…).
     var currentTab by rememberSaveable { mutableStateOf("home") }
+    val appSettings by graph.settings.state.collectAsStateWithLifecycle()
+    val tabs = tabsOf(appSettings.navTabs)
 
     LaunchedEffect(route) {
         if (route != null) {
             AppLog.i("Nav", route)
             AppLog.screen = route
         }
-        tabs.firstOrNull { it.route == route }?.let { currentTab = it.route }
+        if (route != null && route in allTabRoutes) currentTab = route
     }
     LaunchedEffect(Unit) {
         if (!graph.settings.current.navidromeReady) nav.navigate("settings/connections")
@@ -258,6 +274,10 @@ fun MusixRoot() {
                 composable("settings/users") { UsersScreen(nav) }
                 composable("settings/playback") { PlaybackSettingsScreen(nav) }
                 composable("settings/themes") { ThemesScreen(nav) }
+                composable("settings/style") { StyleScreen(nav) }
+                composable("settings/style/now-playing") { NowPlayingStyleScreen(nav) }
+                composable("settings/style/mini-player") { MiniPlayerStyleScreen(nav) }
+                composable("settings/style/nav-bar") { NavBarStyleScreen(nav) }
                 composable("settings/equaliser") { EqualiserScreen(nav) }
                 composable("settings/crossfade") { CrossfadeScreen(nav) }
                 composable("settings/storage") { StorageScreen(nav) }
@@ -410,30 +430,65 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
                     )
                 }
               }
-                // Tap to play or pause; press and hold to stop and clear the queue.
-                Box(
-                    Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .combinedClickable(
-                            onClick = { graph.player.togglePlay() },
-                            onLongClick = {
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                graph.player.stop()
-                            },
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, "Play or pause")
-                }
-                CastButton()
-                IconButton(onClick = { graph.player.next() }) {
-                    Icon(Icons.Rounded.SkipNext, "Next")
+                // The buttons and their order are set in Settings › Style › Mini Player (issue #346).
+                val settings by graph.settings.state.collectAsStateWithLifecycle()
+                settings.miniButtons.forEach { button ->
+                    MiniPlayerButton(button, state, song, onOpen, onStop = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        graph.player.stop()
+                    })
                 }
             }
             MiniProgress(state.durationMs)
         }
       }
+    }
+}
+
+/** One of the mini player's buttons (issue #346); each sits in a 48 dp slot, so they stay evenly spaced. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun MiniPlayerButton(button: MiniButton, state: PlayerState, song: app.musix.data.Song, onOpen: () -> Unit, onStop: () -> Unit) {
+    val graph = LocalGraph.current
+    when (button) {
+        // Tap to play or pause; press and hold to stop and clear the queue.
+        MiniButton.PLAY -> Box(
+            Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .combinedClickable(onClick = { graph.player.togglePlay() }, onLongClick = onStop),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, "Play or pause")
+        }
+        MiniButton.CAST -> CastButton()
+        MiniButton.NEXT -> IconButton(onClick = { graph.player.next() }) { Icon(Icons.Rounded.SkipNext, "Next") }
+        // Opens now playing with the lyrics showing.
+        MiniButton.LYRICS -> IconButton(onClick = { LyricsShortcut.open(); onOpen() }) {
+            Icon(Icons.Rounded.ChatBubble, "Lyrics")
+        }
+        MiniButton.ADD -> {
+            val launch = rememberPlayLauncher()
+            var picking by remember { mutableStateOf(false) }
+            IconButton(onClick = { picking = true }) { Icon(Icons.Rounded.AddCircleOutline, "Add to playlist") }
+            if (picking) {
+                AddToPlaylistDialog(listOf(song)) { message ->
+                    picking = false
+                    message?.let { launch.notify(it) }
+                }
+            }
+        }
+        MiniButton.LIKE -> {
+            val changes by graph.favorites.changes.collectAsStateWithLifecycle()
+            val liked = changes.let { graph.favorites.isLiked(song) }
+            IconButton(onClick = { graph.favorites.toggle(song) }) {
+                Icon(
+                    if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                    if (liked) "Remove from liked songs" else "Like",
+                    tint = if (liked) Accent else LocalContentColor.current,
+                )
+            }
+        }
     }
 }
 

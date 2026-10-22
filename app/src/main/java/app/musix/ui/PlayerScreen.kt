@@ -167,6 +167,17 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     val heartChanges by graph.favorites.changes.collectAsStateWithLifecycle()
     var queueOpen by rememberSaveable { mutableStateOf(false) }
     var lyricsOpen by rememberSaveable { mutableStateOf(false) }
+    // The mini player's lyrics button opens now playing with the lyrics showing (issue #346).
+    val lyricsWanted by LyricsShortcut.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(lyricsWanted) {
+        if (lyricsWanted) {
+            lyricsOpen = true
+            LyricsShortcut.pending.value = false
+        }
+    }
+    // Settings › Style › Now Playing Style: off brings back the look before the lyrics button (issue #346).
+    val style by graph.settings.state.collectAsStateWithLifecycle()
+    val classic = !style.nowPlayingLyricsButton
     var menuOpen by remember { mutableStateOf(false) }
     var sleepOpen by rememberSaveable { mutableStateOf(false) }
     val song = state.current
@@ -295,16 +306,31 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
             val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 // The player fills the screen; the cards below only come into view when scrolling, so none
-                // sits under the phone's own buttons (#294).
-                val pageHeight = maxHeight
+                // sits under the phone's own buttons (#294). The classic style leaves the top of the lyrics card
+                // peeking in at the bottom, as in Spotify, to show there's more below (issue #346).
+                val pageHeight = if (classic) maxHeight - PLAYER_PEEK - navBar else maxHeight
                 val pageHeightPx = with(LocalDensity.current) { pageHeight.toPx() }
+                val queueButton = @Composable {
+                    RoundIcon(
+                        Icons.AutoMirrored.Rounded.QueueMusic,
+                        "Queue",
+                        Modifier.pointerInput(Unit) {
+                            var pulled = 0f
+                            detectVerticalDragGestures(onDragStart = { pulled = 0f }) { change, dy ->
+                                change.consume()
+                                pulled += dy
+                                if (pulled < -QUEUE_PULL_PX) queueOpen = true
+                            }
+                        },
+                    ) { queueOpen = true }
+                }
                 Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
                     Column(
                         Modifier
                             .height(pageHeight)
                             .statusBarsPadding()
                             .padding(horizontal = Space.Section)
-                            .padding(bottom = navBar),
+                            .then(if (classic) Modifier else Modifier.padding(bottom = navBar)),
                     ) {
                         // A gap above the header that suits the screen's height, so the top of the player
                         // isn't pressed against the status bar.
@@ -323,7 +349,15 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         // The lyrics bottom left (greyed out when the song has none), where the music plays in
                         // the middle (with the TV, speaker or headphones' name), and the queue bottom right: tap
                         // it, or swipe up from it (#294).
-                        Row(Modifier.fillMaxWidth().padding(top = Space.Medium, bottom = Space.Small), verticalAlignment = Alignment.CenterVertically) {
+                        if (classic) {
+                            // The classic style (before #294): where the music plays bottom left, the queue bottom right.
+                            Row(Modifier.fillMaxWidth().padding(top = Space.Medium, bottom = Space.Small).testTag("classicBottomRow"), verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                                    CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
+                                }
+                                queueButton()
+                            }
+                        } else Row(Modifier.fillMaxWidth().padding(top = Space.Medium, bottom = Space.Small), verticalAlignment = Alignment.CenterVertically) {
                             // The device name gets all the room between the two buttons (issue #311).
                             Box(Modifier.width(SIDE_BUTTON_WIDTH), contentAlignment = Alignment.Center) {
                                 LyricsButton(enabled = hasLyrics(songLyrics)) { lyricsOpen = true }
@@ -332,18 +366,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                                 CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
                             }
                             Box(Modifier.width(SIDE_BUTTON_WIDTH), contentAlignment = Alignment.Center) {
-                                RoundIcon(
-                                    Icons.AutoMirrored.Rounded.QueueMusic,
-                                    "Queue",
-                                    Modifier.pointerInput(Unit) {
-                                        var pulled = 0f
-                                        detectVerticalDragGestures(onDragStart = { pulled = 0f }) { change, dy ->
-                                            change.consume()
-                                            pulled += dy
-                                            if (pulled < -QUEUE_PULL_PX) queueOpen = true
-                                        }
-                                    },
-                                ) { queueOpen = true }
+                                queueButton()
                             }
                         }
                     }
@@ -780,6 +803,15 @@ private fun QueueView(state: PlayerState) {
     }
 }
 
+
+/** In the classic now playing style, how much of the lyrics card shows under the player before scrolling (issue #346). */
+private val PLAYER_PEEK = 44.dp
+
+/** The mini player's lyrics button asks now playing to open with the lyrics showing (issue #346). */
+object LyricsShortcut {
+    val pending = kotlinx.coroutines.flow.MutableStateFlow(false)
+    fun open() { pending.value = true }
+}
 
 /** How strongly the song playing now is marked in the queue (#212). */
 private const val NOW_PLAYING_TINT = 0.14f
