@@ -764,7 +764,7 @@ private fun QueueView(state: PlayerState) {
         Spacer(Modifier.height(Space.Tight))
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             itemsIndexed(state.queue, key = { i, s -> "$i-${s.id}" }) { index, song ->
-                // The song playing now stands out: a band behind it and "Now playing" under its title (#212).
+                // The song playing now stands out with a band behind it (#212); its cover pauses and plays (#345).
                 val playing = index == state.index
                 Box(Modifier.fillMaxWidth().background(if (playing) Color.White.copy(alpha = NOW_PLAYING_TINT) else Color.Transparent).testTag(if (playing) "queueNowPlaying" else "queueRow")) {
                     SongRow(
@@ -772,7 +772,8 @@ private fun QueueView(state: PlayerState) {
                         onClick = { graph.player.skipTo(index) },
                         highlighted = playing,
                         swipeToQueue = false,
-                        subtitle = if (playing) listOfNotNull("Now playing", artistAndAlbum(song)).joinToString(" · ") else artistAndAlbum(song),
+                        subtitle = artistAndAlbum(song),
+                        nowPlaying = playing,
                     )
                 }
             }
