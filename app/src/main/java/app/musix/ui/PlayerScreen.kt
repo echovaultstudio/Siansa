@@ -797,6 +797,7 @@ private fun QueueView(state: PlayerState) {
                         swipeToQueue = false,
                         subtitle = artistAndAlbum(song),
                         nowPlaying = playing,
+                        autoAdded = index in state.auto,
                     )
                 }
             }
