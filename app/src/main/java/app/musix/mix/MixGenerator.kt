@@ -384,11 +384,17 @@ class MixGenerator(private val graph: AppGraph) {
         val concepts = runCatching { graph.audioMuse.concepts() }.getOrDefault(emptyList()).take(80)
         val recent = graph.history.recent(15).map { "${it.artist} – ${it.title}" }
         val day = now.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
+        // The same moment the vibes use (issue #339): weather, movement, light and charging, as set in Vibes.
+        val options = graph.settings.current.situation
+        val situation = runCatching { graph.situation.read(options) }
+            .onFailure { AppLog.w("Mood", "Couldn't read the moment: ${it.message}") }
+            .getOrDefault(Situation())
         val user = buildString {
             appendLine("The listener describes their mood or wish: \"$mood\"")
             appendLine("Make a playlist that fits it. Title it from their words.")
             appendLine("Now: $day %02d:%02d".format(now.hour, now.minute))
-            appendLine("Listening on: ${describeOutput(graph.app)}")
+            if (options.device) appendLine("Listening on: ${describeOutput(graph.app)}")
+            if (!situation.isEmpty) appendLine("Right now: ${situation.describe()}")
             if (recent.isNotEmpty()) appendLine("Recently played: ${recent.joinToString("; ")}")
             if (concepts.isNotEmpty()) appendLine("Sound concepts the search understands well: ${concepts.joinToString(", ")}")
         }
