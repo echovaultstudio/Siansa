@@ -183,7 +183,8 @@ fun CollectionPage(
                                     leading = if (numbered) song.track?.toString() ?: "${index + 1}" else null,
                                     highlighted = now,
                                     showCover = showCovers,
-                                    subtitle = if (now) listOfNotNull("Now playing", subtitle?.ifBlank { null }).joinToString(" · ") else subtitle,
+                                    subtitle = subtitle,
+                                    nowPlaying = now,
                                     extraMenu = { close -> songMenu?.invoke(index, song, close) },
                                 )
                             }

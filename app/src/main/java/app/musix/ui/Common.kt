@@ -31,6 +31,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -441,6 +443,9 @@ fun SongRow(
     swipeToQueue: Boolean = true,
     // Extra items at the end of the ⋮ menu (such as removing it from a playlist); call close() when picked.
     extraMenu: @Composable (close: () -> Unit) -> Unit = {},
+    // The song playing now (queue, album and playlist pages): its cover, or its number when covers are
+    // hidden, shows play or pause, and a tap on it pauses or plays on (issue #345).
+    nowPlaying: Boolean = false,
 ) {
     val graph = LocalGraph.current
     val nav = LocalNav.current
@@ -463,15 +468,25 @@ fun SongRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (leading != null) {
-                Text(
-                    leading,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(32.dp),
-                )
+                if (nowPlaying && !showCover) {
+                    // No cover on this page: the number's place holds the play/pause toggle instead (issue #345).
+                    Box(Modifier.width(32.dp), contentAlignment = Alignment.CenterStart) {
+                        NowPlayingToggle(Modifier.size(28.dp), RoundedCornerShape(14.dp), overCover = false)
+                    }
+                } else {
+                    Text(
+                        leading,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.width(32.dp),
+                    )
+                }
             }
             if (showCover) {
-                Cover(song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
+                Box(Modifier.size(48.dp)) {
+                    Cover(song.cover, 150, Modifier.size(48.dp), RoundedCornerShape(6.dp))
+                    if (nowPlaying) NowPlayingToggle(Modifier.size(48.dp), RoundedCornerShape(6.dp), overCover = true)
+                }
                 Spacer(Modifier.width(Space.Medium))
             }
             Column(Modifier.weight(1f)) {
@@ -577,6 +592,38 @@ fun SongRow(
             pickPlaylist = false
             message?.let { launch.notify(it) }
         }
+    }
+}
+
+/** What the play/pause toggle on the song playing now says to a screen reader: what a tap will do (issue #345). */
+internal fun playPauseLabel(isPlaying: Boolean): String = if (isPlaying) "Pause" else "Play"
+
+/**
+ * The play/pause toggle on the song playing now in a list (issue #345): pause while it plays, play while it's
+ * paused. Over a cover it dims the cover so the symbol reads on any artwork; in place of a track number it's
+ * the plain symbol in the theme's colour.
+ */
+@Composable
+private fun NowPlayingToggle(modifier: Modifier, shape: Shape, overCover: Boolean) {
+    val graph = LocalGraph.current
+    val state by graph.player.state.collectAsStateWithLifecycle()
+    val playing = state.isPlaying
+    Box(
+        modifier
+            .clip(shape)
+            .background(if (overCover) Color.Black.copy(alpha = 0.45f) else Color.Transparent)
+            .clickable(onClickLabel = playPauseLabel(playing)) {
+                AppLog.d("Ui", "Now playing row: ${if (playing) "pause" else "play"}")
+                graph.player.togglePlay()
+            }
+            .testTag("nowPlayingToggle"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+            playPauseLabel(playing),
+            tint = if (overCover) Color.White else MaterialTheme.colorScheme.primary,
+        )
     }
 }
 
