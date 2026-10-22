@@ -102,7 +102,7 @@ class SongRadio(private val graph: AppGraph) {
                     graph.player.play(listOf(song))
                     graph.player.addAll(similar, auto = true)
                 }
-                mode = picked
+                this@SongRadio.mode = picked
                 heard.clear()
                 topUps = 0
                 heard += song.id
