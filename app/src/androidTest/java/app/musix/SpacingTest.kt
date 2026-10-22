@@ -5,6 +5,7 @@ import app.musix.ui.LyricsSwitchRow
 import app.musix.ui.PathMoodPicker
 import app.musix.ui.Space
 import app.musix.ui.VibeSliders
+import app.musix.ui.DragOrderRow
 import app.musix.mix.SoundDial
 import app.musix.mix.VibeTuning
 import androidx.compose.material3.Text
@@ -475,5 +476,20 @@ class SpacingTest {
         val sound = compose.onNodeWithTag("sliderSound").getBoundsInRoot()
         assertEven("Vibe sliders", tempo.top - energy.bottom, familiar.top - tempo.bottom, 1.dp)
         assertEven("Vibe sliders", familiar.top - tempo.bottom, sound.top - familiar.bottom, 1.dp)
+    }
+
+    /** Style › Mini Player and Nav Bar (issue #346): the draggable buttons sit on evenly spaced slots. */
+    @Test fun styleDragSlotsAreEven() {
+        compose.setContent {
+            MusixTheme {
+                DragOrderRow(listOf("a", "b", "c", "d"), slot = 48.dp, onReorder = { }) { item, _ ->
+                    androidx.compose.material3.Text(item)
+                }
+            }
+        }
+        val slots = compose.onAllNodesWithTag("dragSlot").fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(4, slots.size)
+        val gaps = slots.zipWithNext { a, b -> with(compose.density) { (b.left - a.left).toDp() } }
+        gaps.forEach { assertEven("Drag slots", gaps[0], it, 1.dp) }
     }
 }

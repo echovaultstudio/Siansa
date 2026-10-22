@@ -130,16 +130,12 @@ fun SettingsHub(nav: NavController) {
                 "Playback",
                 eqSummary(eq) + " · " + crossfadeSummary(settings).replaceFirstChar { it.lowercase() } + " · Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}",
             ) { nav.navigate("settings/playback") }
-            val theme = themeChoiceOf(settings)
+            // Themes moved into Style, with the now playing, mini player and nav bar looks (issue #346).
             HubRow(
                 Icons.Rounded.Palette,
-                "Themes",
-                (if (theme.colours == ThemeColours.YOURS) "Your colour ${ThemeTones.toHex(theme.seed)} · " else "${theme.colours.label} colours · ") + when (theme.mode) {
-                    ThemeMode.AUTO -> "follows the phone"
-                    ThemeMode.LIGHT -> "light"
-                    ThemeMode.DARK -> if (theme.pureBlack) "dark, pure black" else "dark"
-                },
-            ) { nav.navigate("settings/themes") }
+                "Style",
+                "Theme, now playing, mini player and nav bar",
+            ) { nav.navigate("settings/style") }
             HubRow(
                 Icons.Rounded.GraphicEq,
                 "Scrobbling",
@@ -199,7 +195,7 @@ internal fun syncSummary(progress: app.musix.data.SyncProgress, library: app.mus
 }
 
 @Composable
-private fun HubRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+internal fun HubRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Space.Page, vertical = Space.Page),
         verticalAlignment = Alignment.CenterVertically,
@@ -210,6 +206,16 @@ private fun HubRow(icon: ImageVector, title: String, subtitle: String, onClick: 
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
+    }
+}
+
+/** The theme in a line: "Musix colours · follows the phone", "Your colour #3A7BD5 · dark, pure black". */
+internal fun themeSummary(settings: AppSettings): String {
+    val theme = themeChoiceOf(settings)
+    return (if (theme.colours == ThemeColours.YOURS) "Your colour ${ThemeTones.toHex(theme.seed)} · " else "${theme.colours.label} colours · ") + when (theme.mode) {
+        ThemeMode.AUTO -> "follows the phone"
+        ThemeMode.LIGHT -> "light"
+        ThemeMode.DARK -> if (theme.pureBlack) "dark, pure black" else "dark"
     }
 }
 
