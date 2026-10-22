@@ -218,8 +218,20 @@ class ContinuousPlay(private val graph: AppGraph) {
         }
     }
 
+    /**
+     * [songs] in DJ order after [last] (issue #337): smooth changes in tempo and key, the most alike first. A song
+     * radio in DJ mode uses this too. [songs] as they are when AudioMuse's analysis isn't available.
+     */
+    suspend fun djArrange(last: Song, songs: List<Song>): List<Song> {
+        if (songs.size < 2) return songs
+        val byId = songs.associateBy { it.id }
+        val hits = songs.map { app.musix.net.ClapHit(it.id, it.title, it.artist, it.album, 0.0) }
+        val ids = djIds(last, hits, songs.size) ?: return songs
+        return ids.mapNotNull { byId[it] }
+    }
+
     /** DJ mode's order of [hits] after [last]; null when AudioMuse's analysis isn't available (Steady order then). */
-    private suspend fun djIds(last: Song, hits: List<app.musix.net.ClapHit>): List<String>? {
+    private suspend fun djIds(last: Song, hits: List<app.musix.net.ClapHit>, count: Int = TOP_UP): List<String>? {
         if (!graph.settings.current.audioMuseReady) {
             AppLog.i("KeepPlaying", "DJ needs AudioMuse; adding in Steady order")
             return null
@@ -235,7 +247,7 @@ class ContinuousPlay(private val graph: AppGraph) {
             val f = features[hit.id]
             DjTrack(hit.id, hit.artist, likenessByRank(i, hits.size), f?.tempo, f?.key, f?.scale)
         }
-        val order = djOrder(seed, pool, TOP_UP)
+        val order = djOrder(seed, pool, count)
         AppLog.d(
             "KeepPlaying",
             "DJ from ${seed.tempo?.let { "%.0f BPM".format(it) } ?: "unknown tempo"} ${seed.key.orEmpty()} ${seed.scale.orEmpty()}: " +
