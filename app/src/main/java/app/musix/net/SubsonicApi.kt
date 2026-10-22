@@ -529,6 +529,8 @@ class SubsonicApi(
         albumCount = o.int("albumCount") ?: 0,
         coverArt = o.str("coverArt"),
         imageUrl = o.str("artistImageUrl"),
+        // OpenSubsonic's "musicBrainzId"; Navidrome sends "" for artists without one (issue #359).
+        mbid = o.str("musicBrainzId")?.trim()?.takeIf { it.isNotEmpty() },
     )
 
     internal companion object {

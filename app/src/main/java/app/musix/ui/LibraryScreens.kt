@@ -263,6 +263,8 @@ fun SyncPrompt(nav: NavController) {
 @Composable
 fun AlbumScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
+    // An album artist that's several artists in one name offers each of them (issue #359).
+    val openArtists = rememberArtistsOpener()
     val detail by loadState(id) {
         val album = graph.library.album(id)
         val songs = album?.let { graph.library.songsOf(it) }.orEmpty()
@@ -298,7 +300,7 @@ fun AlbumScreen(nav: NavController, id: String) {
                 CollectionByline(
                     d.album.artist,
                     artistCover.valueOrNull(),
-                    d.album.artistId?.let { artistId -> { nav.navigate("artist/$artistId") } },
+                    d.album.artistId?.let { artistId -> { openArtists { artistsNamedBy(graph, artistId, d.album.artist) } } },
                     listOfNotNull(
                         d.album.category.single,
                         d.album.year?.toString(),
