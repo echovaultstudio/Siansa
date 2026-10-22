@@ -141,8 +141,16 @@ object AnimatedCovers {
      */
     suspend fun preload(context: Context, graph: AppGraph, song: app.musix.data.Song) {
         val cover = song.coverArt ?: song.albumId?.let { "al-$it" } ?: return
-        val album = song.albumId?.let { if (it.startsWith("al-")) it else "al-$it" }
-        val kind = if (album == null) Kind.Still else kind(graph, album) ?: return
+        // The same cover now playing will pick: the song's own picture, or its album's animation when the
+        // song's is just that picture again (issue #358).
+        val own = bigCoverKey(song.coverArt, song.albumId)
+        val ownKind = if (own == null) Kind.Still else kind(graph, own) ?: return
+        val albumId = albumCoverKey(song.albumId)
+        val (album, kind) = if (own == null) null to ownKind else {
+            val albumKind = albumId?.takeIf { it != own && ownKind == Kind.Still }?.let { kind(graph, it) }
+            val same = if (albumId != null && (albumKind is Kind.Animated || albumKind == Kind.Local)) CoverMatch.same(context, graph, own, albumId) else null
+            pickBigCover(own, ownKind, albumId, albumKind, same)
+        }
         val loader = SingletonImageLoader.get(context.applicationContext)
         // The small one is shown first while anything else loads.
         loader.enqueue(coverRequest(context.applicationContext, graph, cover, SMALL_COVER))
@@ -335,25 +343,76 @@ fun AnimatedCover(coverId: String, kind: AnimatedCovers.Kind, modifier: Modifier
 }
 
 /**
+ * The cover id the big cover in now playing checks for animation and animates (issue #358). Navidrome gives a
+ * song its own id when it has a picture of its own (`mf-…`, only while the server's EnableMediaFileCoverArt is
+ * on) or its disc's (`dc-…`, on albums with several discs); those are checked first, so a compilation's or a
+ * disc's own cover can show instead of the album's. Anything else (`al-…`, or no id) is the album's cover.
+ */
+internal fun bigCoverKey(coverId: String?, albumId: String?): String? {
+    val own = coverId?.let { CoverStore.canonical(it) }
+    if (own != null && (own.startsWith("mf-") || own.startsWith("dc-"))) return coverId
+    return albumCoverKey(albumId) ?: coverId
+}
+
+/** The album's cover id (`al-…`) for an album id, or null without one. */
+internal fun albumCoverKey(albumId: String?): String? = albumId?.let { if (it.startsWith("al-")) it else "al-$it" }
+
+/**
+ * Which cover the big cover animates once both are known (issue #358): the song's own, unless it's a still
+ * that is the same picture as an animated album cover, in which case the album's animation plays.
+ * [same] is null while the two haven't been compared: the song's own is shown meanwhile.
+ */
+internal fun pickBigCover(
+    own: String,
+    ownKind: AnimatedCovers.Kind,
+    album: String?,
+    albumKind: AnimatedCovers.Kind?,
+    same: Boolean?,
+): Pair<String, AnimatedCovers.Kind> {
+    val albumAnimated = albumKind is AnimatedCovers.Kind.Animated || albumKind == AnimatedCovers.Kind.Local
+    return if (album != null && album != own && ownKind == AnimatedCovers.Kind.Still && albumAnimated && same == true) {
+        album to albumKind!!
+    } else {
+        own to ownKind
+    }
+}
+
+/**
  * A big cover (now playing, album page) that's safe for animated albums: the 300 px cover right away,
- * then the large still once the album is known not to be animated, or the animation when it is.
+ * then the large still once the cover is known not to be animated, or the animation when it is. A song
+ * with a picture of its own shows it, unless it's just the album's animated cover again (issue #358).
  */
 // Lint doesn't follow the assignment from the nullable result; it's on the producer's last line.
 @android.annotation.SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
 fun BigCover(coverId: String?, albumId: String?, modifier: Modifier, shape: Shape) {
     val graph = LocalGraph.current
+    val context = LocalContext.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    val albumCover = albumId?.let { if (it.startsWith("al-")) it else "al-$it" }
-    val initial: AnimatedCovers.Kind? = if (albumCover == null) AnimatedCovers.Kind.Still else AnimatedCovers.knownKind(graph, albumCover)
-    val kind by produceState(initial, albumCover) {
-        val found = if (albumCover != null) AnimatedCovers.kind(graph, albumCover) else null
-        this.value = found ?: this.value
+    val own = bigCoverKey(coverId, albumId)
+    val album = albumCoverKey(albumId)
+    // Straight away from what's known, so a cover seen before doesn't flicker between the two.
+    val initial: Pair<String, AnimatedCovers.Kind>? = when {
+        own == null -> null
+        else -> AnimatedCovers.knownKind(graph, own)?.let { ownKind ->
+            val albumKind = album?.takeIf { it != own }?.let { AnimatedCovers.knownKind(graph, it) }
+            val same = album?.let { CoverMatch.knownSame(graph, own, it) }
+            pickBigCover(own, ownKind, album, albumKind, same)
+        }
+    }
+    val picked by produceState(initial, own, album) {
+        if (own == null) return@produceState
+        val ownKind = AnimatedCovers.kind(graph, own) ?: return@produceState
+        val albumKind = album?.takeIf { it != own && ownKind == AnimatedCovers.Kind.Still }?.let { AnimatedCovers.kind(graph, it) }
+        val albumAnimated = albumKind is AnimatedCovers.Kind.Animated || albumKind == AnimatedCovers.Kind.Local
+        val same = if (album != null && albumAnimated) CoverMatch.same(context, graph, own, album) else null
+        this.value = pickBigCover(own, ownKind, album, albumKind, same)
     }
     val small = @Composable { Cover(coverId, SMALL_COVER, Modifier.fillMaxSize(), shape) }
-    when (val k = kind) {
+    val key = picked?.first
+    when (val k = if (own == null) AnimatedCovers.Kind.Still else picked?.second) {
         is AnimatedCovers.Kind.Animated, AnimatedCovers.Kind.Local ->
-            if (settings.animatedCovers && albumCover != null) AnimatedCover(albumCover, k, modifier, shape, small)
+            if (settings.animatedCovers && key != null) AnimatedCover(key, k, modifier, shape, small)
             // Kept on the phone: its still is already there at full size.
             else if (k == AnimatedCovers.Kind.Local) Cover(coverId, LARGE_COVER, modifier, shape)
             else Box(modifier) { small() }
