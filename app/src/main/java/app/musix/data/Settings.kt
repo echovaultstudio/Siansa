@@ -71,6 +71,11 @@ data class AppSettings(
     /** Opus kbit/s for downloads, or 0 for the original file. */
     val downloadKbps: Int = 0,
     val homeOrder: List<HomeSection> = HomeSection.default,
+    /** Settings › Style (issue #346): the mini player's buttons, the bottom bar's tabs, and now playing's lyrics button. */
+    val miniButtons: List<MiniButton> = MiniButton.default,
+    val navTabs: List<NavTab> = NavTab.default,
+    /** On: now playing's lyrics, device and queue buttons (issue #294). Off: the earlier look, lyrics card peeking in. */
+    val nowPlayingLyricsButton: Boolean = true,
     val homeHidden: Set<HomeSection> = emptySet(),
     /** Show only music on the phone, across the whole app (issue #141). */
     val downloadedOnly: Boolean = false,
@@ -222,6 +227,9 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         downloadLimitMb = prefs.getInt("download_limit_mb", 0),
         downloadKbps = prefs.getInt("download_kbps", 0),
         homeOrder = HomeSection.parse(prefs.getString("home_order", null)),
+        miniButtons = MiniButton.parse(prefs.getString("mini_buttons", null)),
+        navTabs = NavTab.parse(prefs.getString("nav_tabs", null)),
+        nowPlayingLyricsButton = prefs.getBoolean("now_playing_lyrics_button", true),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
         timeMachineMissing = prefs.getBoolean("time_machine_missing", true),
@@ -377,6 +385,22 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(logQuiet = quiet)
     }
 
+
+    fun setMiniButtons(buttons: List<MiniButton>) {
+        prefs.edit().putString("mini_buttons", MiniButton.format(buttons)).apply()
+        _state.value = _state.value.copy(miniButtons = buttons)
+    }
+
+    fun setNavTabs(tabs: List<NavTab>) {
+        val kept = NavTab.parse(NavTab.format(tabs))
+        prefs.edit().putString("nav_tabs", NavTab.format(kept)).apply()
+        _state.value = _state.value.copy(navTabs = kept)
+    }
+
+    fun setNowPlayingLyricsButton(on: Boolean) {
+        prefs.edit().putBoolean("now_playing_lyrics_button", on).apply()
+        _state.value = _state.value.copy(nowPlayingLyricsButton = on)
+    }
 
     fun setHomeOrder(order: List<HomeSection>) {
         prefs.edit().putString("home_order", HomeSection.format(order)).apply()
