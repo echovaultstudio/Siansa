@@ -151,7 +151,8 @@ fun SettingsHub(nav: NavController) {
             ) { nav.navigate("settings/scrobbling") }
             HubRow(
                 Icons.Rounded.Schedule,
-                "Vibes",
+                // The daily mixes' times of day; Dscvr's own vibes are on the Dscvr tab (issue #339).
+                "Daily Vibe settings",
                 vibes?.let { "${it.size} ${if (it.size == 1) "vibe" else "vibes"} for your daily mixes" } ?: "Times of day for your daily mixes",
             ) { nav.navigate("vibes") }
             val cards by graph.cards.state.collectAsStateWithLifecycle()

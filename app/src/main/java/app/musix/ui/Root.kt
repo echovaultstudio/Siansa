@@ -104,6 +104,8 @@ private val tabs = listOf(
     Tab("home", "Home", Icons.Rounded.Home),
     Tab("search", "Search", Icons.Rounded.Search),
     Tab("library", "Your Library", Icons.Rounded.LibraryMusic),
+    // Describe your aura or tune a vibe (issue #339); between Your Library and Settings.
+    Tab("dscvr", "Dscvr", DscvrStars),
     Tab("settings", "Settings", Icons.Rounded.Settings),
 )
 
@@ -247,6 +249,8 @@ fun MusixRoot() {
                 composable("search") { SearchScreen(nav) }
                 composable("library") { YourLibraryScreen(nav) }
                 composable("vibes") { VibesScreen(nav) }
+                composable("dscvr") { DscvrScreen(nav) }
+                composable("vibe/{id}") { VibeScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("settings/cards") { CardsSettingsScreen(nav) }
                 composable("card/{id}") { CardScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("settings") { SettingsHub(nav) }

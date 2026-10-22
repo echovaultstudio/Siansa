@@ -250,7 +250,9 @@ class HomeLayoutTest {
     }
 
     @Test fun unknownHiddenIdsAreDropped() {
-        assertEquals(setOf(HomeSection.MOOD), HomeSection.parseHidden("gone, mood ,mood,"))
+        assertEquals(setOf(HomeSection.RADIOS), HomeSection.parseHidden("gone, radios ,radios,"))
+        // "mood" moved off Home to Dscvr (issue #339): an older save naming it is read without it.
+        assertEquals(emptySet<HomeSection>(), HomeSection.parseHidden("mood"))
     }
 
     @Test fun hiddenSectionsAreLeftOutOfHomeInOrder() {

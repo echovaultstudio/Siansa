@@ -1,5 +1,7 @@
 package app.musix.ui
 
+import app.musix.mix.VibeTuning
+
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.activity.compose.BackHandler
@@ -222,7 +224,7 @@ fun SearchScreen(nav: NavController) {
                 )
                 soundMode -> SoundResults(soundSongs, onPlay = ::keepSearch)
                 query.trim().length < 2 -> BrowseGrid(nav)
-                else -> LibraryResults(results, nav, onOpen = ::keepSearch)
+                else -> LibraryResults(results, nav, onOpen = ::keepSearch, query = query.trim(), canVibe = aiProblem == null)
             }
         }
     }
@@ -251,14 +253,18 @@ private fun SoundResults(songs: List<Song>?, onPlay: () -> Unit) {
 }
 
 @Composable
-private fun LibraryResults(results: SearchResults?, nav: NavController, onOpen: () -> Unit) {
+private fun LibraryResults(results: SearchResults?, nav: NavController, onOpen: () -> Unit, query: String, canVibe: Boolean) {
     val graph = LocalGraph.current
     if (results == null) return
+    // One search box for names and for vibes (issue #339): the same words can make a vibe.
+    val vibe = canVibe && query.length >= 3
     if (results.artists.isEmpty() && results.albums.isEmpty() && results.songs.isEmpty()) {
+        if (vibe) MakeVibeRow(query, nav, onOpen)
         Text("Nothing found", modifier = Modifier.padding(Space.Page), color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
+        if (vibe) item(key = "make-vibe") { MakeVibeRow(query, nav, onOpen) }
         if (results.artists.isNotEmpty()) {
             item { SectionTitle("Artists") }
             item {
@@ -302,6 +308,35 @@ private fun LibraryResults(results: SearchResults?, nav: NavController, onOpen: 
     }
 }
 
+/** "Make a vibe from “…”": the words in the search box made into a vibe on Dscvr's page (issue #339). */
+@Composable
+private fun MakeVibeRow(query: String, nav: NavController, onOpen: () -> Unit) {
+    val graph = LocalGraph.current
+    val launch = rememberPlayLauncher()
+    val busy = vibeMakingBusy()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(enabled = !busy) {
+                onOpen()
+                makeVibe(graph, nav, launch::notify, query, VibeTuning())
+            }
+            .padding(horizontal = Space.Page, vertical = Space.Medium)
+            .testTag("makeVibe"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (busy) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) // spacing: exact
+        else Icon(DscvrStars, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(Space.Medium))
+        Text(
+            if (busy) "Making your vibe…" else "Make a vibe from “$query”",
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 /** With an empty search box: radios and genres to browse, like a streaming app's Browse page. */
 @Composable
 private fun BrowseGrid(nav: NavController) {
@@ -316,7 +351,6 @@ private fun BrowseGrid(nav: NavController) {
         verticalArrangement = Arrangement.spacedBy(Space.Medium),
         modifier = Modifier.fillMaxSize(),
     ) {
-        item(span = { GridItemSpan(maxLineSpan) }) { MoodBox(nav, Modifier.padding(top = Space.Tight)) }
         item(span = { GridItemSpan(maxLineSpan) }) {
             Text("Radios", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = Space.Small))
         }

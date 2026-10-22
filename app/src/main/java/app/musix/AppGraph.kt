@@ -208,6 +208,8 @@ class AppGraph(val app: Application) {
     /** Other users' music shown alongside the user in use's (issue #141). */
     val guests: Guests by lazy { Guests(app, http, library, scope) }
     val mixes = MixStore(app)
+    /** Vibes made on Dscvr (issue #339). */
+    val savedVibes = app.musix.data.SavedVibes(app)
     val history = HistoryStore(app)
     /** What was last played as a whole, for Home's shortcuts (issue #271). */
     val recentPlays = RecentPlays(app)
