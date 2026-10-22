@@ -1,5 +1,6 @@
 package app.musix
 
+import app.musix.data.SavedVibes
 import app.musix.mix.MixResume
 import app.musix.data.RecentPlays
 import app.musix.data.FavouriteAlbums
@@ -208,6 +209,8 @@ class AppGraph(val app: Application) {
     /** Other users' music shown alongside the user in use's (issue #141). */
     val guests: Guests by lazy { Guests(app, http, library, scope) }
     val mixes = MixStore(app)
+    /** Vibes made on Dscvr (issue #339). */
+    val savedVibes = SavedVibes(app)
     val history = HistoryStore(app)
     /** What was last played as a whole, for Home's shortcuts (issue #271). */
     val recentPlays = RecentPlays(app)

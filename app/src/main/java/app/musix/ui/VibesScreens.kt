@@ -73,7 +73,7 @@ fun VibesScreen(nav: NavController) {
     LaunchedEffect(Unit) { graph.selectors.all() }
 
     Screen(
-        title = "Vibes",
+        title = "Daily Vibe settings",
         nav = nav,
         actions = {
             IconButton(onClick = { nav.navigate("selector/new") }) { Icon(Icons.Rounded.Add, "Add vibe") }

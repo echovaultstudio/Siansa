@@ -317,7 +317,7 @@ class AppTourTest {
             }
             step("vibes") {
                 tab("Settings")
-                click("Vibes")
+                click("Daily Vibe settings")
                 idle(1000)
                 shot("17-vibes")
             }

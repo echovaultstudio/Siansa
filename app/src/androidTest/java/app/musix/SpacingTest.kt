@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import app.musix.ui.LyricsSwitchRow
 import app.musix.ui.PathMoodPicker
 import app.musix.ui.Space
+import app.musix.ui.VibeSliders
+import app.musix.mix.SoundDial
+import app.musix.mix.VibeTuning
 import androidx.compose.material3.Text
 import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.layout.padding
@@ -457,5 +460,20 @@ class SpacingTest {
         assertEquals(4, tiles.size)
         val heights = tiles.map { with(compose.density) { it.height.toDp() } }
         heights.drop(1).forEach { assertEven("Tile heights", heights[0], it, 1.dp) }
+    }
+
+    /** Dscvr's sliders (issue #339): the same gap between each slider and the next. */
+    @Test fun vibeSlidersAreEvenlySpaced() {
+        compose.setContent {
+            MusixTheme {
+                VibeSliders(VibeTuning(sounds = listOf(SoundDial("piano", 2))), onChange = { })
+            }
+        }
+        val energy = compose.onNodeWithTag("sliderEnergy").getBoundsInRoot()
+        val tempo = compose.onNodeWithTag("sliderTempo").getBoundsInRoot()
+        val familiar = compose.onNodeWithTag("sliderFamiliar").getBoundsInRoot()
+        val sound = compose.onNodeWithTag("sliderSound").getBoundsInRoot()
+        assertEven("Vibe sliders", tempo.top - energy.bottom, familiar.top - tempo.bottom, 1.dp)
+        assertEven("Vibe sliders", familiar.top - tempo.bottom, sound.top - familiar.bottom, 1.dp)
     }
 }

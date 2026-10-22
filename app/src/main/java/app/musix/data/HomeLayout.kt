@@ -1,11 +1,13 @@
 package app.musix.data
 
-/** The parts of Home people can move around, in the order a new install shows them. */
+/**
+ * The parts of Home people can move around, in the order a new install shows them. "How are you feeling?"
+ * moved to Dscvr (issue #339); saved orders that still name it simply drop it.
+ */
 enum class HomeSection(val id: String, val label: String) {
     QUICK("quick", "Shortcuts"),
     TODAY("today", "Today's mix"),
     CAROUSEL("carousel", "Your mixes carousel"),
-    MOOD("mood", "How are you feeling?"),
     MADE_FOR_YOU("made", "Made for you"),
     REDISCOVER("rediscover", "Rediscover"),
     RADIOS("radios", "Radios"),
