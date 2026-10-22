@@ -1,5 +1,8 @@
 package app.musix.ui
 
+import app.musix.data.SavedVibe
+import app.musix.data.pinnedVibes
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -74,7 +77,16 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
         }
     }
     LaunchedEffect(Unit) { graph.carousels.all() }
-    val carousel = carousels.orEmpty().firstOrNull { it.covers(hour) }?.takeIf { it.usable.size >= Carousel.MIN } ?: return
+    // Vibes pinned on Dscvr come after the mixes, as an option (issue #339).
+    val saved by graph.savedVibes.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { graph.savedVibes.all() }
+    val pinned = pinnedVibes(saved.orEmpty())
+    val found = carousels.orEmpty().firstOrNull { it.covers(hour) }?.takeIf { it.usable.size >= Carousel.MIN }
+    if (found == null) {
+        if (pinned.isNotEmpty()) PinnedVibesCarousel(nav, pinned)
+        return
+    }
+    val carousel: Carousel = found
     val today = LocalDate.now().toString()
     val made: List<Mix?> = carousel.usable.indices.map { i ->
         val id = "$today-${carousel.selectorFor(i).id}"
@@ -126,7 +138,8 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
         }
     }
 
-    val pager = rememberPagerState { carousel.usable.size }
+    val mixCount = carousel.usable.size
+    val pager = rememberPagerState { mixCount + pinned.size }
     // Room under the dots before the next panel (issue #312): with that panel's own margin, a section's gap.
     Column(Modifier.fillMaxWidth().padding(bottom = Space.Page).testTag("homeCarousel")) {
         SectionTitle(carousel.title)
@@ -136,6 +149,10 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
             pageSpacing = Space.Medium,
             modifier = Modifier.fillMaxWidth(),
         ) { page ->
+            if (page >= mixCount) {
+                pinned.getOrNull(page - mixCount)?.let { PinnedVibeCard(nav, it) }
+                return@HorizontalPager
+            }
             val mix = made[page]
             val selector = carousel.selectorFor(page)
             CarouselCard(
@@ -154,8 +171,39 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
                 onPlay = if (mix != null) ({ graph.mixResume.play(mix) }) else null,
             )
         }
-        CarouselDots(count = carousel.usable.size, current = pager.currentPage)
+        CarouselDots(count = mixCount + pinned.size, current = pager.currentPage)
     }
+}
+
+/** Pinned vibes on their own, when no carousel covers this hour (issue #339). */
+@Composable
+private fun PinnedVibesCarousel(nav: NavController, pinned: List<SavedVibe>) {
+    val pager = rememberPagerState { pinned.size }
+    Column(Modifier.fillMaxWidth().padding(bottom = Space.Page).testTag("homeCarousel")) {
+        SectionTitle("Your vibes")
+        HorizontalPager(
+            state = pager,
+            contentPadding = PaddingValues(horizontal = Space.Page),
+            pageSpacing = Space.Medium,
+            modifier = Modifier.fillMaxWidth(),
+        ) { page -> pinned.getOrNull(page)?.let { PinnedVibeCard(nav, it) } }
+        CarouselDots(count = pinned.size, current = pager.currentPage)
+    }
+}
+
+/** A vibe pinned on Dscvr: opens its page, plays its songs (issue #339). */
+@Composable
+private fun PinnedVibeCard(nav: NavController, vibe: SavedVibe) {
+    val graph = LocalGraph.current
+    CarouselCard(
+        name = vibe.title,
+        caption = "${vibe.songs.size} tracks · " + vibe.description,
+        colors = tileColors(vibe.text.ifEmpty { vibe.title }),
+        coverArt = vibe.songs.firstOrNull()?.coverArt,
+        busy = false,
+        onOpen = { nav.navigate("vibe/${vibe.id}") },
+        onPlay = { graph.player.play(vibe.songs) },
+    )
 }
 
 @Composable

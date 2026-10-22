@@ -36,10 +36,16 @@ data class TrackFeatures(
     val scale: String?,
     val moods: Map<String, Double>,
     val genres: Map<String, Double>,
+    /** AudioMuse's energy for the song (higher is more energetic), when it sends one (issue #339). */
+    val energy: Double? = null,
 )
 
-/** One concept to steer the Sound search with (issue #208): [more] or less of it. */
-data class Steer(val term: String, val more: Boolean = true)
+/**
+ * One concept to steer the Sound search with (issue #208): [more] or less of it. [weight] is how strongly
+ * (AudioMuse takes 1, 2, 3, 5 or 10, and uses 3 when none is sent); null leaves it to AudioMuse (issue #339).
+ */
+@kotlinx.serialization.Serializable
+data class Steer(val term: String, val more: Boolean = true, val weight: Int? = null)
 
 /** One of AudioMuse's mood centres: [mood] (happy, relaxed…), its [index], and the tags that describe it. */
 data class MoodCentre(val mood: String, val index: Int, val tags: List<String>)
@@ -171,6 +177,7 @@ class AudioMuseApi(
                         add(buildJsonObject {
                             put("term", s.term)
                             put("direction", if (s.more) "more" else "less")
+                            s.weight?.let { put("weight", it) }
                         })
                     }
                 })
@@ -349,7 +356,7 @@ class AudioMuseApi(
 
         /** One log line for a sound search: words, concepts, how many came back, the best few with their score. */
         fun searchSummary(query: String, steering: List<Steer>, hits: List<ClapHit>, warnings: List<String>, top: Int = 5): String {
-            val steer = steering.joinToString(", ") { (if (it.more) "+" else "−") + it.term }.ifEmpty { "none" }
+            val steer = steering.joinToString(", ") { (if (it.more) "+" else "−") + it.term + (it.weight?.let { w -> "×$w" } ?: "") }.ifEmpty { "none" }
             val best = hits.take(top).joinToString("; ") { "${it.title} – ${it.artist} (${"%.3f".format(Locale.ROOT, it.similarity)})" }
             return "Search \"$query\" · concepts $steer · ${hits.size} songs" +
                 (if (best.isNotEmpty()) " · best: $best" else "") +
@@ -393,6 +400,7 @@ class AudioMuseApi(
                 scale = o.str("scale"),
                 moods = parseScores(o.str("other_features")),
                 genres = parseScores(o.str("mood_vector")),
+                energy = o.dbl("energy"),
             )
         }
 
