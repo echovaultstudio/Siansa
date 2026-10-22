@@ -336,6 +336,8 @@ fun MusixRoot() {
           }
         }
 
+        // "Start song radio" from any menu asks Steady or DJ here (issue #337).
+        RadioChooserHost()
         BackHandler(enabled = sheet.isOpen) { sheet.close() }
         AnimatedVisibility(
             visible = sheet.isOpen,

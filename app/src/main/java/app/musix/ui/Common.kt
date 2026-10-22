@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
@@ -446,6 +447,8 @@ fun SongRow(
     // The song playing now (queue, album and playlist pages): its cover, or its number when covers are
     // hidden, shows play or pause, and a tap on it pauses or plays on (issue #345).
     nowPlaying: Boolean = false,
+    // Added by keep playing or a song radio rather than chosen: a small mark beside it (issue #337).
+    autoAdded: Boolean = false,
 ) {
     val graph = LocalGraph.current
     val nav = LocalNav.current
@@ -507,6 +510,14 @@ fun SongRow(
                     )
                 }
             }
+            if (autoAdded) {
+                Icon(
+                    Icons.Rounded.AutoAwesome,
+                    "Added automatically",
+                    Modifier.padding(start = Space.Small).size(16.dp).testTag("autoAdded"),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
             DownloadedMark(song.id)
             if (song.durationSec > 0) {
                 // A gap after a long title, and the same width for every length so they line up (issue #309).
@@ -542,7 +553,7 @@ fun SongRow(
                     DropdownMenuItem(text = { Text("Start song radio") }, onClick = {
                         menu = false
                         if (graph.connection.current.offline) launch.notify("You're offline: song radio needs the server")
-                        else graph.songRadio.start(song) { message -> launch.notify(message) }
+                        else RadioChooser.ask(song)
                     })
                     if (graph.settings.current.audioMuseReady) {
                         DropdownMenuItem(text = { Text("Song path…") }, onClick = {
