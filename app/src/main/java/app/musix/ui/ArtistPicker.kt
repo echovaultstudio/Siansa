@@ -1,5 +1,7 @@
 package app.musix.ui
 
+import app.musix.data.CombinedArtists
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,6 +45,16 @@ import kotlinx.coroutines.launch
 @Composable
 fun rememberArtistOpener(beforeOpen: () -> Unit = {}): (Song) -> Unit {
     val graph = LocalGraph.current
+    val open = rememberArtistsOpener(beforeOpen)
+    return { song: Song -> open { artistsOf(graph, song) } }
+}
+
+/**
+ * Opens one of the artists [find] returns: straight to it when there's one, with the chooser when there are
+ * several (a song's artists, or the artists a combined album artist names, issue #359).
+ */
+@Composable
+fun rememberArtistsOpener(beforeOpen: () -> Unit = {}): (find: suspend () -> List<Artist>) -> Unit {
     val nav = LocalNav.current
     val scope = rememberCoroutineScope()
     var choices by remember { mutableStateOf<List<Artist>>(emptyList()) }
@@ -78,9 +90,9 @@ fun rememberArtistOpener(beforeOpen: () -> Unit = {}): (Song) -> Unit {
         }
     }
 
-    return { song: Song ->
+    return { find: suspend () -> List<Artist> ->
         scope.launch {
-            val artists = artistsOf(graph, song)
+            val artists = find()
             // Navigation and screen state only on the main thread, whatever thread the lookup ended on.
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                 when {
@@ -98,6 +110,10 @@ fun ArtistCircle(artist: Artist, modifier: Modifier) {
     Cover(artist.coverArt ?: "ar-${artist.id}", 150, modifier, CircleShape)
 }
 
+/** The artist with [id], or the artists it names when it's several artists in one name (issue #359). */
+internal suspend fun artistsNamedBy(graph: AppGraph, id: String, name: String): List<Artist> =
+    CombinedArtists.expand(listOf(graph.library.artist(id) ?: Artist(id, name)), graph.library.combinedArtists())
+
 /** Every artist on the song, as artists in the library where possible. */
 private suspend fun artistsOf(graph: AppGraph, song: Song): List<Artist> {
     var refs = song.artists
@@ -108,9 +124,11 @@ private suspend fun artistsOf(graph: AppGraph, song: Song): List<Artist> {
             .onFailure { AppLog.w("Artist", "Couldn't load the artists of ${song.id}: ${it.message}") }
             .getOrDefault(emptyList())
     }
-    val found = refs.map { ref -> graph.library.artist(ref.id) ?: Artist(ref.id, ref.name) }
+    val combined = graph.library.combinedArtists()
+    // A name that's several artists in one (tagged without the server's separator) offers each of them (issue #359).
+    val found = CombinedArtists.expand(refs.map { ref -> graph.library.artist(ref.id) ?: Artist(ref.id, ref.name) }, combined)
     AppLog.d("Artist", "Song ${song.id}: ${found.size} artists from Navidrome's list")
-    if (found.isNotEmpty()) return found.distinctBy { it.id }
+    if (found.isNotEmpty()) return found
 
     // No list from Navidrome (older servers, offline): split the name, keeping library artists whose
     // name has a join in it ("Chase & Status") whole, and look each part up.
@@ -120,5 +138,5 @@ private suspend fun artistsOf(graph: AppGraph, song: Song): List<Artist> {
         .distinctBy { it.id }
     if (byName.size > 1) return byName
     val single = song.artistId?.let { graph.library.artist(it) ?: Artist(it, song.artist) }
-    return listOfNotNull(single ?: byName.firstOrNull())
+    return CombinedArtists.expand(listOfNotNull(single ?: byName.firstOrNull()), combined)
 }

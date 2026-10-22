@@ -75,6 +75,8 @@ data class Artist(
     val albumCount: Int = 0,
     val coverArt: String? = null,
     val imageUrl: String? = null,
+    /** The artist's MusicBrainz ID (a 36-character UUID), when its files are tagged with one (issue #359). */
+    val mbid: String? = null,
 )
 
 @Serializable

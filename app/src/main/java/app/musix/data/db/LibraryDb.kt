@@ -75,6 +75,8 @@ data class ArtistEntity(
     val coverArt: String?,
     val imageUrl: String?,
     val sortKey: String,
+    /** MusicBrainz ID, when Navidrome has one (issue #359). */
+    val mbid: String? = null,
 )
 
 @Entity(tableName = "playlists")
@@ -320,7 +322,7 @@ interface LibraryDao {
 
 @Database(
     entities = [SongEntity::class, AlbumEntity::class, ArtistEntity::class, PlaylistEntity::class, MetaEntity::class, SourceEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class LibraryDatabase : RoomDatabase() {
@@ -335,9 +337,16 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        /** Version 3 keeps each artist's MusicBrainz ID (issue #359); it fills in on the next sync. */
+        val ADD_ARTIST_MBID = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `artists` ADD COLUMN `mbid` TEXT")
+            }
+        }
+
         fun open(context: Context): LibraryDatabase =
             Room.databaseBuilder(context, LibraryDatabase::class.java, app.musix.data.Users.scoped(app.musix.data.UserFiles.DATABASE))
-                .addMigrations(ADD_SOURCES)
+                .addMigrations(ADD_SOURCES, ADD_ARTIST_MBID)
                 // The library can always be synced again, so any other schema change simply starts fresh.
                 .fallbackToDestructiveMigration()
                 .build()

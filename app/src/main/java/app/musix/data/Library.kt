@@ -183,15 +183,54 @@ class LibraryRepository(context: Context) {
         .toList()
         .sortedBy { it.first.ordinal }
 
-    suspend fun artists(): List<Artist> = dao.artists().map { it.toArtist() }.let { list -> onlyDownloaded()?.artists(list) ?: list }
+    /** Every artist, without names that are several library artists in one (issue #359). */
+    suspend fun artists(): List<Artist> {
+        val all = dao.artists().map { it.toArtist() }
+        val list = CombinedArtists.withoutCombined(all, combinedArtists(all))
+        return onlyDownloaded()?.artists(list) ?: list
+    }
     suspend fun artist(id: String): Artist? = dao.artist(id)?.toArtist()
     suspend fun artistByName(name: String): Artist? = dao.artistByKey(normalizeKey(name))?.toArtist()
 
-    suspend fun albumsOf(artist: Artist): List<Album> =
-        dao.albumsOfArtist(artist.id, normalizeKey(artist.name)).map { it.toAlbum() }.onlyDownloadedAlbums()
+    @Volatile private var combined: Map<String, CombinedArtist>? = null
 
-    suspend fun songsOf(artist: Artist): List<Song> =
-        dao.songsOfArtist(artist.id, artist.name).map { it.toSong() }.distinctBy { songKey(it) }.onlyDownloadedSongs()
+    /**
+     * Artists Navidrome made from several artists tagged in one name ("Rudimental, Orginal Koffee & Winny"),
+     * by id, with the library artists they name (issue #359). Worked out once per sync.
+     */
+    suspend fun combinedArtists(all: List<Artist>? = null): Map<String, CombinedArtist> {
+        combined?.let { return it }
+        val found = CombinedArtists.find(all ?: dao.artists().map { it.toArtist() })
+        if (found.isNotEmpty()) {
+            AppLog.i(
+                "Library",
+                "${found.size} artists are several artists in one name; shown as their own artists: " +
+                    found.values.take(5).joinToString("; ") { c -> "${c.combined.name} → ${(c.parts.map { it.name } + c.unknown).joinToString(" | ")}" },
+            )
+        }
+        combined = found
+        return found
+    }
+
+    /** The artist's albums, with those of names it's tagged in together with others (issue #359). */
+    suspend fun albumsOf(artist: Artist): List<Album> {
+        val also = CombinedArtists.containing(artist, combinedArtists())
+        return (listOf(artist) + also)
+            .flatMap { a -> dao.albumsOfArtist(a.id, normalizeKey(a.name)) }
+            .distinctBy { it.id }
+            .map { it.toAlbum() }
+            .onlyDownloadedAlbums()
+    }
+
+    /** The artist's songs, with those of names it's tagged in together with others (issue #359). */
+    suspend fun songsOf(artist: Artist): List<Song> {
+        val also = CombinedArtists.containing(artist, combinedArtists())
+        return (listOf(artist) + also)
+            .flatMap { a -> dao.songsOfArtist(a.id, a.name) }
+            .map { it.toSong() }
+            .distinctBy { songKey(it) }
+            .onlyDownloadedSongs()
+    }
 
     private suspend fun List<Song>.onlyDownloadedSongs(): List<Song> = onlyDownloaded()?.songs(this) ?: this
 
@@ -261,6 +300,7 @@ class LibraryRepository(context: Context) {
         fun all(key: String) = terms.all { key.contains(it) }
         val only = onlyDownloaded()
         val artists = dao.searchArtists(first, 200).filter { all(it.sortKey) }.map { it.toArtist() }
+            .let { CombinedArtists.withoutCombined(it, combinedArtists()) }
         val albums = dao.searchAlbums(first, 400).filter { all(it.sortKey + " " + it.artistKey) }.map { it.toAlbum() }
         val songs = dao.searchSongs(first, 1500).filter { all(it.searchKey) }.map { it.toSong() }.distinctBy { songKey(it) }
         SearchResults(
@@ -277,6 +317,7 @@ class LibraryRepository(context: Context) {
     suspend fun putMeta(key: String, value: String) = dao.putMeta(MetaEntity(key, value))
 
     suspend fun replaceArtists(artists: List<Artist>) = db.withTransaction {
+        combined = null
         dao.deleteAllArtists()
         artists.distinctBy { it.id }.chunked(CHUNK).forEach { chunk ->
             dao.forgetSources(chunk.map { it.id })
@@ -320,6 +361,7 @@ class LibraryRepository(context: Context) {
 
     /** Removes everything that came from [user]. */
     suspend fun removeSource(user: Int) {
+        combined = null
         db.withTransaction {
             dao.deleteSongsOfSource(user)
             dao.deleteAlbumsOfSource(user)
@@ -336,6 +378,7 @@ class LibraryRepository(context: Context) {
      * Returns how many songs were added.
      */
     suspend fun putSource(user: Int, music: GuestMusic): Int {
+        combined = null
         val added = db.withTransaction {
             dao.deleteSongsOfSource(user)
             dao.deleteAlbumsOfSource(user)
@@ -411,8 +454,8 @@ class LibraryRepository(context: Context) {
         signature = signature(),
     )
 
-    private fun ArtistEntity.toArtist() = Artist(id, name, albumCount, coverArt, imageUrl)
-    private fun Artist.toEntity() = ArtistEntity(id, name, albumCount, coverArt, imageUrl, normalizeKey(name))
+    private fun ArtistEntity.toArtist() = Artist(id, name, albumCount, coverArt, imageUrl, mbid)
+    private fun Artist.toEntity() = ArtistEntity(id, name, albumCount, coverArt, imageUrl, normalizeKey(name), mbid)
 
     companion object {
         const val META_SYNCED_AT = "syncedAt"
