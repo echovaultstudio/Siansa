@@ -203,8 +203,6 @@ fun HomeScreen(nav: NavController) {
     }
     val genres by loadState(version to "genres") { if (graph.library.isSynced) graph.library.genres(12) else emptyList() }
 
-    // The keyboard shrinks the list, so the "How are you feeling?" box scrolls up above it. While it shows, the
-    // bottom bar is behind it, so the list needn't leave room for the bar.
     // The Home tab tapped again: glide back to the top. From far down, jump most of the way first so it's quick.
     val listState = rememberLazyListState()
     val scrollRequests by HomeScrollToTop.requests.collectAsStateWithLifecycle()
@@ -304,9 +302,6 @@ fun HomeScreen(nav: NavController) {
                 HomeSection.CAROUSEL -> {
                     // Your own mixes for this part of the day, set in Vibes (issue #253).
                     if (homeSettings.audioMuseReady) item(key = "carousel") { HomeCarousel(nav, aiDown) }
-                }
-                HomeSection.MOOD -> {
-                    item(key = "mood") { MoodBox(nav, Modifier.padding(horizontal = Space.Page, vertical = Space.Medium)) }
                 }
                 HomeSection.MADE_FOR_YOU -> {
                     // Made for you: the vibe for this hour, then mixes from your own listening.

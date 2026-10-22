@@ -379,16 +379,85 @@ class MixGenerator(private val graph: AppGraph) {
         return MoodResult(plan.title, plan.description, plan.query, songs, plan.ai)
     }
 
+    /** What a vibe on Dscvr searches for: from the AI, or the words themselves (issue #339). */
+    data class VibePlan(val title: String, val description: String, val query: String, val steering: List<Steer>, val ai: Boolean)
+
+    /**
+     * The plan for a vibe described in words ([text]): the AI's title, sound search and concepts when an AI is
+     * set up, otherwise the words searched as they are. With no words, the sliders make the search ([tuning]).
+     */
+    suspend fun vibePlan(text: String, tuning: VibeTuning): VibePlan {
+        if (!graph.settings.current.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
+        val words = text.trim()
+        if (words.isEmpty()) {
+            val query = sliderQuery(tuning) ?: throw MixException("Describe your aura, or move a slider")
+            val summary = tuning.summary().ifEmpty { "Your vibe" }
+            return VibePlan(summary.replaceFirstChar { it.uppercase() }, "Made from your sliders", query, emptyList(), ai = false)
+        }
+        if (words.length < 3) throw MixException("Describe your aura in a few words")
+        var plan = Plan(words.replaceFirstChar { it.uppercase() }, words, "From your description", ai = false)
+        if (graph.settings.current.aiReady) {
+            runCatching { aiMoodPlan(words) }
+                .onSuccess { plan = it }
+                .onFailure { AppLog.w("Vibe", "AI couldn't interpret the vibe, searching the words directly: ${it.message}") }
+        }
+        AppLog.i("Vibe", "\"$words\" → \"${plan.title}\" · search \"${plan.query}\" · ai=${plan.ai}")
+        return VibePlan(plan.title, plan.description, plan.query, plan.steering, plan.ai)
+    }
+
+    /** Sound concepts AudioMuse's search understands, for the sound dials; empty when it can't say. */
+    suspend fun soundConcepts(): List<String> = runCatching { graph.audioMuse.concepts() }
+        .onFailure { AppLog.w("Vibe", "Couldn't load sound concepts: ${it.message}") }
+        .getOrDefault(emptyList())
+
+    /**
+     * The songs for a vibe: AudioMuse's sound search for [query] steered by the sound dials (or the AI's
+     * concepts while no dial is set), re-ranked by the energy, tempo and familiar sliders (issue #339).
+     */
+    suspend fun vibeSongs(query: String, aiSteering: List<Steer>, tuning: VibeTuning, size: Int = 50): List<Song> {
+        val dials = tuning.steering()
+        // The dials start at the AI's concepts, so once any is shown they say everything; before that, the AI's.
+        val steering = if (tuning.sounds.isNotEmpty()) dials else aiSteering
+        val hits = graph.audioMuse.textSearch(query, size * 3, steering)
+        if (hits.isEmpty()) throw MixException("AudioMuse found nothing for that vibe")
+        val features = if (tuning.energy != 0 || tuning.tempo != 0) {
+            runCatching { graph.audioMuse.features(hits.map { it.id }).associateBy { it.id } }
+                .onFailure { AppLog.w("Vibe", "Couldn't load energy and tempo, leaving them out: ${it.message}") }
+                .getOrDefault(emptyMap())
+        } else emptyMap()
+        val familiarity = if (tuning.familiar != 0) {
+            graph.history.all().groupingBy { it.artist.lowercase() }.eachCount()
+        } else emptyMap()
+        val ranked = rankVibe(hits, features, familiarity, tuning) { Random.nextDouble() * 0.05 }
+        val perArtist = HashMap<String, Int>()
+        val picked = ranked.filter { hit ->
+            val n = perArtist[hit.artist.lowercase()] ?: 0
+            if (n >= 3) false else { perArtist[hit.artist.lowercase()] = n + 1; true }
+        }.take(size)
+        AppLog.i(
+            "Vibe",
+            "Search \"$query\" · ${tuning.summary().ifEmpty { "no sliders moved" }} · ${hits.size} found, " +
+                "${features.size} with energy/tempo, ${picked.size} picked",
+        )
+        return spreadArtists(resolve(picked.map { it.id }))
+    }
+
     private suspend fun aiMoodPlan(mood: String): Plan {
         val now = LocalDateTime.now()
         val concepts = runCatching { graph.audioMuse.concepts() }.getOrDefault(emptyList()).take(80)
         val recent = graph.history.recent(15).map { "${it.artist} – ${it.title}" }
         val day = now.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
+        // The same moment the daily vibes use (issue #339): weather, movement, light and charging, as set there.
+        val options = graph.settings.current.situation
+        val situation = runCatching { graph.situation.read(options) }
+            .onFailure { AppLog.w("Mood", "Couldn't read the moment: ${it.message}") }
+            .getOrDefault(Situation())
         val user = buildString {
             appendLine("The listener describes their mood or wish: \"$mood\"")
             appendLine("Make a playlist that fits it. Title it from their words.")
             appendLine("Now: $day %02d:%02d".format(now.hour, now.minute))
-            appendLine("Listening on: ${describeOutput(graph.app)}")
+            if (options.device) appendLine("Listening on: ${describeOutput(graph.app)}")
+            if (!situation.isEmpty) appendLine("Right now: ${situation.describe()}")
             if (recent.isNotEmpty()) appendLine("Recently played: ${recent.joinToString("; ")}")
             if (concepts.isNotEmpty()) appendLine("Sound concepts the search understands well: ${concepts.joinToString(", ")}")
         }

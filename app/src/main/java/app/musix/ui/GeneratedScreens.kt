@@ -151,7 +151,10 @@ fun BlendScreen(nav: NavController, playlistId: String) {
     )
 }
 
-/** A playlist made on the spot from what the listener typed about their mood. */
+/**
+ * A playlist made on the spot from what the listener typed about their mood. Its box moved to Dscvr (issue #339);
+ * the page stays for Home shortcuts made to it before.
+ */
 @Composable
 fun MoodScreen(nav: NavController, text: String) {
     val graph = LocalGraph.current
@@ -187,52 +190,3 @@ fun MoodScreen(nav: NavController, text: String) {
     )
 }
 
-/** "Describe your mood" box that opens a playlist made from it. */
-@Composable
-fun MoodBox(nav: NavController, modifier: Modifier = Modifier) {
-    var text by rememberSaveable { mutableStateOf("") }
-    val aiProblem = rememberAiProblem()
-    fun go() {
-        if (text.trim().length >= 3) nav.openMoodPlaylist(text.trim())
-    }
-    val colors = Color(0xFF4B2BD6) to Color(0xFFD6338A)
-    Column(
-        modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Brush.linearGradient(listOf(lerp(colors.first, Color.Black, 0.2f), lerp(colors.second, Color.Black, 0.35f))))
-            .padding(Space.Page),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.AutoAwesome, null, tint = Color.White, modifier = Modifier.padding(end = Space.Small))
-            Text("How are you feeling?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
-        }
-        Spacer(Modifier.height(Space.Small))
-        if (aiProblem != null) {
-            // No box to type into while AudioMuse can't be reached: it would only make an empty playlist.
-            AiUnavailable(aiProblem, onDark = true)
-            return@Column
-        }
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
-            placeholder = { Text("e.g. tired but hopeful, rainy Sunday, need to focus", color = Color.White.copy(alpha = 0.6f)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-            keyboardActions = KeyboardActions(onGo = { go() }),
-            trailingIcon = {
-                IconButton(onClick = { go() }, enabled = text.trim().length >= 3) {
-                    Icon(Icons.Rounded.AutoAwesome, "Make playlist", tint = Color.White)
-                }
-            },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedBorderColor = Color.White,
-                unfocusedBorderColor = Color.White.copy(alpha = 0.5f),
-                cursorColor = Color.White,
-            ),
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
