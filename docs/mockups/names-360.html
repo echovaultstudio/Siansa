@@ -1,0 +1,175 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #e9e7e2; font-family: Inter, sans-serif; }
+  #shot { width: 1500px; padding: 48px 48px 40px; background: #eceae5; }
+  header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 28px; }
+  header h1 { font-family: "Inter Display"; font-weight: 600; font-size: 30px; letter-spacing: -0.5px; color: #17161a; }
+  header p { font-size: 15px; color: #6b6870; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .card { border-radius: 22px; overflow: hidden; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.06); }
+  .dark { height: 250px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; position: relative; }
+  .icon { width: 104px; height: 104px; border-radius: 26px; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+  .icon svg { width: 64px; height: 64px; }
+  .word { font-size: 40px; line-height: 1; }
+  .light { padding: 20px 22px 18px; display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; }
+  .meta .wordsm { font-size: 26px; line-height: 1.1; margin-bottom: 6px; }
+  .meta .say { font-size: 13px; color: #6b6870; }
+  .meta .mean { font-size: 14px; color: #2b2a30; margin-top: 4px; }
+  .launch { display: flex; flex-direction: column; align-items: center; gap: 6px; background: #f4f2ee; padding: 10px 12px 8px; border-radius: 14px; }
+  .launch .mini { width: 52px; height: 52px; border-radius: 15px; display: flex; align-items: center; justify-content: center; }
+  .launch .mini svg { width: 32px; height: 32px; }
+  .launch span { font-size: 11.5px; color: #2b2a30; font-family: Inter; }
+  .tag { position: absolute; top: 14px; left: 16px; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: rgba(255,255,255,.55); }
+  .status { position: absolute; top: 12px; right: 14px; font-size: 11px; padding: 4px 9px; border-radius: 99px; font-weight: 600; }
+  .clean { background: rgba(126, 220, 160, .18); color: #9fe8b9; }
+  .some { background: rgba(255, 200, 110, .18); color: #ffd28a; }
+  .note { padding: 0 22px 18px; font-size: 12.5px; color: #6b6870; line-height: 1.45; }
+  footer { margin-top: 22px; font-size: 13px; color: #6b6870; }
+</style></head>
+<body>
+<div id="shot">
+  <header>
+    <h1>Name shortlist · issue #360</h1>
+    <p>Icon and wordmark on dark, wordmark on light, and the icon at home-screen size with its label</p>
+  </header>
+  <div class="grid">
+
+    <!-- FONN -->
+    <div class="card">
+      <div class="dark" style="background: radial-gradient(120% 90% at 30% 20%, #4a1f45 0%, #241024 70%);">
+        <span class="tag">Warm · Irish</span><span class="status clean">Cleanest</span>
+        <div class="icon" style="background: linear-gradient(145deg, #f6b25a, #e0743f);">
+          <svg viewBox="0 0 64 64" fill="none" stroke="#2a1026" stroke-width="4.5" stroke-linecap="round">
+            <circle cx="20" cy="32" r="5" fill="#2a1026" stroke="none"/>
+            <path d="M31 22 a14 14 0 0 1 0 20"/><path d="M39 15 a24 24 0 0 1 0 34"/><path d="M47 8 a34 34 0 0 1 0 48" opacity=".55"/>
+          </svg>
+        </div>
+        <div class="word" style="font-family: Lora; font-style: italic; font-weight: 500; color: #f8e7d6; letter-spacing: .5px;">fonn</div>
+      </div>
+      <div class="light">
+        <div class="meta">
+          <div class="wordsm" style="font-family: Lora; font-style: italic; font-weight: 500; color: #3a1735;">fonn</div>
+          <div class="say">Say it "fun"</div>
+          <div class="mean">Irish: a tune, and a mood or wish</div>
+        </div>
+        <div class="launch"><div class="mini" style="background: linear-gradient(145deg, #f6b25a, #e0743f);"><svg viewBox="0 0 64 64" fill="none" stroke="#2a1026" stroke-width="5" stroke-linecap="round"><circle cx="20" cy="32" r="5" fill="#2a1026" stroke="none"/><path d="M31 22 a14 14 0 0 1 0 20"/><path d="M39 15 a24 24 0 0 1 0 34"/></svg></div><span>Fonn</span></div>
+      </div>
+      <p class="note">Both sides of the app in one word: songs and vibes. Nothing in music apps found.</p>
+    </div>
+
+    <!-- SOINTU -->
+    <div class="card">
+      <div class="dark" style="background: radial-gradient(120% 90% at 70% 15%, #2f3d3a 0%, #151c1b 70%);">
+        <span class="tag">Calm · Finnish</span><span class="status clean">Clean</span>
+        <div class="icon" style="background: linear-gradient(160deg, #eef1ec, #c9d6cf);">
+          <svg viewBox="0 0 64 64" fill="none" stroke-width="3.2"><circle cx="22" cy="39" r="16" stroke="#8fb3a6"/><circle cx="42" cy="39" r="16" stroke="#4f7a6c"/><circle cx="32" cy="22" r="16" stroke="#1d2a27"/></svg>
+        </div>
+        <div class="word" style="font-family: 'Inter Display'; font-weight: 300; color: #e8efe9; letter-spacing: 9px;">SOINTU</div>
+      </div>
+      <div class="light">
+        <div class="meta">
+          <div class="wordsm" style="font-family: 'Inter Display'; font-weight: 300; color: #1d2a27; letter-spacing: 6px;">SOINTU</div>
+          <div class="say">Say it "SOYN-too"</div>
+          <div class="mean">Finnish: a chord, harmony</div>
+        </div>
+        <div class="launch"><div class="mini" style="background: linear-gradient(160deg, #eef1ec, #c9d6cf);"><svg viewBox="0 0 64 64" fill="none" stroke-width="4"><circle cx="22" cy="39" r="16" stroke="#8fb3a6"/><circle cx="42" cy="39" r="16" stroke="#4f7a6c"/><circle cx="32" cy="22" r="16" stroke="#1d2a27"/></svg></div><span>Sointu</span></div>
+      </div>
+      <p class="note">Nordic hi-fi calm, in the mould of Linn or Dali. Only an unrelated Finnish company uses it.</p>
+    </div>
+
+    <!-- SKALD -->
+    <div class="card">
+      <div class="dark" style="background: radial-gradient(120% 90% at 50% 10%, #2b2a2f 0%, #0f0f12 70%);">
+        <span class="tag">Bold · Norse</span><span class="status some">Album name</span>
+        <div class="icon" style="background: linear-gradient(150deg, #1b1b20, #0b0b0d); border: 1px solid #3a3528;">
+          <svg viewBox="0 0 64 64" fill="none" stroke="#c9a45c" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M24 10 V54"/><path d="M24 14 L42 26 L24 38"/><path d="M24 38 L40 50" opacity=".6"/>
+          </svg>
+        </div>
+        <div class="word" style="font-family: 'GFS Baskerville'; color: #e7d3a5; letter-spacing: 10px;">SKALD</div>
+      </div>
+      <div class="light">
+        <div class="meta">
+          <div class="wordsm" style="font-family: 'GFS Baskerville'; color: #1a1712; letter-spacing: 7px;">SKALD</div>
+          <div class="say">Say it "skahld"</div>
+          <div class="mean">Norse poet-singer who kept memories in song</div>
+        </div>
+        <div class="launch"><div class="mini" style="background: linear-gradient(150deg, #1b1b20, #0b0b0d);"><svg viewBox="0 0 64 64" fill="none" stroke="#c9a45c" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"><path d="M24 10 V54"/><path d="M24 14 L42 26 L24 38"/></svg></div><span>Skald</span></div>
+      </div>
+      <p class="note">The most premium-feeling. No app uses it, but Wardruna's album "Skald" is well known.</p>
+    </div>
+
+    <!-- RONDO -->
+    <div class="card">
+      <div class="dark" style="background: radial-gradient(120% 90% at 30% 15%, #0f4a4c 0%, #0a2223 70%);">
+        <span class="tag">Classic · Music form</span><span class="status some">Old music apps</span>
+        <div class="icon" style="background: linear-gradient(150deg, #f3eadb, #e2d3b8);">
+          <svg viewBox="0 0 64 64" fill="none" stroke="#0c3b3d" stroke-width="5" stroke-linecap="round">
+            <path d="M46.5 21 A18 18 0 1 0 50 32"/><circle cx="50" cy="32" r="4.5" fill="#d2683a" stroke="none"/>
+          </svg>
+        </div>
+        <div class="word" style="font-family: 'Inter Display'; font-weight: 600; color: #f3eadb; letter-spacing: -1px;">rondo</div>
+      </div>
+      <div class="light">
+        <div class="meta">
+          <div class="wordsm" style="font-family: 'Inter Display'; font-weight: 600; color: #0c3b3d; letter-spacing: -.5px;">rondo</div>
+          <div class="say">Say it "RON-doh"</div>
+          <div class="mean">A piece whose main theme keeps coming back</div>
+        </div>
+        <div class="launch"><div class="mini" style="background: linear-gradient(150deg, #f3eadb, #e2d3b8);"><svg viewBox="0 0 64 64" fill="none" stroke="#0c3b3d" stroke-width="6" stroke-linecap="round"><path d="M46.5 21 A18 18 0 1 0 50 32"/><circle cx="50" cy="32" r="5" fill="#d2683a" stroke="none"/></svg></div><span>Rondo</span></div>
+      </div>
+      <p class="note">The safest choice in English. Used before by a Mac MIDI player (2006–09) and a sheet-music app.</p>
+    </div>
+
+    <!-- EKKO FLOW -->
+    <div class="card">
+      <div class="dark" style="background: radial-gradient(120% 90% at 70% 15%, #1d2b5a 0%, #0b1126 70%);">
+        <span class="tag">Your favourite · Echo</span><span class="status clean">Clean as a pair</span>
+        <div class="icon" style="background: linear-gradient(150deg, #2d4bd1, #1a2a7a);">
+          <svg viewBox="0 0 64 64" fill="none" stroke-linecap="round" stroke-width="4.5">
+            <path d="M10 38 C18 24 26 24 32 32 S46 40 54 26" stroke="#8fe3ff"/>
+            <path d="M10 46 C18 32 26 32 32 40 S46 48 54 34" stroke="#8fe3ff" opacity=".45"/>
+          </svg>
+        </div>
+        <div class="word" style="font-family: 'Inter Display'; font-weight: 500; color: #e6edff; letter-spacing: -.5px;">Ekko <span style="font-weight: 300; color: #8fe3ff;">Flow</span></div>
+      </div>
+      <div class="light">
+        <div class="meta">
+          <div class="wordsm" style="font-family: 'Inter Display'; font-weight: 500; color: #121a3d; letter-spacing: -.3px;">Ekko <span style="font-weight: 300; color: #2d4bd1;">Flow</span></div>
+          <div class="say">Say it "EK-oh flow"</div>
+          <div class="mean">An echo, and one song running into the next</div>
+        </div>
+        <div class="launch"><div class="mini" style="background: linear-gradient(150deg, #2d4bd1, #1a2a7a);"><svg viewBox="0 0 64 64" fill="none" stroke-linecap="round" stroke-width="5.5"><path d="M10 38 C18 24 26 24 32 32 S46 40 54 26" stroke="#8fe3ff"/></svg></div><span>Ekko Flow</span></div>
+      </div>
+      <p class="note">Ties to Echo Vault Studio. "Ekko" alone is crowded; the pair is free. Rename the Flow tab.</p>
+    </div>
+
+    <!-- LATHE -->
+    <div class="card">
+      <div class="dark" style="background: radial-gradient(120% 90% at 50% 10%, #3a2a22 0%, #120d0b 70%);">
+        <span class="tag">Crafted · Vinyl</span><span class="status clean">Clean</span>
+        <div class="icon" style="background: radial-gradient(circle at 50% 50%, #1a1513 0%, #0c0a09 100%);">
+          <svg viewBox="0 0 64 64" fill="none" stroke="#c98a5e" stroke-width="1.6">
+            <circle cx="32" cy="32" r="24" opacity=".9"/><circle cx="32" cy="32" r="20" opacity=".7"/><circle cx="32" cy="32" r="16" opacity=".55"/><circle cx="32" cy="32" r="12" opacity=".4"/>
+            <circle cx="32" cy="32" r="5" fill="#c98a5e" stroke="none"/><path d="M46 8 L36 28" stroke-width="3.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="word" style="font-family: Lora; font-weight: 500; color: #f0d9c6; letter-spacing: 8px;">LATHE</div>
+      </div>
+      <div class="light">
+        <div class="meta">
+          <div class="wordsm" style="font-family: Lora; font-weight: 500; color: #2a1a12; letter-spacing: 6px;">LATHE</div>
+          <div class="say">Say it "layth"</div>
+          <div class="mean">The machine a record is cut on</div>
+        </div>
+        <div class="launch"><div class="mini" style="background: #0c0a09;"><svg viewBox="0 0 64 64" fill="none" stroke="#c98a5e" stroke-width="2.2"><circle cx="32" cy="32" r="24"/><circle cx="32" cy="32" r="17" opacity=".6"/><circle cx="32" cy="32" r="5" fill="#c98a5e" stroke="none"/><path d="M46 8 L36 28" stroke-width="4" stroke-linecap="round"/></svg></div><span>Lathe</span></div>
+      </div>
+      <p class="note">Short and crafted, like a hi-fi brand. A little industrial; not everyone knows how to say it.</p>
+    </div>
+
+  </div>
+  <footer>Clash notes are from web searches on 23 Oct 2026, not a trademark search. Check EUIPO / USPTO (classes 9 and 41) and the Play Store before deciding.</footer>
+</div>
+</body></html>
