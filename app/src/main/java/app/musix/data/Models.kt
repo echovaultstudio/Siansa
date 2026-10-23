@@ -144,16 +144,59 @@ data class Selector(
     val leaveOutTopPlayed: Int = 50,
     /** This share of the mix (percent) comes from outside your usual artists and sound (issue #236). */
     val surprise: Int = 30,
+    /**
+     * Days it's for (issue #348), as ISO days of the week (1 Monday … 7 Sunday); empty means every day. Days and
+     * hours work on their own: a vibe can be for Fridays at any time, or every day from 6 to 12.
+     */
+    val days: List<Int> = emptyList(),
+    /** For the whole day, whatever [startHour] and [endHour] say (issue #348). */
+    val anyTime: Boolean = false,
 ) {
+    /** Whether it's for this hour, whatever the day. */
     fun covers(hour: Int): Boolean = when {
-        startHour == endHour -> true
+        anyTime || startHour == endHour -> true
         startHour < endHour -> hour in startHour until endHour
         else -> hour >= startHour || hour < endHour
     }
 
+    /** Whether it's for this day of the week (ISO, 1 Monday … 7 Sunday). */
+    fun coversDay(day: Int): Boolean = days.isEmpty() || day in days
+
+    /** Whether it's for this hour on this day (issue #348). */
+    fun appliesAt(hour: Int, day: Int): Boolean = covers(hour) && coversDay(day)
+
+    /**
+     * How narrowly it's set, so the most fitting vibe wins when several apply: one for a day beats one for every
+     * day, and one for some hours beats one for the whole day.
+     */
+    val specificity: Int
+        get() = (if (days.isNotEmpty()) 2 else 0) + (if (anyTime || startHour == endHour) 0 else 1)
+
+    /** When it's for, in a line: "06:00–12:00", "Fri · 12:00–17:00", "Mon, Tue · any time" (issue #348). */
     val hoursLabel: String
-        get() = "%02d:00–%02d:00".format(startHour, endHour)
+        get() {
+            val hours = if (anyTime || startHour == endHour) "any time" else "%02d:00–%02d:00".format(startHour, endHour)
+            return if (days.isEmpty()) hours else daysLabel(days) + " · " + hours
+        }
 }
+
+/** Days of the week in short, in week order: "Mon, Fri", "Weekdays", "Weekends", "Every day" (issue #348). */
+fun daysLabel(days: Collection<Int>): String {
+    val set = days.filter { it in 1..7 }.toSortedSet()
+    return when {
+        set.isEmpty() || set.size == 7 -> "Every day"
+        set == sortedSetOf(1, 2, 3, 4, 5) -> "Weekdays"
+        set == sortedSetOf(6, 7) -> "Weekends"
+        else -> set.joinToString(", ") { DAY_SHORT[it - 1] }
+    }
+}
+
+/** Monday first, as ISO days of the week. */
+val DAY_SHORT = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+/** Of [selectors], the enabled one most fitting for [hour] on [day]: the most narrowly set, then the first. */
+fun fittingSelector(selectors: List<Selector>, hour: Int, day: Int): Selector? =
+    selectors.filter { it.enabled && it.appliesAt(hour, day) }.sortedByDescending { it.specificity }.firstOrNull()
 
 @Serializable
 data class Mix(
