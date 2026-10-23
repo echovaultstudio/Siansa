@@ -1,9 +1,11 @@
 package app.musix
 
 import app.musix.data.LyricLine
+import app.musix.data.LyricWord
 import app.musix.data.Lyrics
 import app.musix.data.LyricsFormats
 import app.musix.ui.sungWords
+import app.musix.ui.sungLetters
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -103,5 +105,17 @@ class LyricsFormatsTest {
         assertEquals(0, sungWords(line, 9_000))
         assertEquals(2, sungWords(line, 11_500))
         assertEquals(3, sungWords(line, 20_000))
+    }
+
+    /** Issue #362: the fill glides through the word being sung instead of jumping a word at a time. */
+    @Test fun sungLettersGlideThroughEachWord() {
+        val line = LyricLine(10_000, "Hey you", listOf(LyricWord(10_000, "Hey "), LyricWord(11_000, "you")))
+        assertEquals(0f, sungLetters(line, 9_000, 13_000), 0.001f)
+        assertEquals(2f, sungLetters(line, 10_500, 13_000), 0.001f) // half of "Hey "
+        assertEquals(4f, sungLetters(line, 11_000, 13_000), 0.001f) // "Hey " done
+        // The last word lasts until the next line, at most 900 ms.
+        assertEquals(4f + 1.5f, sungLetters(line, 11_450, 13_000), 0.001f)
+        assertEquals(7f, sungLetters(line, 12_000, 13_000), 0.001f)
+        assertEquals(4f + 1.5f, sungLetters(line, 11_250, 11_500), 0.001f)
     }
 }

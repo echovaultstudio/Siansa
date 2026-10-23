@@ -20,7 +20,10 @@ class LyricsColorsTest {
         for (tint in covers) {
             val bg = lyricsBackground(tint)
             val upcoming = worstContrast(LyricsTextColors.upcoming, bg)
-            assertTrue("Lines to come on $tint: contrast $upcoming", upcoming >= 4.5)
+            // Big bold text: WCAG's 3:1 for large text (issue #362 made them darker, to stand apart from the words
+            // being sung). Still clearer than the sung lines, which pass the same check.
+            assertTrue("Lines to come on $tint: contrast $upcoming", upcoming >= 3.0)
+            assertTrue("Lines to come clearer than sung ones on $tint", upcoming > worstContrast(LyricsTextColors.sung, bg))
         }
     }
 
