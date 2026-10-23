@@ -2,10 +2,8 @@ package app.musix.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,14 +21,12 @@ import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.Cast
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.FavoriteBorder
-import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material.icons.rounded.PlayCircle
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -56,9 +52,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -67,6 +61,17 @@ import app.musix.data.NavTab
 import app.musix.data.moved
 import app.musix.log.AppLog
 import kotlin.math.roundToInt
+import app.musix.data.shownInOrder
+import app.musix.data.arrangeOrder
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.DragIndicator
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.alpha
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectDragGestures
 
 /**
  * Settings › Style (issue #346): how the app looks, each part on its own page. Theme is the Themes page as
@@ -127,9 +132,9 @@ private fun setLyricsButton(graph: app.musix.AppGraph, on: Boolean) {
 }
 
 /**
- * Mini Player (issue #346): a picture of the mini player where the buttons can be dragged into place, and a
- * list to show, hide or add them (Lyrics, Add to playlist, Like). Each button keeps its own slot, so the
- * spacing stays even however they're arranged.
+ * Mini Player (issue #346, #372): its buttons as a list, in the order they sit on the bar. Hold a row or grab its
+ * 6-dot handle to move it; the eye shows or hides it. Lyrics, Add to playlist and Like can be added, up to
+ * [MiniButton.MAX] at once.
  */
 @Composable
 fun MiniPlayerStyleScreen(nav: NavController) {
@@ -146,29 +151,24 @@ fun MiniPlayerStyleScreen(nav: NavController) {
         actions = { TextButton(onClick = { save(MiniButton.default) }, enabled = shown != MiniButton.default) { Text("Reset") } },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
-            StyleHint("Drag a button in the picture to move it.")
-            Box(Modifier.padding(horizontal = Space.Small)) {
-                MiniPlayerPicture(shown, onReorder = ::save)
-            }
-            Spacer(Modifier.height(Space.Section))
-            SectionTitle("Buttons", top = Space.Tight)
-            MiniButton.entries.forEach { button ->
-                val on = button in shown
-                ToggleRow(
-                    icon = button.icon(),
-                    title = button.label,
-                    subtitle = if (!on && shown.size >= MiniButton.MAX) "Up to ${MiniButton.MAX} buttons" else null,
-                    checked = on,
-                    enabled = on || shown.size < MiniButton.MAX,
-                ) { save(MiniButton.toggle(shown, button)) }
-            }
+            StyleHint("Hold a row and drag it, left to right on the bar. Tap the eye to show or hide it. Up to ${MiniButton.MAX} buttons.")
+            ArrangeList(
+                order = arrangeOrder(shown, MiniButton.entries),
+                shown = shown.toSet(),
+                label = { it.label },
+                icon = { it.icon() },
+                key = { it.id },
+                canHide = { true },
+                canShowMore = shown.size < MiniButton.MAX,
+                onChange = { order, on -> save(shownInOrder(order, on)) },
+            )
         }
     }
 }
 
 /**
- * Nav Bar (issue #346): a picture of the bottom bar where the tabs can be dragged into a new order, and a
- * list to show or hide them, up to [NavTab.MAX]. Settings always stays, so these choices can be found again.
+ * Nav Bar (issue #346, #372): the tabs as a list, in their order on the bar. Hold a row or grab its 6-dot handle to
+ * move it; the eye shows or hides it, up to [NavTab.MAX]. Settings always stays, so these choices can be found.
  */
 @Composable
 fun NavBarStyleScreen(nav: NavController) {
@@ -185,21 +185,17 @@ fun NavBarStyleScreen(nav: NavController) {
         actions = { TextButton(onClick = { save(NavTab.default) }, enabled = shown != NavTab.default) { Text("Reset") } },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
-            StyleHint("Drag a tab in the picture to move it.")
-            NavBarPicture(shown, onReorder = ::save)
-            Spacer(Modifier.height(Space.Section))
-            SectionTitle("Tabs", top = Space.Tight)
-            NavTab.entries.forEach { tab ->
-                val on = tab in shown
-                val required = tab in NavTab.required
-                ToggleRow(
-                    icon = tab.icon(),
-                    title = tab.label,
-                    subtitle = if (required) "Always shown" else null,
-                    checked = on,
-                    enabled = !required && (on || shown.size < NavTab.MAX),
-                ) { save(NavTab.toggle(shown, tab)) }
-            }
+            StyleHint("Hold a row and drag it, left to right on the bar. Tap the eye to show or hide it. Settings always stays.")
+            ArrangeList(
+                order = arrangeOrder(shown, NavTab.entries),
+                shown = shown.toSet(),
+                label = { it.label },
+                icon = { it.icon() },
+                key = { it.route },
+                canHide = { it !in NavTab.required },
+                canShowMore = shown.size < NavTab.MAX,
+                onChange = { order, on -> save(shownInOrder(order, on)) },
+            )
         }
     }
 }
@@ -214,149 +210,124 @@ private fun StyleHint(text: String) {
     )
 }
 
-/** A row with a checkbox, to show or hide one button or tab. */
+/**
+ * A short list to put in order and show or hide, as Home's Arrange does (issue #372): hold a row, or grab its 6-dot
+ * handle, and move it; the others make room. Hidden rows stay, dimmed, below the shown ones. [onChange] gets the
+ * whole order and the shown set when a row is let go or its eye is tapped.
+ */
 @Composable
-private fun ToggleRow(icon: ImageVector, title: String, subtitle: String?, checked: Boolean, enabled: Boolean, onToggle: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onToggle)
-            .padding(horizontal = Space.Page, vertical = Space.Small)
-            .testTag("styleToggle"),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
-        Column(Modifier.weight(1f).padding(start = Space.Page)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Checkbox(checked = checked, onCheckedChange = { onToggle() }, enabled = enabled)
-    }
-}
+internal fun <T> ArrangeList(
+    order: List<T>,
+    shown: Set<T>,
+    label: (T) -> String,
+    icon: (T) -> ImageVector,
+    key: (T) -> String,
+    canHide: (T) -> Boolean,
+    canShowMore: Boolean,
+    onChange: (order: List<T>, shown: Set<T>) -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    val pitchPx = with(LocalDensity.current) { ARRANGE_PITCH.toPx() }
+    val saved by rememberUpdatedState(order)
+    val on by rememberUpdatedState(shown)
+    val change by rememberUpdatedState(onChange)
+    var items by remember(order) { mutableStateOf(order) }
+    var dragging by remember { mutableStateOf<T?>(null) }
+    var offset by remember { mutableFloatStateOf(0f) }
 
-/** The mini player's look, with its buttons in the order set: drag one to move it. */
-@Composable
-private fun MiniPlayerPicture(buttons: List<MiniButton>, onReorder: (List<MiniButton>) -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFF2A2A30))
-            .padding(Space.Small)
-            .testTag("miniPicture"),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier.size(44.dp).clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center,
-        ) { Icon(Icons.Rounded.MusicNote, null, tint = Color.White.copy(alpha = 0.7f)) }
-        Spacer(Modifier.width(Space.Medium))
-        Column(Modifier.weight(1f)) {
-            Text("Song title", style = MaterialTheme.typography.bodyLarge, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("Artist", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.75f), maxLines = 1)
-        }
-        DragOrderRow(buttons, slot = MINI_SLOT, onReorder = onReorder) { button, lifted ->
-            Box(
-                Modifier
-                    .size(MINI_SLOT)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(if (lifted) Color.White.copy(alpha = 0.2f) else Color.Transparent),
-                contentAlignment = Alignment.Center,
-            ) { Icon(button.icon(), button.label, tint = Color.White) }
+    fun start(item: T) {
+        dragging = item
+        offset = 0f
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
+
+    fun dragBy(dy: Float) {
+        val item = dragging ?: return
+        offset += dy
+        val from = items.indexOf(item)
+        val to = dragTarget(from, offset, pitchPx, items.size)
+        if (to != from) {
+            items = items.moved(from, to)
+            offset -= (to - from) * pitchPx
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         }
     }
-}
 
-/** The bottom bar's look, with its tabs in the order set: drag one to move it. */
-@Composable
-private fun NavBarPicture(tabs: List<NavTab>, onReorder: (List<NavTab>) -> Unit) {
-    BoxWithConstraints(
-        Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(vertical = Space.Small)
-            .testTag("navPicture"),
-    ) {
-        val slot = maxWidth / tabs.size.coerceAtLeast(1)
-        DragOrderRow(tabs, slot = slot, onReorder = onReorder) { tab, lifted ->
-            Column(
-                Modifier
-                    .width(slot)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (lifted) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-                    .padding(vertical = Space.Tight),
-                horizontalAlignment = Alignment.CenterHorizontally,
+    fun end() {
+        if (dragging == null) return
+        dragging = null
+        offset = 0f
+        if (items != saved) change(items, on)
+    }
+
+    Column(Modifier.fillMaxWidth().testTag("arrangeList")) {
+        items.forEach { item ->
+            val lifted = item == dragging
+            val isShown = item in shown
+            val toggleable = if (isShown) canHide(item) else canShowMore
+            Surface(
+                color = if (lifted) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .zIndex(if (lifted) 1f else 0f)
+                    .graphicsLayer { translationY = if (lifted) offset else 0f }
+                    .padding(horizontal = Space.Page, vertical = Space.Tight)
+                    .then(if (lifted) Modifier.shadow(6.dp, RoundedCornerShape(12.dp)) else Modifier)
+                    .fillMaxWidth()
+                    .pointerInput(item) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { start(item) },
+                            onDrag = { c, amount -> c.consume(); dragBy(amount.y) },
+                            onDragEnd = { end() },
+                            onDragCancel = { end() },
+                        )
+                    }
+                    .testTag("arrangeRow"),
             ) {
-                Icon(tab.icon(), null)
-                Text(tab.label, maxLines = 1, softWrap = false, fontSize = 11.sp, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.height(ARRANGE_ROW).padding(start = Space.Page), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(icon(item), null, tint = if (isShown) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                    Text(
+                        label(item),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (isShown) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f).padding(start = Space.Page).alpha(if (isShown) 1f else 0.6f),
+                    )
+                    IconButton(
+                        enabled = toggleable,
+                        onClick = { change(items, if (isShown) on - item else on + item) },
+                    ) {
+                        Icon(
+                            if (isShown) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
+                            contentDescription = if (isShown) "Hide ${label(item)}" else "Show ${label(item)}",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (toggleable) 1f else 0.3f),
+                        )
+                    }
+                    // The handle moves straight away, without the hold.
+                    Icon(
+                        Icons.Rounded.DragIndicator,
+                        contentDescription = "Move ${label(item)}",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .pointerInput(item) {
+                                detectDragGestures(
+                                    onDragStart = { start(item) },
+                                    onDrag = { c, amount -> c.consume(); dragBy(amount.y) },
+                                    onDragEnd = { end() },
+                                    onDragCancel = { end() },
+                                )
+                            }
+                            .padding(Space.Page)
+                            .size(24.dp),
+                    )
+                }
             }
         }
     }
 }
 
-/**
- * A row of equal slots whose items can be dragged sideways into a new order (issue #346). The dragged item
- * follows the finger; as it passes half a slot it takes the neighbouring place, with a tick, so items always
- * sit on their slots and the spacing stays even. The new order is passed on when it's let go.
- */
-@Composable
-internal fun <T> DragOrderRow(
-    items: List<T>,
-    slot: Dp,
-    onReorder: (List<T>) -> Unit,
-    content: @Composable (item: T, lifted: Boolean) -> Unit,
-) {
-    val haptics = LocalHapticFeedback.current
-    // The drag handlers live as long as their item, so they read these through state that follows each change.
-    val slotPx by rememberUpdatedState(with(LocalDensity.current) { slot.toPx() })
-    val saved by rememberUpdatedState(items)
-    val reorder by rememberUpdatedState(onReorder)
-    var order by remember(items) { mutableStateOf(items) }
-    var dragging by remember { mutableStateOf<T?>(null) }
-    var offset by remember { mutableFloatStateOf(0f) }
-    Row(horizontalArrangement = Arrangement.Start) {
-        order.forEach { item ->
-            val lifted = item == dragging
-            Box(
-                Modifier
-                    .width(slot)
-                    .zIndex(if (lifted) 1f else 0f)
-                    .graphicsLayer { translationX = if (lifted) offset else 0f }
-                    .pointerInput(item) {
-                        detectHorizontalDragGestures(
-                            onDragStart = {
-                                dragging = item
-                                offset = 0f
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            },
-                            onDragEnd = {
-                                dragging = null
-                                offset = 0f
-                                if (order != saved) reorder(order)
-                            },
-                            onDragCancel = {
-                                dragging = null
-                                offset = 0f
-                                order = saved
-                            },
-                        ) { change, dx ->
-                            change.consume()
-                            offset += dx
-                            val from = order.indexOf(item)
-                            val to = dragTarget(from, offset, slotPx, order.size)
-                            if (to != from) {
-                                order = order.moved(from, to)
-                                offset -= (to - from) * slotPx
-                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            }
-                        }
-                    }
-                    .testTag("dragSlot"),
-                contentAlignment = Alignment.Center,
-            ) { content(item, lifted) }
-        }
-    }
-}
+/** An arrange row's height, and the distance from one row to the next (the row plus its gaps above and below). */
+private val ARRANGE_ROW = 52.dp
+private val ARRANGE_PITCH = ARRANGE_ROW + Space.Tight * 2
 
 /** Where an item dragged [offset] px from slot [from] lands: the slot it's over by more than half, in range. */
 internal fun dragTarget(from: Int, offset: Float, slotPx: Float, count: Int): Int {
