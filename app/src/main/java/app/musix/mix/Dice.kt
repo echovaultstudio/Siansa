@@ -15,7 +15,7 @@ class Dice(private val graph: AppGraph) {
         val heard = graph.history.all().map { it.id }.toHashSet()
         val onlyOnPhone = graph.settings.current.downloadedOnly
         repeat(TRIES) { attempt ->
-            val batch = graph.subsonic.randomSongPlays(BATCH)
+            val batch = graph.source.randomSongPlays(BATCH)
             val pick = pickNeverPlayed(batch, heard, allowed = { !onlyOnPhone || graph.downloads.isDownloaded(it.id) })
             if (pick != null) {
                 AppLog.i("Dice", "Rolled ${pick.id} \"${pick.title}\" (try ${attempt + 1}, ${batch.count { it.second == 0L }} of ${batch.size} never played)")

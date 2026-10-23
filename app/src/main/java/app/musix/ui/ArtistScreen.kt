@@ -89,12 +89,12 @@ fun ArtistScreen(nav: NavController, id: String) {
         if (local != null) {
             ArtistPage(local, graph.library.albumsOf(local), graph.library.songsOf(local))
         } else {
-            val remote = graph.subsonic.artist(id)
+            val remote = graph.source.artist(id)
             val albums = graph.library.keepSyncedAlbums(remote.albums, "Artist page")
             ArtistPage(remote.artist, albums.sortedByDescending { it.year ?: 0 }, emptyList())
         }
     }
-    val info by loadState("info-$id") { graph.subsonic.artistInfo(id) }
+    val info by loadState("info-$id") { graph.source.artistInfo(id) }
     // Artists that sound alike, from the Musix plugin (issue #223); nothing when it isn't there.
     val soundsAlike by loadState("sounds-alike-$id") {
         val name = snapshotFlow { page.valueOrNull() }.filterNotNull().first().artist.name

@@ -55,7 +55,7 @@ fun SyncScreen(nav: NavController) {
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val library by graph.library.status.collectAsStateWithLifecycle()
-    val folders by loadState("folders") { graph.subsonic.musicFolders() }
+    val folders by loadState("folders") { graph.source.musicFolders() }
 
     Screen(title = "Library sync", nav = nav) { padding ->
         Column(

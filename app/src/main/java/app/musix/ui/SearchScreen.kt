@@ -133,7 +133,7 @@ fun SearchScreen(nav: NavController) {
         busy = true
         error = null
         try {
-            results = if (graph.library.isSynced) graph.library.search(q) else graph.subsonic.search(q)
+            results = if (graph.library.isSynced) graph.library.search(q) else graph.source.search(q)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

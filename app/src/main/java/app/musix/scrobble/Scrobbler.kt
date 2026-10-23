@@ -8,7 +8,7 @@ import app.musix.data.Users
 import app.musix.log.AppLog
 import app.musix.net.LastFmApi
 import app.musix.net.ListenBrainzApi
-import app.musix.net.SubsonicApi
+import app.musix.net.MusicSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -29,7 +29,7 @@ data class PendingListen(val song: Song, val startedAtSec: Long, val targets: Se
 class Scrobbler(
     context: Context,
     private val settings: SettingsRepository,
-    private val subsonic: SubsonicApi,
+    private val source: MusicSource,
     private val lastFm: LastFmApi,
     private val listenBrainz: ListenBrainzApi,
     private val scope: CoroutineScope,
@@ -43,7 +43,7 @@ class Scrobbler(
         val s = settings.current
         scope.launch {
             if (!scrobbles(song, s.scrobbleOffUsers)) return@launch
-            if (s.scrobbleNavidrome) runCatching { subsonic.scrobble(song.id, submission = false) }
+            if (s.scrobbleNavidrome) runCatching { source.scrobble(song.id, submission = false) }
             if (s.lastFmReady) runCatching { lastFm.nowPlaying(lastFmKeys(), song) }
                 .onFailure { AppLog.w("Scrobble", "Last.fm now playing failed: ${it.message}") }
             if (s.listenBrainzReady) runCatching { listenBrainz.nowPlaying(s.listenBrainzUrl, s.listenBrainzToken, song) }
@@ -95,7 +95,7 @@ class Scrobbler(
         val s = settings.current
         return runCatching {
             when (target) {
-                NAVIDROME -> subsonic.scrobble(item.song.id, submission = true, timeMs = item.startedAtSec * 1000)
+                NAVIDROME -> source.scrobble(item.song.id, submission = true, timeMs = item.startedAtSec * 1000)
                 LASTFM -> if (s.lastFmReady) lastFm.scrobble(lastFmKeys(), item.song, item.startedAtSec) else Unit
                 LISTENBRAINZ -> if (s.listenBrainzReady) listenBrainz.listen(s.listenBrainzUrl, s.listenBrainzToken, item.song, item.startedAtSec) else Unit
                 else -> Unit

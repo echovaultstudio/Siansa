@@ -135,19 +135,19 @@ private suspend fun loadSection(graph: AppGraph, section: HomeSection): List<Sec
     val list: List<SectionItem> = when (section) {
         HomeSection.Rediscover -> graph.insights.rediscover().map { SectionItem.AlbumItem(it.album, rediscoverSubtitle(it)) }
         HomeSection.Radios -> moodRadios.map { SectionItem.Radio(it) }
-        HomeSection.Playlists -> graph.library.refreshPlaylists { graph.subsonic.playlists() }
+        HomeSection.Playlists -> graph.library.refreshPlaylists { graph.source.playlists() }
             .let(graph.playlists.removed::visible)
             .map { SectionItem.PlaylistItem(it) }
         HomeSection.RecentlyPlayed -> recentlyPlayedAlbums(graph, 100).map { SectionItem.AlbumItem(it, it.artist) }
         HomeSection.ArtistRadios -> artistRadioArtists(graph, 60).map { SectionItem.ArtistItem(it) }
         HomeSection.RecentlyAdded -> (
             if (synced) graph.library.albums("newest").take(200)
-            else graph.subsonic.albums("newest", 200, 0).distinctBy { it.name + "|" + it.artist }
+            else graph.source.albums("newest", 200, 0).distinctBy { it.name + "|" + it.artist }
             ).map { SectionItem.AlbumItem(it, it.artist) }
         HomeSection.Genres -> (if (synced) graph.library.genres(500) else emptyList()).map { SectionItem.GenreItem(it) }
         HomeSection.RandomPicks -> (
             if (synced) graph.library.randomAlbums(100)
-            else graph.subsonic.albums("random", 100, 0).distinctBy { it.name + "|" + it.artist }
+            else graph.source.albums("random", 100, 0).distinctBy { it.name + "|" + it.artist }
             ).map { SectionItem.AlbumItem(it, it.artist) }
     }
     // The same album can come back twice from the server; keys in a grid must be unique.

@@ -43,8 +43,8 @@ fun SongDetailsScreen(nav: NavController, songId: String) {
     val graph = LocalGraph.current
     val page by loadState(songId) {
         AppLog.i("Details", "Song details for $songId")
-        val details = graph.subsonic.songDetails(songId)
-        val song = graph.library.songs(listOf(songId)).firstOrNull() ?: graph.subsonic.song(songId)
+        val details = graph.source.songDetails(songId)
+        val song = graph.library.songs(listOf(songId)).firstOrNull() ?: graph.source.song(songId)
         SongDetailsPage(song, details, skipCount(graph.history.all(), songId))
     }
 
