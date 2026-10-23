@@ -60,6 +60,9 @@ data class SyncProgress(
  * - nothing to do when Navidrome hasn't scanned since the last sync (only hearts, play counts and playlists refresh);
  * - otherwise the album list is compared and only new or changed albums have their songs fetched;
  * - a full sync, or a first one, fetches every song page by page.
+ *
+ * Every Navidrome library is kept on the phone, each album knowing which it's in (issue #376); the libraries
+ * chosen in Settings are only which of them show ([LibraryRepository.showFolders]), so switching one is instant.
  */
 class LibrarySync(
     private val api: SubsonicApi,
@@ -97,16 +100,15 @@ class LibrarySync(
     private suspend fun run(forceFull: Boolean, quiet: Boolean) {
         _progress.value = SyncProgress(phase = SyncPhase.CONNECTING, quiet = quiet)
         val all = api.musicFolders()
-        val chosen = settings.current.syncFolders
-        val folders = all.filter { it.id in chosen }
-        // Nothing chosen, or every library chosen: one pass without a library filter.
-        val passes: List<MusicFolder?> = if (folders.isEmpty() || folders.size == all.size) listOf(null) else folders
-        val folderKey = passes.joinToString(",") { it?.id ?: "*" }
+        // Every library, each in its own pass so its albums know where they're from (issue #376); one library
+        // needs no filter.
+        val passes: List<MusicFolder?> = if (all.size <= 1) listOf(null) else all
+        val folderKey = syncScope(all)
 
         val synced = library.meta(LibraryRepository.META_SYNCED_AT) != null
-        val sameFolders = library.meta(LibraryRepository.META_FOLDERS) == folderKey
+        val sameFolders = library.meta(LibraryRepository.META_SCOPE) == folderKey
         val lastScan = runCatching { api.lastScan() }.getOrNull()
-        AppLog.i("Sync", "Start full=$forceFull quiet=$quiet lastScan=$lastScan folders=$folderKey", event = "sync.started",
+        AppLog.i("Sync", "Start full=$forceFull quiet=$quiet lastScan=$lastScan libraries=${all.size}", event = "sync.started",
             fields = mapOf("full" to forceFull, "quiet" to quiet, "last_scan" to lastScan, "folders" to folderKey))
 
         if (!forceFull && synced && sameFolders && lastScan != null && lastScan != "scanning" &&
@@ -132,7 +134,7 @@ class LibrarySync(
             var offset = 0
             while (true) {
                 val page = api.albums("alphabeticalByName", PAGE, offset, folder?.id)
-                page.forEach { albums.putIfAbsent(it.id, it) }
+                page.forEach { albums.putIfAbsent(it.id, it.copy(folderId = folder?.id)) }
                 _progress.update { it.copy(albums = albums.size) }
                 if (page.size < PAGE) break
                 offset += PAGE
@@ -188,10 +190,11 @@ class LibrarySync(
             library.putAlbumsAndSongs(albums.values.toList(), songs, changed.map { it.id }, removed)
         }
 
-        val merged = library.recomputePrimaries()
+        library.putFolderNames(all)
+        library.putMeta(LibraryRepository.META_SCOPE, folderKey)
+        val merged = library.showFolders(settings.current.syncFolders)
         refreshExtras()
         lastScan?.takeIf { it != "scanning" }?.let { library.putMeta(LibraryRepository.META_LAST_SCAN, it) }
-        library.putMeta(LibraryRepository.META_FOLDERS, folderKey)
         library.putMeta(LibraryRepository.META_SYNCED_AT, System.currentTimeMillis().toString())
         library.refreshStatus()
         val status = library.status.value
@@ -223,3 +226,6 @@ class LibrarySync(
         const val PAGE = 500
     }
 }
+
+/** What the phone keeps after a sync: every library on the server, by id (issue #376). */
+internal fun syncScope(all: List<MusicFolder>): String = "all:" + all.map { it.id }.sorted().joinToString(",")
