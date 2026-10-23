@@ -1,0 +1,201 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #eceae5; font-family: Inter, sans-serif; }
+  #shot { width: 1500px; padding: 48px 48px 40px; background: #eceae5; }
+  header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 28px; }
+  header h1 { font-family: "Inter Display"; font-weight: 600; font-size: 30px; letter-spacing: -0.5px; color: #17161a; }
+  header p { font-size: 15px; color: #6b6870; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .card { border-radius: 22px; overflow: hidden; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.06); }
+  .dark { height: 270px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; position: relative; }
+  .icon { width: 112px; height: 112px; border-radius: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 32px rgba(0,0,0,.38); overflow: hidden; }
+  .icon svg { width: 112px; height: 112px; }
+  .word { font-size: 42px; line-height: 1; }
+  .light { padding: 20px 22px 18px; display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; }
+  .meta .wordsm { font-size: 27px; line-height: 1.1; margin-bottom: 6px; }
+  .meta .say { font-size: 13px; color: #6b6870; }
+  .meta .mean { font-size: 14px; color: #2b2a30; margin-top: 4px; }
+  .launch { display: flex; flex-direction: column; align-items: center; gap: 6px; background: #f4f2ee; padding: 10px 12px 8px; border-radius: 14px; }
+  .launch .mini { width: 54px; height: 54px; border-radius: 15px; overflow: hidden; }
+  .launch .mini svg { width: 54px; height: 54px; display: block; }
+  .launch span { font-size: 11.5px; color: #2b2a30; }
+  .tag { position: absolute; top: 14px; left: 16px; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: rgba(255,255,255,.55); }
+  .status { position: absolute; top: 12px; right: 14px; font-size: 11px; padding: 4px 9px; border-radius: 99px; font-weight: 600; }
+  .clean { background: rgba(126, 220, 160, .18); color: #9fe8b9; }
+  .some { background: rgba(255, 200, 110, .18); color: #ffd28a; }
+  .note { padding: 0 22px 18px; font-size: 12.5px; color: #6b6870; line-height: 1.45; }
+  footer { margin-top: 22px; font-size: 13px; color: #6b6870; }
+</style></head>
+<body>
+<!-- Icons are full-bleed SVGs (viewBox 0 0 112 112) so the same art works big and at launcher size. -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <!-- EKKORA: a dot sending out echo rings, each fainter -->
+    <linearGradient id="ekBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b3fd8"/><stop offset="1" stop-color="#171a5e"/></linearGradient>
+    <symbol id="ekkora" viewBox="0 0 112 112">
+      <rect width="112" height="112" fill="url(#ekBg)"/>
+      <circle cx="38" cy="56" r="8" fill="#9ff0ff"/>
+      <path d="M52 40 A22 22 0 0 1 52 72" fill="none" stroke="#9ff0ff" stroke-width="6" stroke-linecap="round"/>
+      <path d="M64 30 A36 36 0 0 1 64 82" fill="none" stroke="#9ff0ff" stroke-width="6" stroke-linecap="round" opacity=".6"/>
+      <path d="M76 20 A50 50 0 0 1 76 92" fill="none" stroke="#9ff0ff" stroke-width="6" stroke-linecap="round" opacity=".3"/>
+    </symbol>
+    <!-- ONDRA: one wave rolling over a deep sea -->
+    <linearGradient id="onBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f6b6e"/><stop offset="1" stop-color="#083a3d"/></linearGradient>
+    <symbol id="ondra" viewBox="0 0 112 112">
+      <rect width="112" height="112" fill="url(#onBg)"/>
+      <path d="M0 74 C18 74 22 46 40 46 S62 74 80 74 S102 50 112 50 V112 H0Z" fill="#f2dfb8"/>
+      <path d="M0 86 C18 86 22 62 40 62 S62 86 80 86 S102 66 112 66 V112 H0Z" fill="#e7c98f" opacity=".85"/>
+    </symbol>
+    <!-- VINORA: a record with a warm aura -->
+    <radialGradient id="viAura" cx=".5" cy=".5" r=".6"><stop offset=".45" stop-color="#f0a46b"/><stop offset=".75" stop-color="#b8456a"/><stop offset="1" stop-color="#2a0f22"/></radialGradient>
+    <symbol id="vinora" viewBox="0 0 112 112">
+      <rect width="112" height="112" fill="url(#viAura)"/>
+      <circle cx="56" cy="56" r="33" fill="#140b10"/>
+      <circle cx="56" cy="56" r="28" fill="none" stroke="#3a2630" stroke-width="1.2"/>
+      <circle cx="56" cy="56" r="23" fill="none" stroke="#3a2630" stroke-width="1.2"/>
+      <circle cx="56" cy="56" r="18" fill="none" stroke="#3a2630" stroke-width="1.2"/>
+      <circle cx="56" cy="56" r="10" fill="#f0a46b"/>
+      <circle cx="56" cy="56" r="2.5" fill="#140b10"/>
+    </symbol>
+    <!-- LIRVO: a lyric line that becomes a note -->
+    <linearGradient id="liBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7a6b"/><stop offset="1" stop-color="#c2366b"/></linearGradient>
+    <symbol id="lirvo" viewBox="0 0 112 112">
+      <rect width="112" height="112" fill="url(#liBg)"/>
+      <path d="M26 70 C40 70 46 40 60 40 S74 58 74 58" fill="none" stroke="#fff4ec" stroke-width="7" stroke-linecap="round"/>
+      <path d="M74 58 V28" stroke="#fff4ec" stroke-width="7" stroke-linecap="round"/>
+      <path d="M74 28 C82 30 86 34 88 40" fill="none" stroke="#fff4ec" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="66" cy="70" r="10" fill="#fff4ec"/>
+    </symbol>
+    <!-- KAELO: a sun of equaliser bars -->
+    <symbol id="kaelo" viewBox="0 0 112 112">
+      <rect width="112" height="112" fill="#fff3d6"/>
+      <circle cx="56" cy="56" r="34" fill="#ffb81f"/>
+      <g stroke="#7a3410" stroke-width="7" stroke-linecap="round">
+        <path d="M38 62 V52"/><path d="M47 68 V44"/><path d="M56 74 V36"/><path d="M65 66 V46"/><path d="M74 60 V54"/>
+      </g>
+    </symbol>
+    <!-- REKKO: a record looping back on itself -->
+    <symbol id="rekko" viewBox="0 0 112 112">
+      <rect width="112" height="112" fill="#d8283f"/>
+      <circle cx="56" cy="56" r="11" fill="#fff1ec"/>
+      <path d="M86 56 A30 30 0 1 1 74 32" fill="none" stroke="#fff1ec" stroke-width="8" stroke-linecap="round"/>
+      <path d="M62 24 L78 30 L70 45" fill="none" stroke="#fff1ec" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div id="shot">
+  <header>
+    <h1>Logo ideas · issue #360</h1>
+    <p>Icon and wordmark on dark, wordmark on light, and the icon at home-screen size</p>
+  </header>
+  <div class="grid">
+
+    <div class="card">
+      <div class="dark" style="background: radial-gradient(120% 90% at 30% 15%, #20235f 0%, #0b0c24 70%);">
+        <span class="tag">Echo · your pick</span><span class="status some">"Ekko" marks exist</span>
+        <div class="icon"><svg><use href="#ekkora"/></svg></div>
+        <div class="word" style="font-family: 'Inter Display'; font-weight: 600; color: #e9ecff; letter-spacing: -1px;">ekkora</div>
+      </div>
+      <div class="light">
+        <div class="meta">
+          <div class="wordsm" style="font-family: 'Inter Display'; font-weight: 600; color: #171a5e; letter-spacing: -.6px;">ekkora</div>
+          <div class="say">Say it "ek-KOR-a"</div>
+          <div class="mean">An echo that keeps travelling: your music, coming back</div>
+        </div>
+        <div class="launch"><div class="mini"><svg><use href="#ekkora"/></svg></div><span>Ekkora</span></div>
+      </div>
+      <p class="note">Invented, nothing found for Ekkora itself, but EKKO trademarks exist (Ekko King Co., Ekkobar). Check EKKO in TMview too.</p>
+    </div>
+
+    <div class="card">
+      <div class="dark" style="background: radial-gradient(120% 90% at 70% 15%, #0f4f52 0%, #062223 70%);">
+        <span class="tag">Wave · flow</span><span class="status clean">Clean on the web</span>
+        <div class="icon"><svg><use href="#ondra"/></svg></div>
+        <div class="word" style="font-family: Lora; font-weight: 500; color: #f2dfb8; letter-spacing: 1px;">Ondra</div>
+      </div>
+      <div class="light">
+        <div class="meta">
+          <div class="wordsm" style="font-family: Lora; font-weight: 500; color: #083a3d; letter-spacing: .5px;">Ondra</div>
+          <div class="say">Say it "ON-dra"</div>
+          <div class="mean">From onda, a wave: one song rolling into the next</div>
+        </div>
+        <div class="launch"><div class="mini"><svg><use href="#ondra"/></svg></div><span>Ondra</span></div>
+      </div>
+      <p class="note">Calm and grown-up. Nothing in music found; it's also a Czech name (climber Adam Ondra).</p>
+    </div>
+
+    <div class="card">
+      <div class="dark" style="background: radial-gradient(120% 90% at 50% 10%, #3a1630 0%, #12070f 70%);">
+        <span class="tag">Vinyl · aura</span><span class="status clean">Clean on the web</span>
+        <div class="icon"><svg><use href="#vinora"/></svg></div>
+        <div class="word" style="font-family: 'GFS Baskerville'; color: #f6d2b5; letter-spacing: 9px;">VINORA</div>
+      </div>
+      <div class="light">
+        <div class="meta">
+          <div class="wordsm" style="font-family: 'GFS Baskerville'; color: #2a0f22; letter-spacing: 6px;">VINORA</div>
+          <div class="say">Say it "vi-NOR-a"</div>
+          <div class="mean">Vinyl plus aura: the warm glow of your records</div>
+        </div>
+        <div class="launch"><div class="mini"><svg><use href="#vinora"/></svg></div><span>Vinora</span></div>
+      </div>
+      <p class="note">The most premium of the six, like a hi-fi brand. Nothing found in music or software.</p>
+    </div>
+
+    <div class="card">
+      <div class="dark" style="background: radial-gradient(120% 90% at 30% 15%, #5a1a3b 0%, #200915 70%);">
+        <span class="tag">Lyric · song</span><span class="status clean">Clean on the web</span>
+        <div class="icon"><svg><use href="#lirvo"/></svg></div>
+        <div class="word" style="font-family: Lora; font-style: italic; font-weight: 600; color: #ffe2d6;">lirvo</div>
+      </div>
+      <div class="light">
+        <div class="meta">
+          <div class="wordsm" style="font-family: Lora; font-style: italic; font-weight: 600; color: #8f2350;">lirvo</div>
+          <div class="say">Say it "LEER-vo"</div>
+          <div class="mean">From lyric: a line of words that turns into a tune</div>
+        </div>
+        <div class="launch"><div class="mini"><svg><use href="#lirvo"/></svg></div><span>Lirvo</span></div>
+      </div>
+      <p class="note">Snappy and warm. Nothing found in music or software.</p>
+    </div>
+
+    <div class="card">
+      <div class="dark" style="background: radial-gradient(120% 90% at 50% 15%, #5a3a12 0%, #1f1408 70%);">
+        <span class="tag">Bright · playful</span><span class="status some">Close to "Kalei"</span>
+        <div class="icon"><svg><use href="#kaelo"/></svg></div>
+        <div class="word" style="font-family: 'Inter Display'; font-weight: 800; color: #ffd36b; letter-spacing: -1px;">kaelo</div>
+      </div>
+      <div class="light">
+        <div class="meta">
+          <div class="wordsm" style="font-family: 'Inter Display'; font-weight: 800; color: #7a3410; letter-spacing: -.6px;">kaelo</div>
+          <div class="say">Say it "KAY-lo"</div>
+          <div class="mean">No meaning, just a bright, happy sound</div>
+        </div>
+        <div class="launch"><div class="mini"><svg><use href="#kaelo"/></svg></div><span>Kaelo</span></div>
+      </div>
+      <p class="note">The most fun of the six. "Kalei – Music Playlists" is an existing app with a similar look.</p>
+    </div>
+
+    <div class="card">
+      <div class="dark" style="background: radial-gradient(120% 90% at 70% 15%, #4a0f18 0%, #1a0508 70%);">
+        <span class="tag">Record · recommend</span><span class="status some">"Rekko Circles" app</span>
+        <div class="icon"><svg><use href="#rekko"/></svg></div>
+        <div class="word" style="font-family: 'Inter Display'; font-weight: 900; color: #fff1ec; letter-spacing: 3px;">REKKO</div>
+      </div>
+      <div class="light">
+        <div class="meta">
+          <div class="wordsm" style="font-family: 'Inter Display'; font-weight: 900; color: #b01f34; letter-spacing: 2px;">REKKO</div>
+          <div class="say">Say it "REK-oh"</div>
+          <div class="mean">Record plus recommend: your music, spinning back round</div>
+        </div>
+        <div class="launch"><div class="mini"><svg><use href="#rekko"/></svg></div><span>Rekko</span></div>
+      </div>
+      <p class="note">Punchy and clear. An unrelated "Rekko Circles" app exists, nothing in music.</p>
+    </div>
+
+  </div>
+  <footer>Quick sketches to show the feel, not final artwork. Clash notes are from web searches on 23 Oct 2026, not a trademark search: check each in TMview (classes 9, 41, 42, active only).</footer>
+</div>
+</body></html>
