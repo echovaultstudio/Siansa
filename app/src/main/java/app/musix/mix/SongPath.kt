@@ -57,8 +57,8 @@ class SongPath(private val graph: AppGraph) {
             }
             fromMood != null || toMood != null || lyrics ->
                 throw MixException("Set up AudioMuse in Settings to end a path on a mood or follow the lyrics")
-            graph.subsonic.supports("sonicSimilarity") -> {
-                val steps = graph.subsonic.sonicPath(fromId, toId, length).map { it.id }
+            graph.source.hasSonicMatch() -> {
+                val steps = graph.source.sonicPath(fromId, toId, length).map { it.id }
                 if (steps.isEmpty()) throw MixException("Navidrome found no path between these songs")
                 songPathIds(fromId, toId, steps, length)
             }
@@ -75,7 +75,7 @@ class SongPath(private val graph: AppGraph) {
 
     suspend fun save(from: Song, to: Song, songs: List<Song>): String {
         val name = name(from, to)
-        graph.subsonic.createPlaylist(name, songs.map { it.id })
+        graph.source.createPlaylist(name, songs.map { it.id })
         AppLog.i("SongPath", "Saved \"$name\" with ${songs.size} songs as a playlist")
         return name
     }

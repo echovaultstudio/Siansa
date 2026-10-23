@@ -185,7 +185,8 @@ fun MusixRoot() {
         if (route != null && route in allTabRoutes) currentTab = route
     }
     LaunchedEffect(Unit) {
-        if (!graph.settings.current.navidromeReady) nav.navigate("settings/connections")
+        // A new setup starts by picking where the music is (issue #113).
+        if (!graph.settings.current.navidromeReady) nav.navigate("welcome")
     }
     LaunchedEffect(sheet.isOpen) {
         val screen = if (sheet.isOpen) "player" else route
@@ -270,7 +271,15 @@ fun MusixRoot() {
                 composable("settings/cards") { CardsSettingsScreen(nav) }
                 composable("card/{id}") { CardScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("settings") { SettingsHub(nav) }
-                composable("settings/connections") { ConnectionsScreen(nav) }
+                composable(
+                    "settings/connections?source={source}&extras={extras}",
+                    arguments = listOf(
+                        androidx.navigation.navArgument("source") { type = androidx.navigation.NavType.StringType; nullable = true; defaultValue = null },
+                        androidx.navigation.navArgument("extras") { defaultValue = "true" },
+                    ),
+                ) { ConnectionsScreen(nav, it.arguments?.getString("source"), it.arguments?.getString("extras") != "false") }
+                composable("welcome") { SourcePickerScreen(nav) }
+                composable("welcome/extras/{source}") { SmartExtrasScreen(nav, it.arguments?.getString("source").orEmpty()) }
                 composable("settings/users") { UsersScreen(nav) }
                 composable("settings/playback") { PlaybackSettingsScreen(nav) }
                 composable("settings/themes") { ThemesScreen(nav) }

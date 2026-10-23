@@ -29,7 +29,7 @@ fun NavController.openSimilarAlbums(songId: String) = navigate("similar/albums/$
 
 /** The song for an id: from the synced library, otherwise from Navidrome. */
 private suspend fun songFor(graph: AppGraph, id: String): Song =
-    graph.library.song(id) ?: graph.subsonic.song(id)
+    graph.library.song(id) ?: graph.source.song(id)
 
 /** Songs that sound like one song, ready to play like an album. */
 @Composable

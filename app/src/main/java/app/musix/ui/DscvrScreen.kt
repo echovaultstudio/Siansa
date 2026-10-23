@@ -533,7 +533,7 @@ fun VibeScreen(nav: NavController, id: String) {
                         onClick = {
                             saving = true
                             scope.launch {
-                                runCatching { graph.subsonic.createPlaylist(vibe.shownTitle, vibe.songs.map { it.id }) }
+                                runCatching { graph.source.createPlaylist(vibe.shownTitle, vibe.songs.map { it.id }) }
                                     .onSuccess {
                                         savedAs = vibe.shownTitle
                                         AppLog.i("Vibe", "Saved \"${vibe.shownTitle}\" with ${vibe.songs.size} songs as a playlist")
