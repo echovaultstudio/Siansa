@@ -66,6 +66,8 @@ data class Album(
     val isCompilation: Boolean = false,
     // When it was last played (ISO time), from Navidrome's album lists; not stored in the library.
     val played: String? = null,
+    /** Which Navidrome library it's in (issue #376), when the server has several; null otherwise. */
+    val folderId: String? = null,
 ) {
     val allIds: List<String> get() = ids.ifEmpty { listOf(id) }
 }
