@@ -3,6 +3,58 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.26.0beta — 2026-10-23
+
+### Fixed
+- **Songs in formats the phone can't open stopped the music.** WMA, AIFF, APE, WavPack, Musepack and similar
+  files now play, converted to Opus by Navidrome. When the file type is known they're converted from the start,
+  otherwise as soon as the phone finds it can't read them.
+- **A crossfade could start with a short dip or a stutter.** The song fading out now starts a moment early,
+  silently, and keeps in time with the music before it takes over, so the start of a fade is seamless. The log
+  also says why two songs play back to back without a fade.
+- **TVs and speakers took about five seconds to show in the devices list.** Ones you've used before now show
+  almost at once, and new ones appear as soon as they answer instead of all together at the end of the search.
+- **Home showed only one artist radio after listening to one artist for a while.** It now always shows ten: artists
+  you played lately mixed with artists like them, then the ones you play most.
+- **A newly added album could take several Navidrome scans to show.** When Navidrome hadn't run a new scan, the
+  check at app start skipped the sync entirely, even if music had been added. It now looks at Navidrome's newest
+  albums first and syncs when one isn't on the phone. Each sync also logs which new albums it found.
+
+### Added
+- **Roll the dice.** The dice at the top of Home, left of the filter, plays a song from your library you've
+  never played, straight away.
+- **Daily vibes for certain days.** A vibe can be for some days of the week, some hours, or both, e.g. a Friday
+  afternoon vibe or one for all of Monday. Days are optional, and "Any time of day" makes a vibe run all day. When
+  several fit, the most specific one is used, and the AI is told the day so mix names fit it.
+- **Scrobbling per user.** With more than one Navidrome user on the phone, Settings › Scrobbling has a switch
+  for each. Turn a user off and songs from their library, shown with yours, aren't sent to Navidrome, Last.fm or
+  ListenBrainz.
+
+### Changed
+- **Word-by-word lyrics glide.** The words fill in smoothly, letter by letter as they're sung, instead of jumping a
+  word at a time. Lyrics still to come are a little darker, so they stand apart from the words being sung.
+- **The Dscvr tab is now called Flow.** Its box asks you to "Describe what you want to hear".
+- **The sliders are optional.** They're folded away under "Shape your sound" until you open it, and only the
+  sliders you move are used.
+- **Your vibes can be renamed and deleted** from their ⋮ menu, on the tab or on the vibe itself. Flow keeps your
+  last five vibes, plus any you've pinned to Home.
+- **Clearer buttons beside play.** Repeat is now on the left: one tap turns it on, and it lights up with a dot
+  under it (tap again for this song only). On the right, the plus in a circle adds the song to a playlist.
+  Shuffle moved to the ⋮ menu.
+- **Arranging the nav bar and mini player is easier.** Instead of dragging inside a small picture, each is a list
+  like Home's Arrange: hold a row or grab its handle to move it, and tap the eye to show or hide it.
+- **One search box for everything.** The Library and Sound tabs are gone: type and you get artists, albums and
+  songs by name, then "Sounds like …" with songs that sound like your words, once you pause. The box is rounder
+  and sits on a lighter grey.
+- **Settings are tidier.** Each entry shows just its name, without the arrow beside it or the summary under it.
+- **Switching a library on or off is instant.** Every Navidrome library is now kept on the phone, and the ones you
+  choose are the ones shown, so there's no new sync each time. The first sync after updating fetches the
+  libraries that aren't on the phone yet.
+- **Sync now always fetches everything,** from Library sync or Home's source filter, so new music and changed tags
+  show straight away. The quick check when the app starts stays as it was.
+- **The same album in two libraries shows twice,** for example a FLAC and a Dolby Atmos copy. On the artist page
+  each copy carries its library's name.
+
 ## 0.25.0beta — 2026-10-22
 
 ### Fixed
