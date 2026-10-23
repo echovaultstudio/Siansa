@@ -1,5 +1,9 @@
 package app.musix.ui
 
+import app.musix.log.AppLog
+
+import androidx.compose.material3.OutlinedTextFieldDefaults
+
 import app.musix.mix.VibeTuning
 
 import androidx.compose.foundation.rememberScrollState
@@ -54,7 +58,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import app.musix.data.RecentSearch
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -85,9 +88,10 @@ fun SearchScreen(nav: NavController) {
     val graph = LocalGraph.current
     val scope = rememberCoroutineScope()
     var query by rememberSaveable { mutableStateOf("") }
-    var soundMode by rememberSaveable { mutableStateOf(false) }
     var results by remember { mutableStateOf<SearchResults?>(null) }
+    // One box for everything (issue #373): names as you type, and songs that sound like the words once you pause.
     var soundSongs by remember { mutableStateOf<List<Song>?>(null) }
+    var soundBusy by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     // Recent searches show under the box while you're typing into it, before there's anything to search.
@@ -95,7 +99,7 @@ fun SearchScreen(nav: NavController) {
     val focusManager = LocalFocusManager.current
     val history by graph.searchHistory.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { graph.searchHistory.all() }
-    val recent = history.orEmpty().filter { it.sound == soundMode }
+    val recent = oneSearchList(history.orEmpty())
 
     // The Search tab tapped again (issue #189): a new search, with an empty box ready to type in.
     val focus = remember { FocusRequester() }
@@ -115,19 +119,17 @@ fun SearchScreen(nav: NavController) {
     /** Keeps what's in the box as a recent search (on the search key, or when a result is opened). */
     fun keepSearch() {
         val q = query
-        val sound = soundMode
-        scope.launch { graph.searchHistory.add(q, sound) }
+        scope.launch { graph.searchHistory.add(q, false) }
     }
 
-    // Name search runs as you type; sound search waits for the search key, since it takes longer.
-    LaunchedEffect(query, soundMode) {
-        if (soundMode) return@LaunchedEffect
+    // Names as you type.
+    LaunchedEffect(query) {
         val q = query.trim()
         if (q.length < 2) {
             results = null
             return@LaunchedEffect
         }
-        delay(350)
+        delay(NAME_SEARCH_DELAY_MS)
         busy = true
         error = null
         try {
@@ -143,29 +145,28 @@ fun SearchScreen(nav: NavController) {
 
     val aiProblem = rememberAiProblem()
 
-    fun runSound() {
+    // Sounds like the words: AudioMuse's text-to-audio (CLAP) search, once typing pauses, as it takes longer.
+    LaunchedEffect(query, aiProblem) {
         val q = query.trim()
-        if (q.length < 3 || aiProblem != null) return
-        keepSearch()
-        scope.launch {
-            busy = true
-            error = null
-            try {
-                // Words only (issue #272): the concept chips that steered it were taken out.
-                soundSongs = graph.generator.soundSearch(q)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                error = e.message
-            } finally {
-                busy = false
-            }
+        soundSongs = null
+        if (!soundSearchWanted(q, aiProblem != null)) return@LaunchedEffect
+        delay(SOUND_SEARCH_DELAY_MS)
+        soundBusy = true
+        try {
+            soundSongs = graph.generator.soundSearch(q)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.w("Search", "Sound search for \"$q\" failed: ${e.message}")
+            soundSongs = emptyList()
+        } finally {
+            soundBusy = false
         }
     }
 
     // Typing or looking at results: the back arrow in the box, or the phone's back gesture, returns to the
     // search page (genres and radios) instead of leaving Search for Home (issue #203).
-    val active = searchIsActive(focused, query, soundSongs != null)
+    val active = searchIsActive(focused, query, false)
     fun leaveSearch() {
         query = ""
         results = null
@@ -179,13 +180,12 @@ fun SearchScreen(nav: NavController) {
 
     Screen(title = "Search", nav = null) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize()) {
+            // Rounder, on a slightly lighter grey than the page (issue #373).
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Space.Page).focusRequester(focus).onFocusChanged { focused = it.isFocused }.testTag("searchField"),
-                placeholder = {
-                    Text(if (soundMode) "Describe a sound, e.g. rainy jazz piano" else "Artists, albums, songs")
-                },
+                placeholder = { Text("Artists, albums, songs or a sound") },
                 leadingIcon = {
                     if (active) {
                         IconButton(onClick = { leaveSearch() }, modifier = Modifier.testTag("searchBack")) {
@@ -196,76 +196,95 @@ fun SearchScreen(nav: NavController) {
                     }
                 },
                 singleLine = true,
+                shape = RoundedCornerShape(SEARCH_CORNER),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = {
-                    if (soundMode) runSound() else keepSearch()
+                    keepSearch()
                     focusManager.clearFocus()
                 }),
             )
-            Row(Modifier.padding(horizontal = Space.Page, vertical = Space.Small), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                FilterChip(selected = !soundMode, onClick = { soundMode = false }, label = { Text("Library") })
-                FilterChip(selected = soundMode, onClick = { soundMode = true }, label = { Text("Sound") })
-            }
+            Spacer(Modifier.height(Space.Small))
             if (busy) {
                 Box(Modifier.fillMaxWidth().padding(Space.Page), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             }
             error?.let { ErrorText(it) }
             when {
-                soundMode && aiProblem != null -> AiUnavailable(aiProblem, Modifier.padding(horizontal = Space.Page, vertical = Space.Small))
                 focused && query.trim().length < 2 && recent.isNotEmpty() -> RecentSearchList(
                     recent,
                     onPick = { picked ->
                         query = picked.query
                         focusManager.clearFocus()
-                        if (soundMode) runSound() else keepSearch()
+                        keepSearch()
                     },
                     onRemove = { scope.launch { graph.searchHistory.remove(it) } },
                     onClear = { scope.launch { graph.searchHistory.clear() } },
                 )
-                soundMode -> SoundResults(soundSongs, onPlay = ::keepSearch)
                 query.trim().length < 2 -> BrowseGrid(nav)
-                else -> LibraryResults(results, nav, onOpen = ::keepSearch, query = query.trim(), canVibe = aiProblem == null)
+                else -> SearchResultsList(
+                    results,
+                    soundSongs,
+                    soundBusy,
+                    nav,
+                    onOpen = ::keepSearch,
+                    query = query.trim(),
+                    canSound = aiProblem == null,
+                )
             }
         }
     }
 }
 
-@Composable
-private fun SoundResults(songs: List<Song>?, onPlay: () -> Unit) {
-    val graph = LocalGraph.current
-    if (songs == null) {
-        Text(
-            "Describe a mood, genre or instruments and press search. AudioMuse finds matching tracks by how they sound.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(Space.Page),
-        )
-        return
-    }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
-        item {
-            Box(Modifier.padding(horizontal = Space.Page, vertical = Space.Small)) { PlayButtons(songs) }
-        }
-        itemsIndexed(songs, key = { i, s -> "$i-${s.id}" }) { index, song ->
-            SongRow(song = song, onClick = { onPlay(); graph.player.play(songs, index) })
-        }
-    }
-}
+/** How long typing must pause before names are looked up, and before the slower sound search runs. */
+private const val NAME_SEARCH_DELAY_MS = 350L
+internal const val SOUND_SEARCH_DELAY_MS = 900L
 
+/** The search box's corner (issue #373): fully round ends at its usual height. */
+private val SEARCH_CORNER = 28.dp
+
+/** Whether the words should also be searched by sound: at least three letters, with AudioMuse reachable. */
+internal fun soundSearchWanted(query: String, aiDown: Boolean): Boolean = !aiDown && query.trim().length >= 3
+
+/**
+ * Recent searches for the one box (issue #373): names and earlier "Sound" searches together, newest first, each
+ * wording once.
+ */
+internal fun oneSearchList(history: List<app.musix.data.RecentSearch>): List<app.musix.data.RecentSearch> =
+    history.distinctBy { it.query.trim().lowercase() }
+
+/**
+ * Everything the words find (issue #373): making a vibe from them, artists, albums and songs by name, then songs
+ * that sound like them.
+ */
 @Composable
-private fun LibraryResults(results: SearchResults?, nav: NavController, onOpen: () -> Unit, query: String, canVibe: Boolean) {
+private fun SearchResultsList(
+    results: SearchResults?,
+    soundSongs: List<Song>?,
+    soundBusy: Boolean,
+    nav: NavController,
+    onOpen: () -> Unit,
+    query: String,
+    canSound: Boolean,
+) {
     val graph = LocalGraph.current
-    if (results == null) return
+    if (results == null && soundSongs == null && !soundBusy) return
     // One search box for names and for vibes (issue #339): the same words can make a vibe.
-    val vibe = canVibe && query.length >= 3
-    if (results.artists.isEmpty() && results.albums.isEmpty() && results.songs.isEmpty()) {
-        if (vibe) MakeVibeRow(query, nav, onOpen)
-        Text("Nothing found", modifier = Modifier.padding(Space.Page), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        return
-    }
+    val vibe = canSound && query.length >= 3
+    val byName = results != null && (results.artists.isNotEmpty() || results.albums.isNotEmpty() || results.songs.isNotEmpty())
+    val bySound = !soundSongs.isNullOrEmpty()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
         if (vibe) item(key = "make-vibe") { MakeVibeRow(query, nav, onOpen) }
-        if (results.artists.isNotEmpty()) {
+        if (results != null && !byName && !bySound && !soundBusy) {
+            item(key = "nothing") {
+                Text("Nothing found", modifier = Modifier.padding(Space.Page), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (results != null && results.artists.isNotEmpty()) {
             item { SectionTitle("Artists") }
             item {
                 LazyRow(contentPadding = PaddingValues(horizontal = Space.Medium)) {
@@ -286,7 +305,7 @@ private fun LibraryResults(results: SearchResults?, nav: NavController, onOpen: 
                 }
             }
         }
-        if (results.albums.isNotEmpty()) {
+        if (results != null && results.albums.isNotEmpty()) {
             item { SectionTitle("Albums") }
             item {
                 LazyRow(contentPadding = PaddingValues(horizontal = Space.Small)) {
@@ -298,10 +317,25 @@ private fun LibraryResults(results: SearchResults?, nav: NavController, onOpen: 
                 }
             }
         }
-        if (results.songs.isNotEmpty()) {
+        if (results != null && results.songs.isNotEmpty()) {
             item { SectionTitle("Songs") }
-            itemsIndexed(results.songs, key = { i, s -> "$i-${s.id}" }) { index, song ->
+            itemsIndexed(results.songs, key = { i, s -> "name-$i-${s.id}" }) { index, song ->
                 SongRow(song = song, onClick = { onOpen(); graph.player.play(results.songs, index) })
+            }
+        }
+        if (canSound && (bySound || soundBusy)) {
+            item(key = "sound-title") { SectionTitle("Sounds like “$query”") }
+            if (soundBusy && soundSongs == null) {
+                item(key = "sound-busy") {
+                    Box(Modifier.fillMaxWidth().padding(Space.Page), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                }
+            }
+            val songs = soundSongs.orEmpty()
+            if (songs.isNotEmpty()) {
+                item(key = "sound-play") { Box(Modifier.padding(horizontal = Space.Page, vertical = Space.Small)) { PlayButtons(songs) } }
+                itemsIndexed(songs, key = { i, s -> "sound-$i-${s.id}" }) { index, song ->
+                    SongRow(song = song, onClick = { onOpen(); graph.player.play(songs, index) })
+                }
             }
         }
         item { Spacer(Modifier.size(Space.Small)) }

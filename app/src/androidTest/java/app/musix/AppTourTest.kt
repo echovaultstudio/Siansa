@@ -420,9 +420,10 @@ class AppTourTest {
                 }
             }
             step("sound search") {
+                // One box since issue #373: names first, then songs that sound like the words.
                 tab("Search")
-                click("Sound")
-                idle(800)
+                compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("calm piano")
+                idle(3000)
                 shot("15b-sound-search")
             }
             step("home after playing") {
