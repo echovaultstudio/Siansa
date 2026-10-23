@@ -4,6 +4,7 @@ import app.musix.data.AppSettings
 import app.musix.data.ReplayGainMode
 import app.musix.data.Song
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.pow
@@ -83,6 +84,38 @@ object Crossfade {
         val disc = current.disc ?: 1
         val nextDisc = next.disc ?: 1
         return (nextDisc == disc && nextTrack == track + 1) || (nextDisc == disc + 1 && nextTrack == 1)
+    }
+
+    /**
+     * The silent tail's speed while it gets in step (issue #355): [behindMs] behind the main player, it plays up to
+     * 6% faster to catch up over about half a second (slower when ahead); within 10 ms it's in step.
+     */
+    fun tailSpeed(behindMs: Long): Float =
+        if (abs(behindMs) <= IN_STEP_MS) 1f else (1f + behindMs / 500f).coerceIn(0.94f, 1.06f)
+
+    /** Closer than this, the tail and the main player count as in step. */
+    const val IN_STEP_MS = 10L
+
+    /**
+     * Why there's no fade between two songs, for the log (issue #355: "No fade" alone didn't say). Null when
+     * there is one.
+     */
+    fun whyNoFade(
+        mode: CrossfadeMode,
+        maxMs: Long,
+        current: Song,
+        next: Song,
+        currentProfile: TrackProfile?,
+        nextProfile: TrackProfile?,
+    ): String? = when {
+        mode == CrossfadeMode.OFF || maxMs <= 0 -> "crossfade is off"
+        mode == CrossfadeMode.SMART && runsStraightOn(current, next) -> "they run straight on in one album"
+        mode == CrossfadeMode.SMART && currentProfile != null && nextProfile != null -> {
+            val tail = currentProfile.quietForLastMs(QUIET_DB) ?: 0L
+            val head = nextProfile.reachesAfterMs(QUIET_DB) ?: 0L
+            if (tail + head < MIN_OVERLAP_MS) "a hard ending into a quick start (${tail} ms quiet tail + ${head} ms intro), played back to back" else null
+        }
+        else -> null
     }
 
     /** Volume of the song fading out, [t] from 0 (start of the overlap) to 1 (its end): equal power. */
