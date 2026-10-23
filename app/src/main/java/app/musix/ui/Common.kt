@@ -449,6 +449,8 @@ fun SongRow(
     nowPlaying: Boolean = false,
     // Added by keep playing or a song radio rather than chosen: a small mark beside it (issue #337).
     autoAdded: Boolean = false,
+    // The subtitle in the accent colour, for a note about the song rather than its artist (issue #367).
+    subtitleAccent: Boolean = false,
 ) {
     val graph = LocalGraph.current
     val nav = LocalNav.current
@@ -504,7 +506,7 @@ fun SongRow(
                     Text(
                         subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (subtitleAccent) Accent else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )

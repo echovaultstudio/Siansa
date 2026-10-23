@@ -223,6 +223,19 @@ fun YourLibraryScreen(nav: NavController) {
     val letterOfShown = remember(letterStarts) {
         letterStarts?.let { starts -> starts.entries.sortedBy { it.value }.map { it.value to it.key } }
     }
+    // Long lists in any other order get a handle to drag through them instead, with a label for where
+    // you are (issue #374).
+    val scrollLabel: ((Entry) -> String)? = remember(selectedSort, letterStarts, shown.size) {
+        if (letterStarts != null || shown.size < AlphabetIndex.MIN_ITEMS) null
+        else when (selectedSort) {
+            Sort.RECENTS -> { e -> FastScroll.monthLabel(e.recentAt, "Not played") }
+            Sort.ADDED -> { e -> FastScroll.monthLabel(e.addedAt, "No date") }
+            Sort.PLAYS -> { e -> FastScroll.playsLabel(e.plays) }
+            Sort.ALPHABETICAL -> { e -> AlphabetIndex.letterOf(e.title).toString() }
+            Sort.CREATOR -> { e -> AlphabetIndex.letterOf(e.creator).toString() }
+        }
+    }
+    val sideBar = letterStarts != null || scrollLabel != null
     val scope = rememberCoroutineScope()
     val launcher = rememberPlayLauncher()
     var naming by remember { mutableStateOf(false) }
@@ -317,7 +330,7 @@ fun YourLibraryScreen(nav: NavController) {
                             // Three across, like every grid (issue #289).
                             columns = GridCells.Fixed(GRID_COLUMNS),
                             state = gridState,
-                            contentPadding = PaddingValues(start = Space.Small, end = if (letterStarts != null) AlphabetBarWidth + Space.Tight else Space.Small, bottom = bottomBarPadding(Space.Page)),
+                            contentPadding = PaddingValues(start = Space.Small, end = if (sideBar) AlphabetBarWidth + Space.Tight else Space.Small, bottom = bottomBarPadding(Space.Page)),
                             modifier = Modifier.fillMaxSize(),
                         ) {
                             item(span = { GridItemSpan(maxLineSpan) }) { sortBar() }
@@ -327,13 +340,15 @@ fun YourLibraryScreen(nav: NavController) {
                         }
                         if (letterStarts != null && letterOfShown != null) {
                             LibraryAlphabetBar(letterStarts, letterOfShown, { gridState.firstVisibleItemIndex }) { i -> scope.launch { gridState.scrollToItem(i) } }
+                        } else if (scrollLabel != null) {
+                            LibraryFastScroll(shown, scrollLabel, { gridState.firstVisibleItemIndex }, { gridState.layoutInfo.visibleItemsInfo.size }) { i -> scope.launch { gridState.scrollToItem(i) } }
                         }
                     }
                 } else {
                     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
                     PrefetchCovers(listState.firstVisibleItemIndex, listState.layoutInfo.visibleItemsInfo.size, covers, 150)
                     Box(Modifier.fillMaxSize()) {
-                        LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(end = if (letterStarts != null) AlphabetBarWidth else 0.dp, bottom = bottomBarPadding(Space.Page))) {
+                        LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(end = if (sideBar) AlphabetBarWidth else 0.dp, bottom = bottomBarPadding(Space.Page))) {
                             item { sortBar() }
                             items(shown, key = { it.key }) { e ->
                                 RowEntry(e, pinned = e.alwaysPinned || e.key in pinned, held = held == e.key, onClick = { open(e) }, onHold = { held = e.key }, onTogglePin = { togglePin(e) })
@@ -351,6 +366,8 @@ fun YourLibraryScreen(nav: NavController) {
                         }
                         if (letterStarts != null && letterOfShown != null) {
                             LibraryAlphabetBar(letterStarts, letterOfShown, { listState.firstVisibleItemIndex }) { i -> scope.launch { listState.scrollToItem(i) } }
+                        } else if (scrollLabel != null) {
+                            LibraryFastScroll(shown, scrollLabel, { listState.firstVisibleItemIndex }, { listState.layoutInfo.visibleItemsInfo.size }) { i -> scope.launch { listState.scrollToItem(i) } }
                         }
                     }
                 }
@@ -381,6 +398,37 @@ private fun BoxScope.LibraryAlphabetBar(
         current = current,
         // The first letter goes right to the top, so the sort row and pinned items stay in view.
         onPick = { letter -> AlphabetIndex.target(letter, starts)?.let { scrollTo(if (it == starts.values.min()) 0 else it + 1) } },
+        modifier = Modifier.align(Alignment.TopEnd).padding(top = 56.dp, bottom = bottomBarPadding(Space.Small)),  // spacing: exact (below the top bar)
+    )
+}
+
+/**
+ * The quick-scroll handle over the right edge of Your Library, for orders other than by name (issue #374).
+ * Positions are in [shown]; the list's first item is the sort bar, so list positions are one more.
+ */
+@Composable
+private fun BoxScope.LibraryFastScroll(
+    shown: List<Entry>,
+    labelOf: (Entry) -> String,
+    firstVisible: () -> Int,
+    visible: () -> Int,
+    scrollTo: (Int) -> Unit,
+) {
+    val fraction by remember(shown) {
+        derivedStateOf { FastScroll.fractionOf((firstVisible() - 1).coerceAtLeast(0), shown.size, visible()) }
+    }
+    var last by remember { mutableStateOf(-1) }
+    FastScrollBar(
+        fraction = fraction,
+        labelAt = { f -> shown.getOrNull(FastScroll.indexAt(f, shown.size))?.let(labelOf) },
+        // The very top goes right to the top, so the sort row and pinned items come back into view.
+        onScroll = { f ->
+            val i = FastScroll.indexAt(f, shown.size)
+            if (i != last) {
+                last = i
+                scrollTo(if (i == 0) 0 else i + 1)
+            }
+        },
         modifier = Modifier.align(Alignment.TopEnd).padding(top = 56.dp, bottom = bottomBarPadding(Space.Small)),  // spacing: exact (below the top bar)
     )
 }
