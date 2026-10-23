@@ -3,6 +3,25 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.26.0beta](https://github.com/echovaultstudio/musix/releases/tag/v0.26.0beta) — 2026-10-23
+
+- [#379](https://github.com/echovaultstudio/musix/pull/379) Settings: just each entry's name, no arrows or summaries (@Th3K1ngP1n)
+- [#380](https://github.com/echovaultstudio/musix/pull/380) Style: arrange the nav bar and mini player with 6-dot drag lists (@Th3K1ngP1n)
+- [#381](https://github.com/echovaultstudio/musix/pull/381) Flow: rename the tab, fold the sliders away, rename and delete vibes (@Th3K1ngP1n)
+- [#382](https://github.com/echovaultstudio/musix/pull/382) Now playing: repeat on the left with a clear on-state, add to playlist on the right (@Th3K1ngP1n)
+- [#383](https://github.com/echovaultstudio/musix/pull/383) Search: one box for names and sound, rounder and on a lighter grey (@Th3K1ngP1n)
+- [#384](https://github.com/echovaultstudio/musix/pull/384) Home: ten artist radios, played lately mixed with artists like them (@Th3K1ngP1n)
+- [#385](https://github.com/echovaultstudio/musix/pull/385) Home: roll the dice to play a song you've never played (@Th3K1ngP1n)
+- [#386](https://github.com/echovaultstudio/musix/pull/386) Daily vibes: optional days of the week, and any time of day (@Th3K1ngP1n)
+- [#387](https://github.com/echovaultstudio/musix/pull/387) Play formats the phone can't open by having Navidrome convert them (@Th3K1ngP1n)
+- [#388](https://github.com/echovaultstudio/musix/pull/388) Lyrics: smooth letter-by-letter fill for word-timed lines; darker unsung text (@Th3K1ngP1n)
+- [#389](https://github.com/echovaultstudio/musix/pull/389) DLNA: list TVs and speakers as soon as they answer (@Th3K1ngP1n)
+- [#390](https://github.com/echovaultstudio/musix/pull/390) Scrobbling: turn scrobbling on or off for each user's songs (@Th3K1ngP1n)
+- [#391](https://github.com/echovaultstudio/musix/pull/391) Crossfade: start the fading-out copy early and in step; log why there's no fade (@Th3K1ngP1n)
+- [#392](https://github.com/echovaultstudio/musix/pull/392) Library sync: keep every library, show the chosen ones at once, full Sync now (@Th3K1ngP1n)
+- [#394](https://github.com/echovaultstudio/musix/pull/394) Sync: don't skip when Navidrome's newest albums aren't on the phone (@Th3K1ngP1n)
+- 2 commits pushed straight to main
+
 ## [0.25.0beta](https://github.com/echovaultstudio/musix/releases/tag/v0.25.0beta) — 2026-10-22
 
 - [#363](https://github.com/echovaultstudio/musix/pull/363) Queue and album: no "Now playing" label, tap the cover to pause or play (@Th3K1ngP1n)
