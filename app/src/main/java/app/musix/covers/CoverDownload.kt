@@ -407,7 +407,7 @@ object CoverDownload {
      * Stopping the download cancels the request mid-file; the half-written entry is thrown away.
      */
     private suspend fun fetch(graph: AppGraph, disk: DiskCache, id: String, size: Int, key: String): Boolean? = runCatching {
-        graph.imageHttp.newCall(Request.Builder().url(graph.subsonic.coverUrl(id, size)).build()).executeCancellable { response ->
+        graph.imageHttp.newCall(Request.Builder().url(graph.source.coverUrl(id, size)).build()).executeCancellable { response ->
             if (!response.isSuccessful) {
                 AppLog.w("Covers", "Cover $id ($size px): HTTP ${response.code}")
                 return@executeCancellable if (response.code == 404) false else null

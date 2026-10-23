@@ -26,9 +26,9 @@ fun sonicRoute(navidromeSonic: Boolean, audioMuseReady: Boolean): SonicRoute = w
 class Sonic(private val graph: AppGraph) {
     suspend fun similar(songId: String, count: Int): List<ClapHit> {
         val audioMuse = graph.settings.current.audioMuseReady
-        val route = sonicRoute(graph.subsonic.supports("sonicSimilarity"), audioMuse)
+        val route = sonicRoute(graph.source.hasSonicMatch(), audioMuse)
         if (route == SonicRoute.NAVIDROME_SONIC) {
-            val found = runCatching { graph.subsonic.sonicSimilar(songId, count) }
+            val found = runCatching { graph.source.sonicSimilar(songId, count) }
                 .onFailure { AppLog.w("Sonic", "Navidrome's sonic similarity failed: ${it.message}") }
                 .getOrDefault(emptyList())
             if (found.isNotEmpty()) {
@@ -41,7 +41,7 @@ class Sonic(private val graph: AppGraph) {
             AppLog.d("Sonic", "Like $songId: ${hits.size} from AudioMuse")
             return hits
         }
-        val songs = graph.subsonic.similarSongs(songId, count)
+        val songs = graph.source.similarSongs(songId, count)
         AppLog.d("Sonic", "Like $songId: ${songs.size} from Navidrome's similar songs")
         return songs.mapIndexed { i, song -> ClapHit(song.id, song.title, song.artist, song.album, 1.0 - i.toDouble() / (songs.size + 1)) }
     }

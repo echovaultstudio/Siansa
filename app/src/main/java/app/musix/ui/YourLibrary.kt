@@ -688,8 +688,8 @@ private suspend fun refreshFromServer(graph: app.musix.AppGraph, me: String): Bo
     if (graph.connection.current.offline) return false
     val started = System.currentTimeMillis()
     val recentOk = coroutineScope {
-        val recent = async { runCatching { graph.subsonic.albums("recent", 100, 0) }.getOrNull() }
-        val playlists = async { runCatching { graph.library.refreshPlaylists { graph.subsonic.playlists() } } }
+        val recent = async { runCatching { graph.source.albums("recent", 100, 0) }.getOrNull() }
+        val playlists = async { runCatching { graph.library.refreshPlaylists { graph.source.playlists() } } }
         val favourites = async { graph.favouriteAlbums.refresh() }
         playlists.await()
         favourites.await()

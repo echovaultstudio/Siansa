@@ -86,7 +86,7 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
     var busy by remember { mutableStateOf(false) }
     val playlists by loadState("editable-playlists") {
         val server = if (graph.connection.current.offline) graph.library.playlists()
-        else runCatching { graph.subsonic.playlists() }.getOrElse { graph.library.playlists() }
+        else runCatching { graph.source.playlists() }.getOrElse { graph.library.playlists() }
         editablePlaylists(graph.playlists.removed.visible(server) + graph.localPlaylists.all().map { it.toPlaylist() }, graph.settings.current.navidromeUser)
     }
     if (naming) {
@@ -377,7 +377,7 @@ fun ImportPlaylistsDialog(onDone: (String?) -> Unit) {
     val graph = LocalGraph.current
     val removed by loadState("removed-playlists") {
         val ids = graph.playlists.removed.ids()
-        graph.subsonic.playlists().filter { it.id in ids }.sortedBy { it.name.lowercase() }
+        graph.source.playlists().filter { it.id in ids }.sortedBy { it.name.lowercase() }
     }
     AlertDialog(
         onDismissRequest = { onDone(null) },

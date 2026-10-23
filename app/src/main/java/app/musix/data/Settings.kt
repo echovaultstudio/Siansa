@@ -11,6 +11,7 @@ import app.musix.mix.RadioDrift
 import app.musix.situation.SituationOptions
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.net.URLDecoder
+import app.musix.net.SourceKind
 
 enum class ReplayGainMode(val label: String) { TRACK("Track"), ALBUM("Album"), OFF("Off") }
 
@@ -18,6 +19,8 @@ enum class ReplayGainMode(val label: String) { TRACK("Track"), ALBUM("Album"), O
 const val DEFAULT_THEME_SEED: Int = 0xFF0E9AA7.toInt()
 
 data class AppSettings(
+    /** Where the music comes from (issue #113); the server fields below are its address and login. */
+    val sourceKind: SourceKind = SourceKind.OPENSUBSONIC,
     val navidromeUrl: String = "",
     val navidromeUser: String = "",
     val navidromePassword: String = "",
@@ -183,6 +186,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     private fun secret(key: String) = SecretBox.decrypt(prefs.getString(key, "") ?: "")
 
     private fun load(): AppSettings = AppSettings(
+        sourceKind = SourceKind.parse(prefs.getString("source_kind", null)),
         navidromeUrl = prefs.getString("nd_url", "") ?: "",
         navidromeUser = prefs.getString("nd_user", "") ?: "",
         navidromePassword = secret("nd_pass"),
@@ -279,6 +283,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun save(input: AppSettings) {
         val s = clean(input)
         prefs.edit()
+            .putString("source_kind", s.sourceKind.name)
             .putString("nd_url", s.navidromeUrl)
             .putString("nd_user", s.navidromeUser)
             .putString("nd_pass", SecretBox.encrypt(s.navidromePassword))

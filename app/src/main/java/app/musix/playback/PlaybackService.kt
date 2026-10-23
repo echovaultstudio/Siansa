@@ -138,7 +138,7 @@ class PlaybackService : MediaSessionService() {
                     mediaItems: MutableList<MediaItem>,
                 ): ListenableFuture<MutableList<MediaItem>> {
                     val resolved = mediaItems.map { item ->
-                        val uri = item.requestMetadata.mediaUri ?: Uri.parse(graph.subsonic.streamUrl(item.mediaId))
+                        val uri = item.requestMetadata.mediaUri ?: Uri.parse(graph.source.streamUrl(item.mediaId))
                         item.buildUpon().setUri(uri).build()
                     }.toMutableList()
                     return Futures.immediateFuture(resolved)
@@ -283,7 +283,7 @@ class PlaybackService : MediaSessionService() {
         AppLog.i("Stream", "Song ${item.mediaId}: loading again as ${if (kbps > 0) "Opus $kbps kbit/s" else "the original"} at $position ms, after a quality change in Settings")
         // The plain stream address, pointed at the chosen quality when it opens. The reload marker makes
         // the address differ from before, otherwise the player would carry on with the old stream.
-        val uri = Uri.parse(Streaming.withReload(graph.subsonic.streamUrl(item.mediaId), ++reloads))
+        val uri = Uri.parse(Streaming.withReload(graph.source.streamUrl(item.mediaId), ++reloads))
         player.replaceMediaItem(index, item.buildUpon().setUri(uri).build())
         player.seekTo(index, position)
         publishQuality()
@@ -470,7 +470,7 @@ class PlaybackService : MediaSessionService() {
     private fun playableOnPhone(item: MediaItem): MediaItem {
         if (item.localConfiguration != null) return item
         return SongRegistry.get(item.mediaId)?.toMediaItem(graph.subsonic)
-            ?: item.buildUpon().setUri(graph.subsonic.streamUrl(item.mediaId)).build()
+            ?: item.buildUpon().setUri(graph.source.streamUrl(item.mediaId)).build()
     }
 
     /**

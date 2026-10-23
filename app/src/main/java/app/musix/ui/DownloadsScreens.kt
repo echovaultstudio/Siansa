@@ -362,7 +362,7 @@ fun DownloadPickerScreen(nav: NavController) {
     val options by loadState(tab) {
         when (tab) {
             PickTab.ALBUMS -> graph.library.albums("name").map { it.offlineItem() }
-            PickTab.PLAYLISTS -> graph.library.playlists().ifEmpty { graph.subsonic.playlists() }.map { it.offlineItem() }
+            PickTab.PLAYLISTS -> graph.library.playlists().ifEmpty { graph.source.playlists() }.map { it.offlineItem() }
             PickTab.ARTISTS -> graph.library.artists().map { it.offlineItem() }
         }
     }

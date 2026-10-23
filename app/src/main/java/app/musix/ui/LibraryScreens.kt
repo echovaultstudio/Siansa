@@ -106,7 +106,7 @@ fun LikedScreen(nav: NavController) {
     var sort by remember { mutableStateOf(graph.listSort.get("liked")) }
     val heard by loadState("heard-at" to saved) { lastHeard(graph) }
     val loaded by loadState(changes to saved) {
-        runCatching { graph.subsonic.starredSongs() }
+        runCatching { graph.source.starredSongs() }
             .map { list ->
                 val local = graph.library.songs(list.map { it.id }).associateBy { it.id }
                 graph.library.keepSyncedSongs(list.map { local[it.id] ?: it }, "Liked songs")
@@ -268,7 +268,7 @@ fun AlbumScreen(nav: NavController, id: String) {
     val detail by loadState(id) {
         val album = graph.library.album(id)
         val songs = album?.let { graph.library.songsOf(it) }.orEmpty()
-        if (album != null && songs.isNotEmpty()) AlbumDetail(album, songs) else graph.subsonic.album(id)
+        if (album != null && songs.isNotEmpty()) AlbumDetail(album, songs) else graph.source.album(id)
     }
     val d = detail.valueOrNull()
     val artistCover by loadState(d?.album?.artistId) { d?.album?.artistId?.let { graph.library.artist(it)?.coverArt } }
@@ -324,7 +324,7 @@ private suspend fun discTitlesOf(graph: AppGraph, detail: AlbumDetail): Map<Int,
     if (detail.songs.map { it.disc ?: 1 }.distinct().size < 2) return emptyMap()
     for (id in detail.album.allIds) {
         val titles = try {
-            graph.subsonic.album(id).discTitles
+            graph.source.album(id).discTitles
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

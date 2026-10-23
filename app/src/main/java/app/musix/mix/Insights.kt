@@ -151,7 +151,7 @@ class Insights(private val graph: AppGraph) {
         val recentlyPlayedIds = graph.history.all().filter { !it.skipped }.map { it.id }.toSet()
 
         val navidrome = async {
-            runCatching { graph.subsonic.albums("frequent", 500, 0) }
+            runCatching { graph.source.albums("frequent", 500, 0) }
                 .onFailure { AppLog.w("Rediscover", "Navidrome most-played failed: ${it.message}") }
                 .getOrDefault(emptyList())
                 .let { graph.library.keepSyncedAlbums(it, "Rediscover") }

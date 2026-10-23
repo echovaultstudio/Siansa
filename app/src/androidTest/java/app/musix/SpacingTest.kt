@@ -10,6 +10,8 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Storage
 import app.musix.ui.StateButton
 import app.musix.ui.DayChips
+import app.musix.ui.SourceRow
+import app.musix.net.SourceKind
 import app.musix.ui.VibeSliders
 import app.musix.ui.ArrangeList
 import app.musix.mix.SoundDial
@@ -559,5 +561,19 @@ class SpacingTest {
         val chips = (1..4).map { compose.onNodeWithTag("day-$it").getBoundsInRoot() }
         val gaps = chips.zipWithNext { a, b -> b.left - a.right }
         gaps.forEach { assertEven("Day chips", gaps[0], it, 1.dp) }
+    }
+
+    /** First run (issue #113): every source in the picker is one row height, the text centred against its icon. */
+    @Test fun sourceRowsAreOneHeight() {
+        compose.setContent { MusicSourceRows() }
+        val rows = SourceKind.entries.map { compose.onNodeWithTag("source-${it.name}").getBoundsInRoot() }
+        rows.forEach { assertEven("Source rows", rows[0].bottom - rows[0].top, it.bottom - it.top, 1.dp) }
+        val gaps = rows.zipWithNext { a, b -> b.top - a.bottom }
+        gaps.forEach { assertEven("Gap between source rows", gaps[0], it, 1.dp) }
+    }
+
+    @androidx.compose.runtime.Composable
+    private fun MusicSourceRows() {
+        MusixTheme { Column { SourceKind.entries.forEach { SourceRow(it) { } } } }
     }
 }
