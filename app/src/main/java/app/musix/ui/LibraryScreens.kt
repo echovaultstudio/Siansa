@@ -95,6 +95,9 @@ import app.musix.offline.offlineItem
 import app.musix.log.AppLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import app.musix.data.favouriteArtistList
+import app.musix.data.Artist
+import app.musix.data.PickUps
 
 /** Songs with a heart, newest first as Navidrome lists them. */
 @Composable
@@ -277,6 +280,12 @@ fun AlbumScreen(nav: NavController, id: String) {
     val discTitles by loadState(d) { d?.let { discTitlesOf(graph, it) }.orEmpty() }
     // Library artists by name, so a name like "Chase & Status" isn't split into two artists.
     val knownArtists by loadState("artist-names") { graph.library.artists().map { normalizeKey(it.name) }.toSet() }
+    // Where you stopped on an album you were listening to, from this phone's plays (issue #367). Not while
+    // a song of it is the one playing: that one is marked already.
+    val player by graph.player.state.collectAsStateWithLifecycle()
+    val playingId = player.current?.id
+    val pickUp by loadState(d to playingId) { d?.let { PickUps.find(it.songs, graph.history.all(), System.currentTimeMillis()) } }
+    val pick = pickUp.valueOrNull()?.takeIf { d != null && d.songs.none { it.id == playingId } }
     CollectionPage(
         nav = nav,
         title = d?.album?.name ?: "Album",
@@ -309,8 +318,15 @@ fun AlbumScreen(nav: NavController, id: String) {
                         formatDuration(d.songs.sumOf { it.durationSec.toLong() }),
                     ).joinToString(" · "),
                 )
+                if (pick != null) {
+                    ContinueButton(PickUps.trackLabel(d.songs, pick.continueIndex)) {
+                        AppLog.i("Album", "Continue from ${pick.continueIndex + 1} of ${d.songs.size}")
+                        graph.player.play(d.songs, pick.continueIndex)
+                    }
+                }
             }
         },
+        lastPlayed = pick?.let { it.lastIndex to "Last played · ${PickUps.whenLabel(it.at)}" },
         offline = d?.album?.offlineItem(),
         // A heart for favourite albums, starred in Navidrome (issue #275).
         actions = { d?.album?.let { FavouriteAlbumButton(it) } },
@@ -418,6 +434,60 @@ internal fun FavouriteAlbumButton(album: Album) {
             if (on) "Remove from favourite albums" else "Add to favourite albums",
             tint = if (on) Accent else LocalContentColor.current,
         )
+    }
+}
+
+/**
+ * The heart at the top of an artist's page (issue #397): marks it as a favourite, in Navidrome too. White over
+ * the artist's picture, like the back arrow beside it; the accent colour when on.
+ */
+@Composable
+internal fun FavouriteArtistButton(artist: Artist) {
+    val graph = LocalGraph.current
+    val launcher = rememberPlayLauncher()
+    val ids by graph.favouriteArtists.ids.collectAsStateWithLifecycle()
+    val on = artist.id in ids
+    IconButton(onClick = { graph.favouriteArtists.toggle(artist) { launcher.notify(it) } }, modifier = Modifier.testTag("favouriteArtist")) {
+        Icon(
+            if (on) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+            if (on) "Remove from favourite artists" else "Add to favourite artists",
+            tint = if (on) Accent else Color.White,
+        )
+    }
+}
+
+/**
+ * All favourite artists (issue #397), from the Favourite artists card in Your Library › Favourites, with round
+ * pictures, as a grid or a list.
+ */
+@Composable
+fun FavouriteArtistsScreen(nav: NavController) {
+    val graph = LocalGraph.current
+    val ids by graph.favouriteArtists.ids.collectAsStateWithLifecycle()
+    val artists by loadState("favourite-artists-${ids.hashCode()}") {
+        val fresh = graph.favouriteArtists.refresh()
+        val local = fresh.mapNotNull { a -> graph.library.artist(a.id)?.let { a.id to it } }.toMap()
+        favouriteArtistList(fresh, ids, local)
+    }
+    Screen(title = "Favourite artists", nav = nav) { padding ->
+        LoadBox(artists, Modifier.padding(padding)) { list ->
+            if (list.isEmpty()) {
+                Text(
+                    "No favourite artists yet. Tap the heart at the top of an artist's page to add them.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(padding).padding(Space.Page),
+                )
+            } else {
+                ArtistsGridOrList(
+                    list,
+                    page = "favourite-artists",
+                    onOpen = { nav.navigate("artist/${it.id}") },
+                    modifier = Modifier.padding(padding).fillMaxSize(),
+                    title = "${list.size} ${if (list.size == 1) "artist" else "artists"}",
+                )
+            }
+        }
     }
 }
 
