@@ -2,7 +2,6 @@ package app.musix.ui
 
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material.icons.rounded.Sync
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.clickable
@@ -117,7 +116,6 @@ fun UsersScreen(nav: NavController) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
             }
         }
     }
