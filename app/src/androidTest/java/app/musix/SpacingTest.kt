@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Storage
 import app.musix.ui.StateButton
+import app.musix.ui.DayChips
 import app.musix.ui.VibeSliders
 import app.musix.ui.ArrangeList
 import app.musix.mix.SoundDial
@@ -550,5 +551,13 @@ class SpacingTest {
         assertEven("Dice against the greeting", title.top - dice.top, dice.bottom - title.bottom, tolerance = 2.dp)
         assertEven("Dice and filter on one line", dice.top, filter.top, 1.dp)
         assertTrue("The dice is left of the filter", dice.right <= filter.left)
+    }
+
+    /** Daily vibes (issue #348): the day chips sit one even gap apart. */
+    @Test fun dayChipsAreEvenlySpaced() {
+        compose.setContent { MusixTheme { DayChips(setOf(5)) { } } }
+        val chips = (1..4).map { compose.onNodeWithTag("day-$it").getBoundsInRoot() }
+        val gaps = chips.zipWithNext { a, b -> b.left - a.right }
+        gaps.forEach { assertEven("Day chips", gaps[0], it, 1.dp) }
     }
 }
