@@ -139,7 +139,7 @@ private suspend fun loadSection(graph: AppGraph, section: HomeSection): List<Sec
             .let(graph.playlists.removed::visible)
             .map { SectionItem.PlaylistItem(it) }
         HomeSection.RecentlyPlayed -> recentlyPlayedAlbums(graph, 100).map { SectionItem.AlbumItem(it, it.artist) }
-        HomeSection.ArtistRadios -> recentlyPlayedArtists(graph, 60).map { SectionItem.ArtistItem(it) }
+        HomeSection.ArtistRadios -> artistRadioArtists(graph, 60).map { SectionItem.ArtistItem(it) }
         HomeSection.RecentlyAdded -> (
             if (synced) graph.library.albums("newest").take(200)
             else graph.subsonic.albums("newest", 200, 0).distinctBy { it.name + "|" + it.artist }
