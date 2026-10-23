@@ -61,6 +61,10 @@ import androidx.navigation.NavController
 import app.musix.data.Song
 import app.musix.data.discHeaders
 import app.musix.offline.OfflineItem
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.ButtonDefaults
 
 /**
  * The page used for albums, playlists, mixes and radios, laid out like Spotify: the cover's colour
@@ -89,6 +93,8 @@ fun CollectionPage(
     onSimilar: (() -> Unit)? = null,
     // Extra items in a song's ⋮ menu, by its position in [songs].
     songMenu: (@Composable (index: Int, song: Song, close: () -> Unit) -> Unit)? = null,
+    // The song heard last on an album you stopped part way (issue #367), by position, with its note.
+    lastPlayed: Pair<Int, String>? = null,
     footer: LazyListScope.() -> Unit = {},
 ) {
     val graph = LocalGraph.current
@@ -170,12 +176,14 @@ fun CollectionPage(
                         }
                         item(key = "$index-${song.id}", contentType = "song") {
                             val now = index == playing
-                            val subtitle = if (subtitleOf != null) subtitleOf(song) else artistAndAlbum(song)
+                            val last = lastPlayed?.takeIf { it.first == index }?.second
+                            val subtitle = last ?: if (subtitleOf != null) subtitleOf(song) else artistAndAlbum(song)
                             Box(
                                 Modifier
                                     .fillMaxWidth()
                                     .background(if (now) Selected.copy(alpha = NOW_PLAYING_BAND) else Color.Transparent)
-                                    .testTag(if (now) "collectionNowPlaying" else "collectionRow"),
+                                    .then(if (last != null) Modifier.lastPlayedLine() else Modifier)
+                                    .testTag(if (now) "collectionNowPlaying" else if (last != null) "collectionLastPlayed" else "collectionRow"),
                             ) {
                                 SongRow(
                                     song = song,
@@ -186,6 +194,7 @@ fun CollectionPage(
                                     subtitle = subtitle,
                                     nowPlaying = now,
                                     extraMenu = { close -> songMenu?.invoke(index, song, close) },
+                                    subtitleAccent = last != null,
                                 )
                             }
                         }
@@ -407,4 +416,29 @@ internal fun fillRoute(pattern: String?, value: (String) -> String?): String? {
         if (v == null) { missing = true; "" } else java.net.URLEncoder.encode(v, "UTF-8").replace("+", "%20")
     }
     return filled.takeUnless { missing }
+}
+
+/** The accent line down the left of the song heard last (issue #367). */
+fun Modifier.lastPlayedLine(): Modifier = drawBehind {
+    drawRect(Accent, size = Size(LAST_PLAYED_LINE.toPx(), size.height))
+}
+
+private val LAST_PLAYED_LINE = 3.dp
+
+/**
+ * "Continue from 5" under an album's details, to carry on where you stopped (issue #367). The button's
+ * touch area reaches [Space.Tight] above what you see, so it looks [Space.Small] under the details, like
+ * the artist above them.
+ */
+@Composable
+fun ContinueButton(track: String, onClick: () -> Unit) {
+    FilledTonalButton(
+        onClick = onClick,
+        contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+        modifier = Modifier.padding(top = Space.Tight).testTag("continueFrom"),
+    ) {
+        Icon(Icons.Rounded.PlayArrow, null, Modifier.size(ButtonDefaults.IconSize))
+        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+        Text("Continue from $track")
+    }
 }
