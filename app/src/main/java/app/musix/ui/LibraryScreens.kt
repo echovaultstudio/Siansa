@@ -95,6 +95,8 @@ import app.musix.offline.offlineItem
 import app.musix.log.AppLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import app.musix.data.favouriteArtistList
+import app.musix.data.Artist
 
 /** Songs with a heart, newest first as Navidrome lists them. */
 @Composable
@@ -418,6 +420,60 @@ internal fun FavouriteAlbumButton(album: Album) {
             if (on) "Remove from favourite albums" else "Add to favourite albums",
             tint = if (on) Accent else LocalContentColor.current,
         )
+    }
+}
+
+/**
+ * The heart at the top of an artist's page (issue #397): marks it as a favourite, in Navidrome too. White over
+ * the artist's picture, like the back arrow beside it; the accent colour when on.
+ */
+@Composable
+internal fun FavouriteArtistButton(artist: Artist) {
+    val graph = LocalGraph.current
+    val launcher = rememberPlayLauncher()
+    val ids by graph.favouriteArtists.ids.collectAsStateWithLifecycle()
+    val on = artist.id in ids
+    IconButton(onClick = { graph.favouriteArtists.toggle(artist) { launcher.notify(it) } }, modifier = Modifier.testTag("favouriteArtist")) {
+        Icon(
+            if (on) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+            if (on) "Remove from favourite artists" else "Add to favourite artists",
+            tint = if (on) Accent else Color.White,
+        )
+    }
+}
+
+/**
+ * All favourite artists (issue #397), from the Favourite artists card in Your Library › Favourites, with round
+ * pictures, as a grid or a list.
+ */
+@Composable
+fun FavouriteArtistsScreen(nav: NavController) {
+    val graph = LocalGraph.current
+    val ids by graph.favouriteArtists.ids.collectAsStateWithLifecycle()
+    val artists by loadState("favourite-artists-${ids.hashCode()}") {
+        val fresh = graph.favouriteArtists.refresh()
+        val local = fresh.mapNotNull { a -> graph.library.artist(a.id)?.let { a.id to it } }.toMap()
+        favouriteArtistList(fresh, ids, local)
+    }
+    Screen(title = "Favourite artists", nav = nav) { padding ->
+        LoadBox(artists, Modifier.padding(padding)) { list ->
+            if (list.isEmpty()) {
+                Text(
+                    "No favourite artists yet. Tap the heart at the top of an artist's page to add them.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(padding).padding(Space.Page),
+                )
+            } else {
+                ArtistsGridOrList(
+                    list,
+                    page = "favourite-artists",
+                    onOpen = { nav.navigate("artist/${it.id}") },
+                    modifier = Modifier.padding(padding).fillMaxSize(),
+                    title = "${list.size} ${if (list.size == 1) "artist" else "artists"}",
+                )
+            }
+        }
     }
 }
 
