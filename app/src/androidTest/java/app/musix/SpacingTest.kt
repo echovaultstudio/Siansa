@@ -13,6 +13,7 @@ import app.musix.ui.DayChips
 import app.musix.ui.CollectionByline
 import app.musix.ui.ContinueButton
 import app.musix.ui.lastPlayedLine
+import app.musix.ui.FastScrollBar
 import app.musix.ui.VibeSliders
 import app.musix.ui.ArrangeList
 import app.musix.mix.SoundDial
@@ -28,6 +29,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyDescendant
@@ -595,5 +599,23 @@ class SpacingTest {
         val row = compose.onNodeWithTag("row").getBoundsInRoot()
         val text = compose.onNodeWithText("Shadow Box").getBoundsInRoot()
         assertEven("Room above and below the title", text.top - row.top, row.bottom - text.bottom, 1.dp)
+    }
+
+    /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */
+    @Test fun fastScrollHandleIsCentredAndReachesTheEnds() {
+        var at by mutableFloatStateOf(0f)
+        compose.setContent {
+            MusixTheme {
+                Box(Modifier.height(300.dp)) { FastScrollBar(fraction = at, labelAt = { null }, onScroll = { }) }
+            }
+        }
+        val bar = compose.onNodeWithTag("fastScroll").getBoundsInRoot()
+        var thumb = compose.onNodeWithTag("fastScrollThumb", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Handle left and right", thumb.left - bar.left, bar.right - thumb.right, 1.dp)
+        assertEven("Handle at the top", thumb.top, bar.top, 1.dp)
+        at = 1f
+        compose.waitForIdle()
+        thumb = compose.onNodeWithTag("fastScrollThumb", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Handle at the bottom", thumb.bottom, bar.bottom, 1.dp)
     }
 }
