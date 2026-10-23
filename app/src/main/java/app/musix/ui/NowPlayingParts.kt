@@ -1,5 +1,7 @@
 package app.musix.ui
 
+import androidx.compose.material.icons.rounded.Shuffle
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -170,6 +172,13 @@ fun PlayerMenu(
                 MenuRow(Icons.AutoMirrored.Rounded.QueueMusic, "Add to queue") {
                     graph.player.addToQueue(song)
                     notify("Added to the queue")
+                    onDismiss()
+                }
+                // Shuffle moved here from beside the controls (issue #370); lit while it's on.
+                val shuffled = graph.player.state.collectAsStateWithLifecycle().value.shuffle
+                MenuRow(Icons.Rounded.Shuffle, if (shuffled) "Shuffle: on" else "Shuffle: off", tint = if (shuffled) Accent else null, tag = "menuShuffle") {
+                    graph.player.toggleShuffle()
+                    notify(if (shuffled) "Shuffle off" else "Shuffle on")
                     onDismiss()
                 }
                 MenuDivider()

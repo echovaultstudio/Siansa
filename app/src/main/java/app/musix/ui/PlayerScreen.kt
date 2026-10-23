@@ -1,5 +1,9 @@
 package app.musix.ui
 
+import androidx.compose.ui.graphics.vector.ImageVector
+
+import androidx.compose.material.icons.rounded.AddCircleOutline
+
 import androidx.compose.ui.platform.testTag
 import android.os.SystemClock
 import app.musix.log.AppLog
@@ -84,7 +88,6 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.RepeatOne
-import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.Icon
@@ -727,8 +730,15 @@ private fun Controls(state: PlayerState) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = { graph.player.toggleShuffle() }) {
-            Icon(Icons.Rounded.Shuffle, "Shuffle", tint = if (state.shuffle) Accent else Color.White)
+        // Repeat on the left, add to playlist on the right (issue #370); shuffle is in the ⋮ menu.
+        StateButton(
+            icon = if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
+            label = repeatLabel(state.repeatMode),
+            on = state.repeatMode != Player.REPEAT_MODE_OFF,
+            tag = "repeatButton",
+        ) {
+            graph.player.cycleRepeat()
+            AppLog.i("Player", "Repeat: " + repeatLabel(nextRepeat(state.repeatMode)).lowercase())
         }
         IconButton(onClick = { graph.player.previous() }, modifier = Modifier.size(56.dp)) {
             Icon(Icons.Rounded.SkipPrevious, "Previous", Modifier.size(40.dp))
@@ -759,14 +769,59 @@ private fun Controls(state: PlayerState) {
         IconButton(onClick = { graph.player.next() }, modifier = Modifier.size(56.dp)) {
             Icon(Icons.Rounded.SkipNext, "Next", Modifier.size(40.dp))
         }
-        IconButton(onClick = { graph.player.cycleRepeat() }) {
-            Icon(
-                if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
-                "Repeat",
-                tint = if (state.repeatMode != Player.REPEAT_MODE_OFF) Accent else Color.White,
+        var picking by remember { mutableStateOf(false) }
+        StateButton(icon = Icons.Rounded.AddCircleOutline, label = "Add to playlist", on = false, tag = "addToPlaylistButton") {
+            if (state.current != null) picking = true
+        }
+        if (picking) {
+            val launch = rememberPlayLauncher()
+            state.current?.let { song ->
+                AddToPlaylistDialog(listOf(song)) { message ->
+                    picking = false
+                    message?.let { launch.notify(it) }
+                }
+            } ?: run { picking = false }
+        }
+    }
+}
+
+/**
+ * A button beside the play controls (issue #370): white, or the accent with a dot under it while [on], so the
+ * change shows on any theme, also where the accent is pale. One tap does it: the whole 48 dp square answers.
+ */
+@Composable
+internal fun StateButton(icon: ImageVector, label: String, on: Boolean, tag: String, onClick: () -> Unit) {
+    Box(
+        Modifier.size(48.dp).clip(CircleShape).clickable(onClickLabel = label, onClick = onClick).testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, label, tint = if (on) Accent else Color.White)
+        if (on) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = Space.Tight)
+                    .size(4.dp) // spacing: exact (a dot)
+                    .clip(CircleShape)
+                    .background(Accent)
+                    .testTag("$tag-on"),
             )
         }
     }
+}
+
+/** What the repeat button is set to, for screen readers and the log (issue #370). */
+internal fun repeatLabel(mode: Int): String = when (mode) {
+    Player.REPEAT_MODE_ALL -> "Repeat all"
+    Player.REPEAT_MODE_ONE -> "Repeat this song"
+    else -> "Repeat off"
+}
+
+/** The repeat mode one tap moves to: off → all → this song → off. */
+internal fun nextRepeat(mode: Int): Int = when (mode) {
+    Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+    Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+    else -> Player.REPEAT_MODE_OFF
 }
 
 @Composable
