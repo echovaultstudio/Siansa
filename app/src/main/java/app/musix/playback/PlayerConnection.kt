@@ -276,6 +276,8 @@ class PlayerConnection(
             Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
             else -> Player.REPEAT_MODE_OFF
         }
+        // Shown at once rather than when the service reports back, so the button answers the tap (issue #370).
+        refresh()
     }
 
     fun positionMs(): Long = controller?.currentPosition ?: 0L
