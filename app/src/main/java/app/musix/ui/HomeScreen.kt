@@ -197,17 +197,17 @@ fun HomeScreen(nav: NavController) {
     val todaysMixes = mixes.orEmpty().filter { m ->
         m.date == today && (m.selectorId in personalIds || applicable.any { it.id == m.selectorId })
     }
-    val playlists by loadState(version to "playlists") { graph.library.refreshPlaylists { graph.subsonic.playlists() }.let(graph.playlists.removed::visible) }
+    val playlists by loadState(version to "playlists") { graph.library.refreshPlaylists { graph.source.playlists() }.let(graph.playlists.removed::visible) }
     val recentAlbums by loadState(version to "recent") { recentlyPlayedAlbums(graph) }
     val recentArtists by loadState(version to "artists") { artistRadioArtists(graph) }
     val newest by loadState(version to "newest") {
         if (graph.library.isSynced) graph.library.albums("newest").take(20)
-        else graph.subsonic.albums("newest", 20, 0).distinctBy { it.name + "|" + it.artist }
+        else graph.source.albums("newest", 20, 0).distinctBy { it.name + "|" + it.artist }
     }
     val lovedBefore by loadState(version to today) { graph.insights.rediscover() }
     val rediscover by loadState(version to "random") {
         if (graph.library.isSynced) graph.library.randomAlbums(20)
-        else graph.subsonic.albums("random", 20, 0).distinctBy { it.name + "|" + it.artist }
+        else graph.source.albums("random", 20, 0).distinctBy { it.name + "|" + it.artist }
     }
     val genres by loadState(version to "genres") { if (graph.library.isSynced) graph.library.genres(12) else emptyList() }
 

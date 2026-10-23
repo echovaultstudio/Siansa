@@ -82,7 +82,7 @@ class Taste(private val graph: AppGraph) {
                 .getOrNull()
         }
         val navidrome = async {
-            runCatching { graph.subsonic.albums("frequent", 40, 0) }
+            runCatching { graph.source.albums("frequent", 40, 0) }
                 .onFailure { AppLog.w("Taste", "Navidrome most-played failed: ${it.message}") }
                 .getOrNull()
                 ?.let { graph.library.keepSyncedAlbums(it, "Most played") }

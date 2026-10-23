@@ -67,7 +67,7 @@ class ArtistSuggestions(private val graph: AppGraph) {
         var fromNavidrome = 0
         for (seed in seeds) {
             val local = graph.library.artistByName(seed) ?: continue
-            val info = runCatching { graph.subsonic.artistInfo(local.id, includeNotPresent = true) }
+            val info = runCatching { graph.source.artistInfo(local.id, includeNotPresent = true) }
                 .onFailure { AppLog.d("Suggest", "No similar artists for $seed from Navidrome: ${it.message}") }
                 .getOrNull() ?: continue
             for (a in info.similar) {

@@ -120,7 +120,7 @@ private suspend fun artistsOf(graph: AppGraph, song: Song): List<Artist> {
     // Songs from the phone's library don't carry the list, so Navidrome is asked: its list has every
     // artist tag, also when the name shown is only the main artist ("Fred again.." on a song with Skrillex).
     if (refs.isEmpty()) {
-        refs = runCatching { graph.subsonic.song(song.id).artists }
+        refs = runCatching { graph.source.song(song.id).artists }
             .onFailure { AppLog.w("Artist", "Couldn't load the artists of ${song.id}: ${it.message}") }
             .getOrDefault(emptyList())
     }

@@ -121,16 +121,16 @@ class MadeForYouCards(private val graph: AppGraph, context: Context) {
         if (!fresh) made[key]?.let { return it }
         val started = System.currentTimeMillis()
         val songs = when (card.kind) {
-            CardKind.RANDOM -> graph.subsonic.randomSongs(SIZE)
-            CardKind.GENRE -> graph.subsonic.randomSongs(SIZE, genre = card.genre)
-            CardKind.YEARS -> graph.subsonic.randomSongs(SIZE, fromYear = card.fromYear, toYear = card.toYear)
-            CardKind.NEWEST -> fromAlbums(graph.subsonic.albums("newest", 20, 0))
-            CardKind.TOP_RATED -> fromAlbums(graph.subsonic.albums("highest", 20, 0))
-            CardKind.MOST_PLAYED -> fromAlbums(graph.subsonic.albums("frequent", 20, 0))
-            CardKind.FAVOURITE_ALBUMS -> fromAlbums(graph.subsonic.albums("starred", 40, 0).shuffled().take(20))
+            CardKind.RANDOM -> graph.source.randomSongs(SIZE)
+            CardKind.GENRE -> graph.source.randomSongs(SIZE, genre = card.genre)
+            CardKind.YEARS -> graph.source.randomSongs(SIZE, fromYear = card.fromYear, toYear = card.toYear)
+            CardKind.NEWEST -> fromAlbums(graph.source.albums("newest", 20, 0))
+            CardKind.TOP_RATED -> fromAlbums(graph.source.albums("highest", 20, 0))
+            CardKind.MOST_PLAYED -> fromAlbums(graph.source.albums("frequent", 20, 0))
+            CardKind.FAVOURITE_ALBUMS -> fromAlbums(graph.source.albums("starred", 40, 0).shuffled().take(20))
             CardKind.FORGOTTEN -> {
                 val cutoff = System.currentTimeMillis() - FORGOTTEN_DAYS * 24L * 60 * 60 * 1000
-                fromAlbums(forgottenAlbums(graph.subsonic.albums("frequent", 100, 0), cutoff).shuffled().take(20))
+                fromAlbums(forgottenAlbums(graph.source.albums("frequent", 100, 0), cutoff).shuffled().take(20))
             }
         }
         AppLog.i("Cards", "\"${card.title}\": ${songs.size} songs in ${System.currentTimeMillis() - started}ms")
@@ -143,7 +143,7 @@ class MadeForYouCards(private val graph: AppGraph, context: Context) {
     private suspend fun fromAlbums(albums: List<Album>): List<Song> {
         val byAlbum = albums.map { a ->
             (graph.library.album(a.id)?.let { graph.library.songsOf(it) }).orEmpty()
-                .ifEmpty { runCatching { graph.subsonic.album(a.id).songs }.getOrDefault(emptyList()) }
+                .ifEmpty { runCatching { graph.source.album(a.id).songs }.getOrDefault(emptyList()) }
         }
         return spreadOverAlbums(byAlbum, perAlbum = 4, size = SIZE)
     }

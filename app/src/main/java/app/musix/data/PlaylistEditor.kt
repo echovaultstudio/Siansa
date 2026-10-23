@@ -2,7 +2,7 @@ package app.musix.data
 
 import app.musix.log.AppLog
 import app.musix.net.NavidromeNativeApi
-import app.musix.net.SubsonicApi
+import app.musix.net.MusicSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,7 +14,7 @@ import kotlinx.coroutines.withContext
  * ([LocalPlaylists]) change on the phone and work offline.
  */
 class PlaylistEditor(
-    private val subsonic: SubsonicApi,
+    private val source: MusicSource,
     private val native: NavidromeNativeApi,
     private val library: LibraryRepository,
     private val local: LocalPlaylists,
@@ -35,7 +35,7 @@ class PlaylistEditor(
             }
         } else {
             onTheServer("Creating a playlist") {
-                val made = subsonic.createPlaylist(name.trim(), songs.map { it.id })
+                val made = source.createPlaylist(name.trim(), songs.map { it.id })
                 AppLog.i("Playlist", "Made playlist ${made?.id} with ${songs.size} songs")
                 made
             }
@@ -43,18 +43,18 @@ class PlaylistEditor(
 
     suspend fun add(playlistId: String, songs: List<Song>): Result<Unit> =
         edit(playlistId, "Adding to a playlist", { local.add(playlistId, songs) }) {
-            subsonic.addToPlaylist(playlistId, songs.map { it.id })
+            source.addToPlaylist(playlistId, songs.map { it.id })
         }.also { if (it.isSuccess) AppLog.i("Playlist", "Added ${songs.size} songs to playlist $playlistId") }
 
     suspend fun rename(playlistId: String, name: String): Result<Unit> =
         edit(playlistId, "Renaming a playlist", { local.rename(playlistId, name.trim()) }) {
-            subsonic.renamePlaylist(playlistId, name.trim())
+            source.renamePlaylist(playlistId, name.trim())
         }.also { if (it.isSuccess) AppLog.i("Playlist", "Renamed playlist $playlistId") }
 
     /** Removes the song at [index] (from 0, in the playlist's order). */
     suspend fun remove(playlistId: String, index: Int): Result<Unit> =
         edit(playlistId, "Removing from a playlist", { local.remove(playlistId, index) }) {
-            subsonic.removeFromPlaylist(playlistId, listOf(index))
+            source.removeFromPlaylist(playlistId, listOf(index))
         }.also { if (it.isSuccess) AppLog.i("Playlist", "Removed song $index from playlist $playlistId") }
 
     /**
@@ -97,7 +97,7 @@ class PlaylistEditor(
     suspend fun moveToServer(playlistId: String): Result<Playlist?> {
         val playlist = local.get(playlistId) ?: return Result.failure(IllegalStateException("That playlist isn't on this phone any more"))
         return onTheServer("Moving a playlist to Navidrome") {
-            val made = subsonic.createPlaylist(playlist.name, playlist.songs.map { it.id })
+            val made = source.createPlaylist(playlist.name, playlist.songs.map { it.id })
             val picture = playlist.picture?.let { java.io.File(it) }?.takeIf { it.exists() }
             if (made != null && picture != null) {
                 // The playlist is safe on the server by now; a server without pictures only loses the picture.
@@ -134,7 +134,7 @@ class PlaylistEditor(
         val result = attempt(what, block)
         if (result.isFailure) return result
         // The phone's copy of the list, for Your Library and offline; a failure here only waits for the next sync.
-        runCatching { library.updatePlaylists(subsonic.playlists()) }
+        runCatching { library.updatePlaylists(source.playlists()) }
             .onFailure { AppLog.w("Playlist", "Playlist list not refreshed: ${it.message}") }
         library.bump()
         return result

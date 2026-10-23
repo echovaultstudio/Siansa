@@ -56,7 +56,7 @@ class MusixApp : Application(), SingletonImageLoader.Factory {
             // The time machine's song index, ready before it's opened (issue #319).
             graph.insights.warmUp()
             if (graph.settings.current.navidromeReady) {
-                runCatching { AppLog.i("Server", graph.subsonic.ping()) }
+                runCatching { AppLog.i("Server", graph.source.ping()) }
             }
             // A quick check at every start: usually just "nothing changed", or a few albums.
             if (graph.settings.current.navidromeReady) graph.sync.start(quiet = true)

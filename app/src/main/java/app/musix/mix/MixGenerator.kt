@@ -498,7 +498,7 @@ class MixGenerator(private val graph: AppGraph) {
         ids.map { id ->
             async {
                 local[id] ?: if (fetchMissing) {
-                    permits.withPermit { runCatching { graph.subsonic.song(id) }.getOrNull() }
+                    permits.withPermit { runCatching { graph.source.song(id) }.getOrNull() }
                 } else {
                     null
                 }

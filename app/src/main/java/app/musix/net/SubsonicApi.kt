@@ -47,7 +47,9 @@ import java.security.SecureRandom
 class SubsonicApi(
     private val http: OkHttpClient,
     private val settings: () -> AppSettings,
-) {
+) : MusicSource {
+    override val kind: SourceKind = SourceKind.OPENSUBSONIC
+
     // Song and cover addresses: one salt per app run (see above).
     private val mediaSalt: String = newSalt()
     private var mediaToken: Pair<String, String>? = null
@@ -105,9 +107,9 @@ class SubsonicApi(
     }
 
     /** The untouched original file (format=raw), whatever Navidrome's own transcoding defaults say. */
-    fun streamUrl(id: String): String = url("stream", mapOf("id" to id, "format" to "raw"))
+    override fun streamUrl(id: String): String = url("stream", mapOf("id" to id, "format" to "raw"))
 
-    fun coverUrl(id: String, size: Int?): String =
+    override fun coverUrl(id: String, size: Int?): String =
         url("getCoverArt", mapOf("id" to id, "size" to size?.toString()))
 
     // ---- OpenSubsonic extensions ----
@@ -139,6 +141,8 @@ class SubsonicApi(
     }
 
     suspend fun supports(name: String, version: Int = 1): Boolean = extensions()[name]?.contains(version) == true
+
+    override suspend fun hasSonicMatch(): Boolean = supports("sonicSimilarity")
 
     // ---- Calls ----
 
@@ -208,7 +212,7 @@ class SubsonicApi(
         return status.str("lastScan")
     }
 
-    suspend fun ping(): String {
+    override suspend fun ping(): String {
         val root = call("ping")
         val type = root.str("type") ?: "Subsonic server"
         val version = root.str("serverVersion") ?: root.str("version") ?: ""
@@ -216,7 +220,7 @@ class SubsonicApi(
     }
 
     /** Navidrome's libraries. */
-    suspend fun musicFolders(): List<MusicFolder> =
+    override suspend fun musicFolders(): List<MusicFolder> =
         call("getMusicFolders").obj("musicFolders")?.arr("musicFolder").orEmpty().mapNotNull { f ->
             val id = f.str("id") ?: return@mapNotNull null
             MusicFolder(id, f.str("name") ?: "Library $id")
@@ -230,14 +234,14 @@ class SubsonicApi(
         ).obj("albumList2")?.arr("album").orEmpty().map(::parseAlbum)
 
     /** Albums of the libraries chosen in Settings (all when none are): one call per chosen library, merged. */
-    suspend fun albums(type: String, size: Int, offset: Int): List<Album> {
+    override suspend fun albums(type: String, size: Int, offset: Int): List<Album> {
         val folders = chosenFolders()
         if (folders.size <= 1) return albums(type, size, offset, folders.firstOrNull())
         val all = folders.flatMap { albums(type, size + offset, 0, it) }.distinctBy { it.id }
         return mergeAlbumLists(type, all).drop(offset).take(size)
     }
 
-    suspend fun album(id: String): AlbumDetail {
+    override suspend fun album(id: String): AlbumDetail {
         val album = call("getAlbum", mapOf("id" to id)).obj("album") ?: throw ApiException("Album not found")
         return AlbumDetail(parseAlbum(album), album.arr("song").map(::parseSong), parseDiscTitles(album))
     }
@@ -254,7 +258,7 @@ class SubsonicApi(
         call("getArtists", mapOf("musicFolderId" to folderId)).obj("artists")?.arr("index").orEmpty()
             .flatMap { index -> index.arr("artist").map(::parseArtist) }
 
-    suspend fun artist(id: String): ArtistDetail {
+    override suspend fun artist(id: String): ArtistDetail {
         val artist = call("getArtist", mapOf("id" to id)).obj("artist") ?: throw ApiException("Artist not found")
         return ArtistDetail(parseArtist(artist), artist.arr("album").map(::parseAlbum))
     }
@@ -263,7 +267,7 @@ class SubsonicApi(
      * Biography, image and similar artists that Navidrome already has (from its agents or AudioMuse).
      * With [includeNotPresent], similar artists that aren't in the library are listed too (by name only).
      */
-    suspend fun artistInfo(id: String, includeNotPresent: Boolean = false): ArtistInfo {
+    override suspend fun artistInfo(id: String, includeNotPresent: Boolean): ArtistInfo {
         val info = call("getArtistInfo2", mapOf("id" to id, "count" to "20", "includeNotPresent" to "$includeNotPresent"))
             .obj("artistInfo2")
         return ArtistInfo(
@@ -281,20 +285,20 @@ class SubsonicApi(
         )
     }
 
-    suspend fun topSongs(artistName: String, count: Int = 10): List<Song> =
+    override suspend fun topSongs(artistName: String, count: Int): List<Song> =
         call("getTopSongs", mapOf("artist" to artistName, "count" to "$count"))
             .obj("topSongs")?.arr("song").orEmpty().map(::parseSong)
 
-    suspend fun playlists(): List<Playlist> =
+    override suspend fun playlists(): List<Playlist> =
         call("getPlaylists").obj("playlists")?.arr("playlist").orEmpty().map(::parsePlaylist)
 
-    suspend fun playlist(id: String): PlaylistDetail {
+    override suspend fun playlist(id: String): PlaylistDetail {
         val p = call("getPlaylist", mapOf("id" to id)).obj("playlist") ?: throw ApiException("Playlist not found")
         return PlaylistDetail(parsePlaylist(p), p.arr("entry").map(::parseSong))
     }
 
     /** Songs that sound like this one. With the AudioMuse plugin, Navidrome answers from sonic analysis. */
-    suspend fun similarSongs(songId: String, count: Int = 50): List<Song> =
+    override suspend fun similarSongs(songId: String, count: Int): List<Song> =
         call("getSimilarSongs", mapOf("id" to songId, "count" to "$count"))
             .obj("similarSongs")?.arr("song").orEmpty().map(::parseSong)
 
@@ -302,11 +306,11 @@ class SubsonicApi(
      * Songs that sound like this one through Navidrome's own sonic similarity (OpenSubsonic `sonicSimilarity`,
      * the AudioMuse-AI Navidrome plugin), with their similarity (1 = the same song). Issue #208.
      */
-    suspend fun sonicSimilar(songId: String, count: Int): List<Pair<Song, Double>> =
+    override suspend fun sonicSimilar(songId: String, count: Int): List<Pair<Song, Double>> =
         parseSonicMatches(call("getSonicSimilarTracks", mapOf("id" to songId, "count" to "$count")))
 
     /** A song path through Navidrome's sonic similarity (`findSonicPath`), both ends included. */
-    suspend fun sonicPath(startId: String, endId: String, count: Int): List<Song> =
+    override suspend fun sonicPath(startId: String, endId: String, count: Int): List<Song> =
         parseSonicMatches(call("findSonicPath", mapOf("startSongId" to startId, "endSongId" to endId, "count" to "$count")))
             .map { it.first }
 
@@ -317,17 +321,17 @@ class SubsonicApi(
         }.filter { it.first.id.isNotEmpty() }
 
     /** Songs by this artist and similar artists. */
-    suspend fun artistRadio(artistId: String, count: Int = 50): List<Song> =
+    override suspend fun artistRadio(artistId: String, count: Int): List<Song> =
         call("getSimilarSongs2", mapOf("id" to artistId, "count" to "$count"))
             .obj("similarSongs2")?.arr("song").orEmpty().map(::parseSong)
 
-    suspend fun song(id: String): Song {
+    override suspend fun song(id: String): Song {
         val song = call("getSong", mapOf("id" to id)).obj("song") ?: throw ApiException("Song not found")
         return parseSong(song)
     }
 
     /** The song's codec, bit rate, file path and play count, as Navidrome reports them. */
-    suspend fun songDetails(id: String): SongDetails {
+    override suspend fun songDetails(id: String): SongDetails {
         val song = call("getSong", mapOf("id" to id)).obj("song") ?: throw ApiException("Song not found")
         return parseSongDetails(song)
     }
@@ -350,7 +354,7 @@ class SubsonicApi(
      * Random songs with Navidrome's play count for each (for Roll the dice, issue #347): how often this user
      * played it, 0 for never.
      */
-    suspend fun randomSongPlays(size: Int): List<Pair<Song, Long>> {
+    override suspend fun randomSongPlays(size: Int): List<Pair<Song, Long>> {
         val folders = folderPasses()
         val each = (size + folders.size - 1) / folders.size
         return folders.flatMap { folder ->
@@ -361,7 +365,7 @@ class SubsonicApi(
     }
 
     /** Random songs, optionally of a genre or between two years (Navidrome's getRandomSongs), from the chosen libraries. */
-    suspend fun randomSongs(size: Int, genre: String? = null, fromYear: Int? = null, toYear: Int? = null): List<Song> {
+    override suspend fun randomSongs(size: Int, genre: String?, fromYear: Int?, toYear: Int?): List<Song> {
         val folders = folderPasses()
         val each = (size + folders.size - 1) / folders.size
         return folders.flatMap { folder ->
@@ -378,7 +382,7 @@ class SubsonicApi(
         }.distinctBy { it.id }.shuffled().take(size)
     }
 
-    suspend fun search(query: String): SearchResults {
+    override suspend fun search(query: String): SearchResults {
         val parts = folderPasses().map { folder ->
             call(
                 "search3",
@@ -396,7 +400,7 @@ class SubsonicApi(
     private fun folderPasses(): List<String?> = chosenFolders().toList().ifEmpty { listOf(null) }
 
     /** Synced lyrics from the OpenSubsonic extension when available, plain lyrics otherwise. */
-    suspend fun lyrics(song: Song): Lyrics? {
+    override suspend fun lyrics(song: Song): Lyrics? {
         // Navidrome reads lyrics from the file's tags and from .lrc / .txt files next to it, sometimes several
         // (languages, or both synced and plain). Each is read in whatever format it's in (LRC, enhanced LRC
         // with word times, TTML, SRT…), and the most detailed one is used.
@@ -428,42 +432,42 @@ class SubsonicApi(
     }
 
     /** submission=false marks "now playing"; true records a finished play, at [timeMs] when given. */
-    suspend fun scrobble(id: String, submission: Boolean, timeMs: Long? = null) {
+    override suspend fun scrobble(id: String, submission: Boolean, timeMs: Long?) {
         call("scrobble", mapOf("id" to id, "submission" to submission.toString(), "time" to timeMs?.toString()))
     }
 
     /** Saves [songIds], in order, as a new playlist on Navidrome; the new playlist, when the server sends it back. */
-    suspend fun createPlaylist(name: String, songIds: List<String>): Playlist? =
+    override suspend fun createPlaylist(name: String, songIds: List<String>): Playlist? =
         call("createPlaylist", mapOf("name" to name), songIds.map { "songId" to it }).obj("playlist")?.let(::parsePlaylist)
 
-    suspend fun renamePlaylist(playlistId: String, name: String) {
+    override suspend fun renamePlaylist(playlistId: String, name: String) {
         call("updatePlaylist", mapOf("playlistId" to playlistId, "name" to name))
     }
 
     /** Removes the songs at these positions (from 0, in the playlist's own order). */
-    suspend fun removeFromPlaylist(playlistId: String, indexes: List<Int>) {
+    override suspend fun removeFromPlaylist(playlistId: String, indexes: List<Int>) {
         call("updatePlaylist", mapOf("playlistId" to playlistId), indexes.map { "songIndexToRemove" to "$it" })
     }
 
     /** Adds songs to the end of one of your playlists. */
-    suspend fun addToPlaylist(playlistId: String, songIds: List<String>) {
+    override suspend fun addToPlaylist(playlistId: String, songIds: List<String>) {
         call("updatePlaylist", mapOf("playlistId" to playlistId), songIds.map { "songIdToAdd" to it })
     }
 
-    suspend fun star(id: String) {
+    override suspend fun star(id: String) {
         call("star", mapOf("id" to id))
     }
 
-    suspend fun unstar(id: String) {
+    override suspend fun unstar(id: String) {
         call("unstar", mapOf("id" to id))
     }
 
     /** Marks an album as a favourite (Navidrome's star on the album, issue #275). */
-    suspend fun starAlbum(albumId: String) {
+    override suspend fun starAlbum(albumId: String) {
         call("star", mapOf("albumId" to albumId))
     }
 
-    suspend fun unstarAlbum(albumId: String) {
+    override suspend fun unstarAlbum(albumId: String) {
         call("unstar", mapOf("albumId" to albumId))
     }
 
@@ -483,13 +487,13 @@ class SubsonicApi(
         }.distinctBy { it.id }
 
     /** Favourite (starred) albums. */
-    suspend fun starredAlbums(): List<Album> =
+    override suspend fun starredAlbums(): List<Album> =
         folderPasses().flatMap { folder ->
             call("getStarred2", mapOf("musicFolderId" to folder)).obj("starred2")?.arr("album").orEmpty().map(::parseAlbum)
         }.distinctBy { it.id }
 
     /** Liked (starred) songs. */
-    suspend fun starredSongs(): List<Song> =
+    override suspend fun starredSongs(): List<Song> =
         folderPasses().flatMap { folder ->
             call("getStarred2", mapOf("musicFolderId" to folder)).obj("starred2")?.arr("song").orEmpty().map(::parseSong)
         }.distinctBy { it.id }

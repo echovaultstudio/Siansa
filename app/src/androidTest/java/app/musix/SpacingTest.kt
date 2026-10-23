@@ -16,6 +16,8 @@ import app.musix.ui.CollectionByline
 import app.musix.ui.ContinueButton
 import app.musix.ui.lastPlayedLine
 import app.musix.ui.FastScrollBar
+import app.musix.ui.SourceRow
+import app.musix.net.SourceKind
 import app.musix.ui.VibeSliders
 import app.musix.ui.ArrangeList
 import app.musix.mix.SoundDial
@@ -605,7 +607,7 @@ class SpacingTest {
         val details = compose.onNodeWithText("DJ-mix · 2024 · 7 songs").getBoundsInRoot()
         val button = compose.onNodeWithTag("continueFrom").getBoundsInRoot()
         // The button you see is 40 dp tall, centred in its taller touch area.
-        val seenTop = button.top + (button.height - 40.dp) / 2
+        val seenTop = button.top + ((button.bottom - button.top) - 40.dp) / 2
         assertEven("Continue under the details", details.top - artist.bottom, seenTop - details.bottom, 1.dp)
     }
 
@@ -640,5 +642,17 @@ class SpacingTest {
         compose.waitForIdle()
         thumb = compose.onNodeWithTag("fastScrollThumb", useUnmergedTree = true).getBoundsInRoot()
         assertEven("Handle at the bottom", thumb.bottom, bar.bottom, 1.dp)
+    /** First run (issue #113): every source in the picker is one row height, the text centred against its icon. */
+    @Test fun sourceRowsAreOneHeight() {
+        compose.setContent { MusicSourceRows() }
+        val rows = SourceKind.entries.map { compose.onNodeWithTag("source-${it.name}").getBoundsInRoot() }
+        rows.forEach { assertEven("Source rows", rows[0].bottom - rows[0].top, it.bottom - it.top, 1.dp) }
+        val gaps = rows.zipWithNext { a, b -> b.top - a.bottom }
+        gaps.forEach { assertEven("Gap between source rows", gaps[0], it, 1.dp) }
+    }
+
+    @androidx.compose.runtime.Composable
+    private fun MusicSourceRows() {
+        MusixTheme { Column { SourceKind.entries.forEach { SourceRow(it) { } } } }
     }
 }
