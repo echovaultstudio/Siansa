@@ -1,5 +1,11 @@
 package app.musix.ui
 
+import app.musix.data.normalizeKey
+
+import app.musix.mix.mixArtistRadios
+
+import app.musix.mix.ArtistRadioPicks
+
 import app.musix.mix.resumeStart
 import app.musix.data.RecentPlay
 import app.musix.data.cover
@@ -191,7 +197,7 @@ fun HomeScreen(nav: NavController) {
     }
     val playlists by loadState(version to "playlists") { graph.library.refreshPlaylists { graph.subsonic.playlists() }.let(graph.playlists.removed::visible) }
     val recentAlbums by loadState(version to "recent") { recentlyPlayedAlbums(graph) }
-    val recentArtists by loadState(version to "artists") { recentlyPlayedArtists(graph) }
+    val recentArtists by loadState(version to "artists") { artistRadioArtists(graph) }
     val newest by loadState(version to "newest") {
         if (graph.library.isSynced) graph.library.albums("newest").take(20)
         else graph.subsonic.albums("newest", 20, 0).distinctBy { it.name + "|" + it.artist }
@@ -458,11 +464,38 @@ internal suspend fun recentlyPlayedAlbums(graph: AppGraph, limit: Int = 15): Lis
 
 internal suspend fun recentlyPlayedArtists(graph: AppGraph, limit: Int = 10): List<Artist> {
     if (!graph.library.isSynced) return emptyList()
-    val heard = graph.library.songs(graph.history.recent(if (limit > 10) 2000 else 300).map { it.id }.distinct())
-    val songs = graph.library.onlyDownloaded()?.songs(heard) ?: heard
-    return songs.distinctBy { it.artistId ?: it.artist }.take(limit).mapNotNull { s ->
-        s.artistId?.let { graph.library.artist(it) } ?: graph.library.artistByName(s.artist)
-    }.distinctBy { it.id }
+    // The last few hundred plays first; when they're all a few artists (a long mix), further back (issue #377).
+    for (plays in listOf(300, 2000)) {
+        val heard = graph.library.songs(graph.history.recent(plays).map { it.id }.distinct())
+        val songs = graph.library.onlyDownloaded()?.songs(heard) ?: heard
+        val artists = songs.distinctBy { it.artistId ?: it.artist }.take(limit).mapNotNull { s ->
+            s.artistId?.let { graph.library.artist(it) } ?: graph.library.artistByName(s.artist)
+        }.distinctBy { it.id }
+        if (artists.size >= limit || plays == 2000) return artists
+    }
+    return emptyList()
+}
+
+/**
+ * Home's artist radios (issue #377): always [count] when the library has that many artists, mixing artists you
+ * played lately with artists like them (the Musix plugin's "Fans also like"), then the ones you play most.
+ */
+internal suspend fun artistRadioArtists(graph: AppGraph, count: Int = ArtistRadioPicks.HOME): List<Artist> {
+    if (!graph.library.isSynced) return emptyList()
+    val recent = recentlyPlayedArtists(graph, count)
+    val similar = recent.take(ArtistRadioPicks.SIMILAR_FROM).map { artist ->
+        runCatching { graph.similar.artists(artist.name) }.getOrDefault(emptyList()).mapNotNull { s ->
+            val id = s.id ?: return@mapNotNull null
+            graph.library.artist(id) ?: Artist(id, s.name, coverArt = s.coverArt)
+        }
+    }
+    val library = graph.library.artists()
+    val byKey = library.associateBy { normalizeKey(it.name) }
+    val mostPlayed = graph.history.all().groupingBy { normalizeKey(it.artist) }.eachCount()
+        .entries.sortedByDescending { it.value }.mapNotNull { byKey[it.key] }
+    val picked = mixArtistRadios(recent, similar, mostPlayed + library.shuffled(), count)
+    AppLog.d("Home", "Artist radios: ${picked.size} (${recent.size} played lately, ${similar.sumOf { it.size }} like them)")
+    return picked
 }
 
 /** Opens a Home row's full list; navigation stays on the main thread (it's called from a tap). */
