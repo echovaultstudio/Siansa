@@ -65,6 +65,7 @@ import app.musix.mix.SimilarPlugin
 import app.musix.data.Song
 import app.musix.data.category
 import app.musix.data.isTopSongsFresh
+import app.musix.data.quickTopSongs
 import app.musix.log.AppLog
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.CancellationException
@@ -107,6 +108,13 @@ fun ArtistScreen(nav: NavController, id: String) {
             if (cached != null) value = cached.songs
             if (cached != null && isTopSongsFresh(cached, System.currentTimeMillis())) return@produceState
             val loaded = snapshotFlow { page.valueOrNull() }.filterNotNull().first()
+            // Nothing saved yet (issue #398): the artist's songs you've played most, straight away, instead of
+            // waiting the second or two Navidrome takes to ask Last.fm. Its list replaces them when it comes.
+            if (value == null && loaded.songs.isNotEmpty()) {
+                val plays = graph.history.all().groupingBy { it.id }.eachCount()
+                value = quickTopSongs(loaded.songs, plays)
+                AppLog.d("Artist", "Popular songs: none saved, showing ${value?.size} of the artist's own first")
+            }
             value = graph.topSongs.refresh(loaded.artist, loaded.songs)
         } catch (e: CancellationException) {
             throw e
@@ -225,7 +233,10 @@ fun ArtistScreen(nav: NavController, id: String) {
                 full { SectionTitle("Popular") }
                 // Three, and "Show more" for up to six (issue #328).
                 itemsIndexed(topSongs.take(topRowsShown(topSongs.size, topExpanded)), key = { i, s -> "top-$i-${s.id}" }, span = { _, _ -> GridItemSpan(maxLineSpan) }) { index, song ->
-                    SongRow(song = song, onClick = { graph.player.play(topSongs, index) }, leading = "${index + 1}")
+                    // Fades when Navidrome's list replaces the first one (issue #398), rather than jumping.
+                    Box(Modifier.animateItem(placementSpec = null)) {
+                        SongRow(song = song, onClick = { graph.player.play(topSongs, index) }, leading = "${index + 1}")
+                    }
                 }
                 if (topSongs.size > TOP_ROWS_SHORT) {
                     full {
