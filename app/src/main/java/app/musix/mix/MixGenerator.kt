@@ -1,5 +1,9 @@
 package app.musix.mix
 
+import app.musix.data.daysLabel
+
+import app.musix.data.fittingSelector
+
 import android.content.Context
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
@@ -57,8 +61,9 @@ class MixGenerator(private val graph: AppGraph) {
     )
 
     suspend fun currentSelector(): Selector? {
-        val hour = LocalDateTime.now().hour
-        return graph.selectors.all().firstOrNull { it.enabled && it.covers(hour) }
+        val now = LocalDateTime.now()
+        // The most fitting vibe for the hour and the day (issue #348).
+        return fittingSelector(graph.selectors.all(), now.hour, now.dayOfWeek.value)
     }
 
     /** Today's mix for the selector covering this hour, built if it doesn't exist yet. */
@@ -208,6 +213,8 @@ class MixGenerator(private val graph: AppGraph) {
 
         val user = buildString {
             appendLine("Time slot: ${selector.name} (${selector.hoursLabel})")
+            // The day, so titles fit it (issue #348); a vibe set for certain days says so.
+            if (selector.days.isNotEmpty()) appendLine("This vibe is for: ${daysLabel(selector.days)}. Make the title fit the day.")
             appendLine("Guidance: ${selector.guidance}")
             if (selector.avoid.isNotEmpty()) appendLine("Forbidden words: ${selector.avoid.joinToString(", ")}")
             appendLine("Now: $day %02d:%02d".format(now.hour, now.minute))
