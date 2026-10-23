@@ -5,7 +5,9 @@ import app.musix.ui.LyricsSwitchRow
 import app.musix.ui.PathMoodPicker
 import app.musix.ui.Space
 import app.musix.ui.VibeSliders
-import app.musix.ui.DragOrderRow
+import app.musix.ui.ArrangeList
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.Icons
 import app.musix.mix.SoundDial
 import app.musix.mix.VibeTuning
 import androidx.compose.material3.Text
@@ -478,18 +480,25 @@ class SpacingTest {
         assertEven("Vibe sliders", familiar.top - tempo.bottom, sound.top - familiar.bottom, 1.dp)
     }
 
-    /** Style › Mini Player and Nav Bar (issue #346): the draggable buttons sit on evenly spaced slots. */
-    @Test fun styleDragSlotsAreEven() {
+    /** Style › Mini Player and Nav Bar (issue #372): the arrange rows sit evenly, one step apart. */
+    @Test fun styleArrangeRowsAreEven() {
         compose.setContent {
             MusixTheme {
-                DragOrderRow(listOf("a", "b", "c", "d"), slot = 48.dp, onReorder = { }) { item, _ ->
-                    androidx.compose.material3.Text(item)
-                }
+                ArrangeList(
+                    order = listOf("a", "b", "c", "d"),
+                    shown = setOf("a", "b", "c"),
+                    label = { it },
+                    icon = { Icons.Rounded.Palette },
+                    key = { it },
+                    canHide = { true },
+                    canShowMore = true,
+                    onChange = { _, _ -> },
+                )
             }
         }
-        val slots = compose.onAllNodesWithTag("dragSlot").fetchSemanticsNodes().map { it.boundsInRoot }
-        assertEquals(4, slots.size)
-        val gaps = slots.zipWithNext { a, b -> with(compose.density) { (b.left - a.left).toDp() } }
-        gaps.forEach { assertEven("Drag slots", gaps[0], it, 1.dp) }
+        val rows = compose.onAllNodesWithTag("arrangeRow").fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(4, rows.size)
+        val gaps = rows.zipWithNext { a, b -> with(compose.density) { (b.top - a.bottom).toDp() } }
+        gaps.forEach { assertEven("Arrange rows", gaps[0], it, 1.dp) }
     }
 }
