@@ -605,7 +605,7 @@ class SpacingTest {
         val details = compose.onNodeWithText("DJ-mix · 2024 · 7 songs").getBoundsInRoot()
         val button = compose.onNodeWithTag("continueFrom").getBoundsInRoot()
         // The button you see is 40 dp tall, centred in its taller touch area.
-        val seenTop = button.top + (button.height - 40.dp) / 2
+        val seenTop = button.top + ((button.bottom - button.top) - 40.dp) / 2
         assertEven("Continue under the details", details.top - artist.bottom, seenTop - details.bottom, 1.dp)
     }
 
