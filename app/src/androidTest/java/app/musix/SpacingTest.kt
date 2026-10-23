@@ -586,7 +586,7 @@ class SpacingTest {
     @Test fun lastPlayedLineKeepsTheRowEven() {
         compose.setContent {
             MusixTheme {
-                Box(Modifier.lastPlayedLine().testTag("row")) {
+                Box(Modifier.lastPlayedLine(androidx.compose.ui.graphics.Color.Red).testTag("row")) {
                     Text("Shadow Box", Modifier.padding(vertical = Space.Small))
                 }
             }
