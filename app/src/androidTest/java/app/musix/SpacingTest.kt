@@ -10,6 +10,9 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Storage
 import app.musix.ui.StateButton
 import app.musix.ui.DayChips
+import app.musix.ui.CollectionByline
+import app.musix.ui.ContinueButton
+import app.musix.ui.lastPlayedLine
 import app.musix.ui.FastScrollBar
 import app.musix.ui.VibeSliders
 import app.musix.ui.ArrangeList
@@ -563,6 +566,39 @@ class SpacingTest {
         val chips = (1..4).map { compose.onNodeWithTag("day-$it").getBoundsInRoot() }
         val gaps = chips.zipWithNext { a, b -> b.left - a.right }
         gaps.forEach { assertEven("Day chips", gaps[0], it, 1.dp) }
+    }
+
+    /** Album page (issue #367): Continue sits the same step under the details as the details under the artist. */
+    @Test fun continueButtonSitsAStepUnderTheDetails() {
+        compose.setContent {
+            MusixTheme {
+                Column {
+                    CollectionByline("Various Artists", null, null, "DJ-mix · 2024 · 7 songs")
+                    ContinueButton("5") { }
+                }
+            }
+        }
+        val artist = compose.onNodeWithText("Various Artists").getBoundsInRoot()
+        val details = compose.onNodeWithText("DJ-mix · 2024 · 7 songs").getBoundsInRoot()
+        val button = compose.onNodeWithTag("continueFrom").getBoundsInRoot()
+        // The button you see is 40 dp tall, centred in its taller touch area.
+        val seenTop = button.top + (button.height - 40.dp) / 2
+        assertEven("Continue under the details", details.top - artist.bottom, seenTop - details.bottom, 1.dp)
+    }
+
+    /** Album page (issue #367): the last-played line is drawn behind its row, so the title keeps its even room. */
+    @Test fun lastPlayedLineKeepsTheRowEven() {
+        compose.setContent {
+            MusixTheme {
+                Box(Modifier.lastPlayedLine(androidx.compose.ui.graphics.Color.Red).testTag("row")) {
+                    Text("Shadow Box", Modifier.padding(vertical = Space.Small))
+                }
+            }
+        }
+        compose.onNodeWithTag("row").assertExists()
+        val row = compose.onNodeWithTag("row").getBoundsInRoot()
+        val text = compose.onNodeWithText("Shadow Box").getBoundsInRoot()
+        assertEven("Room above and below the title", text.top - row.top, row.bottom - text.bottom, 1.dp)
     }
 
     /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */
