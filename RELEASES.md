@@ -3,6 +3,14 @@
 Every release of Musix and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.27.0beta](https://github.com/echovaultstudio/musix/releases/tag/v0.27.0beta) — 2026-10-23
+
+- [#395](https://github.com/echovaultstudio/musix/pull/395) Your Library: quick-scroll handle for long lists in any order (#374) (@Th3K1ngP1n)
+- [#396](https://github.com/echovaultstudio/musix/pull/396) Album pages: mark the last song heard and offer Continue from (#367) (@Th3K1ngP1n)
+- [#399](https://github.com/echovaultstudio/musix/pull/399) Favourite artists: heart on the artist page, synced with Navidrome (#397) (@Th3K1ngP1n)
+- [#400](https://github.com/echovaultstudio/musix/pull/400) Artist page: popular songs without the wait (#398) (@Th3K1ngP1n)
+- 2 commits pushed straight to main
+
 ## [0.26.0beta](https://github.com/echovaultstudio/musix/releases/tag/v0.26.0beta) — 2026-10-23
 
 - [#379](https://github.com/echovaultstudio/musix/pull/379) Settings: just each entry's name, no arrows or summaries (@Th3K1ngP1n)
