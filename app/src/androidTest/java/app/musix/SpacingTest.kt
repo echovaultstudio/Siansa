@@ -8,10 +8,9 @@ import app.musix.ui.HubRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Storage
+import app.musix.ui.StateButton
 import app.musix.ui.VibeSliders
 import app.musix.ui.ArrangeList
-import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.Icons
 import app.musix.mix.SoundDial
 import app.musix.mix.VibeTuning
 import androidx.compose.material3.Text
@@ -519,5 +518,18 @@ class SpacingTest {
         val rows = compose.onAllNodesWithTag("hubRow").fetchSemanticsNodes().map { it.boundsInRoot }
         assertEquals(2, rows.size)
         assertEven("Settings rows", with(compose.density) { rows[0].height.toDp() }, with(compose.density) { rows[1].height.toDp() }, 1.dp)
+    }
+
+    /** Now playing (issue #370): an active button's dot sits centred under its icon, a small step above the edge. */
+    @Test fun activeButtonDotIsCentred() {
+        compose.setContent {
+            MusixTheme {
+                StateButton(Icons.Rounded.Palette, "Repeat all", on = true, tag = "repeatButton") { }
+            }
+        }
+        val button = compose.onNodeWithTag("repeatButton").getBoundsInRoot()
+        val dot = compose.onNodeWithTag("repeatButton-on", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Dot left and right", dot.left - button.left, button.right - dot.right, 1.dp)
+        assertEven("Dot above the edge", button.bottom - dot.bottom, Space.Tight, 1.dp)
     }
 }
