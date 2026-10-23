@@ -112,7 +112,7 @@ class LibrarySync(
             fields = mapOf("full" to forceFull, "quiet" to quiet, "last_scan" to lastScan, "folders" to folderKey))
 
         if (!forceFull && synced && sameFolders && lastScan != null && lastScan != "scanning" &&
-            lastScan == library.meta(LibraryRepository.META_LAST_SCAN)
+            lastScan == library.meta(LibraryRepository.META_LAST_SCAN) && newestAlbumsKnown()
         ) {
             // Navidrome hasn't scanned since: the music is the same. Refresh what changes without a scan.
             refreshExtras()
@@ -146,6 +146,11 @@ class LibrarySync(
         val known = if (sameFolders) stored else emptyMap()
         val changed = albums.values.filter { known[it.id] != it.signature() }
         val removed = stored.keys - albums.keys
+        // Which albums are new, by name, so a log shows when an album arrived (issue #393).
+        val added = albums.values.filter { it.id !in stored }
+        if (added.isNotEmpty()) {
+            AppLog.i("Sync", "New albums: " + added.take(8).joinToString("; ") { "${it.artist} – ${it.name}" } + if (added.size > 8) " and ${added.size - 8} more" else "")
+        }
         val full = forceFull || !synced || !sameFolders || changed.size > maxOf(300, albums.size / 3)
         AppLog.i("Sync", "${albums.size} albums on server, ${changed.size} new or changed, ${removed.size} removed, full=$full", event = "sync.progress",
             fields = mapOf("albums_on_server" to albums.size, "changed" to changed.size, "removed" to removed.size, "full" to full))
@@ -212,6 +217,25 @@ class LibrarySync(
         }
     }
 
+    /**
+     * Whether the phone has Navidrome's newest albums (issue #393). Navidrome can add music without its last-scan
+     * time moving on (its folder watcher, or a scan that finished while Musix was looking), so before skipping a
+     * sync because "nothing was scanned", one quick look at the newest albums makes sure none is missing.
+     */
+    private suspend fun newestAlbumsKnown(): Boolean {
+        val newest = runCatching { api.albums("newest", NEWEST_CHECK, 0, null) }
+            .onFailure { AppLog.w("Sync", "Couldn't check the newest albums: ${it.message}") }
+            .getOrNull() ?: return true
+        val missing = missingAlbums(newest) { library.album(it) != null }
+        if (missing.isEmpty()) return true
+        AppLog.i(
+            "Sync",
+            "No new scan, but Navidrome has ${missing.size} newest album(s) the phone doesn't (" +
+                missing.take(3).joinToString("; ") { "${it.artist} – ${it.name}" } + "); syncing",
+        )
+        return false
+    }
+
     /** Hearts and playlists change without a Navidrome scan, so they're refreshed on every sync. */
     private suspend fun refreshExtras() {
         runCatching { api.starredSongs().map { it.id } }
@@ -224,8 +248,14 @@ class LibrarySync(
 
     private companion object {
         const val PAGE = 500
+        /** How many of Navidrome's newest albums the quick check looks at. */
+        const val NEWEST_CHECK = 20
     }
 }
 
 /** What the phone keeps after a sync: every library on the server, by id (issue #376). */
 internal fun syncScope(all: List<MusicFolder>): String = "all:" + all.map { it.id }.sorted().joinToString(",")
+
+/** Of [newest], the albums the phone doesn't have ([known] says which it does), in Navidrome's order (issue #393). */
+internal suspend fun missingAlbums(newest: List<Album>, known: suspend (String) -> Boolean): List<Album> =
+    newest.filterNot { known(it.id) }
