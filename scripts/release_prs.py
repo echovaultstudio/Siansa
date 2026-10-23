@@ -106,7 +106,7 @@ def render(grouped):
     lines = [
         "# Releases",
         "",
-        "Every release of Musix and the pull requests in it, newest first. CI updates this page after each",
+        "Every release of Siansa and the pull requests in it, newest first. CI updates this page after each",
         "release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.",
         "",
     ]
