@@ -191,7 +191,9 @@ fun HomeScreen(nav: NavController) {
     val today = LocalDate.now().toString()
     val personalIds = MixGenerator.Personal.entries.map { it.id }.toSet()
     // Only what fits now: the vibe for this hour and the personal mixes, not this morning's mix in the evening.
-    val applicable = selectors.orEmpty().filter { it.enabled && it.covers(hour) }
+    // Vibes for this hour and today, the most narrowly set first (issue #348).
+    val weekday = LocalDate.now().dayOfWeek.value
+    val applicable = selectors.orEmpty().filter { it.enabled && it.appliesAt(hour, weekday) }.sortedByDescending { it.specificity }
     val todaysMixes = mixes.orEmpty().filter { m ->
         m.date == today && (m.selectorId in personalIds || applicable.any { it.id == m.selectorId })
     }

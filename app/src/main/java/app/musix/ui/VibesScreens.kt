@@ -1,5 +1,15 @@
 package app.musix.ui
 
+import androidx.compose.ui.platform.testTag
+
+import androidx.compose.foundation.horizontalScroll
+
+import androidx.compose.material3.FilterChip
+
+import app.musix.data.daysLabel
+
+import app.musix.data.DAY_SHORT
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -209,6 +219,9 @@ fun SelectorEditor(nav: NavController, id: String) {
     var surprise by remember { mutableStateOf(30f) }
     var useAi by remember { mutableStateOf(true) }
     var enabled by remember { mutableStateOf(true) }
+    // Days and time of day, each optional and on its own (issue #348).
+    var days by remember { mutableStateOf(emptySet<Int>()) }
+    var anyTime by remember { mutableStateOf(false) }
     var problem by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(id) {
@@ -226,6 +239,8 @@ fun SelectorEditor(nav: NavController, id: String) {
             surprise = existing.surprise.toFloat()
             useAi = existing.useAi
             enabled = existing.enabled
+            days = existing.days.toSet()
+            anyTime = existing.anyTime || existing.startHour == existing.endHour
         } else {
             selectorId = "vibe-" + UUID.randomUUID().toString().take(8)
         }
@@ -233,12 +248,13 @@ fun SelectorEditor(nav: NavController, id: String) {
     }
 
     fun save() {
-        val startHour = start.trim().toIntOrNull()
-        val endHour = end.trim().toIntOrNull()
+        // With "any time", the hours aren't used, so they needn't be filled in.
+        val startHour = if (anyTime) start.trim().toIntOrNull() ?: 0 else start.trim().toIntOrNull()
+        val endHour = if (anyTime) end.trim().toIntOrNull() ?: 0 else end.trim().toIntOrNull()
         problem = when {
             name.isBlank() -> "Give the vibe a name"
-            startHour == null || startHour !in 0..23 -> "Start hour must be 0–23"
-            endHour == null || endHour !in 0..23 -> "End hour must be 0–23"
+            !anyTime && (startHour == null || startHour !in 0..23) -> "Start hour must be 0–23"
+            !anyTime && (endHour == null || endHour !in 0..23) -> "End hour must be 0–23"
             baseQuery.isBlank() && guidance.isBlank() -> "Add guidance or a sound search"
             else -> null
         }
@@ -257,6 +273,8 @@ fun SelectorEditor(nav: NavController, id: String) {
             surprise = surprise.roundToInt(),
             useAi = useAi,
             enabled = enabled,
+            days = days.sorted(),
+            anyTime = anyTime,
         )
         scope.launch {
             graph.selectors.save(selector)
@@ -290,7 +308,12 @@ fun SelectorEditor(nav: NavController, id: String) {
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+            // Days (issue #348): none picked means every day.
+            Text("Days", style = MaterialTheme.typography.bodyLarge)
+            DayChips(days) { day -> days = if (day in days) days - day else days + day }
+            Hint(if (days.isEmpty()) "Every day. Pick days to make this vibe only for them, e.g. a Friday afternoon vibe." else "Only on " + daysLabel(days) + ".")
+            SwitchRow("Any time of day", anyTime) { anyTime = it }
+            if (!anyTime) Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                 OutlinedTextField(
                     start, { start = it.filter(Char::isDigit).take(2) },
                     label = { Text("From hour") },
@@ -306,7 +329,8 @@ fun SelectorEditor(nav: NavController, id: String) {
                     modifier = Modifier.weight(1f),
                 )
             }
-            Hint("Hours are 0–23. A vibe from 22 to 5 runs past midnight.")
+            if (!anyTime) Hint("Hours are 0–23. A vibe from 22 to 5 runs past midnight.")
+            Hint("When several vibes fit, the most specific wins: one set for a day before an everyday one, one for some hours before an all-day one.")
             OutlinedTextField(
                 guidance, { guidance = it },
                 label = { Text("Guidance for the AI") },
@@ -349,6 +373,24 @@ fun SelectorEditor(nav: NavController, id: String) {
             SwitchRow("Enabled", enabled) { enabled = it }
             problem?.let { ErrorText(it, Modifier) }
             FilledTonalButton(onClick = { save() }, modifier = Modifier.fillMaxWidth()) { Text("Save") }
+        }
+    }
+}
+
+/** Monday to Sunday as chips; tap one to pick it or leave it out (issue #348). */
+@Composable
+internal fun DayChips(days: Set<Int>, onToggle: (Int) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("dayChips"),
+        horizontalArrangement = Arrangement.spacedBy(Space.Tight),
+    ) {
+        DAY_SHORT.forEachIndexed { i, label ->
+            FilterChip(
+                selected = (i + 1) in days,
+                onClick = { onToggle(i + 1) },
+                label = { Text(label) },
+                modifier = Modifier.testTag("day-${i + 1}"),
+            )
         }
     }
 }
