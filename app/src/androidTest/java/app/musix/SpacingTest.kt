@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.Modifier
@@ -531,5 +532,23 @@ class SpacingTest {
         val dot = compose.onNodeWithTag("repeatButton-on", useUnmergedTree = true).getBoundsInRoot()
         assertEven("Dot left and right", dot.left - button.left, button.right - dot.right, 1.dp)
         assertEven("Dot above the edge", button.bottom - dot.bottom, Space.Tight, 1.dp)
+    }
+
+    /** Home (issue #347): the dice and the filter button sit side by side, both centred on the greeting's line. */
+    @Test fun diceSitsBesideTheFilterOnTheGreetingLine() {
+        compose.setContent {
+            MusixTheme {
+                app.musix.ui.HomeHeader("Good evening") {
+                    Box(Modifier.size(48.dp).testTag("dice"))
+                    Box(Modifier.size(48.dp).testTag("filter"))
+                }
+            }
+        }
+        val title = compose.onNodeWithText("Good evening").getBoundsInRoot()
+        val dice = compose.onNodeWithTag("dice").getBoundsInRoot()
+        val filter = compose.onNodeWithTag("filter").getBoundsInRoot()
+        assertEven("Dice against the greeting", title.top - dice.top, dice.bottom - title.bottom, tolerance = 2.dp)
+        assertEven("Dice and filter on one line", dice.top, filter.top, 1.dp)
+        assertTrue("The dice is left of the filter", dice.right <= filter.left)
     }
 }
