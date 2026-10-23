@@ -7,8 +7,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,21 +74,41 @@ object Dlna {
         }
     }
 
-    /** Looks for TVs and speakers until [stopSearch], asking again every few seconds. */
+    /**
+     * Looks for TVs and speakers until [stopSearch], asking again every few seconds (issue #361: they show at
+     * once). Devices found before are asked directly first, which takes a fraction of a second, and each device
+     * that answers the search is listed as soon as its description is read, rather than after the whole search.
+     */
     fun startSearch(context: Context) {
         if (search?.isActive == true) return
-        val wifi = context.applicationContext.getSystemService(WifiManager::class.java)
+        val app = context.applicationContext
+        val wifi = app.getSystemService(WifiManager::class.java)
+        val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         search = scope.launch {
+            val started = System.currentTimeMillis()
+            var firstLogged = false
+            fun found(device: DlnaDevice, location: String, how: String) {
+                _devices.update { old -> (old.filterNot { it.id == device.id } + device).sortedBy { it.name.lowercase() } }
+                val known = prefs.getStringSet(KNOWN, emptySet()).orEmpty()
+                val kept = rememberLocation(known, location)
+                if (kept != known) prefs.edit().putStringSet(KNOWN, kept).apply()
+                if (!firstLogged) {
+                    firstLogged = true
+                    AppLog.i("DLNA", "First TV or speaker (${device.name}) after ${System.currentTimeMillis() - started} ms, $how")
+                }
+            }
             // Android drops multicast answers unless an app asks for them.
             val lock = runCatching { wifi?.createMulticastLock("musix-dlna")?.apply { setReferenceCounted(false); acquire() } }.getOrNull()
             try {
+                // The ones seen before: straight to their description, no waiting for the search.
+                prefs.getStringSet(KNOWN, emptySet()).orEmpty().forEach { location ->
+                    launch { describe(location)?.let { found(it, location, "known from before") } }
+                }
                 var round = 0
                 while (isActive) {
                     round++
-                    val found = runCatching { searchOnce() }
+                    runCatching { searchOnce { device, location -> found(device, location, "by search") } }
                         .onFailure { AppLog.w("DLNA", "Search failed: ${it.javaClass.simpleName}") }
-                        .getOrDefault(emptyList())
-                    _devices.update { old -> (old + found).distinctBy { it.id }.sortedBy { it.name.lowercase() } }
                     if (round == 1) AppLog.i("DLNA", "Found ${_devices.value.size} TVs and speakers")
                     delay(if (round < 3) 2_000 else 8_000)
                 }
@@ -105,18 +123,21 @@ object Dlna {
         search = null
     }
 
-    /** One SSDP search: every renderer that answers within a few seconds, with its description read. */
-    private suspend fun searchOnce(): List<DlnaDevice> {
-        val locations = LinkedHashSet<String>()
+    /**
+     * One SSDP search. Renderers are asked to answer within a second; each one is described and passed to
+     * [onFound] as soon as it answers, while the search keeps listening for slower ones.
+     */
+    private suspend fun searchOnce(onFound: (DlnaDevice, String) -> Unit) = coroutineScope {
+        val locations = HashSet<String>()
         withContext(Dispatchers.IO) {
             MulticastSocket(null).use { socket ->
                 socket.reuseAddress = true
-                socket.soTimeout = 500
+                socket.soTimeout = 250
                 socket.bind(null)
-                val request = Upnp.searchRequest().toByteArray()
+                val request = Upnp.searchRequest(SEARCH_WAIT_S).toByteArray()
                 val group = InetAddress.getByName(Upnp.SSDP_ADDRESS)
                 repeat(2) { socket.send(DatagramPacket(request, request.size, group, Upnp.SSDP_PORT)) }
-                val until = System.currentTimeMillis() + 3_000
+                val until = System.currentTimeMillis() + LISTEN_MS
                 val buffer = ByteArray(4096)
                 while (System.currentTimeMillis() < until) {
                     val packet = DatagramPacket(buffer, buffer.size)
@@ -126,12 +147,12 @@ object Dlna {
                         continue
                     }
                     val headers = Upnp.ssdpHeaders(String(packet.data, 0, packet.length))
-                    headers["location"]?.takeIf { it.startsWith("http") }?.let(locations::add)
+                    val location = headers["location"]?.takeIf { it.startsWith("http") } ?: continue
+                    if (locations.add(location)) {
+                        this@coroutineScope.launch { describe(location)?.let { onFound(it, location) } }
+                    }
                 }
             }
-        }
-        return coroutineScope {
-            locations.map { location -> async { describe(location) } }.awaitAll().filterNotNull()
         }
     }
 
@@ -142,6 +163,13 @@ object Dlna {
             }
         }.getOrNull()
     }
+
+    private const val PREFS = "dlna"
+    private const val KNOWN = "known_locations"
+    /** How long devices may wait before answering (SSDP's MX; 1 is the least it allows). */
+    private const val SEARCH_WAIT_S = 1
+    /** How long one search listens for answers. */
+    private const val LISTEN_MS = 2_500L
 
     /** Sends a SOAP [action] to a device and returns its answer; throws when the device refuses it. */
     internal suspend fun soap(url: String, service: String, action: String, vararg args: Pair<String, String>): String =
@@ -158,4 +186,11 @@ object Dlna {
                 text
             }
         }
+}
+
+/** The device addresses kept for next time: [location] added, at most [max], the newest kept (issue #361). */
+internal fun rememberLocation(known: Set<String>, location: String, max: Int = 12): Set<String> {
+    if (location in known) return known
+    val list = known.toList() + location
+    return list.takeLast(max).toSet()
 }
