@@ -50,6 +50,11 @@ data class AppSettings(
     val scrobbleNavidrome: Boolean = true,
     /** How much of a song must be heard, in percent, before it's scrobbled (issue #270). */
     val scrobblePercent: Int = 50,
+    /**
+     * Users on this phone whose songs aren't scrobbled (issue #356): playing music from their library, shown with
+     * yours, sends nothing to Navidrome, Last.fm or ListenBrainz, as Symfonium's "scrobble as advertisement" does.
+     */
+    val scrobbleOffUsers: Set<Int> = emptySet(),
     val lastFmEnabled: Boolean = false,
     val lastFmApiKey: String = "",
     val lastFmSecret: String = "",
@@ -210,6 +215,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         ),
         scrobbleNavidrome = prefs.getBoolean("scrobble_nd", true),
         scrobblePercent = prefs.getInt("scrobble_pct", 50),
+        scrobbleOffUsers = prefs.getString("scrobble_off_users", null).orEmpty().split(',').mapNotNull { it.trim().toIntOrNull() }.toSet(),
         lastFmEnabled = prefs.getBoolean("lfm_on", false),
         lastFmApiKey = prefs.getString("lfm_key", "") ?: "",
         lastFmSecret = secret("lfm_secret"),
@@ -298,6 +304,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putBoolean("situation_device", s.situation.device)
             .putBoolean("scrobble_nd", s.scrobbleNavidrome)
             .putInt("scrobble_pct", s.scrobblePercent)
+            .putString("scrobble_off_users", s.scrobbleOffUsers.sorted().joinToString(","))
             .putBoolean("lfm_on", s.lastFmEnabled)
             .putString("lfm_key", s.lastFmApiKey.trim())
             .putString("lfm_secret", SecretBox.encrypt(s.lastFmSecret.trim()))

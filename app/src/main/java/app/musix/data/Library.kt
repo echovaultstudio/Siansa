@@ -356,6 +356,9 @@ class LibraryRepository(context: Context) {
     /** Which items come from which other user, for sending their requests with that user's login. */
     suspend fun sources(): Map<String, Int> = dao.sources().associate { it.id to it.source }
 
+    /** Which user's library a song or album is from: another user's when it came with their music, else yours. */
+    suspend fun userOf(id: String): Int = dao.sourceOf(id) ?: Users.active
+
     /** Users whose music is in the library besides the user in use's. */
     suspend fun sourceUsers(): List<Int> = dao.sourceUsers()
 
