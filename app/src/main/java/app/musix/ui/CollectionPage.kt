@@ -182,7 +182,7 @@ fun CollectionPage(
                                 Modifier
                                     .fillMaxWidth()
                                     .background(if (now) Selected.copy(alpha = NOW_PLAYING_BAND) else Color.Transparent)
-                                    .then(if (last != null) Modifier.lastPlayedLine() else Modifier)
+                                    .then(if (last != null) Modifier.lastPlayedLine(Accent) else Modifier)
                                     .testTag(if (now) "collectionNowPlaying" else if (last != null) "collectionLastPlayed" else "collectionRow"),
                             ) {
                                 SongRow(
@@ -419,8 +419,8 @@ internal fun fillRoute(pattern: String?, value: (String) -> String?): String? {
 }
 
 /** The accent line down the left of the song heard last (issue #367). */
-fun Modifier.lastPlayedLine(): Modifier = drawBehind {
-    drawRect(Accent, size = Size(LAST_PLAYED_LINE.toPx(), size.height))
+fun Modifier.lastPlayedLine(color: Color): Modifier = drawBehind {
+    drawRect(color, size = Size(LAST_PLAYED_LINE.toPx(), size.height))
 }
 
 private val LAST_PLAYED_LINE = 3.dp
