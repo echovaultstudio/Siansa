@@ -74,26 +74,12 @@ import kotlin.math.roundToInt
  */
 @Composable
 fun StyleScreen(nav: NavController) {
-    val graph = LocalGraph.current
-    val settings by graph.settings.state.collectAsStateWithLifecycle()
     Screen(title = "Style", nav = nav) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
-            HubRow(Icons.Rounded.Palette, "Theme", themeSummary(settings)) { nav.navigate("settings/themes") }
-            HubRow(
-                Icons.Rounded.PhoneAndroid,
-                "Now Playing Style",
-                if (settings.nowPlayingLyricsButton) "With the lyrics button" else "Classic, lyrics card below",
-            ) { nav.navigate("settings/style/now-playing") }
-            HubRow(
-                Icons.Rounded.PlayCircle,
-                "Mini Player",
-                settings.miniButtons.joinToString(", ") { it.label }.ifEmpty { "No buttons" },
-            ) { nav.navigate("settings/style/mini-player") }
-            HubRow(
-                Icons.Rounded.Dashboard,
-                "Nav Bar",
-                settings.navTabs.joinToString(", ") { it.label },
-            ) { nav.navigate("settings/style/nav-bar") }
+            HubRow(Icons.Rounded.Palette, "Theme") { nav.navigate("settings/themes") }
+            HubRow(Icons.Rounded.PhoneAndroid, "Now Playing Style") { nav.navigate("settings/style/now-playing") }
+            HubRow(Icons.Rounded.PlayCircle, "Mini Player") { nav.navigate("settings/style/mini-player") }
+            HubRow(Icons.Rounded.Dashboard, "Nav Bar") { nav.navigate("settings/style/nav-bar") }
         }
     }
 }
