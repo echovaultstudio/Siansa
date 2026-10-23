@@ -1,5 +1,7 @@
 package app.musix.ui
 
+import app.musix.data.versionLabels
+
 import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.animation.animateContentSize
@@ -158,6 +160,10 @@ fun ArtistScreen(nav: NavController, id: String) {
         }
         val others by loadState("appears-$id") { graph.library.appearsOn(p.artist) }
         val groups = p.albums.groupBy { it.category }.toList().sortedBy { it.first.ordinal }
+        // An album in more than one library shows once for each, with the library's name (issue #376).
+        val folderNames by loadState("folder-names") { graph.library.folderNames() }
+        val versions = versionLabels(p.albums, folderNames.valueOrNull().orEmpty())
+        fun albumLine(album: Album) = listOfNotNull(album.year?.toString(), versions[album.id]).joinToString(" · ")
 
         // Release-type chips (Albums, Singles, DJ-mixes…): one type at a time, only while the page is open.
         var typeName by rememberReleaseTypeFilter()
@@ -250,13 +256,13 @@ fun ArtistScreen(nav: NavController, id: String) {
                     if (releasesGrid) {
                         AlbumTile(
                             name = album.name,
-                            subtitle = album.year?.toString() ?: "",
+                            subtitle = albumLine(album),
                             coverArt = album.coverArt,
                             onClick = { nav.navigate("album/${album.id}") },
                             modifier = Modifier.padding(horizontal = Space.Tight),
                         )
                     } else {
-                        MediaRow(album.name, album.year?.toString() ?: "", album.coverArt, onClick = { nav.navigate("album/${album.id}") })
+                        MediaRow(album.name, albumLine(album), album.coverArt, onClick = { nav.navigate("album/${album.id}") })
                     }
                 }
             }

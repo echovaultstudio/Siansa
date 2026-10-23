@@ -151,7 +151,8 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                     onSync = {
                         if (inUse) {
                             watching = true
-                            graph.sync.start()
+                            // A full sync: new music and changed tags are picked up (issue #376).
+                            graph.sync.start(full = true)
                         } else {
                             graph.guests.sync(user.id, force = true)
                         }
@@ -163,9 +164,8 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                         if (next.isNotEmpty() && !syncing) {
                             AppLog.i("Sources", "User ${user.id + 1}: ${next.size} of ${all.size} libraries")
                             if (inUse) {
-                                graph.settings.setSyncFolders(next)
-                                watching = true
-                                graph.sync.start(quiet = true)
+                                // Every library is on the phone: shown or hidden at once (issue #376).
+                                chooseLibraries(graph, next)
                             } else {
                                 graph.guests.setFolders(user.id, next)
                             }

@@ -1,5 +1,9 @@
 package app.musix.ui
 
+import androidx.compose.ui.platform.testTag
+
+import kotlinx.coroutines.launch
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,7 +68,7 @@ fun SyncScreen(nav: NavController) {
         ) {
             Text(
                 "Musix keeps a copy of your library on the phone, so browsing and search are instant and mixes build quickly. " +
-                    "It checks for changes each time the app starts and only fetches albums that are new or changed.",
+                    "It checks for changes each time the app starts. Sync now fetches everything again, so new music and changed tags show.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -86,7 +90,7 @@ fun SyncScreen(nav: NavController) {
                                     .fillMaxWidth()
                                     .clickable(enabled = !progress.running) {
                                         val next = if (checked) chosen - folder.id else chosen + folder.id
-                                        if (next.isNotEmpty()) graph.settings.setSyncFolders(next)
+                                        if (next.isNotEmpty()) chooseLibraries(graph, next)
                                     },
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -95,13 +99,13 @@ fun SyncScreen(nav: NavController) {
                                     enabled = !progress.running,
                                     onCheckedChange = { on ->
                                         val next = if (on) chosen + folder.id else chosen - folder.id
-                                        if (next.isNotEmpty()) graph.settings.setSyncFolders(next)
+                                        if (next.isNotEmpty()) chooseLibraries(graph, next)
                                     },
                                 )
                                 Text(folder.name, style = MaterialTheme.typography.bodyLarge)
                             }
                         }
-                        Hint("Albums that exist in more than one chosen library are shown once.")
+                        Hint("Every library is kept on the phone, so switching one on or off is instant. An album in more than one library shows once for each, with the library's name.")
                     }
                 }
             }
@@ -113,15 +117,12 @@ fun SyncScreen(nav: NavController) {
             if (progress.running) {
                 OutlinedButton(onClick = { graph.sync.cancel() }, modifier = Modifier.fillMaxWidth()) { Text("Stop") }
             } else {
-                Button(onClick = { graph.sync.start() }, modifier = Modifier.fillMaxWidth()) {
+                // Always a full sync (issue #376): new music and changed tags are picked up, whatever Navidrome
+                // says about its last scan. The check at app start stays a quick one.
+                Button(onClick = { graph.sync.start(full = true) }, modifier = Modifier.fillMaxWidth().testTag("syncNow")) {
                     Icon(Icons.Rounded.Sync, null)
                     Spacer(Modifier.width(Space.Small))
-                    Text(if (library == null) "Sync now" else "Check for changes")
-                }
-                if (library != null) {
-                    OutlinedButton(onClick = { graph.sync.start(full = true) }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Full sync (fetch everything again)")
-                    }
+                    Text("Sync now")
                 }
             }
 
@@ -226,4 +227,16 @@ private fun StepRow(icon: ImageVector, label: String, value: String, active: Boo
         }
     }
     Spacer(Modifier.height(0.dp))
+}
+
+/**
+ * Shows the libraries in [chosen] (issue #376): at once when every library is on the phone; otherwise (the first
+ * time after updating) a sync fetches the missing ones.
+ */
+internal fun chooseLibraries(graph: app.musix.AppGraph, chosen: Set<String>) {
+    graph.settings.setSyncFolders(chosen)
+    graph.scope.launch {
+        if (graph.library.keepsEveryLibrary()) graph.library.showFolders(chosen)
+        else graph.sync.start(quiet = true)
+    }
 }
