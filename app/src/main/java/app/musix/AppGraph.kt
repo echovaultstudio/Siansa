@@ -1,5 +1,6 @@
 package app.musix
 
+import app.musix.mix.Dice
 import app.musix.data.SavedVibes
 import app.musix.mix.MixResume
 import app.musix.data.RecentPlays
@@ -309,6 +310,8 @@ class AppGraph(val app: Application) {
     val situation = SituationReader(app, http)
     /** Similar songs, albums and artists (issue #223). */
     val similar = Similar(this)
+    /** Roll the dice on Home (issue #347). */
+    val dice = Dice(this)
     /** Your sonic fingerprint on Home (issue #216). */
     val fingerprint = SonicFingerprint(this)
     val songRadio = SongRadio(this)
