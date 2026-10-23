@@ -265,6 +265,10 @@ interface LibraryDao {
     suspend fun putPlaylists(playlists: List<PlaylistEntity>)
 
     // Other users' items
+    /** The other user an item came from, or null when it's the user in use's own (issue #356). */
+    @Query("SELECT source FROM sources WHERE id = :id LIMIT 1")
+    suspend fun sourceOf(id: String): Int?
+
     @Query("SELECT * FROM sources")
     suspend fun sources(): List<SourceEntity>
 

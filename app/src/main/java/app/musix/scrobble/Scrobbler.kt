@@ -4,6 +4,7 @@ import android.content.Context
 import app.musix.data.JsonFile
 import app.musix.data.SettingsRepository
 import app.musix.data.Song
+import app.musix.data.Users
 import app.musix.log.AppLog
 import app.musix.net.LastFmApi
 import app.musix.net.ListenBrainzApi
@@ -32,13 +33,16 @@ class Scrobbler(
     private val lastFm: LastFmApi,
     private val listenBrainz: ListenBrainzApi,
     private val scope: CoroutineScope,
+    /** Whose library a song is from: the user in use, or another user whose music shows with theirs (issue #356). */
+    private val sourceOf: suspend (songId: String) -> Int = { Users.active },
 ) {
-    private val pending = JsonFile(File(context.filesDir, app.musix.data.Users.scoped("pending_scrobbles.json")), ListSerializer(PendingListen.serializer())) { emptyList() }
+    private val pending = JsonFile(File(context.filesDir, Users.scoped("pending_scrobbles.json")), ListSerializer(PendingListen.serializer())) { emptyList() }
     private val flushLock = Mutex()
 
     fun nowPlaying(song: Song) {
         val s = settings.current
         scope.launch {
+            if (!scrobbles(song, s.scrobbleOffUsers)) return@launch
             if (s.scrobbleNavidrome) runCatching { subsonic.scrobble(song.id, submission = false) }
             if (s.lastFmReady) runCatching { lastFm.nowPlaying(lastFmKeys(), song) }
                 .onFailure { AppLog.w("Scrobble", "Last.fm now playing failed: ${it.message}") }
@@ -64,6 +68,10 @@ class Scrobbler(
         }
         if (targets.isEmpty()) return
         scope.launch {
+            if (!scrobbles(song, s.scrobbleOffUsers)) {
+                AppLog.i("Scrobble", "Not sent: ${song.title} is from user ${sourceOf(song.id) + 1}, whose songs aren't scrobbled")
+                return@launch
+            }
             pending.update { it + PendingListen(song, startedAtMs / 1000, targets) }
             flush()
         }
@@ -95,6 +103,10 @@ class Scrobbler(
         }.onFailure { AppLog.w("Scrobble", "$target failed for ${item.song.title}: ${it.message}") }.isSuccess
     }
 
+    /** Whether [song] may be scrobbled: not from a user whose songs are set not to be (issue #356). */
+    private suspend fun scrobbles(song: Song, off: Set<Int>): Boolean =
+        off.isEmpty() || scrobblesFrom(runCatching { sourceOf(song.id) }.getOrDefault(Users.active), off)
+
     private fun lastFmKeys(): LastFmApi.Keys {
         val s = settings.current
         return LastFmApi.Keys(s.lastFmApiKey, s.lastFmSecret, s.lastFmSession)
@@ -116,3 +128,6 @@ val SCROBBLE_PERCENTS = listOf(25, 40, 50, 60, 75, 90)
  */
 fun scrobbleNeededMs(durationMs: Long, percent: Int): Long =
     minOf(durationMs * percent.coerceIn(10, 100) / 100, 240_000L)
+
+/** Whether songs from [user]'s library are scrobbled, given the users set not to be (issue #356). */
+fun scrobblesFrom(user: Int, off: Set<Int>): Boolean = user !in off
