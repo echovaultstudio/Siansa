@@ -40,8 +40,9 @@ enum class NavTab(val route: String, val label: String) {
     HOME("home", "Home"),
     SEARCH("search", "Search"),
     LIBRARY("library", "Your Library"),
-    // Dscvr sits between Your Library and Settings by default (issue #339).
-    DSCVR("dscvr", "Dscvr"),
+    // Between Your Library and Settings by default (issue #339); called Flow since #369. The route stays
+    // "dscvr" so saved nav bar orders keep it.
+    DSCVR("dscvr", "Flow"),
     SETTINGS("settings", "Settings");
 
     companion object {

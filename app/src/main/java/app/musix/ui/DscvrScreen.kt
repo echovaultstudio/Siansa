@@ -25,6 +25,12 @@ import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -150,8 +156,9 @@ internal fun makeVibe(graph: app.musix.AppGraph, nav: NavController, notify: (St
 internal fun vibeMakingBusy(): Boolean = VibeMaking.busy.collectAsStateWithLifecycle().value
 
 /**
- * Dscvr (issue #339): describe your aura and get a vibe, or set the sliders and generate one; recent vibes
- * below, each one tap from playing again. Replaces Home's "How are you feeling?" box.
+ * Flow (issue #339, renamed in #369): describe what you want to hear and get a vibe; "Shape your sound" opens the
+ * optional sliders. Recent vibes below (the last five, plus pinned ones), each one tap from playing again, and
+ * each can be renamed or deleted.
  */
 @Composable
 fun DscvrScreen(nav: NavController) {
@@ -168,10 +175,20 @@ fun DscvrScreen(nav: NavController) {
         if (aiProblem == null && tuning == null) tuning = VibeTuning.start(emptyList(), graph.generator.soundConcepts())
     }
     val current = tuning ?: VibeTuning()
+    // The sliders are optional and folded away until opened (issue #369); only the ones moved are used.
+    var shaping by rememberSaveable { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf<SavedVibe?>(null) }
 
     fun make(words: String, with: VibeTuning) = makeVibe(graph, nav, launch::notify, words, with)
 
-    Screen(title = "Dscvr", nav = null) { padding ->
+    renaming?.let { vibe ->
+        RenameVibeDialog(vibe, onDismiss = { renaming = null }) { name ->
+            renaming = null
+            graph.scope.launch { graph.savedVibes.rename(vibe.id, name) }
+        }
+    }
+
+    Screen(title = "Flow", nav = null) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().aboveKeyboard(),
             contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = bottomBarPadding(Space.Section)),
@@ -187,27 +204,44 @@ fun DscvrScreen(nav: NavController) {
                 )
             }
             if (aiProblem == null) {
-                item(key = "custom") {
+                item(key = "shape") {
                     Column(Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Section)) {
-                        Text("Custom vibe", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(
-                            "Set the sliders, then generate. Anything typed above is used too.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(Space.Medium))
-                        VibeSliders(current, onChange = { tuning = it })
-                        Spacer(Modifier.height(Space.Medium))
-                        Button(
-                            onClick = { make(text, current) },
-                            enabled = !busy && (text.trim().length >= 3 || !current.isNeutral),
-                            colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = OnAccent),
-                            modifier = Modifier.fillMaxWidth().testTag("vibeGenerate"),
+                        Row(
+                            Modifier.fillMaxWidth().clickable { shaping = !shaping }.testTag("shapeToggle"),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            if (busy) CircularProgressIndicator(Modifier.size(18.dp), color = OnAccent, strokeWidth = 2.dp) // spacing: exact
-                            else Icon(DscvrStars, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(Space.Small))
-                            Text(if (busy) "Generating…" else "Generate")
+                            Column(Modifier.weight(1f)) {
+                                Text("Shape your sound", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                Text(
+                                    shapeHint(current),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Icon(
+                                if (shaping) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                                if (shaping) "Hide the sliders" else "Show the sliders",
+                            )
+                        }
+                        if (shaping) {
+                            Spacer(Modifier.height(Space.Medium))
+                            VibeSliders(current, onChange = { tuning = it })
+                            Spacer(Modifier.height(Space.Medium))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                TextButton(onClick = { tuning = current.cleared() }, enabled = !current.isNeutral) { Text("Reset") }
+                                Spacer(Modifier.width(Space.Small))
+                                Button(
+                                    onClick = { make(text, current) },
+                                    enabled = !busy && (text.trim().length >= 3 || !current.isNeutral),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = OnAccent),
+                                    modifier = Modifier.weight(1f).testTag("vibeGenerate"),
+                                ) {
+                                    if (busy) CircularProgressIndicator(Modifier.size(18.dp), color = OnAccent, strokeWidth = 2.dp) // spacing: exact
+                                    else Icon(DscvrStars, null, Modifier.size(18.dp))
+                                    Spacer(Modifier.width(Space.Small))
+                                    Text(if (busy) "Generating…" else "Generate")
+                                }
+                            }
                         }
                     }
                 }
@@ -220,6 +254,11 @@ fun DscvrScreen(nav: NavController) {
                         vibe,
                         onOpen = { nav.navigate("vibe/${vibe.id}") },
                         onPin = { graph.scope.launch { graph.savedVibes.setPinned(vibe.id, !vibe.pinned) } },
+                        onRename = { renaming = vibe },
+                        onDelete = {
+                            AppLog.i("Vibe", "Deleted \"${vibe.shownTitle}\"")
+                            graph.scope.launch { graph.savedVibes.remove(vibe.id) }
+                        },
                     )
                 }
             }
@@ -227,7 +266,7 @@ fun DscvrScreen(nav: NavController) {
     }
 }
 
-/** "Describe your Aura": the words for a vibe, made with the stars button or the keyboard's Go. */
+/** "Describe what you want to hear" (issue #369): the words for a vibe, made with the stars button or the keyboard's Go. */
 @Composable
 private fun AuraBox(
     text: String,
@@ -250,7 +289,7 @@ private fun AuraBox(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(DscvrStars, null, tint = Color.White, modifier = Modifier.size(22.dp))
             Spacer(Modifier.width(Space.Small))
-            Text("Describe your Aura", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("Describe what you want to hear", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
         }
         Spacer(Modifier.height(Space.Small))
         if (aiProblem != null) {
@@ -283,18 +322,22 @@ private fun AuraBox(
     }
 }
 
-/** A recent vibe: tap to open it, the pin to show it on Home (as an option, issue #339). */
+/**
+ * A recent vibe: tap to open it, the pin to show it on Home (as an option, issue #339), and ⋮ to rename or
+ * delete it (issue #369).
+ */
 @Composable
-private fun VibeRow(vibe: SavedVibe, onOpen: () -> Unit, onPin: () -> Unit) {
+private fun VibeRow(vibe: SavedVibe, onOpen: () -> Unit, onPin: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit) {
     val colors = tileColors(vibe.text.ifEmpty { vibe.title })
+    var menu by remember { mutableStateOf(false) }
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(start = Space.Page, end = Space.Tight, top = Space.Small, bottom = Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        GeneratedCover(vibe.title, colors, Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)))
+        GeneratedCover(vibe.shownTitle, colors, Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)))
         Spacer(Modifier.width(Space.Medium))
         Column(Modifier.weight(1f)) {
-            Text(vibe.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(vibe.shownTitle, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 listOfNotNull(vibe.text.takeIf { it.isNotEmpty() }?.let { "“$it”" }, "${vibe.songs.size} songs").joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
@@ -310,8 +353,40 @@ private fun VibeRow(vibe: SavedVibe, onOpen: () -> Unit, onPin: () -> Unit) {
                 tint = if (vibe.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        Box {
+            IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; onRename() })
+                DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; onDelete() })
+            }
+        }
     }
 }
+
+/** Gives a vibe a name of your own (issue #369); an empty name goes back to the one it was made with. */
+@Composable
+internal fun RenameVibeDialog(vibe: SavedVibe, onDismiss: () -> Unit, onRename: (String) -> Unit) {
+    var name by remember(vibe.id) { mutableStateOf(vibe.shownTitle) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename vibe") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it.take(60) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().testTag("renameVibe"),
+            )
+        },
+        confirmButton = { TextButton(onClick = { onRename(name) }) { Text("Rename") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** Under "Shape your sound": what it's for while nothing is set, otherwise what is (issue #369). */
+internal fun shapeHint(tuning: VibeTuning): String =
+    if (tuning.isNeutral) "Optional. Only the sliders you move are used."
+    else "Using: " + tuning.summary()
 
 /**
  * The tuning sliders (issue #339): energy, tempo, familiar ↔ niche and the sound dials, each with a tick at
@@ -387,6 +462,14 @@ fun VibeScreen(nav: NavController, id: String) {
     var saving by remember { mutableStateOf(false) }
     var savedAs by rememberSaveable { mutableStateOf<String?>(null) }
     val shown = tuning ?: vibe?.tuning ?: VibeTuning()
+    var menu by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf(false) }
+    if (renaming && vibe != null) {
+        RenameVibeDialog(vibe, onDismiss = { renaming = false }) { name ->
+            renaming = false
+            scope.launch { graph.savedVibes.rename(vibe.id, name) }
+        }
+    }
 
     fun retune(with: VibeTuning) {
         val v = vibe ?: return
@@ -411,11 +494,26 @@ fun VibeScreen(nav: NavController, id: String) {
     val colors = tileColors(vibe?.text?.ifEmpty { vibe.title } ?: id)
     CollectionPage(
         nav = nav,
-        title = vibe?.title ?: if (vibes == null) "Loading…" else "Vibe not found",
+        title = vibe?.shownTitle ?: if (vibes == null) "Loading…" else "Vibe not found",
         color = lerp(colors.first, Color.Black, 0.25f),
         songs = if (vibes == null) null else vibe?.songs.orEmpty(),
         error = if (vibes != null && vibe == null) "This vibe is no longer kept" else null,
-        cover = { m -> GeneratedCover(vibe?.title ?: "", colors, m) },
+        cover = { m -> GeneratedCover(vibe?.shownTitle ?: "", colors, m) },
+        // Rename or delete the vibe (issue #369).
+        actions = {
+            if (vibe != null) Box {
+                IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More", tint = Color.White) }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; renaming = true })
+                    DropdownMenuItem(text = { Text("Delete") }, onClick = {
+                        menu = false
+                        AppLog.i("Vibe", "Deleted \"${vibe.shownTitle}\"")
+                        scope.launch { graph.savedVibes.remove(vibe.id) }
+                        nav.popBackStack()
+                    })
+                }
+            }
+        },
         header = {
             if (vibe != null) {
                 Text(vibe.description, style = MaterialTheme.typography.bodyMedium)
@@ -435,11 +533,11 @@ fun VibeScreen(nav: NavController, id: String) {
                         onClick = {
                             saving = true
                             scope.launch {
-                                runCatching { graph.subsonic.createPlaylist(vibe.title, vibe.songs.map { it.id }) }
+                                runCatching { graph.subsonic.createPlaylist(vibe.shownTitle, vibe.songs.map { it.id }) }
                                     .onSuccess {
-                                        savedAs = vibe.title
-                                        AppLog.i("Vibe", "Saved \"${vibe.title}\" with ${vibe.songs.size} songs as a playlist")
-                                        snack.showSnackbar("Saved as playlist “${vibe.title}”")
+                                        savedAs = vibe.shownTitle
+                                        AppLog.i("Vibe", "Saved \"${vibe.shownTitle}\" with ${vibe.songs.size} songs as a playlist")
+                                        snack.showSnackbar("Saved as playlist “${vibe.shownTitle}”")
                                     }
                                     .onFailure { snack.showSnackbar("Couldn't save the playlist: ${it.message}") }
                                 saving = false
