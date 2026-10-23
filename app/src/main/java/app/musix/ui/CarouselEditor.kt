@@ -11,7 +11,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
@@ -64,7 +63,6 @@ fun CarouselPanel(nav: NavController) {
                         Text("${c.title} · %02d:00–%02d:00".format(c.startHour, c.endHour), style = MaterialTheme.typography.bodyLarge)
                         Hint(c.usable.joinToString(" · ") { it.name })
                     }
-                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
                 }
             }
         }

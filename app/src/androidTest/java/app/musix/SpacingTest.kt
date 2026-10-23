@@ -4,6 +4,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import app.musix.ui.LyricsSwitchRow
 import app.musix.ui.PathMoodPicker
 import app.musix.ui.Space
+import app.musix.ui.HubRow
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Storage
 import app.musix.ui.VibeSliders
 import app.musix.ui.DragOrderRow
 import app.musix.mix.SoundDial
@@ -491,5 +495,20 @@ class SpacingTest {
         assertEquals(4, slots.size)
         val gaps = slots.zipWithNext { a, b -> with(compose.density) { (b.left - a.left).toDp() } }
         gaps.forEach { assertEven("Drag slots", gaps[0], it, 1.dp) }
+    }
+
+    /** Settings (issue #375): every entry is just its name, so each row is the same height. */
+    @Test fun settingsRowsAreOneHeight() {
+        compose.setContent {
+            MusixTheme {
+                Column {
+                    HubRow(Icons.Rounded.Palette, "Style") { }
+                    HubRow(Icons.Rounded.Storage, "Storage") { }
+                }
+            }
+        }
+        val rows = compose.onAllNodesWithTag("hubRow").fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(2, rows.size)
+        assertEven("Settings rows", with(compose.density) { rows[0].height.toDp() }, with(compose.density) { rows[1].height.toDp() }, 1.dp)
     }
 }

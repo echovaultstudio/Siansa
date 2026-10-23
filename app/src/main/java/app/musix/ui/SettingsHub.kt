@@ -22,7 +22,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Dns
@@ -94,94 +93,26 @@ import java.text.DateFormat
 import java.util.Date
 import kotlin.math.roundToInt
 
-/** Settings start page: one entry per area, each opening its own page. */
+/** Settings start page: one entry per area, each opening its own page. Just the names (issue #375). */
 @Composable
 fun SettingsHub(nav: NavController) {
-    val graph = LocalGraph.current
-    val settings by graph.settings.state.collectAsStateWithLifecycle()
-    val libraryState by graph.library.status.collectAsStateWithLifecycle()
-    val progress by graph.sync.progress.collectAsStateWithLifecycle()
-    val library = libraryState
-    val vibes by graph.selectors.state.collectAsStateWithLifecycle()
-    val eq by graph.equaliser.state.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) { graph.selectors.all() }
     Screen(title = "Settings", nav = nav) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
-            val hubContext = LocalContext.current
-            val userCount = remember { Users.ids(hubContext).size }
             // Library sync lives under Users now (issue #273): each user's library is their own.
-            HubRow(
-                Icons.Rounded.People,
-                "Users and library sync",
-                (if (userCount > 1) "$userCount users on this phone" else "Add another Navidrome login") + " · " +
-                    syncSummary(progress, library).replaceFirstChar { it.lowercase() },
-            ) { nav.navigate("settings/users") }
-            HubRow(
-                Icons.Rounded.Dns,
-                "Connections",
-                listOfNotNull(
-                    "Navidrome".takeIf { settings.navidromeReady },
-                    "AudioMuse".takeIf { settings.audioMuseReady },
-                    "OpenRouter".takeIf { settings.openRouterKey.isNotBlank() },
-                ).joinToString(" · ").ifEmpty { "Not set up" },
-            ) { nav.navigate("settings/connections") }
-            HubRow(
-                Icons.Rounded.Equalizer,
-                "Playback",
-                eqSummary(eq) + " · " + crossfadeSummary(settings).replaceFirstChar { it.lowercase() } + " · Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}",
-            ) { nav.navigate("settings/playback") }
+            HubRow(Icons.Rounded.People, "Users and library sync") { nav.navigate("settings/users") }
+            HubRow(Icons.Rounded.Dns, "Connections") { nav.navigate("settings/connections") }
+            HubRow(Icons.Rounded.Equalizer, "Playback") { nav.navigate("settings/playback") }
             // Themes moved into Style, with the now playing, mini player and nav bar looks (issue #346).
-            HubRow(
-                Icons.Rounded.Palette,
-                "Style",
-                "Theme, now playing, mini player and nav bar",
-            ) { nav.navigate("settings/style") }
-            HubRow(
-                Icons.Rounded.GraphicEq,
-                "Scrobbling",
-                listOfNotNull(
-                    "Navidrome".takeIf { settings.scrobbleNavidrome },
-                    "Last.fm".takeIf { settings.lastFmReady },
-                    "ListenBrainz/Koito".takeIf { settings.listenBrainzReady },
-                ).joinToString(" · ").ifEmpty { "Off" },
-            ) { nav.navigate("settings/scrobbling") }
-            HubRow(
-                Icons.Rounded.Schedule,
-                // The daily mixes' times of day; Dscvr's own vibes are on the Dscvr tab (issue #339).
-                "Daily Vibe settings",
-                vibes?.let { "${it.size} ${if (it.size == 1) "vibe" else "vibes"} for your daily mixes" } ?: "Times of day for your daily mixes",
-            ) { nav.navigate("vibes") }
-            val cards by graph.cards.state.collectAsStateWithLifecycle()
-            LaunchedEffect(Unit) { graph.cards.all() }
-            HubRow(
-                Icons.Rounded.Dashboard,
-                "Made for you cards",
-                cards.orEmpty().let { if (it.isEmpty()) "Add your own cards to Home, like songs you haven't played in a while" else it.joinToString(" · ") { c -> c.title } },
-            ) { nav.navigate("settings/cards") }
-            val downloads by graph.downloads.list.collectAsStateWithLifecycle()
-            HubRow(
-                Icons.Rounded.DownloadForOffline,
-                "Downloads",
-                (if (downloads.items.isEmpty()) "Keep music on the phone for listening offline"
-                else "${downloads.done.size} songs on the phone" + if (downloads.waiting.isNotEmpty()) " · ${downloads.waiting.size} to go" else "") +
-                    if (settings.coverDownload) " · all covers downloaded" else "",
-            ) { nav.navigate("downloads") }
-            HubRow(Icons.Rounded.Storage, "Storage", "Songs up to ${formatMb(settings.songCacheMb)} · images ${imageLimit(settings.imageCacheMb)}") {
-                nav.navigate("settings/storage")
-            }
-            HubRow(Icons.Rounded.Backup, "Backup", "Save or restore your settings, vibes and history") {
-                nav.navigate("settings/backup")
-            }
-            HubRow(Icons.Rounded.BugReport, "Logs", if (settings.logging) "Logging on" else "Logging off") {
-                nav.navigate("settings/logs")
-            }
-            val context = LocalContext.current
-            val version = remember {
-                runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: ""
-            }
-            HubRow(Icons.Rounded.NewReleases, "What's new", "Musix $version · changes in each version") {
-                nav.navigate("settings/whatsnew")
-            }
+            HubRow(Icons.Rounded.Palette, "Style") { nav.navigate("settings/style") }
+            HubRow(Icons.Rounded.GraphicEq, "Scrobbling") { nav.navigate("settings/scrobbling") }
+            // The daily mixes' times of day; the tab's own vibes are on that tab (issue #339).
+            HubRow(Icons.Rounded.Schedule, "Daily Vibe settings") { nav.navigate("vibes") }
+            HubRow(Icons.Rounded.Dashboard, "Made for you cards") { nav.navigate("settings/cards") }
+            HubRow(Icons.Rounded.DownloadForOffline, "Downloads") { nav.navigate("downloads") }
+            HubRow(Icons.Rounded.Storage, "Storage") { nav.navigate("settings/storage") }
+            HubRow(Icons.Rounded.Backup, "Backup") { nav.navigate("settings/backup") }
+            HubRow(Icons.Rounded.BugReport, "Logs") { nav.navigate("settings/logs") }
+            HubRow(Icons.Rounded.NewReleases, "What's new") { nav.navigate("settings/whatsnew") }
         }
     }
 }
@@ -194,28 +125,15 @@ internal fun syncSummary(progress: app.musix.data.SyncProgress, library: app.mus
     else -> "Not synced yet"
 }
 
+/** A settings entry: its icon and name, the whole row opening its page (issue #375: no arrow, no summary). */
 @Composable
-internal fun HubRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+internal fun HubRow(icon: ImageVector, title: String, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Space.Page, vertical = Space.Page),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Space.Page, vertical = Space.Page).testTag("hubRow"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
-        Column(Modifier.weight(1f).padding(start = Space.Page)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
-    }
-}
-
-/** The theme in a line: "Musix colours · follows the phone", "Your colour #3A7BD5 · dark, pure black". */
-internal fun themeSummary(settings: AppSettings): String {
-    val theme = themeChoiceOf(settings)
-    return (if (theme.colours == ThemeColours.YOURS) "Your colour ${ThemeTones.toHex(theme.seed)} · " else "${theme.colours.label} colours · ") + when (theme.mode) {
-        ThemeMode.AUTO -> "follows the phone"
-        ThemeMode.LIGHT -> "light"
-        ThemeMode.DARK -> if (theme.pureBlack) "dark, pure black" else "dark"
+        Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(start = Space.Page))
     }
 }
 
@@ -230,10 +148,6 @@ internal fun crossfadeSummary(s: AppSettings): String {
         "levelling ${s.replayGain.label.lowercase()} by " + if (s.loudnessSource == LoudnessSource.PLUGIN) "the Musix plugin" else "ReplayGain tags"
     return "$fade · $levelling"
 }
-
-private fun eqSummary(eq: EqSettings): String = if (eq.enabled) "equaliser ${eq.preset.label.lowercase()}" else "equaliser off"
-
-private fun imageLimit(mb: Int): String = if (mb <= 0) "without a limit" else "up to ${formatMb(mb)}"
 
 private fun formatMb(mb: Int): String = if (mb >= 1024) "${"%.0f".format(mb / 1024.0)} GB" else "$mb MB"
 private fun formatBytes(bytes: Long): String = when {
@@ -260,7 +174,6 @@ fun PlaybackSettingsScreen(nav: NavController) {
                     Heading("Equaliser")
                     Hint(if (eq.enabled) "On · ${eq.preset.label}" else "Off")
                 }
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
             }
             HorizontalDivider()
             Row(
@@ -271,7 +184,6 @@ fun PlaybackSettingsScreen(nav: NavController) {
                     Heading("Crossfade and levelling")
                     Hint(crossfadeSummary(settings))
                 }
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
             }
             HorizontalDivider()
             Heading("Streaming quality")
@@ -370,7 +282,6 @@ internal fun PreloadRow(label: String, value: Int, tag: String, onPick: (Int) ->
 
 private val qualities = listOf(0, 96, 128, 160, 192, 256, 320)
 
-private fun qualityLabel(kbps: Int) = if (kbps <= 0) "original" else "Opus $kbps"
 
 @Composable
 private fun QualityRow(label: String, value: Int, onPick: (Int) -> Unit) {
