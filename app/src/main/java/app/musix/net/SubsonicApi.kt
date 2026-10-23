@@ -346,6 +346,20 @@ class SubsonicApi(
             ),
         ).obj("searchResult3")?.arr("song").orEmpty().map(::parseSong)
 
+    /**
+     * Random songs with Navidrome's play count for each (for Roll the dice, issue #347): how often this user
+     * played it, 0 for never.
+     */
+    suspend fun randomSongPlays(size: Int): List<Pair<Song, Long>> {
+        val folders = folderPasses()
+        val each = (size + folders.size - 1) / folders.size
+        return folders.flatMap { folder ->
+            call("getRandomSongs", mapOf("size" to "$each", "musicFolderId" to folder))
+                .obj("randomSongs")?.arr("song").orEmpty()
+                .map { parseSong(it) to (it.long("playCount") ?: 0L) }
+        }.distinctBy { it.first.id }
+    }
+
     /** Random songs, optionally of a genre or between two years (Navidrome's getRandomSongs), from the chosen libraries. */
     suspend fun randomSongs(size: Int, genre: String? = null, fromYear: Int? = null, toYear: Int? = null): List<Song> {
         val folders = folderPasses()

@@ -1,10 +1,10 @@
 package app.musix.ui
 
 import app.musix.data.normalizeKey
-
 import app.musix.mix.mixArtistRadios
-
 import app.musix.mix.ArtistRadioPicks
+import androidx.compose.ui.platform.testTag
+import androidx.compose.material.icons.rounded.Casino
 
 import app.musix.mix.resumeStart
 import app.musix.data.RecentPlay
@@ -228,7 +228,11 @@ fun HomeScreen(nav: NavController) {
     ) {
         item {
             // One button for the source filter and arranging Home (issue #152): both are tabs of one panel.
-            HomeHeader(greeting(), Modifier.statusBarsPadding()) { SourceFilterButton { arranging = true } }
+            HomeHeader(greeting(), Modifier.statusBarsPadding()) {
+                // Left of the source filter and Arrange (issue #347).
+                DiceButton()
+                SourceFilterButton { arranging = true }
+            }
         }
         item(key = "sources") { SourceChips { arranging = true } }
 
@@ -652,6 +656,46 @@ fun MixRow(mix: Mix, onClick: () -> Unit) {
 }
 
 /** Home's top line: the greeting, and the one button for the source filter and arranging Home. */
+/** Roll the dice (issue #347): plays a song from your library you've never played, straight away. */
+@Composable
+private fun DiceButton() {
+    val graph = LocalGraph.current
+    val launch = rememberPlayLauncher()
+    val scope = rememberCoroutineScope()
+    var rolling by remember { mutableStateOf(false) }
+    IconButton(
+        enabled = !rolling,
+        onClick = {
+            if (graph.connection.current.offline) {
+                launch.notify("You're offline: rolling the dice needs the server")
+                return@IconButton
+            }
+            rolling = true
+            scope.launch {
+                try {
+                    val song = graph.dice.roll()
+                    if (song == null) launch.notify("No songs you haven't played turned up")
+                    else {
+                        graph.player.play(listOf(song))
+                        launch.notify("Rolled: ${song.title}" + if (song.artist.isNotBlank()) " – ${song.artist}" else "")
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    AppLog.w("Dice", "Couldn't roll: ${e.message}")
+                    launch.notify("Couldn't roll the dice: ${e.message}")
+                } finally {
+                    rolling = false
+                }
+            }
+        },
+        modifier = Modifier.testTag("dice"),
+    ) {
+        if (rolling) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) // spacing: exact
+        else Icon(Icons.Rounded.Casino, "Roll the dice: play a song you've never played")
+    }
+}
+
 @Composable
 internal fun HomeHeader(title: String, modifier: Modifier = Modifier, action: @Composable () -> Unit) {
     Row(
