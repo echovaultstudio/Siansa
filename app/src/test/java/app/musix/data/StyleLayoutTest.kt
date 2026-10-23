@@ -55,4 +55,18 @@ class StyleLayoutTest {
         assertEquals(4, dragTarget(2, 900f, 100f, 5))
         assertEquals(1, dragTarget(1, 50f, 0f, 5))
     }
+
+    @Test fun arrangeListShowsTheBarFirstThenTheHiddenOnes() {
+        val shown = listOf(MiniButton.NEXT, MiniButton.PLAY)
+        assertEquals(
+            listOf(MiniButton.NEXT, MiniButton.PLAY, MiniButton.CAST, MiniButton.LYRICS, MiniButton.ADD, MiniButton.LIKE),
+            arrangeOrder(shown, MiniButton.entries),
+        )
+    }
+
+    @Test fun arrangeListSavesOnlyTheShownInTheirNewOrder() {
+        // Like dragged above Play and shown: it goes on the bar in that place.
+        val order = listOf(MiniButton.NEXT, MiniButton.LIKE, MiniButton.PLAY, MiniButton.CAST)
+        assertEquals(listOf(MiniButton.NEXT, MiniButton.LIKE, MiniButton.PLAY), shownInOrder(order, setOf(MiniButton.PLAY, MiniButton.NEXT, MiniButton.LIKE)))
+    }
 }

@@ -83,3 +83,12 @@ enum class NavTab(val route: String, val label: String) {
         }
     }
 }
+
+/**
+ * The order an arrange list shows (issue #372): the [shown] items in their order on the bar, then the rest of
+ * [all] (hidden) in their usual order, so a hidden item can be shown again and dragged into place.
+ */
+fun <T> arrangeOrder(shown: List<T>, all: List<T>): List<T> = shown.distinct() + all.filter { it !in shown }
+
+/** What an arrange list saves: the items in [order] that are [shown], in that order. */
+fun <T> shownInOrder(order: List<T>, shown: Set<T>): List<T> = order.filter { it in shown }
