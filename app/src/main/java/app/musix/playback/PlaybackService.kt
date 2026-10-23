@@ -213,7 +213,13 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun kbpsFor(songId: String): Int = chosenKbps.getOrPut(songId) {
-        // Only what's chosen in Settings → Playback: Musix never switches quality on its own.
+        // A file type the phone can't open is converted from the start (issue #354).
+        SongRegistry.get(songId)?.suffix?.takeIf { Formats.mustConvert(it) }?.let { suffix ->
+            val kbps = Streaming.bitrate(this, graph.settings.current).takeIf { it > 0 } ?: FALLBACK_KBPS
+            AppLog.i("Stream", "Song $songId: Opus $kbps kbit/s, as the phone can't open .$suffix files")
+            return@getOrPut kbps
+        }
+        // Otherwise only what's chosen in Settings → Playback: Musix never switches quality on its own.
         Streaming.bitrate(this, graph.settings.current).also {
             AppLog.i("Stream", "Song $songId: " + if (it > 0) "Opus $it kbit/s" else "original")
         }
@@ -653,6 +659,19 @@ class PlaybackService : MediaSessionService() {
             AppLog.e("Player", "Playback error ${error.errorCodeName} on ${current?.id ?: "?"}", error, event = "playback.error", fields = mapOf(
                 "song_id" to current?.id, "code" to error.errorCodeName, "category" to errorCategory(error.errorCode),
             ))
+            // A file the phone can't open or decode at all (a WMA, say) plays converted to Opus by Navidrome
+            // instead of stopping (issue #354). Tracks the phone can open but not decode are handled in
+            // onTracksChanged; this covers the ones that never get that far.
+            if (!onPhone || !Formats.convertible(error.errorCode)) return
+            val item = player.currentMediaItem ?: return
+            if (chosenKbps[item.mediaId] == FALLBACK_KBPS) return
+            if (graph.connection.current.offline) return
+            AppLog.w("Audio", "The phone can't play ${item.mediaId} (${error.errorCodeName}); playing it as Opus $FALLBACK_KBPS kbit/s from Navidrome",
+                event = "playback.recovery", fields = mapOf("song_id" to item.mediaId, "action" to "transcode_opus", "reason" to error.errorCodeName))
+            chosenKbps[item.mediaId] = FALLBACK_KBPS
+            val uri = item.localConfiguration?.uri ?: return
+            player.replaceMediaItem(player.currentMediaItemIndex, item.buildUpon().setUri(Streaming.rewrite(uri, FALLBACK_KBPS)).build())
+            player.prepare()
         }
 
         /**

@@ -491,6 +491,7 @@ class SubsonicApi(
                 val artistId = a.str("id") ?: return@mapNotNull null
                 ArtistRef(artistId, a.str("name").orEmpty())
             },
+            suffix = o.str("suffix")?.lowercase()?.takeIf { it.isNotBlank() },
         )
     }
 

@@ -37,6 +37,8 @@ data class Song(
     val starred: Boolean = false,
     // Every artist on the song (Navidrome's OpenSubsonic "artists"), e.g. both sides of a "feat.".
     val artists: List<ArtistRef> = emptyList(),
+    /** The file's type as Navidrome names it ("flac", "wma"…), when it sent one; not kept in the library. */
+    val suffix: String? = null,
 )
 
 /** The song's cover, or its album's when Navidrome didn't send one with the song. */
