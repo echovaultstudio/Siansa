@@ -10,6 +10,8 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Storage
 import app.musix.ui.StateButton
 import app.musix.ui.DayChips
+import app.musix.ui.HeroPage
+import androidx.compose.ui.test.onNodeWithContentDescription
 import app.musix.ui.CollectionByline
 import app.musix.ui.ContinueButton
 import app.musix.ui.lastPlayedLine
@@ -566,6 +568,27 @@ class SpacingTest {
         val chips = (1..4).map { compose.onNodeWithTag("day-$it").getBoundsInRoot() }
         val gaps = chips.zipWithNext { a, b -> b.left - a.right }
         gaps.forEach { assertEven("Day chips", gaps[0], it, 1.dp) }
+    }
+
+    /** Artist page (issue #397): the heart sits on the title bar's line, level with the back arrow. */
+    @Test fun artistHeartSitsLevelWithTheBackArrow() {
+        compose.setContent {
+            MusixTheme {
+                HeroPage(
+                    title = "Burial",
+                    heroHeight = 200.dp,
+                    scrolledPx = 0f,
+                    onBack = { },
+                    color = androidx.compose.ui.graphics.Color.DarkGray,
+                    image = { m -> Box(m) },
+                    actions = { Box(Modifier.size(48.dp).testTag("heart")) },
+                ) { }
+            }
+        }
+        val back = compose.onNodeWithContentDescription("Back").getBoundsInRoot()
+        val heart = compose.onNodeWithTag("heart").getBoundsInRoot()
+        assertEven("Heart and back arrow on one line", back.top, heart.top, 1.dp)
+        assertEven("Heart and back arrow the same size", back.bottom - back.top, heart.bottom - heart.top, 1.dp)
     }
 
     /** Album page (issue #367): Continue sits the same step under the details as the details under the artist. */
