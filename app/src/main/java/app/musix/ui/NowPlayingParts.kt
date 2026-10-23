@@ -1,6 +1,7 @@
 package app.musix.ui
 
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.ui.graphics.drawscope.clipPath
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -490,7 +491,7 @@ fun LyricsScreen(song: Song?, tint: Color, onClose: () -> Unit, menu: () -> Unit
                     itemsIndexed(loaded.lines) { index, line ->
                         // Word-timed lyrics: the line playing now fills in word by word (or syllable by syllable).
                         if (index == current && line.words.isNotEmpty()) {
-                            KaraokeLine(line, colors, Modifier.fillMaxWidth().clickable { line.startMs?.let { graph.player.seekTo(it) } }.padding(vertical = Space.Small))
+                            KaraokeLine(line, loaded.lines.getOrNull(index + 1)?.startMs, colors, Modifier.fillMaxWidth().clickable { line.startMs?.let { graph.player.seekTo(it) } }.padding(vertical = Space.Small))
                             return@itemsIndexed
                         }
                         Text(
@@ -550,25 +551,88 @@ fun RoundIcon(icon: ImageVector, label: String, modifier: Modifier = Modifier, o
 fun sungWords(line: app.musix.data.LyricLine, positionMs: Long): Int = line.words.count { it.startMs <= positionMs }
 
 /**
- * The line playing now, for lyrics timed word by word: sung words white, the rest of the line in the colour
- * of the lines to come. It
- * reads the player's position every few frames, so the words keep up with the singing.
+ * How far through a word-timed line the singing is at [positionMs], in letters (issue #362): the words already
+ * sung in full, plus the part of the word being sung that its time so far covers, so the fill glides through the
+ * word instead of jumping a word at a time. A word lasts until the next one starts; the last one until [lineEndMs]
+ * (the next line), at most [LAST_WORD_MS].
+ */
+fun sungLetters(line: app.musix.data.LyricLine, positionMs: Long, lineEndMs: Long?): Float {
+    var letters = 0f
+    line.words.forEachIndexed { i, word ->
+        if (positionMs < word.startMs) return letters
+        val end = line.words.getOrNull(i + 1)?.startMs
+            ?: (lineEndMs?.coerceAtMost(word.startMs + LAST_WORD_MS) ?: (word.startMs + LAST_WORD_MS))
+        val span = (end - word.startMs).coerceAtLeast(1)
+        val part = ((positionMs - word.startMs).toFloat() / span).coerceIn(0f, 1f)
+        letters += word.text.length * part
+        if (part < 1f) return letters
+    }
+    return letters
+}
+
+/** How long the last word of a line takes to fill when nothing says when it ends. */
+const val LAST_WORD_MS = 900L
+
+/**
+ * The line playing now, for lyrics timed word by word (issue #362): the whole line in the colour of the lines to
+ * come, with a white copy on top revealed letter by letter as the words are sung. The position is read from the
+ * player a few times a second and carried on smoothly in between, frame by frame, so the fill glides rather than
+ * stepping; only the drawing updates, not the layout.
  */
 @Composable
-private fun KaraokeLine(line: app.musix.data.LyricLine, colors: LyricsColors, modifier: Modifier) {
+private fun KaraokeLine(line: app.musix.data.LyricLine, lineEndMs: Long?, colors: LyricsColors, modifier: Modifier) {
     val graph = LocalGraph.current
-    var position by remember { mutableStateOf(graph.player.positionMs()) }
+    val sung = remember(line) { androidx.compose.runtime.mutableFloatStateOf(0f) }
     LaunchedEffect(line) {
+        var base = graph.player.positionMs()
+        var baseAt = 0L
         while (true) {
-            position = graph.player.positionMs()
-            kotlinx.coroutines.delay(40)
+            androidx.compose.runtime.withFrameMillis { frame ->
+                if (baseAt == 0L || frame - baseAt >= RESAMPLE_MS) {
+                    base = graph.player.positionMs()
+                    baseAt = frame
+                }
+                val playing = graph.player.state.value.isPlaying
+                val position = if (playing) base + (frame - baseAt) else base
+                sung.floatValue = sungLetters(line, position, lineEndMs)
+            }
         }
     }
-    val sung = sungWords(line, position)
-    val text = androidx.compose.ui.text.buildAnnotatedString {
-        line.words.forEachIndexed { i, word ->
-            withStyle(androidx.compose.ui.text.SpanStyle(color = if (i < sung) colors.current else colors.upcoming)) { append(word.text) }
+    val text = line.words.joinToString("") { it.text }
+    var layout by remember(line) { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+    val style = MaterialTheme.typography.headlineSmall
+    Box(modifier) {
+        Text(text, style = style, fontWeight = FontWeight.ExtraBold, color = colors.upcoming, onTextLayout = { layout = it })
+        Text(
+            text,
+            style = style,
+            fontWeight = FontWeight.ExtraBold,
+            color = colors.current,
+            modifier = Modifier.drawWithContent {
+                val l = layout ?: return@drawWithContent
+                val path = sungPath(l, sung.floatValue)
+                clipPath(path) { this@drawWithContent.drawContent() }
+            },
+        )
+    }
+}
+
+/** How often the karaoke line asks the player where it is; in between it counts on by itself. */
+private const val RESAMPLE_MS = 250L
+
+/** The area of [layout] covering the first [letters] letters, the last one in part, line by line as it wraps. */
+private fun sungPath(layout: androidx.compose.ui.text.TextLayoutResult, letters: Float): androidx.compose.ui.graphics.Path {
+    val path = androidx.compose.ui.graphics.Path()
+    val count = layout.layoutInput.text.length
+    if (letters <= 0f || count == 0) return path
+    val whole = letters.toInt().coerceAtMost(count)
+    for (i in 0 until whole) path.addRect(layout.getBoundingBox(i))
+    if (whole < count) {
+        val part = letters - whole
+        if (part > 0f) {
+            val box = layout.getBoundingBox(whole)
+            path.addRect(androidx.compose.ui.geometry.Rect(box.left, box.top, box.left + box.width * part, box.bottom))
         }
     }
-    Text(text, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, modifier = modifier)
+    return path
 }
