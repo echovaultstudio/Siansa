@@ -3,6 +3,26 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.27.0beta — 2026-10-23
+
+### Fixed
+- **Popular songs on an artist's page no longer keep you waiting.** The first time you open an artist, their
+  songs you've played most show straight away, and Navidrome's popular songs fade in when they arrive. While a
+  song plays, Musix also fetches its artist's popular songs in the background, so their page is usually ready
+  before you open it.
+
+### Added
+- **Pick up an album where you stopped.** If you were listening to an album, such as a mix CD, and stopped
+  part way, its page now marks the song you heard last ("Last played · yesterday") and offers **Continue
+  from 5**. It only shows when you played the album itself and didn't finish it, and it goes after a week.
+- **Scroll quickly through long lists in Your Library, whatever the order.** Sorted by name, the A to Z bar
+  stays as it was. In the other orders (Recents, Recently added, Most played) a handle on the right lets you
+  drag through the whole list, and a label next to your finger shows where you are, such as "Mar 2025" or
+  "120 plays".
+- **Favourite artists.** Tap the heart at the top of an artist's page to make them a favourite. It's saved in
+  Navidrome, so other apps see it too, and artists you've starred elsewhere show up in Musix. You'll find them
+  all under Your Library › Favourites › Favourite artists, with round pictures, as a grid or a list.
+
 ## 0.26.0beta — 2026-10-23
 
 ### Fixed
