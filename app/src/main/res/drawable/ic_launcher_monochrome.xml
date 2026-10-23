@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Themed (monochrome) launcher icon: the same bars as ic_launcher_foreground.xml in one flat colour,
-     which Android tints to match the wallpaper. -->
+<!-- Themed (monochrome) launcher icon: the orb's outline and the sine wave in one flat colour, which Android
+     tints to match the wallpaper. Same placement as the coloured foreground: inside the 66dp circle every
+     launcher shows (LauncherIconTest checks this, keep the paths' format). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:fillColor="#FFFFFFFF" android:pathData="M31,59a3,3 0 0,1 6,0v8a3,3 0 0,1 -6,0z" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M41,47a3,3 0 0,1 6,0v20a3,3 0 0,1 -6,0z" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M51,37a3,3 0 0,1 6,0v30a3,3 0 0,1 -6,0z" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M61,45a3,3 0 0,1 6,0v22a3,3 0 0,1 -6,0z" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M71,55a3,3 0 0,1 6,0v12a3,3 0 0,1 -6,0z" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.65" android:pathData="M37.37,54a16.63,16.63 0 1,0 33.26,0a16.63,16.63 0 1,0 -33.26,0" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="3.02" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M23.00,54.00 L24.24,51.93 L25.48,49.99 L26.72,48.31 L27.96,46.98 L29.20,46.09 L30.44,45.70 L31.68,45.83 L32.92,46.47 L34.16,47.59 L35.40,49.11 L36.64,50.94 L37.88,52.96 L39.12,55.04 L40.36,57.06 L41.60,58.89 L42.84,60.41 L44.08,61.53 L45.32,62.17 L46.56,62.30 L47.80,61.91 L49.04,61.02 L50.28,59.69 L51.52,58.01 L52.76,56.07 L54.00,54.00 L55.24,51.93 L56.48,49.99 L57.72,48.31 L58.96,46.98 L60.20,46.09 L61.44,45.70 L62.68,45.83 L63.92,46.47 L65.16,47.59 L66.40,49.11 L67.64,50.94 L68.88,52.96 L70.12,55.04 L71.36,57.06 L72.60,58.89 L73.84,60.41 L75.08,61.53 L76.32,62.17 L77.56,62.30 L78.80,61.91 L80.04,61.02 L81.28,59.69 L82.52,58.01 L83.76,56.07 L85.00,54.00 L85.00,54.00" />
 </vector>
