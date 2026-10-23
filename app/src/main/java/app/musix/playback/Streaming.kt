@@ -112,3 +112,27 @@ object Streaming {
         return builder.build()
     }
 }
+
+/**
+ * File types the phone can't open (issue #354): Media3 has no way into their container, whatever decoders the app
+ * has, so Navidrome converts them to Opus. WMA (ASF), AIFF, Monkey's Audio, WavPack, Musepack, TTA, DSD and others.
+ */
+object Formats {
+    val needsConverting: Set<String> = setOf(
+        "wma", "asf", "aif", "aiff", "aifc", "ape", "wv", "mpc", "mp+", "mpp", "tta", "tak", "dsf", "dff", "ra", "rm", "au", "snd", "shn", "ofr",
+    )
+
+    /** Whether a song of this file type has to be converted to play on the phone. */
+    fun mustConvert(suffix: String?): Boolean = suffix?.trim()?.lowercase()?.removePrefix(".") in needsConverting
+
+    /**
+     * Whether a playback error means the phone can't read the song itself (rather than the network failing), so
+     * playing it converted by Navidrome should work.
+     */
+    fun convertible(errorCode: Int): Boolean = errorCode in setOf(
+        androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+        androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+        androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
+        androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+    )
+}
