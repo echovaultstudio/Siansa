@@ -321,6 +321,7 @@ fun MusixRoot() {
                 composable("discover/artists") { ArtistDiscoveryScreen(nav) }
                 composable("timemachine") { TimeMachineScreen(nav) }
                 composable("favourite-albums") { FavouriteAlbumsScreen(nav) }
+                composable("favourite-artists") { FavouriteArtistsScreen(nav) }
                 composable("fingerprint") { FingerprintScreen(nav) }
                 composable("song/{id}/details") { SongDetailsScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }

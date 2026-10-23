@@ -5,6 +5,7 @@ import app.musix.data.SavedVibes
 import app.musix.mix.MixResume
 import app.musix.data.RecentPlays
 import app.musix.data.FavouriteAlbums
+import app.musix.data.FavouriteArtists
 import app.musix.mix.MadeForYouCards
 import app.musix.playback.ProfileStore
 import app.musix.covers.CoverStore
@@ -235,6 +236,8 @@ class AppGraph(val app: Application) {
     val favorites = Favorites(subsonic, lastFm, settings, library, scope)
     /** Favourite albums, starred in Navidrome (issue #275). */
     val favouriteAlbums = FavouriteAlbums(app, subsonic, scope)
+    /** Favourite artists, starred in Navidrome (issue #397). */
+    val favouriteArtists = FavouriteArtists(app, subsonic, scope)
 
     /**
      * Songs kept on the phone as they play (and the next one in the queue), so replays start at once

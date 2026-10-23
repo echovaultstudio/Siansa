@@ -175,11 +175,12 @@ fun YourLibraryScreen(nav: NavController) {
     val pinned = remember(pinVersion) { pins(context).getStringSet("keys", emptySet()).orEmpty() }
 
     val favouriteIds by graph.favouriteAlbums.ids.collectAsStateWithLifecycle()
+    val favouriteArtistIds by graph.favouriteArtists.ids.collectAsStateWithLifecycle()
     // From the phone straight away, then again once Navidrome has answered (issue #161).
     // Built again when the connection comes back, for what only Navidrome has.
     val connection by graph.connection.state.collectAsStateWithLifecycle()
     val online = !connection.offline
-    val data by produceState<Load<LibraryData>>(Load.Loading, version, mixes?.size, settings.navidromeUser, favouriteIds, online) {
+    val data by produceState<Load<LibraryData>>(Load.Loading, version, mixes?.size, settings.navidromeUser, favouriteIds, favouriteArtistIds, online) {
         val me = settings.navidromeUser
         value = loadLibrary(graph, me)
         if (refreshFromServer(graph, me)) value = loadLibrary(graph, me)
@@ -739,8 +740,10 @@ private suspend fun refreshFromServer(graph: app.musix.AppGraph, me: String): Bo
         val recent = async { runCatching { graph.subsonic.albums("recent", 100, 0) }.getOrNull() }
         val playlists = async { runCatching { graph.library.refreshPlaylists { graph.subsonic.playlists() } } }
         val favourites = async { graph.favouriteAlbums.refresh() }
+        val favouriteArtists = async { graph.favouriteArtists.refresh() }
         playlists.await()
         favourites.await()
+        favouriteArtists.await()
         recent.await()?.also { lastRecent = me to it } != null
     }
     AppLog.d("Library", "Navidrome part of the library ${if (recentOk) "fetched" else "not reachable"} in ${System.currentTimeMillis() - started} ms")
@@ -752,6 +755,8 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
     val now = LocalDate.now()
     // Favourite albums as Navidrome last sent them (refreshed in refreshFromServer), or the phone's copy (issue #275).
     val favouriteAlbums = graph.favouriteAlbums.albums
+    // And favourite artists the same way (issue #397).
+    val favouriteArtists = graph.favouriteArtists.artists
 
     // What you've played: Musix's own history, and Navidrome's recently played albums (other apps too).
     val history = graph.history.all()
@@ -942,6 +947,23 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
         gradient = Color(0xFFB8336A) to Color(0xFFFFB547),
         heart = true,
         recentAt = System.currentTimeMillis() - 4,
+        favourite = true,
+    )
+    // One card for all favourite artists (issue #397), next to the albums one.
+    entries += Entry(
+        key = "favourite-artists",
+        kind = null,
+        title = "Favourite artists",
+        subtitle = "Artists · " + when (favouriteArtists.size) {
+            0 -> "tap the heart on an artist to add them"
+            1 -> "1 artist"
+            else -> "${favouriteArtists.size} artists"
+        },
+        route = "favourite-artists",
+        gradient = Color(0xFF2B5FD6) to Color(0xFF7FE0D0),
+        heart = true,
+        round = true,
+        recentAt = System.currentTimeMillis() - 5,
         favourite = true,
     )
 
