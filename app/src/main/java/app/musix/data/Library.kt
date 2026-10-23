@@ -34,6 +34,21 @@ fun normalizeKey(value: String): String =
 
 data class Genre(val name: String, val songCount: Int)
 
+/** Copies of an album are merged in lists when they share this: name, album artist and library (issue #376). */
+fun albumGroupKey(name: String, artist: String, folderId: String?): String =
+    normalizeKey(name) + "|" + normalizeKey(artist) + (folderId?.let { "|$it" } ?: "")
+
+/**
+ * Labels for albums that are in more than one library (issue #376): each copy gets its library's name, so a FLAC
+ * and a Dolby Atmos copy can be told apart on the artist page. Albums in one library get none.
+ */
+fun versionLabels(albums: List<Album>, folderNames: Map<String, String>): Map<String, String> =
+    albums.groupBy { normalizeKey(it.name) + "|" + normalizeKey(it.artist) }.values
+        .filter { copies -> copies.mapNotNull { it.folderId }.distinct().size > 1 }
+        .flatten()
+        .mapNotNull { album -> album.folderId?.let { folderNames[it] }?.let { album.id to it } }
+        .toMap()
+
 /** What the phone holds after a sync; null in [LibraryRepository.status] means never synced. */
 data class LibraryStatus(val syncedAt: Long, val artists: Int, val albums: Int, val songs: Int)
 
@@ -408,14 +423,47 @@ class LibraryRepository(context: Context) {
         return added
     }
 
-    /** Picks one album per name + album artist (the copy with most songs) to stand for the group in lists. */
+    /**
+     * Picks one album per name + album artist + library (the copy with most songs) to stand for the group in
+     * lists, among the albums whose library is shown (issue #376). Copies in different libraries stay apart.
+     */
     suspend fun recomputePrimaries(): Int = db.withTransaction {
-        val rows = dao.albumGroups()
+        val rows = dao.albumGroups().filter { it.visible }
         val primaries = rows.groupBy { it.groupKey }.values.map { group -> group.maxBy { it.songCount }.id }
         dao.clearPrimary()
         primaries.chunked(CHUNK).forEach { dao.markPrimary(it) }
         rows.size - primaries.size
     }
+
+    /**
+     * Shows the albums, songs and artists of the libraries in [chosen] (all when empty or every one) and hides the
+     * rest, at once: every library is on the phone (issue #376). Returns how many copies were merged.
+     */
+    suspend fun showFolders(chosen: Set<String>): Int {
+        val all = folderNames().keys
+        val every = chosen.isEmpty() || all.isEmpty() || all.all { it in chosen }
+        db.withTransaction {
+            if (every) dao.showAllFolders() else dao.showFolders(chosen.toList())
+        }
+        val merged = recomputePrimaries()
+        putMeta(META_FOLDERS, if (every) "*" else chosen.sorted().joinToString(","))
+        combined = null
+        refreshStatus()
+        bump()
+        AppLog.i("Library", if (every) "Showing every library" else "Showing ${chosen.size} of ${all.size} libraries")
+        return merged
+    }
+
+    /** Whether every Navidrome library is on the phone, so switching one on needs no sync (issue #376). */
+    suspend fun keepsEveryLibrary(): Boolean = meta(META_SCOPE) != null
+
+    /** The server's libraries by id, as of the last sync (issue #376). */
+    suspend fun folderNames(): Map<String, String> = meta(META_FOLDER_NAMES).orEmpty().lineSequence()
+        .mapNotNull { line -> line.split('\t', limit = 2).takeIf { it.size == 2 }?.let { it[0] to it[1] } }
+        .toMap()
+
+    suspend fun putFolderNames(folders: List<MusicFolder>) =
+        putMeta(META_FOLDER_NAMES, folders.joinToString("\n") { "${it.id}\t${it.name.replace('\n', ' ').replace('\t', ' ')}" })
 
     suspend fun setStarredIds(ids: Collection<String>) = db.withTransaction {
         dao.clearStarred()
@@ -442,7 +490,7 @@ class LibraryRepository(context: Context) {
     private fun AlbumEntity.toAlbum() = Album(
         id = id, name = name, artist = artist, artistId = artistId, coverArt = coverArt, songCount = songCount,
         durationSec = durationSec, year = year, genre = genre, created = created, playCount = playCount,
-        releaseTypes = splitTypes(releaseTypes), isCompilation = isCompilation,
+        releaseTypes = splitTypes(releaseTypes), isCompilation = isCompilation, folderId = folderId,
     )
 
     private fun Album.toEntity() = AlbumEntity(
@@ -450,8 +498,10 @@ class LibraryRepository(context: Context) {
         durationSec = durationSec, year = year, genre = genre, created = created, playCount = playCount,
         releaseTypes = releaseTypes.joinToString(TYPE_SEPARATOR), isCompilation = isCompilation,
         sortKey = normalizeKey(name), artistKey = normalizeKey(artist),
-        groupKey = normalizeKey(name) + "|" + normalizeKey(artist),
+        // The same album in two libraries (a FLAC and a Dolby Atmos copy) stays two albums (issue #376).
+        groupKey = albumGroupKey(name, artist, folderId),
         signature = signature(),
+        folderId = folderId,
     )
 
     private fun ArtistEntity.toArtist() = Artist(id, name, albumCount, coverArt, imageUrl, mbid)
@@ -461,6 +511,9 @@ class LibraryRepository(context: Context) {
         const val META_SYNCED_AT = "syncedAt"
         const val META_LAST_SCAN = "lastScan"
         const val META_FOLDERS = "folders"
+        /** Which libraries the phone keeps: every one, as "all:<ids>" (issue #376). */
+        const val META_SCOPE = "scope"
+        const val META_FOLDER_NAMES = "folderNames"
         private const val GUEST_POSITION = 1_000_000
 
         /** What decides whether an album's songs need fetching again. Play counts are left out on purpose. */

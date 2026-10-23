@@ -13,6 +13,12 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 /** A song as stored on the phone. [searchKey] is the normalised "title artist album" used by search. */
+/** Songs whose library is shown (issue #376): no album, or an album in a chosen library. */
+const val VISIBLE_SONG = " AND (albumId IS NULL OR albumId IN (SELECT id FROM albums WHERE visible = 1))"
+
+/** Artists with something in a shown library, or another user's (issue #376). */
+const val VISIBLE_ARTIST = "(id IN (SELECT artistId FROM albums WHERE visible = 1 AND artistId IS NOT NULL) OR id IN (SELECT artistId FROM songs WHERE artistId IS NOT NULL AND (albumId IS NULL OR albumId IN (SELECT id FROM albums WHERE visible = 1))) OR id IN (SELECT id FROM sources))"
+
 @Entity(
     tableName = "songs",
     indices = [Index("albumId"), Index("artistId"), Index("genre"), Index("starred")],
@@ -65,6 +71,10 @@ data class AlbumEntity(
     val groupKey: String,
     val signature: String,
     val isPrimary: Boolean = true,
+    /** Which Navidrome library it's in, when the server has several (issue #376). */
+    val folderId: String? = null,
+    /** Whether its library is chosen to show; every library is kept, so switching one is instant (issue #376). */
+    @androidx.room.ColumnInfo(defaultValue = "1") val visible: Boolean = true,
 )
 
 @Entity(tableName = "artists", indices = [Index("sortKey")])
@@ -103,7 +113,7 @@ data class SourceEntity(@PrimaryKey val id: String, val source: Int)
 data class MetaEntity(@PrimaryKey val key: String, val value: String)
 
 data class AlbumSignature(val id: String, val signature: String)
-data class AlbumGroupRow(val id: String, val groupKey: String, val songCount: Int)
+data class AlbumGroupRow(val id: String, val groupKey: String, val songCount: Int, val visible: Boolean = true)
 data class AlbumTypeRow(val releaseTypes: String, val isCompilation: Boolean)
 data class GenreRow(val name: String, val songCount: Int)
 /** Just what matching songs by title and artist needs (issue #186's time machine). */
@@ -115,10 +125,10 @@ interface LibraryDao {
     @Query("SELECT * FROM songs WHERE id = :id")
     suspend fun song(id: String): SongEntity?
 
-    @Query("SELECT * FROM songs WHERE id IN (:ids)")
+    @Query("SELECT * FROM songs WHERE id IN (:ids)" + VISIBLE_SONG)
     suspend fun songs(ids: List<String>): List<SongEntity>
 
-    @Query("SELECT id, title, artist FROM songs")
+    @Query("SELECT id, title, artist FROM songs WHERE 1 = 1" + VISIBLE_SONG)
     suspend fun songTitles(): List<SongTitleRow>
 
     /** The album cover id for a song's cover id (a song without its own picture shows its album's). */
@@ -132,20 +142,20 @@ interface LibraryDao {
     @Query("SELECT * FROM songs WHERE albumId IN (:albumIds)")
     suspend fun songsOfAlbums(albumIds: List<String>): List<SongEntity>
 
-    @Query("SELECT * FROM songs WHERE artistId = :artistId OR (artistId IS NULL AND artist = :name COLLATE NOCASE)")
+    @Query("SELECT * FROM songs WHERE (artistId = :artistId OR (artistId IS NULL AND artist = :name COLLATE NOCASE))" + VISIBLE_SONG)
     suspend fun songsOfArtist(artistId: String, name: String): List<SongEntity>
 
     /** Songs whose artist is [artistId] or whose artist text contains [namePattern] (a LIKE pattern, escaped with '\\'). */
-    @Query("SELECT * FROM songs WHERE artistId = :artistId OR artist LIKE :namePattern ESCAPE '\\'")
+    @Query("SELECT * FROM songs WHERE (artistId = :artistId OR artist LIKE :namePattern ESCAPE '\\')" + VISIBLE_SONG)
     suspend fun songsCrediting(artistId: String, namePattern: String): List<SongEntity>
 
-    @Query("SELECT * FROM songs WHERE genre = :genre COLLATE NOCASE ORDER BY RANDOM() LIMIT :limit")
+    @Query("SELECT * FROM songs WHERE genre = :genre COLLATE NOCASE" + VISIBLE_SONG + " ORDER BY RANDOM() LIMIT :limit")
     suspend fun songsOfGenre(genre: String, limit: Int): List<SongEntity>
 
-    @Query("SELECT * FROM songs WHERE searchKey LIKE '%' || :term || '%' LIMIT :limit")
+    @Query("SELECT * FROM songs WHERE searchKey LIKE '%' || :term || '%'" + VISIBLE_SONG + " LIMIT :limit")
     suspend fun searchSongs(term: String, limit: Int): List<SongEntity>
 
-    @Query("SELECT * FROM songs WHERE starred = 1")
+    @Query("SELECT * FROM songs WHERE starred = 1" + VISIBLE_SONG)
     suspend fun starredSongs(): List<SongEntity>
 
     @Query("UPDATE songs SET starred = :starred WHERE id = :id")
@@ -158,7 +168,7 @@ interface LibraryDao {
     suspend fun markStarred(ids: List<String>)
 
     @Query(
-        "SELECT genre AS name, COUNT(*) AS songCount FROM songs WHERE genre IS NOT NULL AND genre != '' " +
+        "SELECT genre AS name, COUNT(*) AS songCount FROM songs WHERE genre IS NOT NULL AND genre != ''" + VISIBLE_SONG + " " +
             "GROUP BY genre COLLATE NOCASE ORDER BY songCount DESC LIMIT :limit"
     )
     suspend fun genres(limit: Int): List<GenreRow>
@@ -173,7 +183,7 @@ interface LibraryDao {
     @Query("DELETE FROM songs WHERE id NOT IN (SELECT id FROM sources)")
     suspend fun deleteAllSongs()
 
-    @Query("SELECT COUNT(*) FROM songs")
+    @Query("SELECT COUNT(*) FROM songs WHERE 1 = 1" + VISIBLE_SONG)
     suspend fun songCount(): Int
 
     // Albums
@@ -214,8 +224,16 @@ interface LibraryDao {
     @Query("SELECT id, signature FROM albums WHERE id NOT IN (SELECT id FROM sources)")
     suspend fun albumSignatures(): List<AlbumSignature>
 
-    @Query("SELECT id, groupKey, songCount FROM albums")
+    @Query("SELECT id, groupKey, songCount, visible FROM albums")
     suspend fun albumGroups(): List<AlbumGroupRow>
+
+    /** Every library shows (issue #376). */
+    @Query("UPDATE albums SET visible = 1")
+    suspend fun showAllFolders()
+
+    /** Only albums in [folderIds] show, and albums without a library (another user's music). */
+    @Query("UPDATE albums SET visible = CASE WHEN folderId IS NULL OR folderId IN (:folderIds) THEN 1 ELSE 0 END")
+    suspend fun showFolders(folderIds: List<String>)
 
     @Query("UPDATE albums SET isPrimary = 0")
     suspend fun clearPrimary()
@@ -233,7 +251,7 @@ interface LibraryDao {
     suspend fun albumCount(): Int
 
     // Artists
-    @Query("SELECT * FROM artists ORDER BY sortKey")
+    @Query("SELECT * FROM artists WHERE " + VISIBLE_ARTIST + " ORDER BY sortKey")
     suspend fun artists(): List<ArtistEntity>
 
     @Query("SELECT * FROM artists WHERE id = :id")
@@ -242,7 +260,7 @@ interface LibraryDao {
     @Query("SELECT * FROM artists WHERE sortKey = :key LIMIT 1")
     suspend fun artistByKey(key: String): ArtistEntity?
 
-    @Query("SELECT * FROM artists WHERE sortKey LIKE '%' || :term || '%' ORDER BY sortKey LIMIT :limit")
+    @Query("SELECT * FROM artists WHERE sortKey LIKE '%' || :term || '%' AND " + VISIBLE_ARTIST + " ORDER BY sortKey LIMIT :limit")
     suspend fun searchArtists(term: String, limit: Int): List<ArtistEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -251,7 +269,7 @@ interface LibraryDao {
     @Query("DELETE FROM artists WHERE id NOT IN (SELECT id FROM sources)")
     suspend fun deleteAllArtists()
 
-    @Query("SELECT COUNT(*) FROM artists")
+    @Query("SELECT COUNT(*) FROM artists WHERE " + VISIBLE_ARTIST)
     suspend fun artistCount(): Int
 
     // Playlists
@@ -322,7 +340,7 @@ interface LibraryDao {
 
 @Database(
     entities = [SongEntity::class, AlbumEntity::class, ArtistEntity::class, PlaylistEntity::class, MetaEntity::class, SourceEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class LibraryDatabase : RoomDatabase() {
@@ -344,9 +362,20 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Version 4 keeps every Navidrome library and which one each album is in, showing only the chosen ones
+         * (issue #376); the next sync fetches the libraries not on the phone yet.
+         */
+        val ADD_ALBUM_FOLDERS = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `albums` ADD COLUMN `folderId` TEXT")
+                db.execSQL("ALTER TABLE `albums` ADD COLUMN `visible` INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         fun open(context: Context): LibraryDatabase =
             Room.databaseBuilder(context, LibraryDatabase::class.java, app.musix.data.Users.scoped(app.musix.data.UserFiles.DATABASE))
-                .addMigrations(ADD_SOURCES, ADD_ARTIST_MBID)
+                .addMigrations(ADD_SOURCES, ADD_ARTIST_MBID, ADD_ALBUM_FOLDERS)
                 // The library can always be synced again, so any other schema change simply starts fresh.
                 .fallbackToDestructiveMigration()
                 .build()
