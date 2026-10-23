@@ -196,7 +196,7 @@ private fun PinnedVibesCarousel(nav: NavController, pinned: List<SavedVibe>) {
 private fun PinnedVibeCard(nav: NavController, vibe: SavedVibe) {
     val graph = LocalGraph.current
     CarouselCard(
-        name = vibe.title,
+        name = vibe.shownTitle,
         caption = "${vibe.songs.size} tracks · " + vibe.description,
         colors = tileColors(vibe.text.ifEmpty { vibe.title }),
         coverArt = vibe.songs.firstOrNull()?.coverArt,

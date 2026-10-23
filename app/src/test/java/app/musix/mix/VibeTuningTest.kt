@@ -3,6 +3,7 @@ package app.musix.mix
 import app.musix.data.SavedVibe
 import app.musix.data.pinnedVibes
 import app.musix.data.withVibe
+import app.musix.data.keptVibes
 import app.musix.net.ClapHit
 import app.musix.net.Steer
 import app.musix.net.TrackFeatures
@@ -105,5 +106,25 @@ class VibeTuningTest {
         val song = app.musix.data.Song("s", "Song")
         val list = listOf(vibe("a", "x", pinned = true).copy(songs = listOf(song)), vibe("b", "y", pinned = true), vibe("c", "z").copy(songs = listOf(song)))
         assertEquals(listOf("a"), pinnedVibes(list).map { it.id })
+    }
+
+    @Test fun onlyTheLastFiveAreKeptPlusPinned() {
+        assertEquals(5, app.musix.data.SavedVibes.KEEP)
+        val list = (1..7).map { vibe("v$it", "w$it") } + vibe("p", "pinned", pinned = true)
+        assertEquals(listOf("v1", "v2", "v3", "v4", "v5", "p"), keptVibes(list).map { it.id })
+    }
+
+    @Test fun aNameOfYourOwnShowsAndSurvivesMakingItAgain() {
+        val named = vibe("a", "rainy sunday").copy(name = "Sunday rain")
+        assertEquals("Sunday rain", named.shownTitle)
+        assertEquals("T", named.copy(name = null).shownTitle)
+        val again = withVibe(listOf(named), vibe("new", "Rainy Sunday").copy(title = "New AI title"))
+        assertEquals("Sunday rain", again.first().shownTitle)
+    }
+
+    @Test fun resetPutsEverySliderBackButKeepsTheSounds() {
+        val t = VibeTuning(energy = 2, tempo = -1, familiar = 1, sounds = listOf(SoundDial("piano", 4)))
+        assertEquals(VibeTuning(sounds = listOf(SoundDial("piano", 0))), t.cleared())
+        assertTrue(t.cleared().isNeutral)
     }
 }
