@@ -1,5 +1,11 @@
 package app.musix.ui
 
+import androidx.compose.ui.platform.LocalContext
+
+import app.musix.scrobble.scrobblesFrom
+
+import app.musix.data.Users
+
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.FilterChip
@@ -86,6 +92,23 @@ fun ScrobblingScreen(nav: NavController) {
             Hint("A song is sent once more than ${settings.scrobblePercent}% of it has played, or four minutes, whichever comes first. Songs under 30 seconds never count. Listens made offline are sent later.")
 
             HorizontalDivider()
+
+            // Per user (issue #356): songs from a user switched off here aren't scrobbled anywhere.
+            val context = LocalContext.current
+            val users = remember { Users.all(context) }
+            if (users.size > 1) {
+                Heading("Users")
+                users.forEach { user ->
+                    val on = scrobblesFrom(user.id, settings.scrobbleOffUsers)
+                    SwitchRow(user.label + if (user.id == Users.active) " (you)" else "", on) { scrobble ->
+                        val off = graph.settings.current.scrobbleOffUsers.let { if (scrobble) it - user.id else it + user.id }
+                        AppLog.i("Scrobble", "Songs from user ${user.id + 1}: " + if (scrobble) "scrobbled" else "not scrobbled")
+                        graph.settings.save(graph.settings.current.copy(scrobbleOffUsers = off))
+                    }
+                }
+                Hint("Turn a user off and songs from their library aren't sent to Navidrome, Last.fm or ListenBrainz, while you listen as you.")
+                HorizontalDivider()
+            }
 
             Heading("Navidrome")
             SwitchRow("Record plays in Navidrome", settings.scrobbleNavidrome) {
