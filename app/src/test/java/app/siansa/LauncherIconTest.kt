@@ -4,7 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
-import javax.imageio.ImageIO
+import java.io.ByteArrayOutputStream
+import java.util.zip.Inflater
 
 /**
  * The launcher icon (issue #360): the orb and sine wave as a picture for every screen density, a black
@@ -19,11 +20,11 @@ class LauncherIconTest {
         for ((density, px) in sizes) {
             val file = File(res, "mipmap-$density/ic_launcher_foreground.png")
             assertTrue("$file is missing", file.exists())
-            val image = ImageIO.read(file)
-            assertEquals("$density width", px, image.width)
-            assertEquals("$density height", px, image.height)
+            val png = Png(file.readBytes())
+            assertEquals("$density width", px, png.width)
+            assertEquals("$density height", px, png.height)
             // The corners are see-through, so the black background shows round the orb.
-            assertEquals("$density corner", 0, image.getRGB(0, 0) ushr 24)
+            assertEquals("$density corner", 0, png.firstPixelAlpha())
         }
     }
 
@@ -55,5 +56,34 @@ class LauncherIconTest {
         val (startX, startY, radius) = Regex("""M([\d.]+),([\d.]+)a([\d.]+),""").find(xml)!!.destructured
         assertEquals(54.0, startX.toDouble() + radius.toDouble(), 0.05)
         assertEquals(54.0, startY.toDouble(), 0.05)
+    }
+
+    /**
+     * Just enough of a PNG reader for these checks (Android's unit tests have no image library): the size from
+     * the header, and the alpha of the top-left pixel of an 8-bit RGBA image. Row filters leave the first pixel
+     * of the first row as it is, so it can be read straight from the unpacked data.
+     */
+    private class Png(private val bytes: ByteArray) {
+        private fun int(at: Int) = (0..3).fold(0) { acc, i -> (acc shl 8) or (bytes[at + i].toInt() and 0xFF) }
+        val width = int(16)
+        val height = int(20)
+        private val bitDepth = bytes[24].toInt()
+        private val colourType = bytes[25].toInt()
+
+        fun firstPixelAlpha(): Int {
+            assertEquals("8-bit RGBA", 8 to 6, bitDepth to colourType)
+            val data = ByteArrayOutputStream()
+            var at = 8
+            while (at < bytes.size) {
+                val length = int(at)
+                val type = String(bytes, at + 4, 4, Charsets.US_ASCII)
+                if (type == "IDAT") data.write(bytes, at + 8, length)
+                at += 12 + length
+            }
+            val row = ByteArray(5)
+            Inflater().apply { setInput(data.toByteArray()); inflate(row); end() }
+            // row[0] is the filter type, then R, G, B, A.
+            return row[4].toInt() and 0xFF
+        }
     }
 }
