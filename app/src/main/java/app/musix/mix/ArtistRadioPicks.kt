@@ -20,7 +20,7 @@ fun mixArtistRadios(
 ): List<Artist> {
     val seen = HashSet<String>()
     fun fresh(a: Artist) = seen.add(a.id)
-    val r = recent.filter(::fresh).take(recentShare)
+    val r = recent.distinctBy { it.id }.take(recentShare).onEach { seen.add(it.id) }
     // Similar artists, one from each recent artist's list in turn.
     val s = ArrayList<Artist>()
     val lists = similar.map { it.toMutableList() }
