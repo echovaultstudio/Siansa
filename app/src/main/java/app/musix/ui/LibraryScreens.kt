@@ -97,6 +97,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import app.musix.data.favouriteArtistList
 import app.musix.data.Artist
+import app.musix.data.PickUps
 
 /** Songs with a heart, newest first as Navidrome lists them. */
 @Composable
@@ -279,6 +280,12 @@ fun AlbumScreen(nav: NavController, id: String) {
     val discTitles by loadState(d) { d?.let { discTitlesOf(graph, it) }.orEmpty() }
     // Library artists by name, so a name like "Chase & Status" isn't split into two artists.
     val knownArtists by loadState("artist-names") { graph.library.artists().map { normalizeKey(it.name) }.toSet() }
+    // Where you stopped on an album you were listening to, from this phone's plays (issue #367). Not while
+    // a song of it is the one playing: that one is marked already.
+    val player by graph.player.state.collectAsStateWithLifecycle()
+    val playingId = player.current?.id
+    val pickUp by loadState(d to playingId) { d?.let { PickUps.find(it.songs, graph.history.all(), System.currentTimeMillis()) } }
+    val pick = pickUp.valueOrNull()?.takeIf { d != null && d.songs.none { it.id == playingId } }
     CollectionPage(
         nav = nav,
         title = d?.album?.name ?: "Album",
@@ -311,8 +318,15 @@ fun AlbumScreen(nav: NavController, id: String) {
                         formatDuration(d.songs.sumOf { it.durationSec.toLong() }),
                     ).joinToString(" · "),
                 )
+                if (pick != null) {
+                    ContinueButton(PickUps.trackLabel(d.songs, pick.continueIndex)) {
+                        AppLog.i("Album", "Continue from ${pick.continueIndex + 1} of ${d.songs.size}")
+                        graph.player.play(d.songs, pick.continueIndex)
+                    }
+                }
             }
         },
+        lastPlayed = pick?.let { it.lastIndex to "Last played · ${PickUps.whenLabel(it.at)}" },
         offline = d?.album?.offlineItem(),
         // A heart for favourite albums, starred in Navidrome (issue #275).
         actions = { d?.album?.let { FavouriteAlbumButton(it) } },
