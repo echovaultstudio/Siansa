@@ -180,6 +180,26 @@ class SubsonicComplianceTest {
         assertEquals(listOf<String?>(null), all.seen.filter { it.endpoint == "getStarred2" }.map { it.one("musicFolderId") })
     }
 
+    /** Favourite artists (issue #397): starred by artistId, and read from getStarred2 in each chosen library. */
+    @Test fun favouriteArtistsUseTheArtistStar() = runBlocking {
+        val server = FakeServer { seen ->
+            when (seen.endpoint) {
+                "getOpenSubsonicExtensions" -> extensions()
+                "getStarred2" -> ok(""""starred2":{"artist":[{"id":"ar${seen.one("musicFolderId")}","name":"N","albumCount":3},{"id":"both","name":"B"}]}""")
+                else -> ok()
+            }
+        }
+        val api = api(server).apply { chosenFolders = { setOf("1", "2") } }
+        api.starArtist("ar9")
+        api.unstarArtist("ar9")
+        assertEquals("ar9", server.seen.single { it.endpoint == "star" }.one("artistId"))
+        assertEquals(null, server.seen.single { it.endpoint == "star" }.one("id"))
+        assertEquals("ar9", server.seen.single { it.endpoint == "unstar" }.one("artistId"))
+        val artists = api.starredArtists()
+        assertEquals(listOf("ar1", "both", "ar2"), artists.map { it.id })
+        assertEquals(3, artists.first().albumCount)
+    }
+
     @Test fun albumsFromSeveralLibrariesInOneOrder() {
         val a = Album(id = "a", name = "B side", created = "2026-01-01")
         val b = Album(id = "b", name = "a side", created = "2026-03-01")
