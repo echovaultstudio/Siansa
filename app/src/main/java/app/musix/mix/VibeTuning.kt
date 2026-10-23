@@ -30,6 +30,9 @@ data class VibeTuning(
     /** The sound dials as steering for AudioMuse's search: the ones set, each with its weight. */
     fun steering(): List<Steer> = sounds.filter { it.value != 0 }.map { Steer(it.term, it.value > 0, steerWeight(it.value)) }
 
+    /** Every slider and dial back in the middle, keeping which sounds the dials are for (issue #369). */
+    fun cleared(): VibeTuning = VibeTuning(sounds = sounds.map { it.copy(value = 0) })
+
     /** A short description for the log and the vibe page: "more energy · faster · +piano ×3". */
     fun summary(): String = buildList {
         if (energy != 0) add(if (energy > 0) "more energy" else "calmer")
