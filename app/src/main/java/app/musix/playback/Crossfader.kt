@@ -19,10 +19,13 @@ import kotlin.math.min
  * Crossfades on the phone (issue #60), keeping the one main player behind the media session, so the queue,
  * lock screen, casting, sleep timer and scrobbling work as without crossfade.
  *
- * A few seconds before a fade, a second "tail" player gets the current song ready at the point where the fade
- * starts (from the song cache or a download, so it costs no new download in the usual case). When the fade
- * starts, the tail takes over the rest of the current song in a 40 ms blend and fades it out, while the main
- * player moves on to the next song and fades it in. Volumes combine with levelling (ReplayGain or measured
+ * A few seconds before a fade, a second "tail" player gets the current song ready a little before the point where
+ * the fade starts (from the song cache or a download, so it costs no new download in the usual case). Shortly
+ * before the fade it starts playing, silent, and keeps itself in step with the main player by playing a touch
+ * faster or slower (it can't be heard, so that changes nothing). When the fade starts, the tail is already
+ * sounding in time with the main player and takes the song over in a short equal-power blend (issue #355: it
+ * used to start at that moment, and its start-up delay made a short dip and a repeated sliver of sound), then
+ * fades it out while the main player moves on to the next song and fades it in. Volumes combine with levelling (ReplayGain or measured
  * loudness) and the sleep timer: the main player's fade-in is [level], which the service multiplies in.
  *
  * The fade stops at once (the tail falls silent, the next song plays at full level) when you pause, skip or
@@ -62,6 +65,11 @@ internal class Crossfader(
     private var startedAt = 0L
     private var switched = false
     private var expectSeek = false
+    /** Where the tail starts, a little before [startAt]; once the main player gets there the tail plays, silent. */
+    private var primeAt = 0L
+    /** The tail is playing silently, keeping in step with the main player. */
+    private var primed = false
+    private var lastCoarseAlign = 0L
     /** A song whose fade was given up or isn't wanted, until the queue moves on or changes. */
     private var skipped: String? = null
 
@@ -139,7 +147,9 @@ internal class Crossfader(
                 nextProfile = profiles.cached(next.id),
             )
             if (planned == null) {
-                AppLog.d("Crossfade", "No fade from ${current.id} into ${next.id}" + if (Crossfade.runsStraightOn(current, next)) ": they run straight on" else "")
+                val why = Crossfade.whyNoFade(s.crossfade, maxMs, current, next, profiles.cached(current.id), profiles.cached(next.id))
+                    ?: "one of them is too short to share a fade"
+                AppLog.d("Crossfade", "No fade from ${current.id} into ${next.id}: $why")
                 skipped = item.mediaId
                 return LOOK_MS
             }
@@ -149,32 +159,69 @@ internal class Crossfader(
                 skipped = item.mediaId
                 return LOOK_MS
             }
-            arm(item, planned, at)
+            arm(item, planned, at, primeFrom(position, at))
         }
         val speed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
+        if (!primed && position >= primeAt - ON_TIME_MS) prime()
+        if (primed) align(speed)
         val until = ((startAt - position) / speed).toLong()
         if (until <= ON_TIME_MS) {
             begin()
             return 0
         }
-        return min(LOOK_MS, until)
+        // While primed, check the step often; before that, wake when it's time to prime.
+        val untilPrime = if (primed) ALIGN_MS else ((primeAt - position) / speed).toLong().coerceAtLeast(ON_TIME_MS)
+        return minOf(LOOK_MS, until, untilPrime)
     }
 
-    private fun arm(item: MediaItem, planned: FadePlan, at: Long) {
+    /** Where the tail should start: [PREROLL_MS] before the fade, but never before the main player is there. */
+    private fun primeFrom(position: Long, at: Long): Long = (at - PREROLL_MS).coerceAtLeast(position + MIN_PREPARE_MS / 2).coerceAtMost(at)
+
+    /** Starts the tail playing, silent, so it's sounding and in step when the fade begins. */
+    private fun prime() {
+        val t = tail ?: return
+        if (t.playbackState != Player.STATE_READY) return
+        t.volume = 0f
+        t.play()
+        primed = true
+        AppLog.d("Crossfade", "Tail playing silently from ${primeAt} ms, ${startAt - primeAt} ms before the fade")
+    }
+
+    /**
+     * Keeps the silent tail in step with the main player: far off (more than [COARSE_MS]), it jumps to just ahead
+     * of it; otherwise it plays a few percent faster or slower until they match ([tailSpeed]).
+     */
+    private fun align(mainSpeed: Float) {
+        val t = tail ?: return
+        if (!t.isPlaying) return
+        val behind = main.currentPosition - t.currentPosition
+        val now = SystemClock.elapsedRealtime()
+        if (abs(behind) > COARSE_MS && now - lastCoarseAlign > 600) {
+            lastCoarseAlign = now
+            t.seekTo(main.currentPosition + COARSE_LEAD_MS)
+            return
+        }
+        t.setPlaybackSpeed(mainSpeed * Crossfade.tailSpeed(behind))
+    }
+
+    private fun arm(item: MediaItem, planned: FadePlan, at: Long, from: Long) {
         val t = tail ?: newTail().also { tail = it }
         t.volume = 0f
         t.playWhenReady = false
-        t.setMediaItem(item, at)
+        t.setMediaItem(item, from)
         t.prepare()
         outgoing = item.mediaId
         plan = planned
         startAt = at
+        primeAt = from
+        primed = false
         phase = Phase.READY
         AppLog.i("Crossfade", "Getting the fade out of ${item.mediaId} ready (${planned.why})")
     }
 
     private fun disarm() {
         if (phase == Phase.FADING) return
+        primed = false
         releaseTail()
         outgoing = null
         plan = null
@@ -201,7 +248,11 @@ internal class Crossfader(
             return
         }
         // Only a tail that can really carry on from the same point; a stream that can't jump would start over.
-        val ready = t.playbackState == Player.STATE_READY && t.isCurrentMediaItemSeekable && abs(t.currentPosition - startAt) < 1_500
+        // One that didn't get to play silently in time jumps to where the main player is, as before #355.
+        if (t.playbackState == Player.STATE_READY && t.isCurrentMediaItemSeekable && !(primed && t.isPlaying)) {
+            t.seekTo(main.currentPosition)
+        }
+        val ready = t.playbackState == Player.STATE_READY && t.isCurrentMediaItemSeekable && abs(t.currentPosition - main.currentPosition) < 1_500
         if (!ready) {
             AppLog.w(
                 "Crossfade",
@@ -216,9 +267,16 @@ internal class Crossfader(
         startedAt = SystemClock.elapsedRealtime()
         switched = false
         phase = Phase.FADING
+        val wasPrimed = primed && t.isPlaying
+        val drift = t.currentPosition - main.currentPosition
+        t.setPlaybackSpeed(main.playbackParameters.speed.takeIf { it > 0f } ?: 1f)
         t.volume = 0f
-        t.play()
-        AppLog.i("Crossfade", "Fading ${item.mediaId} into ${main.getMediaItemAt(nextIndex).mediaId}: ${planned.why}")
+        if (!t.isPlaying) t.play()
+        AppLog.i(
+            "Crossfade",
+            "Fading ${item.mediaId} into ${main.getMediaItemAt(nextIndex).mediaId}: ${planned.why} · " +
+                if (wasPrimed) "tail in step (${if (drift >= 0) "+" else ""}$drift ms)" else "tail started now (not primed in time)",
+        )
         handler.post(fadeTick)
     }
 
@@ -234,10 +292,11 @@ internal class Crossfader(
             val sleep = sleepLevel()
             val elapsed = SystemClock.elapsedRealtime() - startedAt
             if (!switched) {
-                // The rest of the song moves from the main player to the tail in a short blend of the two copies.
+                // The rest of the song moves from the main player to the tail in a short equal-power blend of the
+                // two copies; they play in step, so it's heard as one.
                 val h = (elapsed.toFloat() / HANDOVER_MS).coerceIn(0f, 1f)
-                t.volume = tailBase * sleep * h
-                level = 1f - h
+                t.volume = tailBase * sleep * Crossfade.fadeIn(h)
+                level = Crossfade.fadeOut(h)
                 onLevel()
                 if (elapsed >= HANDOVER_MS && t.isPlaying) {
                     switched = true
@@ -272,6 +331,7 @@ internal class Crossfader(
     private fun finish() {
         handler.removeCallbacks(fadeTick)
         phase = Phase.IDLE
+        primed = false
         releaseTail()
         outgoing = null
         plan = null
@@ -347,7 +407,15 @@ internal class Crossfader(
         /** Starting this close to the planned moment is on time. */
         const val ON_TIME_MS = 15L
         /** The blend as the tail takes the song over from the main player. */
-        const val HANDOVER_MS = 40L
+        const val HANDOVER_MS = 120L
+        /** The tail starts playing, silent, this long before the fade, to be sounding and in step by then. */
+        const val PREROLL_MS = 2_000L
+        /** While the tail plays silently, how often its step is checked. */
+        const val ALIGN_MS = 50L
+        /** Further apart than this, the tail jumps to the main player rather than catching up by speed. */
+        const val COARSE_MS = 250L
+        /** How far ahead of the main player the tail jumps, as it takes a moment to start again. */
+        const val COARSE_LEAD_MS = 100L
         /** Volume steps during a fade: 50 a second. */
         const val TICK_MS = 20L
         /** How long after the old song has faded out to wait for the new one to start fading in. */
