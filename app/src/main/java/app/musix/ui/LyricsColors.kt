@@ -21,7 +21,8 @@ internal const val LYRICS_WHITE_CONTRAST = 7.0
 val LyricsTextColors = LyricsColors(
     current = Color.White,
     sung = Color.White.copy(alpha = 0.5f),
-    upcoming = Color.White.copy(alpha = 0.72f),
+    // Darker than before (issue #362), so what's still to sing stands apart from the words being sung.
+    upcoming = Color.White.copy(alpha = 0.6f),
 )
 
 /**
