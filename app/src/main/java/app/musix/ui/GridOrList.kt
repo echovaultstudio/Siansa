@@ -154,3 +154,36 @@ fun AlbumsGridOrList(
         }
     }
 }
+
+/**
+ * Artists as a grid of [GRID_COLUMNS] or as a list, with round pictures and the switch at the top (the favourite
+ * artists page, issue #397).
+ */
+@Composable
+fun ArtistsGridOrList(
+    artists: List<app.musix.data.Artist>,
+    page: String,
+    onOpen: (app.musix.data.Artist) -> Unit,
+    modifier: Modifier = Modifier,
+    title: String? = null,
+) {
+    var grid by rememberGridMode(page)
+    fun line(a: app.musix.data.Artist) = if (a.albumCount > 0) "${a.albumCount} ${if (a.albumCount == 1) "album" else "albums"}" else "Artist"
+    androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+        columns = gridCells(grid),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            start = if (grid) Space.Small else 0.dp,
+            end = if (grid) Space.Small else 0.dp,
+            bottom = bottomBarPadding(Space.Section),
+        ),
+        modifier = modifier.testTag("artistsGridOrList"),
+    ) {
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) { GridListHeader(title, grid) { grid = !grid } }
+        items(artists, key = { it.id }) { a ->
+            val cover = a.coverArt ?: "ar-${a.id}"
+            if (grid) AlbumTile(a.name, line(a), cover, onClick = { onOpen(a) }, round = true)
+            else MediaRow(a.name, line(a), cover, onClick = { onOpen(a) }, round = true)
+        }
+    }
+}
+

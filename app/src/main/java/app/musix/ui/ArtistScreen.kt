@@ -156,6 +156,8 @@ fun ArtistScreen(nav: NavController, id: String) {
                 )
             }
         },
+        // A heart to make the artist a favourite, in Navidrome too (issue #397).
+        actions = { p?.artist?.let { FavouriteArtistButton(it) } },
         image = { modifier ->
             // Navidrome's artist image through its cover endpoint (ND_ARTISTARTPRIORITY), cached and downloaded
             // like every cover (issue #206).

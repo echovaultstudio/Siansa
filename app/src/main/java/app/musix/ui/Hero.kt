@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,6 +51,8 @@ fun HeroPage(
     color: Color,
     image: @Composable BoxScope.(Modifier) -> Unit,
     overlay: @Composable BoxScope.() -> Unit = {},
+    // Buttons at the right of the title bar (the artist page's heart, issue #397).
+    actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (pageModifier: Modifier) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -115,8 +118,9 @@ fun HeroPage(
                 color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.graphicsLayer { alpha = barAlpha },
+                modifier = Modifier.weight(1f).graphicsLayer { alpha = barAlpha },
             )
+            actions()
         }
     }
 }

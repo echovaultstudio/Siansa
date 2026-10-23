@@ -175,11 +175,12 @@ fun YourLibraryScreen(nav: NavController) {
     val pinned = remember(pinVersion) { pins(context).getStringSet("keys", emptySet()).orEmpty() }
 
     val favouriteIds by graph.favouriteAlbums.ids.collectAsStateWithLifecycle()
+    val favouriteArtistIds by graph.favouriteArtists.ids.collectAsStateWithLifecycle()
     // From the phone straight away, then again once Navidrome has answered (issue #161).
     // Built again when the connection comes back, for what only Navidrome has.
     val connection by graph.connection.state.collectAsStateWithLifecycle()
     val online = !connection.offline
-    val data by produceState<Load<LibraryData>>(Load.Loading, version, mixes?.size, settings.navidromeUser, favouriteIds, online) {
+    val data by produceState<Load<LibraryData>>(Load.Loading, version, mixes?.size, settings.navidromeUser, favouriteIds, favouriteArtistIds, online) {
         val me = settings.navidromeUser
         value = loadLibrary(graph, me)
         if (refreshFromServer(graph, me)) value = loadLibrary(graph, me)
@@ -222,6 +223,19 @@ fun YourLibraryScreen(nav: NavController) {
     val letterOfShown = remember(letterStarts) {
         letterStarts?.let { starts -> starts.entries.sortedBy { it.value }.map { it.value to it.key } }
     }
+    // Long lists in any other order get a handle to drag through them instead, with a label for where
+    // you are (issue #374).
+    val scrollLabel: ((Entry) -> String)? = remember(selectedSort, letterStarts, shown.size) {
+        if (letterStarts != null || shown.size < AlphabetIndex.MIN_ITEMS) null
+        else when (selectedSort) {
+            Sort.RECENTS -> { e -> FastScroll.monthLabel(e.recentAt, "Not played") }
+            Sort.ADDED -> { e -> FastScroll.monthLabel(e.addedAt, "No date") }
+            Sort.PLAYS -> { e -> FastScroll.playsLabel(e.plays) }
+            Sort.ALPHABETICAL -> { e -> AlphabetIndex.letterOf(e.title).toString() }
+            Sort.CREATOR -> { e -> AlphabetIndex.letterOf(e.creator).toString() }
+        }
+    }
+    val sideBar = letterStarts != null || scrollLabel != null
     val scope = rememberCoroutineScope()
     val launcher = rememberPlayLauncher()
     var naming by remember { mutableStateOf(false) }
@@ -316,7 +330,7 @@ fun YourLibraryScreen(nav: NavController) {
                             // Three across, like every grid (issue #289).
                             columns = GridCells.Fixed(GRID_COLUMNS),
                             state = gridState,
-                            contentPadding = PaddingValues(start = Space.Small, end = if (letterStarts != null) AlphabetBarWidth + Space.Tight else Space.Small, bottom = bottomBarPadding(Space.Page)),
+                            contentPadding = PaddingValues(start = Space.Small, end = if (sideBar) AlphabetBarWidth + Space.Tight else Space.Small, bottom = bottomBarPadding(Space.Page)),
                             modifier = Modifier.fillMaxSize(),
                         ) {
                             item(span = { GridItemSpan(maxLineSpan) }) { sortBar() }
@@ -326,13 +340,15 @@ fun YourLibraryScreen(nav: NavController) {
                         }
                         if (letterStarts != null && letterOfShown != null) {
                             LibraryAlphabetBar(letterStarts, letterOfShown, { gridState.firstVisibleItemIndex }) { i -> scope.launch { gridState.scrollToItem(i) } }
+                        } else if (scrollLabel != null) {
+                            LibraryFastScroll(shown, scrollLabel, { gridState.firstVisibleItemIndex }, { gridState.layoutInfo.visibleItemsInfo.size }) { i -> scope.launch { gridState.scrollToItem(i) } }
                         }
                     }
                 } else {
                     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
                     PrefetchCovers(listState.firstVisibleItemIndex, listState.layoutInfo.visibleItemsInfo.size, covers, 150)
                     Box(Modifier.fillMaxSize()) {
-                        LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(end = if (letterStarts != null) AlphabetBarWidth else 0.dp, bottom = bottomBarPadding(Space.Page))) {
+                        LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(end = if (sideBar) AlphabetBarWidth else 0.dp, bottom = bottomBarPadding(Space.Page))) {
                             item { sortBar() }
                             items(shown, key = { it.key }) { e ->
                                 RowEntry(e, pinned = e.alwaysPinned || e.key in pinned, held = held == e.key, onClick = { open(e) }, onHold = { held = e.key }, onTogglePin = { togglePin(e) })
@@ -350,6 +366,8 @@ fun YourLibraryScreen(nav: NavController) {
                         }
                         if (letterStarts != null && letterOfShown != null) {
                             LibraryAlphabetBar(letterStarts, letterOfShown, { listState.firstVisibleItemIndex }) { i -> scope.launch { listState.scrollToItem(i) } }
+                        } else if (scrollLabel != null) {
+                            LibraryFastScroll(shown, scrollLabel, { listState.firstVisibleItemIndex }, { listState.layoutInfo.visibleItemsInfo.size }) { i -> scope.launch { listState.scrollToItem(i) } }
                         }
                     }
                 }
@@ -380,6 +398,37 @@ private fun BoxScope.LibraryAlphabetBar(
         current = current,
         // The first letter goes right to the top, so the sort row and pinned items stay in view.
         onPick = { letter -> AlphabetIndex.target(letter, starts)?.let { scrollTo(if (it == starts.values.min()) 0 else it + 1) } },
+        modifier = Modifier.align(Alignment.TopEnd).padding(top = 56.dp, bottom = bottomBarPadding(Space.Small)),  // spacing: exact (below the top bar)
+    )
+}
+
+/**
+ * The quick-scroll handle over the right edge of Your Library, for orders other than by name (issue #374).
+ * Positions are in [shown]; the list's first item is the sort bar, so list positions are one more.
+ */
+@Composable
+private fun BoxScope.LibraryFastScroll(
+    shown: List<Entry>,
+    labelOf: (Entry) -> String,
+    firstVisible: () -> Int,
+    visible: () -> Int,
+    scrollTo: (Int) -> Unit,
+) {
+    val fraction by remember(shown) {
+        derivedStateOf { FastScroll.fractionOf((firstVisible() - 1).coerceAtLeast(0), shown.size, visible()) }
+    }
+    var last by remember { mutableStateOf(-1) }
+    FastScrollBar(
+        fraction = fraction,
+        labelAt = { f -> shown.getOrNull(FastScroll.indexAt(f, shown.size))?.let(labelOf) },
+        // The very top goes right to the top, so the sort row and pinned items come back into view.
+        onScroll = { f ->
+            val i = FastScroll.indexAt(f, shown.size)
+            if (i != last) {
+                last = i
+                scrollTo(if (i == 0) 0 else i + 1)
+            }
+        },
         modifier = Modifier.align(Alignment.TopEnd).padding(top = 56.dp, bottom = bottomBarPadding(Space.Small)),  // spacing: exact (below the top bar)
     )
 }
@@ -691,8 +740,10 @@ private suspend fun refreshFromServer(graph: app.musix.AppGraph, me: String): Bo
         val recent = async { runCatching { graph.subsonic.albums("recent", 100, 0) }.getOrNull() }
         val playlists = async { runCatching { graph.library.refreshPlaylists { graph.subsonic.playlists() } } }
         val favourites = async { graph.favouriteAlbums.refresh() }
+        val favouriteArtists = async { graph.favouriteArtists.refresh() }
         playlists.await()
         favourites.await()
+        favouriteArtists.await()
         recent.await()?.also { lastRecent = me to it } != null
     }
     AppLog.d("Library", "Navidrome part of the library ${if (recentOk) "fetched" else "not reachable"} in ${System.currentTimeMillis() - started} ms")
@@ -704,6 +755,8 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
     val now = LocalDate.now()
     // Favourite albums as Navidrome last sent them (refreshed in refreshFromServer), or the phone's copy (issue #275).
     val favouriteAlbums = graph.favouriteAlbums.albums
+    // And favourite artists the same way (issue #397).
+    val favouriteArtists = graph.favouriteArtists.artists
 
     // What you've played: Musix's own history, and Navidrome's recently played albums (other apps too).
     val history = graph.history.all()
@@ -894,6 +947,23 @@ private suspend fun buildLibrary(graph: app.musix.AppGraph, me: String): Library
         gradient = Color(0xFFB8336A) to Color(0xFFFFB547),
         heart = true,
         recentAt = System.currentTimeMillis() - 4,
+        favourite = true,
+    )
+    // One card for all favourite artists (issue #397), next to the albums one.
+    entries += Entry(
+        key = "favourite-artists",
+        kind = null,
+        title = "Favourite artists",
+        subtitle = "Artists · " + when (favouriteArtists.size) {
+            0 -> "tap the heart on an artist to add them"
+            1 -> "1 artist"
+            else -> "${favouriteArtists.size} artists"
+        },
+        route = "favourite-artists",
+        gradient = Color(0xFF2B5FD6) to Color(0xFF7FE0D0),
+        heart = true,
+        round = true,
+        recentAt = System.currentTimeMillis() - 5,
         favourite = true,
     )
 

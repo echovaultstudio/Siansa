@@ -10,6 +10,12 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Storage
 import app.musix.ui.StateButton
 import app.musix.ui.DayChips
+import app.musix.ui.HeroPage
+import androidx.compose.ui.test.onNodeWithContentDescription
+import app.musix.ui.CollectionByline
+import app.musix.ui.ContinueButton
+import app.musix.ui.lastPlayedLine
+import app.musix.ui.FastScrollBar
 import app.musix.ui.VibeSliders
 import app.musix.ui.ArrangeList
 import app.musix.mix.SoundDial
@@ -25,6 +31,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyDescendant
@@ -559,5 +568,77 @@ class SpacingTest {
         val chips = (1..4).map { compose.onNodeWithTag("day-$it").getBoundsInRoot() }
         val gaps = chips.zipWithNext { a, b -> b.left - a.right }
         gaps.forEach { assertEven("Day chips", gaps[0], it, 1.dp) }
+    }
+
+    /** Artist page (issue #397): the heart sits on the title bar's line, level with the back arrow. */
+    @Test fun artistHeartSitsLevelWithTheBackArrow() {
+        compose.setContent {
+            MusixTheme {
+                HeroPage(
+                    title = "Burial",
+                    heroHeight = 200.dp,
+                    scrolledPx = 0f,
+                    onBack = { },
+                    color = androidx.compose.ui.graphics.Color.DarkGray,
+                    image = { m -> Box(m) },
+                    actions = { Box(Modifier.size(48.dp).testTag("heart")) },
+                ) { }
+            }
+        }
+        val back = compose.onNodeWithContentDescription("Back").getBoundsInRoot()
+        val heart = compose.onNodeWithTag("heart").getBoundsInRoot()
+        assertEven("Heart and back arrow on one line", back.top, heart.top, 1.dp)
+        assertEven("Heart and back arrow the same size", back.bottom - back.top, heart.bottom - heart.top, 1.dp)
+    }
+
+    /** Album page (issue #367): Continue sits the same step under the details as the details under the artist. */
+    @Test fun continueButtonSitsAStepUnderTheDetails() {
+        compose.setContent {
+            MusixTheme {
+                Column {
+                    CollectionByline("Various Artists", null, null, "DJ-mix · 2024 · 7 songs")
+                    ContinueButton("5") { }
+                }
+            }
+        }
+        val artist = compose.onNodeWithText("Various Artists").getBoundsInRoot()
+        val details = compose.onNodeWithText("DJ-mix · 2024 · 7 songs").getBoundsInRoot()
+        val button = compose.onNodeWithTag("continueFrom").getBoundsInRoot()
+        // The button you see is 40 dp tall, centred in its taller touch area.
+        val seenTop = button.top + (button.height - 40.dp) / 2
+        assertEven("Continue under the details", details.top - artist.bottom, seenTop - details.bottom, 1.dp)
+    }
+
+    /** Album page (issue #367): the last-played line is drawn behind its row, so the title keeps its even room. */
+    @Test fun lastPlayedLineKeepsTheRowEven() {
+        compose.setContent {
+            MusixTheme {
+                Box(Modifier.lastPlayedLine(androidx.compose.ui.graphics.Color.Red).testTag("row")) {
+                    Text("Shadow Box", Modifier.padding(vertical = Space.Small))
+                }
+            }
+        }
+        compose.onNodeWithTag("row").assertExists()
+        val row = compose.onNodeWithTag("row").getBoundsInRoot()
+        val text = compose.onNodeWithText("Shadow Box").getBoundsInRoot()
+        assertEven("Room above and below the title", text.top - row.top, row.bottom - text.bottom, 1.dp)
+    }
+
+    /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */
+    @Test fun fastScrollHandleIsCentredAndReachesTheEnds() {
+        var at by mutableFloatStateOf(0f)
+        compose.setContent {
+            MusixTheme {
+                Box(Modifier.height(300.dp)) { FastScrollBar(fraction = at, labelAt = { null }, onScroll = { }) }
+            }
+        }
+        val bar = compose.onNodeWithTag("fastScroll").getBoundsInRoot()
+        var thumb = compose.onNodeWithTag("fastScrollThumb", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Handle left and right", thumb.left - bar.left, bar.right - thumb.right, 1.dp)
+        assertEven("Handle at the top", thumb.top, bar.top, 1.dp)
+        at = 1f
+        compose.waitForIdle()
+        thumb = compose.onNodeWithTag("fastScrollThumb", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Handle at the bottom", thumb.bottom, bar.bottom, 1.dp)
     }
 }
