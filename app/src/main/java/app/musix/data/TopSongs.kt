@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import java.io.File
@@ -56,6 +57,21 @@ fun nextTopSongs(
     else -> TopSongsEntry(artistId, now, fallback(), fromServer = false)
 }
 
+/**
+ * A list to show at once when nothing is saved yet (issue #398), while Navidrome looks the popular songs up on
+ * Last.fm: the artist's songs you've played most on this phone ([plays] by song id), then the rest in the
+ * library's order.
+ */
+fun quickTopSongs(own: List<Song>, plays: Map<String, Int>, count: Int = TOP_SONGS_COUNT): List<Song> =
+    own.distinctBy { it.id }
+        .withIndex()
+        .sortedWith(compareByDescending<IndexedValue<Song>> { plays[it.value.id] ?: 0 }.thenBy { it.index })
+        .map { it.value }
+        .take(count)
+
+/** Whether to fetch an artist's popular songs before their page is opened: none saved, or the saved ones are old. */
+fun shouldFetchTopSongsAhead(entry: TopSongsEntry?, now: Long): Boolean = entry == null || !isTopSongsFresh(entry, now)
+
 /** [entry] first, replacing the artist's older one, keeping at most [max] artists. */
 fun putTopSongs(entries: List<TopSongsEntry>, entry: TopSongsEntry, max: Int = TOP_SONGS_MAX_ARTISTS): List<TopSongsEntry> =
     (listOf(entry) + entries.filterNot { it.artistId == entry.artistId }).take(max)
@@ -82,6 +98,26 @@ class TopSongs(
         val entry = json.read().firstOrNull { it.artistId == artistId } ?: return null
         val songs = preferLocal(entry.songs, library.songs(entry.songs.map { it.id }))
         return entry.copy(songs = library.keepSyncedSongs(songs, "Popular songs"))
+    }
+
+    /**
+     * Fetches the popular songs of the artist with [artistId] in the background when none are saved or they're
+     * old (issue #398), e.g. for the song playing now, so their page shows them at once when opened.
+     */
+    fun fetchAhead(artistId: String) {
+        scope.launch {
+            try {
+                val entry = json.read().firstOrNull { it.artistId == artistId }
+                if (!shouldFetchTopSongsAhead(entry, System.currentTimeMillis())) return@launch
+                val artist = library.artist(artistId) ?: return@launch
+                AppLog.d(TAG, "Fetching popular songs of ${artist.name} ahead")
+                refresh(artist, library.songsOf(artist))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w(TAG, "Popular songs not fetched ahead: ${e.javaClass.simpleName}")
+            }
+        }
     }
 
     /** Asks Navidrome for the artist's popular songs and saves them; one request per artist at a time. */

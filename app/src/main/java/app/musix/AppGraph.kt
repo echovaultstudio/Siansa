@@ -68,12 +68,14 @@ import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import okhttp3.Credentials
@@ -282,6 +284,18 @@ class AppGraph(val app: Application) {
         onlyDownloads = { settings.current.downloadedOnly }
         isDownloaded = { downloads.isDownloaded(it) }
     }
+    init {
+        // The playing artist's popular songs, fetched ahead so their page shows them at once (issue #398). After
+        // a short wait, so skipping through songs doesn't ask for every artist on the way.
+        scope.launch(CoroutineName("top-songs-ahead")) {
+            player.state.map { it.current?.artistId }.distinctUntilChanged().collectLatest { artistId ->
+                if (artistId == null) return@collectLatest
+                delay(TOP_SONGS_AHEAD_WAIT_MS)
+                if (!connection.current.offline) topSongs.fetchAhead(artistId)
+            }
+        }
+    }
+
     /** Playlists kept only on this phone. */
     val localPlaylists = LocalPlaylists(app).also { local ->
         // Phone-only playlists are kept downloaded, so they play without a connection.
@@ -337,3 +351,6 @@ fun movedPreamp(oldReplayGainPreamp: Float, equaliserPreamp: Float): Float? {
     if (oldReplayGainPreamp == 0f || equaliserPreamp != 0f) return null
     return oldReplayGainPreamp.coerceIn(-app.musix.playback.EqSettings.MAX_PREAMP_DB, app.musix.playback.EqSettings.MAX_PREAMP_DB)
 }
+
+/** How long a song plays before its artist's popular songs are fetched ahead (issue #398). */
+private const val TOP_SONGS_AHEAD_WAIT_MS = 5_000L
