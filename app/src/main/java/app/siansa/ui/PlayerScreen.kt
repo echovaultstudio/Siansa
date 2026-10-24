@@ -374,8 +374,11 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         }
                     }
                     if (song != null) {
-                        LyricsPreviewCard(songLyrics, tint) { lyricsOpen = true }
-                        Spacer(Modifier.height(Space.Medium))
+                        // With the lyrics button under the controls, the lyrics needn't be on a card below too (issue #434).
+                        if (showsLyricsCard(lyricsButton = !classic)) {
+                            LyricsPreviewCard(songLyrics, tint) { lyricsOpen = true }
+                            Spacer(Modifier.height(Space.Medium))
+                        }
                         AboutArtistCard(song) { openArtist(song) }
                         Spacer(Modifier.height(Space.Medium))
                         AboutSongCard(song, onOpenDetails = ::openDetails)
@@ -863,6 +866,9 @@ private fun QueueView(state: PlayerState) {
 
 /** In the classic now playing style, how much of the lyrics card shows under the player before scrolling (issue #346). */
 private val PLAYER_PEEK = 44.dp
+
+/** Whether now playing shows the lyrics card under the player: only without the lyrics button (issue #434). */
+internal fun showsLyricsCard(lyricsButton: Boolean): Boolean = !lyricsButton
 
 /** The mini player's lyrics button asks now playing to open with the lyrics showing (issue #346). */
 object LyricsShortcut {
