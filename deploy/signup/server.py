@@ -6,13 +6,14 @@ Standard library only.
   sign-ups (signups.jsonl) and emails the owner two signed links, Approve and Deny.
 - /signup/decide: the page behind those links. A link only shows a page; the decision is made by a button
   (POST), so mail scanners that open links can't approve anyone.
-- Approve: F-Droid testers get their own private link to the repo (testers.json keeps only a hash of it) and a
-  welcome email; Play testers get a welcome email and the owner adds them to the Play Console tester list.
-  Deny sends a polite no.
+- Approve: F-Droid testers get the beta's one private repo link in a welcome email; Play testers get a welcome
+  email and the owner adds them to the Play Console tester list. Deny sends a polite no. The link is one secret
+  code (repo_code, made by scripts/repo-link, which also puts it in the F-Droid index); `rotate` makes a new one
+  and emails it to everyone approved.
 - Places: BETA_LIMIT (12) testers at a time, Play and F-Droid together. When the beta is full, new sign-ups go on a waiting list and are
   approved automatically, oldest first, when a place frees up (a deny or `revoke`).
 - GET /signup/count: places taken, for the home page.
-- GET /auth: Caddy asks this before serving /fdroid/t/<link>/repo (forward_auth); 200 for a valid link, else 404.
+- GET /auth: Caddy asks this before serving /fdroid/t/<code>/repo (forward_auth); 200 for the current code, else 404.
 No IP addresses are stored, no cookies, no third parties. Caddy passes /signup*, and /auth for its own checks.
 """
 import calendar
@@ -37,11 +38,13 @@ from urllib.parse import parse_qs, urlsplit
 DATA_FILE = os.environ.get("SIGNUPS_FILE", "/data/signups.jsonl")
 DATA_DIR = os.path.dirname(DATA_FILE)
 DECISIONS_FILE = os.path.join(DATA_DIR, "decisions.jsonl")
-TESTERS_FILE = os.path.join(DATA_DIR, "testers.json")
+CODE_FILE = os.path.join(DATA_DIR, "repo_code")
 LOCK_FILE = os.path.join(DATA_DIR, "state.lock")
 SECRET = os.environ.get("SIGNUP_SECRET", "")
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "https://siansa.app").rstrip("/")
 LINK_DAYS = 14
+ISSUES_URL = "https://github.com/echovaultstudio/siansa-beta-testers/issues/new/choose"
+BETA_REPO_URL = "https://github.com/echovaultstudio/siansa-beta-testers"
 FAILS_PER_HOUR = 30
 LIMIT = int(os.environ.get("BETA_LIMIT", "12") or 12)
 MAX_BODY = 4096
@@ -185,7 +188,8 @@ def counts():
         s = st.get(r["id"], "pending")
         if s in c:
             c[s] += 1
-    return {"limit": LIMIT, "taken": c["approved"] + c["pending"], "waiting": c["waiting"]}
+    return {"limit": LIMIT, "approved": c["approved"], "pending": c["pending"],
+            "taken": c["approved"] + c["pending"], "waiting": c["waiting"]}
 
 
 def live_record_for(email):
@@ -230,41 +234,20 @@ def expired(rec, now=None):
     return (time.time() if now is None else now) - t > LINK_DAYS * 86400
 
 
-# ---------- testers: the private F-Droid links ----------
+# ---------- the beta's private F-Droid link ----------
 
-def token_hash(token):
-    return hashlib.sha256(token.encode()).hexdigest()
-
-
-def load_testers():
+def current_code():
     try:
-        with open(TESTERS_FILE) as f:
-            return json.load(f)
+        with open(CODE_FILE) as f:
+            code = f.read().strip()
     except FileNotFoundError:
-        return {}
+        return None
+    return code if re.fullmatch(r"[A-Za-z0-9_-]{20,}", code) else None
 
 
-def _write_testers(testers):
-    tmp = TESTERS_FILE + ".tmp"
-    with open(tmp, "w") as f:
-        os.fchmod(f.fileno(), 0o600)
-        json.dump(testers, f)
-    os.replace(tmp, TESTERS_FILE)
-
-
-def add_tester(email, now=None):
-    """Make this person's private link. Returns the link's secret code; only its hash is kept."""
-    code = secrets.token_urlsafe(24)
-    with locked():
-        testers = {h: t for h, t in load_testers().items() if t["email"] != email}  # a new link replaces the old
-        testers[token_hash(code)] = {"email": email,
-                                     "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now or time.time()))}
-        _write_testers(testers)
-    return code
-
-
-def repo_url(code):
-    return f"{PUBLIC_URL}/fdroid/t/{code}/repo"
+def repo_url(code=None):
+    code = code or current_code()
+    return f"{PUBLIC_URL}/fdroid/t/{code}/repo" if code else None
 
 
 LINK_PATH = re.compile(r"^/fdroid/t/([A-Za-z0-9_-]{20,})/repo(?:/|$)")
@@ -272,7 +255,8 @@ LINK_PATH = re.compile(r"^/fdroid/t/([A-Za-z0-9_-]{20,})/repo(?:/|$)")
 
 def valid_link(uri):
     m = LINK_PATH.match((uri or "").split("?", 1)[0])
-    return bool(m) and token_hash(m.group(1)) in load_testers()
+    code = current_code()
+    return bool(m and code) and hmac.compare_digest(m.group(1), code)
 
 
 _fails = {}
@@ -311,6 +295,12 @@ def send_mail(to, subject, body):
         return False
 
 
+def places_line():
+    c = counts()
+    return (f"Beta places: {c['approved']} of {c['limit']} have the link, {c['pending']} waiting for your decision, "
+            f"{c['waiting']} on the waiting list.")
+
+
 def notify_owner(rec, wait=False):
     to = mail_settings()["NOTIFY_TO"]
     if not to:
@@ -318,6 +308,7 @@ def notify_owner(rec, wait=False):
     body = (f"New beta sign-up\n\nEmail: {rec['email']}\nInstall: {'Google Play' if rec['route'] == 'play' else 'F-Droid'}\n"
             f"Server: {rec['server']}\nPhone: {rec['device'] or '-'}\n\n"
             f"Approve: {link(rec['id'], 'approve')}\n\nDeny: {link(rec['id'], 'deny')}\n\n"
+            f"{places_line()}\n\n"
             f"The links work for {LINK_DAYS} days. Each opens a page with a button; nothing happens until you press it.\n")
     args = (to, f"Siansa beta sign-up: {rec['email']}", body)
     if wait:
@@ -325,16 +316,27 @@ def notify_owner(rec, wait=False):
     threading.Thread(target=send_mail, args=args, daemon=True).start()
 
 
-def welcome_text(rec, code):
-    tail = ("Setting up your servers: https://github.com/echovaultstudio/siansa-beta-testers\n"
-            "Found a problem? Report it there or write to help@siansa.app.\n\nThank you for testing Siansa.\n")
+def welcome_tail():
+    return ("Setting up your servers: " + BETA_REPO_URL + "\n"
+            "Found a problem or have an idea? Report it here: " + ISSUES_URL + "\n"
+            "(Don't post passwords or your server's address. You can also write to help@siansa.app.)\n\n"
+            "Thank you for testing Siansa.\n")
+
+
+def welcome_text(rec):
     if rec["route"] == "fdroid":
         return ("Hello,\n\nYou're in the Siansa beta. To install it:\n\n1. In the F-Droid app, go to Settings > Repositories > +.\n"
-                f"2. Paste your private address:\n   {repo_url(code)}\n3. Search for Siansa and install it.\n\n"
-                "The address is yours only; please don't share it.\n" + tail)
+                f"2. Paste the beta address:\n   {repo_url()}\n3. Search for Siansa and install it.\n\n"
+                "The address is private to the beta: please don't share it.\n\n" + welcome_tail())
     return ("Hello,\n\nYou're in the Siansa beta. We're adding your Google account email to the test on Google Play. "
             "You'll get a link in a separate message; open it, tap Become a tester, then install Siansa from Play. "
-            "Please stay in the test for 14 days.\n\n" + tail)
+            "Please stay in the test for 14 days.\n\n" + welcome_tail())
+
+
+def new_link_text():
+    return ("Hello,\n\nThe Siansa beta address has changed. In the F-Droid app, remove the old Siansa beta repository "
+            "(Settings > Repositories) and add this one:\n\n   " + repo_url() + "\n\nThe old address no longer works. "
+            "Please don't share the new one.\n\n" + welcome_tail())
 
 
 DENY_TEXT = ("Hello,\n\nThank you for asking to join the Siansa beta. We can't offer you a place right now. "
@@ -342,12 +344,15 @@ DENY_TEXT = ("Hello,\n\nThank you for asking to join the Siansa beta. We can't o
 
 
 def approve_effects(rec, now=None, auto=False):
-    """After an approval is recorded: make the link, email the tester (and the owner, for automatic ones)."""
-    code = add_tester(rec["email"], now) if rec["route"] == "fdroid" else None
-    sent = send_mail(rec["email"], "Welcome to the Siansa beta", welcome_text(rec, code))
-    line = "Approved. " + ("The welcome email was sent." if sent else "The welcome email could NOT be sent: check the mail settings.")
+    """After an approval is recorded: email the tester (and the owner, for automatic ones, with the count)."""
+    if rec["route"] == "fdroid" and not repo_url():
+        line = "Approved, but there is no beta link yet, so no email was sent. Run scripts/repo-link on the server, then `signups link`."
+    else:
+        sent = send_mail(rec["email"], "Welcome to the Siansa beta", welcome_text(rec))
+        line = "Approved. " + ("The welcome email was sent." if sent else "The welcome email could NOT be sent: check the mail settings.")
     if rec["route"] == "play":
         line += f" Now add {rec['email']} to the closed test's tester list in Play Console."
+    line += " " + places_line()
     if auto:
         to = mail_settings()["NOTIFY_TO"]
         if to:
@@ -386,7 +391,8 @@ def decide(rec, action, now=None):
 
 
 def revoke(email, now=None):
-    """Take a tester's place and link away; the next one on the waiting list moves up."""
+    """Take a tester's place; the next one on the waiting list moves up. The link is shared, so to cut off
+    access for good, rotate it."""
     email = email.strip().lower()
     n = 0
     with locked():
@@ -395,11 +401,12 @@ def revoke(email, now=None):
             if r["email"] == email and st.get(r["id"]) == "approved":
                 append_event(r["id"], "revoked", now)
                 n += 1
-        testers = load_testers()
-        kept = {h: t for h, t in testers.items() if t["email"] != email}
-        if len(kept) != len(testers):
-            _write_testers(kept)
     return n, promote(now)
+
+
+def approved_fdroid_emails():
+    st = statuses()
+    return sorted({r["email"] for r in read_lines(DATA_FILE) if st.get(r["id"]) == "approved" and r["route"] == "fdroid"})
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -506,7 +513,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def cli(argv):
-    """Owner tools, run in the container: server.py revoke EMAIL, resend (the approval emails again), approve EMAIL or link EMAIL (print a private address)."""
+    """Owner tools, run in the container: server.py revoke EMAIL, resend (the approval emails again), approve EMAIL, link EMAIL, notify-new-link."""
     if len(argv) == 2 and argv[1] == "resend":
         st = statuses()
         pending = [r for r in read_lines(DATA_FILE) if st.get(r["id"]) is None and not expired(r)]
@@ -514,34 +521,38 @@ def cli(argv):
             print(("sent   " if notify_owner(r, wait=True) else "FAILED ") + r["email"])
         print(f"{len(pending)} undecided sign-up(s)")
         return True
+    if len(argv) == 2 and argv[1] == "notify-new-link":
+        for email in approved_fdroid_emails():
+            print(("sent   " if send_mail(email, "The Siansa beta address has changed", new_link_text()) else "FAILED ") + email)
+        return True
     if len(argv) == 3 and argv[1] in ("approve", "link"):
-        # For when email isn't working: approve (or give a fresh link to) someone from the server.
+        # For when email isn't working: approve (or just show the link for someone already approved) from the server.
         email = argv[2].strip().lower()
         rec, st = live_record_for(email)
         if not rec:
             print(f"No sign-up for {email}. They need to use the form on the website first.")
             return True
-        if st == "approved" or argv[1] == "approve":
+        if argv[1] == "approve" and st != "approved":
             with locked():
-                if status_of(rec["id"]) != "approved":
-                    if counts()["taken"] - (1 if st == "pending" else 0) >= LIMIT:
-                        print(f"The beta is full ({LIMIT} places). Revoke someone first.")
-                        return True
-                    append_event(rec["id"], "approved")
-        else:
+                if counts()["taken"] - (1 if st == "pending" else 0) >= LIMIT:
+                    print(f"The beta is full ({LIMIT} places). Revoke someone first.")
+                    return True
+                append_event(rec["id"], "approved")
+        elif st != "approved":
             print(f"{email} is {st}; use `approve` first.")
             return True
         if rec["route"] == "fdroid":
-            print("Private address (send it to the tester, keep it out of logs):")
-            print(repo_url(add_tester(email)))
+            print(repo_url() or "No beta link yet: run scripts/repo-link on the server first.")
         else:
             print(f"Google Play tester: add {email} to the closed test's tester list in Play Console.")
+        print(places_line())
         return True
     if len(argv) == 3 and argv[1] == "revoke":
         n, promoted = revoke(argv[2])
         print(f"revoked {n} place(s) for {argv[2]}")
         for line in promoted:
             print("from the waiting list:", line)
+        print("The beta link is shared. To cut off access, run: scripts/repo-link rotate")
         return True
     return False
 
