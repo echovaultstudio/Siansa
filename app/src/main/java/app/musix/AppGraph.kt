@@ -55,6 +55,10 @@ import app.musix.net.OpenRouterApi
 import app.musix.net.Connection
 import app.musix.net.SubsonicApi
 import app.musix.net.MusicSource
+import app.musix.net.ActiveSource
+import app.musix.net.EmbyApi
+import app.musix.net.EmbyLogins
+import app.musix.net.SourceKind
 import app.musix.offline.Downloads
 import app.musix.offline.OfflineItem
 import app.musix.offline.OfflineKind
@@ -202,11 +206,20 @@ class AppGraph(val app: Application) {
         chosenFolders = { settings.current.syncFolders }
     }
 
+    /** An Emby server (issue #113), when that's the source picked in setup. */
+    val emby = EmbyApi(
+        http,
+        settings = { settings.current },
+        deviceId = { EmbyLogins.deviceId(app) },
+        recall = { EmbyLogins.recall(app) },
+        remember = { EmbyLogins.remember(app, it) },
+    )
+
     /**
      * Where the music comes from (issue #113): what screens, mixes and services use, rather than one server's API.
-     * OpenSubsonic for now; other kinds of source ([SourceKind]) come in their own pull requests.
+     * Follows the source in the settings, so picking Emby or Navidrome in setup takes effect at once.
      */
-    val source: MusicSource = subsonic
+    val source: MusicSource = ActiveSource { if (settings.current.sourceKind == SourceKind.EMBY) emby else subsonic }
     val audioMuse = AudioMuseApi(http) { settings.current }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
     val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
@@ -228,7 +241,7 @@ class AppGraph(val app: Application) {
     /** How Liked songs and playlists are sorted (issue #257). */
     val listSort = ListSortStore(app)
     val library = LibraryRepository(app)
-    val topSongs = TopSongs(app, subsonic, library, scope)
+    val topSongs = TopSongs(app, source, library, scope)
 
     init {
         CoverStore.init(app)
@@ -237,14 +250,14 @@ class AppGraph(val app: Application) {
             songAlbums[songCover] ?: runBlocking { library.albumCoverOfSongCover(songCover) }?.also { songAlbums[songCover] = it }
         }
     }
-    val sync = LibrarySync(subsonic, library, settings, scope)
+    val sync = LibrarySync(source, library, settings, scope)
 
     val lastFm = LastFmApi(http)
     val listenBrainz = ListenBrainzApi(http)
-    val scrobbler = Scrobbler(app, settings, subsonic, lastFm, listenBrainz, scope) { id -> library.userOf(id) }
-    val favorites = Favorites(subsonic, lastFm, settings, library, scope)
+    val scrobbler = Scrobbler(app, settings, source, lastFm, listenBrainz, scope) { id -> library.userOf(id) }
+    val favorites = Favorites(subsonic, source, lastFm, settings, library, scope)
     /** Favourite albums, starred in Navidrome (issue #275). */
-    val favouriteAlbums = FavouriteAlbums(app, subsonic, scope)
+    val favouriteAlbums = FavouriteAlbums(app, source, scope)
     /** Favourite artists, starred in Navidrome (issue #397). */
     val favouriteArtists = FavouriteArtists(app, source, scope)
 
@@ -262,7 +275,7 @@ class AppGraph(val app: Application) {
     }
 
     /** Albums, playlists and songs kept on the phone for listening without a connection. */
-    val downloads = Downloads(app, subsonic, library, streamHttp, settings, scope).also { d ->
+    val downloads = Downloads(app, source, library, streamHttp, settings, scope).also { d ->
         // "Only downloaded music": every list in the app shows only what's on the phone.
         library.downloadedOnly = { if (settings.current.downloadedOnly) d.shelf.value else null }
         scope.launch(CoroutineName("downloaded-only")) {
@@ -286,7 +299,7 @@ class AppGraph(val app: Application) {
     val suggestions = ArtistSuggestions(this)
     /** Whether the server and AudioMuse can be reached, for offline messages and playing only downloads. */
     val connection = Connection(app, http, { settings.current }, scope)
-    val player = PlayerConnection(app, subsonic).apply {
+    val player = PlayerConnection(app, source).apply {
         isOffline = { connection.current.offline }
         onlyDownloads = { settings.current.downloadedOnly }
         isDownloaded = { downloads.isDownloaded(it) }
@@ -314,11 +327,11 @@ class AppGraph(val app: Application) {
         }
     }
     /** Every Navidrome playlist's songs kept on the phone (issue #251). */
-    val playlistCache = PlaylistCache(app, subsonic, library).also { cache ->
+    val playlistCache = PlaylistCache(app, source, library).also { cache ->
         downloads.playlistSongs = { id -> cache.get(id).songs }
     }
     val playlists = PlaylistEditor(
-        subsonic,
+        source,
         NavidromeNativeApi(http) { settings.current },
         library,
         localPlaylists,

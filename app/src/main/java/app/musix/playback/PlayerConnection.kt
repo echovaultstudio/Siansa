@@ -11,7 +11,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import app.musix.data.Song
 import app.musix.log.AppLog
-import app.musix.net.SubsonicApi
+import app.musix.net.MusicSource
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.flow.MutableStateFlow
 import app.musix.net.offlinePick
@@ -47,7 +47,7 @@ data class PlayerState(
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlayerConnection(
     private val context: Context,
-    private val api: SubsonicApi,
+    private val api: MusicSource,
 ) {
     private var future: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null

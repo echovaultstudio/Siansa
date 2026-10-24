@@ -11,7 +11,7 @@ import androidx.mediarouter.media.MediaRouteSelector
 import app.musix.data.Song
 import app.musix.data.cover
 import app.musix.log.AppLog
-import app.musix.net.SubsonicApi
+import app.musix.net.MusicSource
 import com.google.android.gms.cast.CastMediaControlIntent
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaMetadata
@@ -127,7 +127,7 @@ object Cast {
  * itself, converted to MP3 so any Cast device can play it, with the cover at TV size.
  */
 @OptIn(UnstableApi::class)
-class CastItems(private val api: SubsonicApi) : MediaItemConverter {
+class CastItems(private val api: MusicSource) : MediaItemConverter {
     override fun toMediaQueueItem(mediaItem: MediaItem): MediaQueueItem {
         val song = mediaItem.toSong()
         val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {

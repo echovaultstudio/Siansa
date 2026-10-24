@@ -306,7 +306,7 @@ class MixGenerator(private val graph: AppGraph) {
         val s = graph.settings.current
         if (!s.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
         val recent = graph.history.playedSince(System.currentTimeMillis() - 2 * DAY_MS)
-        val hits = graph.audioMuse.sonicFingerprint(150, s.navidromeUser, s.navidromePassword)
+        val hits = graph.audioMuse.sonicFingerprint(150, s.fingerprintUser, s.fingerprintPassword)
             .filter { it.id !in skipped && it.id !in recent }
         val picked = capPerArtist(hits.map { it to it.similarity * (0.85 + Random.nextDouble() * 0.15) }, 3, 40)
         return spreadArtists(resolve(picked.map { it.id })) to "The sound of what you play most, found by AudioMuse"
@@ -330,7 +330,7 @@ class MixGenerator(private val graph: AppGraph) {
         val heard = graph.history.all().map { it.id }.toSet()
         var seeds = taste?.favouriteSongs.orEmpty().shuffled().take(8)
         if (seeds.size < 3) {
-            seeds = runCatching { graph.audioMuse.sonicFingerprint(20, s.navidromeUser, s.navidromePassword) }
+            seeds = runCatching { graph.audioMuse.sonicFingerprint(20, s.fingerprintUser, s.fingerprintPassword) }
                 .getOrDefault(emptyList()).shuffled().take(8).map { it.id }
         }
         if (seeds.isEmpty()) return emptyList<Song>() to ""

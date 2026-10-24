@@ -2,6 +2,7 @@ package app.musix.data
 
 import app.musix.log.AppLog
 import app.musix.net.LastFmApi
+import app.musix.net.MusicSource
 import app.musix.net.SubsonicApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,8 @@ internal fun mergeLikedSongs(fromServer: List<Song>, likedHere: List<Song>, over
 
 class Favorites(
     private val subsonic: SubsonicApi,
+    /** The source in use (issue #113); another shown user's song still goes through [subsonic] with their login. */
+    private val source: MusicSource,
     private val lastFm: LastFmApi,
     private val settings: SettingsRepository,
     private val library: LibraryRepository,
@@ -61,7 +64,8 @@ class Favorites(
             // Another shown user's song is liked with their login, in their account (issue #141).
             val login = subsonic.loginFor(song.id)
             val who = login?.let { "user ${it.navidromeUser} (their song)" } ?: "user ${settings.current.navidromeUser}"
-            val ok = runCatching { if (liked) subsonic.star(song.id) else subsonic.unstar(song.id) }
+            val api: MusicSource = if (login != null) subsonic else source
+            val ok = runCatching { if (liked) api.star(song.id) else api.unstar(song.id) }
                 .onFailure { AppLog.w("Favorites", "Navidrome ${if (liked) "star" else "unstar"} for $who failed: ${it.message}") }
                 .isSuccess
             if (!ok) {
@@ -72,7 +76,7 @@ class Favorites(
             }
             AppLog.i("Favorites", "${if (liked) "Liked" else "Unliked"} ${song.id} ${song.title} for $who")
             // Read it back: Navidrome answered OK, but say so in the log if the song still isn't (un)liked there.
-            runCatching { subsonic.song(song.id).starred }
+            runCatching { api.song(song.id).starred }
                 .onSuccess { now ->
                     if (now != liked) AppLog.w("Favorites", "Navidrome answered OK but ${song.id} is ${if (now) "still" else "not"} liked there for $who")
                     else AppLog.d("Favorites", "Checked: ${song.id} is ${if (now) "liked" else "not liked"} in Navidrome for $who")

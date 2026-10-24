@@ -1,0 +1,3 @@
+### Added
+- Emby: when you set up Musix, you can now pick Emby as where your music is, and log in with your Emby user name and password. Your albums, artists, playlists and favourites come from Emby, songs play as the original files, and what you play shows in Emby as it plays (with pause and stop) and is marked as played. Similar songs and artist radio use Emby's Instant Mix, and lyrics come from Emby (4.8 or later). With Emby, everything smart (mixes made for you, Vibes, sounds-like, Song path, Your sound) comes from AudioMuse-AI, set up to read your Emby library.
+- AudioMuse-AI with several music servers (AudioMuse 3): Settings › Connections has a "Server name in AudioMuse" so it knows which of its servers is yours. Leave it empty if AudioMuse has only one.

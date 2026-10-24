@@ -51,6 +51,24 @@ class Scrobbler(
         }
     }
 
+    /**
+     * Where the playing song is (play, pause, and every so often), for servers that follow playback as it
+     * happens (Emby, issue #113). Goes with "Scrobble to the server": it's off, nothing is sent.
+     */
+    fun progress(song: Song, positionMs: Long, paused: Boolean) = timeline(song) { source.playbackProgress(song.id, positionMs, paused) }
+
+    /** The song stopped being the current one, [positionMs] in; for servers with a playback timeline. */
+    fun stopped(song: Song, positionMs: Long) = timeline(song) { source.playbackStopped(song.id, positionMs) }
+
+    private fun timeline(song: Song, send: suspend () -> Unit) {
+        val s = settings.current
+        if (!s.scrobbleNavidrome) return
+        scope.launch {
+            if (!scrobbles(song, s.scrobbleOffUsers)) return@launch
+            runCatching { send() }.onFailure { AppLog.d("Scrobble", "Playback timeline for ${song.id} not sent: ${it.message}") }
+        }
+    }
+
     /** Called when a song stops being the current one, with how long it was actually heard. */
     fun finished(song: Song, startedAtMs: Long, listenedMs: Long) {
         val durationMs = song.durationSec * 1000L

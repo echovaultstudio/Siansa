@@ -49,6 +49,7 @@ import app.musix.data.Users
 import app.musix.net.AudioMuseApi
 import app.musix.net.OpenRouterApi
 import app.musix.net.SubsonicApi
+import app.musix.net.EmbyApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.text.DateFormat
@@ -98,7 +99,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                     navidromeUrl = d.navidromeUrl, navidromeUser = d.navidromeUser, navidromePassword = d.navidromePassword,
                     proxyUser = d.proxyUser, proxyPassword = d.proxyPassword,
                     audioMuseUrl = d.audioMuseUrl, audioMuseToken = d.audioMuseToken,
-                    audioMuseUser = d.audioMuseUser, audioMusePassword = d.audioMusePassword,
+                    audioMuseUser = d.audioMuseUser, audioMusePassword = d.audioMusePassword, audioMuseServer = d.audioMuseServer,
                     openRouterKey = d.openRouterKey, openRouterModel = d.openRouterModel, aiTitles = d.aiTitles,
                 )
             )
@@ -148,18 +149,21 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
 
             Heading("${kind.label} server")
             Hint(kind.detail)
-            Field("Server address", draft.navidromeUrl, "192.168.1.10:4533") { draft = draft.copy(navidromeUrl = it) }
+            Field("Server address", draft.navidromeUrl, if (kind == SourceKind.EMBY) "192.168.1.10:8096" else "192.168.1.10:4533") { draft = draft.copy(navidromeUrl = it) }
             Field("Username", draft.navidromeUser, keyboard = KeyboardType.Text) { draft = draft.copy(navidromeUser = it) }
             SecretField("Password", draft.navidromePassword) { draft = draft.copy(navidromePassword = it) }
             if (showProxy) {
-                Hint("Only for a reverse proxy that asks for its own login before Navidrome.")
+                Hint("Only for a reverse proxy that asks for its own login before your server.")
                 Field("Proxy username", draft.proxyUser, keyboard = KeyboardType.Text) { draft = draft.copy(proxyUser = it) }
                 SecretField("Proxy password", draft.proxyPassword) { draft = draft.copy(proxyPassword = it) }
             } else {
                 TextButton(onClick = { showProxy = true }) { Text("Server behind a login page? Add a proxy login") }
             }
             TestRow(navidromeTest) {
-                runTest({ navidromeTest = it }) { s -> "Connected to " + SubsonicApi(graph.http) { s }.ping() }
+                runTest({ navidromeTest = it }) { s ->
+                    val server = if (kind == SourceKind.EMBY) EmbyApi(graph.http, { s }) else SubsonicApi(graph.http) { s }
+                    "Connected to " + server.ping()
+                }
             }
             // Smart extras turned down on the first run (issue #113): only the server. They're here later in Settings.
             if (extras || !firstRun) {
@@ -171,6 +175,11 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                 SecretField("API token", draft.audioMuseToken) { draft = draft.copy(audioMuseToken = it) }
                 Field("Username", draft.audioMuseUser, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseUser = it) }
                 SecretField("Password", draft.audioMusePassword) { draft = draft.copy(audioMusePassword = it) }
+                Field("Server name in AudioMuse", draft.audioMuseServer, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseServer = it) }
+                Hint(
+                    if (kind == SourceKind.EMBY) "AudioMuse reads your Emby library for everything smart. If AudioMuse has more than one music server, enter this Emby server's name as it is in AudioMuse."
+                    else "Only if AudioMuse has more than one music server: this server's name as it is in AudioMuse. Leave empty for its main one."
+                )
                 TestRow(audioMuseTest) {
                     runTest({ audioMuseTest = it }) { s ->
                         val hits = AudioMuseApi(graph.http) { s }.textSearch("calm piano", 3)
