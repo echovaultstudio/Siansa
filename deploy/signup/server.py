@@ -248,8 +248,14 @@ def store_report_privately(rec_id, issue=None, now=None, call=None):
                 if e.code != 422 or attempt == 2:
                     raise
         return False
-    except Exception as e:  # never log the content
-        print("report copy failed:", type(e).__name__, flush=True)
+    except Exception as e:  # never log the content; GitHub's status and message are safe and say why
+        why = type(e).__name__
+        if isinstance(e, urllib.error.HTTPError):
+            try:
+                why = f"HTTP {e.code} {json.load(e).get('message', '')}"
+            except Exception:
+                why = f"HTTP {e.code}"
+        print("report copy failed:", why, flush=True)
         return False
 
 
