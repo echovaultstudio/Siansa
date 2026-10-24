@@ -168,8 +168,9 @@ the words and the report id is opened in `siansa-beta-testers`. To turn issues o
 GitHub › Settings › Developer settings › Personal access tokens › Fine-grained: only the `siansa-beta-testers`
 repo, permission **Issues: Read and write**, nothing else. Put it in `.env` as `GITHUB_TOKEN=` and run
 `docker compose up -d`. Without it the log is still kept. To also keep a copy of each log in a private repository (so it can be read next to its issue),
-create a private repo such as `siansa-reports` with a README (it needs a `main` branch), add it to the same token
-with **Contents: Read and write**, and set `REPORTS_REPO=echovaultstudio/siansa-reports` in `.env`. Delete old reports with `sudo rm /srv/siansa-signups/reports/<id>.*`.
+create a private repo such as `siansa-logs` with a README (it needs a `main` branch), make a second fine-grained token
+for that repo only with **Contents: Read and write**, and set `REPORTS_REPO=echovaultstudio/siansa-logs` and
+`REPORTS_TOKEN=` in `.env`. Delete old reports with `sudo rm /srv/siansa-signups/reports/<id>.*`.
 
 ### 7. The demo server for Google (and testers)
 Google reviews the app before testers get it, and needs a server to log in to: without one, the review fails
