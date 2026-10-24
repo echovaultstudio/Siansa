@@ -13,6 +13,7 @@ import app.siansa.offline.OnlyDownloaded
 import app.siansa.playback.playLimit
 import app.siansa.ui.sourceChipLabels
 import app.siansa.ui.sourceFilterActive
+import app.siansa.ui.canToggleUser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -118,5 +119,11 @@ class SourcesTest {
         assertEquals(false, sourceFilterActive(downloadedOnly = false, shownUsers = 1))
         assertEquals(true, sourceFilterActive(downloadedOnly = false, shownUsers = 2))
         assertEquals(true, sourceFilterActive(downloadedOnly = true, shownUsers = 1))
+        // Issue #427: the user in use's music can be hidden (no restart) only while another user's shows.
+        assertEquals(false, canToggleUser(connected = true, inUse = true, ownHidden = false, shownUsers = 1))
+        assertEquals(true, canToggleUser(connected = true, inUse = true, ownHidden = false, shownUsers = 2))
+        assertEquals(true, canToggleUser(connected = true, inUse = true, ownHidden = true, shownUsers = 2))
+        assertEquals(true, canToggleUser(connected = true, inUse = false, ownHidden = false, shownUsers = 1))
+        assertEquals(false, canToggleUser(connected = false, inUse = false, ownHidden = false, shownUsers = 1))
     }
 }
