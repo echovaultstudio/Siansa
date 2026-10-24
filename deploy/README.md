@@ -118,6 +118,9 @@ sudo sh scripts/signups fdroid
 sudo sh scripts/signups csv
 sudo sh scripts/signups revoke EMAIL   # take away a tester's F-Droid login
 ```
+The approval emails didn't arrive (mail settings were wrong at the time)? After fixing `.env` and `docker compose up -d`:
+`sudo docker compose exec signup python -I /app/server.py resend` sends them again for every undecided sign-up.
+
 A tester who loses their login: `revoke` it and ask them to sign up again. Logins are kept only as hashes, so
 nobody (including you) can read a password back.
 

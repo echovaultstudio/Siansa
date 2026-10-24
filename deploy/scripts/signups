@@ -5,6 +5,7 @@
 #   sudo sh scripts/signups fdroid     just the approved F-Droid emails
 #   sudo sh scripts/signups csv        everything as CSV
 #   sudo sh scripts/signups revoke EMAIL   take away a tester's F-Droid login
+#   (resend the approval emails: sudo docker compose exec signup python -I /app/server.py resend)
 set -eu
 FILE="${SIGNUPS_FILE:-/srv/siansa-signups/signups.jsonl}"
 if [ "${1:-}" = revoke ]; then

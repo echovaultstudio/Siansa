@@ -108,6 +108,15 @@ class FlowTest(unittest.TestCase):
         server.add_tester("a@b.co"); server.add_tester("a@b.co")
         self.assertEqual(len(server.load_testers()), 1)
 
+    def test_resend_mails_only_undecided(self):
+        server.NOTIFY_TO = None
+        os.environ["NOTIFY_TO"] = "me@example.com"
+        a = self.signup(); b = self.signup()
+        server.decide(a, "deny"); self.sent.clear()
+        self.assertTrue(server.cli(["server.py", "resend"]))
+        self.assertEqual(len(self.sent), 1)
+        self.assertIn(server.link(b["id"], "approve"), self.sent[0][2])
+
     def test_link_expires(self):
         rec = self.signup()
         self.assertFalse(server.expired(rec))

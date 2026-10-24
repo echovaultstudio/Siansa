@@ -269,7 +269,7 @@ def send_mail(to, subject, body):
         return False
 
 
-def notify_owner(rec):
+def notify_owner(rec, wait=False):
     cfg = mail_settings()
     to = cfg["NOTIFY_TO"]
     if not to:
@@ -278,7 +278,10 @@ def notify_owner(rec):
             f"Server: {rec['server']}\nPhone: {rec['device'] or '-'}\n\n"
             f"Approve: {link(rec['id'], 'approve')}\n\nDeny: {link(rec['id'], 'deny')}\n\n"
             f"The links work for {LINK_DAYS} days. Each opens a page with a button; nothing happens until you press it.\n")
-    threading.Thread(target=send_mail, args=(to, f"Siansa beta sign-up: {rec['email']}", body), daemon=True).start()
+    args = (to, f"Siansa beta sign-up: {rec['email']}", body)
+    if wait:
+        return send_mail(*args)
+    threading.Thread(target=send_mail, args=args, daemon=True).start()
 
 
 def welcome_text(rec, creds):
@@ -418,7 +421,13 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def cli(argv):
-    """Owner tools, run on the server: python3 server.py revoke EMAIL"""
+    """Owner tools, run on the server: server.py revoke EMAIL, or server.py resend (the approval emails again)."""
+    if len(argv) == 2 and argv[1] == "resend":
+        pending = [r for r in read_lines(DATA_FILE) if not decision_of(r["id"]) and not expired(r)]
+        for r in pending:
+            print(("sent   " if notify_owner(r, wait=True) else "FAILED ") + r["email"])
+        print(f"{len(pending)} undecided sign-up(s)")
+        return True
     if len(argv) == 3 and argv[1] == "revoke":
         print(f"removed {remove_tester(argv[2].strip().lower())} login(s) for {argv[2]}")
         return True
