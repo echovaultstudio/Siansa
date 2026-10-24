@@ -6,16 +6,20 @@ Standard library only.
   sign-ups (signups.jsonl) and emails the owner two signed links, Approve and Deny.
 - /signup/decide: the page behind those links. A link only shows a page; the decision is made by a button
   (POST), so mail scanners that open links can't approve anyone.
-- Approve: F-Droid testers get their own login (testers.json, passwords stored hashed) and a welcome email;
-  Play testers get a welcome email and the owner adds them to the Play Console tester list. Deny sends a polite no.
-- GET /auth: Caddy asks this before serving /fdroid/repo (forward_auth); 200 for a tester's login, else 401.
+- Approve: F-Droid testers get their own private link to the repo (testers.json keeps only a hash of it) and a
+  welcome email; Play testers get a welcome email and the owner adds them to the Play Console tester list.
+  Deny sends a polite no.
+- Places: BETA_LIMIT (12) testers at a time, Play and F-Droid together. When the beta is full, new sign-ups go on a waiting list and are
+  approved automatically, oldest first, when a place frees up (a deny or `revoke`).
+- GET /signup/count: places taken, for the home page.
+- GET /auth: Caddy asks this before serving /fdroid/t/<link>/repo (forward_auth); 200 for a valid link, else 404.
 No IP addresses are stored, no cookies, no third parties. Caddy passes /signup*, and /auth for its own checks.
 """
-import base64
 import calendar
 import fcntl
 import hashlib
 import hmac
+import contextlib
 import html
 import json
 import os
@@ -34,10 +38,12 @@ DATA_FILE = os.environ.get("SIGNUPS_FILE", "/data/signups.jsonl")
 DATA_DIR = os.path.dirname(DATA_FILE)
 DECISIONS_FILE = os.path.join(DATA_DIR, "decisions.jsonl")
 TESTERS_FILE = os.path.join(DATA_DIR, "testers.json")
+LOCK_FILE = os.path.join(DATA_DIR, "state.lock")
 SECRET = os.environ.get("SIGNUP_SECRET", "")
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "https://siansa.app").rstrip("/")
 LINK_DAYS = 14
 FAILS_PER_HOUR = 30
+LIMIT = int(os.environ.get("BETA_LIMIT", "12") or 12)
 MAX_BODY = 4096
 EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,255}\.[^@\s]{2,63}$")
 # Abuse limits: 10 tries per address-hash per hour, and 60 accepted sign-ups per hour in total.
@@ -123,7 +129,89 @@ def save(record):
         os.close(fd)
 
 
-# ---------- decisions: signed links ----------
+# ---------- state: who is pending, waiting, approved, denied, revoked ----------
+
+@contextlib.contextmanager
+def locked():
+    """One writer at a time, across threads and processes (the owner's CLI runs beside the service)."""
+    fd = os.open(LOCK_FILE, os.O_WRONLY | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(fd)
+
+
+def read_lines(path):
+    try:
+        with open(path) as f:
+            return [json.loads(x) for x in f if x.strip()]
+    except FileNotFoundError:
+        return []
+
+
+def append_event(rec_id, status, now=None):
+    fd = os.open(DECISIONS_FILE, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+    try:
+        os.write(fd, (json.dumps({"id": rec_id, "status": status,
+                                  "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now or time.time()))}) + "\n").encode())
+    finally:
+        os.close(fd)
+
+
+def statuses():
+    """id -> latest status: waiting, approved, denied or revoked. No entry means pending (waiting for the owner)."""
+    out = {}
+    for d in read_lines(DECISIONS_FILE):
+        out[d["id"]] = d["status"]
+    return out
+
+
+def status_of(rec_id):
+    return statuses().get(rec_id)
+
+
+def find_record(rec_id):
+    for r in read_lines(DATA_FILE):
+        if r.get("id") == rec_id:
+            return r
+    return None
+
+
+def counts():
+    st = statuses()
+    c = {"approved": 0, "pending": 0, "waiting": 0}
+    for r in read_lines(DATA_FILE):
+        s = st.get(r["id"], "pending")
+        if s in c:
+            c[s] += 1
+    return {"limit": LIMIT, "taken": c["approved"] + c["pending"], "waiting": c["waiting"]}
+
+
+def live_record_for(email):
+    """The sign-up of this email that is still alive (pending, waiting or approved), if any."""
+    st = statuses()
+    for r in reversed(read_lines(DATA_FILE)):
+        if r["email"] == email and st.get(r["id"], "pending") in ("pending", "waiting", "approved"):
+            return r, st.get(r["id"], "pending")
+    return None, None
+
+
+def accept(record, now=None):
+    """Save a checked sign-up. Returns (record, state): state is 'new', 'waiting' (beta full) or 'again'
+    (this email is already signed up, nothing saved)."""
+    with locked():
+        old, _ = live_record_for(record["email"])
+        if old:
+            return old, "again"
+        full = counts()["taken"] >= LIMIT
+        save(record)
+        if full:
+            append_event(record["id"], "waiting", now)
+        return record, "waiting" if full else "new"
+
+
+# ---------- signed links for the owner ----------
 
 def sign(rec_id, action):
     return hmac.new(SECRET.encode(), f"{rec_id}:{action}".encode(), hashlib.sha256).hexdigest()[:32]
@@ -137,37 +225,15 @@ def link(rec_id, action):
     return f"{PUBLIC_URL}/signup/decide?id={rec_id}&a={action}&t={sign(rec_id, action)}"
 
 
-def read_lines(path):
-    try:
-        with open(path) as f:
-            return [json.loads(x) for x in f if x.strip()]
-    except FileNotFoundError:
-        return []
-
-
-def find_record(rec_id):
-    for r in read_lines(DATA_FILE):
-        if r.get("id") == rec_id:
-            return r
-    return None
-
-
-def decision_of(rec_id):
-    for d in read_lines(DECISIONS_FILE):
-        if d["id"] == rec_id:
-            return d["status"]
-    return None
-
-
 def expired(rec, now=None):
     t = calendar.timegm(time.strptime(rec["time"], "%Y-%m-%dT%H:%M:%SZ"))
     return (time.time() if now is None else now) - t > LINK_DAYS * 86400
 
 
-# ---------- testers: the F-Droid logins ----------
+# ---------- testers: the private F-Droid links ----------
 
-def hash_password(password, salt):
-    return hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 100_000).hex()
+def token_hash(token):
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def load_testers():
@@ -178,63 +244,38 @@ def load_testers():
         return {}
 
 
+def _write_testers(testers):
+    tmp = TESTERS_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        os.fchmod(f.fileno(), 0o600)
+        json.dump(testers, f)
+    os.replace(tmp, TESTERS_FILE)
+
+
 def add_tester(email, now=None):
-    """Make a login for this person. Returns (username, password); only the hash is kept."""
-    username = "tester-" + secrets.token_hex(3)
-    password = secrets.token_urlsafe(18)
-    salt = secrets.token_bytes(16)
-    fd = os.open(TESTERS_FILE + ".lock", os.O_WRONLY | os.O_CREAT, 0o600)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        testers = load_testers()
-        testers = {u: t for u, t in testers.items() if t["email"] != email}  # a new login replaces the old one
-        testers[username] = {"email": email, "salt": salt.hex(), "hash": hash_password(password, salt),
-                             "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now or time.time()))}
-        tmp = TESTERS_FILE + ".tmp"
-        with open(tmp, "w") as f:
-            os.fchmod(f.fileno(), 0o600)
-            json.dump(testers, f)
-        os.replace(tmp, TESTERS_FILE)
-    finally:
-        os.close(fd)
-    return username, password
+    """Make this person's private link. Returns the link's secret code; only its hash is kept."""
+    code = secrets.token_urlsafe(24)
+    with locked():
+        testers = {h: t for h, t in load_testers().items() if t["email"] != email}  # a new link replaces the old
+        testers[token_hash(code)] = {"email": email,
+                                     "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now or time.time()))}
+        _write_testers(testers)
+    return code
 
 
-def remove_tester(email):
-    fd = os.open(TESTERS_FILE + ".lock", os.O_WRONLY | os.O_CREAT, 0o600)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        testers = load_testers()
-        kept = {u: t for u, t in testers.items() if t["email"] != email.lower()}
-        with open(TESTERS_FILE + ".tmp", "w") as f:
-            os.fchmod(f.fileno(), 0o600)
-            json.dump(kept, f)
-        os.replace(TESTERS_FILE + ".tmp", TESTERS_FILE)
-        return len(testers) - len(kept)
-    finally:
-        os.close(fd)
+def repo_url(code):
+    return f"{PUBLIC_URL}/fdroid/t/{code}/repo"
 
 
-_ok_cache = {}  # sha256 of an accepted Authorization header -> expiry; saves hashing on every file of a download
+LINK_PATH = re.compile(r"^/fdroid/t/([A-Za-z0-9_-]{20,})/repo(?:/|$)")
+
+
+def valid_link(uri):
+    m = LINK_PATH.match((uri or "").split("?", 1)[0])
+    return bool(m) and token_hash(m.group(1)) in load_testers()
+
+
 _fails = {}
-
-
-def check_login(header):
-    if not header or not header.startswith("Basic "):
-        return False
-    key = hashlib.sha256(header.encode()).hexdigest()
-    now = time.time()
-    if _ok_cache.get(key, 0) > now:
-        return True
-    try:
-        user, _, password = base64.b64decode(header[6:], validate=True).decode().partition(":")
-    except Exception:
-        return False
-    t = load_testers().get(user)
-    if t and hmac.compare_digest(hash_password(password, bytes.fromhex(t["salt"])), t["hash"]):
-        _ok_cache[key] = now + 300
-        return True
-    return False
 
 
 def too_many_fails(client, now):
@@ -265,14 +306,13 @@ def send_mail(to, subject, body):
                 s.login(cfg["SMTP_USER"], cfg["SMTP_PASSWORD"])
             s.send_message(msg)
         return True
-    except Exception as e:  # never log the message: it can hold a password
+    except Exception as e:  # never log the message: it can hold a private link
         print("mail failed:", type(e).__name__, flush=True)
         return False
 
 
 def notify_owner(rec, wait=False):
-    cfg = mail_settings()
-    to = cfg["NOTIFY_TO"]
+    to = mail_settings()["NOTIFY_TO"]
     if not to:
         return
     body = (f"New beta sign-up\n\nEmail: {rec['email']}\nInstall: {'Google Play' if rec['route'] == 'play' else 'F-Droid'}\n"
@@ -285,56 +325,95 @@ def notify_owner(rec, wait=False):
     threading.Thread(target=send_mail, args=args, daemon=True).start()
 
 
-def welcome_text(rec, creds):
+def welcome_text(rec, code):
+    tail = ("Setting up your servers: https://github.com/echovaultstudio/siansa-beta-testers\n"
+            "Found a problem? Report it there or write to help@siansa.app.\n\nThank you for testing Siansa.\n")
     if rec["route"] == "fdroid":
-        user, password = creds
-        return (f"Hello,\n\nYou're in the Siansa beta. To install it:\n\n1. In the F-Droid app, go to Settings > Repositories > +.\n"
-                f"2. Address: {PUBLIC_URL}/fdroid/repo\n3. When it asks for a login, use:\n   User name: {user}\n   Password: {password}\n"
-                f"4. Search for Siansa and install it.\n\nThe login is yours only; please don't share it. "
-                f"Setting up your servers: https://github.com/echovaultstudio/siansa-beta-testers\n"
-                f"Found a problem? Report it there or write to help@siansa.app.\n\nThank you for testing Siansa.\n")
+        return ("Hello,\n\nYou're in the Siansa beta. To install it:\n\n1. In the F-Droid app, go to Settings > Repositories > +.\n"
+                f"2. Paste your private address:\n   {repo_url(code)}\n3. Search for Siansa and install it.\n\n"
+                "The address is yours only; please don't share it.\n" + tail)
     return ("Hello,\n\nYou're in the Siansa beta. We're adding your Google account email to the test on Google Play. "
             "You'll get a link in a separate message; open it, tap Become a tester, then install Siansa from Play. "
-            "Please stay in the test for 14 days.\n\nSetting up your servers: https://github.com/echovaultstudio/siansa-beta-testers\n"
-            "Found a problem? Report it there or write to help@siansa.app.\n\nThank you for testing Siansa.\n")
+            "Please stay in the test for 14 days.\n\n" + tail)
 
 
 DENY_TEXT = ("Hello,\n\nThank you for asking to join the Siansa beta. We can't offer you a place right now. "
              "We'll write if that changes.\n\nSiansa\n")
 
 
-def decide(rec, action, now=None):
-    """Record the decision, make the login, send the email. Returns a line for the owner."""
-    fd = os.open(DECISIONS_FILE, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        if decision_of(rec["id"]):
-            return None
-        status = "approved" if action == "approve" else "denied"
-        os.write(fd, (json.dumps({"id": rec["id"], "status": status, "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now or time.time()))}) + "\n").encode())
-    finally:
-        os.close(fd)
-    if action == "deny":
-        sent = send_mail(rec["email"], "Your Siansa beta request", DENY_TEXT)
-        return "Denied. " + ("A short no was emailed." if sent else "The email could not be sent.")
-    creds = add_tester(rec["email"], now) if rec["route"] == "fdroid" else None
-    sent = send_mail(rec["email"], "Welcome to the Siansa beta", welcome_text(rec, creds))
+def approve_effects(rec, now=None, auto=False):
+    """After an approval is recorded: make the link, email the tester (and the owner, for automatic ones)."""
+    code = add_tester(rec["email"], now) if rec["route"] == "fdroid" else None
+    sent = send_mail(rec["email"], "Welcome to the Siansa beta", welcome_text(rec, code))
     line = "Approved. " + ("The welcome email was sent." if sent else "The welcome email could NOT be sent: check the mail settings.")
     if rec["route"] == "play":
         line += f" Now add {rec['email']} to the closed test's tester list in Play Console."
+    if auto:
+        to = mail_settings()["NOTIFY_TO"]
+        if to:
+            send_mail(to, f"Siansa beta: {rec['email']} came off the waiting list", f"{rec['email']} ({rec['route']}) was approved automatically.\n{line}\n")
     return line
+
+
+def promote(now=None):
+    """While there is a free place, approve the oldest waiting sign-up. Returns one line per person."""
+    lines = []
+    while True:
+        with locked():
+            if counts()["taken"] >= LIMIT:
+                break
+            st = statuses()
+            nxt = next((r for r in read_lines(DATA_FILE) if st.get(r["id"]) == "waiting"), None)
+            if not nxt:
+                break
+            append_event(nxt["id"], "approved", now)
+        lines.append(f"{nxt['email']}: " + approve_effects(nxt, now, auto=True))
+    return lines
+
+
+def decide(rec, action, now=None):
+    """Record the owner's decision, then do what follows. Returns a line for the owner, or None if already decided."""
+    with locked():
+        if status_of(rec["id"]) in ("approved", "denied", "revoked"):
+            return None
+        append_event(rec["id"], "approved" if action == "approve" else "denied", now)
+    if action == "deny":
+        sent = send_mail(rec["email"], "Your Siansa beta request", DENY_TEXT)
+        line = "Denied. " + ("A short no was emailed." if sent else "The email could not be sent.")
+        promoted = promote(now)  # a place may have freed up
+        return line + (f" Waiting list: {'; '.join(promoted)}" if promoted else "")
+    return approve_effects(rec, now)
+
+
+def revoke(email, now=None):
+    """Take a tester's place and link away; the next one on the waiting list moves up."""
+    email = email.strip().lower()
+    n = 0
+    with locked():
+        st = statuses()
+        for r in read_lines(DATA_FILE):
+            if r["email"] == email and st.get(r["id"]) == "approved":
+                append_event(r["id"], "revoked", now)
+                n += 1
+        testers = load_testers()
+        kept = {h: t for h, t in testers.items() if t["email"] != email}
+        if len(kept) != len(testers):
+            _write_testers(kept)
+    return n, promote(now)
 
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "siansa-signup"
     sys_version = ""
 
-    def _send(self, status, body, extra=()):
+    def _send(self, status, body, extra=(), ctype="text/html; charset=utf-8"):
         self.send_response(status)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         for k, v in extra:
+            if k == "Cache-Control":
+                continue
             self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
@@ -354,9 +433,11 @@ class Handler(BaseHTTPRequestHandler):
         rec = find_record(rec_id)
         if not rec:
             return page("Not found", "<p>That sign-up doesn't exist any more.</p>", 404)
-        already = decision_of(rec_id)
-        if already:
+        already = status_of(rec_id)
+        if already in ("approved", "denied", "revoked"):
             return page("Already decided", f"<p>{html.escape(rec['email'])} was already {already}.</p>")
+        if already == "waiting":
+            return page("On the waiting list", f"<p>{html.escape(rec['email'])} is on the waiting list and will be approved automatically when a place is free.</p>")
         if expired(rec):
             return page("Link expired", f"<p>This link is older than {LINK_DAYS} days.</p>", 410)
         if not confirm:
@@ -396,21 +477,24 @@ class Handler(BaseHTTPRequestHandler):
         record, problems = check(form, now)
         if problems:
             return self._send(*problems_page(problems))
-        save(record)
+        rec, state = accept(record, now)
         _accepted.append(now)
-        print("signup accepted", record["route"], record["server"], flush=True)  # no email in the log
-        notify_owner(record)
-        self._send(303, b"", [("Location", "/signup-thanks-play" if record["route"] == "play" else "/signup-thanks")])
+        print("signup", state, record["route"], record["server"], flush=True)  # no email in the log
+        if state == "new":
+            notify_owner(rec)
+        where = "/signup-waiting" if state == "waiting" else ("/signup-thanks-play" if rec["route"] == "play" else "/signup-thanks")
+        self._send(303, b"", [("Location", where)])
 
     def do_GET(self):
         parts = urlsplit(self.path)
-        if parts.path == "/auth":  # Caddy's forward_auth for /fdroid/repo
-            now = time.time()
-            if check_login(self.headers.get("Authorization")):
+        if parts.path == "/auth":  # Caddy's forward_auth for /fdroid/t/<link>/repo
+            if valid_link(self.headers.get("X-Forwarded-Uri")):
                 return self._send(200, b"ok")
-            if too_many_fails(self._client(), now):
+            if too_many_fails(self._client(), time.time()):
                 return self._send(429, b"slow down")
-            return self._send(401, b"Login needed", [("WWW-Authenticate", 'Basic realm="Siansa beta", charset="UTF-8"')])
+            return self._send(404, b"Not found")
+        if parts.path == "/signup/count":
+            return self._send(200, json.dumps(counts()).encode(), ctype="application/json")
         if parts.path == "/signup/decide":
             if too_many_fails(self._client(), time.time()):
                 return self._send(*page("Slow down", "<p>Too many tries.</p>", 429))
@@ -422,15 +506,19 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def cli(argv):
-    """Owner tools, run on the server: server.py revoke EMAIL, or server.py resend (the approval emails again)."""
+    """Owner tools, run in the container: server.py revoke EMAIL, or server.py resend (the approval emails again)."""
     if len(argv) == 2 and argv[1] == "resend":
-        pending = [r for r in read_lines(DATA_FILE) if not decision_of(r["id"]) and not expired(r)]
+        st = statuses()
+        pending = [r for r in read_lines(DATA_FILE) if st.get(r["id"]) is None and not expired(r)]
         for r in pending:
             print(("sent   " if notify_owner(r, wait=True) else "FAILED ") + r["email"])
         print(f"{len(pending)} undecided sign-up(s)")
         return True
     if len(argv) == 3 and argv[1] == "revoke":
-        print(f"removed {remove_tester(argv[2].strip().lower())} login(s) for {argv[2]}")
+        n, promoted = revoke(argv[2])
+        print(f"revoked {n} place(s) for {argv[2]}")
+        for line in promoted:
+            print("from the waiting list:", line)
         return True
     return False
 
@@ -440,5 +528,7 @@ if __name__ == "__main__":
         sys.exit(0)
     if not SECRET:
         print("SIGNUP_SECRET is not set: approval links will not work", flush=True)
+    for _ in promote():  # a raised BETA_LIMIT lets the waiting list move up
+        print("moved someone up from the waiting list", flush=True)
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
