@@ -1,16 +1,16 @@
 # Changelog
 
-Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
+Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
 ## 0.28.0beta — 2026-10-24
 
 ### Added
-- Emby: when you set up Musix, you can now pick Emby as where your music is, and log in with your Emby user name and password. Your albums, artists, playlists and favourites come from Emby, songs play as the original files, and what you play shows in Emby as it plays (with pause and stop) and is marked as played. Similar songs and artist radio use Emby's Instant Mix, and lyrics come from Emby (4.8 or later). With Emby, everything smart (mixes made for you, Vibes, sounds-like, Song path, Your sound) comes from AudioMuse-AI, set up to read your Emby library.
+- Emby: when you set up Siansa, you can now pick Emby as where your music is, and log in with your Emby user name and password. Your albums, artists, playlists and favourites come from Emby, songs play as the original files, and what you play shows in Emby as it plays (with pause and stop) and is marked as played. Similar songs and artist radio use Emby's Instant Mix, and lyrics come from Emby (4.8 or later). With Emby, everything smart (mixes made for you, Vibes, sounds-like, Song path, Your sound) comes from AudioMuse-AI, set up to read your Emby library.
 - AudioMuse-AI with several music servers (AudioMuse 3): Settings › Connections has a "Server name in AudioMuse" so it knows which of its servers is yours. Leave it empty if AudioMuse has only one.
 
 ### Changed
-- **Setting up Musix starts by asking where your music is.** A new setup now opens on "Where's your music?":
+- **Setting up Siansa starts by asking where your music is.** A new setup now opens on "Where's your music?":
   pick OpenSubsonic (Navidrome, Gonic, Airsonic, Ampache and others), then choose whether to add AudioMuse-AI,
   then enter your server's address and login. Jellyfin, Emby and files on your phone are listed as coming soon.
   Settings › Connections now calls the server "OpenSubsonic server". Nothing changes for an app that's already
@@ -24,7 +24,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 ### Fixed
 - **Popular songs on an artist's page no longer keep you waiting.** The first time you open an artist, their
   songs you've played most show straight away, and Navidrome's popular songs fade in when they arrive. While a
-  song plays, Musix also fetches its artist's popular songs in the background, so their page is usually ready
+  song plays, Siansa also fetches its artist's popular songs in the background, so their page is usually ready
   before you open it.
 
 ### Added
@@ -36,7 +36,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
   drag through the whole list, and a label next to your finger shows where you are, such as "Mar 2025" or
   "120 plays".
 - **Favourite artists.** Tap the heart at the top of an artist's page to make them a favourite. It's saved in
-  Navidrome, so other apps see it too, and artists you've starred elsewhere show up in Musix. You'll find them
+  Navidrome, so other apps see it too, and artists you've starred elsewhere show up in Siansa. You'll find them
   all under Your Library › Favourites › Favourite artists, with round pictures, as a grid or a list.
 
 ## 0.26.0beta — 2026-10-23
@@ -98,8 +98,8 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
   discs with their own artwork now show their own cover. When a song's cover is just the album's again, an
   animated album cover still plays.
 - **Several artists tagged in one name showed as one artist.** A name like "Rudimental, Orginal Koffee & Winny"
-  is now shown as its own artists when Musix can tell them apart: each artist's page includes those songs and
-  albums, and Go to artist lets you pick one. Musix now keeps each artist's MusicBrainz ID to check this, and
+  is now shown as its own artists when Siansa can tell them apart: each artist's page includes those songs and
+  albums, and Go to artist lets you pick one. Siansa now keeps each artist's MusicBrainz ID to check this, and
   never splits an artist that has its own (like "Earth, Wind & Fire"). It takes effect after the next sync.
 
 ### Added
@@ -174,7 +174,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 
 ### Changed
 - **Tapping Home while on the Home page takes you back to its top.** Coming back to Home from another page or tab still keeps your place.
-- **The time machine shows its list straight away.** Your plays from Koito (or Musix's own history) appear first, and Last.fm's are added in place when they arrive, instead of everything waiting a few seconds for Last.fm. Months and years that have ended are kept on the phone, so going back to one needs no waiting at all.
+- **The time machine shows its list straight away.** Your plays from Koito (or Siansa's own history) appear first, and Last.fm's are added in place when they arrive, instead of everything waiting a few seconds for Last.fm. Months and years that have ended are kept on the phone, so going back to one needs no waiting at all.
 
 ## 0.22.1beta — 2026-10-20
 
@@ -211,13 +211,13 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 ## 0.20.0beta — 2026-10-20
 
 ### Fixed
-- **Download all covers didn't start.** Tapping Download covers now did nothing, especially with a VPN on over Wi-Fi: Android treats most VPNs as metered, so the download kept waiting for an unmetered network. It now starts straight away, and if it can't run on this network it says why. Musix still only downloads on Wi-Fi at home (or any Wi-Fi, if you switch that on).
+- **Download all covers didn't start.** Tapping Download covers now did nothing, especially with a VPN on over Wi-Fi: Android treats most VPNs as metered, so the download kept waiting for an unmetered network. It now starts straight away, and if it can't run on this network it says why. Siansa still only downloads on Wi-Fi at home (or any Wi-Fi, if you switch that on).
 
 ### Added
 - **Download all covers has a Wi-Fi only switch**, like offline songs. With Wi-Fi only on, covers and offline songs never download over a VPN or mobile data. Turn it off to let them download on any connection, VPN included.
 
 ### Changed
-- **A VPN counts as mobile data.** While a VPN is on, Musix uses your mobile data settings: streaming quality, how many songs load ahead, and downloads.
+- **A VPN counts as mobile data.** While a VPN is on, Siansa uses your mobile data settings: streaming quality, how many songs load ahead, and downloads.
 
 ## 0.19.2beta — 2026-10-20
 
@@ -227,7 +227,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 - **Wind down didn't follow what you were playing.** It now starts from the song playing and moves step by step to calmer, quieter songs (AudioMuse song path).
 - **The Library took 15 to 20 seconds to show when offline.** It now shows straight away from what's on the
   phone, and fills in Navidrome's recently played albums, playlists and favourites once the server answers.
-- **Musix stayed offline after the connection came back.** It now notices within seconds, instead of up to
+- **Siansa stayed offline after the connection came back.** It now notices within seconds, instead of up to
   three minutes later.
 
 ## 0.19.1beta — 2026-10-20
@@ -261,7 +261,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 ## 0.18.0beta — 2026-10-20
 
 ### Fixed
-- **Songs you like now show in Liked songs straight away.** The list asked Navidrome too early, before it had saved the like, so new likes only showed up later. Musix now also checks that Navidrome really saved each like, and says which user it went to in the log.
+- **Songs you like now show in Liked songs straight away.** The list asked Navidrome too early, before it had saved the like, so new likes only showed up later. Siansa now also checks that Navidrome really saved each like, and says which user it went to in the log.
 
 ### Added
 - **A carousel of your own mixes on Home.** Swipe through 3 or 4 mixes for the time of day, like Your morning with Wake up, Caffeine kick, Mellow morning and Sunny start. They are made each day, sound different and never share songs. Change their names, sounds and hours in Vibes › Home carousel, or hide the carousel with Arrange Home.
@@ -270,7 +270,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 - **Sort Liked songs and playlists.** Chips under the title sort them by when you liked them (Liked songs) or the playlist's own order, last played, date added, title or artist. Each list remembers its choice, and Play and Shuffle follow it.
 
 ### Changed
-- **Playlists open and play faster.** Musix keeps each playlist's songs on the phone and only asks Navidrome again when the playlist has changed there. Songs you add or remove still go to Navidrome straight away, and an unreachable server falls back to the songs kept on the phone.
+- **Playlists open and play faster.** Siansa keeps each playlist's songs on the phone and only asks Navidrome again when the playlist has changed there. Songs you add or remove still go to Navidrome straight away, and an unreachable server falls back to the songs kept on the phone.
 - **Search no longer shows "Moods in your library".** The Radios and Genres to browse stay.
 - **Your sonic fingerprint moved from Home to Your Library › Your listening**, on a page of its own. It shows its numbers (tempo, key, top mood, songs) as tiles above the mood bars, with the songs listed underneath to play.
 
@@ -339,11 +339,11 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 
 ### Added
 - **Similar songs and similar albums.** Find them from the now playing ⋮ menu and any song's ⋮ menu; albums also from the
-  new ⋮ menu on an album page. Similar albums need the Musix plugin on your AudioMuse server.
-- **Fans also like** on an artist page now includes artists that sound alike, found by the Musix plugin.
+  new ⋮ menu on an album page. Similar albums need the Siansa plugin on your AudioMuse server.
+- **Fans also like** on an artist page now includes artists that sound alike, found by the Siansa plugin.
 
 ### Changed
-- **Levelling and smooth crossfades now come from the Musix plugin.** Musix has its own plugin for AudioMuse-AI
+- **Levelling and smooth crossfades now come from the Siansa plugin.** Siansa has its own plugin for AudioMuse-AI
   (in `audiomuse-plugin/`), which measures each song's loudness and how it starts and ends. Install it on your
   AudioMuse server in place of the plugin used before. Your choice under Crossfade and levelling carries over.
 
@@ -379,18 +379,18 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
   - **"More like this playlist"** in a playlist's ⋮ menu: new songs that sound like the whole playlist blended together.
 
 ### Changed
-- Song radios and "Discover for you" use Navidrome's own sonic similarity when the AudioMuse-AI plugin is installed there. Otherwise Musix asks AudioMuse directly.
-- Similar songs follow the duplicate and mood settings you made in AudioMuse, instead of Musix's own.
+- Song radios and "Discover for you" use Navidrome's own sonic similarity when the AudioMuse-AI plugin is installed there. Otherwise Siansa asks AudioMuse directly.
+- Similar songs follow the duplicate and mood settings you made in AudioMuse, instead of Siansa's own.
 - Song paths are now exactly the length you pick.
 
 ## 0.12.2beta — 2026-10-19
 
 ### Fixed
 - **Better at talking to Navidrome**, following its rules more closely:
-  - Musix asks Navidrome which extras it has and only uses those.
+  - Siansa asks Navidrome which extras it has and only uses those.
   - Logins are safer: each request gets a fresh one-time code.
   - A clear message when the password is wrong, something was removed, or your user isn't allowed to do something.
-  - If your Navidrome user can't log in the usual way (LDAP or proxy login), Musix now tries the other way.
+  - If your Navidrome user can't log in the usual way (LDAP or proxy login), Siansa now tries the other way.
   - Long playlists save even behind a proxy.
   - Artist photos come through Navidrome like every other cover, so they're saved by "Download all covers" too.
   - Liked songs, search and Home lists keep to the libraries you picked for the sync.
@@ -457,14 +457,14 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 - **Animated album covers stayed grey in song lists** (playlists, an artist's Popular songs). Songs now use the copy of the album's cover that's already on your phone, instead of downloading the whole animation again for each list.
 
 ### Added
-- **Your colour** in Settings → Themes: pick one colour with the rainbow slider, a quick pick or a colour code, and Musix makes the whole light and dark theme from it. Both are previewed side by side before you use it. Grey picks give a grey theme, and text stays readable whatever colour you choose.
+- **Your colour** in Settings → Themes: pick one colour with the rainbow slider, a quick pick or a colour code, and Siansa makes the whole light and dark theme from it. Both are previewed side by side before you use it. Grey picks give a grey theme, and text stays readable whatever colour you choose.
 - **Crossfade.** Songs can blend into each other: Off (the default), Fixed (1 to 12 seconds) or Smart, in Settings › Playback › Crossfade and loudness. Smart keeps songs on one album that run straight on gapless.
-- **Loudness from the Lumae plugin.** If your AudioMuse server has the Lumae plugin, Musix can use its measurement of each song to even out loudness (to −18 or −14 LUFS), also for songs without ReplayGain tags. Smart crossfades then start where a song goes quiet and last as long as the two songs need. Songs the plugin hasn't measured use their tags, as before.
+- **Loudness from the Lumae plugin.** If your AudioMuse server has the Lumae plugin, Siansa can use its measurement of each song to even out loudness (to −18 or −14 LUFS), also for songs without ReplayGain tags. Smart crossfades then start where a song goes quiet and last as long as the two songs need. Songs the plugin hasn't measured use their tags, as before.
 
 ## 0.8.2beta — 2026-10-18
 
 ### Changed
-- **Musix no longer switches to Opus on its own on a slow connection.** Songs always play in the quality chosen
+- **Siansa no longer switches to Opus on its own on a slow connection.** Songs always play in the quality chosen
   in Settings → Playback (Wi-Fi and mobile data); the "Switch to Opus when the connection is too slow" setting is
   gone. On a slow connection, choose Opus for mobile data there.
 
@@ -472,13 +472,13 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 
 ### Fixed
 - **Songs no longer get stuck after switching to Opus on a slow connection.** When the connection was too slow
-  for the original file, Musix switched the song to Opus but then waited, sometimes for good, before it played
+  for the original file, Siansa switched the song to Opus but then waited, sometimes for good, before it played
   on. Navidrome now starts the converted song right where it was, and jumping around in a song that plays as
   Opus is instant too.
 - **Animated album covers no longer show blank in lists now and then.**
 - **Now playing uses less battery.** The seek bar updates five times a second instead of on every screen frame.
 - **Covers that Navidrome failed to send no longer stay blank.** Navidrome sometimes answers with an error
-  instead of a picture (for example when shrinking a big GIF); Musix kept that answer as the cover. Now it asks
+  instead of a picture (for example when shrinking a big GIF); Siansa kept that answer as the cover. Now it asks
   again, and a cover that can't be read is fetched afresh next time.
 - **A changed stream quality applies to every song.** A stopped song kept its old quality when played again.
 
@@ -486,7 +486,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 
 ### Added
 - **Themes.** Settings → Themes picks light, dark, or Auto (follows your phone, including its dark-mode
-  schedule), a **Pure black** background for dark mode, and the colours: Musix's own, **Wallpaper** (your phone's
+  schedule), a **Pure black** background for dark mode, and the colours: Siansa's own, **Wallpaper** (your phone's
   Material You colours, Android 12 and later), or the presets Ocean, Forest, Rose, Sunset and Mono. A preview
   shows the choice straight away. Album, artist and now playing pages keep their colours from the cover; their
   buttons take the theme's colour.
@@ -495,8 +495,8 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 
 ### Fixed
 - **Lyrics timed by syllable now light up as they're sung.** Navidrome 0.63 and later send word and syllable
-  timings only to apps that ask for them; Musix now asks, so lyrics that work word by word in Symfonium do
-  in Musix too. A lyrics offset set in the file also moves the lyrics the right way now.
+  timings only to apps that ask for them; Siansa now asks, so lyrics that work word by word in Symfonium do
+  in Siansa too. A lyrics offset set in the file also moves the lyrics the right way now.
 
 ## 0.7.1beta — 2026-10-18
 
@@ -510,7 +510,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 - **Playlists on this phone only.** When you make a playlist you can keep it on Navidrome or on this phone only. A phone playlist works offline, can have its own picture, and can be sent to Navidrome later with "Send to Navidrome" in its ⋮ menu. Your Library lists them under "On this phone".
 - **Phone playlists download their songs.** Songs you add to a phone playlist are downloaded so they play offline (using your download settings). Songs you take out are removed from the phone, unless an album or other download still needs them.
 - **Make and change your own playlists.** Your Library's + button now has "New playlist", and "Add to playlist" (in a song's ⋮ menu and in now playing) can make a new one too. On one of your playlists, the ⋮ at the top renames it or changes or removes its picture, and a song's ⋮ menu removes it from the playlist. Every change is saved on Navidrome straight away. Pictures need Navidrome 0.61 or later.
-- **Remove playlists you don't need.** "Remove from Musix" in a playlist's ⋮ menu takes it out of the app but never deletes it on Navidrome. Bring it back with + → "Import from Navidrome" in Your Library.
+- **Remove playlists you don't need.** "Remove from Siansa" in a playlist's ⋮ menu takes it out of the app but never deletes it on Navidrome. Bring it back with + → "Import from Navidrome" in Your Library.
 
 ## 0.6.0beta — 2026-10-17
 
@@ -523,7 +523,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
   - **Users**: every user on the phone has a card with an eye. Show several at once and their music plays
     together; each song streams, downloads and scrobbles with its own user's login, even from another server.
     Hiding a user hides all their songs, albums, artists and playlists. Hiding the user in use switches to
-    another shown user (Musix restarts with their history and settings).
+    another shown user (Siansa restarts with their history and settings).
   - **Libraries**: tick each user's libraries on or off.
   - Small chips under the greeting show what's filtered; tap one to change it.
 
@@ -540,7 +540,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
   playing a list plays only its downloaded songs.
 
 ### Added
-- **Lyrics in every common format, including word by word.** Musix now reads LRC (also with several times on one
+- **Lyrics in every common format, including word by word.** Siansa now reads LRC (also with several times on one
   line and an offset), enhanced LRC with word or syllable times, TTML (Apple Music style), SRT and WebVTT, and plain
   text: from the song's tags or a .lrc / .txt file next to it, as Navidrome provides them. When there are several,
   the most detailed one is used (word by word, then line by line, then plain), in your phone's language first.
@@ -621,7 +621,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
   or as two artists. Names that are one artist in your library now stay whole under a song and when choosing
   an artist.
 - **Tapping the artist in now playing didn't offer every artist** on songs whose shown name is only the main
-  artist (for example "Fred again.." on a song with Skrillex). Musix now asks Navidrome for all of the song's
+  artist (for example "Fred again.." on a song with Skrillex). Siansa now asks Navidrome for all of the song's
   artists, so you can choose between them.
 - **Songs from libraries you unchecked still played.** Popular songs on artist pages, song and artist radios,
   Liked songs, Rediscover and most played came straight from Navidrome, which includes every library. When
@@ -655,7 +655,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 ### Added
 - **Copy errors.** On Settings → Logs, "Copy errors" puts every error in the log, with its details, on the
   clipboard, ready to paste into a message or an issue. The app version and phone model are at the top.
-- **Several Navidrome users.** Add more logins (on the same server or different ones) in Settings → Users and switch between them with one tap. Each user has their own library, history, mixes and settings, including AudioMuse, which can be left empty for a user without it. Musix restarts when you switch.
+- **Several Navidrome users.** Add more logins (on the same server or different ones) in Settings → Users and switch between them with one tap. Each user has their own library, history, mixes and settings, including AudioMuse, which can be left empty for a user without it. Siansa restarts when you switch.
 
 ### Changed
 - **The format under the seek bar is just a label now.** Tapping it no longer opens a quality menu (switching
@@ -671,7 +671,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 
 ### Added
 - **Song details.** "Show details" in a song's menu (the three dots) shows its format (FLAC, MP3, Opus…), bit rate, sample rate, file size, how often it was played, how often you skipped it on this phone, and the file's path on the server.
-- **What's new in Settings.** A new page lists what changed in each version of Musix, newest first, with the version you have marked. Tap your version at the top (or any version's number) to open its release on GitHub.
+- **What's new in Settings.** A new page lists what changed in each version of Siansa, newest first, with the version you have marked. Tap your version at the top (or any version's number) to open its release on GitHub.
 - **Release type chips on artist pages.** Tap Albums, Singles, DJ-mixes and so on to see only that kind of
   release. Tap it again, or ✕, to see everything. Only the types the artist has are shown.
 - **Hide parts of Home.** In Arrange Home, tap the eye next to a row to hide it from Home, and tap it again to bring
@@ -706,7 +706,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 - **The Liked songs tile at the top of Home was blank.** It now shows the heart, like in Your library.
 
 ### Added
-- **Song path.** Choose "Song path…" in any song's menu, pick a second song and a length (10, 20 or 30 songs), and Musix builds a queue that moves smoothly from the sound of one song to the other. Swap to make the chosen song the end instead of the start. Play it straight away or save it as a playlist on Navidrome. Needs AudioMuse.
+- **Song path.** Choose "Song path…" in any song's menu, pick a second song and a length (10, 20 or 30 songs), and Siansa builds a queue that moves smoothly from the sound of one song to the other. Swap to make the chosen song the end instead of the start. Play it straight away or save it as a playlist on Navidrome. Needs AudioMuse.
 
 ### Changed
 - **Disc names are easier to spot.** On albums with several discs, each disc's name now sits on a band in the album's colour (darker in dark mode, a soft tint in light mode), so it stands out in long track lists.
@@ -717,7 +717,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 - **App icon looked off centre.** The sound bars now sit in the middle of the icon instead of leaning right and low.
 
 ### Added
-- **Artists you might like** on Home: artists you don't have yet that are similar to the ones you play most, each with a photo. Tap one to see how many albums and fans it has, which of your artists it's like, and open it in Deezer to listen. The list is made once a day. Similar artists come from your Navidrome server (through Last.fm) and from Deezer; to find them and their photos, Musix sends Deezer only artist names. Like every Home row, you can move it under Arrange Home.
+- **Artists you might like** on Home: artists you don't have yet that are similar to the ones you play most, each with a photo. Tap one to see how many albums and fans it has, which of your artists it's like, and open it in Deezer to listen. The list is made once a day. Similar artists come from your Navidrome server (through Last.fm) and from Deezer; to find them and their photos, Siansa sends Deezer only artist names. Like every Home row, you can move it under Arrange Home.
 
 ### Changed
 - **App icon has more depth.** The bars have a soft shine and a gentle glow behind them, so the icon looks less flat. The themed (one-colour) icon stays plain.
@@ -741,7 +741,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 - Alphabetical and Creator sorting now put names with accents with their letter (Ångström with the A's), and names starting with a number or symbol first.
 - **Lyrics blend into now playing** instead of sitting in a dark box with visible edges. The box is gone; the lyrics fade out softly at the top and bottom into the blurred cover, and a light shadow keeps them readable on bright covers.
 - **Now playing sits a little lower**: "Playing from album" was pressed against the top of the screen. It now has a gap above it that suits the phone's height (more on tall phones, less on small ones), so the whole screen looks more even.
-- **Album pages no longer repeat the album's artist and name under every song.** A song only shows a second line when other artists are on it (a "feat." or a duet), and then only those artists. Musix reads this from the song's artist tags as Navidrome reports them.
+- **Album pages no longer repeat the album's artist and name under every song.** A song only shows a second line when other artists are on it (a "feat." or a duet), and then only those artists. Siansa reads this from the song's artist tags as Navidrome reports them.
 - **Vibes moved from the bottom bar into Settings** (#3). The bottom bar now has four tabs: Home, Search, Your Library and Settings. Vibes is a row in Settings that shows how many vibes you have, and its page now has a back arrow.
 
 ## 0.0.25beta — 2026-10-16
@@ -761,7 +761,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 ## 0.0.17beta — 2026-10-16
 
 ### Fixed
-- **Albums with an animated GIF cover showed no cover** in lists, the mini player and now playing (found by the app tour, explained by the new image log). Navidrome converts GIFs to animated WebP, and Android's still-image decoder rejects those files. Wherever a still is shown, Musix now draws the first frame through Android's animation decoder instead. This also fixes such covers already in the image cache, without downloading them again.
+- **Albums with an animated GIF cover showed no cover** in lists, the mini player and now playing (found by the app tour, explained by the new image log). Navidrome converts GIFs to animated WebP, and Android's still-image decoder rejects those files. Wherever a still is shown, Siansa now draws the first frame through Android's animation decoder instead. This also fixes such covers already in the image cache, without downloading them again.
 - Making the still of a kept animated cover read the whole file into memory (they can be over 100 MB); it's now decoded straight from the file.
 
 ## 0.0.16beta — 2026-10-16
@@ -791,7 +791,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 ## 0.0.14beta — 2026-10-16
 
 ### Fixed
-- **A chosen song sometimes loaded but didn't start** until play was pressed (the log showed songs "heard 0s" while the player said it was ready). Musix now checks 2.5 seconds after a song is chosen that it's actually playing, and fixes it if not: if Android held the sound back for another app it asks for the audio again, and if the song is stuck waiting with no data arriving it restarts the download from where it is. It keeps checking for a few rounds and logs what it found and did.
+- **A chosen song sometimes loaded but didn't start** until play was pressed (the log showed songs "heard 0s" while the player said it was ready). Siansa now checks 2.5 seconds after a song is chosen that it's actually playing, and fixes it if not: if Android held the sound back for another app it asks for the audio again, and if the song is stuck waiting with no data arriving it restarts the download from where it is. It keeps checking for a few rounds and logs what it found and did.
 - **Missing covers** on some pages (artist Popular songs, the mini player, now playing):
   - a song without its own picture now falls back to its album's cover;
   - a song cover that is really the album's big animated cover is recognised by its first bytes and uses the copy already on the phone, instead of downloading 20–160 MB again (the server doesn't send a size to compare);
@@ -807,9 +807,9 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 ## 0.0.13beta — 2026-10-16
 
 ### Changed
-- **Your Library**, rebuilt in the style of Spotify's library in Musix's colours, and now the one place to find everything:
+- **Your Library**, rebuilt in the style of Spotify's library in Siansa's colours, and now the one place to find everything:
   - **Filters** at the top: Playlists, Mixes, Albums, Artists and Your listening. Choosing one shows ✕ to go back and its own sub-filters: playlists by you or by others; mixes from today, made for you, vibes or earlier; albums you've played, not played yet, and by release type (Albums, EPs, Singles, Live…); artists you've played or not.
-  - **Sort** by Recents, Recently added, Alphabetical, Creator or Most played. Recents follows your listening: Musix's own play history plus Navidrome's recently played albums (from other apps too).
+  - **Sort** by Recents, Recently added, Alphabetical, Creator or Most played. Recents follows your listening: Siansa's own play history plus Navidrome's recently played albums (from other apps too).
   - A **list or grid** view, and **search** inside your library.
   - Each row says what it is: "Playlist · owner", "Album · artist", "EP · artist", "Mix · Made for you · 30 songs", "Artist · 4 albums".
   - **Pins**: Liked songs and this month's listening are pinned at the top; long-press anything to pin or unpin it.
@@ -820,7 +820,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 ## 0.0.12beta — 2026-10-16
 
 ### Fixed
-- **Download all covers stopped after a few seconds** ("Job was cancelled" in the log). Android stopped the background worker, and switching the option on also started the daily run at the same moment. The download now runs inside the app, once at a time; the background worker only starts it and waits, so if Android stops the worker the download carries on while Musix is running. The daily run no longer starts straight away, and the log says why a run stopped.
+- **Download all covers stopped after a few seconds** ("Job was cancelled" in the log). Android stopped the background worker, and switching the option on also started the daily run at the same moment. The download now runs inside the app, once at a time; the background worker only starts it and waits, so if Android stops the worker the download carries on while Siansa is running. The daily run no longer starts straight away, and the log says why a run stopped.
 - The Storage page stuttered while covers downloaded: its progress now updates a few times a second instead of after every cover.
 - Animated covers over 100 MB (motion covers can be 160 MB) were sent on as they were instead of being kept; the limit is now 400 MB.
 
@@ -831,12 +831,12 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 ## 0.0.11beta — 2026-10-16
 
 ### Fixed
-- **The app crashing (out of memory) and covers taking half a minute on albums with an animated WebP cover.** Navidrome only shrinks animated GIFs; an animated WebP comes back as the full original (here 1080×1080, several MB) whatever size is asked for. Musix's "300 px" cover was really the whole file, and the album page, now playing, the blurred background, the colour sampling, list tiles and the lock screen each downloaded it and decoded it as an animation of its own, which filled the 256 MB the app may use. Now:
+- **The app crashing (out of memory) and covers taking half a minute on albums with an animated WebP cover.** Navidrome only shrinks animated GIFs; an animated WebP comes back as the full original (here 1080×1080, several MB) whatever size is asked for. Siansa's "300 px" cover was really the whole file, and the album page, now playing, the blurred background, the colour sampling, list tiles and the lock screen each downloaded it and decoded it as an animation of its own, which filled the 256 MB the app may use. Now:
   - an animated cover that Navidrome sends full size is downloaded **once**, kept on the phone, and a still of its first frame is made from it. Every other request for that cover (any size, the song's cover too) is answered from the phone without the network;
   - requests for the same cover that arrive together wait for that one download instead of each starting their own;
   - lists, backgrounds, colours and the lock screen always get a still picture. Like Symfonium, covers only move on the album page and in now playing, and the animation is decoded at screen size (720 px) rather than the file's full size;
   - only the last few animations are kept in memory.
-- The lock screen and notification cover now come from Musix's image cache instead of being downloaded again in full on every song change.
+- The lock screen and notification cover now come from Siansa's image cache instead of being downloaded again in full on every song change.
 
 ### Added
 - Settings → Storage → **Download all covers**: fetches every album, artist and playlist cover in the background, at the sizes the app shows, after each library sync and once a day. Only on Wi-Fi, and by default only when the phone is on the same local network as Navidrome (switch on "On any Wi-Fi" if you reach Navidrome by a domain name). Covers already on the phone are skipped, and it stops by itself when you leave home. Progress and a **Download covers now** button are on the same page.
@@ -847,14 +847,14 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 
 ### Fixed
 - **Playback stopping and starting, and blank covers, on albums with animated covers.** Found by running a real Navidrome 0.64.2 behind a link limited to 4.3 Mbit/s (what the phone measured):
-  - Musix downloaded the album's original animated cover.gif (often over 10 MB), sometimes several copies at once (album page, now playing, the animation check). That took most of the connection: the song got about 1,100 kbit/s while FLAC needs about 1,370, so it kept stopping.
+  - Siansa downloaded the album's original animated cover.gif (often over 10 MB), sometimes several copies at once (album page, now playing, the animation check). That took most of the connection: the song got about 1,100 kbit/s while FLAC needs about 1,370, so it kept stopping.
   - For every cover size requested, Navidrome converts an animated GIF with ffmpeg. 300 px worked (about 5 s), but 600 and 1000 px failed and returned no image, which is why big covers were blank, and each new request started the conversion again.
-- Now Musix reads only the first bytes of an album's cover to see if it's animated, then shows the original only when it's small, otherwise Navidrome's 300 px animated version, which is converted once and kept. Big sizes are never asked for on animated albums, the result is remembered across app starts, and lists use one cover size so each album is converted only once.
+- Now Siansa reads only the first bytes of an album's cover to see if it's animated, then shows the original only when it's small, otherwise Navidrome's 300 px animated version, which is converted once and kept. Big sizes are never asked for on animated albums, the result is remembered across app starts, and lists use one cover size so each album is converted only once.
 - Animated covers now move on the album page and in now playing.
 
 ### Changed
 - Songs, covers and API calls each use their own connections, so cover downloads can't hold up a song.
-- If a song waits 8 seconds for data that's arriving slower than it needs, Musix switches to Opus straight away instead of after three stops.
+- If a song waits 8 seconds for data that's arriving slower than it needs, Siansa switches to Opus straight away instead of after three stops.
 - The log shows the Navidrome version, large cover downloads, how long Navidrome took to prepare an animated cover, and what each animated cover was shown as.
 
 ### Added
@@ -863,10 +863,10 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 ## 0.0.9beta — 2026-10-16
 
 ### Fixed
-- Songs started slowly and then played a few seconds, stopped, and started again. The log showed the connection to Navidrome delivering only about 250–335 kbit/s while the FLAC files need roughly 900–1,400 kbit/s, and Musix made it worse by downloading the next song at the same time. Now:
+- Songs started slowly and then played a few seconds, stopped, and started again. The log showed the connection to Navidrome delivering only about 250–335 kbit/s while the FLAC files need roughly 900–1,400 kbit/s, and Siansa made it worse by downloading the next song at the same time. Now:
   - the next song is only pre-cached once the current one has fully downloaded, so they never share the connection;
   - after running dry mid-song, playback waits for 5 seconds of audio instead of 2, so there are fewer, longer stretches;
-  - if the original still stops three times in two minutes, Musix carries on in Opus at a bitrate the connection can manage, from the same spot, and tries the original again after 15 minutes. This can be switched off under Settings → Playback.
+  - if the original still stops three times in two minutes, Siansa carries on in Opus at a bitrate the connection can manage, from the same spot, and tries the original again after 15 minutes. This can be switched off under Settings → Playback.
 - Personal and vibe mixes were cancelled half-way when you left Home while they were being made.
 
 ### Added
@@ -880,7 +880,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 ## 0.0.8beta — 2026-10-16
 
 ### Added
-- **Your listening**: Wrapped-style pages for this month, last month and this year. They show minutes and plays, top artists, songs (playable) and albums, your listening clock by hour (early bird, night owl…), and how your taste moved: artists new in your rotation, ones that dropped out, and genres you played more or less. Built from Koito when you scrobble there, otherwise from Musix's own history.
+- **Your listening**: Wrapped-style pages for this month, last month and this year. They show minutes and plays, top artists, songs (playable) and albums, your listening clock by hour (early bird, night owl…), and how your taste moved: artists new in your rotation, ones that dropped out, and genres you played more or less. Built from Koito when you scrobble there, otherwise from Siansa's own history.
 - **Rediscover** on Home: albums you played a lot but not for at least five months, from Navidrome's play counts and your Koito favourites from 6 to 24 months ago. Each shows when you last played it. The old random shelf is now called **Random picks**.
 
 ### Fixed
@@ -889,7 +889,7 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 ## 0.0.7beta — 2026-10-16
 
 ### Fixed
-- Animated covers didn't move. Now playing asked Navidrome for the song's own picture, which is always the still image embedded in the file; the animated cover.gif / cover.webp in the album folder is only used for the album. Musix now checks whether the album has an animated cover and, if so, shows it in now playing and on the album page, at full size so older Navidrome versions don't flatten it. Albums without one keep each song's own cover.
+- Animated covers didn't move. Now playing asked Navidrome for the song's own picture, which is always the still image embedded in the file; the animated cover.gif / cover.webp in the album folder is only used for the album. Siansa now checks whether the album has an animated cover and, if so, shows it in now playing and on the album page, at full size so older Navidrome versions don't flatten it. Albums without one keep each song's own cover.
 
 ### Added
 - Settings → Storage → **Animated covers** switch (on by default).
@@ -899,10 +899,10 @@ Changes add a note in `changelog.d/` instead of editing this file; the release a
 ### Added
 - **Personal mixes** under Made for you, made fresh each day:
   - **Your sound**: AudioMuse's sonic fingerprint of what you play most in Navidrome.
-  - **On repeat**: your most-played songs lately, from Musix's history and your Koito / ListenBrainz / Last.fm top tracks.
+  - **On repeat**: your most-played songs lately, from Siansa's history and your Koito / ListenBrainz / Last.fm top tracks.
   - **Discover for you**: songs you haven't played that sound like your favourites, leaning away from artists you already play a lot.
-- **Taste profile** built on the phone from Musix's own history, Koito or ListenBrainz and Last.fm top artists this month, and Navidrome's most-played albums. Only a few artist names ever go to the AI, never your history.
-- Musix now notices skips (under 30 seconds). Songs skipped twice in a month, or once in the last few days, are left out of mixes.
+- **Taste profile** built on the phone from Siansa's own history, Koito or ListenBrainz and Last.fm top artists this month, and Navidrome's most-played albums. Only a few artist names ever go to the AI, never your history.
+- Siansa now notices skips (under 30 seconds). Songs skipped twice in a month, or once in the last few days, are left out of mixes.
 
 ### Changed
 - Vibe mixes lean towards artists you play, and those you usually play at this time of day. The AI also gets your favourite artists and time-of-day habits as hints.
@@ -975,7 +975,7 @@ The first beta. Everything built so far:
 - Song cache and image cache with sizes you choose under Settings → Storage.
 - ReplayGain, background playback and lock-screen controls.
 - Optional logs that can be saved to a file and shared.
-- Musix's own amber-and-plum colours.
+- Siansa's own amber-and-plum colours.
 - Versions come from `version.txt`; each version gets one release.
 
 ### Fixed
