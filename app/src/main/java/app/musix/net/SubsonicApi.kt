@@ -472,16 +472,16 @@ class SubsonicApi(
     }
 
     /** Marks an artist as a favourite (Navidrome's star on the artist, issue #397). */
-    suspend fun starArtist(artistId: String) {
+    override suspend fun starArtist(artistId: String) {
         call("star", mapOf("artistId" to artistId))
     }
 
-    suspend fun unstarArtist(artistId: String) {
+    override suspend fun unstarArtist(artistId: String) {
         call("unstar", mapOf("artistId" to artistId))
     }
 
     /** Favourite (starred) artists (issue #397). */
-    suspend fun starredArtists(): List<Artist> =
+    override suspend fun starredArtists(): List<Artist> =
         folderPasses().flatMap { folder ->
             call("getStarred2", mapOf("musicFolderId" to folder)).obj("starred2")?.arr("artist").orEmpty().map(::parseArtist)
         }.distinctBy { it.id }

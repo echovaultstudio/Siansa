@@ -2,6 +2,7 @@ package app.musix.net
 
 import app.musix.data.Album
 import app.musix.data.AlbumDetail
+import app.musix.data.Artist
 import app.musix.data.ArtistDetail
 import app.musix.data.ArtistInfo
 import app.musix.data.Lyrics
@@ -99,6 +100,9 @@ interface MusicSource {
     suspend fun unstarAlbum(albumId: String)
     suspend fun starredAlbums(): List<Album>
     suspend fun starredSongs(): List<Song>
+    suspend fun starArtist(artistId: String)
+    suspend fun unstarArtist(artistId: String)
+    suspend fun starredArtists(): List<Artist>
 
     // ---- Listening ----
 
