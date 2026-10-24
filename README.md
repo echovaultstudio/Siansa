@@ -1,5 +1,7 @@
 # Musix
 
+<p align="center"><img src="docs/brand/musix-banner.png" alt="Musix" width="720"></p>
+
 A personal Android music player for **Navidrome**, with daily mixes built on the phone from **AudioMuse-AI** text search and, optionally, titles and searches written by an **OpenRouter** model.
 
 ## What it does
