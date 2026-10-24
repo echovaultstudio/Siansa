@@ -12,7 +12,7 @@ import androidx.media3.common.SimpleBasePlayer
 import androidx.media3.common.util.UnstableApi
 import app.musix.data.cover
 import app.musix.log.AppLog
-import app.musix.net.SubsonicApi
+import app.musix.net.MusicSource
 import app.musix.playback.Streaming
 import app.musix.playback.toSong
 import com.google.common.util.concurrent.Futures
@@ -35,7 +35,7 @@ import kotlinx.coroutines.sync.withLock
  * the next one is sent.
  */
 @OptIn(UnstableApi::class)
-class DlnaPlayer(private val device: DlnaDevice, private val api: SubsonicApi) : SimpleBasePlayer(Looper.getMainLooper()) {
+class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) : SimpleBasePlayer(Looper.getMainLooper()) {
     /** The TV or speaker's name, for the log and the screen. */
     val name: String get() = device.name
     val deviceId: String get() = device.id

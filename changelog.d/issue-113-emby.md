@@ -1,0 +1,2 @@
+### Added
+- Emby: when you set up Musix, you can now pick Emby as where your music is, and log in with your Emby user name and password. Your albums, artists, playlists and favourites come from Emby, songs play as the original files, and plays are marked as played in Emby. Similar songs and artist radio use Emby's Instant Mix. Lyrics, sound-alike search and Song path aren't available with Emby.

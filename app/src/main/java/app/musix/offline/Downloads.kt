@@ -22,7 +22,7 @@ import app.musix.data.Song
 import app.musix.data.SettingsRepository
 import app.musix.data.Users
 import app.musix.log.AppLog
-import app.musix.net.SubsonicApi
+import app.musix.net.MusicSource
 import app.musix.playback.Streaming
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -260,7 +260,7 @@ object OfflinePlan {
  */
 class Downloads(
     private val context: Context,
-    private val subsonic: SubsonicApi,
+    private val subsonic: MusicSource,
     private val library: LibraryRepository,
     private val http: OkHttpClient,
     private val settings: SettingsRepository,
