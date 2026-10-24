@@ -8,8 +8,8 @@ echovaultstudio/siansa-beta-testers#N" in the pull request's description) gets a
 the fix and how to update, and is closed if it's still open. GitHub already closes such an issue when the pull
 request is merged; the comment is what tells the tester when they can have it.
 
-Needs BETA_ISSUES_TOKEN: a fine-grained token owned by echovaultstudio for the beta testers repo only, with
-Issues: Read and write. Without it nothing is sent. A version is only announced once per issue.
+Needs BETA_REPO_TOKEN: a fine-grained token owned by echovaultstudio for the beta testers repo only, with
+Issues and Contents: Read and write (the same token copies the changelog, issue #435). Without it nothing is sent. A version is only announced once per issue.
 """
 import json
 import os
@@ -63,9 +63,9 @@ def beta_api(method, path, body=None, token=None):
 
 
 def main(tag):
-    token = os.environ.get("BETA_ISSUES_TOKEN", "")
+    token = os.environ.get("BETA_REPO_TOKEN", "")
     if not token:
-        print("::notice::No BETA_ISSUES_TOKEN; beta testers issues not told about this release.")
+        print("::notice::No BETA_REPO_TOKEN; beta testers issues not told about this release.")
         return
     name = rp.repo()
     grouped = rp.group(rp.releases_with_commits(name), rp.merged_pulls(name), lambda sha: rp.pulls_of_commit(name, sha))
