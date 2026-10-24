@@ -97,7 +97,9 @@ fun ProblemReportScreen(nav: NavController) {
 
     Screen(title = "Report a problem", nav = nav) { padding ->
         Column(
-            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())
+            // Ends above the keyboard, so the box being typed in scrolls into view (beta testers #10).
+            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().aboveKeyboard()
+                .verticalScroll(rememberScrollState())
                 .padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
