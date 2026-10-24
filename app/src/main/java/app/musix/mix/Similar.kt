@@ -77,7 +77,7 @@ class Similar(private val graph: AppGraph) {
         val songs = graph.generator.resolveSongs(hits.map { it.trackId }).associateBy { it.id }
         val albums = hits.mapNotNull { hit ->
             val albumId = songs[hit.trackId]?.albumId ?: return@mapNotNull null
-            graph.library.album(albumId) ?: runCatching { graph.subsonic.album(albumId).album }.getOrNull()
+            graph.library.album(albumId) ?: runCatching { graph.source.album(albumId).album }.getOrNull()
         }.distinctBy { it.id }
         val kept = graph.library.keepSyncedAlbums(albums, "Similar albums")
         AppLog.i("Similar", "Albums like the album of $trackId: ${kept.size} of ${hits.size}")

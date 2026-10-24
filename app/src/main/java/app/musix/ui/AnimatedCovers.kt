@@ -218,7 +218,7 @@ object AnimatedCovers {
     private suspend fun peek(graph: AppGraph, id: String, size: Int?): Peek? = withContext(Dispatchers.IO) {
         val started = System.currentTimeMillis()
         val client = graph.imageHttp.newBuilder().callTimeout(40, TimeUnit.SECONDS).build()
-        val call = client.newCall(Request.Builder().url(graph.subsonic.coverUrl(id, size)).header(CoverStore.PEEK, "1").build())
+        val call = client.newCall(Request.Builder().url(graph.source.coverUrl(id, size)).header(CoverStore.PEEK, "1").build())
         runCatching {
             call.executeCancellable { response ->
                 val ms = System.currentTimeMillis() - started
@@ -271,7 +271,7 @@ object AnimatedCovers {
                     withContext(Dispatchers.IO) {
                         runCatching {
                             graph.imageHttp.newCall(
-                                Request.Builder().url(graph.subsonic.coverUrl(coverId, null)).header(CoverStore.WANT_ANIMATION, "1").build()
+                                Request.Builder().url(graph.source.coverUrl(coverId, null)).header(CoverStore.WANT_ANIMATION, "1").build()
                             ).execute().close()
                         }.onFailure { AppLog.w("Cover", "Couldn't download the animated cover $coverId: ${it.message}") }
                     }
@@ -281,7 +281,7 @@ object AnimatedCovers {
             }
             is Kind.Animated -> {
                 val key = "cover:$coverId:${kind.size}"
-                builder.data(graph.subsonic.coverUrl(coverId, kind.size)).diskCacheKey(key)
+                builder.data(graph.source.coverUrl(coverId, kind.size)).diskCacheKey(key)
                     .httpHeaders(NetworkHeaders.Builder().set(CoverStore.WANT_ANIMATION, "1").build())
             }
             else -> return null

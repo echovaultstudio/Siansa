@@ -316,7 +316,7 @@ fun AboutArtistCard(song: Song, onOpenArtist: () -> Unit) {
     val local by loadState("artist-$artistId") {
         graph.library.artist(artistId)?.let { a -> Triple(a, graph.library.albumsOf(a).size, graph.library.songsOf(a).size) }
     }
-    val info by loadState("info-$artistId") { graph.subsonic.artistInfo(artistId) }
+    val info by loadState("info-$artistId") { graph.source.artistInfo(artistId) }
     val artist = local.valueOrNull()
     val name = artist?.first?.name ?: song.artists.firstOrNull()?.name ?: song.artist
     Column(Modifier.padding(horizontal = Space.Page).fillMaxWidth().clip(CardShape).background(CardSurface).clickable(onClick = onOpenArtist)) {
@@ -357,7 +357,7 @@ fun AboutArtistCard(song: Song, onOpenArtist: () -> Unit) {
 @Composable
 fun AboutSongCard(song: Song, onOpenDetails: () -> Unit) {
     val graph = LocalGraph.current
-    val details by loadState("details-${song.id}") { graph.subsonic.songDetails(song.id) }
+    val details by loadState("details-${song.id}") { graph.source.songDetails(song.id) }
     val d = details.valueOrNull() ?: return
     val cells = listOfNotNull(
         d.codec?.let { codec -> "Format" to listOfNotNull(codec, d.bitDepth?.let { "$it-bit" }).joinToString(" · ") },
@@ -437,7 +437,7 @@ fun LyricsScreen(song: Song?, tint: Color, onClose: () -> Unit, menu: () -> Unit
     BackHandler(onBack = onClose)
     val graph = LocalGraph.current
     val position by rememberPosition()
-    val lyrics by loadState("lyrics-${song?.id}") { song?.let { graph.subsonic.lyrics(it) } }
+    val lyrics by loadState("lyrics-${song?.id}") { song?.let { graph.source.lyrics(it) } }
     val colors = LyricsTextColors
     Column(
         Modifier

@@ -2,7 +2,7 @@ package app.musix.data
 
 import android.content.Context
 import app.musix.log.AppLog
-import app.musix.net.SubsonicApi
+import app.musix.net.MusicSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
  */
 class FavouriteAlbums(
     context: Context,
-    private val subsonic: SubsonicApi,
+    private val source: MusicSource,
     private val scope: CoroutineScope,
 ) {
     private val prefs = context.getSharedPreferences(Users.scoped("favourite_albums"), Context.MODE_PRIVATE)
@@ -36,7 +36,7 @@ class FavouriteAlbums(
         val ids = album.allIds
         set(if (on) _ids.value + ids else _ids.value - ids.toSet())
         scope.launch {
-            runCatching { ids.forEach { if (on) subsonic.starAlbum(it) else subsonic.unstarAlbum(it) } }
+            runCatching { ids.forEach { if (on) source.starAlbum(it) else source.unstarAlbum(it) } }
                 .onSuccess { AppLog.i("Favorites", "${if (on) "Favourite" else "No longer favourite"}: album ${album.id} ${album.name}") }
                 .onFailure {
                     AppLog.w("Favorites", "Navidrome ${if (on) "star" else "unstar"} for album ${album.id} failed: ${it.message}")
@@ -48,7 +48,7 @@ class FavouriteAlbums(
 
     /** Reads the favourite albums from Navidrome; keeps the phone's copy when it can't be reached. */
     suspend fun refresh(): List<Album> {
-        val fresh = runCatching { subsonic.starredAlbums() }
+        val fresh = runCatching { source.starredAlbums() }
             .onFailure { AppLog.w("Favorites", "Favourite albums not read from Navidrome: ${it.message}") }
             .getOrNull() ?: return albums
         albums = fresh

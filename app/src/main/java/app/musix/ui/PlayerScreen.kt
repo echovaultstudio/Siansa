@@ -193,7 +193,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     val tint = rememberCoverColor(song?.cover)
     // The song's lyrics, for the lyrics button and the preview card. Cleared as the song changes, so the
     // button doesn't stay lit for a song without lyrics.
-    val lyrics by loadStateFresh("lyrics-${song?.id}") { song?.let { graph.subsonic.lyrics(it) } }
+    val lyrics by loadStateFresh("lyrics-${song?.id}") { song?.let { graph.source.lyrics(it) } }
     val songLyrics = lyrics.valueOrNull()
     val close by rememberUpdatedState(onClose)
 

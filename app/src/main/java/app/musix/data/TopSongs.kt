@@ -2,7 +2,7 @@ package app.musix.data
 
 import android.content.Context
 import app.musix.log.AppLog
-import app.musix.net.SubsonicApi
+import app.musix.net.MusicSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -83,7 +83,7 @@ fun putTopSongs(entries: List<TopSongsEntry>, entry: TopSongsEntry, max: Int = T
  */
 class TopSongs(
     context: Context,
-    private val subsonic: SubsonicApi,
+    private val source: MusicSource,
     private val library: LibraryRepository,
     private val scope: CoroutineScope,
 ) {
@@ -134,7 +134,7 @@ class TopSongs(
     private suspend fun fetch(artist: Artist, ownSongs: List<Song>): List<Song> {
         val started = System.currentTimeMillis()
         val remote = try {
-            subsonic.topSongs(artist.name, TOP_SONGS_COUNT)
+            source.topSongs(artist.name, TOP_SONGS_COUNT)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

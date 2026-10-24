@@ -54,12 +54,17 @@ import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 import kotlin.math.roundToInt
+import app.musix.net.SourceKind
 
 @Composable
-fun ConnectionsScreen(nav: NavController) {
+fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Boolean = true) {
     val graph = LocalGraph.current
     val scope = rememberCoroutineScope()
     val firstRun = !graph.settings.current.navidromeReady
+    // Picked on the first-run picker (issue #113), else the one in use.
+    val kind = sourceName?.let { SourceKind.parse(it) } ?: graph.settings.current.sourceKind
+    // From the picker there's a way back to it; a plain first run (an older flow) has none.
+    val fromPicker = sourceName != null
     var draft by remember { mutableStateOf(graph.settings.current) }
     var showProxy by remember { mutableStateOf(graph.settings.current.proxyUser.isNotBlank()) }
     var problem by remember { mutableStateOf<String?>(null) }
@@ -89,6 +94,7 @@ fun ConnectionsScreen(nav: NavController) {
             val d = draft
             graph.settings.save(
                 graph.settings.current.copy(
+                    sourceKind = kind,
                     navidromeUrl = d.navidromeUrl, navidromeUser = d.navidromeUser, navidromePassword = d.navidromePassword,
                     proxyUser = d.proxyUser, proxyPassword = d.proxyPassword,
                     audioMuseUrl = d.audioMuseUrl, audioMuseToken = d.audioMuseToken,
@@ -114,7 +120,7 @@ fun ConnectionsScreen(nav: NavController) {
 
     Screen(
         title = if (firstRun) "Connect your servers" else "Connections",
-        nav = if (firstRun) null else nav,
+        nav = if (firstRun && !fromPicker) null else nav,
         actions = { IconButton(onClick = { save() }) { Icon(Icons.Rounded.Check, "Save") } },
     ) { padding ->
         Column(
@@ -128,7 +134,8 @@ fun ConnectionsScreen(nav: NavController) {
         ) {
             if (firstRun) {
                 Text(
-                    "Welcome! Connect your Navidrome server to get started. AudioMuse and OpenRouter can be added now or later.",
+                    if (fromPicker) "Enter your server's address and login. Test checks them before you save."
+                    else "Welcome! Connect your server to get started. AudioMuse and OpenRouter can be added now or later.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 // A user being added: a way back to the users already set up.
@@ -139,7 +146,8 @@ fun ConnectionsScreen(nav: NavController) {
                 }
             }
 
-            Heading("Navidrome")
+            Heading("${kind.label} server")
+            Hint(kind.detail)
             Field("Server address", draft.navidromeUrl, "192.168.1.10:4533") { draft = draft.copy(navidromeUrl = it) }
             Field("Username", draft.navidromeUser, keyboard = KeyboardType.Text) { draft = draft.copy(navidromeUser = it) }
             SecretField("Password", draft.navidromePassword) { draft = draft.copy(navidromePassword = it) }
@@ -153,33 +161,36 @@ fun ConnectionsScreen(nav: NavController) {
             TestRow(navidromeTest) {
                 runTest({ navidromeTest = it }) { s -> "Connected to " + SubsonicApi(graph.http) { s }.ping() }
             }
-            HorizontalDivider()
-            Heading("AudioMuse-AI")
-            Field("Server address", draft.audioMuseUrl, "192.168.1.10:8000") { draft = draft.copy(audioMuseUrl = it) }
-            Hint("Leave the address empty if this user has no AudioMuse.")
-            Hint("If AudioMuse has a login, use either an API token or its username and password.")
-            SecretField("API token", draft.audioMuseToken) { draft = draft.copy(audioMuseToken = it) }
-            Field("Username", draft.audioMuseUser, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseUser = it) }
-            SecretField("Password", draft.audioMusePassword) { draft = draft.copy(audioMusePassword = it) }
-            TestRow(audioMuseTest) {
-                runTest({ audioMuseTest = it }) { s ->
-                    val hits = AudioMuseApi(graph.http) { s }.textSearch("calm piano", 3)
-                    "Text search works (${hits.size} matches for \"calm piano\")"
+            // Smart extras turned down on the first run (issue #113): only the server. They're here later in Settings.
+            if (extras || !firstRun) {
+                HorizontalDivider()
+                Heading("AudioMuse-AI")
+                Field("Server address", draft.audioMuseUrl, "192.168.1.10:8000") { draft = draft.copy(audioMuseUrl = it) }
+                Hint("Leave the address empty if this user has no AudioMuse.")
+                Hint("If AudioMuse has a login, use either an API token or its username and password.")
+                SecretField("API token", draft.audioMuseToken) { draft = draft.copy(audioMuseToken = it) }
+                Field("Username", draft.audioMuseUser, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseUser = it) }
+                SecretField("Password", draft.audioMusePassword) { draft = draft.copy(audioMusePassword = it) }
+                TestRow(audioMuseTest) {
+                    runTest({ audioMuseTest = it }) { s ->
+                        val hits = AudioMuseApi(graph.http) { s }.textSearch("calm piano", 3)
+                        "Text search works (${hits.size} matches for \"calm piano\")"
+                    }
                 }
-            }
 
-            HorizontalDivider()
-            Heading("OpenRouter (optional)")
-            Hint("Writes the mix titles and sound searches. Only the vibe's guidance, the time and your last 20 plays are sent.")
-            SecretField("API key", draft.openRouterKey) { draft = draft.copy(openRouterKey = it) }
-            Field("Model", draft.openRouterModel, AppSettings.DEFAULT_MODEL, keyboard = KeyboardType.Text) {
-                draft = draft.copy(openRouterModel = it)
-            }
-            SwitchRow("AI titles and sound searches", draft.aiTitles) { draft = draft.copy(aiTitles = it) }
-            TestRow(openRouterTest) {
-                runTest({ openRouterTest = it }) { s ->
-                    val answer = OpenRouterApi(graph.http) { s }.complete("Reply with one word.", "Say hello.")
-                    "Model answered: ${answer.trim().take(40)}"
+                HorizontalDivider()
+                Heading("OpenRouter (optional)")
+                Hint("Writes the mix titles and sound searches. Only the vibe's guidance, the time and your last 20 plays are sent.")
+                SecretField("API key", draft.openRouterKey) { draft = draft.copy(openRouterKey = it) }
+                Field("Model", draft.openRouterModel, AppSettings.DEFAULT_MODEL, keyboard = KeyboardType.Text) {
+                    draft = draft.copy(openRouterModel = it)
+                }
+                SwitchRow("AI titles and sound searches", draft.aiTitles) { draft = draft.copy(aiTitles = it) }
+                TestRow(openRouterTest) {
+                    runTest({ openRouterTest = it }) { s ->
+                        val answer = OpenRouterApi(graph.http) { s }.complete("Reply with one word.", "Say hello.")
+                        "Model answered: ${answer.trim().take(40)}"
+                    }
                 }
             }
 

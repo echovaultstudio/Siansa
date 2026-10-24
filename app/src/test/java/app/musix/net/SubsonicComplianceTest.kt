@@ -200,6 +200,14 @@ class SubsonicComplianceTest {
         assertEquals(3, artists.first().albumCount)
     }
 
+    /** The music source layer (issue #113): sonic matching is offered only when the server has the extension. */
+    @Test fun sonicMatchFollowsTheExtension() = runBlocking {
+        val with: MusicSource = api(FakeServer { extensions("sonicSimilarity" to "1") })
+        assertEquals(true, with.hasSonicMatch())
+        val without: MusicSource = api(FakeServer { extensions() })
+        assertEquals(false, without.hasSonicMatch())
+    }
+
     @Test fun albumsFromSeveralLibrariesInOneOrder() {
         val a = Album(id = "a", name = "B side", created = "2026-01-01")
         val b = Album(id = "b", name = "a side", created = "2026-03-01")
