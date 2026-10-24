@@ -38,6 +38,7 @@ services:
       PUBLIC_URL: https://${DOMAIN}
       NOTIFY_TO: ${NOTIFY_TO:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      REPORTS_REPO: ${REPORTS_REPO:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}

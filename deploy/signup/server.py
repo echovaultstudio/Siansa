@@ -37,6 +37,7 @@ import ssl
 import sys
 import threading
 import time
+import urllib.error
 import urllib.request
 from email.message import EmailMessage
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -60,6 +61,10 @@ REPORTS_MAX_TOTAL = 2 * 1024 * 1024 * 1024
 REPORTS_DIR = os.environ.get("REPORTS_DIR", os.path.join(DATA_DIR, "reports"))
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 BETA_REPO = os.environ.get("BETA_REPO", "echovaultstudio/siansa-beta-testers")
+# A private repository that keeps a copy of each report's log, so it can be read next to its issue (with a token
+# that can write to that repository only). Empty = logs stay on this server only.
+REPORTS_REPO = os.environ.get("REPORTS_REPO", "")
+REPORTS_TOKEN = os.environ.get("REPORTS_TOKEN", "") or os.environ.get("GITHUB_TOKEN", "")
 REPORTS_PER_HOUR = 5
 _reports = {}
 EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,255}\.[^@\s]{2,63}$")
@@ -179,7 +184,7 @@ def issue_text(rec_id, f):
             "\n\n| | |\n|---|---|\n| Report id | `" + rec_id + "` |\n| App | " + f["app"].replace("|", "/") +
             " |\n| Android | " + f["android"].replace("|", "/") + " |\n| Phone | " + f["device"].replace("|", "/") +
             " |\n| Server type | " + f["source"].replace("|", "/") +
-            " |\n\nThe log was sent privately to the maintainer; quote the report id if you add details.")
+            " |\n\nThe log is kept privately by the Siansa team; quote the report id if you add details.")
     return title.replace("@", "@\u200b").replace("#", "#\u200b"), body
 
 
@@ -199,6 +204,53 @@ def open_issue(title, body):
     except Exception as e:  # the report is kept either way
         print("report issue failed:", type(e).__name__, flush=True)
         return None, None
+
+
+def github(method, path, body=None, token=None):
+    """One GitHub API call; returns the JSON answer. Raises on failure."""
+    req = urllib.request.Request(
+        "https://api.github.com/" + path, method=method,
+        data=None if body is None else json.dumps(body).encode(),
+        headers={"Authorization": "Bearer " + (token or REPORTS_TOKEN), "Accept": "application/vnd.github+json",
+                 "User-Agent": "siansa-beta", "Content-Type": "application/json", "X-GitHub-Api-Version": "2022-11-28"})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return json.load(r)
+
+
+def store_report_privately(rec_id, issue=None, now=None, call=None):
+    """Copies the report (its ZIP and details) into REPORTS_REPO as reports/<yyyy-mm>/<id>.zip and .json, in one
+    commit on main. True when stored; False when not set up or GitHub refused (the copy here stays either way)."""
+    if not (REPORTS_REPO and REPORTS_TOKEN):
+        return False
+    call = call or github
+    base = os.path.join(REPORTS_DIR, rec_id)
+    try:
+        with open(base + ".json", encoding="utf-8") as f:
+            meta = json.load(f)
+        meta["issue"] = issue
+        month = time.strftime("%Y-%m", time.gmtime(time.time() if now is None else now))
+        repo = "repos/" + REPORTS_REPO
+        with open(base + ".zip", "rb") as f:
+            zip_blob = call("POST", repo + "/git/blobs", {"content": base64.b64encode(f.read()).decode(), "encoding": "base64"})
+        json_blob = call("POST", repo + "/git/blobs", {"content": json.dumps(meta, indent=2, ensure_ascii=False) + "\n", "encoding": "utf-8"})
+        for attempt in range(3):  # another report may land at the same moment
+            head = call("GET", repo + "/git/ref/heads/main")["object"]["sha"]
+            tree = call("GET", repo + "/git/commits/" + head)["tree"]["sha"]
+            new_tree = call("POST", repo + "/git/trees", {"base_tree": tree, "tree": [
+                {"path": f"reports/{month}/{rec_id}.zip", "mode": "100644", "type": "blob", "sha": zip_blob["sha"]},
+                {"path": f"reports/{month}/{rec_id}.json", "mode": "100644", "type": "blob", "sha": json_blob["sha"]}]})
+            commit = call("POST", repo + "/git/commits", {"message": f"Report {rec_id}" + (f" (issue #{issue})" if issue else ""),
+                                                           "tree": new_tree["sha"], "parents": [head]})
+            try:
+                call("PATCH", repo + "/git/refs/heads/main", {"sha": commit["sha"]})
+                return True
+            except urllib.error.HTTPError as e:
+                if e.code != 422 or attempt == 2:
+                    raise
+        return False
+    except Exception as e:  # never log the content
+        print("report copy failed:", type(e).__name__, flush=True)
+        return False
 
 
 def reports_total():
@@ -634,6 +686,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, b'{"error":"bad log"}', ctype="application/json")
         title, body = issue_text(rec_id, fields)
         number, url = open_issue(title, body)
+        threading.Thread(target=store_report_privately, args=(rec_id, number), daemon=True).start()
         print("report", rec_id, "issue", number, flush=True)  # no words, no address
         self._send(200, json.dumps({"id": rec_id, "issue": number, "url": url}).encode(), ctype="application/json")
 
