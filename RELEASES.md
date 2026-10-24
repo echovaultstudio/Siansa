@@ -3,6 +3,14 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.29.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.29.1beta) — 2026-10-24
+
+- [#412](https://github.com/echovaultstudio/Siansa/pull/412) Beta server: website, privacy policy, F-Droid repo, demo Navidrome (#410) (@Th3K1ngP1n)
+- [#421](https://github.com/echovaultstudio/Siansa/pull/421) Plugin docs and changelog without the Musix history (#420) (@Th3K1ngP1n)
+- [#423](https://github.com/echovaultstudio/Siansa/pull/423) Deploy: update the website and the beta emails from GitHub (#422) (@Th3K1ngP1n)
+- [#425](https://github.com/echovaultstudio/Siansa/pull/425) Report a problem: say where the log is kept (#424) (@Th3K1ngP1n)
+- [#426](https://github.com/echovaultstudio/Siansa/pull/426) Home: no '2 users' chip; Emby users next to another say so plainly (beta reports) (@Th3K1ngP1n)
+
 ## [0.29.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.29.0beta) — 2026-10-24
 
 - [#415](https://github.com/echovaultstudio/Siansa/pull/415) Report a problem from the app (#414) (@Th3K1ngP1n)
