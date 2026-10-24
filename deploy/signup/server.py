@@ -506,13 +506,36 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def cli(argv):
-    """Owner tools, run in the container: server.py revoke EMAIL, or server.py resend (the approval emails again)."""
+    """Owner tools, run in the container: server.py revoke EMAIL, resend (the approval emails again), approve EMAIL or link EMAIL (print a private address)."""
     if len(argv) == 2 and argv[1] == "resend":
         st = statuses()
         pending = [r for r in read_lines(DATA_FILE) if st.get(r["id"]) is None and not expired(r)]
         for r in pending:
             print(("sent   " if notify_owner(r, wait=True) else "FAILED ") + r["email"])
         print(f"{len(pending)} undecided sign-up(s)")
+        return True
+    if len(argv) == 3 and argv[1] in ("approve", "link"):
+        # For when email isn't working: approve (or give a fresh link to) someone from the server.
+        email = argv[2].strip().lower()
+        rec, st = live_record_for(email)
+        if not rec:
+            print(f"No sign-up for {email}. They need to use the form on the website first.")
+            return True
+        if st == "approved" or argv[1] == "approve":
+            with locked():
+                if status_of(rec["id"]) != "approved":
+                    if counts()["taken"] - (1 if st == "pending" else 0) >= LIMIT:
+                        print(f"The beta is full ({LIMIT} places). Revoke someone first.")
+                        return True
+                    append_event(rec["id"], "approved")
+        else:
+            print(f"{email} is {st}; use `approve` first.")
+            return True
+        if rec["route"] == "fdroid":
+            print("Private address (send it to the tester, keep it out of logs):")
+            print(repo_url(add_tester(email)))
+        else:
+            print(f"Google Play tester: add {email} to the closed test's tester list in Play Console.")
         return True
     if len(argv) == 3 and argv[1] == "revoke":
         n, promoted = revoke(argv[2])
