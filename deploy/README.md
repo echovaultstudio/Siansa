@@ -142,6 +142,24 @@ Your emails (new sign-up, automatic approval) end with "Beta places: N of 12 hav
 Unit tests: `python3 -I signup/test_server.py`. Check the Caddyfile after changing it:
 `docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile`.
 
+### Changing the website and the beta emails from GitHub
+
+The pages are in `deploy/site/` and the emails testers get are in `deploy/emails/` (see its README for what
+each file is and the `$placeholders`). When a change to either is merged to `main`, the *Website* workflow
+sends them to the server with the same restricted SSH key that publishes APKs; the next email uses the new
+text, with no restart. The server accepts only a tar.gz of plain files for this and can run nothing else.
+
+One-time on the server, from the kit folder (after unpacking the update, and after `add-ci-key.sh` has been run):
+
+```
+sudo sh scripts/enable-site-deploy.sh
+sudo docker compose up -d
+```
+
+The first command installs the update scripts and makes the key run `siansa-ci`, which picks "publish an APK" or
+"update the site". The second mounts the emails folder (`/srv/siansa-emails`) into the sign-up service. Changes
+to `docker-compose.yml`, `Caddyfile` and `.env` still need you to copy them and restart.
+
 ### Problem reports from the app
 
 Settings › Report a problem sends the tester's two answers and the whole log to `POST /report`. The log is kept in
