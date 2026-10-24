@@ -3,7 +3,6 @@ package app.siansa.data
 import android.content.Context
 import android.content.Intent
 import app.siansa.log.AppLog
-import app.siansa.net.SourceKind
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.io.File
 
@@ -30,7 +29,7 @@ object UserFiles {
     fun userOf(name: String): Int = SUFFIX.find(name)?.groupValues?.get(1)?.toIntOrNull() ?: FIRST
 
     /** Settings stores kept per user. */
-    val PREFS = listOf("settings", "library_pins", "artist_suggestions")
+    val PREFS = listOf("settings", "library_pins", "artist_suggestions", "emby")
 
     /** Files in the app's files folder kept per user. */
     val FILES = listOf("history.json", "mixes.json", "selectors.json", "pending_scrobbles.json")
@@ -84,7 +83,7 @@ object UserFiles {
 }
 
 /** One Navidrome login on this phone. */
-data class UserEntry(val id: Int, val label: String, val connected: Boolean, val emby: Boolean = false)
+data class UserEntry(val id: Int, val label: String, val connected: Boolean)
 
 /**
  * Several Navidrome logins (on the same or different servers), each with its own settings, library and
@@ -117,10 +116,7 @@ object Users {
         val settings = context.getSharedPreferences(UserFiles.scoped("settings", id), Context.MODE_PRIVATE)
         val user = settings.getString("nd_user", "").orEmpty()
         val address = settings.getString("nd_url", "").orEmpty()
-        UserEntry(
-            id, UserFiles.label(user, address), connected = user.isNotBlank() && address.isNotBlank(),
-            emby = SourceKind.parse(settings.getString("source_kind", null)) == SourceKind.EMBY,
-        )
+        UserEntry(id, UserFiles.label(user, address), connected = user.isNotBlank() && address.isNotBlank())
     }
 
     /** Users whose music shows; always includes the user in use (issue #141). */

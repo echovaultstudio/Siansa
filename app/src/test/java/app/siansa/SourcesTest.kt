@@ -118,7 +118,5 @@ class SourcesTest {
         assertEquals(false, sourceFilterActive(downloadedOnly = false, shownUsers = 1))
         assertEquals(true, sourceFilterActive(downloadedOnly = false, shownUsers = 2))
         assertEquals(true, sourceFilterActive(downloadedOnly = true, shownUsers = 1))
-        // An Emby user shown next to another says so plainly, without naming Navidrome (beta report 5296551f).
-        assertEquals(false, app.siansa.data.EMBY_GUEST_NOTE.contains("Navidrome"))
     }
 }

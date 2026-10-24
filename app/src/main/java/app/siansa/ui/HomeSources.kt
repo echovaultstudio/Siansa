@@ -55,7 +55,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.siansa.data.MusicFolder
-import app.siansa.data.EMBY_GUEST_NOTE
 import app.siansa.data.UserEntry
 import app.siansa.data.UserFiles
 import app.siansa.data.Users
@@ -130,7 +129,6 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                     status = when {
                         !user.connected -> "Not connected yet. Set it up in Settings → Users."
                         inUse -> inUseStatus(syncing, libraryStatus)
-                        user.emby -> EMBY_GUEST_NOTE
                         !isShown -> "Hidden"
                         guest?.error != null -> "Couldn't load: ${guest.error}"
                         syncing -> "Loading their music… ${guest?.songs ?: 0} songs"
@@ -138,8 +136,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                         else -> "Shown"
                     },
                     shown = isShown,
-                    // An Emby user can't be shown next to another yet; one already shown can still be hidden.
-                    canToggle = user.connected && (!inUse || shown.size > 1) && (inUse || !user.emby || isShown),
+                    canToggle = user.connected && (!inUse || shown.size > 1),
                     syncing = syncing,
                     libraries = if (isShown && all.size > 1) all.map { it.name to (it.id in chosen) } else emptyList(),
                     onToggle = {
