@@ -96,17 +96,33 @@ Open `https://siansa.app` and `https://siansa.app/privacy`. Check the headers at
 [securityheaders.com](https://securityheaders.com) and the certificate at
 [ssllabs.com](https://www.ssllabs.com/ssltest/).
 
-### Beta sign-ups
+### Beta sign-ups and who may download
 The home page has a sign-up form. `signup/server.py` checks the answers (email, install route, Android 8.0+, own
-Navidrome or Emby server reachable from the phone, 14 days for Play, feedback, privacy) and saves accepted ones to
-`/srv/siansa-signups/signups.jsonl` (no IP addresses). Read them with:
+Navidrome or Emby server reachable from the phone, 14 days for Play, feedback, privacy) and saves accepted ones in
+`/srv/siansa-signups` (no IP addresses). Each new one is emailed to `NOTIFY_TO` with **Approve** and **Deny** links:
+- A link opens a page with a button; nothing happens until you press it (so mail scanners can't approve anyone).
+  Links are signed and work for 14 days, once.
+- **Approve**, F-Droid: the tester gets an email with their own login for the F-Droid repo. Caddy asks the sign-up
+  service to check that login before serving anything under `/fdroid/repo` (`forward_auth`).
+- **Approve**, Google Play: the tester gets a welcome email, and the page tells you to add their email to the
+  closed test's tester list in Play Console (Google gives no way to do that from here).
+- **Deny** sends a short no.
+
+Mail goes out through a mailbox on your mail server: fill in `SMTP_*`, `SMTP_FROM` and `NOTIFY_TO` in `.env`
+(`SIGNUP_SECRET` is made by `setup.sh`). Then `docker compose up -d`.
+
 ```sh
-sudo sh scripts/signups          # table
-sudo sh scripts/signups play     # Google emails, comma separated, to paste into Play Console's tester list
+sudo sh scripts/signups          # table with status (pending / approved / denied)
+sudo sh scripts/signups play     # approved Google emails, comma separated, to paste into Play Console
 sudo sh scripts/signups fdroid
 sudo sh scripts/signups csv
+sudo sh scripts/signups revoke EMAIL   # take away a tester's F-Droid login
 ```
-Unit tests: `python3 -I signup/test_server.py`.
+A tester who loses their login: `revoke` it and ask them to sign up again. Logins are kept only as hashes, so
+nobody (including you) can read a password back.
+
+Unit tests: `python3 -I signup/test_server.py`. Check the Caddyfile after changing it:
+`docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile`.
 
 ### 7. The demo server for Google (and testers)
 Google reviews the app before testers get it, and needs a server to log in to: without one, the review fails

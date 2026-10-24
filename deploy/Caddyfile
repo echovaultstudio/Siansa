@@ -39,17 +39,24 @@
 	header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 
 	# The F-Droid repo: https://DOMAIN/fdroid/repo (add this address in the F-Droid app).
+	# Only approved testers get in: Caddy asks the sign-up service (/auth) to check the login first.
 	handle_path /fdroid/repo/* {
-		root * /srv/fdroid/repo
-		header /index-v* Cache-Control "no-cache"
-		header /entry.* Cache-Control "no-cache"
-		header *.apk Cache-Control "public, max-age=31536000, immutable"
-		file_server
+		route {
+			forward_auth signup:8080 {
+				uri /auth
+			}
+			root * /srv/fdroid/repo
+			header /index-v* Cache-Control "no-cache"
+			header /entry.* Cache-Control "no-cache"
+			header *.apk Cache-Control "private, max-age=31536000, immutable"
+			file_server
+		}
 	}
 	redir /fdroid /fdroid/repo/ 302
 
-	# Beta sign-up form (signup/server.py). Only this one path reaches it.
-	handle /signup {
+	# Beta sign-up form and the approve/deny pages (signup/server.py). Only these paths reach it.
+	@signup path /signup /signup/decide
+	handle @signup {
 		request_body {
 			max_size 8KB
 		}

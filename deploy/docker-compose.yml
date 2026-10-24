@@ -33,6 +33,14 @@ services:
     command: ["python", "-I", "/app/server.py", "8080"]
     environment:
       SIGNUPS_FILE: /data/signups.jsonl
+      SIGNUP_SECRET: ${SIGNUP_SECRET:-}
+      PUBLIC_URL: https://${DOMAIN}
+      NOTIFY_TO: ${NOTIFY_TO:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
     volumes:
       - ./signup/server.py:/app/server.py:ro
       - ${SIGNUPS_DIR}:/data
