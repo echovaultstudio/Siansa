@@ -142,6 +142,21 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(len(self.sent), 1)
         self.assertIn(server.link(b["id"], "approve"), self.sent[0][2])
 
+    def test_cli_approve_prints_private_address_without_email(self):
+        import io, contextlib
+        rec, _ = self.signup(1)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            server.cli(["server.py", "approve", "P1@example.com"])
+            server.cli(["server.py", "link", "p1@example.com"])
+        urls = [l for l in out.getvalue().split() if l.startswith("https://siansa.app/fdroid/t/")]
+        self.assertEqual(len(urls), 2)
+        self.assertNotEqual(urls[0], urls[1])  # a new link replaces the old one
+        self.assertEqual(server.status_of(rec["id"]), "approved")
+        self.assertTrue(server.valid_link(urls[1][len("https://siansa.app"):] + "/index-v2.json"))
+        self.assertFalse(server.valid_link(urls[0][len("https://siansa.app"):] + "/index-v2.json"))
+        self.assertEqual(self.sent, [])  # no email involved
+
     def test_link_expires(self):
         rec, _ = self.signup(1)
         self.assertFalse(server.expired(rec))
