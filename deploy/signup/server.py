@@ -52,6 +52,7 @@ def page(title, body, status=200):
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         f"<title>{html.escape(title)}</title>"
+        '<link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">'
         '<link rel="stylesheet" href="/style.css"></head><body><main>'
         f"<h1>{html.escape(title)}</h1>{body}"
         '<p><a href="/">Back to the home page</a></p></main></body></html>'
