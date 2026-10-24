@@ -379,6 +379,26 @@ jobs:
           files: siansa-*.apk
           make_latest: true
 
+      # The beta F-Droid repo on our server (issue #410, deploy/): the APK goes over SSH to a key that can only
+      # publish (deploy/scripts/siansa-publish). Skipped until the FDROID_* secrets are set.
+      - name: Publish to the F-Droid beta repo
+        if: steps.version.outputs.exists != 'true'
+        env:
+          FDROID_HOST: ${{ secrets.FDROID_HOST }}
+          FDROID_SSH_KEY: ${{ secrets.FDROID_SSH_KEY }}
+          FDROID_KNOWN_HOSTS: ${{ secrets.FDROID_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$FDROID_HOST" ] || [ -z "$FDROID_SSH_KEY" ] || [ -z "$FDROID_KNOWN_HOSTS" ]; then
+            echo "::notice::No F-Droid beta repo set up (FDROID_HOST, FDROID_SSH_KEY, FDROID_KNOWN_HOSTS); skipped."
+            exit 0
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$FDROID_SSH_KEY" > ~/.ssh/fdroid && chmod 600 ~/.ssh/fdroid
+          printf '%s\n' "$FDROID_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          apk=$(ls siansa-*.apk | head -n 1)
+          ssh -i ~/.ssh/fdroid -o BatchMode=yes -o StrictHostKeyChecking=yes "siansa-deploy@$FDROID_HOST" < "$apk"
+          rm -f ~/.ssh/fdroid
+
       # Keeps the notes of every published version matching CHANGELOG.md, so fixes to the text show up too.
       - name: Sync release notes
         env:

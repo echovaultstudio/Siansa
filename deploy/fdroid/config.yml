@@ -1,0 +1,20 @@
+# fdroidserver config for the Siansa beta repo (issue #410). setup.sh copies this to $FDROID_DIR/config.yml and
+# fills in the domain; `fdroid init` there creates the repo signing key (kept only on the server).
+repo_url: https://DOMAIN/fdroid/repo
+repo_name: Siansa beta
+repo_description: >-
+  Beta builds of Siansa, a music player for your own Navidrome or Emby server. For testers.
+repo_icon: icon.png
+
+# Keep the newest few builds in the repo; older ones move to the archive (not served).
+repo_maxage: 0
+archive_older: 5
+
+# The repo signing key: made by `fdroid init`, never leaves the server. Back it up offline: losing it means
+# every tester has to remove and add the repo again.
+keystore: keystore.p12
+repo_keyalias: siansa-beta
+# keystorepass and keypass are written here by `fdroid init`. This file must stay chmod 600.
+
+# Apps come in as ready-built, signed APKs from CI: no building from source here.
+make_current_version_link: false
