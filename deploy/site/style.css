@@ -24,8 +24,3 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
 .trap { position: absolute; left: -9999px; }
 button { font: inherit; font-weight: 600; padding: 10px 20px; border: 0; border-radius: 999px; cursor: pointer;
   background: var(--accent); color: #1C1530; }
-
-.shots { display: flex; gap: 16px; overflow-x: auto; margin: 24px 0 8px; padding-bottom: 8px; scroll-snap-type: x proximity; }
-.shots figure { margin: 0; flex: 0 0 auto; scroll-snap-align: start; }
-.shots img { display: block; width: 200px; height: auto; border-radius: 20px; border: 1px solid rgba(127, 127, 127, 0.3); }
-.shots figcaption { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
