@@ -1,0 +1,43 @@
+# Sends the website pages and the beta emails (deploy/site, deploy/emails) to the server when they change on main
+# (issue #410). It uses the same restricted SSH key as the F-Droid publish: the server only accepts a tar.gz of
+# plain files for this (deploy/scripts/siansa-site-update). Skipped until the FDROID_* secrets are set.
+name: Website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/site/**"
+      - "deploy/emails/**"
+      - ".github/workflows/site.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: site
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Update the website and emails
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Send to the server
+        env:
+          FDROID_HOST: ${{ secrets.FDROID_HOST }}
+          FDROID_SSH_KEY: ${{ secrets.FDROID_SSH_KEY }}
+          FDROID_KNOWN_HOSTS: ${{ secrets.FDROID_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$FDROID_HOST" ] || [ -z "$FDROID_SSH_KEY" ] || [ -z "$FDROID_KNOWN_HOSTS" ]; then
+            echo "::notice::No server set up (FDROID_HOST, FDROID_SSH_KEY, FDROID_KNOWN_HOSTS); skipped."
+            exit 0
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$FDROID_SSH_KEY" > ~/.ssh/fdroid && chmod 600 ~/.ssh/fdroid
+          printf '%s\n' "$FDROID_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          tar czf site.tar.gz --exclude=README.md -C deploy site emails
+          ssh -i ~/.ssh/fdroid -o BatchMode=yes -o StrictHostKeyChecking=yes "siansa-deploy@$FDROID_HOST" site < site.tar.gz
+          rm -f ~/.ssh/fdroid
