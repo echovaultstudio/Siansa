@@ -101,7 +101,8 @@ fun ArtistScreen(nav: NavController, id: String) {
         graph.similar.artists(name)
     }
     // Popular songs: the saved list shows at once; Navidrome is asked again only when it's a few days old.
-    // Started with the page, not after it, so the request runs alongside the rest.
+    // Started with the page, not after it, so the request runs alongside the rest. Whatever shows first stays while
+    // the page is open (issue #440: the list switching looked clunky); a newer list is saved for the next visit.
     val top by produceState<List<Song>?>(null, id) {
         try {
             val cached = graph.topSongs.cached(id)
@@ -115,7 +116,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                 value = quickTopSongs(loaded.songs, plays)
                 AppLog.d("Artist", "Popular songs: none saved, showing ${value?.size} of the artist's own first")
             }
-            value = graph.topSongs.refresh(loaded.artist, loaded.songs)
+            value = keepFirstShown(value, graph.topSongs.refresh(loaded.artist, loaded.songs))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -360,6 +361,10 @@ fun AppearsOnScreen(nav: NavController, id: String) {
 private fun LazyGridScope.full(content: @Composable () -> Unit) {
     item(span = { GridItemSpan(maxLineSpan) }) { content() }
 }
+
+/** The popular songs to show: the ones already showing stay (issue #440); [fresh] only fills an empty list. */
+internal fun keepFirstShown(showing: List<Song>?, fresh: List<Song>): List<Song> =
+    if (!showing.isNullOrEmpty()) showing else fresh
 
 /** Popular songs shown on an artist's page, and with Show more (issue #328). */
 private const val TOP_ROWS_SHORT = 3
