@@ -1,6 +1,6 @@
-# Musix
+# Siansa
 
-<p align="center"><img src="docs/brand/musix-banner.png" alt="Musix" width="720"></p>
+<p align="center"><img src="docs/brand/siansa-banner.png" alt="Siansa" width="720"></p>
 
 A personal Android music player for **Navidrome**, with daily mixes built on the phone from **AudioMuse-AI** text search and, optionally, titles and searches written by an **OpenRouter** model.
 
@@ -26,7 +26,7 @@ A personal Android music player for **Navidrome**, with daily mixes built on the
    - **AudioMuse-AI**: address of its web/API port (e.g. `http://192.168.1.10:8000`) and its API token if authentication is on. Text search (CLAP) must be enabled.
    - **OpenRouter** (optional): API key and model id (default `google/gemini-2.5-flash`; any OpenRouter model id works).
 3. Use **Test** next to each section, then **Save**.
-4. Optional: install the **Musix plugin** on AudioMuse-AI (see [`audiomuse-plugin/`](audiomuse-plugin/README.md)) and choose it
+4. Optional: install the **Siansa plugin** on AudioMuse-AI (see [`audiomuse-plugin/`](audiomuse-plugin/README.md)) and choose it
    under Settings › Crossfade and levelling. It measures each song's loudness and how it starts and ends, for
    levelling and smooth crossfades, and finds similar albums and artists.
 
@@ -54,6 +54,6 @@ Inside the app, with **Settings → Logs → Keep a log** on, the log records ea
 
 ## Building
 
-GitHub Actions builds a signed APK on every push to `main` and publishes it once all quality checks pass. The version comes from `version.txt` (e.g. `0.0.3beta`). Each change adds a note in `changelog.d/` (see its README). When changes are merged to `main` and the checks pass, CI raises the version by the size of the change (fixes 0.1.3 → 0.1.4, new features 0.1.3 → 0.2.0, 1.0 only when asked for; see `changelog.d/README.md`), publishes `v<version>` with `musix-<version>.apk` and the notes, and records the section in `CHANGELOG.md` and the version in `version.txt`. Edits to older changelog sections are copied to their releases too. `RELEASES.md` lists every release with the pull requests in it and is updated after each release. The signing key is in `app/musix.keystore`, so each new build installs over the previous one. Keep this repository private.
+GitHub Actions builds a signed APK on every push to `main` and publishes it once all quality checks pass. The version comes from `version.txt` (e.g. `0.0.3beta`). Each change adds a note in `changelog.d/` (see its README). When changes are merged to `main` and the checks pass, CI raises the version by the size of the change (fixes 0.1.3 → 0.1.4, new features 0.1.3 → 0.2.0, 1.0 only when asked for; see `changelog.d/README.md`), publishes `v<version>` with `siansa-<version>.apk` and the notes, and records the section in `CHANGELOG.md` and the version in `version.txt`. Edits to older changelog sections are copied to their releases too. `RELEASES.md` lists every release with the pull requests in it and is updated after each release. The signing key is in `app/siansa.keystore`, so each new build installs over the previous one. Keep this repository private.
 
 To build locally: `gradle :app:assembleRelease` with Gradle 8.14+, JDK 17 and the Android SDK (platform 36).

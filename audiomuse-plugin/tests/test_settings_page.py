@@ -4,8 +4,8 @@ from flask import Flask
 
 import support  # noqa: F401  (import path and the plugin.api stand-in)
 from plugin import api
-from musix_analysis import status, web
-from musix_analysis.generations import Inputs
+from siansa_analysis import status, web
+from siansa_analysis.generations import Inputs
 
 
 class TimingTest(unittest.TestCase):
@@ -36,7 +36,7 @@ class SettingsPostTest(unittest.TestCase):
 
     def setUp(self):
         self.app = Flask(__name__)
-        self.app.register_blueprint(web.bp, url_prefix="/plugins/musix_analysis")
+        self.app.register_blueprint(web.bp, url_prefix="/plugins/siansa_analysis")
         self.client = self.app.test_client()
         self.states = {}
         self.saved = web.store.set_state
@@ -48,7 +48,7 @@ class SettingsPostTest(unittest.TestCase):
         web.enqueue = self.enqueue
 
     def post(self, action):
-        return self.client.post("/plugins/musix_analysis/settings", data={"action": action, "batch_size": "40"})
+        return self.client.post("/plugins/siansa_analysis/settings", data={"action": action, "batch_size": "40"})
 
     def test_buttons_redirect_so_a_reload_sends_nothing(self):
         queued = []
@@ -75,7 +75,7 @@ class LumaeImportTest(unittest.TestCase):
 
     def setUp(self):
         self.app = Flask(__name__)
-        self.app.register_blueprint(web.bp, url_prefix="/plugins/musix_analysis")
+        self.app.register_blueprint(web.bp, url_prefix="/plugins/siansa_analysis")
         self.run = web.lumae_import.run
 
     def tearDown(self):
@@ -83,7 +83,7 @@ class LumaeImportTest(unittest.TestCase):
 
     def test_import_reports_how_many(self):
         web.lumae_import.run = lambda db: 1234
-        answer = self.app.test_client().post("/plugins/musix_analysis/settings", data={"action": "import_lumae"})
+        answer = self.app.test_client().post("/plugins/siansa_analysis/settings", data={"action": "import_lumae"})
         self.assertEqual(answer.status_code, 302)
         self.assertTrue(answer.headers["Location"].endswith("note=imported&n=1234"))
 
@@ -91,7 +91,7 @@ class LumaeImportTest(unittest.TestCase):
         def boom(db):
             raise RuntimeError("no table")
         web.lumae_import.run = boom
-        answer = self.app.test_client().post("/plugins/musix_analysis/settings", data={"action": "import_lumae"})
+        answer = self.app.test_client().post("/plugins/siansa_analysis/settings", data={"action": "import_lumae"})
         self.assertTrue(answer.headers["Location"].endswith("note=import_failed"))
 
     def test_only_fills_songs_not_measured_here(self):

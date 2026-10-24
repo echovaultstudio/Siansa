@@ -3,8 +3,8 @@ import unittest
 import numpy as np
 
 import support  # noqa: F401  (import path and the plugin.api stand-in)
-from musix_analysis import generations, similarity, status, web
-from musix_analysis.generations import Inputs
+from siansa_analysis import generations, similarity, status, web
+from siansa_analysis.generations import Inputs
 
 
 def vec(*values):
