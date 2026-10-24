@@ -59,11 +59,11 @@ enum class ThemeColours(val label: String, val seed: Long? = null) {
 }
 
 /**
- * The colour of selected and active items (issue #313): chosen chips, the current tab, the playing song.
- * [THEME] takes the theme's accent (amber when the theme is grey); the others are fixed.
+ * The accent colour (issues #313, #404): one colour for everything that stands out, whether it's on, chosen or
+ * something you press. [THEME] ("Match theme") takes the theme's own; the others are fixed.
  */
 enum class SelectionColour(val label: String, val argb: Long? = null) {
-    THEME("Theme"),
+    THEME("Match theme"),
     AMBER("Amber", 0xFFFFB547),
     VIOLET("Violet", 0xFF9C7CFF),
     BLUE("Blue", 0xFF4F8EF7),
@@ -80,9 +80,50 @@ enum class SelectionColour(val label: String, val argb: Long? = null) {
 /** Whether [c] is (nearly) grey: its channels hardly differ. */
 internal fun isGreyish(c: Color): Boolean = maxOf(c.red, c.green, c.blue) - minOf(c.red, c.green, c.blue) < 0.12f
 
-/** The colour for selected items: [choice]'s own, or the theme's [accent] (amber when that is grey). */
-internal fun selectionColourOf(choice: SelectionColour, accent: Color): Color =
-    choice.argb?.let { Color(it) } ?: if (isGreyish(accent)) Brand.Amber else accent
+/** Mono's accent (issue #404): near black on light pages, near white on dark ones, so it stands out. */
+internal val MonoOnLight = Color(0xFF1C1C1C)
+internal val MonoOnDark = Color(0xFFEDEDED)
+
+/**
+ * The accent as picked: [choice]'s own, or the theme's [accent]. A grey theme (Mono) gets black or white
+ * by the page ([dark]), not a mid grey that is hard to see on white (issue #404).
+ */
+internal fun selectionColourOf(choice: SelectionColour, accent: Color, dark: Boolean): Color =
+    choice.argb?.let { Color(it) } ?: if (isGreyish(accent)) (if (dark) MonoOnDark else MonoOnLight) else accent
+
+/** Relative luminance (WCAG). */
+internal fun luminanceOf(c: Color): Float {
+    fun ch(v: Float) = if (v <= 0.03928f) v / 12.92f else Math.pow(((v + 0.055f) / 1.055f).toDouble(), 2.4).toFloat()
+    return 0.2126f * ch(c.red) + 0.7152f * ch(c.green) + 0.0722f * ch(c.blue)
+}
+
+/** The contrast between two colours, 1 to 21 (WCAG). */
+internal fun contrastOf(a: Color, b: Color): Float {
+    val la = luminanceOf(a); val lb = luminanceOf(b)
+    return (maxOf(la, lb) + 0.05f) / (minOf(la, lb) + 0.05f)
+}
+
+/** Icons and controls need this much contrast with the page to be seen (WCAG non-text contrast). */
+internal const val ACCENT_MIN_CONTRAST = 3f
+
+/**
+ * [colour], made darker on a light [page] or lighter on a dark one until it can be seen there (issue #404):
+ * the same colour, just a shade that stands out. Kept as it is when it already does.
+ */
+internal fun readableOn(colour: Color, page: Color, min: Float = ACCENT_MIN_CONTRAST): Color {
+    if (contrastOf(colour, page) >= min) return colour
+    val toward = if (luminanceOf(page) > 0.18f) Color.Black else Color.White
+    var step = 1
+    while (step <= 20) {
+        val c = androidx.compose.ui.graphics.lerp(colour, toward, step / 20f)
+        if (contrastOf(c, page) >= min) return c
+        step++
+    }
+    return toward
+}
+
+/** The accent for this page: the picked one ([fill]), in a shade that can be seen on [page]. */
+internal fun accentFor(fill: Color, page: Color): Color = readableOn(fill, page)
 
 /** Text and icons on [selected]: near black on light colours, white on dark ones. */
 internal fun onSelectionColourOf(selected: Color): Color =
@@ -99,11 +140,11 @@ data class ThemeChoice(
     val pureBlack: Boolean = false,
     /** The seed for [ThemeColours.YOURS], as ARGB. */
     val seed: Int = app.musix.data.DEFAULT_THEME_SEED,
-    /** The colour of selected items (issue #313). */
+    /** The accent colour (issues #313, #404). */
     val selection: SelectionColour = SelectionColour.THEME,
 )
 
-/** The colour of selected and active items (issue #313): set in Themes. */
+/** Filled selected items (chips, the current tab): the accent colour exactly as picked in Themes (issue #404). */
 val Selected: Color
     @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.secondaryContainer
 
@@ -111,7 +152,10 @@ val Selected: Color
 val OnSelected: Color
     @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.onSecondaryContainer
 
-/** The colour for play buttons, active controls, hearts and the playing song: the theme's main colour. */
+/**
+ * The accent colour (issue #404): play buttons, active controls, hearts and the playing song. The same colour
+ * as [Selected], in a shade that can be seen on the page.
+ */
 val Accent: Color
     @Composable @ReadOnlyComposable get() = LocalAccent.current
 
@@ -123,7 +167,12 @@ val OnAccent: Color
 val DarkColours: ColorScheme
     @Composable @ReadOnlyComposable get() = LocalDarkColours.current
 
+/** The theme's own accent, before any picked colour (the "Match theme" swatch in Themes). */
+val ThemeAccent: Color
+    @Composable @ReadOnlyComposable get() = LocalThemeAccent.current
+
 private val LocalAccent = staticCompositionLocalOf { Brand.Amber }
+private val LocalThemeAccent = staticCompositionLocalOf { Brand.Amber }
 private val LocalOnAccent = staticCompositionLocalOf { Color(0xFF2A1700) }
 private val LocalDarkColours = staticCompositionLocalOf { MusixDark }
 private val LocalChoice = staticCompositionLocalOf { ThemeChoice() }
@@ -221,8 +270,6 @@ fun themeScheme(colours: ThemeColours, dark: Boolean, pureBlack: Boolean = false
 private fun accentOf(colours: ThemeColours, scheme: ColorScheme): Color =
     if (colours == ThemeColours.MUSIX) Brand.Amber else scheme.primary
 
-private fun onAccentOf(colours: ThemeColours, scheme: ColorScheme): Color =
-    if (colours == ThemeColours.MUSIX) Color(0xFF2A1700) else scheme.onPrimary
 
 /** Whether [choice] is dark right now (Auto follows the phone, including its dark-mode schedule). */
 @Composable
@@ -237,13 +284,16 @@ fun isDark(choice: ThemeChoice): Boolean = when (choice.mode) {
 fun MusixTheme(choice: ThemeChoice = ThemeChoice(), content: @Composable () -> Unit) {
     val dark = isDark(choice)
     val plain = themeScheme(choice.colours, dark, choice.pureBlack, choice.seed)
-    val scheme = plain.withSelection(selectionColourOf(choice.selection, accentOf(choice.colours, plain)))
+    val fill = selectionColourOf(choice.selection, accentOf(choice.colours, plain), dark)
+    val scheme = plain.withSelection(fill)
+    val accent = accentFor(fill, plain.surface)
     val darkPlain = if (dark) plain else themeScheme(choice.colours, true, choice.pureBlack, choice.seed)
-    val darkScheme = darkPlain.withSelection(selectionColourOf(choice.selection, accentOf(choice.colours, darkPlain)))
+    val darkScheme = darkPlain.withSelection(selectionColourOf(choice.selection, accentOf(choice.colours, darkPlain), true))
     CompositionLocalProvider(
         LocalChoice provides choice,
-        LocalAccent provides accentOf(choice.colours, scheme),
-        LocalOnAccent provides onAccentOf(choice.colours, scheme),
+        LocalAccent provides accent,
+        LocalOnAccent provides onSelectionColourOf(accent),
+        LocalThemeAccent provides selectionColourOf(SelectionColour.THEME, accentOf(choice.colours, plain), dark),
         LocalDarkColours provides darkScheme,
     ) {
         MaterialTheme(colorScheme = scheme, content = content)
@@ -255,10 +305,13 @@ fun MusixTheme(choice: ThemeChoice = ThemeChoice(), content: @Composable () -> U
 fun MusixDarkTheme(content: @Composable () -> Unit) {
     val choice = LocalChoice.current
     val plain = themeScheme(choice.colours, true, seed = choice.seed)
-    val scheme = plain.withSelection(selectionColourOf(choice.selection, accentOf(choice.colours, plain)))
+    val fill = selectionColourOf(choice.selection, accentOf(choice.colours, plain), true)
+    val scheme = plain.withSelection(fill)
+    val accent = accentFor(fill, plain.surface)
     CompositionLocalProvider(
-        LocalAccent provides accentOf(choice.colours, scheme),
-        LocalOnAccent provides onAccentOf(choice.colours, scheme),
+        LocalAccent provides accent,
+        LocalOnAccent provides onSelectionColourOf(accent),
+        LocalThemeAccent provides selectionColourOf(SelectionColour.THEME, accentOf(choice.colours, plain), true),
         // Text on these pages is light, also when the phone is in light mode: before, text without a colour
         // of its own took the light theme's dark one and all but vanished ("Top artists" on Your month).
         androidx.compose.material3.LocalContentColor provides scheme.onSurface,
