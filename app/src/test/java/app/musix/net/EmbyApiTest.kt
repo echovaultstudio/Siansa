@@ -113,7 +113,7 @@ class EmbyApiTest {
         api.starredSongs()
         val stream = api.streamUrl("s 1")
         assertTrue(stream, stream.startsWith("http://emby.local:8096/Audio/s+1/stream?"))
-        assertTrue(stream.contains("static=true") && stream.contains("api_key=t1"))
+        assertTrue(stream.contains("Static=true") && stream.contains("api_key=t1"))
         // Covers by item id; Navidrome-style album ids from older data work too.
         assertEquals(api.coverUrl("a1", 300), api.coverUrl("al-a1", 300))
         assertTrue(api.coverUrl("a1", 300).contains("/Items/a1/Images/Primary?maxWidth=300"))
@@ -184,6 +184,32 @@ class EmbyApiTest {
         assertEquals("lrc", EmbyApi.lyricsFormat("LRC"))
         assertEquals("srt", EmbyApi.lyricsFormat("subrip"))
         assertEquals("txt", EmbyApi.lyricsFormat(null))
+    }
+
+    @Test fun albumSongsAreInDiscAndTrackOrder() = runBlocking {
+        val server = FakeEmby { seen ->
+            if (seen.path == "/Users/u1/Items/a1") 200 to """{"Id":"a1","Name":"Untrue"}"""
+            else 200 to """{"Items":[{"Id":"x","Name":"B","IndexNumber":1,"ParentIndexNumber":2},
+                {"Id":"y","Name":"A","IndexNumber":2,"ParentIndexNumber":1},{"Id":"z","Name":"C","IndexNumber":1,"ParentIndexNumber":1}]}"""
+        }
+        assertEquals(listOf("z", "y", "x"), EmbyApi(server.client, { settings }).album("a1").songs.map { it.id })
+    }
+
+    @Test fun anArtistsPageShowsTheirOwnAlbums() = runBlocking {
+        val server = FakeEmby { seen ->
+            if (seen.path == "/Users/u1/Items/ar1") 200 to """{"Id":"ar1","Name":"Burial"}"""
+            else 200 to """{"Items":[{"Id":"a1","Name":"Untrue","AlbumArtists":[{"Id":"ar1","Name":"Burial"}]},
+                {"Id":"a2","Name":"Compilation","AlbumArtists":[{"Id":"va","Name":"Various Artists"}]}]}"""
+        }
+        val detail = EmbyApi(server.client, { settings }).artist("ar1")
+        assertEquals(listOf("a1"), detail.albums.map { it.id })
+        assertEquals("ar1", server.seen.last().query["ArtistIds"])
+    }
+
+    @Test fun artistRadioIsTheArtistsInstantMix() = runBlocking {
+        val server = FakeEmby { 200 to """{"Items":[]}""" }
+        EmbyApi(server.client, { settings }).artistRadio("ar1", 20)
+        assertEquals("/Items/ar1/InstantMix", server.seen.last().path)
     }
 
     @Test fun albumListsMapToEmbySorts() {
