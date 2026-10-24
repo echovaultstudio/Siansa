@@ -8,7 +8,7 @@
     {
       "version": "0.2.0",
       "min_core_version": "3.6.4",
-      "changelog": "Renamed with the app to Siansa Analysis (siansa_analysis). Installing it copies everything the earlier Musix Analysis plugin measured and built, so nothing is measured again; uninstall the earlier one afterwards.",
+      "changelog": "First public version of Siansa Analysis: volume and fade profiles for levelling and SmoothFade, and similar albums and artists from AudioMuse-AI's sound analysis.",
       "imageUrl": ""
     },
     {
