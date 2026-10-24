@@ -34,7 +34,7 @@ def migrate(db):
             error TEXT,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )""")
-    # Where a profile came from: 'measured' here, or 'lumae' when imported (lumae_import.py, until 0.1.3).
+    # Where a profile came from ('measured' here).
     cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'measured'")
     cur.execute(f"CREATE INDEX IF NOT EXISTS {table('profiles_status')} ON {table('profiles')} (status, analyzer_version)")
     cur.execute(f"""
@@ -293,24 +293,21 @@ def mark_wanted(db, item_ids):
 
 
 def profile_counts(db):
-    """``(songs, ready, failed, wanted, imported)`` across the library; ``imported`` are ready ones from Lumae."""
+    """``(songs, ready, failed, wanted)`` across the library."""
     cur = db.cursor()
     cur.execute(f"""
         SELECT (SELECT count(*) FROM score),
                count(*) FILTER (WHERE p.status='ready' AND p.analyzer_version=%s),
                count(*) FILTER (WHERE p.status='failed'),
-               (SELECT count(*) FROM {table('wanted')}),
-               count(*) FILTER (WHERE p.status='ready' AND p.analyzer_version=%s AND p.source='lumae')
-          FROM {table('profiles')} p JOIN score s USING (item_id)""", (ANALYZER_VERSION, ANALYZER_VERSION))
-    songs, ready, failed, wanted, imported = cur.fetchone()
+               (SELECT count(*) FROM {table('wanted')})
+          FROM {table('profiles')} p JOIN score s USING (item_id)""", (ANALYZER_VERSION,))
+    songs, ready, failed, wanted = cur.fetchone()
     cur.close()
-    return int(songs or 0), int(ready or 0), int(failed or 0), int(wanted or 0), int(imported or 0)
+    return int(songs or 0), int(ready or 0), int(failed or 0), int(wanted or 0)
 
 
-def songs_to_measure(db, limit, include_imported=False):
+def songs_to_measure(db, limit):
     """Up to ``limit`` songs without a current profile: asked-for songs first, then the newest.
-
-    ``include_imported`` also returns songs whose profile was imported from Lumae ("Measure all songs").
     """
     cur = db.cursor()
     cur.execute(f"""
@@ -320,10 +317,9 @@ def songs_to_measure(db, limit, include_imported=False):
           LEFT JOIN {table('wanted')} w USING (item_id)
          WHERE (p.item_id IS NULL
                 OR (p.status='ready' AND p.analyzer_version <> %s)
-                OR (p.status IN ('failed', 'elsewhere') AND (p.retry_after IS NULL OR p.retry_after <= now()))
-                OR (%s AND p.status='ready' AND p.source='lumae'))
-         ORDER BY w.asked_at DESC NULLS LAST, (p.source='lumae') NULLS FIRST, s.created_at DESC
-         LIMIT %s""", (ANALYZER_VERSION, bool(include_imported), int(limit)))
+                OR (p.status IN ('failed', 'elsewhere') AND (p.retry_after IS NULL OR p.retry_after <= now())))
+         ORDER BY w.asked_at DESC NULLS LAST, s.created_at DESC
+         LIMIT %s""", (ANALYZER_VERSION, int(limit)))
     rows = cur.fetchall()
     cur.close()
     return rows

@@ -18,9 +18,8 @@ enum class LoudnessSource(val label: String, val detail: String) {
     PLUGIN("Siansa plugin", "Measured by the Siansa plugin on your AudioMuse server");
 
     companion object {
-        /** The stored choice; "LUMAE", saved before issue #188, is the plugin it was replaced by. */
-        fun parse(value: String?): LoudnessSource =
-            if (value == "LUMAE") PLUGIN else entries.firstOrNull { it.name == value } ?: TAGS
+        /** The stored choice. */
+        fun parse(value: String?): LoudnessSource = entries.firstOrNull { it.name == value } ?: TAGS
     }
 }
 

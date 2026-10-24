@@ -41,10 +41,16 @@ class Grouping(unittest.TestCase):
 class Page(unittest.TestCase):
     def test_newest_first_with_links(self):
         text = rp.render(rp.group([release("v0.1.0", commit("a")), release("v0.2.0", commit("b"))],
-                                  [pull(7, "b", "Shiny")]))
+                                  [pull(7, "b", "Shiny")]), since="")
         self.assertLess(text.index("## [0.2.0]"), text.index("## [0.1.0]"))
         self.assertIn("- [#7](https://x/pull/7) Shiny (@someone)", text)
         self.assertIn("- 1 commit pushed straight to main", text)
+
+
+    def test_starts_at_the_first_siansa_beta(self):
+        grouped = rp.group([release("v0.1.0", commit("a")), release("v0.2.0", commit("b"))], [])
+        self.assertNotIn("## [0.1.0]", rp.render(grouped, since="2026-10-18"))
+        self.assertIn("## [0.1.0]", rp.render(grouped, since="2026-10-17"))
 
 
 class Retries(unittest.TestCase):

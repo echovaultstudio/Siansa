@@ -17,6 +17,8 @@ import sys
 import time
 
 OUT = "RELEASES.md"
+# Releases published before this are left off the page: it starts at the first Siansa beta, 0.28.1beta.
+FIRST_PUBLISHED = "2026-10-24T10:00:00Z"
 
 
 def gh(path, run=subprocess.run, wait=time.sleep, tries=4):
@@ -102,7 +104,7 @@ def group(releases, pulls, lookup=lambda sha: []):
     return result
 
 
-def render(grouped):
+def render(grouped, since=FIRST_PUBLISHED):
     lines = [
         "# Releases",
         "",
@@ -112,6 +114,8 @@ def render(grouped):
     ]
     for r, prs, direct in reversed(grouped):
         version = r["tag_name"].removeprefix("v")
+        if r["published_at"] < since:  # the page starts at the first Siansa beta
+            continue
         lines += [f"## [{version}]({r['html_url']}) — {r['published_at'][:10]}", ""]
         for p in prs:
             title = p["title"].replace("\n", " ").strip()
