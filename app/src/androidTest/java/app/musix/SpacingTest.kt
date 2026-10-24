@@ -411,7 +411,7 @@ class SpacingTest {
         assertTrue("A gap after the title: ${title.right} vs ${lengths[0].left}", title.right <= with(compose.density) { lengths[0].left.toDp() } - Space.Small + 1.dp)
     }
 
-    /** Themes › Selected items (issue #313): the colours sit in even columns, four to a row. */
+    /** Themes › Accent colour (issues #313, #404): the colours sit in even columns, four to a row. */
     @Test fun selectionSwatchesAreEven() {
         compose.setContent { MusixTheme { app.musix.ui.SelectionSwatches(app.musix.ui.SelectionColour.THEME, onPick = {}) } }
         val names = listOf("THEME", "AMBER", "VIOLET", "BLUE", "TEAL")

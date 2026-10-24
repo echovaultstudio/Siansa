@@ -149,14 +149,14 @@ fun ThemesScreen(nav: NavController) {
                 modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = SWATCH_GAP),
             )
 
-            // The colour of selected items everywhere (issue #313).
-            ThemeLabel("Selected items")
+            // One accent colour for everything that stands out (issues #313, #404).
+            ThemeLabel("Accent colour")
             SelectionSwatches(choice.selection, onPick = { pick ->
-                AppLog.i("Themes", "Selected items: ${pick.label}")
+                AppLog.i("Themes", "Accent colour: ${pick.label}")
                 graph.settings.setSelectionColour(pick.name)
             }, modifier = Modifier.padding(horizontal = Space.Page))
             Text(
-                "Chosen chips, the current tab and the playing song. Theme uses the theme's own colour.",
+                "Buttons, hearts, the playing song, and anything that's on. It gets darker or lighter where it needs to stand out.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = SWATCH_GAP, bottom = Space.Section),
@@ -300,10 +300,10 @@ internal fun SwatchGridForTest() {
     )
 }
 
-/** The colours for selected items, as circles four to a row (issue #313); "Theme" shows the theme's own. */
+/** The accent colours, as circles four to a row (issues #313, #404); "Match theme" shows the theme's own. */
 @Composable
 internal fun SelectionSwatches(selected: SelectionColour, onPick: (SelectionColour) -> Unit, modifier: Modifier = Modifier) {
-    val themeColour = selectionColourOf(SelectionColour.THEME, Accent)
+    val themeColour = ThemeAccent
     Column(modifier.testTag("selectionSwatches"), verticalArrangement = Arrangement.spacedBy(SWATCH_GAP)) {
         SelectionColour.entries.chunked(4).forEach { row ->
             Row(Modifier.fillMaxWidth()) {
