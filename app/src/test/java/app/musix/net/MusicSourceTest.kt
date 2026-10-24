@@ -10,7 +10,7 @@ import org.junit.Test
 /** The music source layer (issue #113). */
 class MusicSourceTest {
     @Test fun onlyReadySourcesCanBeChosen() {
-        assertEquals(listOf(SourceKind.OPENSUBSONIC), SourceKind.entries.filter { it.ready })
+        assertEquals(listOf(SourceKind.OPENSUBSONIC, SourceKind.EMBY), SourceKind.entries.filter { it.ready })
         // The picker lists every kind, ready ones first.
         assertEquals(SourceKind.OPENSUBSONIC, SourceKind.entries.first())
     }
@@ -22,6 +22,7 @@ class MusicSourceTest {
         assertEquals(SourceKind.OPENSUBSONIC, SourceKind.parse("PLEX"))
         // A kind that isn't ready yet can't be in use.
         assertEquals(SourceKind.OPENSUBSONIC, SourceKind.parse("JELLYFIN"))
+        assertEquals(SourceKind.EMBY, SourceKind.parse("EMBY"))
         assertEquals(SourceKind.OPENSUBSONIC, AppSettings().sourceKind)
     }
 
@@ -29,6 +30,18 @@ class MusicSourceTest {
         val source: MusicSource = SubsonicApi(okhttp3.OkHttpClient()) { AppSettings() }
         assertEquals(SourceKind.OPENSUBSONIC, source.kind)
         assertTrue(source.streamUrl("s1").contains("/rest/stream"))
+    }
+
+    @Test fun theActiveSourceFollowsTheSettings() {
+        var settings = AppSettings(navidromeUrl = "http://music.local")
+        val subsonic = SubsonicApi(okhttp3.OkHttpClient()) { settings }
+        val emby = EmbyApi(okhttp3.OkHttpClient(), { settings })
+        val active = ActiveSource { if (settings.sourceKind == SourceKind.EMBY) emby else subsonic }
+        assertEquals(SourceKind.OPENSUBSONIC, active.kind)
+        assertTrue(active.streamUrl("s1").contains("/rest/stream"))
+        settings = settings.copy(sourceKind = SourceKind.EMBY)
+        assertEquals(SourceKind.EMBY, active.kind)
+        assertTrue(active.streamUrl("s1").contains("/Audio/s1/stream"))
     }
 
     @Test fun setupStepsCarryTheChoice() {

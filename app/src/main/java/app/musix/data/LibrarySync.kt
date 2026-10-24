@@ -2,7 +2,7 @@ package app.musix.data
 
 import app.musix.data.LibraryRepository.Companion.signature
 import app.musix.log.AppLog
-import app.musix.net.SubsonicApi
+import app.musix.net.MusicSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -65,7 +65,7 @@ data class SyncProgress(
  * chosen in Settings are only which of them show ([LibraryRepository.showFolders]), so switching one is instant.
  */
 class LibrarySync(
-    private val api: SubsonicApi,
+    private val api: MusicSource,
     private val library: LibraryRepository,
     private val settings: SettingsRepository,
     private val scope: CoroutineScope,
