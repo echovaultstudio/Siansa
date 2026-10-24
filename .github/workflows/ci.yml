@@ -441,5 +441,5 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-          BETA_ISSUES_TOKEN: ${{ secrets.BETA_ISSUES_TOKEN }}
+          BETA_REPO_TOKEN: ${{ secrets.BETA_REPO_TOKEN }}
         run: python3 scripts/beta_notify.py "v${{ steps.version.outputs.version }}"
