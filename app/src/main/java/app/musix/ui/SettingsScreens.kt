@@ -99,7 +99,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                     navidromeUrl = d.navidromeUrl, navidromeUser = d.navidromeUser, navidromePassword = d.navidromePassword,
                     proxyUser = d.proxyUser, proxyPassword = d.proxyPassword,
                     audioMuseUrl = d.audioMuseUrl, audioMuseToken = d.audioMuseToken,
-                    audioMuseUser = d.audioMuseUser, audioMusePassword = d.audioMusePassword,
+                    audioMuseUser = d.audioMuseUser, audioMusePassword = d.audioMusePassword, audioMuseServer = d.audioMuseServer,
                     openRouterKey = d.openRouterKey, openRouterModel = d.openRouterModel, aiTitles = d.aiTitles,
                 )
             )
@@ -175,6 +175,11 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                 SecretField("API token", draft.audioMuseToken) { draft = draft.copy(audioMuseToken = it) }
                 Field("Username", draft.audioMuseUser, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseUser = it) }
                 SecretField("Password", draft.audioMusePassword) { draft = draft.copy(audioMusePassword = it) }
+                Field("Server name in AudioMuse", draft.audioMuseServer, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseServer = it) }
+                Hint(
+                    if (kind == SourceKind.EMBY) "AudioMuse reads your Emby library for everything smart. If AudioMuse has more than one music server, enter this Emby server's name as it is in AudioMuse."
+                    else "Only if AudioMuse has more than one music server: this server's name as it is in AudioMuse. Leave empty for its main one."
+                )
                 TestRow(audioMuseTest) {
                     runTest({ audioMuseTest = it }) { s ->
                         val hits = AudioMuseApi(graph.http) { s }.textSearch("calm piano", 3)
