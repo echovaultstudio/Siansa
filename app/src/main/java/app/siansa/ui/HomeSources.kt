@@ -29,7 +29,6 @@ import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,9 +54,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.siansa.data.MusicFolder
-import app.siansa.data.UserEntry
-import app.siansa.data.UserFiles
 import app.siansa.data.Users
+import kotlinx.coroutines.launch
 import app.siansa.log.AppLog
 
 /*
@@ -79,7 +77,8 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
     val guestStates by graph.guests.state.collectAsStateWithLifecycle()
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
     val users = remember { Users.all(context) }
-    var hidingActive by remember { mutableStateOf<UserEntry?>(null) }
+    // The user in use's own music hidden (issue #427): instant, their settings and history stay in use.
+    val ownHidden by graph.library.ownHidden.collectAsStateWithLifecycle()
     val libraryStatus by graph.library.status.collectAsStateWithLifecycle()
     // A sync started from this sheet shows its progress and result here, like the Library sync page (#220).
     var watching by remember { mutableStateOf(false) }
@@ -113,7 +112,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
         Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
             users.forEach { user ->
                 val inUse = user.id == Users.active
-                val isShown = user.id in shown
+                val isShown = if (inUse) !ownHidden else user.id in shown
                 val folders by loadState("folders-${user.id}-$isShown") {
                     if (!isShown || !user.connected) emptyList()
                     else if (inUse) graph.source.musicFolders()
@@ -128,6 +127,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                     name = user.label,
                     status = when {
                         !user.connected -> "Not connected yet. Set it up in Settings → Users."
+                        inUse && ownHidden -> "In use · their music is hidden. Their settings and history stay in use."
                         inUse -> inUseStatus(syncing, libraryStatus)
                         !isShown -> "Hidden"
                         guest?.error != null -> "Couldn't load: ${guest.error}"
@@ -136,15 +136,19 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                         else -> "Shown"
                     },
                     shown = isShown,
-                    canToggle = user.connected && (!inUse || shown.size > 1),
+                    canToggle = canToggleUser(user.connected, inUse, ownHidden, shown.size),
                     syncing = syncing,
                     libraries = if (isShown && all.size > 1) all.map { it.name to (it.id in chosen) } else emptyList(),
                     onToggle = {
                         when {
-                            inUse -> hidingActive = user
+                            inUse -> graph.scope.launch { graph.library.setOwnHidden(!ownHidden, settings.syncFolders) }
                             else -> {
                                 AppLog.i("Sources", "${if (isShown) "Hiding" else "Showing"} user ${user.id + 1}")
                                 graph.guests.setShown(user.id, !isShown)
+                                // Hiding the last other user while the user in use's music is hidden shows theirs again.
+                                if (isShown && ownHidden && shown.size <= 2) {
+                                    graph.scope.launch { graph.library.setOwnHidden(false, settings.syncFolders) }
+                                }
                             }
                         }
                     },
@@ -184,27 +188,6 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = Space.Medium, bottom = Space.Page, start = Space.Tight, end = Space.Tight),
         )
-    }
-
-    hidingActive?.let { user ->
-        val next = UserFiles.afterHidingActive(shown, Users.active)
-        val other = next?.let { (id, _) -> users.firstOrNull { it.id == id } }
-        if (next == null || other == null) {
-            hidingActive = null
-        } else {
-            AlertDialog(
-                onDismissRequest = { hidingActive = null },
-                title = { Text("Hide ${user.label}?") },
-                text = { Text("Siansa restarts as ${other.label}, with their history, playlists and settings.") },
-                confirmButton = {
-                    TextButton(onClick = {
-                        AppLog.i("Sources", "Hiding the user in use; switching to user ${next.first + 1}")
-                        Users.switchTo(context, next.first, next.second)
-                    }) { Text("Hide and restart") }
-                },
-                dismissButton = { TextButton(onClick = { hidingActive = null }) { Text("Cancel") } },
-            )
-        }
     }
 }
 
@@ -358,6 +341,13 @@ private const val DOWNLOADED_CHIP = "Only downloaded"
 internal fun sourceChipLabels(downloadedOnly: Boolean): List<String> = buildList {
     if (downloadedOnly) add(DOWNLOADED_CHIP)
 }
+
+/**
+ * Whether a user's eye in Sources can be tapped (issue #427): something always shows, so the user in use's own
+ * music can only be hidden while another user's is shown ([shownUsers] counts the user in use too).
+ */
+internal fun canToggleUser(connected: Boolean, inUse: Boolean, ownHidden: Boolean, shownUsers: Int): Boolean =
+    connected && (!inUse || ownHidden || shownUsers > 1)
 
 /** Whether Home's filter button is lit: something is hidden, or several users' music is shown. */
 internal fun sourceFilterActive(downloadedOnly: Boolean, shownUsers: Int): Boolean = downloadedOnly || shownUsers > 1

@@ -166,7 +166,7 @@ class Guests(
         }
     }
 
-    /** Shows or hides [user]'s music. The user in use can't be hidden here (see [Users.afterHidingActive]). */
+    /** Shows or hides [user]'s music. The user in use's own music is hidden by [LibraryRepository.setOwnHidden] (issue #427). */
     fun setShown(user: Int, show: Boolean) {
         if (user == Users.active) return
         val next = if (show) _shown.value + user else _shown.value - user
