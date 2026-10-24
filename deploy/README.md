@@ -77,7 +77,8 @@ nano .env    # ACME_EMAIL, and DEMO_ADMIN_PASSWORD (make one: openssl rand -base
 sudo sh scripts/harden.sh
 ```
 This sets up:
-- a firewall that lets in only SSH (rate limited), 80 and 443
+- a firewall that lets in only SSH (rate limited), 80 and 443 (skip it with `SKIP_FIREWALL=1` if your hosting
+  provider's firewall already does this)
 - fail2ban for SSH
 - automatic security updates
 - stricter SSH settings

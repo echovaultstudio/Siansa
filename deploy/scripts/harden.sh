@@ -3,19 +3,24 @@
 #   sudo sh scripts/harden.sh
 # SSH password logins are switched off only when NO_PASSWORD_SSH=1 is given, after you've checked that your own
 # key login works (otherwise you could lock yourself out).
+# Firewall: set SKIP_FIREWALL=1 if the hosting provider's firewall already does this (ufw is then left alone).
 set -eu
 
 SSH_PORT="${SSH_PORT:-22}"
 
-echo "== Firewall: SSH, HTTP, HTTPS (and HTTP/3) only"
-ufw default deny incoming
-ufw default allow outgoing
-ufw limit "$SSH_PORT"/tcp comment 'SSH, rate limited'
-ufw allow 80/tcp comment 'HTTP (redirects to HTTPS, certificates)'
-ufw allow 443/tcp comment 'HTTPS'
-ufw allow 443/udp comment 'HTTP/3'
-ufw --force enable
-# Docker publishes ports past ufw's rules; only Caddy publishes any (80/443), Navidrome has none of its own.
+if [ "${SKIP_FIREWALL:-0}" = 1 ]; then
+	echo "== Firewall: skipped (SKIP_FIREWALL=1), the provider's firewall is used"
+else
+	echo "== Firewall: SSH, HTTP, HTTPS (and HTTP/3) only"
+	ufw default deny incoming
+	ufw default allow outgoing
+	ufw limit "$SSH_PORT"/tcp comment 'SSH, rate limited'
+	ufw allow 80/tcp comment 'HTTP (redirects to HTTPS, certificates)'
+	ufw allow 443/tcp comment 'HTTPS'
+	ufw allow 443/udp comment 'HTTP/3'
+	ufw --force enable
+	# Docker publishes ports past ufw's rules; only Caddy publishes any (80/443), Navidrome has none of its own.
+fi
 
 echo "== fail2ban for SSH"
 cat > /etc/fail2ban/jail.d/siansa.local <<EOF
@@ -59,4 +64,4 @@ if [ ! -f /etc/docker/daemon.json ]; then
 	systemctl restart docker
 fi
 
-echo "Done. Check: ufw status verbose; fail2ban-client status sshd"
+echo "Done. Check: fail2ban-client status sshd (and ufw status verbose, unless SKIP_FIREWALL=1)"
