@@ -156,6 +156,36 @@ class EmbyApiTest {
         assertEquals("e1,e3", delete.query["EntryIds"])
     }
 
+    @Test fun lyricsComeFromTheSongsLyricsStreams() = runBlocking {
+        val server = FakeEmby { seen ->
+            when {
+                seen.path == "/Users/u1/Items/s1" -> 200 to """{"Id":"s1","MediaSources":[{"Id":"ms1","MediaStreams":[
+                    {"Type":"Audio","Index":0},{"Type":"Subtitle","Index":1,"Codec":"lrc","Language":"eng"}]}]}"""
+                seen.path == "/Items/s1/ms1/Subtitles/1/Stream.lrc" -> 200 to "[00:01.00]Hello\n[00:03.50]World"
+                else -> 404 to ""
+            }
+        }
+        val lyrics = EmbyApi(server.client, { settings }).lyrics(Song("s1", "T"))!!
+        assertTrue(lyrics.synced)
+        assertEquals(listOf(1000L, 3500L), lyrics.lines.map { it.startMs })
+        assertEquals("World", lyrics.lines[1].text)
+    }
+
+    @Test fun noLyricsStreamMeansNoLyrics() = runBlocking {
+        val server = FakeEmby { 200 to """{"Id":"s1","MediaSources":[{"Id":"ms1","MediaStreams":[{"Type":"Audio","Index":0}]}]}""" }
+        assertNull(EmbyApi(server.client, { settings }).lyrics(Song("s1", "T")))
+    }
+
+    @Test fun plainLyricsStayPlain() {
+        val plain = EmbyApi.readLyrics("Line one\nLine two")!!
+        assertFalse(plain.synced)
+        assertEquals(listOf("Line one", "Line two"), plain.lines.map { it.text })
+        assertNull(EmbyApi.readLyrics("  "))
+        assertEquals("lrc", EmbyApi.lyricsFormat("LRC"))
+        assertEquals("srt", EmbyApi.lyricsFormat("subrip"))
+        assertEquals("txt", EmbyApi.lyricsFormat(null))
+    }
+
     @Test fun albumListsMapToEmbySorts() {
         assertEquals("DateCreated,SortName" to "Descending", EmbyApi.albumSort("newest"))
         assertEquals("PlayCount,SortName" to "Descending", EmbyApi.albumSort("frequent"))
@@ -168,7 +198,6 @@ class EmbyApiTest {
         val api = EmbyApi(OkHttpClient(), { settings })
         assertFalse(api.hasSonicMatch())
         assertTrue(api.sonicSimilar("s1", 10).isEmpty())
-        assertNull(api.lyrics(Song("s1", "T")))
         assertNull(api.lastScan())
     }
 }

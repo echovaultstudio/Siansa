@@ -8,7 +8,9 @@ import app.musix.data.Artist
 import app.musix.data.ArtistDetail
 import app.musix.data.ArtistInfo
 import app.musix.data.ArtistRef
+import app.musix.data.LyricLine
 import app.musix.data.Lyrics
+import app.musix.data.LyricsFormats
 import app.musix.data.MusicFolder
 import app.musix.data.Playlist
 import app.musix.data.PlaylistDetail
@@ -40,7 +42,7 @@ import java.time.Instant
  *   app run; a request the server refuses (HTTP 401) logs in again once.
  * - Song and cover addresses carry the token as `api_key`, since players, Cast and the image cache can't send headers.
  * - Songs play as the untouched original file (`static=true`), like Navidrome's raw stream.
- * - Emby has no sound-alike search, no song paths and no lyrics through this API: those come back empty, so the
+ * - Lyrics come from the song's lyrics streams (Emby 4.8+). Emby has no sound-alike search and no song paths: those come back empty, so the
  *   app hides them like it does for a Navidrome server without them. Similar songs and artist radio use Emby's
  *   Instant Mix.
  */
@@ -94,8 +96,24 @@ class EmbyApi(
 
     private class Refused : Exception()
 
-    /** One HTTP exchange; null for an empty answer. Throws [Refused] for HTTP 401 with a token. */
-    private suspend fun exchange(method: String, path: String, body: String?, token: String?): JsonObject? =
+    /** One HTTP exchange, as JSON; null for an empty answer. Throws [Refused] for HTTP 401 with a token. */
+    private suspend fun exchange(method: String, path: String, body: String?, token: String?): JsonObject? {
+        val text = send(method, path, body, token)
+        if (text.isBlank()) return null
+        val element = try {
+            AppJson.parseToJsonElement(text)
+        } catch (e: Exception) {
+            throw ApiException("That address doesn't look like an Emby server")
+        }
+        return when (element) {
+            is JsonObject -> element
+            is JsonArray -> JsonObject(mapOf("Items" to element))
+            else -> null
+        }
+    }
+
+    /** One HTTP exchange, as text. Throws [Refused] for HTTP 401 with a token. */
+    private suspend fun send(method: String, path: String, body: String?, token: String?): String =
         withContext(Dispatchers.IO) {
             val builder = Request.Builder().url(base() + path).header("X-Emby-Authorization", authHeader(token))
             if (token != null) builder.header("X-Emby-Token", token)
@@ -116,36 +134,33 @@ class EmbyApi(
                     AppLog.w("Server", "Emby $method ${path.substringBefore('?')} answered HTTP ${response.code}")
                     throw ApiException("Emby answered HTTP ${response.code}")
                 }
-                if (text.isBlank()) return@use null
-                val element = try {
-                    AppJson.parseToJsonElement(text)
-                } catch (e: Exception) {
-                    throw ApiException("That address doesn't look like an Emby server")
-                }
-                when (element) {
-                    is JsonObject -> element
-                    is JsonArray -> JsonObject(mapOf("Items" to element))
-                    else -> null
-                }
+                text
             }
         }
 
-    /** A call as the logged-in user; [path] may use `{user}` for the user's id. Logs in again once when refused. */
-    private suspend fun call(path: String, method: String = "GET", body: String? = null): JsonObject {
+    /** Runs [block] as the logged-in user, with [path]'s `{user}` filled in; logs in again once when refused. */
+    private suspend fun <T> asUser(path: String, block: suspend (path: String, token: String) -> T): T {
         fun at(s: Login) = path.replace("{user}", s.userId).replace(USER_ENCODED, s.userId)
         var s = session()
         return try {
-            exchange(method, at(s), body, s.token)
+            block(at(s), s.token)
         } catch (e: Refused) {
             AppLog.w("Server", "Emby refused the saved login; logging in again")
             s = session(again = true)
             try {
-                exchange(method, at(s), body, s.token)
+                block(at(s), s.token)
             } catch (e: Refused) {
                 throw ApiException("Emby refused the login")
             }
-        } ?: JsonObject(emptyMap())
+        }
     }
+
+    /** A call as the logged-in user; [path] may use `{user}` for the user's id. */
+    private suspend fun call(path: String, method: String = "GET", body: String? = null): JsonObject =
+        asUser(path) { at, token -> exchange(method, at, body, token) } ?: JsonObject(emptyMap())
+
+    /** A file's text as the logged-in user (lyrics). */
+    private suspend fun text(path: String): String = asUser(path) { at, token -> send("GET", at, null, token) }
 
     private fun q(vararg params: Pair<String, Any?>): String =
         params.filter { it.second != null }.joinToString("&") { (k, v) -> k + "=" + enc(v.toString()) }
@@ -296,7 +311,26 @@ class EmbyApi(
         )
     }
 
-    override suspend fun lyrics(song: Song): Lyrics? = null
+    /**
+     * Lyrics (Emby 4.8 and later): Emby lists a song's lyrics (an .lrc or .txt next to the file, or embedded) as
+     * subtitle streams of the song, read through its subtitle address. Several (languages): the most detailed.
+     */
+    override suspend fun lyrics(song: Song): Lyrics? {
+        val item = call("/Users/{user}/Items/" + enc(song.id) + "?" + q("Fields" to "MediaSources,MediaStreams"))
+        val source = item.arr("MediaSources").firstOrNull()
+        val sourceId = source?.str("Id") ?: song.id
+        val streams = (source?.arr("MediaStreams").orEmpty().ifEmpty { item.arr("MediaStreams") })
+            .filter { it.str("Type") == "Subtitle" || it.str("Type") == "Lyrics" }
+        if (streams.isEmpty()) return null
+        val options = streams.mapNotNull { stream ->
+            val index = stream.int("Index") ?: return@mapNotNull null
+            val raw = runCatching {
+                text("/Items/" + enc(song.id) + "/" + enc(sourceId) + "/Subtitles/$index/Stream." + lyricsFormat(stream.str("Codec")))
+            }.onFailure { AppLog.w("Lyrics", "Emby lyrics ${song.id} #$index not read: ${it.message}") }.getOrNull()
+            readLyrics(raw)?.let { stream.str("Language") to it }
+        }
+        return LyricsFormats.best(options)
+    }
 
     // ---- Similar ----
 
@@ -472,6 +506,20 @@ class EmbyApi(
         const val ADD_CHUNK = 100
 
         fun enc(value: String): String = URLEncoder.encode(value, "UTF-8")
+
+        /** The format to ask Emby for: the lyrics' own when Musix reads it, else plain text. */
+        fun lyricsFormat(codec: String?): String = when (val c = codec?.lowercase()?.trim()) {
+            "lrc", "srt", "vtt", "ttml" -> c
+            "subrip" -> "srt"
+            "webvtt" -> "vtt"
+            else -> "txt"
+        }
+
+        /** Lyrics from Emby's text: timed when it is LRC or subtitles, else plain lines; null when empty. */
+        fun readLyrics(raw: String?): Lyrics? {
+            val text = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+            return LyricsFormats.parse(text) ?: Lyrics(false, text.lines().map { LyricLine(null, it.trimEnd()) })
+        }
 
         /** Emby counts time in ticks of 100 nanoseconds. */
         fun ticksToSec(ticks: Long?): Int = ((ticks ?: 0L) / 10_000_000L).toInt()
