@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.data.Song
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -14,5 +15,14 @@ class ArtistTopSongsTest {
         assertEquals(2, topRowsShown(2, expanded = false))
         assertEquals(4, topRowsShown(4, expanded = true))
         assertEquals(0, topRowsShown(0, expanded = true))
+    }
+
+    @Test fun theFirstListShownStays() {
+        // Issue #440: no switching while the page is open; the server's list only fills an empty one.
+        val quick = listOf(Song("a", "A"), Song("b", "B"))
+        val server = listOf(Song("c", "C"))
+        assertEquals(quick, keepFirstShown(quick, server))
+        assertEquals(server, keepFirstShown(null, server))
+        assertEquals(server, keepFirstShown(emptyList(), server))
     }
 }
