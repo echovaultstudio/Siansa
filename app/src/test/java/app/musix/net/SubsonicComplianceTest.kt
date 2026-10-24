@@ -180,7 +180,6 @@ class SubsonicComplianceTest {
         assertEquals(listOf<String?>(null), all.seen.filter { it.endpoint == "getStarred2" }.map { it.one("musicFolderId") })
     }
 
-<<<<<<< HEAD
     /** Favourite artists (issue #397): starred by artistId, and read from getStarred2 in each chosen library. */
     @Test fun favouriteArtistsUseTheArtistStar() = runBlocking {
         val server = FakeServer { seen ->
@@ -199,14 +198,14 @@ class SubsonicComplianceTest {
         val artists = api.starredArtists()
         assertEquals(listOf("ar1", "both", "ar2"), artists.map { it.id })
         assertEquals(3, artists.first().albumCount)
-=======
+    }
+
     /** The music source layer (issue #113): sonic matching is offered only when the server has the extension. */
     @Test fun sonicMatchFollowsTheExtension() = runBlocking {
         val with: MusicSource = api(FakeServer { extensions("sonicSimilarity" to "1") })
         assertEquals(true, with.hasSonicMatch())
         val without: MusicSource = api(FakeServer { extensions() })
         assertEquals(false, without.hasSonicMatch())
->>>>>>> b525a56 (Music source layer and first-run picker (#113, step 1))
     }
 
     @Test fun albumsFromSeveralLibrariesInOneOrder() {
