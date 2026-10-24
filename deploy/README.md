@@ -102,11 +102,17 @@ Navidrome or Emby server reachable from the phone, 14 days for Play, feedback, p
 `/srv/siansa-signups` (no IP addresses). Each new one is emailed to `NOTIFY_TO` with **Approve** and **Deny** links:
 - A link opens a page with a button; nothing happens until you press it (so mail scanners can't approve anyone).
   Links are signed and work for 14 days, once.
-- **Approve**, F-Droid: the tester gets an email with their own login for the F-Droid repo. Caddy asks the sign-up
-  service to check that login before serving anything under `/fdroid/repo` (`forward_auth`).
+- **Approve**, F-Droid: the tester gets an email with their own private address for the F-Droid repo,
+  `https://siansa.app/fdroid/t/<code>/repo` (F-Droid's "Add repository" screen can't take a user name and password,
+  so the secret is in the address). Caddy asks the sign-up service whether the code is valid before serving
+  anything (`forward_auth`); only a hash of the code is kept. The old open address `/fdroid/repo` is closed.
 - **Approve**, Google Play: the tester gets a welcome email, and the page tells you to add their email to the
   closed test's tester list in Play Console (Google gives no way to do that from here).
 - **Deny** sends a short no.
+- **Places:** `BETA_LIMIT` (12) testers at a time, Google Play and F-Droid together. When it's full, new sign-ups
+  are accepted and put on a waiting list (the home page shows "N of 12 beta places taken"). When a place frees up
+  (a deny, or `revoke`), the oldest waiting person is approved automatically and emailed; you get a note.
+  Raise `BETA_LIMIT` in `.env` and restart to let more in.
 
 Mail goes out through a mailbox on your mail server: fill in `SMTP_*`, `SMTP_FROM` and `NOTIFY_TO` in `.env`
 (`SIGNUP_SECRET` is made by `setup.sh`). Then `docker compose up -d`.
@@ -116,13 +122,14 @@ sudo sh scripts/signups          # table with status (pending / approved / denie
 sudo sh scripts/signups play     # approved Google emails, comma separated, to paste into Play Console
 sudo sh scripts/signups fdroid
 sudo sh scripts/signups csv
-sudo sh scripts/signups revoke EMAIL   # take away a tester's F-Droid login
+sudo sh scripts/signups revoke EMAIL   # take away a place and link; the next one waiting moves up
 ```
 The approval emails didn't arrive (mail settings were wrong at the time)? After fixing `.env` and `docker compose up -d`:
 `sudo docker compose exec signup python -I /app/server.py resend` sends them again for every undecided sign-up.
 
-A tester who loses their login: `revoke` it and ask them to sign up again. Logins are kept only as hashes, so
-nobody (including you) can read a password back.
+A tester who loses their private address: `revoke` them and ask them to sign up again (they get a new one). Only
+a hash of each code is kept, so it can't be read back. The address is in Caddy's request log on the server, which
+rotates after a few megabytes; don't share those logs.
 
 Unit tests: `python3 -I signup/test_server.py`. Check the Caddyfile after changing it:
 `docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile`.

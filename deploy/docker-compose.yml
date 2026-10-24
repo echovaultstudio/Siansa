@@ -34,6 +34,7 @@ services:
     environment:
       SIGNUPS_FILE: /data/signups.jsonl
       SIGNUP_SECRET: ${SIGNUP_SECRET:-}
+      BETA_LIMIT: ${BETA_LIMIT:-12}
       PUBLIC_URL: https://${DOMAIN}
       NOTIFY_TO: ${NOTIFY_TO:-}
       SMTP_HOST: ${SMTP_HOST:-}

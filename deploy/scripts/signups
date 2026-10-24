@@ -4,12 +4,14 @@
 #   sudo sh scripts/signups play       just the APPROVED Google Play emails, comma separated, to paste into Play Console
 #   sudo sh scripts/signups fdroid     just the approved F-Droid emails
 #   sudo sh scripts/signups csv        everything as CSV
-#   sudo sh scripts/signups revoke EMAIL   take away a tester's F-Droid login
+#   sudo sh scripts/signups revoke EMAIL   take away a tester's place and link; the next one waiting is approved
 #   (resend the approval emails: sudo docker compose exec signup python -I /app/server.py resend)
 set -eu
 FILE="${SIGNUPS_FILE:-/srv/siansa-signups/signups.jsonl}"
+HERE=$(cd "$(dirname "$0")/.." && pwd)
 if [ "${1:-}" = revoke ]; then
-	exec env SIGNUPS_FILE="$FILE" python3 -I "$(dirname "$0")/../signup/server.py" revoke "${2:?Give the tester's email}"
+	# Inside the container, so a freed place can email the next person on the waiting list.
+	exec docker compose --project-directory "$HERE" exec -T signup python -I /app/server.py revoke "${2:?Give the tester's email}"
 fi
 [ -s "$FILE" ] || { echo "No sign-ups yet."; exit 0; }
 python3 -I - "$FILE" "${1:-table}" <<'PY'

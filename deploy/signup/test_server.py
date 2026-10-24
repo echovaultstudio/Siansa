@@ -37,7 +37,7 @@ class CheckTest(unittest.TestCase):
         self.assertFalse(server.rate_limited("d", 100 + 3700))
 
 
-import base64, json, tempfile
+import tempfile
 
 
 class FlowTest(unittest.TestCase):
@@ -46,15 +46,17 @@ class FlowTest(unittest.TestCase):
         server.DATA_FILE = os.path.join(self.dir, "signups.jsonl")
         server.DECISIONS_FILE = os.path.join(self.dir, "decisions.jsonl")
         server.TESTERS_FILE = os.path.join(self.dir, "testers.json")
+        server.LOCK_FILE = os.path.join(self.dir, "state.lock")
         server.SECRET = "s3cret"
-        server._ok_cache.clear(); server._fails.clear()
+        server.LIMIT = 2
+        server._fails.clear()
+        os.environ["NOTIFY_TO"] = "me@example.com"
         self.sent = []
         server.send_mail = lambda to, subject, body: self.sent.append((to, subject, body)) or True
 
-    def signup(self, route="fdroid"):
-        rec, _ = server.check({**OK, "route": [route]})
-        server.save(rec)
-        return rec
+    def signup(self, n=0, route="fdroid"):
+        rec, _ = server.check({**OK, "email": [f"p{n}@example.com"], "route": [route]})
+        return server.accept(rec)
 
     def test_links_are_signed_per_action(self):
         a, d = server.sign("abc", "approve"), server.sign("abc", "deny")
@@ -66,59 +68,82 @@ class FlowTest(unittest.TestCase):
         server.SECRET = ""
         self.assertFalse(server.verify("abc", "approve", a))
 
-    def test_approve_fdroid_makes_login_and_emails_it(self):
-        rec = self.signup("fdroid")
-        line = server.decide(rec, "approve")
-        self.assertIn("Approved", line)
-        to, subject, body = self.sent[0]
-        self.assertEqual(to, "max@example.com")
-        user = body.split("User name: ")[1].split("\n")[0]
-        password = body.split("Password: ")[1].split("\n")[0]
-        header = "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode()
-        self.assertTrue(server.check_login(header))
-        self.assertNotIn(password, open(server.TESTERS_FILE).read())  # only a hash is kept
-        bad = "Basic " + base64.b64encode(f"{user}:wrong".encode()).decode()
-        self.assertFalse(server.check_login(bad))
-        self.assertFalse(server.check_login(None))
-        self.assertFalse(server.check_login("Basic !!!"))
+    def test_approve_fdroid_makes_private_link(self):
+        rec, state = self.signup(1)
+        self.assertEqual(state, "new")
+        self.assertIn("Approved", server.decide(rec, "approve"))
+        body = self.sent[0][2]
+        url = next(w for w in body.split() if w.startswith("https://siansa.app/fdroid/t/"))
+        path = url[len("https://siansa.app"):]
+        self.assertTrue(server.valid_link(path + "/entry.jar"))
+        self.assertTrue(server.valid_link(path + "/index-v1.jar?x=1"))
+        self.assertFalse(server.valid_link(path.replace("/repo", "") + "/x"))
+        self.assertFalse(server.valid_link(path[:-6] + "AAAA/repo/entry.jar"))
+        self.assertFalse(server.valid_link("/fdroid/repo/entry.jar"))
+        self.assertFalse(server.valid_link(None))
+        self.assertNotIn(url.split("/t/")[1].split("/")[0], open(server.TESTERS_FILE).read())  # only a hash is kept
 
     def test_decision_happens_once(self):
-        rec = self.signup()
+        rec, _ = self.signup(1)
         self.assertIsNotNone(server.decide(rec, "deny"))
         self.assertIsNone(server.decide(rec, "approve"))
-        self.assertEqual(server.decision_of(rec["id"]), "denied")
-        self.assertEqual(len(self.sent), 1)
+        self.assertEqual(server.status_of(rec["id"]), "denied")
         self.assertEqual(server.load_testers(), {})
 
-    def test_play_approval_makes_no_login_and_reminds_owner(self):
-        rec = self.signup("play")
+    def test_play_approval_makes_no_link_and_reminds_owner(self):
+        rec, _ = self.signup(1, "play")
         self.assertIn("Play Console", server.decide(rec, "approve"))
         self.assertEqual(server.load_testers(), {})
 
-    def test_revoke_removes_login(self):
-        rec = self.signup("fdroid")
-        server.decide(rec, "approve")
-        user = server.load_testers()
-        header_user = next(iter(user))
-        self.assertEqual(server.remove_tester("MAX@example.com"), 1)
-        self.assertEqual(server.load_testers(), {})
-        self.assertFalse(header_user in server.load_testers())
+    def test_full_beta_puts_people_on_waiting_list(self):
+        a, _ = self.signup(1); b, _ = self.signup(2)
+        c, state = self.signup(3)
+        self.assertEqual(state, "waiting")
+        self.assertEqual(server.counts(), {"limit": 2, "taken": 2, "waiting": 1})
+        self.assertEqual(server.status_of(c["id"]), "waiting")
 
-    def test_new_login_replaces_old_for_same_email(self):
-        server.add_tester("a@b.co"); server.add_tester("a@b.co")
-        self.assertEqual(len(server.load_testers()), 1)
+    def test_free_place_approves_oldest_waiting_automatically(self):
+        a, _ = self.signup(1); b, _ = self.signup(2)
+        c, _ = self.signup(3); d, _ = self.signup(4)
+        server.decide(a, "approve"); server.decide(b, "approve")
+        self.sent.clear()
+        n, promoted = server.revoke("P1@example.com")
+        self.assertEqual(n, 1)
+        self.assertEqual(len(promoted), 1)
+        self.assertEqual(server.status_of(c["id"]), "approved")  # oldest waiting
+        self.assertEqual(server.status_of(d["id"]), "waiting")
+        self.assertIn("p3@example.com", [m[0] for m in self.sent])
+        self.assertTrue(any("waiting list" in m[1] for m in self.sent))  # the owner is told
+        self.assertEqual(server.counts()["taken"], 2)
+
+    def test_deny_frees_place_for_waiting(self):
+        a, _ = self.signup(1); b, _ = self.signup(2); c, _ = self.signup(3)
+        self.assertIn("Waiting list", server.decide(a, "deny"))
+        self.assertEqual(server.status_of(c["id"]), "approved")
+
+    def test_raised_limit_moves_waiting_up(self):
+        for n in range(1, 4):
+            self.signup(n)
+        server.LIMIT = 3
+        self.assertEqual(len(server.promote()), 1)
+
+    def test_same_email_twice_is_not_a_second_place(self):
+        self.signup(1)
+        again, state = self.signup(1)
+        self.assertEqual(state, "again")
+        self.assertEqual(len(server.read_lines(server.DATA_FILE)), 1)
+        server.decide(again, "deny")
+        self.assertEqual(self.signup(1)[1], "new")  # after a no, they may ask again
 
     def test_resend_mails_only_undecided(self):
-        server.NOTIFY_TO = None
-        os.environ["NOTIFY_TO"] = "me@example.com"
-        a = self.signup(); b = self.signup()
+        a, _ = self.signup(1); b, _ = self.signup(2)
         server.decide(a, "deny"); self.sent.clear()
         self.assertTrue(server.cli(["server.py", "resend"]))
         self.assertEqual(len(self.sent), 1)
         self.assertIn(server.link(b["id"], "approve"), self.sent[0][2])
 
     def test_link_expires(self):
-        rec = self.signup()
+        rec, _ = self.signup(1)
         self.assertFalse(server.expired(rec))
         self.assertTrue(server.expired(rec, __import__("time").time() + 15 * 86400))
 
