@@ -3,6 +3,22 @@
 Every version of Musix, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.28.0beta — 2026-10-24
+
+### Added
+- Emby: when you set up Musix, you can now pick Emby as where your music is, and log in with your Emby user name and password. Your albums, artists, playlists and favourites come from Emby, songs play as the original files, and what you play shows in Emby as it plays (with pause and stop) and is marked as played. Similar songs and artist radio use Emby's Instant Mix, and lyrics come from Emby (4.8 or later). With Emby, everything smart (mixes made for you, Vibes, sounds-like, Song path, Your sound) comes from AudioMuse-AI, set up to read your Emby library.
+- AudioMuse-AI with several music servers (AudioMuse 3): Settings › Connections has a "Server name in AudioMuse" so it knows which of its servers is yours. Leave it empty if AudioMuse has only one.
+
+### Changed
+- **Setting up Musix starts by asking where your music is.** A new setup now opens on "Where's your music?":
+  pick OpenSubsonic (Navidrome, Gonic, Airsonic, Ampache and others), then choose whether to add AudioMuse-AI,
+  then enter your server's address and login. Jellyfin, Emby and files on your phone are listed as coming soon.
+  Settings › Connections now calls the server "OpenSubsonic server". Nothing changes for an app that's already
+  set up.
+- Themes: "Selected items" is now "Accent colour", and that one colour is used for everything that stands out: buttons, hearts, the playing song, chosen chips and anything that's on. "Theme" is now called "Match theme". Your choice carries over.
+- The accent colour now always stands out: it gets a darker shade on light pages and a lighter one on dark pages where needed. Mono's accent is black on light pages and white on dark ones, instead of a grey that was hard to see on a white artist page.
+- New app icon: the sound bars you know, now with echo rings around them. The themed icon on Android 13 and later matches.
+
 ## 0.27.0beta — 2026-10-23
 
 ### Fixed
