@@ -240,5 +240,40 @@ class ReportTest(unittest.TestCase):
         self.assertFalse(server.report_limited("a", 4000))
 
 
+class EmailTemplateTest(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        server.EMAILS_DIR = self.dir
+
+    def write(self, name, text):
+        open(os.path.join(self.dir, name + ".txt"), "w").write(text)
+
+    def test_file_is_used_with_placeholders_and_shared_tail(self):
+        self.write("welcome_fdroid", "Subject: Hi $email\n\nUse $repo_url\n\n$tail\n")
+        self.write("tail.txt".removesuffix(".txt"), "Report: $issues_url\nCosts $$5\n")
+        subject, body = server.template("welcome_fdroid", "d", "d", repo_url="https://r", email="a@b.c", issues_url="https://i")
+        self.assertEqual(subject, "Hi a@b.c")
+        self.assertIn("Use https://r", body)
+        self.assertIn("Report: https://i\nCosts $5", body)
+
+    def test_missing_or_broken_file_falls_back(self):
+        self.assertEqual(server.template("nope", "S", "B"), ("S", "B"))
+        self.write("deny", "no subject line here\n\nbody")
+        self.assertEqual(server.template("deny", "S", "B"), ("S", "B"))
+        self.write("deny", "Subject: X\n\n")
+        self.assertEqual(server.template("deny", "S", "B"), ("S", "B"))
+
+    def test_unknown_placeholders_are_left_alone(self):
+        self.write("deny", "Subject: S\n\nHello $nobody")
+        self.assertEqual(server.template("deny", "d", "d")[1], "Hello $nobody")
+
+    def test_the_shipped_templates_are_valid(self):
+        server.EMAILS_DIR = os.path.join(os.path.dirname(__file__), "..", "emails")
+        for name in ("welcome_fdroid", "welcome_play", "new_link", "deny"):
+            subject, body = server.template(name, "FALLBACK", "FALLBACK", repo_url="https://r", beta_repo_url="b", issues_url="i", email="e")
+            self.assertNotEqual(subject, "FALLBACK", name)
+            self.assertNotIn("$", body, name)
+
+
 if __name__ == "__main__":
     unittest.main()

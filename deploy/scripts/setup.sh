@@ -22,6 +22,9 @@ fi
 echo "== Deploy user (CI publishes APKs as this user, nothing else)"
 id siansa-deploy >/dev/null 2>&1 || useradd --system --create-home --home-dir /var/lib/siansa-deploy --shell /bin/sh siansa-deploy
 install -m 755 "$HERE/scripts/siansa-publish" /usr/local/bin/siansa-publish
+install -m 755 "$HERE/scripts/siansa-ci" /usr/local/bin/siansa-ci
+install -m 755 "$HERE/scripts/siansa-site-update" /usr/local/bin/siansa-site-update
+mkdir -p /etc/siansa && printf '%s\n' "$DOMAIN" > /etc/siansa/domain
 
 echo "== F-Droid repo in $FDROID_DIR"
 mkdir -p "$FDROID_DIR"
@@ -53,12 +56,21 @@ echo "== Website pages for $DOMAIN in $SITE_DIR"
 mkdir -p "$SITE_DIR"
 cp "$HERE"/site/* "$SITE_DIR"/
 for f in "$SITE_DIR"/*.html; do sed -i "s#{{DOMAIN}}#$DOMAIN#g" "$f"; done
+chown -R siansa-deploy:siansa-deploy "$SITE_DIR"  # so CI can update the pages (scripts/siansa-site-update)
 
 echo "== Cloudflare's certificate for Authenticated Origin Pulls (TLS_MODE=cloudflare)"
 mkdir -p "$HERE/certs"
 curl -fsSL -o "$HERE/certs/cloudflare-origin-pull-ca.pem" \
 	https://developers.cloudflare.com/ssl/static/authenticated_origin_pull_ca.pem ||
 	echo "Couldn't download it: get it from Cloudflare's docs (Authenticated Origin Pulls) into certs/" >&2
+
+EMAILS_DIR="${EMAILS_DIR:-/srv/siansa-emails}"
+echo "== Beta emails in $EMAILS_DIR"
+mkdir -p "$EMAILS_DIR"
+[ -n "$(ls -A "$EMAILS_DIR")" ] || cp "$HERE"/emails/*.txt "$EMAILS_DIR"/
+chown -R siansa-deploy:siansa-deploy "$EMAILS_DIR"
+chmod 755 "$EMAILS_DIR"
+chmod 644 "$EMAILS_DIR"/*.txt
 
 echo "== Beta sign-ups folder $SIGNUPS_DIR"
 mkdir -p "$SIGNUPS_DIR"

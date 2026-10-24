@@ -32,6 +32,7 @@ import os
 import re
 import secrets
 import smtplib
+import string
 import ssl
 import sys
 import threading
@@ -431,11 +432,44 @@ def notify_owner(rec, wait=False):
     threading.Thread(target=send_mail, args=args, daemon=True).start()
 
 
+EMAILS_DIR = os.environ.get("EMAILS_DIR", "/emails")
+
+
+def template(name, default_subject, default_body, **values):
+    """(subject, body) from emails/<name>.txt: 'Subject: …', a blank line, then the message with $placeholders.
+    A missing or broken file means the built-in text, so a typo can't stop an email from going out."""
+    try:
+        with open(os.path.join(EMAILS_DIR, name + ".txt"), encoding="utf-8") as f:
+            head, _, body = f.read().partition("\n\n")
+        if not head.lower().startswith("subject:") or not body.strip():
+            raise ValueError("no subject or body")
+        values.setdefault("tail", "")
+        if "$tail" in body:
+            values["tail"] = _tail(values)
+        return string.Template(head[8:].strip()).safe_substitute(values), string.Template(body).safe_substitute(values)
+    except (OSError, ValueError):
+        return default_subject, default_body
+
+
+def _tail(values):
+    try:
+        with open(os.path.join(EMAILS_DIR, "tail.txt"), encoding="utf-8") as f:
+            return string.Template(f.read()).safe_substitute(values).rstrip("\n") + "\n"
+    except OSError:
+        return welcome_tail()
+
+
 def welcome_tail():
     return ("Setting up your servers: " + BETA_REPO_URL + "\n"
             "Found a problem or have an idea? Report it here: " + ISSUES_URL + "\n"
             "(Don't post passwords or your server's address. You can also write to help@siansa.app.)\n\n"
             "Thank you for testing Siansa.\n")
+
+
+def welcome_mail(rec):
+    values = dict(repo_url=repo_url() or "", beta_repo_url=BETA_REPO_URL, issues_url=ISSUES_URL, email=rec["email"])
+    subject = "Welcome to the Siansa beta"
+    return template("welcome_" + ("fdroid" if rec["route"] == "fdroid" else "play"), subject, welcome_text(rec), **values)
 
 
 def welcome_text(rec):
@@ -446,6 +480,11 @@ def welcome_text(rec):
     return ("Hello,\n\nYou're in the Siansa beta. We're adding your Google account email to the test on Google Play. "
             "You'll get a link in a separate message; open it, tap Become a tester, then install Siansa from Play. "
             "Please stay in the test for 14 days.\n\n" + welcome_tail())
+
+
+def new_link_mail(email=""):
+    values = dict(repo_url=repo_url() or "", beta_repo_url=BETA_REPO_URL, issues_url=ISSUES_URL, email=email)
+    return template("new_link", "The Siansa beta address has changed", new_link_text(), **values)
 
 
 def new_link_text():
@@ -463,7 +502,7 @@ def approve_effects(rec, now=None, auto=False):
     if rec["route"] == "fdroid" and not repo_url():
         line = "Approved, but there is no beta link yet, so no email was sent. Run scripts/repo-link on the server, then `signups link`."
     else:
-        sent = send_mail(rec["email"], "Welcome to the Siansa beta", welcome_text(rec))
+        sent = send_mail(rec["email"], *welcome_mail(rec))
         line = "Approved. " + ("The welcome email was sent." if sent else "The welcome email could NOT be sent: check the mail settings.")
     if rec["route"] == "play":
         line += f" Now add {rec['email']} to the closed test's tester list in Play Console."
@@ -498,7 +537,7 @@ def decide(rec, action, now=None):
             return None
         append_event(rec["id"], "approved" if action == "approve" else "denied", now)
     if action == "deny":
-        sent = send_mail(rec["email"], "Your Siansa beta request", DENY_TEXT)
+        sent = send_mail(rec["email"], *template("deny", "Your Siansa beta request", DENY_TEXT, email=rec["email"], beta_repo_url=BETA_REPO_URL, issues_url=ISSUES_URL))
         line = "Denied. " + ("A short no was emailed." if sent else "The email could not be sent.")
         promoted = promote(now)  # a place may have freed up
         return line + (f" Waiting list: {'; '.join(promoted)}" if promoted else "")
@@ -663,7 +702,7 @@ def cli(argv):
         return True
     if len(argv) == 2 and argv[1] == "notify-new-link":
         for email in approved_fdroid_emails():
-            print(("sent   " if send_mail(email, "The Siansa beta address has changed", new_link_text()) else "FAILED ") + email)
+            print(("sent   " if send_mail(email, *new_link_mail(email)) else "FAILED ") + email)
         return True
     if len(argv) == 3 and argv[1] in ("approve", "link"):
         # For when email isn't working: approve (or just show the link for someone already approved) from the server.
