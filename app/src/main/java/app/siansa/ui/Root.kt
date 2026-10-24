@@ -294,6 +294,7 @@ fun SiansaRoot() {
                 composable("downloads/add") { DownloadPickerScreen(nav) }
                 composable("downloads/songs") { DownloadedSongsScreen(nav) }
                 composable("settings/logs") { LogsScreen(nav) }
+                composable("settings/report") { ProblemReportScreen(nav) }
                 composable("settings/backup") { BackupScreen(nav) }
                 composable("settings/scrobbling") { ScrobblingScreen(nav) }
                 composable("settings/whatsnew") { WhatsNewScreen(nav) }

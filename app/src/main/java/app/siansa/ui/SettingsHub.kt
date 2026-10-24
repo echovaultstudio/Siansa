@@ -111,6 +111,7 @@ fun SettingsHub(nav: NavController) {
             HubRow(Icons.Rounded.DownloadForOffline, "Downloads") { nav.navigate("downloads") }
             HubRow(Icons.Rounded.Storage, "Storage") { nav.navigate("settings/storage") }
             HubRow(Icons.Rounded.Backup, "Backup") { nav.navigate("settings/backup") }
+            HubRow(Icons.Rounded.BugReport, "Report a problem") { nav.navigate("settings/report") }
             HubRow(Icons.Rounded.BugReport, "Logs") { nav.navigate("settings/logs") }
             HubRow(Icons.Rounded.NewReleases, "What's new") { nav.navigate("settings/whatsnew") }
         }
@@ -150,7 +151,7 @@ internal fun crossfadeSummary(s: AppSettings): String {
 }
 
 private fun formatMb(mb: Int): String = if (mb >= 1024) "${"%.0f".format(mb / 1024.0)} GB" else "$mb MB"
-private fun formatBytes(bytes: Long): String = when {
+internal fun formatBytes(bytes: Long): String = when {
     bytes >= 1L shl 30 -> "%.1f GB".format(bytes / (1L shl 30).toDouble())
     bytes >= 1L shl 20 -> "%.0f MB".format(bytes / (1L shl 20).toDouble())
     else -> "%.0f KB".format(bytes / 1024.0)
@@ -483,24 +484,6 @@ fun LogsScreen(nav: NavController) {
                             "If the app crashes, its last few hundred steps are kept on the phone so the crash can be looked into. " +
                             "Share sends a ZIP with the log, the same entries as data for tools, and what's in it.",
                     )
-                    // Detail per part of the app (issue #237): leave out what isn't needed to keep the log small.
-                    Text("Detail for", style = MaterialTheme.typography.titleSmall)
-                    androidx.compose.foundation.layout.FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(Space.Small),
-                        verticalArrangement = Arrangement.spacedBy(Space.Small),
-                    ) {
-                        LOG_DETAIL.forEach { (component, label) ->
-                            FilterChip(
-                                selected = component !in settings.logQuiet,
-                                onClick = {
-                                    val quiet = if (component in settings.logQuiet) settings.logQuiet - component else settings.logQuiet + component
-                                    graph.settings.setLogQuiet(quiet)
-                                    AppLog.quiet = quiet
-                                },
-                                label = { Text(label) },
-                            )
-                        }
-                    }
                     androidx.compose.foundation.layout.FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(Space.Small),
                         verticalArrangement = Arrangement.spacedBy(Space.Small),
@@ -513,6 +496,7 @@ fun LogsScreen(nav: NavController) {
                             Spacer(Modifier.width(Space.Small))
                             Text("Save logs")
                         }
+                        Button(onClick = { nav.navigate("settings/report") }) { Text("Report a problem") }
                         OutlinedButton(onClick = { scope.launch { shareLogs(context) } }) {
                             Icon(Icons.Rounded.Share, null)
                             Spacer(Modifier.width(Space.Small))
@@ -608,18 +592,6 @@ fun LogsScreen(nav: NavController) {
         }
     }
 }
-
-/** Parts of the app with detailed entries, and their names under Settings › Logs › Detail for (issue #237). */
-private val LOG_DETAIL = listOf(
-    "Net" to "Requests",
-    "Load" to "Streaming",
-    "Audio" to "Audio",
-    "Player" to "Player",
-    "Downloads" to "Downloads",
-    "Frames" to "Screen speed",
-    "Phone" to "Phone state",
-    "App" to "App and screens",
-)
 
 /** Shares the diagnostics ZIP (issue #237): log, events, recent steps, last crash and a manifest. */
 private suspend fun shareLogs(context: Context) {
