@@ -275,5 +275,60 @@ class EmailTemplateTest(unittest.TestCase):
             self.assertNotIn("$", body, name)
 
 
+class PrivateCopyTest(unittest.TestCase):
+    def setUp(self):
+        import io, json
+        self.dir = tempfile.mkdtemp()
+        server.REPORTS_DIR = self.dir
+        server.REPORTS_REPO, server.REPORTS_TOKEN = "o/siansa-reports", "t"
+        data = b"PK\x03\x04" + b"x" * 50
+        self.rid = server.save_report(io.BytesIO(data), len(data), {"happened": "x"}, 0)
+        self.calls = []
+
+    def tearDown(self):
+        server.REPORTS_REPO = server.REPORTS_TOKEN = ""
+
+    def fake(self, fail_patch=0):
+        left = [fail_patch]
+
+        def call(method, path, body=None):
+            self.calls.append((method, path, body))
+            if path.endswith("/git/blobs"):
+                return {"sha": "blob%d" % len(self.calls)}
+            if "/git/ref/heads/main" in path:
+                return {"object": {"sha": "head"}}
+            if "/git/commits/" in path:
+                return {"tree": {"sha": "tree"}}
+            if path.endswith("/git/trees"):
+                return {"sha": "newtree"}
+            if path.endswith("/git/commits"):
+                return {"sha": "commit"}
+            if method == "PATCH":
+                if left[0]:
+                    left[0] -= 1
+                    raise server.urllib.error.HTTPError(path, 422, "x", {}, None)
+                return {}
+        return call
+
+    def test_one_commit_with_zip_and_details(self):
+        self.assertTrue(server.store_report_privately(self.rid, 7, 0, self.fake()))
+        tree = [c for c in self.calls if c[1].endswith("/git/trees")][0][2]["tree"]
+        self.assertEqual([t["path"] for t in tree], [f"reports/1970-01/{self.rid}.zip", f"reports/1970-01/{self.rid}.json"])
+        self.assertIn('"issue": 7', [c for c in self.calls if c[1].endswith("/git/blobs")][1][2]["content"])
+        self.assertEqual(self.calls[-1][0], "PATCH")
+
+    def test_retries_when_main_moved(self):
+        self.assertTrue(server.store_report_privately(self.rid, None, 0, self.fake(fail_patch=1)))
+        self.assertEqual(sum(1 for c in self.calls if c[0] == "PATCH"), 2)
+
+    def test_not_set_up_or_failing_is_quiet(self):
+        server.REPORTS_REPO = ""
+        self.assertFalse(server.store_report_privately(self.rid, 1, 0, self.fake()))
+        server.REPORTS_REPO = "o/r"
+        def boom(*a, **k):
+            raise OSError("down")
+        self.assertFalse(server.store_report_privately(self.rid, 1, 0, boom))
+
+
 if __name__ == "__main__":
     unittest.main()
