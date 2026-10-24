@@ -399,7 +399,7 @@ class Handler(BaseHTTPRequestHandler):
         _accepted.append(now)
         print("signup accepted", record["route"], record["server"], flush=True)  # no email in the log
         notify_owner(record)
-        self._send(303, b"", [("Location", "/signup-thanks")])
+        self._send(303, b"", [("Location", "/signup-thanks-play" if record["route"] == "play" else "/signup-thanks")])
 
     def do_GET(self):
         parts = urlsplit(self.path)
