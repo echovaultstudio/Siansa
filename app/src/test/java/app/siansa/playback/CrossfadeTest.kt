@@ -89,12 +89,10 @@ class PluginProfilesTest {
         assertEquals("siansa_analysis", ProfileStore.PLUGIN_NAME)
     }
 
-    @Test fun theChoiceSavedForLumaeNowMeansOurPlugin() {
-        assertEquals(LoudnessSource.PLUGIN, LoudnessSource.parse("LUMAE"))
+    @Test fun theStoredChoiceIsRead() {
         assertEquals(LoudnessSource.PLUGIN, LoudnessSource.parse("PLUGIN"))
         assertEquals(LoudnessSource.TAGS, LoudnessSource.parse("TAGS"))
         assertEquals(LoudnessSource.TAGS, LoudnessSource.parse(null))
-        assertTrue(LoudnessSource.entries.none { "Lumae" in it.label || "Lumae" in it.detail })
     }
 
     @Test fun aNewerLayoutIsNotMisread() {

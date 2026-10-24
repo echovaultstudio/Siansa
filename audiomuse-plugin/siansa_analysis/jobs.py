@@ -112,7 +112,7 @@ def measure_missing(budget_seconds=None, batch=None):
         tried = set()
         stopped = False
         while len(tried) < limit and not stopped:
-            rows = [r for r in store.songs_to_measure(db, min(25, limit - len(tried)) + len(tried), include_imported=all_on)
+            rows = [r for r in store.songs_to_measure(db, min(25, limit - len(tried)) + len(tried))
                     if r[0] not in tried]
             if not rows:
                 break
@@ -148,7 +148,7 @@ def measure_missing(budget_seconds=None, batch=None):
                                                      "measured": measured, "error": None}, db)
         seconds = round(time.monotonic() - started, 1)
         store.set_state("profiles_rate", status.next_rate(rate, measured + failed, seconds), db)
-        if all_on and not store.songs_to_measure(db, 1, include_imported=True):
+        if all_on and not store.songs_to_measure(db, 1):
             store.set_state("measure_all", {"on": False, "finished_at": now_iso()}, db)
             logger.info("siansa_analysis: every song is measured")
         result = {"status": "idle", "finished_at": now_iso(), "measured": measured, "failed": failed,

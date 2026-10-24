@@ -70,37 +70,6 @@ class SettingsPostTest(unittest.TestCase):
         self.assertFalse(self.states["measure_all"]["on"])
 
 
-class LumaeImportTest(unittest.TestCase):
-    """TEMPORARY until plugin 0.1.3 (issue #225): the one-time import from Lumae."""
-
-    def setUp(self):
-        self.app = Flask(__name__)
-        self.app.register_blueprint(web.bp, url_prefix="/plugins/siansa_analysis")
-        self.run = web.lumae_import.run
-
-    def tearDown(self):
-        web.lumae_import.run = self.run
-
-    def test_import_reports_how_many(self):
-        web.lumae_import.run = lambda db: 1234
-        answer = self.app.test_client().post("/plugins/siansa_analysis/settings", data={"action": "import_lumae"})
-        self.assertEqual(answer.status_code, 302)
-        self.assertTrue(answer.headers["Location"].endswith("note=imported&n=1234"))
-
-    def test_a_failed_import_is_a_note(self):
-        def boom(db):
-            raise RuntimeError("no table")
-        web.lumae_import.run = boom
-        answer = self.app.test_client().post("/plugins/siansa_analysis/settings", data={"action": "import_lumae"})
-        self.assertTrue(answer.headers["Location"].endswith("note=import_failed"))
-
-    def test_only_fills_songs_not_measured_here(self):
-        import inspect
-        sql = inspect.getsource(web.lumae_import.run)
-        self.assertIn("WHERE {table}.status <> 'ready' OR {table}.source = 'lumae'", sql)
-        self.assertIn("'lumae'", sql)
-
-
 class MeasureAllPageTest(unittest.TestCase):
     def state(self, measure_all=False, running=False):
         inputs = Inputs("L", 3, 10, "A", 5, 8)
@@ -124,17 +93,6 @@ class MeasureAllPageTest(unittest.TestCase):
         self.assertIn('value="stop_all"', page)
         self.assertNotIn('value="measure_all"', page)
         self.assertIn('value="measure" disabled', page)
-
-    def test_lumae_import_offer_and_imported_count(self):
-        state = self.state()
-        self.assertNotIn("Import from Lumae", web.render_settings(state, 40))
-        state["lumae"] = 900
-        state["counts"] = status.profile_counts(10, 6, 0, 0, 2)
-        page = web.render_settings(state, 40)
-        self.assertIn("The Lumae plugin has measured 900 songs", page)
-        self.assertIn('value="import_lumae"', page)
-        self.assertIn("2 of them imported from Lumae", page)
-        self.assertIn("Measure all 6 songs", page)  # 4 to measure and the 2 imported
 
     def test_notes_are_shown(self):
         self.assertIn(web.MESSAGES["busy"], web.render_settings(self.state(), 40, web.MESSAGES["busy"]))
