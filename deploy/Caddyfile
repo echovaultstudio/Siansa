@@ -1,0 +1,61 @@
+# Siansa beta server (issue #410). Caddy gets and renews the HTTPS certificates itself.
+# The names come from .env: DOMAIN, DEMO_DOMAIN, ACME_EMAIL.
+{
+	email {$ACME_EMAIL}
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+(security) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "geolocation=(), camera=(), microphone=(), interest-cohort=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		-Server
+	}
+	encode zstd gzip
+	log {
+		output stdout
+		# No IP addresses or query strings kept beyond the container log rotation.
+		format filter {
+			request>remote_ip delete
+			request>client_ip delete
+			request>uri query {
+				delete *
+			}
+		}
+	}
+}
+
+# Website, privacy policy and the F-Droid repo.
+{$DOMAIN} {
+	import security
+	header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
+	# The F-Droid repo: https://DOMAIN/fdroid/repo (add this address in the F-Droid app).
+	handle_path /fdroid/repo/* {
+		root * /srv/fdroid/repo
+		header /index-v* Cache-Control "no-cache"
+		header /entry.* Cache-Control "no-cache"
+		header *.apk Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+	redir /fdroid /fdroid/repo/ 302
+	redir /privacy /privacy.html 301
+
+	handle {
+		root * /srv/site
+		try_files {path} {path}.html {path}/index.html
+		file_server
+	}
+}
+
+# Demo Navidrome for reviewers and testers.
+{$DEMO_DOMAIN} {
+	import security
+	reverse_proxy navidrome-demo:4533
+}

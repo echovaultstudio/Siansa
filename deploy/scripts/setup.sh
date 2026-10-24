@@ -1,0 +1,67 @@
+#!/bin/sh
+# One-time setup of the Siansa beta server (issue #410), on Debian or Ubuntu, as root, from the deploy/ folder:
+#   sudo DOMAIN=siansa.app sh scripts/setup.sh
+# Safe to run again. It doesn't touch SSH logins for you: see harden.sh for that.
+set -eu
+
+: "${DOMAIN:?Set DOMAIN, e.g. DOMAIN=siansa.app}"
+FDROID_DIR="${FDROID_DIR:-/srv/fdroid}"
+DEMO_DIR="${DEMO_DIR:-/srv/siansa-demo}"
+SITE_DIR="${SITE_DIR:-/srv/siansa-site}"
+HERE=$(cd "$(dirname "$0")/.." && pwd)
+
+echo "== Packages"
+apt-get update -q
+apt-get install -y -q fdroidserver apksigner aapt unzip ufw fail2ban unattended-upgrades ca-certificates curl
+if ! command -v docker >/dev/null; then
+	echo "Docker is missing: install Docker Engine (https://docs.docker.com/engine/install/) and run this again." >&2
+	exit 1
+fi
+
+echo "== Deploy user (CI publishes APKs as this user, nothing else)"
+id siansa-deploy >/dev/null 2>&1 || useradd --system --create-home --home-dir /var/lib/siansa-deploy --shell /bin/sh siansa-deploy
+install -m 755 "$HERE/scripts/siansa-publish" /usr/local/bin/siansa-publish
+
+echo "== F-Droid repo in $FDROID_DIR"
+mkdir -p "$FDROID_DIR"
+chown siansa-deploy:siansa-deploy "$FDROID_DIR"
+as_deploy() { (cd "$FDROID_DIR" && runuser -u siansa-deploy -- "$@"); }
+if [ ! -f "$FDROID_DIR/keystore.p12" ]; then
+	# Makes config.yml and the repo signing key (keystore.p12), which never leave this server.
+	as_deploy fdroid init --repo-keyalias siansa-beta
+fi
+# Our settings over fdroid's defaults (same keys removed first, then ours added).
+keys=$(sed -n 's/^\([a-z_]*\):.*/\1/p' "$HERE/fdroid/config.yml" | grep -Ev '^(keystore|repo_keyalias)$' | paste -sd'|')
+grep -Ev "^($keys):" "$FDROID_DIR/config.yml" > "$FDROID_DIR/config.yml.new" || true
+sed "s#DOMAIN#$DOMAIN#g" "$HERE/fdroid/config.yml" | grep -Ev '^(keystore|repo_keyalias):' >> "$FDROID_DIR/config.yml.new"
+mv "$FDROID_DIR/config.yml.new" "$FDROID_DIR/config.yml"
+mkdir -p "$FDROID_DIR/repo" "$FDROID_DIR/metadata" "$FDROID_DIR/tmp"
+sed "s#DOMAIN#$DOMAIN#g" "$HERE/fdroid/metadata/app.siansa.yml" > "$FDROID_DIR/metadata/app.siansa.yml"
+[ -f "$FDROID_DIR/repo/icon.png" ] || cp "$HERE/site/icon.png" "$FDROID_DIR/repo/icon.png"
+chown -R siansa-deploy:siansa-deploy "$FDROID_DIR"
+chmod 750 "$FDROID_DIR"
+chmod 600 "$FDROID_DIR/config.yml" "$FDROID_DIR/keystore.p12"
+as_deploy fdroid update --create-metadata >/dev/null 2>&1 || true
+
+echo "== Website pages for $DOMAIN in $SITE_DIR"
+mkdir -p "$SITE_DIR"
+cp "$HERE"/site/* "$SITE_DIR"/
+for f in "$SITE_DIR"/*.html; do sed -i "s#{{DOMAIN}}#$DOMAIN#g" "$f"; done
+
+echo "== Demo Navidrome folders in $DEMO_DIR"
+mkdir -p "$DEMO_DIR/music" "$DEMO_DIR/data"
+chown -R 1000:1000 "$DEMO_DIR"
+
+[ -f "$HERE/.env" ] || { cp "$HERE/.env.example" "$HERE/.env"; sed -i "s#^DOMAIN=.*#DOMAIN=$DOMAIN#; s#^DEMO_DOMAIN=.*#DEMO_DOMAIN=demo.$DOMAIN#" "$HERE/.env"; }
+chmod 600 "$HERE/.env"
+
+cat <<EOF
+
+Done. Next:
+  1. Edit $HERE/.env (ACME_EMAIL), check DNS for $DOMAIN and demo.$DOMAIN, then: docker compose up -d
+  2. Run scripts/harden.sh for the firewall, fail2ban and automatic security updates.
+  3. Add CI's SSH key for publishing: scripts/add-ci-key.sh "<public key>"
+  4. Put a few freely licensed albums in $DEMO_DIR/music and create the demo user in Navidrome (README).
+The F-Droid repo's address and fingerprint (for testers) are on https://$DOMAIN/fdroid/repo/ once Caddy runs.
+Back up $FDROID_DIR/keystore.p12 and config.yml somewhere offline.
+EOF
