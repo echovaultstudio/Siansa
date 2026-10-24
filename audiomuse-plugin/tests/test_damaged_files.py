@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 import support  # noqa: F401  (import path and the plugin.api stand-in)
-from musix_analysis import loudness
+from siansa_analysis import loudness
 
 
 class InvalidDataError(ValueError):
