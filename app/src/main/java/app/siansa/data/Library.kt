@@ -331,6 +331,9 @@ class LibraryRepository(context: Context) {
     suspend fun meta(key: String): String? = dao.meta(key)
     suspend fun putMeta(key: String, value: String) = dao.putMeta(MetaEntity(key, value))
 
+    /** Keeps [id]'s new picture id, so lists ask for the photo the server has now (beta report 95a30366). */
+    suspend fun setArtistCover(id: String, coverArt: String) = dao.setArtistCover(id, coverArt)
+
     suspend fun replaceArtists(artists: List<Artist>) = db.withTransaction {
         combined = null
         dao.deleteAllArtists()

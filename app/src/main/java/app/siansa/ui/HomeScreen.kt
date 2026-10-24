@@ -200,6 +200,7 @@ fun HomeScreen(nav: NavController) {
     val playlists by loadState(version to "playlists") { graph.library.refreshPlaylists { graph.source.playlists() }.let(graph.playlists.removed::visible) }
     val recentAlbums by loadState(version to "recent") { recentlyPlayedAlbums(graph) }
     val recentArtists by loadState(version to "artists") { artistRadioArtists(graph) }
+    val freshCovers by graph.artistPhotos.covers.collectAsStateWithLifecycle()
     val newest by loadState(version to "newest") {
         if (graph.library.isSynced) graph.library.albums("newest").take(20)
         else graph.source.albums("newest", 20, 0).distinctBy { it.name + "|" + it.artist }
@@ -407,7 +408,7 @@ fun HomeScreen(nav: NavController) {
                             AlbumTile(
                                 name = "${artist.name} radio",
                                 subtitle = "With similar artists",
-                                coverArt = artist.coverArt,
+                                coverArt = freshCovers[artist.id] ?: artist.coverArt,
                                 onClick = {
                                     launch.progressive("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
                                 },
@@ -500,6 +501,8 @@ internal suspend fun artistRadioArtists(graph: AppGraph, count: Int = ArtistRadi
     val mostPlayed = graph.history.all().groupingBy { normalizeKey(it.artist) }.eachCount()
         .entries.sortedByDescending { it.value }.mapNotNull { byKey[it.key] }
     val picked = mixArtistRadios(recent, similar, mostPlayed + library.shuffled(), count)
+    // Their photos as the server has them now, once per run (beta report 95a30366); the tiles pick them up at once.
+    graph.scope.launch { graph.artistPhotos.refresh(picked) }
     AppLog.d("Home", "Artist radios: ${picked.size} (${recent.size} played lately, ${similar.sumOf { it.size }} like them)")
     return picked
 }

@@ -257,6 +257,10 @@ interface LibraryDao {
     @Query("SELECT * FROM artists WHERE id = :id")
     suspend fun artist(id: String): ArtistEntity?
 
+    /** An artist's picture id, as the server gives it now (beta report 95a30366). */
+    @Query("UPDATE artists SET coverArt = :coverArt WHERE id = :id")
+    suspend fun setArtistCover(id: String, coverArt: String)
+
     @Query("SELECT * FROM artists WHERE sortKey = :key LIMIT 1")
     suspend fun artistByKey(key: String): ArtistEntity?
 
