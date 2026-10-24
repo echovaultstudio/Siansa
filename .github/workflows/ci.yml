@@ -380,14 +380,20 @@ jobs:
           make_latest: true
 
       # Keeps the notes of every published version matching CHANGELOG.md, so fixes to the text show up too.
-      - name: Sync release notes
+      - name: Sync release notes and titles
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           for f in notes/*.md; do
             v=$(basename "$f" .md)
             if gh release view "v$v" > /dev/null 2>&1; then
-              gh release edit "v$v" --notes-file "$f"
+              gh release edit "v$v" --title "Siansa $v" --notes-file "$f"
+              # Releases from before the rename (issue #360): their APK gets the app's name too. One-time; it
+              # finds nothing to do once every old file is renamed.
+              gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$v" --jq '.assets[] | select(.name | startswith("musix-")) | "\(.id) \(.name)"' |
+                while read -r id name; do
+                  gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/assets/$id" -f name="siansa-${name#musix-}" > /dev/null
+                done
             fi
           done
 
