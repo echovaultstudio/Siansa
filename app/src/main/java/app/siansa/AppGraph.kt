@@ -347,6 +347,8 @@ class AppGraph(val app: Application) {
     val situation = SituationReader(app, http)
     /** Similar songs, albums and artists (issue #223). */
     val similar = Similar(this)
+    /** Fresh photos for Home's artist radios (beta report 95a30366). */
+    val artistPhotos = app.siansa.data.ArtistPhotos(source, library)
     /** Roll the dice on Home (issue #347). */
     val dice = Dice(this)
     /** Your sonic fingerprint on Home (issue #216). */
