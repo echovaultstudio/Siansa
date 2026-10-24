@@ -434,3 +434,12 @@ jobs:
             git commit -q -m "Release history [skip ci]"
             for i in 1 2 3; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 5; done
           fi
+
+      # Beta testers issues fixed in this release get a comment with the version, and are closed (issue #433).
+      - name: Tell beta testers what's fixed
+        if: steps.version.outputs.exists != 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BETA_ISSUES_TOKEN: ${{ secrets.BETA_ISSUES_TOKEN }}
+        run: python3 scripts/beta_notify.py "v${{ steps.version.outputs.version }}"
