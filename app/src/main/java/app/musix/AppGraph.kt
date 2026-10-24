@@ -246,7 +246,7 @@ class AppGraph(val app: Application) {
     /** Favourite albums, starred in Navidrome (issue #275). */
     val favouriteAlbums = FavouriteAlbums(app, subsonic, scope)
     /** Favourite artists, starred in Navidrome (issue #397). */
-    val favouriteArtists = FavouriteArtists(app, subsonic, scope)
+    val favouriteArtists = FavouriteArtists(app, source, scope)
 
     /**
      * Songs kept on the phone as they play (and the next one in the queue), so replays start at once
