@@ -193,5 +193,52 @@ class FlowTest(unittest.TestCase):
         self.assertTrue(server.expired(rec, __import__("time").time() + 15 * 86400))
 
 
+class ReportTest(unittest.TestCase):
+    def setUp(self):
+        import base64, io, json
+        self.b64, self.io, self.json = base64, io, json
+        self.dir = tempfile.mkdtemp()
+        server.REPORTS_DIR = self.dir
+
+    def header(self, **kw):
+        d = {"happened": "Song stops @max #1", "expected": "Plays", "app": "0.28.1", "android": "15", "device": "Pixel", "source": "EMBY"}
+        d.update(kw)
+        return self.b64.urlsafe_b64encode(self.json.dumps(d).encode()).decode().rstrip("=")
+
+    def test_fields_need_words_and_are_cut(self):
+        self.assertIsNone(server.report_fields("!!!"))
+        self.assertIsNone(server.report_fields(self.header(happened="no")))
+        self.assertEqual(len(server.report_fields(self.header(happened="x" * 5000))["happened"]), 1000)
+
+    def test_issue_text_cannot_ping_or_link(self):
+        title, body = server.issue_text("ab12cd34", server.report_fields(self.header()))
+        for t in (title, body):
+            self.assertNotIn("@max", t)
+            self.assertNotIn("#1", t)
+        self.assertIn("ab12cd34", body)
+        self.assertIn("> Song stops", body)
+
+    def test_saves_a_zip_privately(self):
+        data = b"PK\x03\x04" + b"x" * 100
+        rid = server.save_report(self.io.BytesIO(data), len(data), {"happened": "x"}, 0)
+        self.assertEqual(open(f"{self.dir}/{rid}.zip", "rb").read(), data)
+        self.assertEqual(oct(os.stat(f"{self.dir}/{rid}.zip").st_mode & 0o777), "0o600")
+
+    def test_refuses_non_zip_short_and_too_big(self):
+        for data, length in [(b"hello world", 11), (b"PK\x03\x04abc", 40), (b"PK", 2), (b"PK\x03\x04", server.REPORT_MAX_ZIP + 1)]:
+            self.assertIsNone(server.save_report(self.io.BytesIO(data), length, {}, 0))
+        self.assertEqual(os.listdir(self.dir), [])
+
+    def test_no_token_means_no_issue(self):
+        server.GITHUB_TOKEN = ""
+        self.assertEqual(server.open_issue("t", "b"), (None, None))
+
+    def test_report_rate_limit(self):
+        server._reports.clear()
+        self.assertFalse(any(server.report_limited("a", 100 + i) for i in range(server.REPORTS_PER_HOUR)))
+        self.assertTrue(server.report_limited("a", 200))
+        self.assertFalse(server.report_limited("a", 4000))
+
+
 if __name__ == "__main__":
     unittest.main()

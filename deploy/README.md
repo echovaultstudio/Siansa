@@ -142,6 +142,15 @@ Your emails (new sign-up, automatic approval) end with "Beta places: N of 12 hav
 Unit tests: `python3 -I signup/test_server.py`. Check the Caddyfile after changing it:
 `docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile`.
 
+### Problem reports from the app
+
+Settings › Report a problem sends the tester's two answers and the whole log to `POST /report`. The log is kept in
+`/srv/siansa-signups/reports/<id>.zip` (owner-only, 2 GB cap, 5 reports per hour per tester) and a public issue with
+the words and the report id is opened in `siansa-beta-testers`. To turn issues on, create a fine-grained token at
+GitHub › Settings › Developer settings › Personal access tokens › Fine-grained: only the `siansa-beta-testers`
+repo, permission **Issues: Read and write**, nothing else. Put it in `.env` as `GITHUB_TOKEN=` and run
+`docker compose up -d`. Without it the log is still kept. Delete old reports with `sudo rm /srv/siansa-signups/reports/<id>.*`.
+
 ### 7. The demo server for Google (and testers)
 Google reviews the app before testers get it, and needs a server to log in to: without one, the review fails
 with "we couldn't access your app".
