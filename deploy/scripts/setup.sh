@@ -8,6 +8,7 @@ set -eu
 FDROID_DIR="${FDROID_DIR:-/srv/fdroid}"
 DEMO_DIR="${DEMO_DIR:-/srv/siansa-demo}"
 SITE_DIR="${SITE_DIR:-/srv/siansa-site}"
+SIGNUPS_DIR="${SIGNUPS_DIR:-/srv/siansa-signups}"
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 
 echo "== Packages"
@@ -53,6 +54,11 @@ mkdir -p "$HERE/certs"
 curl -fsSL -o "$HERE/certs/cloudflare-origin-pull-ca.pem" \
 	https://developers.cloudflare.com/ssl/static/authenticated_origin_pull_ca.pem ||
 	echo "Couldn't download it: get it from Cloudflare's docs (Authenticated Origin Pulls) into certs/" >&2
+
+echo "== Beta sign-ups folder $SIGNUPS_DIR"
+mkdir -p "$SIGNUPS_DIR"
+chown 1000:1000 "$SIGNUPS_DIR"
+chmod 700 "$SIGNUPS_DIR"
 
 echo "== Demo Navidrome folders in $DEMO_DIR"
 mkdir -p "$DEMO_DIR/music" "$DEMO_DIR/data"
