@@ -155,9 +155,10 @@ internal fun ReportBody(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
         Hint(
-            "Tell us what went wrong. Your words and the whole log are sent to the Siansa beta team and kept private: " +
-                "only a short note with your words is posted in the beta testers repo. The log records every request in full, " +
-                "including your server's address and what you played. Passwords, tokens and API keys are removed.",
+            "Tell us what went wrong. Your words are posted as a short note in the public beta testers repo. " +
+                "The whole log stays private: it's kept on the Siansa server and in a private GitHub repository, and may be " +
+                "read with AI tools to find the problem. It records every request in full, including your server's address " +
+                "and what you played. Passwords, tokens and API keys are removed.",
         )
         OutlinedTextField(
             happened, onHappened,
