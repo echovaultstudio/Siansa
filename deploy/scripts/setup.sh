@@ -33,12 +33,17 @@ if [ ! -f "$FDROID_DIR/keystore.p12" ]; then
 fi
 # Our settings over fdroid's defaults (same keys removed first, then ours added).
 keys=$(sed -n 's/^\([a-z_]*\):.*/\1/p' "$HERE/fdroid/config.yml" | grep -Ev '^(keystore|repo_keyalias)$' | paste -sd'|')
+OLD_REPO_URL=$(sed -n 's/^repo_url: //p' "$FDROID_DIR/config.yml" 2>/dev/null | head -n 1)
 grep -Ev "^($keys):" "$FDROID_DIR/config.yml" > "$FDROID_DIR/config.yml.new" || true
 sed "s#DOMAIN#$DOMAIN#g" "$HERE/fdroid/config.yml" | grep -Ev '^(keystore|repo_keyalias):' >> "$FDROID_DIR/config.yml.new"
 mv "$FDROID_DIR/config.yml.new" "$FDROID_DIR/config.yml"
+# Running setup again must not undo the private beta address (scripts/repo-link).
+case "$OLD_REPO_URL" in */fdroid/t/*) sed -i "s#^repo_url:.*#repo_url: $OLD_REPO_URL#" "$FDROID_DIR/config.yml" ;; esac
 mkdir -p "$FDROID_DIR/repo" "$FDROID_DIR/metadata" "$FDROID_DIR/tmp"
 sed "s#DOMAIN#$DOMAIN#g" "$HERE/fdroid/metadata/app.siansa.yml" > "$FDROID_DIR/metadata/app.siansa.yml"
-[ -f "$FDROID_DIR/repo/icon.png" ] || cp "$HERE/site/icon.png" "$FDROID_DIR/repo/icon.png"
+# The app's icon for F-Droid (the APK's own icon is a drawn one that fdroidserver can't turn into a picture).
+mkdir -p "$FDROID_DIR/metadata/app.siansa/en-US"
+cp "$HERE/site/icon.png" "$FDROID_DIR/metadata/app.siansa/en-US/icon.png"
 chown -R siansa-deploy:siansa-deploy "$FDROID_DIR"
 chmod 750 "$FDROID_DIR"
 chmod 600 "$FDROID_DIR/config.yml" "$FDROID_DIR/keystore.p12"
