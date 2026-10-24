@@ -16,16 +16,6 @@ downloaded from the music server and read in full, so a large library takes hour
 round runs, AudioMuse-AI doesn't start its own jobs (analysis, clustering, scheduled tasks), which is why
 the rounds leave a gap. Without it, the tick measures one batch in at most 4 minutes.
 
-Moving from the plugin's earlier name (`musix_analysis`, before the app was renamed, issue #360): install
-this one **before** uninstalling the earlier one. On install it copies the earlier plugin's tables (measured
-songs, similar lists, job state) into its own, so nothing is measured again, and switches off the earlier
-plugin's tick. Then uninstall the earlier plugin. Until this one is installed, the app keeps using the earlier
-one.
-
-Moving from the Lumae plugin: **Import from Lumae** on the settings page copies the profiles Lumae already
-measured (only for songs not measured here), so they needn't be measured again. Do it before uninstalling
-Lumae with its tables. This import is temporary and goes away in plugin 0.1.3 (issue #225).
-
 The **tick** is a scheduled task (`plugin.siansa_analysis.tick`, every 15 minutes, set up when the plugin is
 installed). Change or switch it off under Administration › Scheduled Tasks. The settings page (Plugins ›
 Siansa Analysis › Settings) shows the three sections, Library, Volume & fade profiles and Similar albums &

@@ -100,7 +100,7 @@ class GenerationTest(unittest.TestCase):
 class StatusTest(unittest.TestCase):
     def test_profile_counts(self):
         self.assertEqual(status.profile_counts(10, 6, 3, 2),
-                         {"songs": 10, "ready": 6, "failed": 3, "to_measure": 1, "asked_for": 2, "imported": 0})
+                         {"songs": 10, "ready": 6, "failed": 3, "to_measure": 1, "asked_for": 2})
         self.assertEqual(status.profile_counts(5, 9, 9)["ready"], 5)  # never above the library
 
     def test_profile_labels(self):
@@ -134,7 +134,7 @@ class StatusTest(unittest.TestCase):
         def get_state(name, default=None, db=None):
             return state.get(name, default)
 
-        for name, fake in (("get_state", get_state), ("profile_counts", lambda db: (10, 4, 0, 0, 0))):
+        for name, fake in (("get_state", get_state), ("profile_counts", lambda db: (10, 4, 0, 0))):
             saved[name] = getattr(web.store, name)
             setattr(web.store, name, fake)
         try:
@@ -178,7 +178,6 @@ class PageTest(unittest.TestCase):
         self.assertIn("library generation 2 of\n      3", page)
         self.assertIn("Song &lt;1&gt;", page)  # escaped
         self.assertNotIn("location.reload", page)
-        self.assertNotIn("Lumae", page)
 
     def test_reloads_while_working(self):
         page = web.render_settings(self.state(profiles_job={"status": "running"}), 40)
