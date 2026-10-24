@@ -29,7 +29,6 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
         app.siansa.data.Users.init(this)
         graph = AppGraph(this)
         AppLog.init(this, graph.settings.current.logging)
-        AppLog.quiet = graph.settings.current.logQuiet
         AppLog.watchLifecycle(this)
         graph.mixResume.watch()
         // A step count each time the app comes to the front, so the next mix can tell walking from sitting
