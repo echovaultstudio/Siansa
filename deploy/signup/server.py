@@ -178,13 +178,20 @@ def quote(text):
     return "\n".join("> " + line for line in text.splitlines()) or "> -"
 
 
-def issue_text(rec_id, f):
+def report_path(rec_id, now=None):
+    """Where a report's log goes in REPORTS_REPO, without the extension: reports/<yyyy-mm>/<id>."""
+    return f"reports/{time.strftime('%Y-%m', time.gmtime(time.time() if now is None else now))}/{rec_id}"
+
+
+def issue_text(rec_id, f, now=None):
     title = "Report " + rec_id + ": " + " ".join(f["happened"].split())[:70]
     body = ("**What happened**\n" + quote(f["happened"]) + "\n\n**What was expected**\n" + quote(f["expected"] or "-") +
             "\n\n| | |\n|---|---|\n| Report id | `" + rec_id + "` |\n| App | " + f["app"].replace("|", "/") +
             " |\n| Android | " + f["android"].replace("|", "/") + " |\n| Phone | " + f["device"].replace("|", "/") +
             " |\n| Server type | " + f["source"].replace("|", "/") +
-            " |\n\nThe log is kept privately by the Siansa team; quote the report id if you add details.")
+            " |\n\nThe log is kept privately by the Siansa team; quote the report id if you add details." +
+            (f"\n\nLog (Siansa team only): https://github.com/{REPORTS_REPO}/blob/main/{report_path(rec_id, now)}.zip"
+             if REPORTS_REPO and REPORTS_TOKEN else ""))
     return title.replace("@", "@\u200b").replace("#", "#\u200b"), body
 
 
@@ -228,7 +235,7 @@ def store_report_privately(rec_id, issue=None, now=None, call=None):
         with open(base + ".json", encoding="utf-8") as f:
             meta = json.load(f)
         meta["issue"] = issue
-        month = time.strftime("%Y-%m", time.gmtime(time.time() if now is None else now))
+        path = report_path(rec_id, now)
         repo = "repos/" + REPORTS_REPO
         with open(base + ".zip", "rb") as f:
             zip_blob = call("POST", repo + "/git/blobs", {"content": base64.b64encode(f.read()).decode(), "encoding": "base64"})
@@ -237,9 +244,10 @@ def store_report_privately(rec_id, issue=None, now=None, call=None):
             head = call("GET", repo + "/git/ref/heads/main")["object"]["sha"]
             tree = call("GET", repo + "/git/commits/" + head)["tree"]["sha"]
             new_tree = call("POST", repo + "/git/trees", {"base_tree": tree, "tree": [
-                {"path": f"reports/{month}/{rec_id}.zip", "mode": "100644", "type": "blob", "sha": zip_blob["sha"]},
-                {"path": f"reports/{month}/{rec_id}.json", "mode": "100644", "type": "blob", "sha": json_blob["sha"]}]})
-            commit = call("POST", repo + "/git/commits", {"message": f"Report {rec_id}" + (f" (issue #{issue})" if issue else ""),
+                {"path": path + ".zip", "mode": "100644", "type": "blob", "sha": zip_blob["sha"]},
+                {"path": path + ".json", "mode": "100644", "type": "blob", "sha": json_blob["sha"]}]})
+            # The full reference links the commit to the public issue (shown only to people who can see this repo).
+            commit = call("POST", repo + "/git/commits", {"message": f"Report {rec_id}" + (f" ({BETA_REPO}#{issue})" if issue else ""),
                                                            "tree": new_tree["sha"], "parents": [head]})
             try:
                 call("PATCH", repo + "/git/refs/heads/main", {"sha": commit["sha"]})
@@ -690,9 +698,9 @@ class Handler(BaseHTTPRequestHandler):
         rec_id = save_report(self.rfile, length, fields, now)
         if rec_id is None:
             return self._send(400, b'{"error":"bad log"}', ctype="application/json")
-        title, body = issue_text(rec_id, fields)
+        title, body = issue_text(rec_id, fields, now)
         number, url = open_issue(title, body)
-        threading.Thread(target=store_report_privately, args=(rec_id, number), daemon=True).start()
+        threading.Thread(target=store_report_privately, args=(rec_id, number, now), daemon=True).start()
         print("report", rec_id, "issue", number, flush=True)  # no words, no address
         self._send(200, json.dumps({"id": rec_id, "issue": number, "url": url}).encode(), ctype="application/json")
 

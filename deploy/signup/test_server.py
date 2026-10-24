@@ -317,6 +317,14 @@ class PrivateCopyTest(unittest.TestCase):
         self.assertIn('"issue": 7', [c for c in self.calls if c[1].endswith("/git/blobs")][1][2]["content"])
         self.assertEqual(self.calls[-1][0], "PATCH")
 
+    def test_issue_links_to_the_private_log(self):
+        self.fields = {"happened": "It stops a lot", "expected": "", "app": "", "android": "", "device": "", "source": "", "session": ""}
+        _, body = server.issue_text(self.rid, self.fields, 0)
+        self.assertIn(f"https://github.com/o/siansa-reports/blob/main/reports/1970-01/{self.rid}.zip", body)
+        server.REPORTS_REPO = ""
+        _, body = server.issue_text(self.rid, self.fields, 0)
+        self.assertNotIn("Log (Siansa team only)", body)
+
     def test_retries_when_main_moved(self):
         self.assertTrue(server.store_report_privately(self.rid, None, 0, self.fake(fail_patch=1)))
         self.assertEqual(sum(1 for c in self.calls if c[0] == "PATCH"), 2)
