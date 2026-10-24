@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Siansa privacy policy</title>
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+<h1>Privacy policy</h1>
+<p class="meta">Siansa for Android · Last updated: 24 October 2026</p>
+
+<p>Siansa is a music player for your own music server. It has <strong>no account with us, no ads, no analytics
+and no tracking</strong>. We (the makers of Siansa) don't run any server that receives your data. Everything Siansa
+sends goes to services <strong>you</strong> set up or switch on, listed below.</p>
+
+<h2>Your music server</h2>
+<p>Siansa connects to the server you enter (Navidrome or another OpenSubsonic server, or Emby). It sends your user
+name and password (or a login token) to that server, and asks it for your music, covers, lyrics and playlists. It
+tells your server what you play, what you like (favourites), and which playlists you make or change. Your server
+is run by you or by whoever gave you the account; their privacy rules apply to it.</p>
+
+<h2>Optional services you switch on</h2>
+<ul>
+<li><strong>AudioMuse-AI</strong> (your own server, if you add it): song ids for sound-alike songs, mixes and song
+paths, and the text you type into "search by sound".</li>
+<li><strong>OpenRouter</strong> (if you add an API key, for AI mix titles): the vibe's description, the day and
+time, the kind of audio device (for example "car Bluetooth"), and the titles and artists of your last 20 plays.
+Your library is never sent. OpenRouter's privacy policy applies.</li>
+<li><strong>Last.fm</strong> and <strong>ListenBrainz</strong> (or a compatible server) if you connect them: the
+songs you play (title, artist, album, time), to keep your listening history there.</li>
+<li><strong>Weather for "Situation"</strong> (only if you turn it on and allow location): your approximate location,
+rounded to about 10 km, is sent to Open-Meteo (open-meteo.com) to get the weather. Your location isn't stored or
+sent anywhere else. Whether you're on the move comes from the phone's step counter
+(the "physical activity" permission), read on the phone only; nothing about it leaves the phone.</li>
+<li><strong>Artist photos</strong>: for artists that aren't in your library, only the artist's name is sent to
+Deezer's public API (api.deezer.com) to find a photo and similar artists.</li>
+<li><strong>Casting</strong>: when you cast to a TV or speaker, Google Cast or DLNA on your network receives the song's
+address and its details to play it.</li>
+</ul>
+
+<h2>On your phone</h2>
+<ul>
+<li>Your settings, server passwords (encrypted with Android's keystore), play history, downloads and caches stay
+on your phone. Uninstalling Siansa removes them.</li>
+<li>Siansa keeps a log for finding problems. It stays on the phone. It's only shared if you choose to share or send
+it yourself (for example to report a bug); it can contain your server addresses but never passwords or keys.</li>
+<li>If you use Report a problem in the app, the words you write and the whole log are sent to this server. The log
+is kept privately and only the owner can read it; it is used to fix the problem and deleted afterwards. A short
+note with your words, app version and phone model is posted publicly in the beta testers repository on GitHub.</li>
+<li>Backups you make in Siansa are files you save and keep yourself.</li>
+</ul>
+
+<h2>Permissions</h2>
+<ul>
+<li><strong>Internet and network state</strong>: to reach your servers and to know when you're offline or on mobile data.</li>
+<li><strong>Notifications and foreground service (media playback)</strong>: to keep playing with the screen off and
+show the player controls.</li>
+<li><strong>Wi-Fi multicast</strong>: to find Cast and DLNA speakers and TVs on your network.</li>
+<li><strong>Approximate location and physical activity</strong>: only for "Situation", only after you turn it on and allow them.</li>
+</ul>
+
+<h2>Beta sign-up on this website</h2>
+<p>If you ask for a beta invite on this website, we keep the answers you give (email, how you'll install Siansa,
+which server you use, and your phone model if you give it) to invite you and write to you about the beta. We don't
+store your IP address, use cookies or analytics, or share the list with anyone, except that Google Play needs the
+email of your Google account to give you access. If you're approved for F-Droid, we also send you the beta's private download address. We delete the list and change the address when the beta ends. To be removed sooner, write to
+the address below.</p>
+
+<h2>Children</h2>
+<p>Siansa isn't directed at children and doesn't knowingly collect anything from anyone.</p>
+
+<h2>Changes and contact</h2>
+<p>If this policy changes, the new version is published here with a new date. Questions:
+<a href="mailto:privacy@{{DOMAIN}}">privacy@{{DOMAIN}}</a>.</p>
+</main>
+</body>
+</html>

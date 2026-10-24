@@ -1,0 +1,22 @@
+Categories:
+  - Multimedia
+License: Proprietary
+AuthorName: Siansa
+WebSite: https://DOMAIN
+SourceCode: https://DOMAIN
+Name: Siansa
+Summary: Music player for your own Navidrome or Emby server
+Description: |-
+  Siansa plays your music from your own Navidrome (or other OpenSubsonic) or Emby server.
+
+  * Albums, artists, playlists, favourites and search, offline downloads and lyrics
+  * Mixes made for the moment, Vibes, Song path and search by sound with AudioMuse-AI (optional)
+  * Cast and DLNA, crossfade and levelling, sleep timer
+  * No ads, no tracking: everything goes to servers you set up
+
+  This is a beta for testers. Please report problems with the log from Settings.
+AntiFeatures:
+  NonFreeDep:
+    en-US: Uses Google Cast for casting to TVs and speakers.
+  NonFreeNet:
+    en-US: Can use OpenRouter (AI titles), Last.fm and Deezer (artist photos) if you switch them on.

@@ -1,0 +1,91 @@
+# Siansa beta server (issue #410). HTTPS as TLS_MODE in .env says: behind Cloudflare with its Origin
+# Certificate (tls/cloudflare.caddy), or straight from Let's Encrypt (tls/auto.caddy).
+# The names come from .env: DOMAIN, DEMO_DOMAIN, ACME_EMAIL.
+{
+	email {$ACME_EMAIL}
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+(security) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "geolocation=(), camera=(), microphone=(), interest-cohort=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		-Server
+	}
+	encode zstd gzip
+	log {
+		output stdout
+		# No IP addresses or query strings kept beyond the container log rotation.
+		format filter {
+			request>remote_ip delete
+			request>client_ip delete
+			request>uri query {
+				delete *
+			}
+		}
+	}
+}
+
+# Website, privacy policy and the F-Droid repo.
+{$DOMAIN} {
+	import /etc/caddy/tls.caddy
+	import security
+	header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+
+	# Only approved testers get in, each with a private link: https://DOMAIN/fdroid/t/<code>/repo
+	# Caddy asks the sign-up service (/auth) whether the code is valid, then serves the repo without the prefix.
+	handle /fdroid/t/* {
+		route {
+			forward_auth signup:8080 {
+				uri /auth
+			}
+			uri path_regexp ^/fdroid/t/[^/]+/repo/? /
+			root * /srv/fdroid/repo
+			header /index-v* Cache-Control "no-cache"
+			header /entry.* Cache-Control "no-cache"
+			header *.apk Cache-Control "private, max-age=3600"
+			file_server
+		}
+	}
+	# The old open address is closed.
+	handle /fdroid* {
+		respond "Not found" 404
+	}
+
+	# Beta sign-up form, the approve/deny pages and the places count (signup/server.py). Only these paths reach it.
+	# Problem reports from the app (a log ZIP, up to 40 MB). The server keeps it privately and opens a GitHub issue.
+	@report path /report
+	handle @report {
+		request_body max_size 41MB
+		reverse_proxy signup:8080
+	}
+
+	@signup path /signup /signup/decide /signup/count
+	handle @signup {
+		request_body {
+			max_size 8KB
+		}
+		reverse_proxy signup:8080
+	}
+
+	redir /privacy /privacy.html 301
+
+	handle {
+		root * /srv/site
+		try_files {path} {path}.html {path}/index.html
+		file_server
+	}
+}
+
+# Demo Navidrome for reviewers and testers.
+{$DEMO_DOMAIN} {
+	import /etc/caddy/tls.caddy
+	import security
+	reverse_proxy navidrome-demo:4533
+}
