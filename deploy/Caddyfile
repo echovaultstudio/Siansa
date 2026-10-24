@@ -59,6 +59,13 @@
 	}
 
 	# Beta sign-up form, the approve/deny pages and the places count (signup/server.py). Only these paths reach it.
+	# Problem reports from the app (a log ZIP, up to 40 MB). The server keeps it privately and opens a GitHub issue.
+	@report path /report
+	handle @report {
+		request_body max_size 41MB
+		reverse_proxy signup:8080
+	}
+
 	@signup path /signup /signup/decide /signup/count
 	handle @signup {
 		request_body {

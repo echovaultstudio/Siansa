@@ -37,6 +37,7 @@ services:
       BETA_LIMIT: ${BETA_LIMIT:-12}
       PUBLIC_URL: https://${DOMAIN}
       NOTIFY_TO: ${NOTIFY_TO:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}

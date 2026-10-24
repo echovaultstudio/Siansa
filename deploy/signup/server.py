@@ -13,9 +13,14 @@ Standard library only.
 - Places: BETA_LIMIT (12) testers at a time, Play and F-Droid together. When the beta is full, new sign-ups go on a waiting list and are
   approved automatically, oldest first, when a place frees up (a deny or `revoke`).
 - GET /signup/count: places taken, for the home page.
+- POST /report (issue #414): a problem report from the app. The body is the diagnostics ZIP, the X-Report header
+  is base64 JSON with what happened, what was expected and the app and phone details. The ZIP is kept privately
+  in REPORTS_DIR (<id>.zip, readable by the owner only); a public issue with the words, the details and the id is
+  opened in the beta testers repo with GITHUB_TOKEN (Issues: write on that repo only). No link to the log is public.
 - GET /auth: Caddy asks this before serving /fdroid/t/<code>/repo (forward_auth); 200 for the current code, else 404.
 No IP addresses are stored, no cookies, no third parties. Caddy passes /signup*, and /auth for its own checks.
 """
+import base64
 import calendar
 import fcntl
 import hashlib
@@ -31,6 +36,7 @@ import ssl
 import sys
 import threading
 import time
+import urllib.request
 from email.message import EmailMessage
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
@@ -48,6 +54,13 @@ BETA_REPO_URL = "https://github.com/echovaultstudio/siansa-beta-testers"
 FAILS_PER_HOUR = 30
 LIMIT = int(os.environ.get("BETA_LIMIT", "12") or 12)
 MAX_BODY = 4096
+REPORT_MAX_ZIP = 40 * 1024 * 1024
+REPORTS_MAX_TOTAL = 2 * 1024 * 1024 * 1024
+REPORTS_DIR = os.environ.get("REPORTS_DIR", os.path.join(DATA_DIR, "reports"))
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+BETA_REPO = os.environ.get("BETA_REPO", "echovaultstudio/siansa-beta-testers")
+REPORTS_PER_HOUR = 5
+_reports = {}
 EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,255}\.[^@\s]{2,63}$")
 # Abuse limits: 10 tries per address-hash per hour, and 60 accepted sign-ups per hour in total.
 PER_CLIENT = 10
@@ -120,6 +133,108 @@ def rate_limited(client, now):
     for k in [k for k, v in _recent.items() if not v or v[-1] <= cutoff]:
         del _recent[k]
     return len(tries) > PER_CLIENT or len(_accepted) >= PER_HOUR_TOTAL
+
+
+def report_limited(client, now):
+    cutoff = now - 3600
+    tries = [t for t in _reports.get(client, []) if t > cutoff]
+    tries.append(now)
+    _reports[client] = tries
+    for k in [k for k, v in _reports.items() if not v or v[-1] <= cutoff]:
+        del _reports[k]
+    return len(tries) > REPORTS_PER_HOUR
+
+
+def report_fields(header):
+    """The words and details from the X-Report header (base64 JSON), cut to size; None if it isn't valid."""
+    try:
+        raw = base64.urlsafe_b64decode(header + "=" * (-len(header) % 4))
+        data = json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+
+    def one(name, limit):
+        v = data.get(name, "")
+        return v.strip()[:limit] if isinstance(v, str) else ""
+    fields = {"happened": one("happened", 1000), "expected": one("expected", 1000), "app": one("app", 40),
+              "android": one("android", 20), "device": one("device", 80), "source": one("source", 20),
+              "session": one("session", 64)}
+    if len(fields["happened"]) < 5:
+        return None
+    return fields
+
+
+def quote(text):
+    """Text for a markdown quote that can't ping anyone, open a link preview or break out of the quote."""
+    text = text.replace("@", "@\u200b").replace("#", "#\u200b")
+    return "\n".join("> " + line for line in text.splitlines()) or "> -"
+
+
+def issue_text(rec_id, f):
+    title = "Report " + rec_id + ": " + " ".join(f["happened"].split())[:70]
+    body = ("**What happened**\n" + quote(f["happened"]) + "\n\n**What was expected**\n" + quote(f["expected"] or "-") +
+            "\n\n| | |\n|---|---|\n| Report id | `" + rec_id + "` |\n| App | " + f["app"].replace("|", "/") +
+            " |\n| Android | " + f["android"].replace("|", "/") + " |\n| Phone | " + f["device"].replace("|", "/") +
+            " |\n| Server type | " + f["source"].replace("|", "/") +
+            " |\n\nThe log was sent privately to the maintainer; quote the report id if you add details.")
+    return title.replace("@", "@\u200b").replace("#", "#\u200b"), body
+
+
+def open_issue(title, body):
+    """Opens the issue; returns (number, url) or (None, None) if GitHub is unreachable or no token is set."""
+    if not GITHUB_TOKEN:
+        return None, None
+    req = urllib.request.Request(
+        "https://api.github.com/repos/" + BETA_REPO + "/issues", method="POST",
+        data=json.dumps({"title": title, "body": body, "labels": ["report"]}).encode(),
+        headers={"Authorization": "Bearer " + GITHUB_TOKEN, "Accept": "application/vnd.github+json",
+                 "User-Agent": "siansa-beta", "Content-Type": "application/json", "X-GitHub-Api-Version": "2022-11-28"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            out = json.load(r)
+        return out.get("number"), out.get("html_url")
+    except Exception as e:  # the report is kept either way
+        print("report issue failed:", type(e).__name__, flush=True)
+        return None, None
+
+
+def reports_total():
+    try:
+        return sum(e.stat().st_size for e in os.scandir(REPORTS_DIR) if e.is_file())
+    except OSError:
+        return 0
+
+
+def save_report(stream, length, fields, now=None):
+    """Writes the ZIP (private) and returns the report id; None if the body isn't a ZIP of the allowed size."""
+    if length <= 4 or length > REPORT_MAX_ZIP:
+        return None
+    os.makedirs(REPORTS_DIR, mode=0o700, exist_ok=True)
+    rec_id = secrets.token_hex(4)
+    path = os.path.join(REPORTS_DIR, rec_id + ".zip")
+    first = True
+    left = length
+    with open(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as out:
+        while left > 0:
+            chunk = stream.read(min(65536, left))
+            if not chunk:
+                break
+            if first and not chunk.startswith(b"PK"):
+                out.close()
+                os.remove(path)
+                return None
+            first = False
+            out.write(chunk)
+            left -= len(chunk)
+    if left:
+        os.remove(path)
+        return None
+    with open(os.path.join(REPORTS_DIR, rec_id + ".json"), "w") as meta:
+        os.chmod(meta.name, 0o600)
+        json.dump({**fields, "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() if now is None else now))}, meta)
+    return rec_id
 
 
 def save(record):
@@ -460,8 +575,33 @@ class Handler(BaseHTTPRequestHandler):
             return page("Already decided", "<p>Someone just decided this one.</p>")
         return page("Done", f"<p>{html.escape(result)}</p>")
 
+    def _report(self):
+        now = time.time()
+        if report_limited(self._client(), now):
+            return self._send(429, b'{"error":"slow down"}', ctype="application/json")
+        fields = report_fields(self.headers.get("X-Report", ""))
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = -1
+        if fields is None:
+            return self._send(400, b'{"error":"bad report"}', ctype="application/json")
+        if length > REPORT_MAX_ZIP:
+            return self._send(413, b'{"error":"too big"}', ctype="application/json")
+        if reports_total() + max(length, 0) > REPORTS_MAX_TOTAL:
+            return self._send(507, b'{"error":"full"}', ctype="application/json")
+        rec_id = save_report(self.rfile, length, fields, now)
+        if rec_id is None:
+            return self._send(400, b'{"error":"bad log"}', ctype="application/json")
+        title, body = issue_text(rec_id, fields)
+        number, url = open_issue(title, body)
+        print("report", rec_id, "issue", number, flush=True)  # no words, no address
+        self._send(200, json.dumps({"id": rec_id, "issue": number, "url": url}).encode(), ctype="application/json")
+
     def do_POST(self):
         path = urlsplit(self.path).path
+        if path == "/report":
+            return self._report()
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
