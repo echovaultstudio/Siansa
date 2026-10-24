@@ -101,6 +101,13 @@ class PlayerConnection(
         connect()
     }
 
+    /**
+     * Goes up each time a new list starts playing or playback is stopped (beta report 95a30366), so songs that
+     * arrive later for an older list (an artist radio's second batch) can tell they're too late and are dropped.
+     */
+    @Volatile var queueGeneration: Long = 0L
+        private set
+
     /** Called when a new list starts playing (anything other than a radio topping itself up). */
     var onNewQueue: (() -> Unit)? = null
 
@@ -146,6 +153,7 @@ class PlayerConnection(
     }
 
     private fun playNow(songs: List<Song>, startIndex: Int, shuffle: Boolean, startMs: Long = 0L) {
+        queueGeneration++
         onNewQueue?.invoke()
         SongRegistry.register(songs)
         val items = songs.map { it.toMediaItem(api) }
@@ -245,6 +253,7 @@ class PlayerConnection(
 
     /** Stops playback and empties the queue (long-press on play). */
     fun stop() {
+        queueGeneration++
         onNewQueue?.invoke()
         withController { c ->
             c.stop()
