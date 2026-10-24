@@ -48,6 +48,12 @@ mkdir -p "$SITE_DIR"
 cp "$HERE"/site/* "$SITE_DIR"/
 for f in "$SITE_DIR"/*.html; do sed -i "s#{{DOMAIN}}#$DOMAIN#g" "$f"; done
 
+echo "== Cloudflare's certificate for Authenticated Origin Pulls (TLS_MODE=cloudflare)"
+mkdir -p "$HERE/certs"
+curl -fsSL -o "$HERE/certs/cloudflare-origin-pull-ca.pem" \
+	https://developers.cloudflare.com/ssl/static/authenticated_origin_pull_ca.pem ||
+	echo "Couldn't download it: get it from Cloudflare's docs (Authenticated Origin Pulls) into certs/" >&2
+
 echo "== Demo Navidrome folders in $DEMO_DIR"
 mkdir -p "$DEMO_DIR/music" "$DEMO_DIR/data"
 chown -R 1000:1000 "$DEMO_DIR"

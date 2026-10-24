@@ -9,7 +9,10 @@ One server for the closed beta (issue #410):
 | `https://siansa.app/fdroid/repo` | F-Droid repo with every release, for testers outside Play |
 | `https://demo.siansa.app` | Demo Navidrome with a small free library, for Google's reviewers and testers |
 
-Caddy serves all of it over HTTPS and gets and renews the certificates itself. The F-Droid repo is signed on
+Caddy serves all of it over HTTPS. The domain sits behind Cloudflare's proxy (orange cloud): visitors get
+Cloudflare's certificate, and Caddy uses a free Cloudflare **Origin Certificate** (valid for 15 years) so the
+hop from Cloudflare to the server is encrypted too, and only accepts connections that come from Cloudflare.
+Without Cloudflare, set `TLS_MODE=auto` in `.env` and Caddy gets Let's Encrypt certificates itself. The F-Droid repo is signed on
 the server; its key never leaves it. CI sends each new release's APK over SSH with a key that can only do that.
 
 ## What's in here
@@ -30,9 +33,16 @@ the server; its key never leaves it. CI sends each new release's APK over SSH wi
 
 You need a Debian or Ubuntu server with Docker Engine, and SSH access with sudo.
 
-### 1. DNS
-Point `siansa.app` and `demo.siansa.app` (A, and AAAA if the server has IPv6) at the server. Caddy can only get
-certificates once both resolve to it.
+### 1. Cloudflare
+In the Cloudflare dashboard for `siansa.app`:
+1. **DNS**: add `A` records (and `AAAA` for IPv6) for `siansa.app` and `demo` pointing at the server, proxied
+   (orange cloud).
+2. **SSL/TLS › Origin Server › Origin Certificates › Create Certificate**: let Cloudflare generate the key
+   (RSA), hostnames `siansa.app` and `*.siansa.app`, 15 years, **PEM**. Keep the page open: the private key is
+   shown only once. Save the certificate as `origin.pem` and the key as `origin.key`.
+3. **SSL/TLS › Overview**: set the encryption mode to **Full (strict)**.
+4. **SSL/TLS › Origin Server › Authenticated Origin Pulls**: switch it on. Caddy then refuses anything that
+   didn't come through Cloudflare.
 
 ### 2. Copy this folder to the server
 ```sh
@@ -40,6 +50,8 @@ scp -r deploy you@server:~/siansa-deploy
 ssh you@server
 cd ~/siansa-deploy
 ```
+Then put the two files from step 1 in `certs/` (`origin.pem`, `origin.key`), e.g. from your computer:
+`scp origin.pem origin.key you@server:~/siansa-deploy/certs/`. They are git-ignored; keep them off GitHub.
 
 ### 3. Set up
 ```sh
@@ -77,7 +89,7 @@ Once you've checked that **your own SSH key login works**, switch off password l
 ### 6. Start
 ```sh
 docker compose up -d
-docker compose logs -f caddy     # wait for "certificate obtained successfully" for both names
+docker compose logs -f caddy     # should show no errors; with TLS_MODE=auto wait for "certificate obtained"
 ```
 Open `https://siansa.app` and `https://siansa.app/privacy`. Check the headers at
 [securityheaders.com](https://securityheaders.com) and the certificate at
