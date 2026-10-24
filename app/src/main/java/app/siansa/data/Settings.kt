@@ -54,7 +54,6 @@ data class AppSettings(
     /** What of the moment the vibes may use for today's mix (Vibes panel, issue #247). */
     val situation: SituationOptions = SituationOptions(),
     /** Parts of the app whose detailed log entries are left out (Settings › Logs › Detail, issue #237). */
-    val logQuiet: Set<String> = emptySet(),
     val scrobbleNavidrome: Boolean = true,
     /** How much of a song must be heard, in percent, before it's scrobbled (issue #270). */
     val scrobblePercent: Int = 50,
@@ -222,7 +221,6 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         coverDownloadAnyWifi = prefs.getBoolean("cover_download_any_wifi", false),
         coverDownloadWifiOnly = prefs.getBoolean("cover_download_wifi_only", true),
         logging = prefs.getBoolean("logging", false),
-        logQuiet = prefs.getString("log_quiet", "").orEmpty().split(',').filter { it.isNotBlank() }.toSet(),
         situation = SituationOptions(
             weather = prefs.getBoolean("situation_weather", false),
             movement = prefs.getBoolean("situation_movement", false),
@@ -316,7 +314,6 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putStringSet("sync_folders", s.syncFolders)
             .putInt("image_cache_mb", s.imageCacheMb)
             .putBoolean("logging", s.logging)
-            .putString("log_quiet", s.logQuiet.sorted().joinToString(","))
             .putBoolean("situation_weather", s.situation.weather)
             .putBoolean("situation_movement", s.situation.movement)
             .putBoolean("situation_light", s.situation.light)
@@ -404,12 +401,6 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putBoolean("situation_device", options.device)
             .apply()
         _state.value = _state.value.copy(situation = options)
-    }
-
-    /** Leaves out (or keeps) the detailed log entries of [component] (issue #237). */
-    fun setLogQuiet(quiet: Set<String>) {
-        prefs.edit().putString("log_quiet", quiet.sorted().joinToString(",")).apply()
-        _state.value = _state.value.copy(logQuiet = quiet)
     }
 
 
