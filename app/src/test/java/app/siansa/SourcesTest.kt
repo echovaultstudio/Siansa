@@ -12,6 +12,7 @@ import app.siansa.offline.OfflineShelf
 import app.siansa.offline.OnlyDownloaded
 import app.siansa.playback.playLimit
 import app.siansa.ui.sourceChipLabels
+import app.siansa.ui.sourceFilterActive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -111,7 +112,13 @@ class SourcesTest {
     }
 
     @Test fun homeChipsSayWhatIsFiltered() {
-        assertEquals(emptyList<String>(), sourceChipLabels(downloadedOnly = false, shownUsers = 1))
-        assertEquals(listOf("Only downloaded", "2 users"), sourceChipLabels(downloadedOnly = true, shownUsers = 2))
+        assertEquals(emptyList<String>(), sourceChipLabels(downloadedOnly = false))
+        assertEquals(listOf("Only downloaded"), sourceChipLabels(downloadedOnly = true))
+        // Two users shown: no chip, but the filter button stays lit (beta report 5737de2e).
+        assertEquals(false, sourceFilterActive(downloadedOnly = false, shownUsers = 1))
+        assertEquals(true, sourceFilterActive(downloadedOnly = false, shownUsers = 2))
+        assertEquals(true, sourceFilterActive(downloadedOnly = true, shownUsers = 1))
+        // An Emby user shown next to another says so plainly, without naming Navidrome (beta report 5296551f).
+        assertEquals(false, app.siansa.data.EMBY_GUEST_NOTE.contains("Navidrome"))
     }
 }
