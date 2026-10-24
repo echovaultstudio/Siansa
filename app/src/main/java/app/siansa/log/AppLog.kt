@@ -61,15 +61,11 @@ object AppLog {
     @Volatile
     var screen: String = "-"
 
-    /** Components whose detailed entries are left out (Settings › Logs › Detail); empty = all detail kept. */
-    @Volatile
-    var quiet: Set<String> = emptySet()
-
     /** Everything is recorded while logging is on: frames, freezes, buffering, downloads, phone state. */
     val detailOn: Boolean get() = enabled
 
     /** Whether detailed entries of [component] are written. */
-    fun detail(component: String): Boolean = enabled && component !in quiet
+    fun detail(@Suppress("UNUSED_PARAMETER") component: String): Boolean = enabled
 
     val current: File get() = text.current
     val crashFile: File get() = File(dir, "crash-last.jsonl")
@@ -137,7 +133,7 @@ object AppLog {
 
     // ---- Writing ----
 
-    /** A detailed entry; written while logging is on and [component] isn't quiet. */
+    /** A detailed entry; written whenever logging is on. */
     fun d(tag: String, message: String, event: String = "log", fields: Map<String, Any?> = emptyMap()) {
         if (detail(tag)) add(Level.DEBUG, tag, event, message, fields, null)
     }
@@ -234,7 +230,7 @@ object AppLog {
             events.files().map { DiagnosticZip.Part(it.name, it) } +
             listOf(DiagnosticZip.Part("recent.jsonl", recentFile)) +
             listOfNotNull(crashFile.takeIf { it.exists() }?.let { DiagnosticZip.Part("crash-last.jsonl", it) })
-        DiagnosticZip.write(target, parts, about + mapOf("logging_on" to enabled, "quiet_components" to quiet.sorted()), System.currentTimeMillis())
+        DiagnosticZip.write(target, parts, about + mapOf("logging_on" to enabled), System.currentTimeMillis())
         recentFile.delete()
         return target
     }
