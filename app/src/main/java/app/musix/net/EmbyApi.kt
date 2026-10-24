@@ -42,6 +42,8 @@ import java.time.Instant
  *   app run; a request the server refuses (HTTP 401) logs in again once.
  * - Song and cover addresses carry the token as `api_key`, since players, Cast and the image cache can't send headers.
  * - Songs play as the untouched original file (`static=true`), like Navidrome's raw stream.
+ * - Playback is reported to Emby as it happens (start, progress, pause, stop), so it shows under Emby's
+ *   now playing, and songs heard to the end are marked played.
  * - Lyrics come from the song's lyrics streams (Emby 4.8+). Emby has no sound-alike search and no song paths: those come back empty, so the
  *   app hides them like it does for a Navidrome server without them. Similar songs and artist radio use Emby's
  *   Instant Mix.
@@ -428,9 +430,27 @@ class EmbyApi(
             val at = Instant.ofEpochMilli(timeMs ?: System.currentTimeMillis()).toString()
             call("/Users/{user}/PlayedItems/" + enc(id) + "?" + q("DatePlayed" to at), method = "POST")
         } else {
-            call("/Sessions/Playing", method = "POST", body = buildJsonObject { put("ItemId", id) }.toString())
+            call("/Sessions/Playing", method = "POST", body = timeline(id, 0, paused = false, event = null))
         }
     }
+
+    /** Emby's now-playing timeline: where the song is, and whether it's paused. */
+    override suspend fun playbackProgress(id: String, positionMs: Long, paused: Boolean) {
+        call("/Sessions/Playing/Progress", method = "POST", body = timeline(id, positionMs, paused, if (paused) "Pause" else "TimeUpdate"))
+    }
+
+    override suspend fun playbackStopped(id: String, positionMs: Long) {
+        call("/Sessions/Playing/Stopped", method = "POST", body = timeline(id, positionMs, paused = false, event = null))
+    }
+
+    private fun timeline(id: String, positionMs: Long, paused: Boolean, event: String?): String = buildJsonObject {
+        put("ItemId", id)
+        put("PositionTicks", positionMs.coerceAtLeast(0) * TICKS_PER_MS)
+        put("IsPaused", paused)
+        put("CanSeek", true)
+        put("PlayMethod", "DirectStream")
+        if (event != null) put("EventName", event)
+    }.toString()
 
     // ---- Reading Emby's items ----
 
@@ -526,6 +546,9 @@ class EmbyApi(
             val text = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
             return LyricsFormats.parse(text) ?: Lyrics(false, text.lines().map { LyricLine(null, it.trimEnd()) })
         }
+
+        /** Emby's time ticks (100 nanoseconds) in a millisecond. */
+        const val TICKS_PER_MS = 10_000L
 
         /** Emby counts time in ticks of 100 nanoseconds. */
         fun ticksToSec(ticks: Long?): Int = ((ticks ?: 0L) / 10_000_000L).toInt()

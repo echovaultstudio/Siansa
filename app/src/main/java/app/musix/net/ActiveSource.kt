@@ -18,6 +18,8 @@ import app.musix.data.Song
  */
 class ActiveSource(private val pick: () -> MusicSource) : MusicSource {
     override val kind: SourceKind get() = pick().kind
+    override suspend fun playbackProgress(id: String, positionMs: Long, paused: Boolean) = pick().playbackProgress(id, positionMs, paused)
+    override suspend fun playbackStopped(id: String, positionMs: Long) = pick().playbackStopped(id, positionMs)
 
     override fun streamUrl(id: String): String = pick().streamUrl(id)
     override fun coverUrl(id: String, size: Int?): String = pick().coverUrl(id, size)

@@ -59,7 +59,7 @@ class SonicFingerprint(private val graph: AppGraph) {
         if (!force) saved()?.takeIf { it.date == date }?.let { return it }
         val s = graph.settings.current
         if (!s.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
-        val hits = graph.audioMuse.sonicFingerprint(FINGERPRINT_SONGS, s.navidromeUser, s.navidromePassword)
+        val hits = graph.audioMuse.sonicFingerprint(FINGERPRINT_SONGS, s.fingerprintUser, s.fingerprintPassword)
         if (hits.isEmpty()) throw MixException("AudioMuse found no fingerprint yet. Play some more and try again later.")
         val ids = hits.map { it.id }
         val features = runCatching { graph.audioMuse.features(ids) }

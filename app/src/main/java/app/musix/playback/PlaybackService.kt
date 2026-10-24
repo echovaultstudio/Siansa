@@ -58,6 +58,8 @@ import java.io.InterruptedIOException
 import java.util.Collections
 
 private const val FALLBACK_KBPS = 320
+/** How often a server with a playback timeline (Emby) hears where the playing song is (issue #113). */
+private const val TIMELINE_MS = 30_000L
 
 
 /**
@@ -569,6 +571,9 @@ class PlaybackService : MediaSessionService() {
             playingSince?.let { listenedMs += SystemClock.elapsedRealtime() - it }
             playingSince = null
             graph.scrobbler.finished(song, startedAtMs, listenedMs)
+            // The player has moved on by now: how long it was heard stands in for where it stopped.
+            graph.scrobbler.stopped(song, listenedMs)
+            handler.removeCallbacks(timelineTick)
             val started = startedAtMs
             val heard = listenedMs
             scope.launch { runCatching { graph.history.finish(song.id, started, heard, song.durationSec) } }
@@ -644,8 +649,19 @@ class PlaybackService : MediaSessionService() {
             if (precachedFor != id && duration > 0 && player.bufferedPosition >= duration - 1000) precacheNext(player)
         }
 
+        /** Tells a server with a playback timeline (Emby) where the song is, every [TIMELINE_MS] while it plays. */
+        private val timelineTick = object : Runnable {
+            override fun run() {
+                current?.let { graph.scrobbler.progress(it, player.currentPosition, paused = false) }
+                if (player.isPlaying) handler.postDelayed(this, TIMELINE_MS)
+            }
+        }
+
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             onIsPlayingChanged2(isPlaying)
+            current?.let { graph.scrobbler.progress(it, player.currentPosition, paused = !isPlaying) }
+            handler.removeCallbacks(timelineTick)
+            if (isPlaying) handler.postDelayed(timelineTick, TIMELINE_MS)
             val now = SystemClock.elapsedRealtime()
             if (isPlaying) {
                 if (playingSince == null) playingSince = now

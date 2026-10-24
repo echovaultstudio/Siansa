@@ -10,7 +10,8 @@ enum class SonicRoute { NAVIDROME_SONIC, AUDIOMUSE, NAVIDROME_SIMILAR }
 /**
  * Navidrome first when it has sonic similarity (OpenSubsonic `sonicSimilarity`, given by the AudioMuse-AI
  * Navidrome plugin): it uses the plugin's settings and Navidrome's own login. Otherwise AudioMuse directly when
- * it's set up in Musix, otherwise Navidrome's plain getSimilarSongs (its agents decide).
+ * it's set up in Musix, otherwise Navidrome's plain getSimilarSongs (its agents decide). Emby has no sonic plugin
+ * (issue #113), so with Emby it's AudioMuse directly, or Emby's Instant Mix without AudioMuse.
  */
 fun sonicRoute(navidromeSonic: Boolean, audioMuseReady: Boolean): SonicRoute = when {
     navidromeSonic -> SonicRoute.NAVIDROME_SONIC

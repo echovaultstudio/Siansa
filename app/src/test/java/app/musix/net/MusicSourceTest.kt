@@ -44,6 +44,19 @@ class MusicSourceTest {
         assertTrue(active.streamUrl("s1").contains("/Audio/s1/stream"))
     }
 
+    @Test fun withEmbyTheAiComesFromAudioMuseAlone() {
+        val emby = EmbyApi(okhttp3.OkHttpClient(), { AppSettings() })
+        // Emby has no sonic plugin: sound-alikes go to AudioMuse when it's set up.
+        kotlinx.coroutines.runBlocking { assertEquals(false, emby.hasSonicMatch()) }
+        assertEquals(app.musix.mix.SonicRoute.AUDIOMUSE, app.musix.mix.sonicRoute(navidromeSonic = false, audioMuseReady = true))
+        // "Your sound": no Navidrome login is sent to AudioMuse for an Emby setup.
+        val navidrome = AppSettings(navidromeUser = "max", navidromePassword = "sesame")
+        assertEquals("max", navidrome.fingerprintUser)
+        val onEmby = navidrome.copy(sourceKind = SourceKind.EMBY)
+        assertEquals("", onEmby.fingerprintUser)
+        assertEquals("", onEmby.fingerprintPassword)
+    }
+
     @Test fun setupStepsCarryTheChoice() {
         assertEquals("welcome/extras/OPENSUBSONIC", extrasRoute(SourceKind.OPENSUBSONIC))
         assertEquals("settings/connections?source=OPENSUBSONIC&extras=false", connectionsRoute(SourceKind.OPENSUBSONIC, extras = false))

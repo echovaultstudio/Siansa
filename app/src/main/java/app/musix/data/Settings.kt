@@ -114,6 +114,13 @@ data class AppSettings(
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
 
+    /**
+     * The login AudioMuse uses to find whose play counts make "Your sound": the Navidrome one. With Emby (issue
+     * #113) none is sent, and AudioMuse reads the plays of the Emby user it's set up with.
+     */
+    val fingerprintUser: String get() = if (sourceKind == SourceKind.OPENSUBSONIC) navidromeUser else ""
+    val fingerprintPassword: String get() = if (sourceKind == SourceKind.OPENSUBSONIC) navidromePassword else ""
+
     val navidromeReady: Boolean
         get() = navidromeUrl.isNotBlank() && navidromeUser.isNotBlank() && navidromePassword.isNotBlank()
     val audioMuseReady: Boolean
