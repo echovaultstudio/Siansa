@@ -44,6 +44,26 @@ class MusicSourceTest {
         assertTrue(active.streamUrl("s1").contains("/Audio/s1/stream"))
     }
 
+    @Test fun anotherUsersMusicGoesToTheirOwnServer() {
+        // Issue #427: the user in use is on Navidrome, another shown user is on Emby (and the other way round).
+        val navidrome = AppSettings(navidromeUrl = "http://navidrome.local")
+        val embyUser = AppSettings(navidromeUrl = "http://emby.local", sourceKind = SourceKind.EMBY)
+        val subsonic = SubsonicApi(okhttp3.OkHttpClient()) { navidrome }
+        val emby = EmbyApi(okhttp3.OkHttpClient(), { embyUser })
+        val theirs = setOf("e1", "ealbum")
+        val active = ActiveSource(route = { id -> if (id in theirs) emby else null }) { subsonic }
+        assertTrue(active.streamUrl("n1").startsWith("http://navidrome.local/rest/stream"))
+        assertTrue(active.streamUrl("e1").startsWith("http://emby.local/Audio/e1/stream"))
+        assertTrue(active.coverUrl("ealbum", 300).startsWith("http://emby.local/Items/ealbum/Images/Primary"))
+        assertTrue(active.coverUrl("al-n2", 300).startsWith("http://navidrome.local/rest/getCoverArt"))
+        // Lists that aren't about one item stay with the user in use.
+        assertEquals(SourceKind.OPENSUBSONIC, active.kind)
+
+        val onEmby = ActiveSource(route = { id -> if (id == "n1") subsonic else null }) { emby }
+        assertTrue(onEmby.streamUrl("n1").startsWith("http://navidrome.local/rest/stream"))
+        assertTrue(onEmby.streamUrl("e1").startsWith("http://emby.local/Audio/e1/stream"))
+    }
+
     @Test fun withEmbyTheAiComesFromAudioMuseAlone() {
         val emby = EmbyApi(okhttp3.OkHttpClient(), { AppSettings() })
         // Emby has no sonic plugin: sound-alikes go to AudioMuse when it's set up.

@@ -63,6 +63,13 @@ class LibraryRepository(context: Context) {
     private val db = LibraryDatabase.open(context)
     private val dao = db.dao()
 
+    private val _ownHidden = MutableStateFlow(false)
+    /**
+     * Whether the user in use's own music is hidden, so only other shown users' music is listed (issue #427).
+     * Their settings, history and playlists stay in use; nothing restarts.
+     */
+    val ownHidden: StateFlow<Boolean> = _ownHidden.asStateFlow()
+
     private val _status = MutableStateFlow<LibraryStatus?>(null)
     val status: StateFlow<LibraryStatus?> = _status.asStateFlow()
     private val _loaded = MutableStateFlow(false)
@@ -93,6 +100,7 @@ class LibraryRepository(context: Context) {
     }
 
     suspend fun load() = withContext(Dispatchers.IO) {
+        _ownHidden.value = meta(META_OWN_HIDDEN) == "1"
         refreshStatus()
         _loaded.value = true
         bump()
@@ -447,6 +455,7 @@ class LibraryRepository(context: Context) {
         val every = chosen.isEmpty() || all.isEmpty() || all.all { it in chosen }
         db.withTransaction {
             if (every) dao.showAllFolders() else dao.showFolders(chosen.toList())
+            if (_ownHidden.value) dao.hideOwnAlbums()
         }
         val merged = recomputePrimaries()
         putMeta(META_FOLDERS, if (every) "*" else chosen.sorted().joinToString(","))
@@ -455,6 +464,18 @@ class LibraryRepository(context: Context) {
         bump()
         AppLog.i("Library", if (every) "Showing every library" else "Showing ${chosen.size} of ${all.size} libraries")
         return merged
+    }
+
+    /**
+     * Hides or shows the user in use's own music at once (issue #427), keeping the libraries chosen in [chosen].
+     * Kept across starts; a library sync keeps it hidden.
+     */
+    suspend fun setOwnHidden(hidden: Boolean, chosen: Set<String>) {
+        if (_ownHidden.value == hidden) return
+        _ownHidden.value = hidden
+        putMeta(META_OWN_HIDDEN, if (hidden) "1" else "0")
+        AppLog.i("Library", if (hidden) "Hiding the music of the user in use" else "Showing the music of the user in use again")
+        showFolders(chosen)
     }
 
     /** Whether every Navidrome library is on the phone, so switching one on needs no sync (issue #376). */
@@ -514,6 +535,7 @@ class LibraryRepository(context: Context) {
         const val META_SYNCED_AT = "syncedAt"
         const val META_LAST_SCAN = "lastScan"
         const val META_FOLDERS = "folders"
+        const val META_OWN_HIDDEN = "own_hidden"
         /** Which libraries the phone keeps: every one, as "all:<ids>" (issue #376). */
         const val META_SCOPE = "scope"
         const val META_FOLDER_NAMES = "folderNames"
