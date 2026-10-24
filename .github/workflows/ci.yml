@@ -383,6 +383,8 @@ jobs:
       # publish (deploy/scripts/siansa-publish). Skipped until the FDROID_* secrets are set.
       - name: Publish to the F-Droid beta repo
         if: steps.version.outputs.exists != 'true'
+        # A server that can't be reached mustn't stop the release notes and history below.
+        continue-on-error: true
         env:
           FDROID_HOST: ${{ secrets.FDROID_HOST }}
           FDROID_SSH_KEY: ${{ secrets.FDROID_SSH_KEY }}
