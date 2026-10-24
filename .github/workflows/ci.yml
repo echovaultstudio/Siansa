@@ -79,7 +79,7 @@ jobs:
                   loc = issue.find("location")
                   where = ""
                   if loc is not None:
-                      path = loc.get("file", "").split("/musix/")[-1]
+                      path = loc.get("file", "").split("/siansa/")[-1]
                       where = f" file={path},line={loc.get('line', '1')}"
                   if sev in ("Error", "Fatal"):
                       errors += 1
@@ -92,7 +92,7 @@ jobs:
           if os.path.exists("gradle-build.txt"):
               seen = 0
               for line in open("gradle-build.txt", errors="ignore"):
-                  m = re.match(r"e: file://\S*?/musix/(\S+?):(\d+):(\d+) (.*)", line.strip())
+                  m = re.match(r"e: file://\S*?/siansa/(\S+?):(\d+):(\d+) (.*)", line.strip())
                   if m and seen < 40:
                       seen += 1
                       print(f"::error file={m[1]},line={m[2]},col={m[3]}::{m[4][:300]}")
@@ -135,13 +135,13 @@ jobs:
         run: |
           VERSION=$(tr -d '[:space:]' < version.txt)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          mv app/build/outputs/apk/release/app-release.apk musix-$VERSION.apk
+          mv app/build/outputs/apk/release/app-release.apk siansa-$VERSION.apk
 
       - uses: actions/upload-artifact@v7
         with:
           name: apk
           path: |
-            musix-*.apk
+            siansa-*.apk
             notes/
           retention-days: 30
 
@@ -374,9 +374,9 @@ jobs:
         if: steps.version.outputs.exists != 'true'
         with:
           tag_name: v${{ steps.version.outputs.version }}
-          name: Musix ${{ steps.version.outputs.version }}
+          name: Siansa ${{ steps.version.outputs.version }}
           body_path: notes/${{ steps.version.outputs.version }}.md
-          files: musix-*.apk
+          files: siansa-*.apk
           make_latest: true
 
       # Keeps the notes of every published version matching CHANGELOG.md, so fixes to the text show up too.

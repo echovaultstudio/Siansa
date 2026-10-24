@@ -14,8 +14,8 @@ base="${base%/}"
 dist="$here/dist"
 rm -rf "$dist" && mkdir -p "$dist"
 version="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["versions"][0]["version"])' "$here/plugin.json")"
-zip_name="musix_analysis-$version.zip"
-(cd "$here/musix_analysis" && find . -name '__pycache__' -prune -o -type f -name '*.py' -print | sort | zip -q -X "$dist/$zip_name" -@)
+zip_name="siansa_analysis-$version.zip"
+(cd "$here/siansa_analysis" && find . -name '__pycache__' -prune -o -type f -name '*.py' -print | sort | zip -q -X "$dist/$zip_name" -@)
 python3 - "$here/plugin.json" "$dist" "$base" "$zip_name" <<'PY'
 import hashlib, json, os, sys
 source, dist, base, zip_name = sys.argv[1:]

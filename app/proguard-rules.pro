@@ -1,20 +1,20 @@
-# Keep class and method names so stack traces in Musix logs stay readable; code is still shrunk and optimised.
+# Keep class and method names so stack traces in Siansa logs stay readable; code is still shrunk and optimised.
 -dontobfuscate
 -keepattributes SourceFile,LineNumberTable,*Annotation*,InnerClasses,Signature
 
 # Settings, mixes and songs are stored as JSON with kotlinx.serialization.
--keep,includedescriptorclasses class app.musix.**$$serializer { *; }
--keepclassmembers class app.musix.** { *** Companion; }
--keepclasseswithmembers class app.musix.** { kotlinx.serialization.KSerializer serializer(...); }
+-keep,includedescriptorclasses class app.siansa.**$$serializer { *; }
+-keepclassmembers class app.siansa.** { *** Companion; }
+-keepclasseswithmembers class app.siansa.** { kotlinx.serialization.KSerializer serializer(...); }
 
 # The FFmpeg audio renderer is created by name and calls into native code.
 -keep class androidx.media3.decoder.ffmpeg.** { *; }
 
 # Google Cast reads its options class by name from the manifest.
--keep class app.musix.playback.CastSetup { <init>(); }
+-keep class app.siansa.playback.CastSetup { <init>(); }
 
 # Background mix generation is started by class name.
--keep class app.musix.mix.MixWorker { <init>(...); }
+-keep class app.siansa.mix.MixWorker { <init>(...); }
 
 -dontwarn org.jetbrains.annotations.**
 -dontwarn javax.annotation.**
