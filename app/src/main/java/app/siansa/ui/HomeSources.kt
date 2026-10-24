@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.siansa.data.MusicFolder
+import app.siansa.data.EMBY_GUEST_NOTE
 import app.siansa.data.UserEntry
 import app.siansa.data.UserFiles
 import app.siansa.data.Users
@@ -129,6 +130,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                     status = when {
                         !user.connected -> "Not connected yet. Set it up in Settings → Users."
                         inUse -> inUseStatus(syncing, libraryStatus)
+                        user.emby -> EMBY_GUEST_NOTE
                         !isShown -> "Hidden"
                         guest?.error != null -> "Couldn't load: ${guest.error}"
                         syncing -> "Loading their music… ${guest?.songs ?: 0} songs"
@@ -136,7 +138,8 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                         else -> "Shown"
                     },
                     shown = isShown,
-                    canToggle = user.connected && (!inUse || shown.size > 1),
+                    // An Emby user can't be shown next to another yet; one already shown can still be hidden.
+                    canToggle = user.connected && (!inUse || shown.size > 1) && (inUse || !user.emby || isShown),
                     syncing = syncing,
                     libraries = if (isShown && all.size > 1) all.map { it.name to (it.id in chosen) } else emptyList(),
                     onToggle = {
@@ -310,10 +313,9 @@ private fun PanelLabel(text: String) {
 internal fun SourceChips(onOpen: () -> Unit) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    val shown by graph.guests.shown.collectAsStateWithLifecycle()
     val connection by graph.connection.state.collectAsStateWithLifecycle()
     val shelf by graph.downloads.shelf.collectAsStateWithLifecycle()
-    val chips = sourceChipLabels(settings.downloadedOnly, shown.size)
+    val chips = sourceChipLabels(settings.downloadedOnly)
     if (chips.isEmpty() && !(connection.offline && !shelf.isEmpty)) return
     Column(Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Tight, bottom = Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
         if (chips.isNotEmpty()) {
@@ -352,11 +354,16 @@ internal fun SourceChips(onOpen: () -> Unit) {
 
 private const val DOWNLOADED_CHIP = "Only downloaded"
 
-/** The chips under Home's greeting: what the source filter is doing, or nothing when it shows everything. */
-internal fun sourceChipLabels(downloadedOnly: Boolean, shownUsers: Int): List<String> = buildList {
+/**
+ * The chips under Home's greeting: only "Only downloaded". Several users' music shown together has no chip
+ * (beta report 5737de2e); the lit filter button says so instead.
+ */
+internal fun sourceChipLabels(downloadedOnly: Boolean): List<String> = buildList {
     if (downloadedOnly) add(DOWNLOADED_CHIP)
-    if (shownUsers > 1) add("$shownUsers users")
 }
+
+/** Whether Home's filter button is lit: something is hidden, or several users' music is shown. */
+internal fun sourceFilterActive(downloadedOnly: Boolean, shownUsers: Int): Boolean = downloadedOnly || shownUsers > 1
 
 /**
  * Home's one settings button (issue #152): opens the panel with Sources and Arrange. Lit while the source
@@ -367,7 +374,7 @@ internal fun SourceFilterButton(onClick: () -> Unit) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val shown by graph.guests.shown.collectAsStateWithLifecycle()
-    val active = sourceChipLabels(settings.downloadedOnly, shown.size).isNotEmpty()
+    val active = sourceFilterActive(settings.downloadedOnly, shown.size)
     IconButton(onClick = onClick) {
         Icon(Icons.Rounded.FilterList, "Source filter and Arrange Home", tint = if (active) Accent else MaterialTheme.colorScheme.onSurface)
     }

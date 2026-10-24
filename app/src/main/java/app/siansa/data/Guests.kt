@@ -63,6 +63,12 @@ data class GuestMusic(
     }
 }
 
+/**
+ * Shown next to the user in use, another user's music is read with the OpenSubsonic API, which Emby doesn't
+ * have (beta report 5296551f). Until Emby users can be shown alongside, their card says this instead of an error.
+ */
+const val EMBY_GUEST_NOTE = "Emby users can't be shown next to another user yet. To play their music, switch to them in Settings › Users."
+
 /** Where loading one other user's music has got to, for their card in the Sources panel. */
 data class GuestState(val running: Boolean = false, val songs: Int? = null, val error: String? = null)
 
@@ -190,6 +196,7 @@ class Guests(
     private suspend fun load(user: Int, force: Boolean): Int? {
         val s = settingsOf(user).current
         if (s.navidromeUrl.isBlank() || s.navidromeUser.isBlank()) throw IllegalStateException("This user isn't connected yet")
+        if (s.sourceKind == SourceKind.EMBY) throw IllegalStateException(EMBY_GUEST_NOTE)
         val api = apiOf(user)
         val all = api.musicFolders()
         val chosen = all.filter { it.id in s.syncFolders }

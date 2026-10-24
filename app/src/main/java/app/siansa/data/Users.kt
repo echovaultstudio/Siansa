@@ -83,7 +83,7 @@ object UserFiles {
 }
 
 /** One Navidrome login on this phone. */
-data class UserEntry(val id: Int, val label: String, val connected: Boolean)
+data class UserEntry(val id: Int, val label: String, val connected: Boolean, val emby: Boolean = false)
 
 /**
  * Several Navidrome logins (on the same or different servers), each with its own settings, library and
@@ -116,7 +116,10 @@ object Users {
         val settings = context.getSharedPreferences(UserFiles.scoped("settings", id), Context.MODE_PRIVATE)
         val user = settings.getString("nd_user", "").orEmpty()
         val address = settings.getString("nd_url", "").orEmpty()
-        UserEntry(id, UserFiles.label(user, address), connected = user.isNotBlank() && address.isNotBlank())
+        UserEntry(
+            id, UserFiles.label(user, address), connected = user.isNotBlank() && address.isNotBlank(),
+            emby = SourceKind.parse(settings.getString("source_kind", null)) == SourceKind.EMBY,
+        )
     }
 
     /** Users whose music shows; always includes the user in use (issue #141). */
