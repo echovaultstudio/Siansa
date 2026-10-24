@@ -3,6 +3,23 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.30.0beta — 2026-10-24
+
+### Fixed
+- **Report a problem: the keyboard covered the text boxes.** The page now ends above the keyboard, so what you type stays in view.
+- **Artist radios on Home showed a grey picture** although the artist's page had a photo. Home now gets each artist's photo the way their page does.
+- **A stopped song came back in the mini player.** An artist radio's later songs (they arrive a few seconds after it starts) were added even after you stopped the music or started something else. Now they're only added while that radio is still playing.
+- **Rearranging the nav bar (and the mini player's buttons) got stuck half-way.** A row now follows your finger past the others, and the rows it passes glide out of the way.
+
+### Added
+- **Show an Emby user's music next to your Navidrome music (and the other way round).** In Home's filter, switch on another user of any server type: their albums, artists and playlists join yours, and their songs play, download, show covers and lyrics, and count as played on their own server, with their login.
+- **Hide the user in use's music without a restart.** In Home's filter, tap the eye on the user in use while another user's music shows: their music hides at once, and their settings, history and playlists stay as they are.
+
+### Changed
+- **Beta reports you sent are closed when they're fixed**, with a note saying which version has the fix and how to update.
+- **No lyrics card under now playing when the lyrics button is on.** The button already opens the lyrics, so the cards below start with the artist. With the button off (Settings › Style › Now Playing), the lyrics card stays.
+- **What's new shows what's new in your version.** Every version's changes are a tap away, in the beta testers repository on GitHub.
+
 ## 0.29.1beta — 2026-10-24
 
 ### Fixed
