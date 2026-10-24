@@ -117,7 +117,7 @@ class MixGenerator(private val graph: AppGraph) {
         otherArtists: Set<String> = emptySet(),
     ): Mix {
         val settings = graph.settings.current
-        if (!settings.navidromeReady) throw MixException("Set up Navidrome in Settings first")
+        if (!settings.navidromeReady) throw MixException("Set up your server in Settings first")
         if (!settings.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
 
         // The moment the mix is made in, as far as the Vibes panel allows (issue #247): read once, here.
@@ -168,10 +168,10 @@ class MixGenerator(private val graph: AppGraph) {
         AppLog.i("Mix", "${selector.name}: ${pool.size} matches, ${surprise.size} from alchemy, left out ${leaveOut.size} most played, " +
             "picked ${picked.size} (${picked.count { s -> surprise.any { it.id == s.id } }} surprise, $fresh not heard lately)")
 
-        val songs = resolve(picked.map { it.id })
+        val songs = resolveHits(picked)
         AppLog.i("Mix", "Resolved ${songs.size} of ${picked.size}")
         if (songs.isEmpty()) {
-            throw MixException("Navidrome didn't recognise AudioMuse's tracks. Check both use the same library.")
+            throw MixException("Your server didn't recognise AudioMuse's tracks. Check both use the same music.")
         }
         return Mix(
             id = id,
@@ -276,7 +276,7 @@ class MixGenerator(private val graph: AppGraph) {
         val id = "$date-${kind.id}"
         if (!force) graph.mixes.get(id)?.let { return@withLock it }
         val settings = graph.settings.current
-        if (!settings.navidromeReady) throw MixException("Set up Navidrome in Settings first")
+        if (!settings.navidromeReady) throw MixException("Set up your server in Settings first")
         val taste = taste()
         val skipped = taste?.skipped.orEmpty()
         val (songs, description) = when (kind) {
@@ -483,6 +483,36 @@ class MixGenerator(private val graph: AppGraph) {
     /** Songs for AudioMuse ids, from the synced library where possible. */
     suspend fun resolveSongs(ids: List<String>): List<Song> = resolve(ids)
 
+    private var cachedIndex: Pair<Int, SongIndex>? = null
+
+    private suspend fun songIndex(): SongIndex {
+        val version = graph.library.version.value
+        cachedIndex?.takeIf { it.first == version }?.let { return it.second }
+        val index = SongIndex(graph.library.songTitles().map { SongIndex.Entry(it.id, it.title, it.artist) })
+        cachedIndex = version to index
+        return index
+    }
+
+    /**
+     * AudioMuse's tracks as songs of the connected server (issue #416). Its ids only fit the server it analysed;
+     * when the app is on another one (AudioMuse on Navidrome, the app on Emby), a track is matched by its
+     * title and artist in the synced library instead. Ids that match are used as they are.
+     */
+    private suspend fun resolveHits(hits: List<ClapHit>): List<Song> {
+        val local = graph.library.songs(hits.map { it.id }).associateBy { it.id }
+        val missing = hits.filter { it.id !in local }
+        val byName = HashMap<String, String>()
+        if (missing.isNotEmpty()) {
+            val index = songIndex()
+            byName += matchByName(missing, index)
+            if (byName.isNotEmpty()) AppLog.i("Mix", "Matched ${byName.size} of ${missing.size} tracks by title and artist")
+        }
+        val matched = graph.library.songs(byName.values.toList()).associateBy { it.id }
+        val rest = missing.filter { it.id !in byName }.map { it.id }
+        val fetched = if (rest.isEmpty()) emptyMap() else resolve(rest).associateBy { it.id }
+        return hits.mapNotNull { hit -> local[hit.id] ?: byName[hit.id]?.let { matched[it] } ?: fetched[hit.id] }.distinctBy { it.id }
+    }
+
     /**
      * Songs from the synced library where possible, otherwise fetched from Navidrome. AudioMuse knows every
      * library on the server, so when only some libraries are synced, songs outside them are left out.
@@ -569,4 +599,11 @@ fun parseSteering(element: kotlinx.serialization.json.JsonElement?, concepts: Li
         val term = o.str("term")?.trim()?.lowercase()?.let { known[it] } ?: return@mapNotNull null
         Steer(term, o.str("direction")?.lowercase() != "less")
     }.distinctBy { it.term }.take(3)
+}
+
+/** AudioMuse's tracks by their id → the id of the song with the same title and artist in the library (issue #416). */
+internal fun matchByName(hits: List<ClapHit>, index: SongIndex): Map<String, String> {
+    val out = LinkedHashMap<String, String>()
+    for (hit in hits) index.find(hit.artist, hit.title)?.let { out[hit.id] = it }
+    return out
 }
