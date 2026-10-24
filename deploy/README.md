@@ -96,6 +96,18 @@ Open `https://siansa.app` and `https://siansa.app/privacy`. Check the headers at
 [securityheaders.com](https://securityheaders.com) and the certificate at
 [ssllabs.com](https://www.ssllabs.com/ssltest/).
 
+### Beta sign-ups
+The home page has a sign-up form. `signup/server.py` checks the answers (email, install route, Android 8.0+, own
+Navidrome or Emby server reachable from the phone, 14 days for Play, feedback, privacy) and saves accepted ones to
+`/srv/siansa-signups/signups.jsonl` (no IP addresses). Read them with:
+```sh
+sudo sh scripts/signups          # table
+sudo sh scripts/signups play     # Google emails, comma separated, to paste into Play Console's tester list
+sudo sh scripts/signups fdroid
+sudo sh scripts/signups csv
+```
+Unit tests: `python3 -I signup/test_server.py`.
+
 ### 7. The demo server for Google (and testers)
 Google reviews the app before testers get it, and needs a server to log in to: without one, the review fails
 with "we couldn't access your app".

@@ -1,0 +1,30 @@
+#!/bin/sh
+# Show the beta sign-ups (newest address wins when someone signed up twice).
+#   sudo sh scripts/signups            a table
+#   sudo sh scripts/signups play       just the Google Play emails, comma separated, to paste into Play Console
+#   sudo sh scripts/signups fdroid     just the F-Droid emails
+#   sudo sh scripts/signups csv        everything as CSV
+set -eu
+FILE="${SIGNUPS_FILE:-/srv/siansa-signups/signups.jsonl}"
+[ -s "$FILE" ] || { echo "No sign-ups yet."; exit 0; }
+python3 -I - "$FILE" "${1:-table}" <<'PY'
+import csv, json, sys
+rows = {}
+for line in open(sys.argv[1]):
+    if line.strip():
+        r = json.loads(line)
+        rows[r["email"]] = r
+rows = sorted(rows.values(), key=lambda r: r["time"])
+mode = sys.argv[2]
+if mode in ("play", "fdroid"):
+    print(", ".join(r["email"] for r in rows if r["route"] == mode))
+elif mode == "csv":
+    w = csv.writer(sys.stdout)
+    w.writerow(["time", "email", "route", "server", "device"])
+    for r in rows:
+        w.writerow([r["time"], r["email"], r["route"], r["server"], r["device"]])
+else:
+    for r in rows:
+        print(f'{r["time"]}  {r["email"]:<34} {r["route"]:<7} {r["server"]:<10} {r["device"]}')
+    print(f"{len(rows)} people")
+PY

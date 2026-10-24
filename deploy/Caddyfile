@@ -36,7 +36,7 @@
 {$DOMAIN} {
 	import /etc/caddy/tls.caddy
 	import security
-	header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 
 	# The F-Droid repo: https://DOMAIN/fdroid/repo (add this address in the F-Droid app).
 	handle_path /fdroid/repo/* {
@@ -47,6 +47,14 @@
 		file_server
 	}
 	redir /fdroid /fdroid/repo/ 302
+
+	# Beta sign-up form (signup/server.py). Only this one path reaches it.
+	handle /signup {
+		request_body {
+			max_size 8KB
+		}
+		reverse_proxy signup:8080
+	}
 	redir /privacy /privacy.html 301
 
 	handle {
