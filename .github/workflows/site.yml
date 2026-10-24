@@ -39,5 +39,16 @@ jobs:
           printf '%s\n' "$FDROID_SSH_KEY" > ~/.ssh/fdroid && chmod 600 ~/.ssh/fdroid
           printf '%s\n' "$FDROID_KNOWN_HOSTS" > ~/.ssh/known_hosts
           tar czf site.tar.gz --exclude=README.md -C deploy site emails
-          ssh -i ~/.ssh/fdroid -o BatchMode=yes -o StrictHostKeyChecking=yes "siansa-deploy@$FDROID_HOST" site < site.tar.gz
+          if ! ssh -i ~/.ssh/fdroid -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
+              "siansa-deploy@$FDROID_HOST" site < site.tar.gz 2> ssh-error.txt; then
+            # Why it failed, as annotations (readable without opening the log). The host name is masked.
+            addr=$(getent ahosts "$FDROID_HOST" | awk '{print $1}' | sort -u | tr '\n' ' ')
+            echo "::error::The server's address resolves to: ${addr:-nothing}"
+            if timeout 10 bash -c "exec 3<>/dev/tcp/$FDROID_HOST/22" 2>/dev/null; then echo "::error::Port 22 is open"; else echo "::error::Port 22 can't be reached"; fi
+            echo "::error::known_hosts has $(grep -c . ~/.ssh/known_hosts) line(s)"
+            while IFS= read -r line; do echo "::error::ssh: $line"; done < <(tail -n 5 ssh-error.txt)
+            rm -f ~/.ssh/fdroid
+            exit 1
+          fi
+          cat ssh-error.txt
           rm -f ~/.ssh/fdroid
