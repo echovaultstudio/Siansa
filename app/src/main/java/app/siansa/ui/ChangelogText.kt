@@ -101,7 +101,16 @@ fun changelogSpans(text: String): List<ChangelogSpan> {
     }
 }
 
-/** The GitHub release page of a version (the repository is private, so it opens for its owner). */
-fun releaseUrl(version: String): String =
-    if (version.isBlank()) "https://github.com/echovaultstudio/siansa/releases"
-    else "https://github.com/echovaultstudio/siansa/releases/tag/v${version.trim()}"
+/**
+ * Every version's changes, in the beta testers repository (issue #435): public, unlike the app's own repository,
+ * and kept up to date by each release.
+ */
+const val FULL_CHANGELOG_URL = "https://github.com/echovaultstudio/siansa-beta-testers/blob/main/CHANGELOG.md"
+
+/** What's new shows only the newest version (issue #435): its heading and what follows, up to the next version. */
+fun latestOnly(blocks: List<ChangelogBlock>): List<ChangelogBlock> {
+    val first = blocks.indexOfFirst { it is ChangelogBlock.Version }
+    if (first < 0) return blocks
+    val next = blocks.drop(first + 1).indexOfFirst { it is ChangelogBlock.Version }
+    return if (next < 0) blocks.drop(first) else blocks.subList(first, first + 1 + next)
+}

@@ -445,6 +445,16 @@ jobs:
             for i in 1 2 3; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 5; done
           fi
 
+      # Every version's changes for testers, in the beta testers repo; the app shows only the newest (issue #435).
+      - name: Changelog to the beta testers repo
+        if: steps.version.outputs.exists != 'true'
+        continue-on-error: true
+        env:
+          BETA_REPO_TOKEN: ${{ secrets.BETA_REPO_TOKEN }}
+        run: |
+          git pull -q --rebase origin main || true
+          python3 scripts/beta_changelog.py
+
       # Beta testers issues fixed in this release get a comment with the version, and are closed (issue #433).
       - name: Tell beta testers what's fixed
         if: steps.version.outputs.exists != 'true'

@@ -95,8 +95,14 @@ class ChangelogTextTest {
         assertEquals(listOf(ChangelogSpan("Docs", true)), changelogSpans("**[Docs](https://x.y)**"))
     }
 
-    @Test fun releaseLinks() {
-        assertEquals("https://github.com/echovaultstudio/siansa/releases/tag/v0.0.29beta", releaseUrl("0.0.29beta"))
-        assertEquals("https://github.com/echovaultstudio/siansa/releases", releaseUrl(""))
+    @Test fun onlyTheNewestVersionShows() {
+        // Issue #435: What's new shows the newest version; every version is in the beta testers repo.
+        val blocks = parseChangelog("# Changelog\n\n## 0.30.0beta — 2026-10-25\n\n### Fixed\n- A\n\n## 0.29.1beta — 2026-10-24\n\n### Added\n- B\n")
+        val latest = latestOnly(blocks)
+        assertEquals(ChangelogBlock.Version("0.30.0beta", "2026-10-25"), latest.first())
+        assertEquals(1, latest.count { it is ChangelogBlock.Version })
+        assertEquals(true, latest.any { it is ChangelogBlock.Bullet && it.text == "A" })
+        assertEquals(false, latest.any { it is ChangelogBlock.Bullet && it.text == "B" })
+        assertEquals(true, FULL_CHANGELOG_URL.contains("siansa-beta-testers"))
     }
 }

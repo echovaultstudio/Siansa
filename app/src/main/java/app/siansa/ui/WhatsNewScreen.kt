@@ -21,6 +21,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,7 +56,8 @@ fun WhatsNewScreen(nav: NavController) {
     LaunchedEffect(Unit) {
         val read = withContext(Dispatchers.IO) {
             try {
-                parseChangelog(context.assets.open("CHANGELOG.md").bufferedReader().use { it.readText() })
+                // Only the newest version; every version is in the beta testers repo (issue #435).
+                latestOnly(parseChangelog(context.assets.open("CHANGELOG.md").bufferedReader().use { it.readText() }))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -67,8 +69,8 @@ fun WhatsNewScreen(nav: NavController) {
         blocks = read
     }
 
-    fun openRelease(url: String) {
-        AppLog.i("WhatsNew", "Opening a release page on GitHub")
+    fun openChangelog(url: String = FULL_CHANGELOG_URL) {
+        AppLog.i("WhatsNew", "Opening the full changelog on GitHub")
         try {
             uriHandler.openUri(url)
         } catch (e: Exception) {
@@ -81,7 +83,7 @@ fun WhatsNewScreen(nav: NavController) {
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(top = padding.calculateTopPadding() + Space.Small, bottom = Space.Section),
         ) {
-            item(key = "version") { VersionCard(version) { openRelease(releaseUrl(version)) } }
+            item(key = "version") { VersionCard(version) { openChangelog() } }
             val list = blocks
             when {
                 list == null -> item(key = "loading") {
@@ -98,7 +100,12 @@ fun WhatsNewScreen(nav: NavController) {
                     )
                 }
                 else -> itemsIndexed(list) { _, block ->
-                    ChangelogItem(block, current = version) { openRelease(releaseUrl(it)) }
+                    ChangelogItem(block, current = version) { openChangelog() }
+                }
+            }
+            if (!list.isNullOrEmpty()) item(key = "all") {
+                TextButton(onClick = { openChangelog() }, modifier = Modifier.padding(horizontal = Space.Small)) {
+                    Text("Every version's changes")
                 }
             }
         }
@@ -120,12 +127,12 @@ private fun VersionCard(version: String, onOpen: () -> Unit) {
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    "You're on this version. Tap to see it on GitHub.",
+                    "You're on this version. Tap to see every version's changes.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Icon(Icons.AutoMirrored.Rounded.OpenInNew, "Open on GitHub", tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.AutoMirrored.Rounded.OpenInNew, "Every version's changes", tint = MaterialTheme.colorScheme.primary)
         }
     }
 }
