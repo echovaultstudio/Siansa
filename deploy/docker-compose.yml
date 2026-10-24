@@ -11,6 +11,8 @@ services:
       - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./tls/${TLS_MODE:-cloudflare}.caddy:/etc/caddy/tls.caddy:ro
+      - ./certs:/etc/caddy/certs:ro
       - ${SITE_DIR}:/srv/site:ro
       # The F-Droid repo that fdroidserver builds on this server (repo/ inside it is what's served).
       - ${FDROID_DIR}/repo:/srv/fdroid/repo:ro

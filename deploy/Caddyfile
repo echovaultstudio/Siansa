@@ -1,4 +1,5 @@
-# Siansa beta server (issue #410). Caddy gets and renews the HTTPS certificates itself.
+# Siansa beta server (issue #410). HTTPS as TLS_MODE in .env says: behind Cloudflare with its Origin
+# Certificate (tls/cloudflare.caddy), or straight from Let's Encrypt (tls/auto.caddy).
 # The names come from .env: DOMAIN, DEMO_DOMAIN, ACME_EMAIL.
 {
 	email {$ACME_EMAIL}
@@ -33,6 +34,7 @@
 
 # Website, privacy policy and the F-Droid repo.
 {$DOMAIN} {
+	import /etc/caddy/tls.caddy
 	import security
 	header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
@@ -56,6 +58,7 @@
 
 # Demo Navidrome for reviewers and testers.
 {$DEMO_DOMAIN} {
+	import /etc/caddy/tls.caddy
 	import security
 	reverse_proxy navidrome-demo:4533
 }
