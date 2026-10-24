@@ -71,7 +71,7 @@ fun NavController.openSongPath(songId: String, fromNowPlaying: Boolean = false) 
 fun SongPathPicker(nav: NavController, songId: String, fromNowPlaying: Boolean = false) {
     val graph = LocalGraph.current
     val song by loadState(songId) {
-        graph.library.songs(listOf(songId)).firstOrNull() ?: graph.subsonic.song(songId)
+        graph.library.songs(listOf(songId)).firstOrNull() ?: graph.source.song(songId)
     }
     var toHere by rememberSaveable { mutableStateOf(false) }
     var length by rememberSaveable { mutableIntStateOf(20) }
@@ -80,7 +80,7 @@ fun SongPathPicker(nav: NavController, songId: String, fromNowPlaying: Boolean =
         val q = query.trim()
         if (q.length < 2) return@loadState emptyList<Song>()
         delay(250)
-        val found = if (graph.library.isSynced) graph.library.search(q).songs else graph.subsonic.search(q).songs
+        val found = if (graph.library.isSynced) graph.library.search(q).songs else graph.source.search(q).songs
         found.filter { it.id != songId }.take(40)
     }
 

@@ -2,7 +2,7 @@ package app.musix.data
 
 import android.content.Context
 import app.musix.log.AppLog
-import app.musix.net.SubsonicApi
+import app.musix.net.MusicSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.MapSerializer
@@ -50,7 +50,7 @@ fun isFresh(kept: CachedPlaylist, listed: Playlist?): Boolean =
  * while Navidrome's playlist list says it hasn't changed. Changes made in Musix still go to Navidrome first
  * ([PlaylistEditor]); then the kept copy is read again. Phone playlists ([LocalPlaylists]) don't need this.
  */
-class PlaylistCache(context: Context, private val subsonic: SubsonicApi, private val library: LibraryRepository) {
+class PlaylistCache(context: Context, private val source: MusicSource, private val library: LibraryRepository) {
     private val json = JsonFile(
         File(context.filesDir, Users.scoped("playlist-songs.json")),
         MapSerializer(String.serializer(), CachedPlaylist.serializer()),
@@ -83,7 +83,7 @@ class PlaylistCache(context: Context, private val subsonic: SubsonicApi, private
 
     /** Asks Navidrome for the playlist and keeps it; after a change made in Musix, or when it changed on Navidrome. */
     suspend fun refresh(id: String): PlaylistDetail {
-        val fresh = subsonic.playlist(id)
+        val fresh = source.playlist(id)
         json.update { it + (id to CachedPlaylist.of(fresh)) }
         AppLog.i("Playlist", "Playlist $id read from Navidrome and kept on the phone: ${fresh.songs.size} songs")
         return fresh

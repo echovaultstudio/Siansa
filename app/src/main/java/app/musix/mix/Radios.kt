@@ -91,7 +91,7 @@ class Radios(private val graph: AppGraph) {
     suspend fun artistMore(artist: Artist, already: List<Song>): List<Song> {
         AppLog.i("Radio", "Artist radio ${artist.id} ${artist.name}")
         val have = already.map { it.id }.toSet()
-        val similar = runCatching { graph.subsonic.artistRadio(artist.id, 60) }
+        val similar = runCatching { graph.source.artistRadio(artist.id, 60) }
             .onFailure { AppLog.w("Radio", "getSimilarSongs2 failed", it) }
             .getOrDefault(emptyList())
         if (similar.isNotEmpty()) return varied(local(similar), 60).filter { it.id !in have }

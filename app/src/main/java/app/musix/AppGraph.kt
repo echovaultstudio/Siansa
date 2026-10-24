@@ -54,6 +54,7 @@ import app.musix.net.NavidromeNativeApi
 import app.musix.net.OpenRouterApi
 import app.musix.net.Connection
 import app.musix.net.SubsonicApi
+import app.musix.net.MusicSource
 import app.musix.offline.Downloads
 import app.musix.offline.OfflineItem
 import app.musix.offline.OfflineKind
@@ -200,6 +201,12 @@ class AppGraph(val app: Application) {
         // Lists asked for straight from Navidrome keep to the libraries chosen for the sync (issue #206).
         chosenFolders = { settings.current.syncFolders }
     }
+
+    /**
+     * Where the music comes from (issue #113): what screens, mixes and services use, rather than one server's API.
+     * OpenSubsonic for now; other kinds of source ([SourceKind]) come in their own pull requests.
+     */
+    val source: MusicSource = subsonic
     val audioMuse = AudioMuseApi(http) { settings.current }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
     val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
@@ -239,7 +246,7 @@ class AppGraph(val app: Application) {
     /** Favourite albums, starred in Navidrome (issue #275). */
     val favouriteAlbums = FavouriteAlbums(app, subsonic, scope)
     /** Favourite artists, starred in Navidrome (issue #397). */
-    val favouriteArtists = FavouriteArtists(app, subsonic, scope)
+    val favouriteArtists = FavouriteArtists(app, source, scope)
 
     /**
      * Songs kept on the phone as they play (and the next one in the queue), so replays start at once

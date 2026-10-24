@@ -116,7 +116,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                 val isShown = user.id in shown
                 val folders by loadState("folders-${user.id}-$isShown") {
                     if (!isShown || !user.connected) emptyList()
-                    else if (inUse) graph.subsonic.musicFolders()
+                    else if (inUse) graph.source.musicFolders()
                     else graph.guests.apiOf(user.id).musicFolders()
                 }
                 val chosenIds = if (inUse) settings.syncFolders else graph.guests.settingsOf(user.id).current.syncFolders

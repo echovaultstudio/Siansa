@@ -2,7 +2,7 @@ package app.musix.data
 
 import android.content.Context
 import app.musix.log.AppLog
-import app.musix.net.SubsonicApi
+import app.musix.net.MusicSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
  */
 class FavouriteArtists(
     context: Context,
-    private val subsonic: SubsonicApi,
+    private val subsonic: MusicSource,
     private val scope: CoroutineScope,
 ) {
     private val prefs = context.getSharedPreferences(Users.scoped("favourite_artists"), Context.MODE_PRIVATE)
