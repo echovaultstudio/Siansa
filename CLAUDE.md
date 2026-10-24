@@ -34,6 +34,8 @@ implements them and opens a pull request. Labels show where each one is: `claude
 ## Pull requests
 
 - One issue per pull request; reference it with `Fixes #N`.
+- A fix for a beta tester's report also says `Fixes echovaultstudio/siansa-beta-testers#N`: GitHub closes it on merge,
+  and the release comments there with the version that has the fix (`scripts/beta_notify.py`, issue #433).
 - Describe before and after, and how it was tested.
 - Don't merge: the owner reviews, and CI (`.github/workflows/ci.yml`) must pass. Pull requests run the build,
   Lint, unit tests and secret scan; emulator tests run after merging to main.
