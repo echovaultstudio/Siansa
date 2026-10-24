@@ -56,6 +56,23 @@ class StyleLayoutTest {
         assertEquals(1, dragTarget(1, 50f, 0f, 5))
     }
 
+    @Test fun oneDragCanMoveARowPastSeveralOthers() {
+        // Beta report 9b2142f0: a row dragged from the top to the bottom in one go ends at the bottom, step by step
+        // as the list moves rows out of its way (the same steps ArrangeList's drag takes).
+        var items = listOf("home", "search", "library", "dscvr", "settings")
+        var offset = 0f
+        repeat(40) {
+            offset += 10f
+            val from = items.indexOf("home")
+            val to = dragTarget(from, offset, 100f, items.size)
+            if (to != from) {
+                items = items.moved(from, to)
+                offset -= (to - from) * 100f
+            }
+        }
+        assertEquals(listOf("search", "library", "dscvr", "settings", "home"), items)
+    }
+
     @Test fun arrangeListShowsTheBarFirstThenTheHiddenOnes() {
         val shown = listOf(MiniButton.NEXT, MiniButton.PLAY)
         assertEquals(
