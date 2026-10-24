@@ -1,4 +1,4 @@
-"""The README banner: the echo-bars icon and the Siansa wordmark with an amber final "a" (issues #360, #407)."""
+"""The README banner: the echo-bars icon and the Siansa wordmark with an amber S (issues #360, #407)."""
 import re, sys
 from playwright.sync_api import sync_playwright
 xml = open(sys.argv[1]).read()
@@ -21,7 +21,7 @@ html = f'''<html><body style="margin:0">
   background:radial-gradient(ellipse at 30% 40%,#2B2055 0%,#15102A 55%,#0B0814 100%);font-family:'Inter Display';">
   <div style="border-radius:50%;box-shadow:0 30px 80px rgba(124,92,255,.35)">{icon}</div>
   <div>
-    <div style="font-size:190px;font-weight:700;letter-spacing:-6px;line-height:1;color:#EDE7F6">Sians<span style="color:#FFB547">a</span></div>
+    <div style="font-size:190px;font-weight:700;letter-spacing:-6px;line-height:1;color:#EDE7F6"><span style="color:#FFB547">S</span>iansa</div>
     <div style="font-size:38px;font-weight:400;color:#B9AEDB;margin-top:22px;letter-spacing:.2px">Your own music server, mixed for the moment</div>
   </div>
 </div></body></html>'''
