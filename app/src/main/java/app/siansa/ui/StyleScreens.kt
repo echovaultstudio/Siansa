@@ -1,5 +1,9 @@
 package app.siansa.ui
 
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -262,15 +266,30 @@ internal fun <T> ArrangeList(
 
     Column(Modifier.fillMaxWidth().testTag("arrangeList")) {
         items.forEach { item ->
+          // Each row keeps its identity as it moves, so its drag isn't cancelled when it passes another row and
+          // the row underneath takes its place (beta report 9b2142f0: rows got stuck half-way).
+          androidx.compose.runtime.key(key(item)) {
             val lifted = item == dragging
             val isShown = item in shown
             val toggleable = if (isShown) canHide(item) else canShowMore
+            // A row pushed aside by the one being moved glides to its new place instead of jumping.
+            val index = items.indexOf(item)
+            var lastIndex by remember { mutableIntStateOf(index) }
+            val glide = remember { Animatable(0f) }
+            LaunchedEffect(index) {
+                val moved = lastIndex - index
+                lastIndex = index
+                if (moved != 0 && !lifted) {
+                    glide.snapTo(moved * pitchPx)
+                    glide.animateTo(0f, tween(150))
+                }
+            }
             Surface(
                 color = if (lifted) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerLow,
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .zIndex(if (lifted) 1f else 0f)
-                    .graphicsLayer { translationY = if (lifted) offset else 0f }
+                    .graphicsLayer { translationY = if (lifted) offset else glide.value }
                     .padding(horizontal = Space.Page, vertical = Space.Tight)
                     .then(if (lifted) Modifier.shadow(6.dp, RoundedCornerShape(12.dp)) else Modifier)
                     .fillMaxWidth()
@@ -321,6 +340,7 @@ internal fun <T> ArrangeList(
                     )
                 }
             }
+          }
         }
     }
 }
