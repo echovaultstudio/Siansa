@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Musix</title>
+<title>Siansa</title>
 <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 <style>
   :root {
@@ -61,7 +61,7 @@
     <path fill="#C9B8FF" d="M63,48a3,3 0 0,1 6,0v22a3,3 0 0,1 -6,0z"/>
     <path fill="#B9A4FF" d="M73,58a3,3 0 0,1 6,0v12a3,3 0 0,1 -6,0z"/>
   </svg>
-  <div class="logo">Musix</div>
+  <div class="logo">Siansa</div>
   <div id="splash-note">Connected. Pick a song on your phone.</div>
 </div>
 
@@ -175,7 +175,7 @@ document.addEventListener('keydown', e => {
   e.preventDefault();
 });
 
-// Original quality: musix sends an MP3 320 stream plus the original file's address in customData.
+// Original quality: siansa sends an MP3 320 stream plus the original file's address in customData.
 // The TV plays the original (FLAC and so on). If it can't, the queue reloads as MP3 and later
 // songs go straight to MP3.
 const M = cast.framework.messages;

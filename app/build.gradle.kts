@@ -12,11 +12,11 @@ val appVersion = rootProject.file("version.txt").readText().trim()
 val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 
 android {
-    namespace = "app.musix"
+    namespace = "app.siansa"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "app.musix"
+        applicationId = "app.siansa"
         minSdk = 26
         targetSdk = 35
         versionCode = buildNumber
@@ -26,10 +26,10 @@ android {
 
     // A fixed key kept in this private repo, so every new APK installs over the last one.
     signingConfigs {
-        create("musix") {
-            storeFile = file("musix.keystore")
+        create("siansa") {
+            storeFile = file("siansa.keystore")
             storePassword = "REDACTED"
-            keyAlias = "musix"
+            keyAlias = "siansa"
             keyPassword = "REDACTED"
         }
     }
@@ -41,10 +41,10 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("musix")
+            signingConfig = signingConfigs.getByName("siansa")
         }
         debug {
-            signingConfig = signingConfigs.getByName("musix")
+            signingConfig = signingConfigs.getByName("siansa")
         }
     }
 

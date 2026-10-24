@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 
 import support  # noqa: F401  (import path and the plugin.api stand-in)
-from musix_analysis import jobs, loudness, ramps
+from siansa_analysis import jobs, loudness, ramps
 
 
 def sine(seconds, peak, rate=48_000, freq=997.0, channels=2):
@@ -103,8 +103,8 @@ class RampTest(unittest.TestCase):
         self.assertEqual(dict(ramps.decode(profile["start_ramp"]))[-18], 0)
         self.assertEqual(dict(ramps.decode(profile["end_ramp"]))[-18], 0)
 
-    def test_blob_layout_is_what_musix_reads(self):
-        # Musix's RampCodec: signed int8 dB, then a little-endian uint16 count of 100 ms chunks.
+    def test_blob_layout_is_what_siansa_reads(self):
+        # Siansa's RampCodec: signed int8 dB, then a little-endian uint16 count of 100 ms chunks.
         blob = ramps.encode([(-18, 300), (6, 1)])
         import base64
         self.assertEqual(base64.b64decode(blob), bytes([0xEE, 0x2C, 0x01, 0x06, 0x01, 0x00]))

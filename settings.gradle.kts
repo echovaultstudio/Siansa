@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "musix"
+rootProject.name = "siansa"
 include(":app")
