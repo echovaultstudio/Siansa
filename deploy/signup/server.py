@@ -39,6 +39,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import email.utils
 from email.message import EmailMessage
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
@@ -464,6 +465,9 @@ def send_mail(to, subject, body):
         return False
     msg = EmailMessage()
     msg["From"], msg["To"], msg["Subject"] = cfg["SMTP_FROM"], to, subject
+    # Required by RFC 5322; mail without them is marked as spam or refused by bigger providers.
+    msg["Date"] = email.utils.formatdate(localtime=True)
+    msg["Message-ID"] = email.utils.make_msgid(domain=email.utils.parseaddr(cfg["SMTP_FROM"])[1].partition("@")[2] or None)
     msg.set_content(body)
     try:
         with smtplib.SMTP(cfg["SMTP_HOST"], int(cfg["SMTP_PORT"] or 587), timeout=20) as s:
