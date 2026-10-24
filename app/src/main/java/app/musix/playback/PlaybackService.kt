@@ -58,6 +58,8 @@ import java.io.InterruptedIOException
 import java.util.Collections
 
 private const val FALLBACK_KBPS = 320
+/** How often a server with a playback timeline (Emby) hears where the playing song is (issue #113). */
+private const val TIMELINE_MS = 30_000L
 
 
 /**
@@ -157,7 +159,7 @@ class PlaybackService : MediaSessionService() {
         // Casting: playback moves to the TV when a Cast session starts and back when it ends.
         Cast.whenReady(this) { cast ->
             if (session == null) return@whenReady
-            val remote = RemoteCastPlayer.Builder(this).setMediaItemConverter(CastItems(graph.subsonic)).build()
+            val remote = RemoteCastPlayer.Builder(this).setMediaItemConverter(CastItems(graph.source)).build()
             castPlayer = remote
             remote.setSessionAvailabilityListener(object : SessionAvailabilityListener {
                 override fun onCastSessionAvailable() {
@@ -400,7 +402,7 @@ class PlaybackService : MediaSessionService() {
             if (old?.deviceId == device.id && session.player === old) return
             // Casting to a Chromecast stops first; its music comes here instead.
             if (session.player === castPlayer) Cast.disconnect()
-            val player = DlnaPlayer(device, graph.subsonic)
+            val player = DlnaPlayer(device, graph.source)
             dlnaPlayer = player
             moveTo(player)
         } else {
@@ -469,7 +471,7 @@ class PlaybackService : MediaSessionService() {
 
     private fun playableOnPhone(item: MediaItem): MediaItem {
         if (item.localConfiguration != null) return item
-        return SongRegistry.get(item.mediaId)?.toMediaItem(graph.subsonic)
+        return SongRegistry.get(item.mediaId)?.toMediaItem(graph.source)
             ?: item.buildUpon().setUri(graph.source.streamUrl(item.mediaId)).build()
     }
 
@@ -569,6 +571,9 @@ class PlaybackService : MediaSessionService() {
             playingSince?.let { listenedMs += SystemClock.elapsedRealtime() - it }
             playingSince = null
             graph.scrobbler.finished(song, startedAtMs, listenedMs)
+            // The player has moved on by now: how long it was heard stands in for where it stopped.
+            graph.scrobbler.stopped(song, listenedMs)
+            handler.removeCallbacks(timelineTick)
             val started = startedAtMs
             val heard = listenedMs
             scope.launch { runCatching { graph.history.finish(song.id, started, heard, song.durationSec) } }
@@ -644,8 +649,19 @@ class PlaybackService : MediaSessionService() {
             if (precachedFor != id && duration > 0 && player.bufferedPosition >= duration - 1000) precacheNext(player)
         }
 
+        /** Tells a server with a playback timeline (Emby) where the song is, every [TIMELINE_MS] while it plays. */
+        private val timelineTick = object : Runnable {
+            override fun run() {
+                current?.let { graph.scrobbler.progress(it, player.currentPosition, paused = false) }
+                if (player.isPlaying) handler.postDelayed(this, TIMELINE_MS)
+            }
+        }
+
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             onIsPlayingChanged2(isPlaying)
+            current?.let { graph.scrobbler.progress(it, player.currentPosition, paused = !isPlaying) }
+            handler.removeCallbacks(timelineTick)
+            if (isPlaying) handler.postDelayed(timelineTick, TIMELINE_MS)
             val now = SystemClock.elapsedRealtime()
             if (isPlaying) {
                 if (playingSince == null) playingSince = now

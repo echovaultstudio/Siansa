@@ -19,7 +19,7 @@ import app.musix.data.Song
 enum class SourceKind(val label: String, val detail: String, val ready: Boolean) {
     OPENSUBSONIC("OpenSubsonic", "Navidrome, Gonic, Airsonic, Ampache and other Subsonic servers", ready = true),
     JELLYFIN("Jellyfin", "Coming soon", ready = false),
-    EMBY("Emby", "Coming soon", ready = false),
+    EMBY("Emby", "Emby Server", ready = true),
     LOCAL("Files on this phone", "Coming soon", ready = false),
     ;
 
@@ -32,10 +32,10 @@ enum class SourceKind(val label: String, val detail: String, val ready: Boolean)
 /**
  * What Musix needs from a music server (issue #113): its music, its playlists and favourites, and telling it
  * what was played. Screens, mixes and services use this rather than one server's API, so each kind of source
- * ([SourceKind]) only has to provide these. [SubsonicApi] is the OpenSubsonic one.
+ * ([SourceKind]) only has to provide these. [SubsonicApi] is the OpenSubsonic one, [EmbyApi] the Emby one.
  *
- * Still per source, outside this: syncing the whole library ([app.musix.data.LibrarySync]), playback addresses
- * at a chosen quality, Cast and DLNA, and other users' logins.
+ * Still OpenSubsonic only: other users' logins ([app.musix.data.Guests]) and the Navidrome-only extras
+ * (AudioMuse's plugin, Navidrome's own API for smart playlists).
  */
 interface MusicSource {
     val kind: SourceKind
@@ -58,6 +58,20 @@ interface MusicSource {
 
     /** Whether the server can find songs that sound alike by itself (OpenSubsonic sonicSimilarity). */
     suspend fun hasSonicMatch(): Boolean
+
+    // ---- Library sync ----
+
+    /** When the server last scanned its music, to skip syncs with no changes; null when it can't say. */
+    suspend fun lastScan(): String?
+
+    /** Every artist, of one library ([folderId]) or all. */
+    suspend fun artists(folderId: String? = null): List<Artist>
+
+    /** One page of every song, of one library ([folderId]) or all. */
+    suspend fun songsPage(offset: Int, size: Int, folderId: String? = null): List<Song>
+
+    /** A list of albums of one library ([folderId]), or all for null. */
+    suspend fun albums(type: String, size: Int, offset: Int, folderId: String?): List<Album>
 
     // ---- Music ----
 
@@ -108,4 +122,13 @@ interface MusicSource {
 
     /** Tells the server a song is playing ([submission] false) or was played ([submission] true). */
     suspend fun scrobble(id: String, submission: Boolean, timeMs: Long? = null)
+
+    /**
+     * Where the playing song is, for servers that follow playback as it happens (Emby's now-playing timeline):
+     * sent on play and pause, and every so often while playing. Nothing for servers without one.
+     */
+    suspend fun playbackProgress(id: String, positionMs: Long, paused: Boolean) {}
+
+    /** The song stopped being played, [positionMs] in. Nothing for servers without a timeline. */
+    suspend fun playbackStopped(id: String, positionMs: Long) {}
 }

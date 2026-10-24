@@ -206,7 +206,7 @@ class SubsonicApi(
     }
 
     /** When Navidrome last scanned the music folders (Navidrome's lastScan), to skip syncs with no changes. */
-    suspend fun lastScan(): String? {
+    override suspend fun lastScan(): String? {
         val status = call("getScanStatus").obj("scanStatus") ?: return null
         if (status.bool("scanning") == true) return "scanning"
         return status.str("lastScan")
@@ -227,7 +227,7 @@ class SubsonicApi(
         }
 
     /** type: alphabeticalByName, newest, frequent, recent, random, starred… */
-    suspend fun albums(type: String, size: Int, offset: Int, folderId: String?): List<Album> =
+    override suspend fun albums(type: String, size: Int, offset: Int, folderId: String?): List<Album> =
         call(
             "getAlbumList2",
             mapOf("type" to type, "size" to "$size", "offset" to "$offset", "musicFolderId" to folderId),
@@ -254,7 +254,7 @@ class SubsonicApi(
             if (title.isNullOrEmpty()) null else disc to title
         }.toMap()
 
-    suspend fun artists(folderId: String? = null): List<Artist> =
+    override suspend fun artists(folderId: String?): List<Artist> =
         call("getArtists", mapOf("musicFolderId" to folderId)).obj("artists")?.arr("index").orEmpty()
             .flatMap { index -> index.arr("artist").map(::parseArtist) }
 
@@ -337,7 +337,7 @@ class SubsonicApi(
     }
 
     /** One page of every song (empty search), used by library sync. */
-    suspend fun songsPage(offset: Int, size: Int, folderId: String? = null): List<Song> =
+    override suspend fun songsPage(offset: Int, size: Int, folderId: String?): List<Song> =
         call(
             "search3",
             mapOf(

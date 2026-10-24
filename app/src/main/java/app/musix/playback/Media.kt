@@ -9,7 +9,7 @@ import app.musix.data.AppJson
 import app.musix.data.AppSettings
 import app.musix.data.ReplayGainMode
 import app.musix.data.Song
-import app.musix.net.SubsonicApi
+import app.musix.net.MusicSource
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
 import kotlin.math.pow
@@ -29,7 +29,7 @@ private const val AUTO_EXTRA = "musix.auto"
  * [queued] marks a song added with "Add to queue", so the next one added goes after it (see [queueInsertIndex]).
  * [auto] marks a song AudioMuse added by itself (keep playing, a song radio), shown in the queue (issue #337).
  */
-fun Song.toMediaItem(api: SubsonicApi, queued: Boolean = false, auto: Boolean = false): MediaItem {
+fun Song.toMediaItem(api: MusicSource, queued: Boolean = false, auto: Boolean = false): MediaItem {
     val uri = Uri.parse(api.streamUrl(id))
     // The whole song travels with the item, so its details survive the trip through the media session.
     val extras = Bundle().apply {

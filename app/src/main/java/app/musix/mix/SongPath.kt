@@ -1,6 +1,7 @@
 package app.musix.mix
 
 import app.musix.AppGraph
+import app.musix.net.SourceKind
 import app.musix.data.Song
 import app.musix.log.AppLog
 import app.musix.net.PathMood
@@ -62,6 +63,8 @@ class SongPath(private val graph: AppGraph) {
                 if (steps.isEmpty()) throw MixException("Navidrome found no path between these songs")
                 songPathIds(fromId, toId, steps, length)
             }
+            // Emby has no sonic plugin (issue #113): its paths come from AudioMuse alone.
+            graph.settings.current.sourceKind != SourceKind.OPENSUBSONIC -> throw MixException("Set up AudioMuse in Settings for song paths")
             else -> throw MixException("Set up AudioMuse in Settings, or the AudioMuse-AI plugin in Navidrome, for song paths")
         }
         val songs = graph.generator.resolveSongs(ids)

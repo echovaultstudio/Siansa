@@ -30,6 +30,11 @@ data class AppSettings(
     val audioMuseToken: String = "",
     val audioMuseUser: String = "",
     val audioMusePassword: String = "",
+    /**
+     * Which of AudioMuse's media servers is this one (AudioMuse 3 can serve several: Navidrome, Emby…), by the name
+     * it has in AudioMuse; empty for AudioMuse's default server.
+     */
+    val audioMuseServer: String = "",
     val openRouterKey: String = "",
     val openRouterModel: String = DEFAULT_MODEL,
     val aiTitles: Boolean = true,
@@ -114,6 +119,13 @@ data class AppSettings(
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
 
+    /**
+     * The login AudioMuse uses to find whose play counts make "Your sound": the Navidrome one. With Emby (issue
+     * #113) none is sent, and AudioMuse reads the plays of the Emby user it's set up with.
+     */
+    val fingerprintUser: String get() = if (sourceKind == SourceKind.OPENSUBSONIC) navidromeUser else ""
+    val fingerprintPassword: String get() = if (sourceKind == SourceKind.OPENSUBSONIC) navidromePassword else ""
+
     val navidromeReady: Boolean
         get() = navidromeUrl.isNotBlank() && navidromeUser.isNotBlank() && navidromePassword.isNotBlank()
     val audioMuseReady: Boolean
@@ -196,6 +208,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         audioMuseToken = secret("am_token"),
         audioMuseUser = prefs.getString("am_user", "") ?: "",
         audioMusePassword = secret("am_pass"),
+        audioMuseServer = prefs.getString("am_server", "") ?: "",
         openRouterKey = secret("or_key"),
         openRouterModel = prefs.getString("or_model", AppSettings.DEFAULT_MODEL) ?: AppSettings.DEFAULT_MODEL,
         aiTitles = prefs.getBoolean("ai_titles", true),
@@ -275,6 +288,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             audioMuseToken = input.audioMuseToken.trim(),
             audioMuseUser = am.user ?: input.audioMuseUser.trim(),
             audioMusePassword = am.password ?: input.audioMusePassword,
+            audioMuseServer = input.audioMuseServer.trim(),
             openRouterKey = input.openRouterKey.trim(),
             openRouterModel = input.openRouterModel.trim(),
         )
@@ -293,6 +307,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putString("am_token", SecretBox.encrypt(s.audioMuseToken))
             .putString("am_user", s.audioMuseUser)
             .putString("am_pass", SecretBox.encrypt(s.audioMusePassword))
+            .putString("am_server", s.audioMuseServer)
             .putString("or_key", SecretBox.encrypt(s.openRouterKey))
             .putString("or_model", s.openRouterModel)
             .putBoolean("ai_titles", s.aiTitles)
