@@ -38,7 +38,6 @@
 	import security
 	header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 
-	# The F-Droid repo: https://DOMAIN/fdroid/repo (add this address in the F-Droid app).
 	# Only approved testers get in, each with a private link: https://DOMAIN/fdroid/t/<code>/repo
 	# Caddy asks the sign-up service (/auth) whether the code is valid, then serves the repo without the prefix.
 	handle /fdroid/t/* {
@@ -58,6 +57,16 @@
 	handle /fdroid* {
 		respond "Not found" 404
 	}
+
+	# Beta sign-up form, the approve/deny pages and the places count (signup/server.py). Only these paths reach it.
+	@signup path /signup /signup/decide /signup/count
+	handle @signup {
+		request_body {
+			max_size 8KB
+		}
+		reverse_proxy signup:8080
+	}
+
 	redir /privacy /privacy.html 301
 
 	handle {
