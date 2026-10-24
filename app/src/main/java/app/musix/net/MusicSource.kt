@@ -122,4 +122,13 @@ interface MusicSource {
 
     /** Tells the server a song is playing ([submission] false) or was played ([submission] true). */
     suspend fun scrobble(id: String, submission: Boolean, timeMs: Long? = null)
+
+    /**
+     * Where the playing song is, for servers that follow playback as it happens (Emby's now-playing timeline):
+     * sent on play and pause, and every so often while playing. Nothing for servers without one.
+     */
+    suspend fun playbackProgress(id: String, positionMs: Long, paused: Boolean) {}
+
+    /** The song stopped being played, [positionMs] in. Nothing for servers without a timeline. */
+    suspend fun playbackStopped(id: String, positionMs: Long) {}
 }

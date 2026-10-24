@@ -145,6 +145,24 @@ class EmbyApiTest {
         assertTrue(server.seen.last { it.path == "/Sessions/Playing" }.body.contains("\"ItemId\":\"s1\""))
     }
 
+    @Test fun playbackIsFollowedOnEmbysTimeline() = runBlocking {
+        val server = FakeEmby { 200 to "" }
+        val api = EmbyApi(server.client, { settings })
+        api.playbackProgress("s1", 90_000, paused = true)
+        api.playbackStopped("s1", 245_000)
+        val progress = server.seen.single { it.path == "/Sessions/Playing/Progress" }.body
+        assertTrue(progress, progress.contains("\"PositionTicks\":900000000") && progress.contains("\"IsPaused\":true") && progress.contains("\"EventName\":\"Pause\""))
+        val stopped = server.seen.single { it.path == "/Sessions/Playing/Stopped" }.body
+        assertTrue(stopped, stopped.contains("\"ItemId\":\"s1\"") && stopped.contains("\"PositionTicks\":2450000000"))
+    }
+
+    @Test fun navidromeHasNoTimeline() = runBlocking {
+        // The defaults do nothing (and ask nothing of the server).
+        val subsonic: MusicSource = SubsonicApi(OkHttpClient()) { AppSettings() }
+        subsonic.playbackProgress("s1", 1000, paused = false)
+        subsonic.playbackStopped("s1", 1000)
+    }
+
     @Test fun removingFromAPlaylistUsesItsEntryIds() = runBlocking {
         val server = FakeEmby { seen ->
             if (seen.method == "GET") 200 to """{"Items":[{"Id":"s1","PlaylistItemId":"e1"},{"Id":"s2","PlaylistItemId":"e2"},{"Id":"s3","PlaylistItemId":"e3"}]}"""
