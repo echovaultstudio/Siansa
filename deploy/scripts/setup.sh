@@ -65,6 +65,9 @@ mkdir -p "$DEMO_DIR/music" "$DEMO_DIR/data"
 chown -R 1000:1000 "$DEMO_DIR"
 
 [ -f "$HERE/.env" ] || { cp "$HERE/.env.example" "$HERE/.env"; sed -i "s#^DOMAIN=.*#DOMAIN=$DOMAIN#; s#^DEMO_DOMAIN=.*#DEMO_DOMAIN=demo.$DOMAIN#" "$HERE/.env"; }
+grep -q '^SIGNUP_SECRET=.' "$HERE/.env" || {
+	if grep -q '^SIGNUP_SECRET=' "$HERE/.env"; then sed -i "s#^SIGNUP_SECRET=.*#SIGNUP_SECRET=$(openssl rand -hex 32)#" "$HERE/.env"; else echo "SIGNUP_SECRET=$(openssl rand -hex 32)" >> "$HERE/.env"; fi
+}
 chmod 600 "$HERE/.env"
 
 cat <<EOF
