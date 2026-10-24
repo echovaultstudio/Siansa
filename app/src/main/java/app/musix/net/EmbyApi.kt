@@ -174,7 +174,7 @@ class EmbyApi(
     private fun mediaToken(): String = current()?.token.orEmpty()
 
     override fun streamUrl(id: String): String =
-        base() + "/Audio/" + enc(id) + "/stream?" + q("static" to "true", "api_key" to mediaToken())
+        base() + "/Audio/" + enc(id) + "/stream?" + q("Static" to "true", "api_key" to mediaToken())
 
     /** A cover: Musix keeps covers as item ids; Navidrome-style "al-" ids from older data are read too. */
     override fun coverUrl(id: String, size: Int?): String {
@@ -219,8 +219,10 @@ class EmbyApi(
     override suspend fun album(id: String): AlbumDetail {
         val album = call("/Users/{user}/Items/" + enc(id))
         if (album.str("Id") == null) throw ApiException("Album not found")
-        val songs = items("ParentId" to id, "IncludeItemTypes" to "Audio", "SortBy" to "ParentIndexNumber,IndexNumber,SortName")
+        // Emby can't sort by disc and track number (not among its sort fields), so they're put in order here.
+        val songs = items("ParentId" to id, "IncludeItemTypes" to "Audio", "SortBy" to "SortName")
             .map(::parseSong)
+            .sortedWith(compareBy({ it.disc ?: 1 }, { it.track ?: Int.MAX_VALUE }))
         return AlbumDetail(parseAlbum(album), songs)
     }
 
@@ -231,8 +233,11 @@ class EmbyApi(
     override suspend fun artist(id: String): ArtistDetail {
         val artist = call("/Users/{user}/Items/" + enc(id))
         if (artist.str("Id") == null) throw ApiException("Artist not found")
-        val albums = items("IncludeItemTypes" to "MusicAlbum", "AlbumArtistIds" to id, "SortBy" to "ProductionYear,SortName")
-        return ArtistDetail(parseArtist(artist), albums.map(::parseAlbum))
+        // Emby filters albums by any artist on them (ArtistIds); the artist's own albums are those with them as
+        // album artist, with the rest (appearances) only when there are none of those.
+        val albums = items("IncludeItemTypes" to "MusicAlbum", "ArtistIds" to id, "SortBy" to "ProductionYear,SortName")
+        val own = albums.filter { a -> a.arr("AlbumArtists").any { it.str("Id") == id } }
+        return ArtistDetail(parseArtist(artist), own.ifEmpty { albums }.map(::parseAlbum))
     }
 
     override suspend fun artistInfo(id: String, includeNotPresent: Boolean): ArtistInfo {
@@ -283,6 +288,7 @@ class EmbyApi(
     }
 
     override suspend fun randomSongs(size: Int, genre: String?, fromYear: Int?, toYear: Int?): List<Song> {
+        // Emby takes several years comma-separated; several genres would be "|"-separated, one is all Musix sends.
         val years = if (fromYear != null || toYear != null) {
             val from = fromYear ?: 1900
             val to = toYear ?: java.time.Year.now().value
@@ -339,7 +345,7 @@ class EmbyApi(
             .arr("Items").map(::parseSong).filter { it.id != songId }
 
     override suspend fun artistRadio(artistId: String, count: Int): List<Song> =
-        call("/Artists/InstantMix?" + q("Id" to artistId, "UserId" to "{user}", "Limit" to count, "Fields" to FIELDS))
+        call("/Items/" + enc(artistId) + "/InstantMix?" + q("UserId" to "{user}", "Limit" to count, "Fields" to FIELDS))
             .arr("Items").map(::parseSong)
 
     override suspend fun sonicSimilar(songId: String, count: Int): List<Pair<Song, Double>> = emptyList()
@@ -364,7 +370,7 @@ class EmbyApi(
 
     override suspend fun createPlaylist(name: String, songIds: List<String>): Playlist? {
         val made = call(
-            "/Playlists?" + q("Name" to name, "Ids" to songIds.joinToString(",").ifEmpty { null }, "UserId" to "{user}", "MediaType" to "Audio"),
+            "/Playlists?" + q("Name" to name, "Ids" to songIds.joinToString(",").ifEmpty { null }, "MediaType" to "Audio"),
             method = "POST",
         )
         val id = made.str("Id") ?: return null
