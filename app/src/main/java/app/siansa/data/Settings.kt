@@ -188,9 +188,26 @@ fun parseAddress(raw: String): ServerAddress {
 
 private fun decode(value: String): String = runCatching { URLDecoder.decode(value, "UTF-8") }.getOrDefault(value)
 
+/** The store for AudioMuse and OpenRouter, shared by every user and server (issue #416). */
+private const val CONNECTIONS = "connections"
+private const val SEEDED = "seeded"
+private val CONNECTION_STRINGS = listOf("am_url", "am_token", "am_user", "am_pass", "am_server", "or_key", "or_model")
+
 /** One user's settings: by default the user in use, or another user's (to show their music too). */
 class SettingsRepository(context: Context, user: Int = Users.active) {
     private val prefs = context.getSharedPreferences(UserFiles.scoped("settings", user), Context.MODE_PRIVATE)
+
+    /**
+     * AudioMuse and OpenRouter are the same for every user and every music server (issue #416): they live in one
+     * store, whatever Navidrome or Emby account is in use. The first time, they're taken from this user's own settings.
+     */
+    private val shared = context.getSharedPreferences(CONNECTIONS, Context.MODE_PRIVATE).also { store ->
+        if (!store.contains(SEEDED) && (prefs.getString("am_url", "").orEmpty().isNotBlank() || prefs.getString("or_key", "").orEmpty().isNotBlank())) {
+            val edit = store.edit().putBoolean(SEEDED, true)
+            for (key in CONNECTION_STRINGS) prefs.getString(key, null)?.let { edit.putString(key, it) }
+            edit.apply()
+        }
+    }
     private val _state = MutableStateFlow(load())
     val state: StateFlow<AppSettings> = _state.asStateFlow()
     val current: AppSettings get() = _state.value
@@ -204,13 +221,13 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         navidromePassword = secret("nd_pass"),
         proxyUser = prefs.getString("proxy_user", "") ?: "",
         proxyPassword = secret("proxy_pass"),
-        audioMuseUrl = prefs.getString("am_url", "") ?: "",
-        audioMuseToken = secret("am_token"),
-        audioMuseUser = prefs.getString("am_user", "") ?: "",
-        audioMusePassword = secret("am_pass"),
-        audioMuseServer = prefs.getString("am_server", "") ?: "",
-        openRouterKey = secret("or_key"),
-        openRouterModel = prefs.getString("or_model", AppSettings.DEFAULT_MODEL) ?: AppSettings.DEFAULT_MODEL,
+        audioMuseUrl = shared.getString("am_url", "") ?: "",
+        audioMuseToken = SecretBox.decrypt(shared.getString("am_token", "") ?: ""),
+        audioMuseUser = shared.getString("am_user", "") ?: "",
+        audioMusePassword = SecretBox.decrypt(shared.getString("am_pass", "") ?: ""),
+        audioMuseServer = shared.getString("am_server", "") ?: "",
+        openRouterKey = SecretBox.decrypt(shared.getString("or_key", "") ?: ""),
+        openRouterModel = shared.getString("or_model", AppSettings.DEFAULT_MODEL) ?: AppSettings.DEFAULT_MODEL,
         aiTitles = prefs.getBoolean("ai_titles", true),
         replayGain = runCatching { ReplayGainMode.valueOf(prefs.getString("rg", "TRACK") ?: "TRACK") }
             .getOrDefault(ReplayGainMode.TRACK),
@@ -303,13 +320,6 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putString("nd_pass", SecretBox.encrypt(s.navidromePassword))
             .putString("proxy_user", s.proxyUser)
             .putString("proxy_pass", SecretBox.encrypt(s.proxyPassword))
-            .putString("am_url", s.audioMuseUrl)
-            .putString("am_token", SecretBox.encrypt(s.audioMuseToken))
-            .putString("am_user", s.audioMuseUser)
-            .putString("am_pass", SecretBox.encrypt(s.audioMusePassword))
-            .putString("am_server", s.audioMuseServer)
-            .putString("or_key", SecretBox.encrypt(s.openRouterKey))
-            .putString("or_model", s.openRouterModel)
             .putBoolean("ai_titles", s.aiTitles)
             .putString("rg", s.replayGain.name)
             .putFloat("preamp", s.preampDb)
@@ -339,6 +349,16 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putInt("preload_wifi", s.preloadWifi)
             .putInt("preload_mobile", s.preloadMobile)
             .putInt("wind_down_songs", s.windDownSongs)
+            .apply()
+        shared.edit()
+            .putBoolean(SEEDED, true)
+            .putString("am_url", s.audioMuseUrl)
+            .putString("am_token", SecretBox.encrypt(s.audioMuseToken))
+            .putString("am_user", s.audioMuseUser)
+            .putString("am_pass", SecretBox.encrypt(s.audioMusePassword))
+            .putString("am_server", s.audioMuseServer)
+            .putString("or_key", SecretBox.encrypt(s.openRouterKey))
+            .putString("or_model", s.openRouterModel)
             .apply()
         _state.value = s
     }
