@@ -1,0 +1,11 @@
+# HTTPS behind Cloudflare's proxy (TLS_MODE=cloudflare, issue #410):
+# - the certificate is a Cloudflare Origin Certificate (SSL/TLS > Origin Server), saved as certs/origin.pem and
+#   certs/origin.key; Cloudflare's SSL mode must be "Full (strict)";
+# - only Cloudflare may connect (Authenticated Origin Pulls): anyone who finds the server's address and goes
+#   round Cloudflare is turned away, so its protection can't be skipped.
+tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key {
+	client_auth {
+		mode require_and_verify
+		trust_pool file /etc/caddy/certs/cloudflare-origin-pull-ca.pem
+	}
+}

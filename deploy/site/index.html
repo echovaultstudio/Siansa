@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Siansa</title>
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/style.css">
+<script src="/count.js" defer></script>
+</head>
+<body>
+<main>
+<h1><span class="x">S</span>iansa</h1>
+<p>A music player for your own Navidrome or Emby server, with mixes made for the moment. <span class="soon">(More servers and features added soon.)</span></p>
+
+<h2>Join the beta</h2>
+<p>Tell us a little about your setup and we'll send an invite. We only use your email for the beta
+(<a href="/privacy">privacy policy</a>).</p>
+<p id="beta-count" class="hint" aria-live="polite"></p>
+<form method="post" action="/signup">
+<p><label>Email<br><input type="email" name="email" required maxlength="254" autocomplete="email"></label>
+<span class="hint">For Google Play this must be the email of your Google account.</span></p>
+
+<fieldset><legend>How will you install Siansa?</legend>
+<label><input type="radio" name="route" value="play" required> Google Play (still in progress)</label>
+<label><input type="radio" name="route" value="fdroid"> F-Droid (quicker for now)</label></fieldset>
+
+<fieldset><legend>Does your phone run Android 8.0 or newer?</legend>
+<label><input type="radio" name="android" value="yes" required> Yes</label>
+<label><input type="radio" name="android" value="no"> No</label></fieldset>
+
+<fieldset><legend>Which server do you use?</legend>
+<label><input type="radio" name="server" value="navidrome" required> Navidrome</label>
+<label><input type="radio" name="server" value="emby"> Emby</label>
+<label><input type="radio" name="server" value="none"> I don't have one yet</label></fieldset>
+
+<fieldset><legend>Can your phone reach your server?</legend>
+<label><input type="radio" name="reach" value="yes" required> Yes (home Wi-Fi is fine)</label>
+<label><input type="radio" name="reach" value="no"> No / not sure</label></fieldset>
+
+<p><label>Phone model (optional)<br><input type="text" name="device" maxlength="80" autocomplete="off"></label></p>
+
+<p><label class="check"><input type="checkbox" name="days" value="yes"> Google Play only: I'll keep Siansa installed
+and stay in the test for 14 days in a row.</label></p>
+<p><label class="check"><input type="checkbox" name="feedback" value="yes" required> I'll tell you about problems I find.</label></p>
+<p><label class="check"><input type="checkbox" name="privacy" value="yes" required> You may keep my email for the beta and
+write to me about it.</label></p>
+<p class="trap" aria-hidden="true"><label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></p>
+<p><button type="submit">Ask for an invite</button></p>
+</form>
+
+<h2>Already invited?</h2>
+<ol>
+<li><strong>Google Play</strong>: open the invite link you were sent, tap "Become a tester", then install Siansa from Play.</li>
+<li><strong>F-Droid</strong>: in the F-Droid app, go to Settings › Repositories › +, and paste the private address in
+your welcome email. Then search for Siansa.</li>
+</ol>
+
+<p><a href="/privacy">Privacy policy</a></p>
+</main>
+</body>
+</html>
