@@ -30,7 +30,7 @@ object UserFiles {
     fun userOf(name: String): Int = SUFFIX.find(name)?.groupValues?.get(1)?.toIntOrNull() ?: FIRST
 
     /** Settings stores kept per user. */
-    val PREFS = listOf("settings", "library_pins", "artist_suggestions")
+    val PREFS = listOf("settings", "library_pins", "artist_suggestions", "emby")
 
     /** Files in the app's files folder kept per user. */
     val FILES = listOf("history.json", "mixes.json", "selectors.json", "pending_scrobbles.json")

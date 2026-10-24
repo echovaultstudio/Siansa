@@ -27,7 +27,7 @@ internal fun mergeLikedSongs(fromServer: List<Song>, likedHere: List<Song>, over
 
 class Favorites(
     private val subsonic: SubsonicApi,
-    /** The source in use (issue #113); another shown user's song still goes through [subsonic] with their login. */
+    /** The source in use (issue #113); it sends another shown user's song to their server (issue #427). */
     private val source: MusicSource,
     private val lastFm: LastFmApi,
     private val settings: SettingsRepository,
@@ -64,7 +64,7 @@ class Favorites(
             // Another shown user's song is liked with their login, in their account (issue #141).
             val login = subsonic.loginFor(song.id)
             val who = login?.let { "user ${it.navidromeUser} (their song)" } ?: "user ${settings.current.navidromeUser}"
-            val api: MusicSource = if (login != null) subsonic else source
+            val api: MusicSource = source
             val ok = runCatching { if (liked) api.star(song.id) else api.unstar(song.id) }
                 .onFailure { AppLog.w("Favorites", "Navidrome ${if (liked) "star" else "unstar"} for $who failed: ${it.message}") }
                 .isSuccess

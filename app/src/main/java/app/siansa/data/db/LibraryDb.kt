@@ -231,6 +231,10 @@ interface LibraryDao {
     @Query("UPDATE albums SET visible = 1")
     suspend fun showAllFolders()
 
+    /** The user in use's own albums (everything that isn't another user's) are hidden (issue #427). */
+    @Query("UPDATE albums SET visible = 0 WHERE id NOT IN (SELECT id FROM sources)")
+    suspend fun hideOwnAlbums()
+
     /** Only albums in [folderIds] show, and albums without a library (another user's music). */
     @Query("UPDATE albums SET visible = CASE WHEN folderId IS NULL OR folderId IN (:folderIds) THEN 1 ELSE 0 END")
     suspend fun showFolders(folderIds: List<String>)

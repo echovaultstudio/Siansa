@@ -2,6 +2,9 @@ package app.siansa.data
 
 import android.content.Context
 import app.siansa.log.AppLog
+import app.siansa.net.EmbyApi
+import app.siansa.net.EmbyLogins
+import app.siansa.net.MusicSource
 import app.siansa.net.SourceKind
 import app.siansa.net.SubsonicApi
 import kotlinx.coroutines.CancellationException
@@ -64,12 +67,6 @@ data class GuestMusic(
     }
 }
 
-/**
- * Shown next to the user in use, another user's music is read with the OpenSubsonic API, which Emby doesn't
- * have (beta report 5296551f). Until Emby users can be shown alongside, their card says this instead of an error.
- */
-const val EMBY_GUEST_NOTE = "Emby users can't be shown next to another user yet. To play their music, switch to them in Settings › Users."
-
 /** Where loading one other user's music has got to, for their card in the Sources panel. */
 data class GuestState(val running: Boolean = false, val songs: Int? = null, val error: String? = null)
 
@@ -100,16 +97,44 @@ class Guests(
     /** [user]'s settings (their login and libraries). */
     fun settingsOf(user: Int): SettingsRepository = settings.getOrPut(user) { SettingsRepository(context, user) }
 
-    /** The API with [user]'s login. */
-    fun apiOf(user: Int): SubsonicApi = SubsonicApi(http) { settingsOf(user).current }
+    private val apis = ConcurrentHashMap<Int, MusicSource>()
+
+    /**
+     * [user]'s server with their login, of the kind they set up (issue #427): Emby or OpenSubsonic. Kept per user,
+     * so an Emby login is made once; made again if they changed kind.
+     */
+    fun apiOf(user: Int): MusicSource {
+        val kind = settingsOf(user).current.sourceKind
+        apis[user]?.takeIf { it.kind == kind }?.let { return it }
+        return sourceOf(kind, user).also { apis[user] = it }
+    }
+
+    private fun sourceOf(kind: SourceKind, user: Int): MusicSource = when (kind) {
+        SourceKind.EMBY -> EmbyApi(
+            http,
+            settings = { settingsOf(user).current },
+            deviceId = { EmbyLogins.deviceId(context) },
+            recall = { EmbyLogins.recall(context, user) },
+            remember = { EmbyLogins.remember(context, it, user) },
+        )
+        else -> SubsonicApi(http) { settingsOf(user).current }
+    }
+
+    /** The other user whose song, album, artist, playlist or cover [id] is, or null for the user in use's. */
+    fun ownerOf(id: String?): Int? {
+        if (id.isNullOrEmpty() || routes.isEmpty()) return null
+        return routes[id] ?: GuestMusic.itemOfCover(id)?.let { routes[it] }
+    }
+
+    /** The source a request about [id] goes to when it's another user's music (their server, their login), else null. */
+    fun sourceFor(id: String?): MusicSource? = ownerOf(id)?.let { apiOf(it) }
 
     /**
      * The login to use for a request about [id] (a song, album, artist, playlist or cover id): another
      * user's when it's theirs, else null (the user in use's).
      */
     fun loginFor(id: String?): AppSettings? {
-        if (id.isNullOrEmpty() || routes.isEmpty()) return null
-        val user = routes[id] ?: GuestMusic.itemOfCover(id)?.let { routes[it] } ?: return null
+        val user = ownerOf(id) ?: return null
         return settingsOf(user).current
     }
 
@@ -141,7 +166,7 @@ class Guests(
         }
     }
 
-    /** Shows or hides [user]'s music. The user in use can't be hidden here (see [Users.afterHidingActive]). */
+    /** Shows or hides [user]'s music. The user in use's own music is hidden by [LibraryRepository.setOwnHidden] (issue #427). */
     fun setShown(user: Int, show: Boolean) {
         if (user == Users.active) return
         val next = if (show) _shown.value + user else _shown.value - user
@@ -197,7 +222,6 @@ class Guests(
     private suspend fun load(user: Int, force: Boolean): Int? {
         val s = settingsOf(user).current
         if (s.navidromeUrl.isBlank() || s.navidromeUser.isBlank()) throw IllegalStateException("This user isn't connected yet")
-        if (s.sourceKind == SourceKind.EMBY) throw IllegalStateException(EMBY_GUEST_NOTE)
         val api = apiOf(user)
         val all = api.musicFolders()
         val chosen = all.filter { it.id in s.syncFolders }

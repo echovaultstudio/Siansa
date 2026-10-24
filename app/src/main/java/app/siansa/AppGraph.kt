@@ -219,7 +219,11 @@ class AppGraph(val app: Application) {
      * Where the music comes from (issue #113): what screens, mixes and services use, rather than one server's API.
      * Follows the source in the settings, so picking Emby or Navidrome in setup takes effect at once.
      */
-    val source: MusicSource = ActiveSource { if (settings.current.sourceKind == SourceKind.EMBY) emby else subsonic }
+    val source: MusicSource = ActiveSource(
+        pick = { if (settings.current.sourceKind == SourceKind.EMBY) emby else subsonic },
+        // Another shown user's songs, albums and covers go to their own server, of whatever kind (issue #427).
+        route = { id -> guests.sourceFor(id) },
+    )
     val audioMuse = AudioMuseApi(http) { settings.current }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
     val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
