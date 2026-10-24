@@ -3,6 +3,16 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.29.1beta — 2026-10-24
+
+### Fixed
+- **An Emby user shown next to another said Navidrome couldn't sync.** Their card now says plainly that Emby users can't be shown next to another user yet, and how to play their music instead.
+
+### Changed
+- **No "2 users" chip on Home.** When several users' music is shown, the filter button stays lit instead.
+- **The Siansa Analysis plugin has its own public catalog.** Add its address in AudioMuse-AI (see the beta testers page) and install Siansa Analysis.
+- **Report a problem says where your log goes.** It is kept privately on the Siansa server and in a private GitHub repository, and may be read with AI tools to find the problem.
+
 ## 0.29.0beta — 2026-10-24
 
 ### Fixed
