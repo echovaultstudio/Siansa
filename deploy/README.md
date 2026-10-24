@@ -102,10 +102,15 @@ Navidrome or Emby server reachable from the phone, 14 days for Play, feedback, p
 `/srv/siansa-signups` (no IP addresses). Each new one is emailed to `NOTIFY_TO` with **Approve** and **Deny** links:
 - A link opens a page with a button; nothing happens until you press it (so mail scanners can't approve anyone).
   Links are signed and work for 14 days, once.
-- **Approve**, F-Droid: the tester gets an email with their own private address for the F-Droid repo,
-  `https://siansa.app/fdroid/t/<code>/repo` (F-Droid's "Add repository" screen can't take a user name and password,
-  so the secret is in the address). Caddy asks the sign-up service whether the code is valid before serving
-  anything (`forward_auth`); only a hash of the code is kept. The old open address `/fdroid/repo` is closed.
+- **Approve**, F-Droid: the tester gets an email with the beta's one private address,
+  `https://siansa.app/fdroid/t/<code>/repo`, and links to the beta testers GitHub repo (issues) for reports.
+  It's one address for everybody because F-Droid only accepts the address the repo's own index names; a different
+  address per person makes it treat the address as a mirror and the app list stays empty. Caddy asks the sign-up
+  service whether the code is valid before serving anything (`forward_auth`); `/fdroid/repo` is closed.
+  Make the address once, after `setup.sh`: `sudo sh scripts/repo-link` (it prints the address and writes it into
+  the F-Droid index). `sudo sh scripts/repo-link rotate` makes a new one, kills the old one at once, rebuilds the
+  index and emails everyone approved for F-Droid. Rotate when someone leaves or the address leaks; testers then
+  remove the old repo in F-Droid and add the new one.
 - **Approve**, Google Play: the tester gets a welcome email, and the page tells you to add their email to the
   closed test's tester list in Play Console (Google gives no way to do that from here).
 - **Deny** sends a short no.
@@ -122,14 +127,17 @@ sudo sh scripts/signups          # table with status (pending / approved / denie
 sudo sh scripts/signups play     # approved Google emails, comma separated, to paste into Play Console
 sudo sh scripts/signups fdroid
 sudo sh scripts/signups csv
-sudo sh scripts/signups revoke EMAIL   # take away a place and link; the next one waiting moves up
+sudo sh scripts/signups revoke EMAIL   # free a place; the next one waiting moves up (the link is shared: rotate to cut access)
+sudo sh scripts/signups approve EMAIL  # approve without email and print the address
+sudo sh scripts/repo-link rotate       # new private address, emailed to everyone approved for F-Droid
 ```
 The approval emails didn't arrive (mail settings were wrong at the time)? After fixing `.env` and `docker compose up -d`:
 `sudo docker compose exec signup python -I /app/server.py resend` sends them again for every undecided sign-up.
 
-A tester who loses their private address: `revoke` them and ask them to sign up again (they get a new one). Only
-a hash of each code is kept, so it can't be read back. The address is in Caddy's request log on the server, which
-rotates after a few megabytes; don't share those logs.
+A tester who loses the address: `sudo sh scripts/repo-link` shows it again. The address is in Caddy's request log
+on the server, which rotates after a few megabytes; don't share those logs.
+
+Your emails (new sign-up, automatic approval) end with "Beta places: N of 12 have the link, …".
 
 Unit tests: `python3 -I signup/test_server.py`. Check the Caddyfile after changing it:
 `docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile`.

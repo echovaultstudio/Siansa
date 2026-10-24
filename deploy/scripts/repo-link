@@ -1,0 +1,31 @@
+#!/bin/sh
+# The beta's one private F-Droid address (issue #410): https://DOMAIN/fdroid/t/<secret code>/repo
+# F-Droid needs the repo's own address to be the one testers add, so it's the same for everybody. The code is
+# kept in $SIGNUPS_DIR/repo_code (the sign-up service checks it) and written into the repo's index (config.yml).
+#   sudo sh scripts/repo-link            show the address (makes it the first time)
+#   sudo sh scripts/repo-link rotate     a new address: the old one stops working at once, the F-Droid index is
+#                                        rebuilt, and everyone approved for F-Droid is emailed the new one
+set -eu
+
+HERE=$(cd "$(dirname "$0")/.." && pwd)
+FDROID_DIR="${FDROID_DIR:-/srv/fdroid}"
+SIGNUPS_DIR="${SIGNUPS_DIR:-/srv/siansa-signups}"
+DOMAIN="${DOMAIN:-$(sed -n 's/^DOMAIN=//p' "$HERE/.env" 2>/dev/null | head -n 1)}"
+: "${DOMAIN:?Set DOMAIN or put it in .env}"
+FDROID_CMD="${FDROID_CMD:-sudo -u siansa-deploy fdroid update --use-date-from-apk}"
+NOTIFY_CMD="${NOTIFY_CMD:-docker compose --project-directory $HERE exec -T signup python -I /app/server.py notify-new-link}"
+CODE_FILE="$SIGNUPS_DIR/repo_code"
+mode="${1:-show}"
+
+if [ ! -s "$CODE_FILE" ] || [ "$mode" = rotate ]; then
+	code=$(openssl rand -base64 24 | tr '+/' '-_' | tr -d '=\n')
+	(umask 077; printf '%s\n' "$code" > "$CODE_FILE")
+	chown 1000:1000 "$CODE_FILE" 2>/dev/null || true
+	sed -i "s#^repo_url:.*#repo_url: https://$DOMAIN/fdroid/t/$code/repo#" "$FDROID_DIR/config.yml"
+	(cd "$FDROID_DIR" && $FDROID_CMD) >/dev/null 2>&1
+	if [ "$mode" = rotate ]; then
+		echo "New address made; the old one is dead. Emailing the testers:"
+		$NOTIFY_CMD
+	fi
+fi
+echo "https://$DOMAIN/fdroid/t/$(tr -d '\n' < "$CODE_FILE")/repo"

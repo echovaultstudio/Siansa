@@ -40,13 +40,17 @@ class CheckTest(unittest.TestCase):
 import tempfile
 
 
+CODE = "Abcdefghijklmnopqrstuvwxyz012345"
+
+
 class FlowTest(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
         server.DATA_FILE = os.path.join(self.dir, "signups.jsonl")
         server.DECISIONS_FILE = os.path.join(self.dir, "decisions.jsonl")
-        server.TESTERS_FILE = os.path.join(self.dir, "testers.json")
+        server.CODE_FILE = os.path.join(self.dir, "repo_code")
         server.LOCK_FILE = os.path.join(self.dir, "state.lock")
+        open(server.CODE_FILE, "w").write(CODE + "\n")
         server.SECRET = "s3cret"
         server.LIMIT = 2
         server._fails.clear()
@@ -68,38 +72,58 @@ class FlowTest(unittest.TestCase):
         server.SECRET = ""
         self.assertFalse(server.verify("abc", "approve", a))
 
-    def test_approve_fdroid_makes_private_link(self):
-        rec, state = self.signup(1)
-        self.assertEqual(state, "new")
-        self.assertIn("Approved", server.decide(rec, "approve"))
-        body = self.sent[0][2]
-        url = next(w for w in body.split() if w.startswith("https://siansa.app/fdroid/t/"))
-        path = url[len("https://siansa.app"):]
-        self.assertTrue(server.valid_link(path + "/entry.jar"))
-        self.assertTrue(server.valid_link(path + "/index-v1.jar?x=1"))
-        self.assertFalse(server.valid_link(path.replace("/repo", "") + "/x"))
-        self.assertFalse(server.valid_link(path[:-6] + "AAAA/repo/entry.jar"))
+    def test_only_the_current_code_opens_the_repo(self):
+        base = f"/fdroid/t/{CODE}/repo"
+        self.assertTrue(server.valid_link(base + "/entry.jar"))
+        self.assertTrue(server.valid_link(base + "/index-v1.jar?x=1"))
+        self.assertTrue(server.valid_link(base))
+        self.assertFalse(server.valid_link(base.replace("Abc", "Abd") + "/entry.jar"))
+        self.assertFalse(server.valid_link(f"/fdroid/t/{CODE}/entry.jar"))
         self.assertFalse(server.valid_link("/fdroid/repo/entry.jar"))
         self.assertFalse(server.valid_link(None))
-        self.assertNotIn(url.split("/t/")[1].split("/")[0], open(server.TESTERS_FILE).read())  # only a hash is kept
+        os.remove(server.CODE_FILE)
+        self.assertFalse(server.valid_link(base + "/entry.jar"))
+
+    def test_approve_fdroid_emails_the_shared_link_and_issues_page(self):
+        rec, state = self.signup(1)
+        self.assertEqual(state, "new")
+        line = server.decide(rec, "approve")
+        self.assertIn("Approved", line)
+        self.assertIn("1 of 2 have the link", line)
+        to, subject, body = self.sent[0]
+        self.assertEqual(to, "p1@example.com")
+        self.assertIn(f"https://siansa.app/fdroid/t/{CODE}/repo", body)
+        self.assertIn(server.ISSUES_URL, body)
+
+    def test_play_welcome_has_issues_page_too_and_no_link(self):
+        rec, _ = self.signup(1, "play")
+        self.assertIn("Play Console", server.decide(rec, "approve"))
+        body = self.sent[0][2]
+        self.assertIn(server.ISSUES_URL, body)
+        self.assertNotIn("/fdroid/t/", body)
+
+    def test_no_link_yet_means_no_email_and_a_hint(self):
+        os.remove(server.CODE_FILE)
+        rec, _ = self.signup(1)
+        self.assertIn("scripts/repo-link", server.decide(rec, "approve"))
+        self.assertEqual(self.sent, [])
+
+    def test_owner_email_has_the_places_count(self):
+        rec, _ = self.signup(1)
+        server.notify_owner(rec, wait=True)
+        self.assertIn("Beta places: 0 of 2 have the link, 1 waiting for your decision, 0 on the waiting list.", self.sent[0][2])
 
     def test_decision_happens_once(self):
         rec, _ = self.signup(1)
         self.assertIsNotNone(server.decide(rec, "deny"))
         self.assertIsNone(server.decide(rec, "approve"))
         self.assertEqual(server.status_of(rec["id"]), "denied")
-        self.assertEqual(server.load_testers(), {})
-
-    def test_play_approval_makes_no_link_and_reminds_owner(self):
-        rec, _ = self.signup(1, "play")
-        self.assertIn("Play Console", server.decide(rec, "approve"))
-        self.assertEqual(server.load_testers(), {})
 
     def test_full_beta_puts_people_on_waiting_list(self):
-        a, _ = self.signup(1); b, _ = self.signup(2)
+        self.signup(1); self.signup(2)
         c, state = self.signup(3)
         self.assertEqual(state, "waiting")
-        self.assertEqual(server.counts(), {"limit": 2, "taken": 2, "waiting": 1})
+        self.assertEqual(server.counts(), {"limit": 2, "approved": 0, "pending": 2, "taken": 2, "waiting": 1})
         self.assertEqual(server.status_of(c["id"]), "waiting")
 
     def test_free_place_approves_oldest_waiting_automatically(self):
@@ -113,11 +137,11 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(server.status_of(c["id"]), "approved")  # oldest waiting
         self.assertEqual(server.status_of(d["id"]), "waiting")
         self.assertIn("p3@example.com", [m[0] for m in self.sent])
-        self.assertTrue(any("waiting list" in m[1] for m in self.sent))  # the owner is told
-        self.assertEqual(server.counts()["taken"], 2)
+        owner = [m for m in self.sent if "waiting list" in m[1]]
+        self.assertTrue(owner and "2 of 2 have the link" in owner[0][2])
 
     def test_deny_frees_place_for_waiting(self):
-        a, _ = self.signup(1); b, _ = self.signup(2); c, _ = self.signup(3)
+        a, _ = self.signup(1); self.signup(2); c, _ = self.signup(3)
         self.assertIn("Waiting list", server.decide(a, "deny"))
         self.assertEqual(server.status_of(c["id"]), "approved")
 
@@ -142,20 +166,26 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(len(self.sent), 1)
         self.assertIn(server.link(b["id"], "approve"), self.sent[0][2])
 
-    def test_cli_approve_prints_private_address_without_email(self):
+    def test_new_link_goes_to_approved_fdroid_testers_only(self):
+        a, _ = self.signup(1, "fdroid"); b, _ = self.signup(2, "play")
+        server.decide(a, "approve"); server.decide(b, "approve"); self.sent.clear()
+        open(server.CODE_FILE, "w").write("Zyxwvutsrqponmlkjihgfedcba987654\n")
+        self.assertTrue(server.cli(["server.py", "notify-new-link"]))
+        self.assertEqual([m[0] for m in self.sent], ["p1@example.com"])
+        self.assertIn("/fdroid/t/Zyxwvutsrqponmlkjihgfedcba987654/repo", self.sent[0][2])
+        self.assertFalse(server.valid_link(f"/fdroid/t/{CODE}/repo/entry.jar"))  # the old address is dead
+
+    def test_cli_approve_prints_link_and_count_without_email(self):
         import io, contextlib
         rec, _ = self.signup(1)
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             server.cli(["server.py", "approve", "P1@example.com"])
             server.cli(["server.py", "link", "p1@example.com"])
-        urls = [l for l in out.getvalue().split() if l.startswith("https://siansa.app/fdroid/t/")]
-        self.assertEqual(len(urls), 2)
-        self.assertNotEqual(urls[0], urls[1])  # a new link replaces the old one
+        self.assertEqual(out.getvalue().count(f"https://siansa.app/fdroid/t/{CODE}/repo"), 2)
+        self.assertIn("1 of 2 have the link", out.getvalue())
         self.assertEqual(server.status_of(rec["id"]), "approved")
-        self.assertTrue(server.valid_link(urls[1][len("https://siansa.app"):] + "/index-v2.json"))
-        self.assertFalse(server.valid_link(urls[0][len("https://siansa.app"):] + "/index-v2.json"))
-        self.assertEqual(self.sent, [])  # no email involved
+        self.assertEqual(self.sent, [])
 
     def test_link_expires(self):
         rec, _ = self.signup(1)
