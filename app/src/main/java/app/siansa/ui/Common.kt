@@ -221,6 +221,8 @@ class PlayLauncher(
                 return@launch
             }
             if (firstSongs.isNotEmpty()) graph.player.play(firstSongs)
+            // The list this radio started; if another starts or playback is stopped meanwhile, its later songs are dropped.
+            val generation = graph.player.queueGeneration
             AppLog.i("Radio", "$label started with ${firstSongs.size} songs in ${System.currentTimeMillis() - started}ms")
             appScope.launch {
                 val rest = runCatching { more(firstSongs) }
@@ -228,10 +230,11 @@ class PlayLauncher(
                     .getOrDefault(emptyList())
                 AppLog.i("Radio", "$label added ${rest.size} more after ${System.currentTimeMillis() - started}ms")
                 withContext(Dispatchers.Main) {
-                    if (firstSongs.isEmpty()) {
-                        if (rest.isNotEmpty()) graph.player.play(rest)
-                    } else {
-                        graph.player.addAll(rest)
+                    when (radioMore(firstSongs.isEmpty(), rest.isEmpty(), generation, graph.player.queueGeneration)) {
+                        RadioMore.PLAY -> graph.player.play(rest)
+                        RadioMore.ADD -> graph.player.addAll(rest)
+                        RadioMore.DROP -> AppLog.i("Radio", "$label: ${rest.size} more songs dropped, something else plays now (or playback was stopped)")
+                        RadioMore.NOTHING -> Unit
                     }
                 }
             }
@@ -960,4 +963,18 @@ fun rememberAiProblem(): String? {
     val connection by graph.connection.state.collectAsStateWithLifecycle()
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     return connection.aiProblem(settings)
+}
+
+/** What a radio does with the songs that arrive after it started (beta report 95a30366). */
+internal enum class RadioMore { PLAY, ADD, DROP, NOTHING }
+
+/**
+ * A radio's later songs: played when it had none to start with, added when its list is still the one playing,
+ * and dropped when another list started or playback was stopped meanwhile ([startedAt] vs [now] generations).
+ */
+internal fun radioMore(startedEmpty: Boolean, restEmpty: Boolean, startedAt: Long, now: Long): RadioMore = when {
+    restEmpty -> RadioMore.NOTHING
+    startedAt != now -> RadioMore.DROP
+    startedEmpty -> RadioMore.PLAY
+    else -> RadioMore.ADD
 }

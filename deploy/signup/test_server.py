@@ -1,6 +1,7 @@
 import os, sys, unittest
 sys.path.insert(0, os.path.dirname(__file__))
 import server
+REAL_SEND_MAIL = server.send_mail  # other tests swap it for a fake
 
 OK = {"email": ["Max@Example.com "], "route": ["play"], "android": ["yes"], "server": ["navidrome"],
       "reach": ["yes"], "days": ["yes"], "feedback": ["yes"], "privacy": ["yes"], "device": ["Pixel 8"]}
@@ -336,6 +337,31 @@ class PrivateCopyTest(unittest.TestCase):
         def boom(*a, **k):
             raise OSError("down")
         self.assertFalse(server.store_report_privately(self.rid, 1, 0, boom))
+
+
+class MailHeadersTest(unittest.TestCase):
+    def test_date_and_message_id_are_set(self):
+        sent = []
+
+        class FakeSMTP:
+            def __init__(self, *a, **k): pass
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def starttls(self, **k): pass
+            def login(self, *a): pass
+            def send_message(self, msg): sent.append(msg)
+
+        old_smtp, old_settings = server.smtplib.SMTP, server.mail_settings
+        server.smtplib.SMTP = FakeSMTP
+        server.mail_settings = lambda: {"SMTP_HOST": "h", "SMTP_PORT": "587", "SMTP_USER": "", "SMTP_PASSWORD": "",
+                                        "SMTP_FROM": "Siansa <help@siansa.app>", "NOTIFY_TO": ""}
+        try:
+            self.assertTrue(REAL_SEND_MAIL("a@b.c", "Hi", "Body"))
+        finally:
+            server.smtplib.SMTP, server.mail_settings = old_smtp, old_settings
+        msg = sent[0]
+        self.assertTrue(msg["Date"])
+        self.assertTrue(msg["Message-ID"].endswith("@siansa.app>"))
 
 
 if __name__ == "__main__":

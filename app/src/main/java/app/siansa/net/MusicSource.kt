@@ -34,7 +34,8 @@ enum class SourceKind(val label: String, val detail: String, val ready: Boolean)
  * what was played. Screens, mixes and services use this rather than one server's API, so each kind of source
  * ([SourceKind]) only has to provide these. [SubsonicApi] is the OpenSubsonic one, [EmbyApi] the Emby one.
  *
- * Still OpenSubsonic only: other users' logins ([app.siansa.data.Guests]) and the Navidrome-only extras
+ * Other users shown next to the user in use ([app.siansa.data.Guests]) each get a source of their own kind, and
+ * [ActiveSource] sends what's theirs there (issue #427). Still OpenSubsonic only: the Navidrome-only extras
  * (AudioMuse's plugin, Navidrome's own API for smart playlists).
  */
 interface MusicSource {
