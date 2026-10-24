@@ -1,0 +1,2 @@
+# The server's own settings and passwords (issue #410)
+.env
