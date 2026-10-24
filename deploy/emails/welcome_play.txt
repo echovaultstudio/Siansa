@@ -1,0 +1,7 @@
+Subject: Welcome to the Siansa beta
+
+Hello,
+
+You're in the Siansa beta. We're adding your Google account email to the test on Google Play. You'll get a link in a separate message; open it, tap Become a tester, then install Siansa from Play. Please stay in the test for 14 days.
+
+$tail

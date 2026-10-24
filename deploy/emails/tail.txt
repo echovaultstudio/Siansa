@@ -1,0 +1,5 @@
+Setting up your servers: $beta_repo_url
+Found a problem or have an idea? Report it here: $issues_url
+(Don't post passwords or your server's address. You can also write to help@siansa.app.)
+
+Thank you for testing Siansa.

@@ -32,10 +32,12 @@ import os
 import re
 import secrets
 import smtplib
+import string
 import ssl
 import sys
 import threading
 import time
+import urllib.error
 import urllib.request
 from email.message import EmailMessage
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -59,6 +61,10 @@ REPORTS_MAX_TOTAL = 2 * 1024 * 1024 * 1024
 REPORTS_DIR = os.environ.get("REPORTS_DIR", os.path.join(DATA_DIR, "reports"))
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 BETA_REPO = os.environ.get("BETA_REPO", "echovaultstudio/siansa-beta-testers")
+# A private repository that keeps a copy of each report's log, so it can be read next to its issue (with a token
+# that can write to that repository only). Empty = logs stay on this server only.
+REPORTS_REPO = os.environ.get("REPORTS_REPO", "")
+REPORTS_TOKEN = os.environ.get("REPORTS_TOKEN", "") or os.environ.get("GITHUB_TOKEN", "")
 REPORTS_PER_HOUR = 5
 _reports = {}
 EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,255}\.[^@\s]{2,63}$")
@@ -172,13 +178,20 @@ def quote(text):
     return "\n".join("> " + line for line in text.splitlines()) or "> -"
 
 
-def issue_text(rec_id, f):
+def report_path(rec_id, now=None):
+    """Where a report's log goes in REPORTS_REPO, without the extension: reports/<yyyy-mm>/<id>."""
+    return f"reports/{time.strftime('%Y-%m', time.gmtime(time.time() if now is None else now))}/{rec_id}"
+
+
+def issue_text(rec_id, f, now=None):
     title = "Report " + rec_id + ": " + " ".join(f["happened"].split())[:70]
     body = ("**What happened**\n" + quote(f["happened"]) + "\n\n**What was expected**\n" + quote(f["expected"] or "-") +
             "\n\n| | |\n|---|---|\n| Report id | `" + rec_id + "` |\n| App | " + f["app"].replace("|", "/") +
             " |\n| Android | " + f["android"].replace("|", "/") + " |\n| Phone | " + f["device"].replace("|", "/") +
             " |\n| Server type | " + f["source"].replace("|", "/") +
-            " |\n\nThe log was sent privately to the maintainer; quote the report id if you add details.")
+            " |\n\nThe log is kept privately by the Siansa team; quote the report id if you add details." +
+            (f"\n\nLog (Siansa team only): https://github.com/{REPORTS_REPO}/blob/main/{report_path(rec_id, now)}.zip"
+             if REPORTS_REPO and REPORTS_TOKEN else ""))
     return title.replace("@", "@\u200b").replace("#", "#\u200b"), body
 
 
@@ -198,6 +211,60 @@ def open_issue(title, body):
     except Exception as e:  # the report is kept either way
         print("report issue failed:", type(e).__name__, flush=True)
         return None, None
+
+
+def github(method, path, body=None, token=None):
+    """One GitHub API call; returns the JSON answer. Raises on failure."""
+    req = urllib.request.Request(
+        "https://api.github.com/" + path, method=method,
+        data=None if body is None else json.dumps(body).encode(),
+        headers={"Authorization": "Bearer " + (token or REPORTS_TOKEN), "Accept": "application/vnd.github+json",
+                 "User-Agent": "siansa-beta", "Content-Type": "application/json", "X-GitHub-Api-Version": "2022-11-28"})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return json.load(r)
+
+
+def store_report_privately(rec_id, issue=None, now=None, call=None):
+    """Copies the report (its ZIP and details) into REPORTS_REPO as reports/<yyyy-mm>/<id>.zip and .json, in one
+    commit on main. True when stored; False when not set up or GitHub refused (the copy here stays either way)."""
+    if not (REPORTS_REPO and REPORTS_TOKEN):
+        return False
+    call = call or github
+    base = os.path.join(REPORTS_DIR, rec_id)
+    try:
+        with open(base + ".json", encoding="utf-8") as f:
+            meta = json.load(f)
+        meta["issue"] = issue
+        path = report_path(rec_id, now)
+        repo = "repos/" + REPORTS_REPO
+        with open(base + ".zip", "rb") as f:
+            zip_blob = call("POST", repo + "/git/blobs", {"content": base64.b64encode(f.read()).decode(), "encoding": "base64"})
+        json_blob = call("POST", repo + "/git/blobs", {"content": json.dumps(meta, indent=2, ensure_ascii=False) + "\n", "encoding": "utf-8"})
+        for attempt in range(3):  # another report may land at the same moment
+            head = call("GET", repo + "/git/ref/heads/main")["object"]["sha"]
+            tree = call("GET", repo + "/git/commits/" + head)["tree"]["sha"]
+            new_tree = call("POST", repo + "/git/trees", {"base_tree": tree, "tree": [
+                {"path": path + ".zip", "mode": "100644", "type": "blob", "sha": zip_blob["sha"]},
+                {"path": path + ".json", "mode": "100644", "type": "blob", "sha": json_blob["sha"]}]})
+            # The full reference links the commit to the public issue (shown only to people who can see this repo).
+            commit = call("POST", repo + "/git/commits", {"message": f"Report {rec_id}" + (f" ({BETA_REPO}#{issue})" if issue else ""),
+                                                           "tree": new_tree["sha"], "parents": [head]})
+            try:
+                call("PATCH", repo + "/git/refs/heads/main", {"sha": commit["sha"]})
+                return True
+            except urllib.error.HTTPError as e:
+                if e.code != 422 or attempt == 2:
+                    raise
+        return False
+    except Exception as e:  # never log the content; GitHub's status and message are safe and say why
+        why = type(e).__name__
+        if isinstance(e, urllib.error.HTTPError):
+            try:
+                why = f"HTTP {e.code} {json.load(e).get('message', '')}"
+            except Exception:
+                why = f"HTTP {e.code}"
+        print("report copy failed:", why, flush=True)
+        return False
 
 
 def reports_total():
@@ -431,11 +498,44 @@ def notify_owner(rec, wait=False):
     threading.Thread(target=send_mail, args=args, daemon=True).start()
 
 
+EMAILS_DIR = os.environ.get("EMAILS_DIR", "/emails")
+
+
+def template(name, default_subject, default_body, **values):
+    """(subject, body) from emails/<name>.txt: 'Subject: …', a blank line, then the message with $placeholders.
+    A missing or broken file means the built-in text, so a typo can't stop an email from going out."""
+    try:
+        with open(os.path.join(EMAILS_DIR, name + ".txt"), encoding="utf-8") as f:
+            head, _, body = f.read().partition("\n\n")
+        if not head.lower().startswith("subject:") or not body.strip():
+            raise ValueError("no subject or body")
+        values.setdefault("tail", "")
+        if "$tail" in body:
+            values["tail"] = _tail(values)
+        return string.Template(head[8:].strip()).safe_substitute(values), string.Template(body).safe_substitute(values)
+    except (OSError, ValueError):
+        return default_subject, default_body
+
+
+def _tail(values):
+    try:
+        with open(os.path.join(EMAILS_DIR, "tail.txt"), encoding="utf-8") as f:
+            return string.Template(f.read()).safe_substitute(values).rstrip("\n") + "\n"
+    except OSError:
+        return welcome_tail()
+
+
 def welcome_tail():
     return ("Setting up your servers: " + BETA_REPO_URL + "\n"
             "Found a problem or have an idea? Report it here: " + ISSUES_URL + "\n"
             "(Don't post passwords or your server's address. You can also write to help@siansa.app.)\n\n"
             "Thank you for testing Siansa.\n")
+
+
+def welcome_mail(rec):
+    values = dict(repo_url=repo_url() or "", beta_repo_url=BETA_REPO_URL, issues_url=ISSUES_URL, email=rec["email"])
+    subject = "Welcome to the Siansa beta"
+    return template("welcome_" + ("fdroid" if rec["route"] == "fdroid" else "play"), subject, welcome_text(rec), **values)
 
 
 def welcome_text(rec):
@@ -446,6 +546,11 @@ def welcome_text(rec):
     return ("Hello,\n\nYou're in the Siansa beta. We're adding your Google account email to the test on Google Play. "
             "You'll get a link in a separate message; open it, tap Become a tester, then install Siansa from Play. "
             "Please stay in the test for 14 days.\n\n" + welcome_tail())
+
+
+def new_link_mail(email=""):
+    values = dict(repo_url=repo_url() or "", beta_repo_url=BETA_REPO_URL, issues_url=ISSUES_URL, email=email)
+    return template("new_link", "The Siansa beta address has changed", new_link_text(), **values)
 
 
 def new_link_text():
@@ -463,7 +568,7 @@ def approve_effects(rec, now=None, auto=False):
     if rec["route"] == "fdroid" and not repo_url():
         line = "Approved, but there is no beta link yet, so no email was sent. Run scripts/repo-link on the server, then `signups link`."
     else:
-        sent = send_mail(rec["email"], "Welcome to the Siansa beta", welcome_text(rec))
+        sent = send_mail(rec["email"], *welcome_mail(rec))
         line = "Approved. " + ("The welcome email was sent." if sent else "The welcome email could NOT be sent: check the mail settings.")
     if rec["route"] == "play":
         line += f" Now add {rec['email']} to the closed test's tester list in Play Console."
@@ -498,7 +603,7 @@ def decide(rec, action, now=None):
             return None
         append_event(rec["id"], "approved" if action == "approve" else "denied", now)
     if action == "deny":
-        sent = send_mail(rec["email"], "Your Siansa beta request", DENY_TEXT)
+        sent = send_mail(rec["email"], *template("deny", "Your Siansa beta request", DENY_TEXT, email=rec["email"], beta_repo_url=BETA_REPO_URL, issues_url=ISSUES_URL))
         line = "Denied. " + ("A short no was emailed." if sent else "The email could not be sent.")
         promoted = promote(now)  # a place may have freed up
         return line + (f" Waiting list: {'; '.join(promoted)}" if promoted else "")
@@ -593,8 +698,9 @@ class Handler(BaseHTTPRequestHandler):
         rec_id = save_report(self.rfile, length, fields, now)
         if rec_id is None:
             return self._send(400, b'{"error":"bad log"}', ctype="application/json")
-        title, body = issue_text(rec_id, fields)
+        title, body = issue_text(rec_id, fields, now)
         number, url = open_issue(title, body)
+        threading.Thread(target=store_report_privately, args=(rec_id, number, now), daemon=True).start()
         print("report", rec_id, "issue", number, flush=True)  # no words, no address
         self._send(200, json.dumps({"id": rec_id, "issue": number, "url": url}).encode(), ctype="application/json")
 
@@ -663,7 +769,7 @@ def cli(argv):
         return True
     if len(argv) == 2 and argv[1] == "notify-new-link":
         for email in approved_fdroid_emails():
-            print(("sent   " if send_mail(email, "The Siansa beta address has changed", new_link_text()) else "FAILED ") + email)
+            print(("sent   " if send_mail(email, *new_link_mail(email)) else "FAILED ") + email)
         return True
     if len(argv) == 3 and argv[1] in ("approve", "link"):
         # For when email isn't working: approve (or just show the link for someone already approved) from the server.
