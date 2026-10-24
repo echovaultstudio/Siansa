@@ -30,9 +30,12 @@ button { font: inherit; font-weight: 600; padding: 10px 20px; border: 0; border-
 .features h3 { margin: 0 0 8px; font-size: 1.05rem; color: var(--accent); }
 .features p { margin: 0; font-size: 0.95rem; }
 
-.site-nav { max-width: 720px; margin: 0 auto; padding: 16px 16px 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
-.site-nav .brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text); text-decoration: none; }
-.site-nav nav { display: flex; flex-wrap: wrap; gap: 8px 16px; }
-.site-nav nav a { color: var(--link); text-decoration: none; font-weight: 600; }
-.site-nav nav a:hover { text-decoration: underline; }
+.site-nav { max-width: 720px; margin: 0 auto; padding: 16px 16px 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.site-nav .brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 1.05rem; color: var(--text); text-decoration: none; }
+.site-nav .brand img { display: block; border-radius: 6px; }
+.site-nav nav { display: flex; flex-wrap: wrap; gap: 8px; }
+.site-nav nav a { color: var(--text); text-decoration: none; font-weight: 600; font-size: 0.9rem; padding: 6px 14px; border-radius: 999px;
+  border: 1px solid rgba(127, 127, 127, 0.35); }
+.site-nav nav a:hover { border-color: var(--accent); color: var(--accent); }
+
 .cta { display: inline-block; font-weight: 600; padding: 10px 20px; border-radius: 999px; background: var(--accent); color: var(--bg); text-decoration: none; }
