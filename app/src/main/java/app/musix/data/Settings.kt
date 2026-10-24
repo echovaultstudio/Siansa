@@ -30,6 +30,11 @@ data class AppSettings(
     val audioMuseToken: String = "",
     val audioMuseUser: String = "",
     val audioMusePassword: String = "",
+    /**
+     * Which of AudioMuse's media servers is this one (AudioMuse 3 can serve several: Navidrome, Emby…), by the name
+     * it has in AudioMuse; empty for AudioMuse's default server.
+     */
+    val audioMuseServer: String = "",
     val openRouterKey: String = "",
     val openRouterModel: String = DEFAULT_MODEL,
     val aiTitles: Boolean = true,
@@ -203,6 +208,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         audioMuseToken = secret("am_token"),
         audioMuseUser = prefs.getString("am_user", "") ?: "",
         audioMusePassword = secret("am_pass"),
+        audioMuseServer = prefs.getString("am_server", "") ?: "",
         openRouterKey = secret("or_key"),
         openRouterModel = prefs.getString("or_model", AppSettings.DEFAULT_MODEL) ?: AppSettings.DEFAULT_MODEL,
         aiTitles = prefs.getBoolean("ai_titles", true),
@@ -282,6 +288,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             audioMuseToken = input.audioMuseToken.trim(),
             audioMuseUser = am.user ?: input.audioMuseUser.trim(),
             audioMusePassword = am.password ?: input.audioMusePassword,
+            audioMuseServer = input.audioMuseServer.trim(),
             openRouterKey = input.openRouterKey.trim(),
             openRouterModel = input.openRouterModel.trim(),
         )
@@ -300,6 +307,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putString("am_token", SecretBox.encrypt(s.audioMuseToken))
             .putString("am_user", s.audioMuseUser)
             .putString("am_pass", SecretBox.encrypt(s.audioMusePassword))
+            .putString("am_server", s.audioMuseServer)
             .putString("or_key", SecretBox.encrypt(s.openRouterKey))
             .putString("or_model", s.openRouterModel)
             .putBoolean("ai_titles", s.aiTitles)

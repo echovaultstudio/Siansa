@@ -15,6 +15,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -82,7 +83,7 @@ class AudioMuseApi(
     private suspend fun request(path: String): Request.Builder {
         val s = settings()
         if (s.audioMuseUrl.isBlank()) throw ApiException("AudioMuse isn't set up yet")
-        val builder = Request.Builder().url(s.audioMuseUrl + path)
+        val builder = Request.Builder().url(serverInUrl(s.audioMuseUrl + path, s.audioMuseServer))
         when {
             s.audioMuseToken.isNotBlank() -> builder.header("Authorization", "Bearer ${s.audioMuseToken}")
             s.audioMuseUser.isNotBlank() -> builder.header("Cookie", "audiomuse_jwt=${login(s, force = false)}")
@@ -183,7 +184,7 @@ class AudioMuseApi(
                 })
             }
         }.toString()
-        val root = execute { request("/api/clap/search").post(payload.toRequestBody(JSON_TYPE)).build() }
+        val root = execute { request("/api/clap/search").post(serverInBody(payload, settings().audioMuseServer).toRequestBody(JSON_TYPE)).build() }
         val hits = root.arr("results").mapNotNull { r ->
             val id = r.str("item_id") ?: return@mapNotNull null
             ClapHit(
@@ -245,7 +246,7 @@ class AudioMuseApi(
             })
             count?.let { put("n", it) }
         }.toString()
-        val root = execute { request("/api/alchemy").post(payload.toRequestBody(JSON_TYPE)).build() }
+        val root = execute { request("/api/alchemy").post(serverInBody(payload, settings().audioMuseServer).toRequestBody(JSON_TYPE)).build() }
         return neighbours(root["results"] ?: JsonArray(emptyList()))
     }
 
@@ -271,7 +272,7 @@ class AudioMuseApi(
             if (navidromeUser.isNotBlank()) put("navidrome_user", navidromeUser)
             if (navidromePassword.isNotBlank()) put("navidrome_password", navidromePassword)
         }.toString()
-        val root = executeElement { request("/api/sonic_fingerprint/generate").post(payload.toRequestBody(JSON_TYPE)).build() }
+        val root = executeElement { request("/api/sonic_fingerprint/generate").post(serverInBody(payload, settings().audioMuseServer).toRequestBody(JSON_TYPE)).build() }
         val rows = (root as? JsonArray) ?: JsonArray(emptyList())
         return rows.mapNotNull { element ->
             val r = element as? JsonObject ?: return@mapNotNull null
@@ -421,4 +422,22 @@ class AudioMuseApi(
             }
         }
     }
+}
+
+/**
+ * AudioMuse 3 serves several media servers; each request names which one with `server` (its name in AudioMuse),
+ * in the address and, for JSON requests, in the body too, so ids come back as that server's. Nothing is added
+ * for AudioMuse's default server ([server] empty).
+ */
+internal fun serverInUrl(url: String, server: String): String {
+    if (server.isBlank()) return url
+    val parsed = url.toHttpUrlOrNull() ?: return url
+    return parsed.newBuilder().setQueryParameter("server", server).build().toString()
+}
+
+/** [payload] (a JSON object) with `server` set, for AudioMuse's [server]; unchanged when empty or not an object. */
+internal fun serverInBody(payload: String, server: String): String {
+    if (server.isBlank()) return payload
+    val obj = runCatching { AppJson.parseToJsonElement(payload) as? JsonObject }.getOrNull() ?: return payload
+    return JsonObject(obj + ("server" to JsonPrimitive(server))).toString()
 }
