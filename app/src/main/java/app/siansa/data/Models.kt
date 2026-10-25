@@ -39,6 +39,8 @@ data class Song(
     val artists: List<ArtistRef> = emptyList(),
     /** The file's type as Navidrome names it ("flac", "wma"…), when it sent one; not kept in the library. */
     val suffix: String? = null,
+    /** How many sound channels the file has (OpenSubsonic "channelCount"), when the server says: 6 for 5.1, 8 for 7.1. */
+    val channels: Int? = null,
 )
 
 /** The song's cover, or its album's when Navidrome didn't send one with the song. */

@@ -518,13 +518,15 @@ class LibraryRepository(context: Context) {
 
     private fun SongEntity.toSong() = Song(
         id, title, artist, artistId, album, albumId, coverArt, durationSec, track, disc, year, genre,
-        trackGain, albumGain, trackPeak, albumPeak, starred,
+        trackGain, albumGain, trackPeak, albumPeak, starred, suffix = suffix, channels = channels,
     )
 
     private fun Song.toEntity() = SongEntity(
         id, title, artist, artistId, album, albumId, coverArt, durationSec, track, disc, year, genre,
         trackGain, albumGain, trackPeak, albumPeak, starred,
         searchKey = normalizeKey("$title $artist $album"),
+        suffix = suffix,
+        channels = channels,
     )
 
     private fun AlbumEntity.toAlbum() = Album(
@@ -555,6 +557,8 @@ class LibraryRepository(context: Context) {
         /** Which libraries the phone keeps: every one, as "all:<ids>" (issue #376). */
         const val META_SCOPE = "scope"
         const val META_FOLDER_NAMES = "folderNames"
+        /** Set once a full sync has stored every song's file type and channels (library version 5). */
+        const val META_SONG_FORMATS = "songFormats"
         private const val GUEST_POSITION = 1_000_000
 
         /** What decides whether an album's songs need fetching again. Play counts are left out on purpose. */

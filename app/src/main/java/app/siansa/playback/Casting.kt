@@ -124,10 +124,11 @@ object Cast {
 
 /**
  * Turns queue songs into what the TV plays and back. The TV fetches each song from Navidrome
- * itself, converted to MP3 so any Cast device can play it, with the cover at TV size.
+ * itself, converted to MP3 so any Cast device can play it (surround files as they are, when that's on),
+ * with the cover at TV size.
  */
 @OptIn(UnstableApi::class)
-class CastItems(private val api: MusicSource) : MediaItemConverter {
+class CastItems(private val api: MusicSource, private val keepSurround: () -> Boolean = { false }) : MediaItemConverter {
     override fun toMediaQueueItem(mediaItem: MediaItem): MediaQueueItem {
         val song = mediaItem.toSong()
         val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
@@ -137,9 +138,11 @@ class CastItems(private val api: MusicSource) : MediaItemConverter {
             song.track?.let { putInt(MediaMetadata.KEY_TRACK_NUMBER, it) }
             song.cover?.let { addImage(WebImage(Uri.parse(api.coverUrl(it, TV_COVER)))) }
         }
+        val stream = Streaming.castStream(Uri.parse(api.streamUrl(mediaItem.mediaId)), song, keepSurround())
+        if (stream.untouched) AppLog.i("Cast", "Song ${mediaItem.mediaId}: ${song.channels} channels, cast as it is (${stream.mime})")
         val info = MediaInfo.Builder(mediaItem.mediaId)
-            .setContentUrl(Streaming.forCast(Uri.parse(api.streamUrl(mediaItem.mediaId))).toString())
-            .setContentType(Streaming.CAST_MIME)
+            .setContentUrl(stream.uri.toString())
+            .setContentType(stream.mime)
             .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
             .setMetadata(metadata)
             .apply { if (song.durationSec > 0) setStreamDuration(song.durationSec * 1000L) }

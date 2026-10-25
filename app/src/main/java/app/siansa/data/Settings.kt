@@ -44,6 +44,8 @@ data class AppSettings(
     /** Image cache limit in MB; 0 = no limit. */
     val imageCacheMb: Int = 500,
     val animatedCovers: Boolean = true,
+    /** Cast surround files (Dolby Atmos, 5.1) as they are instead of as stereo MP3, for TVs and soundbars that play them. */
+    val castSurround: Boolean = false,
     /** Download every album, artist and playlist cover in the background. */
     val coverDownload: Boolean = false,
     /** ...on any Wi-Fi, rather than only on the same local network as Navidrome. */
@@ -236,6 +238,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         syncFolders = prefs.getStringSet("sync_folders", emptySet())?.toSet() ?: emptySet(),
         imageCacheMb = prefs.getInt("image_cache_mb", 500),
         animatedCovers = prefs.getBoolean("animated_covers", true),
+        castSurround = prefs.getBoolean("cast_surround", false),
         coverDownload = prefs.getBoolean("cover_download", false),
         coverDownloadAnyWifi = prefs.getBoolean("cover_download_any_wifi", false),
         coverDownloadWifiOnly = prefs.getBoolean("cover_download_wifi_only", true),
@@ -395,6 +398,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setAnimatedCovers(on: Boolean) {
         prefs.edit().putBoolean("animated_covers", on).apply()
         _state.value = _state.value.copy(animatedCovers = on)
+    }
+
+    fun setCastSurround(on: Boolean) {
+        prefs.edit().putBoolean("cast_surround", on).apply()
+        _state.value = _state.value.copy(castSurround = on)
     }
 
     fun setLogging(on: Boolean) {

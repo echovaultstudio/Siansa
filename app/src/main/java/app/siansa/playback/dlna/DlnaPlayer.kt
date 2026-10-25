@@ -35,7 +35,7 @@ import kotlinx.coroutines.sync.withLock
  * the next one is sent.
  */
 @OptIn(UnstableApi::class)
-class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) : SimpleBasePlayer(Looper.getMainLooper()) {
+class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource, private val keepSurround: () -> Boolean = { false }) : SimpleBasePlayer(Looper.getMainLooper()) {
     /** The TV or speaker's name, for the log and the screen. */
     val name: String get() = device.name
     val deviceId: String get() = device.id
@@ -286,9 +286,11 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
         playingSince = 0
         state = Player.STATE_BUFFERING
         val song = item.toSong()
-        val url = Streaming.forCast(Uri.parse(api.streamUrl(item.mediaId))).toString()
+        val stream = Streaming.castStream(Uri.parse(api.streamUrl(item.mediaId)), song, keepSurround())
+        val url = stream.uri.toString()
+        if (stream.untouched) AppLog.i("DLNA", "Song ${item.mediaId}: ${song.channels} channels, sent as it is (${stream.mime})")
         val cover = song.cover?.let { api.coverUrl(it, COVER_PX) }
-        val metadata = Upnp.didl(item.mediaId, song.title, song.artist, song.album, url, Streaming.CAST_MIME, song.durationSec, cover)
+        val metadata = Upnp.didl(item.mediaId, song.title, song.artist, song.album, url, stream.mime, song.durationSec, cover)
         AppLog.i("DLNA", "Song ${item.mediaId} on ${device.name}" + if (startAt > 0) " from ${startAt / 1000}s" else "")
         send("Load") {
             // Some devices refuse a new song while one plays.

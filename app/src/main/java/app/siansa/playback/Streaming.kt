@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
 import app.siansa.data.AppSettings
+import app.siansa.data.Song
 
 /**
  * Chooses original quality or Opus for each stream, at the moment it starts playing, from the
@@ -94,6 +95,32 @@ object Streaming {
 
     const val CAST_KBPS = 320
     const val CAST_MIME = "audio/mpeg"
+
+    /** A song's stream for a TV or speaker, and its type. */
+    data class CastStream(val uri: Uri, val mime: String, val untouched: Boolean)
+
+    /**
+     * What a TV or speaker plays: MP3 320 (see [forCast]), or with [keepSurround] a file with more than two
+     * channels (Dolby Atmos, 5.1) as it is, so its surround sound reaches a soundbar that can play it.
+     */
+    fun castStream(original: Uri, song: Song, keepSurround: Boolean): CastStream =
+        untouchedMime(song, keepSurround)?.let { CastStream(original, it, untouched = true) }
+            ?: CastStream(forCast(original), CAST_MIME, untouched = false)
+
+    /** The type to send [song] as when it goes as it is (surround, [keepSurround] on, a known file type), else null. */
+    fun untouchedMime(song: Song, keepSurround: Boolean): String? =
+        if (keepSurround && (song.channels ?: 0) > 2) surroundMime(song.suffix) else null
+
+    /** The MIME type of a file type that carries surround sound, or null when Siansa doesn't know it. */
+    fun surroundMime(suffix: String?): String? = when (suffix?.trim()?.lowercase()?.removePrefix(".")) {
+        "m4a", "mp4", "m4b" -> "audio/mp4"
+        "eac3", "ec3" -> "audio/eac3"
+        "ac3" -> "audio/ac3"
+        "flac" -> "audio/flac"
+        "mka", "mkv" -> "audio/x-matroska"
+        "wav" -> "audio/wav"
+        else -> null
+    }
 
     private fun convert(uri: Uri, format: String, kbps: Int, estimateLength: Boolean): Uri {
         if (kbps <= 0 || uri.path?.endsWith("/rest/stream") != true) return uri
