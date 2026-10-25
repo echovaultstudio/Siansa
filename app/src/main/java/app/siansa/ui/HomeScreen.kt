@@ -89,6 +89,13 @@ fun HomeScreen(nav: NavController) {
     val resumePoints by graph.mixResume.points.collectAsStateWithLifecycle()
     val recentPlays by graph.recentPlays.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { graph.recentPlays.all() }
+    // Albums played from libraries or users the source filter now hides drop out of the shortcuts (beta #17).
+    val shownUsers by graph.guests.shown.collectAsStateWithLifecycle()
+    val ownHidden by graph.library.ownHidden.collectAsStateWithLifecycle()
+    val libraryVersion by graph.library.version.collectAsStateWithLifecycle()
+    val shownRecentAlbums by produceState<Set<String>?>(null, recentPlays, shownUsers, ownHidden, libraryVersion) {
+        value = graph.library.shownAlbums(recentPlays.orEmpty().mapNotNull { recentAlbumId(it.route) })
+    }
     val customCards by graph.cards.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { graph.cards.all() }
     val selectors by graph.selectors.state.collectAsStateWithLifecycle()
@@ -256,7 +263,8 @@ fun HomeScreen(nav: NavController) {
                             playlists.valueOrNull().orEmpty().take(2).forEach { p -> add(RecentPlay("playlist/${p.id}", p.name, p.coverArt)) }
                             recentAlbums.valueOrNull().orEmpty().take(8).forEach { a -> add(RecentPlay("album/${a.id}", a.name, a.coverArt)) }
                         }
-                        val played = recentPlays.orEmpty().filter { !it.route.startsWith("mix/") || it.route.removePrefix("mix/") in mixIds }
+                        val played = shownRecents(recentPlays.orEmpty(), shownRecentAlbums)
+                            .filter { !it.route.startsWith("mix/") || it.route.removePrefix("mix/") in mixIds }
                         val quick = buildList<Triple<String, String?, () -> Unit>> {
                             add(Triple("Liked songs", null) { nav.navigate("liked") })
                             quickShortcuts(played, fill, QUICK_COUNT - 1).forEach { r -> add(Triple(r.title, r.cover) { nav.navigate(r.route) }) }
@@ -465,7 +473,10 @@ internal suspend fun recentlyPlayedAlbums(graph: AppGraph, limit: Int = 15): Lis
     val heard = graph.library.songs(graph.history.recent(if (limit > 15) 2000 else 300).map { it.id }.distinct())
     // With "Only downloaded music" on, only songs on the phone count.
     val songs = graph.library.onlyDownloaded()?.songs(heard) ?: heard
-    val albumIds = songs.mapNotNull { it.albumId }.distinct().take(limit)
+    val heardAlbums = songs.mapNotNull { it.albumId }.distinct()
+    // Only albums the source filter shows (beta #17): not a hidden library's or a hidden user's.
+    val shown = graph.library.shownAlbums(heardAlbums)
+    val albumIds = heardAlbums.filter { shown == null || it in shown }.take(limit)
     return albumIds.mapNotNull { graph.library.album(it) }.distinctBy { it.id }
 }
 
@@ -473,7 +484,10 @@ internal suspend fun recentlyPlayedArtists(graph: AppGraph, limit: Int = 10): Li
     if (!graph.library.isSynced) return emptyList()
     // The last few hundred plays first; when they're all a few artists (a long mix), further back (issue #377).
     for (plays in listOf(300, 2000)) {
-        val heard = graph.library.songs(graph.history.recent(plays).map { it.id }.distinct())
+        val played = graph.library.songs(graph.history.recent(plays).map { it.id }.distinct())
+        // Only songs on albums the source filter shows (beta #17).
+        val shown = graph.library.shownAlbums(played.mapNotNull { it.albumId })
+        val heard = played.filter { s -> shown == null || s.albumId == null || s.albumId in shown }
         val songs = graph.library.onlyDownloaded()?.songs(heard) ?: heard
         val artists = songs.distinctBy { it.artistId ?: it.artist }.take(limit).mapNotNull { s ->
             s.artistId?.let { graph.library.artist(it) } ?: graph.library.artistByName(s.artist)
@@ -729,5 +743,13 @@ internal const val QUICK_COUNT = 8
  * The shortcuts after Liked songs: what was played last first, then [fill] (today's mixes, playlists, recent
  * albums) until there are [count], each page once. Liked songs is never among them: it always comes first.
  */
+/** The album a shortcut opens ("album/123"), or null for any other page. */
+internal fun recentAlbumId(route: String): String? =
+    route.takeIf { it.startsWith("album/") }?.removePrefix("album/")?.substringBefore('?')?.takeIf { it.isNotBlank() }
+
+/** Shortcuts without albums the source filter hides; [shownAlbums] null (not synced yet) keeps them all. */
+internal fun shownRecents(played: List<RecentPlay>, shownAlbums: Set<String>?): List<RecentPlay> =
+    if (shownAlbums == null) played else played.filter { r -> recentAlbumId(r.route)?.let { it in shownAlbums } ?: true }
+
 internal fun quickShortcuts(played: List<RecentPlay>, fill: List<RecentPlay>, count: Int): List<RecentPlay> =
     (played + fill).filter { it.route != "liked" }.distinctBy { it.route }.take(count)
