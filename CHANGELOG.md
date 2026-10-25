@@ -3,6 +3,11 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.30.5beta — 2026-10-25
+
+### Fixed
+- **Siansa closed straight away after updating to 0.30.4beta.** The change that made Dolby (E-AC3) songs gapless stopped the player from starting, so it's taken out again until it's fixed properly.
+
 ## 0.30.4beta — 2026-10-25
 
 ### Fixed
