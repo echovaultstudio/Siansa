@@ -422,7 +422,13 @@ class PlaybackService : MediaSessionService() {
         val from = session.player
         if (from === target) return
         val toCast = target !== phone
-        val spot = if (from === castPlayer) spotFromTv(from) else spotOf(from)
+        val spot = when {
+            from === castPlayer -> spotFromTv(from)
+            // Hold to stop on a DLNA TV or speaker (issue #491): its queue was cleared, nothing comes back.
+            from === dlnaPlayer && !toCast && StopCasting.requested -> { StopCasting.requested = false; CastSpot(emptyList(), 0, 0L) }
+            else -> spotOf(from)
+        }
+        if (toCast) StopCasting.requested = false
         castSaved = null
         val (items, index, position) = spot
         val play = toCast && from.playWhenReady
@@ -464,7 +470,10 @@ class PlaybackService : MediaSessionService() {
      */
     private fun spotFromTv(tv: Player): CastSpot<MediaItem> {
         val live = spotOf(tv)
-        val picked = CastHandBack.pick(live, castSaved) { it.mediaId }
+        val stopped = StopCasting.requested
+        StopCasting.requested = false
+        val picked = CastHandBack.afterEnd(live, castSaved, stopped) { it.mediaId }
+        if (stopped) AppLog.i("Cast", "Stopped with hold to stop: nothing comes back to the phone")
         if (picked !== live) AppLog.w("Cast", "The TV forgot the queue while stopping; using the one saved as casting ended")
         val spot = CastHandBack.withoutNameless(picked) { it.mediaId }
         return spot.copy(items = spot.items.map(::playableOnPhone))

@@ -173,6 +173,11 @@ class CastItems(private val api: MusicSource) : MediaItemConverter {
 /** The queue, song and position on the TV, in play order. */
 data class CastSpot<T>(val items: List<T>, val index: Int, val positionMs: Long)
 
+/** Hold to stop while casting (issue #491): set by the app, read once by the playback service as casting ends. */
+object StopCasting {
+    @Volatile var requested: Boolean = false
+}
+
 /** Bringing the music back from the TV to the phone. */
 object CastHandBack {
     /**
@@ -183,6 +188,13 @@ object CastHandBack {
         val lost = live.items.isEmpty() || live.items.any { id(it).isBlank() }
         return if (lost && saved != null && saved.items.isNotEmpty()) saved else live
     }
+
+    /**
+     * What comes back to the phone: nothing after hold to stop ([stopped], issue #491), so the cleared queue stays
+     * cleared even when the TV still listed it as casting ended; otherwise [pick].
+     */
+    fun <T> afterEnd(live: CastSpot<T>, saved: CastSpot<T>?, stopped: Boolean, id: (T) -> String): CastSpot<T> =
+        if (stopped) CastSpot(emptyList(), 0, 0L) else pick(live, saved, id)
 
     /** Leaves out songs with no id, which the phone couldn't play, keeping the same song current. */
     fun <T> withoutNameless(spot: CastSpot<T>, id: (T) -> String): CastSpot<T> {
