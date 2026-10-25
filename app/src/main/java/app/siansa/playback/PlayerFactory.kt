@@ -53,9 +53,13 @@ object PlayerFactory {
 
         // Start playing after one second of audio, for a snappy start. After running dry mid-song, wait for
         // five seconds' worth so a slow connection gives fewer, longer stretches instead of constant stops.
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(15_000, 60_000, 1_000, 5_000)
-            .build()
+        val stretched = StretchedSong()
+        val loadControl = StretchedLoadControl(
+            DefaultLoadControl.Builder()
+                .setBufferDurationsMs(15_000, 60_000, 1_000, 5_000)
+                .build(),
+            stretched::now,
+        )
 
         // FFmpeg's decoders first (FLAC, ALAC, MP3, AAC...); the phone's own for the rest (Opus).
         // media3 splits FLAC into frames by searching for headers without checking the frame number,
@@ -89,6 +93,7 @@ object PlayerFactory {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
+        stretched.follow(player)
         return Built(player, cacheFactory)
     }
 }
