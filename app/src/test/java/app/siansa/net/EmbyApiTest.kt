@@ -257,4 +257,22 @@ class EmbyApiTest {
         assertEquals(start["PlaySessionId"], progress["PlaySessionId"])
         assertTrue(start["PlaySessionId"] != next["PlaySessionId"])
     }
+
+    @Test fun aPlayIsMarkedWithTheDateEmbyReads() = runBlocking {
+        // Beta #15: "DatePlayed=2026-10-25T06:41:34Z" made Emby answer HTTP 500, so plays never reached it.
+        assertEquals("20261025064134", embyDate(java.time.Instant.parse("2026-10-25T06:41:34Z").toEpochMilli()))
+        val server = FakeEmby { 200 to "{}" }
+        EmbyApi(server.client, { settings }).scrobble("s1", submission = true, timeMs = java.time.Instant.parse("2026-10-25T06:41:34Z").toEpochMilli())
+        val played = server.seen.last()
+        assertEquals("/Users/u1/PlayedItems/s1", played.path)
+        assertEquals("20261025064134", played.query["DatePlayed"])
+    }
+
+    @Test fun aRefusedDateStillCountsThePlay() = runBlocking {
+        val server = FakeEmby { seen -> if (seen.query.containsKey("DatePlayed")) 500 to "" else 200 to "{}" }
+        EmbyApi(server.client, { settings }).scrobble("s1", submission = true, timeMs = 0L)
+        val played = server.seen.last()
+        assertEquals("/Users/u1/PlayedItems/s1", played.path)
+        assertTrue(played.query.isEmpty())
+    }
 }

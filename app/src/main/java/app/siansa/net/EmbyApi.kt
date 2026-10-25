@@ -429,8 +429,15 @@ class EmbyApi(
 
     override suspend fun scrobble(id: String, submission: Boolean, timeMs: Long?) {
         if (submission) {
-            val at = Instant.ofEpochMilli(timeMs ?: System.currentTimeMillis()).toString()
-            call("/Users/{user}/PlayedItems/" + enc(id) + "?" + q("DatePlayed" to at), method = "POST")
+            // Emby reads DatePlayed as yyyyMMddHHmmss (UTC); an ISO date made it answer HTTP 500 (beta #15).
+            val at = embyDate(timeMs ?: System.currentTimeMillis())
+            try {
+                call("/Users/{user}/PlayedItems/" + enc(id) + "?" + q("DatePlayed" to at), method = "POST")
+            } catch (e: ApiException) {
+                // A server that won't take the date still counts the play, as of now.
+                AppLog.w("Server", "Emby refused the play's date ($at); marking it played without it")
+                call("/Users/{user}/PlayedItems/" + enc(id), method = "POST")
+            }
         } else {
             call("/Sessions/Playing", method = "POST", body = timeline(id, 0, paused = false, event = null))
         }
@@ -585,3 +592,7 @@ class EmbyApi(
         }
     }
 }
+
+/** A time as Emby's DatePlayed wants it: yyyyMMddHHmmss in UTC. */
+internal fun embyDate(ms: Long): String =
+    java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(java.time.ZoneOffset.UTC).format(Instant.ofEpochMilli(ms))
