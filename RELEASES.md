@@ -3,6 +3,11 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.30.2beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.30.2beta) — 2026-10-25
+
+- [#451](https://github.com/echovaultstudio/Siansa/pull/451) Log: hide Emby's login token (@Th3K1ngP1n)
+- [#452](https://github.com/echovaultstudio/Siansa/pull/452) Emby now playing: media source and play session; log Emby's reason (@Th3K1ngP1n)
+
 ## [0.30.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.30.1beta) — 2026-10-25
 
 - [#445](https://github.com/echovaultstudio/Siansa/pull/445) Website: beta notice, beta testers link, check your spam folder (@Th3K1ngP1n)
