@@ -211,9 +211,10 @@ class Guests(
 
     /**
      * For each user of the same kind at another address: whether it's the same server reached another way (kids on
-     * music.example.com, max on 192.168.1.10). A server gives a song the same id for every user, so it is when their
-     * songs are in the user in use's library by id, or the user in use's songs are on their server. Both ways, since
-     * one user may see only part of the music (kids only their own library). Unknown (no answer, no synced library)
+     * music.example.com, max on 192.168.1.10). First by the server's last scan, which every user sees the same. Else
+     * by songs: a server gives a song the same id for every user, so it is when their songs are in the user in use's
+     * library by id, or the user in use's songs are on their server (both ways, as one may see more than the other).
+     * Users with separate libraries share no songs: then the scan tells, or the person confirms it. Unknown (no answer, no synced library)
      * stays unknown. Once found, it's remembered for these two addresses.
      */
     suspend fun checkSameServers(users: Collection<Int> = Users.ids(context)) {
@@ -222,10 +223,20 @@ class Guests(
             val theirs = settingsOf(user).current
             if (mine.sourceKind != theirs.sourceKind || theirs.navidromeUrl.isBlank()) return@forEach
             if (sameServerNow(user) == true) return@forEach
-            if (!library.isSynced) return@forEach
             val api = apiOf(user)
-            // Their songs in the user in use's library…
+            // One Navidrome has one last scan, the same time to the fraction of a second for every user, whatever
+            // libraries each can see (kids only theirs, max only his)…
+            val ourScan = runCatching { apiOf(Users.active).lastScan() }.getOrNull()
+            val theirScan = runCatching { api.lastScan() }.getOrNull()
+            if (sameServerByScan(ourScan, theirScan)) {
+                AppLog.i("Sources", "User ${user + 1} at another address: the same server (same last scan)")
+                markOf(user)?.let { Users.addSameServer(context, it) }
+                _sameServer.update { it + (user to true) }
+                return@forEach
+            }
+            // …else their songs in the user in use's library…
             val ids = runCatching { api.randomSongs(SAME_SERVER_SAMPLE).map { it.id } }.getOrNull() ?: return@forEach
+            if (!library.isSynced) return@forEach
             val known = library.knownSongIds(ids)
             var same = sameServerBySongs(ids, known)
             var how = "${known.size} of ${ids.size} of their songs known"
@@ -405,3 +416,10 @@ class Guests(
  */
 fun sameServerBySongs(ids: List<String>, known: Collection<String>): Boolean =
     ids.isNotEmpty() && known.count { it in ids } * 2 >= ids.size
+
+/**
+ * The same server reached at another address, told by its last library scan: a server has one, the same for every
+ * user. Not while it scans, and not without one (Emby gives none).
+ */
+fun sameServerByScan(ours: String?, theirs: String?): Boolean =
+    !ours.isNullOrBlank() && ours != "scanning" && ours == theirs

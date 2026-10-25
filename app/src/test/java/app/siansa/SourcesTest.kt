@@ -196,4 +196,14 @@ class SourcesTest {
         val kidsSongs = listOf("k1", "k2", "k3")
         assertEquals(true, app.siansa.data.sameServerBySongs(kidsSongs, setOf("k1", "k2", "k3")))
     }
+
+    @Test fun oneNavidromeHasOneLastScanForEveryUser() {
+        // kids and max with separate libraries share no songs, but their server's last scan is the same.
+        val scan = "2026-10-25T16:02:11.482913Z"
+        assertEquals(true, app.siansa.data.sameServerByScan(scan, scan))
+        assertEquals(false, app.siansa.data.sameServerByScan(scan, "2026-10-25T16:02:11.482914Z"))
+        assertEquals(false, app.siansa.data.sameServerByScan("scanning", "scanning"))
+        assertEquals(false, app.siansa.data.sameServerByScan(null, null))
+        assertEquals(false, app.siansa.data.sameServerByScan("", ""))
+    }
 }
