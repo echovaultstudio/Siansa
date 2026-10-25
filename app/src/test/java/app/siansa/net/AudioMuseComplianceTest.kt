@@ -148,4 +148,24 @@ class AudioMuseComplianceTest {
         assertEquals(listOf(1, 2, 3), evenly(listOf(1, 2, 3), 20))
         assertEquals(listOf(0, 25, 50, 75), evenly((0 until 100).toList(), 4))
     }
+
+    @Test fun everySongRequestNamesTheSongsServer() = runBlocking {
+        // Before: similar songs, mood radios, paths and song details built their own address and lost the name.
+        val fake = FakeAudioMuse { "[$row]" }
+        val api = AudioMuseApi(fake.client, serverFor = { ids -> if ("e1" in ids) "Emby" else "Navidrome" }) { settings }
+        api.similarTracks("e1", 10)
+        assertEquals("Emby", fake.seen.last().first.url.queryParameter("server"))
+        api.similarTracks("n1", 10)
+        assertEquals("Navidrome", fake.seen.last().first.url.queryParameter("server"))
+        api.findPath("e1", "e2", 5)
+        assertEquals("Emby", fake.seen.last().first.url.queryParameter("server"))
+        api.plugin("/plugins/x/api/profiles?ids=e1,e2")
+        assertEquals("Emby", fake.seen.last().first.url.queryParameter("server"))
+    }
+
+    @Test fun withoutServerForTheSettingsNameIsUsed() = runBlocking {
+        val fake = FakeAudioMuse { "[$row]" }
+        AudioMuseApi(fake.client) { settings.copy(audioMuseServer = "Emby") }.similarTracks("s1", 10)
+        assertEquals("Emby", fake.seen.single().first.url.queryParameter("server"))
+    }
 }
