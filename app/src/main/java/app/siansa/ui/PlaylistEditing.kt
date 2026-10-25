@@ -188,7 +188,7 @@ internal fun playlistOwnerName(playlist: Playlist): String = playlist.owner?.tak
 /** Asks for a playlist's name; [onConfirm] gets it trimmed, and only when it isn't empty. */
 @Composable
 fun PlaylistNameDialog(title: String, initial: String, confirm: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) =
-    NameDialog(title, initial, confirm, askWhere = false, onDismiss = onDismiss) { name, _ -> onConfirm(name) }
+    NameDialog(title, initial, confirm, askWhere = false, onDismiss = onDismiss, onConfirm = { name, _ -> onConfirm(name) })
 
 /** Asks for a new playlist's name and where to keep it: on Navidrome (the default), or on this phone only. */
 @Composable
