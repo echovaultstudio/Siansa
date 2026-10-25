@@ -160,6 +160,25 @@ The first command installs the update scripts and makes the key run `siansa-ci`,
 "update the site". The second mounts the emails folder (`/srv/siansa-emails`) into the sign-up service. Changes
 to `docker-compose.yml`, `Caddyfile` and `.env` still need you to copy them and restart.
 
+### Short commands on the server
+
+`scripts/beta.sh` adds `beta-…` commands to your shell (bash). Load them once:
+
+```
+echo '. ~/siansa-deploy/scripts/beta.sh' >> ~/.bashrc && . ~/.bashrc
+```
+
+Then `beta-help` lists them: `beta` (everyone and their status), `beta-accept EMAIL` and `beta-deny EMAIL` (like
+the buttons in your email), `beta-remove EMAIL`, `beta-today`, `beta-new-link` and more.
+
+### Daily summary and F-Droid stats
+
+Every evening (`DIGEST_UTC`, 21:55 UTC by default) the sign-up service emails `NOTIFY_TO` a summary of the day: new
+sign-ups and decisions, places taken, how many devices checked the F-Droid beta repo, downloads per build, and
+problem reports from the app. `sudo sh scripts/signups stats` shows it now; `sudo sh scripts/signups digest` sends it
+now. Devices are told apart by address with a key that only lives for the day; only totals are stored
+(`/srv/siansa-signups/stats.json`).
+
 ### Problem reports from the app
 
 Settings › Report a problem sends the tester's two answers and the whole log to `POST /report`. The log is kept in
