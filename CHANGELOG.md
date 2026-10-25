@@ -3,6 +3,44 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.33.0beta — 2026-10-25
+
+### Fixed
+- **Songs on a DLNA TV or speaker had a gap between them.** Siansa now hands the device the next song ahead, so
+  devices that support it play one after the other without a gap. Devices that don't still get the next song
+  sooner than before.
+- **Naming a server renamed it for every user on it.** The name you give a server in **Settings › Users** is now
+  each user's own, so two logins on one server can be told apart ("max on Home", "kids on Kids"). Names you
+  already gave stay as they are.
+
+### Added
+- **Original files on DLNA TVs and speakers.** Tap the cog beside one in **Play on** and turn on **Send the
+  original file**: it then gets your music as it is (for example FLAC) instead of MP3 320, whenever it says it
+  plays that format. Better sound, and no tiny gap between songs.
+- **Scroll quickly through long lists.** Liked songs, playlists, albums, favourite albums and artists, and Home's
+  full lists now have the handle on the right that Your Library has. Drag it to move through the whole list; a
+  label shows where you are (a letter, a month, or the place in the list).
+- **Daily mixes without AudioMuse.** On a server without AudioMuse-AI, or when only music it hasn't analysed is
+  shown (a kids' library on its own), today's mix and your carousel mixes are now picked from the music shown, by
+  the genres that fit the vibe. Showing or hiding music in the source filter makes them again.
+
+### Today
+Everything else that changed today, in 0.30.1beta to 0.32.0beta:
+- **Emby:** songs you play reach Emby's play history and show under its now playing; your Emby login key no
+  longer shows in the log; AudioMuse song radio, sound search, similar albums and vibes work with Emby.
+- **Several users and servers:** showing users together is for users on the same server; a user on your server
+  at another address is recognised by its songs; artists and albums open on the song's own server;
+  "Server name in AudioMuse" is kept per user.
+- **Name your servers** in Settings › Users, to tell logins apart.
+- **The source filter is followed everywhere:** Roll the dice, recently played, Home's shortcuts, playlists and
+  today's mixes only show what you chose to show.
+- **Save a mix as a playlist**, from any mix, radio or card, or from the queue.
+- **Playlists check your server for changes when you open them**, with a turning cog.
+- **Search shows the top 5 of each kind**; tap a section to see every match.
+- **Add to playlist** only offers playlists that can hold the songs.
+- **Fixes:** Siansa closing at start in 0.30.4beta; .m4a Dolby songs showing a wrong length; Navidrome's log filling
+  with "missing parameter" warnings; Play and Shuffle for "Sounds like" at the top; even rows at first setup.
+
 ## 0.32.0beta — 2026-10-25
 
 ### Added
