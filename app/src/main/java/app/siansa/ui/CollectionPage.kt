@@ -4,6 +4,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.material.icons.rounded.AddCircle
 import kotlinx.coroutines.launch
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.runtime.rememberCoroutineScope
 import app.siansa.data.cover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -100,6 +104,8 @@ fun CollectionPage(
     songMenu: (@Composable (index: Int, song: Song, close: () -> Unit) -> Unit)? = null,
     // The song heard last on an album you stopped part way (issue #367), by position, with its note.
     lastPlayed: Pair<Int, String>? = null,
+    // What the quick-scroll handle says for a song (a letter, a month); by default where it is in the list.
+    scrollLabel: ((index: Int, song: Song) -> String?)? = null,
     footer: LazyListScope.() -> Unit = {},
 ) {
     val graph = LocalGraph.current
@@ -112,6 +118,7 @@ fun CollectionPage(
         graph.scope.launch { graph.recentPlays.note(r, title, cover) }
     }
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val coverSize = (LocalConfiguration.current.screenWidthDp * 0.62f).dp
     val coverPx = with(density) { coverSize.toPx() }
@@ -121,6 +128,14 @@ fun CollectionPage(
     val progress = (scrolled / coverPx).coerceIn(0f, 1f)
     val barAlpha = ((scrolled - coverPx * 0.8f) / (coverPx * 0.3f)).coerceIn(0f, 1f)
     val surface = MaterialTheme.colorScheme.surface
+    // Albums with several discs get a heading above each disc (its title, or "Disc 2").
+    val discs = remember(songs, numbered, discTitles) { if (numbered && songs != null) discHeaders(songs, discTitles) else emptyMap() }
+    // Long lists get a handle on the right to move through them quickly (beta testers #24); the songs make
+    // room for it.
+    val fast = songs != null && showFastScroll(songs.size)
+    val positions = remember(songs, discs) { FastScroll.positions(songs?.size ?: 0, headers = 1, headed = discs.keys) }
+    val pastHeader by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
+    val rowEnd = if (fast) AlphabetBarWidth else 0.dp
 
     Box(Modifier.fillMaxSize().background(surface)) {
         if (showCovers && songs != null) {
@@ -171,13 +186,11 @@ fun CollectionPage(
                 }
                 error != null -> item { ErrorText(error) }
                 songs != null -> {
-                    // Albums with several discs get a heading above each disc (its title, or "Disc 2").
-                    val discs = if (numbered) discHeaders(songs, discTitles) else emptyMap()
                     // The song playing now is always marked, even when the page lists another copy of it (issue #228).
                     val playing = playingIndex(songs, player.current)
                     songs.forEachIndexed { index, song ->
                         discs[index]?.let { header ->
-                            item(key = "disc-$index-${header.disc}", contentType = "disc") { DiscHeading(header.label, color) }
+                            item(key = "disc-$index-${header.disc}", contentType = "disc") { Box(Modifier.padding(end = rowEnd)) { DiscHeading(header.label, color) } }
                         }
                         item(key = "$index-${song.id}", contentType = "song") {
                             val now = index == playing
@@ -187,6 +200,7 @@ fun CollectionPage(
                                 Modifier
                                     .fillMaxWidth()
                                     .background(if (now) Selected.copy(alpha = NOW_PLAYING_BAND) else Color.Transparent)
+                                    .padding(end = rowEnd)
                                     .then(if (last != null) Modifier.lastPlayedLine(Accent) else Modifier)
                                     .testTag(if (now) "collectionNowPlaying" else if (last != null) "collectionLastPlayed" else "collectionRow"),
                             ) {
@@ -207,6 +221,26 @@ fun CollectionPage(
                 }
             }
             footer()
+        }
+
+        // Shown once the cover has scrolled away, so it never covers the page's buttons. The top of the list is
+        // its first song, which keeps the handle in view while you drag.
+        if (fast && songs != null) {
+            AnimatedVisibility(
+                visible = pastHeader,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 56.dp, bottom = bottomBarPadding(Space.Small)),  // spacing: exact (below the top bar)
+            ) {
+                ListFastScroll(
+                    count = songs.size,
+                    positions = positions,
+                    firstVisible = { listState.firstVisibleItemIndex },
+                    visible = { listState.layoutInfo.visibleItemsInfo.size },
+                    scrollTo = { i -> scope.launch { listState.scrollToItem(i) } },
+                    labelAt = { i -> songs.getOrNull(i)?.let { song -> scrollLabel?.invoke(i, song) } ?: FastScroll.positionLabel(i, songs.size) },
+                )
+            }
         }
 
         // Title bar: just a back button over the colour, then a solid bar in the cover's colour.

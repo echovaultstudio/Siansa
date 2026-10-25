@@ -422,6 +422,21 @@ class SpacingTest {
         assertEven("Fourth under first", titles[3].left - titles[0].left, 0.dp, 1.dp)
     }
 
+    /** Long album grids (beta testers #24): the quick-scroll handle has room of its own, the columns stay even. */
+    @Test fun longAlbumGridsMakeRoomForTheScrollHandle() {
+        val albums = (1..40).map { app.siansa.data.Album("a$it", "Album $it", artist = "Artist $it") }
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalGraph provides graph) {
+                SiansaTheme { app.siansa.ui.AlbumsGridOrList(albums, page = "spacing-test-long", onOpen = {}) }
+            }
+        }
+        val bar = compose.onNodeWithTag("fastScroll").getBoundsInRoot()
+        val titles = (1..3).map { compose.onNodeWithText("Album $it").getBoundsInRoot() }
+        assertTrue("The third column ends before the handle: ${titles[2].right} vs ${bar.left}", titles[2].right <= bar.left + 1.dp)
+        assertEven("Even columns", titles[1].left - titles[0].left, titles[2].left - titles[1].left, 1.dp)
+    }
+
     /** Song rows (issue #309): a long title stops a gap short of the song's length, and lengths line up. */
     @Test fun songLengthKeepsAGapAfterALongTitle() {
         val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
