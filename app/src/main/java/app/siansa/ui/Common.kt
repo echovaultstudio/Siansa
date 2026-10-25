@@ -150,7 +150,10 @@ fun <T> LoadBox(load: Load<T>, modifier: Modifier = Modifier, content: @Composab
             CircularProgressIndicator()
         }
         is Load.Err -> ErrorText(load.message, modifier)
-        is Load.Ok -> content(load.value)
+        // [modifier] (a page's padding) applies once it has loaded too: search's show-all pages started under the
+        // title bar (issue #488). Pages pass their Scaffold padding here once, not again inside. Without a modifier
+        // the content stays in its parent, so it can still align itself there (the lyrics' "No lyrics").
+        is Load.Ok -> if (modifier == Modifier) content(load.value) else Box(modifier) { content(load.value) }
     }
 }
 
