@@ -152,5 +152,4 @@ class SourcesTest {
         assertEquals("887226", app.siansa.ui.recentAlbumId("album/887226"))
         assertNull(app.siansa.ui.recentAlbumId("playlist/p1"))
     }
-
 }
