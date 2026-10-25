@@ -3,6 +3,11 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.30.3beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.30.3beta) — 2026-10-25
+
+- [#453](https://github.com/echovaultstudio/Siansa/pull/453) AudioMuse: every request names its songs' server, one name per music server (@Th3K1ngP1n)
+- [#454](https://github.com/echovaultstudio/Siansa/pull/454) Shown users: a song's own artists and album open on its server (@Th3K1ngP1n)
+
 ## [0.30.2beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.30.2beta) — 2026-10-25
 
 - [#451](https://github.com/echovaultstudio/Siansa/pull/451) Log: hide Emby's login token (@Th3K1ngP1n)
