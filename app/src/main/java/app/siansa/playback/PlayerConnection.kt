@@ -11,6 +11,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import app.siansa.data.Song
 import app.siansa.log.AppLog
+import app.siansa.playback.dlna.Dlna
 import app.siansa.net.MusicSource
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -251,13 +252,25 @@ class PlayerConnection(
         }
     }
 
-    /** Stops playback and empties the queue (long-press on play). */
+    /**
+     * Stops playback and empties the queue (long-press on play). While casting, casting ends too, so the next song
+     * picked plays on the phone (issue #491).
+     */
     fun stop() {
         queueGeneration++
         onNewQueue?.invoke()
         withController { c ->
             c.stop()
             c.clearMediaItems()
+        }
+        val cast = Cast.status.value
+        val onTv = cast.device != null || cast.connecting
+        val onDlna = Dlna.selected.value != null
+        if (onTv || onDlna) {
+            AppLog.i("Player", "Hold to stop: casting ends too")
+            StopCasting.requested = true
+            if (onDlna) Dlna.select(null)
+            if (onTv) Cast.disconnect()
         }
     }
 

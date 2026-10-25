@@ -25,6 +25,15 @@ class CastHandBackTest {
         assertSame(live, CastHandBack.pick(live, CastSpot(emptyList(), 0, 0L), id))
     }
 
+    @Test fun afterHoldToStopNothingComesBack() {
+        // Issue #491: the TV may still list the cleared queue as casting ends; the phone gets nothing.
+        val live = CastSpot(listOf("a", "b"), 1, 5_000L)
+        assertEquals(CastSpot(emptyList<String>(), 0, 0L), CastHandBack.afterEnd(live, saved, stopped = true, id = id))
+        // Ending casting any other way still brings the music back.
+        assertSame(live, CastHandBack.afterEnd(live, saved, stopped = false, id = id))
+        assertSame(saved, CastHandBack.afterEnd(CastSpot(emptyList(), 0, 0L), saved, stopped = false, id = id))
+    }
+
     @Test fun leavesOutNamelessSongsAndKeepsTheCurrentOne() {
         val spot = CastHandBack.withoutNameless(CastSpot(listOf("", "a", "", "b", "c"), 3, 7_000L), id)
         assertEquals(CastSpot(listOf("a", "b", "c"), 1, 7_000L), spot)
