@@ -35,7 +35,8 @@ jobs:
   # secret scan, what changed (for the jobs below) and, when the plugin changed, its tests.
   quick:
     name: Quick checks
-    runs-on: ubuntu-latest
+    # Your own runner when the RUNS_ON variable names it (e.g. ["self-hosted", "siansa"]), else GitHub's.
+    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 15
     outputs:
       app: ${{ steps.diff.outputs.app }}
@@ -100,7 +101,8 @@ jobs:
     # Pull requests and nightly runs build only when the app can be affected; main always does (its APK is released).
     if: >-
       github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.quick.outputs.app == 'true'
-    runs-on: ubuntu-latest
+    # Your own runner when the RUNS_ON variable names it (e.g. ["self-hosted", "siansa"]), else GitHub's.
+    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -229,11 +231,14 @@ jobs:
     if: >-
       always() && needs.checks.result == 'success' && github.event_name != 'pull_request' &&
       (github.event_name == 'workflow_dispatch' || needs.quick.outputs.emulator == 'true')
-    runs-on: ubuntu-latest
+    # Your own runner when the RUNS_ON variable names it (e.g. ["self-hosted", "siansa"]), else GitHub's.
+    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 60
     steps:
       # The emulator needs ~7.5 GB for its storage; the runner image leaves too little free.
       - name: Free disk space
+        # Only on GitHub's machines: it deletes system folders, never on your own runner.
+        if: runner.environment == 'github-hosted'
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /usr/share/swift /opt/hostedtoolcache/CodeQL /usr/local/lib/node_modules || true
           echo "::notice::Free disk: $(df -h / | awk 'NR==2{print $4}')"
@@ -256,6 +261,8 @@ jobs:
         run: scripts/test-server.sh
 
       - name: Enable KVM
+        # GitHub's machines need it opened up; your own runner's user is in the kvm group instead.
+        if: runner.environment == 'github-hosted'
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
@@ -339,7 +346,8 @@ jobs:
     name: Publish release
     needs: [checks, quick]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
+    # Your own runner when the RUNS_ON variable names it (e.g. ["self-hosted", "siansa"]), else GitHub's.
+    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
     steps:
       - uses: actions/checkout@v7
         with:

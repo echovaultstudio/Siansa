@@ -22,7 +22,8 @@ permissions:
 jobs:
   deploy:
     name: Update the website and emails
-    runs-on: ubuntu-latest
+    # Your own runner when the RUNS_ON variable names it (e.g. ["self-hosted", "siansa"]), else GitHub's.
+    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
     steps:
       - uses: actions/checkout@v7
       - name: Send to the server
