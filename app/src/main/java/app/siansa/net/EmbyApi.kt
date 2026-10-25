@@ -133,7 +133,9 @@ class EmbyApi(
                 }
                 if (response.code == 407) throw ApiException("The server asked for a login (HTTP 407). Fill in the proxy login in Settings.")
                 if (!response.isSuccessful) {
-                    AppLog.w("Server", "Emby $method ${path.substringBefore('?')} answered HTTP ${response.code}")
+                    // Emby says why in a short text (e.g. a missing field): kept in the log to trace it.
+                    val why = AppLog.redact(text.trim().take(200)).takeIf { it.isNotEmpty() }?.let { ": $it" }.orEmpty()
+                    AppLog.w("Server", "Emby $method ${path.substringBefore('?')} answered HTTP ${response.code}$why")
                     throw ApiException("Emby answered HTTP ${response.code}")
                 }
                 text
@@ -443,14 +445,29 @@ class EmbyApi(
         call("/Sessions/Playing/Stopped", method = "POST", body = timeline(id, positionMs, paused = false, event = null))
     }
 
-    private fun timeline(id: String, positionMs: Long, paused: Boolean, event: String?): String = buildJsonObject {
+    internal fun timeline(id: String, positionMs: Long, paused: Boolean, event: String?): String = buildJsonObject {
         put("ItemId", id)
+        // Emby files each play under its media source and a play session; without them it may answer HTTP 400.
+        put("MediaSourceId", "mediasource_$id")
+        put("PlaySessionId", playSession(id))
         put("PositionTicks", positionMs.coerceAtLeast(0) * TICKS_PER_MS)
         put("IsPaused", paused)
         put("CanSeek", true)
         put("PlayMethod", "DirectStream")
         if (event != null) put("EventName", event)
     }.toString()
+
+    private var sessionSong: String? = null
+    private var sessionId: String = ""
+
+    /** One play session id per song, the same for its start, progress and stop. */
+    @Synchronized private fun playSession(id: String): String {
+        if (id != sessionSong) {
+            sessionSong = id
+            sessionId = java.util.UUID.randomUUID().toString().replace("-", "")
+        }
+        return sessionId
+    }
 
     // ---- Reading Emby's items ----
 
