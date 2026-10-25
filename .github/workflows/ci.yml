@@ -274,6 +274,8 @@ jobs:
         if: always()
         run: |
           grep -A8 "What went wrong" gradle.txt 2>/dev/null | head -12 | while IFS= read -r line; do [ -n "$line" ] && echo "::error::$line"; done || true
+          # Kotlin compile errors in the emulator tests, with file and line (they don't show up in the Build job).
+          grep -E "^e: file://" gradle.txt 2>/dev/null | sort -u | head -30 | sed -E 's#^e: file://[^ ]*/app/(src/[^:]+):([0-9]+):([0-9]+) (.*)#::error file=app/\1,line=\2,col=\3::\4#' || true
           grep -E "Tests? .*(passed|failed)|BUILD (SUCCESSFUL|FAILED)" gradle.txt 2>/dev/null | tail -3 | while IFS= read -r line; do echo "::notice::$line"; done || true
           find app/build/outputs -iname "logcat*.txt" -exec cat {} + > logcat.txt 2>/dev/null || true
           grep -h "System.out" logcat.txt 2>/dev/null | grep -E "Kinds:|drawable:|setup|Tour: " | sed 's/.*System.out: //' | head -40 | while IFS= read -r line; do echo "::notice::$line"; done || true
