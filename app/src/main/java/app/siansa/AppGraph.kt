@@ -2,8 +2,6 @@ package app.siansa
 
 import app.siansa.mix.Dice
 import app.siansa.data.ArtistPhotos
-import app.siansa.data.Users
-import app.siansa.data.audioMuseUserFor
 import app.siansa.data.SavedVibes
 import app.siansa.mix.MixResume
 import app.siansa.data.RecentPlays
@@ -227,14 +225,8 @@ class AppGraph(val app: Application) {
         // Another shown user's songs, albums and covers go to their own server, of whatever kind (issue #427).
         route = { id -> guests.sourceFor(id) },
     )
-    val audioMuse = AudioMuseApi(
-        http,
-        // Each music server's songs go to AudioMuse with that server's name (its user's), whichever user is in use.
-        serverFor = { ids ->
-            val user = audioMuseUserFor(ids, { guests.ownerOf(it) }, Users.active, guests.shown.value, library.ownHidden.value)
-            if (user == Users.active) settings.current.audioMuseServer else guests.settingsOf(user).current.audioMuseServer
-        },
-    ) { settings.current }
+    // Users shown together are on one server (Guests.onSameServer), so one AudioMuse server name serves them all.
+    val audioMuse = AudioMuseApi(http) { settings.current }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
     val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
     val openRouter = OpenRouterApi(http) { settings.current }
