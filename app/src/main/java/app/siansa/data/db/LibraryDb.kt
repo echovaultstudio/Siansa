@@ -197,6 +197,9 @@ interface LibraryDao {
     @Query("SELECT id FROM albums WHERE id IN (:ids)")
     suspend fun knownAlbumIds(ids: List<String>): List<String>
 
+    @Query("SELECT id FROM albums WHERE visible = 1 AND id IN (:ids)")
+    suspend fun shownAlbumIds(ids: List<String>): List<String>
+
     @Query("SELECT * FROM albums WHERE groupKey = :groupKey ORDER BY isPrimary DESC")
     suspend fun albumGroup(groupKey: String): List<AlbumEntity>
 
