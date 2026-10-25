@@ -5,6 +5,7 @@ import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,8 +17,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,7 +39,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import app.siansa.data.UserEntry
+import app.siansa.data.UserFiles
 import app.siansa.data.Users
+import app.siansa.log.AppLog
 
 /**
  * Settings → Users: every Navidrome login on this phone. Tap one to switch to it (the app restarts with
@@ -49,13 +54,14 @@ fun UsersScreen(nav: NavController) {
     var changes by remember { mutableIntStateOf(0) }
     val users = remember(changes) { Users.all(context) }
     var removing by remember { mutableStateOf<UserEntry?>(null) }
+    var naming by remember { mutableStateOf<UserEntry?>(null) }
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
     val library by graph.library.status.collectAsStateWithLifecycle()
 
     Screen(title = "Users", nav = nav) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
             Text(
-                "Each user has their own library, history and settings. Tap a user to switch; Siansa restarts. To show several users' music together, use the filter button on Home.",
+                "Each user has their own library, history and settings. Tap a user to switch; Siansa restarts. To show several users' music together, use the filter button on Home. Tap the pencil to give a server a name.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
@@ -81,6 +87,11 @@ fun UsersScreen(nav: NavController) {
                             style = MaterialTheme.typography.bodySmall,
                             color = if (inUse) Accent else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                    if (user.server != null) {
+                        IconButton(onClick = { naming = user }, modifier = Modifier.testTag("nameServer")) {
+                            Icon(Icons.Rounded.Edit, "Name the server of ${user.label}")
+                        }
                     }
                     if (!inUse) {
                         IconButton(onClick = { removing = user }) { Icon(Icons.Rounded.Delete, "Remove ${user.label}") }
@@ -118,6 +129,39 @@ fun UsersScreen(nav: NavController) {
                 }
             }
         }
+    }
+
+    naming?.let { user ->
+        val server = user.server ?: return@let
+        var name by remember(user.id) { mutableStateOf(user.serverName.orEmpty()) }
+        AlertDialog(
+            onDismissRequest = { naming = null },
+            title = { Text("Name this server") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    Text(
+                        "Shown instead of its address for every user on it, like \"Home Navidrome\". Leave it empty to show the address.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it.replace("\n", " ").take(UserFiles.SERVER_NAME_MAX) },
+                        singleLine = true,
+                        placeholder = { Text(server.substringAfter("://").substringBefore('/').substringBefore(':')) },
+                        modifier = Modifier.fillMaxWidth().testTag("serverNameField"),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    AppLog.i("Users", "Server of user ${user.id + 1} ${if (UserFiles.cleanServerName(name).isEmpty()) "unnamed" else "named"}")
+                    Users.setServerName(context, server, name)
+                    naming = null
+                    changes++
+                }) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { naming = null }) { Text("Cancel") } },
+        )
     }
 
     removing?.let { user ->

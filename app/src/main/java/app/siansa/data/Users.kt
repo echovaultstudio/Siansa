@@ -40,9 +40,12 @@ object UserFiles {
 
     const val DATABASE = "library.db"
 
-    /** How a user is shown in the list: "anna on music.example.com", or a note when not set up yet. */
-    fun label(user: String, address: String): String {
-        val host = address.toHttpUrlOrNull()?.host
+    /**
+     * How a user is shown in the list: "anna on music.example.com", or "anna on Home Navidrome" when their server has
+     * a name ([serverName]), or a note when not set up yet.
+     */
+    fun label(user: String, address: String, serverName: String? = null): String {
+        val host = serverName?.takeIf { it.isNotBlank() } ?: address.toHttpUrlOrNull()?.host
         return when {
             user.isNotBlank() && host != null -> "$user on $host"
             user.isNotBlank() -> user
@@ -67,6 +70,22 @@ object UserFiles {
         val a = serverKey(addressA) ?: return false
         return kindA == kindB && a == serverKey(addressB)
     }
+
+    /** Longest name a server can be given. */
+    const val SERVER_NAME_MAX = 40
+
+    /** A name as typed, made fit to show: one line, trimmed, not too long; blank for none. */
+    fun cleanServerName(name: String): String =
+        name.replace(Regex("\\s+"), " ").trim().take(SERVER_NAME_MAX).trim()
+
+    /** Server names as stored, "<server key>\n<name>" each, by server key ([serverKey]). */
+    fun parseServerNames(stored: Set<String>): Map<String, String> = stored.mapNotNull { entry ->
+        val cut = entry.indexOf('\n')
+        if (cut <= 0) null else entry.substring(0, cut) to cleanServerName(entry.substring(cut + 1))
+    }.filter { it.second.isNotEmpty() }.toMap()
+
+    fun formatServerNames(names: Map<String, String>): Set<String> =
+        names.mapNotNull { (key, name) -> cleanServerName(name).takeIf { it.isNotEmpty() }?.let { "$key\n$it" } }.toSet()
 
     /** The stored list of users; before a second user is added, just the first. */
     fun parseIds(stored: String?): List<Int> =
@@ -102,7 +121,16 @@ object UserFiles {
 }
 
 /** One Navidrome login on this phone. */
-data class UserEntry(val id: Int, val label: String, val connected: Boolean, val emby: Boolean = false)
+data class UserEntry(
+    val id: Int,
+    val label: String,
+    val connected: Boolean,
+    val emby: Boolean = false,
+    /** Their server's address as a key ([UserFiles.serverKey]), for naming it; null when not set up. */
+    val server: String? = null,
+    /** The name given to their server, or null. */
+    val serverName: String? = null,
+)
 
 /**
  * Several Navidrome logins (on the same or different servers), each with its own settings, library and
@@ -114,6 +142,7 @@ object Users {
     private const val KEY_ACTIVE = "active"
     private const val KEY_IDS = "ids"
     private const val KEY_SHOWN = "shown"
+    private const val KEY_SERVER_NAMES = "serverNames"
 
     /** The user whose files are in use, read once when the app starts. */
     @Volatile var active: Int = UserFiles.FIRST
@@ -131,14 +160,33 @@ object Users {
 
     fun ids(context: Context): List<Int> = UserFiles.parseIds(prefs(context).getString(KEY_IDS, null))
 
-    fun all(context: Context): List<UserEntry> = ids(context).map { id ->
+    fun all(context: Context): List<UserEntry> {
+        val names = serverNames(context)
+        return ids(context).map { id -> entry(context, id, names) }
+    }
+
+    private fun entry(context: Context, id: Int, names: Map<String, String>): UserEntry {
         val settings = context.getSharedPreferences(UserFiles.scoped("settings", id), Context.MODE_PRIVATE)
         val user = settings.getString("nd_user", "").orEmpty()
         val address = settings.getString("nd_url", "").orEmpty()
-        UserEntry(
-            id, UserFiles.label(user, address), connected = user.isNotBlank() && address.isNotBlank(),
+        val server = UserFiles.serverKey(address)
+        val name = server?.let { names[it] }
+        return UserEntry(
+            id, UserFiles.label(user, address, name), connected = user.isNotBlank() && address.isNotBlank(),
             emby = SourceKind.parse(settings.getString("source_kind", null)) == SourceKind.EMBY,
+            server = server, serverName = name,
         )
+    }
+
+    /** Names given to servers, by server key: shown instead of the address for every user on that server. */
+    fun serverNames(context: Context): Map<String, String> =
+        UserFiles.parseServerNames(prefs(context).getStringSet(KEY_SERVER_NAMES, null).orEmpty())
+
+    /** Names the server at [server] (a server key); a blank name shows its address again. */
+    fun setServerName(context: Context, server: String, name: String) {
+        val clean = UserFiles.cleanServerName(name)
+        val next = serverNames(context) - server + (if (clean.isEmpty()) emptyMap() else mapOf(server to clean))
+        prefs(context).edit().putStringSet(KEY_SERVER_NAMES, UserFiles.formatServerNames(next)).commit()
     }
 
     /** Users whose music shows; always includes the user in use (issue #141). */
