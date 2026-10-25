@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -34,6 +35,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.siansa.data.ListSort
+import app.siansa.data.Song
+import app.siansa.data.SongDates
+import app.siansa.data.isoMillis
 import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
@@ -72,7 +77,103 @@ object FastScroll {
         plays == 1L -> "1 play"
         else -> "$plays plays"
     }
+
+    /** Whether [names] are in A to Z order (ignoring case and accents), so a letter says where you are. */
+    fun inLetterOrder(names: List<String>): Boolean {
+        if (names.size < 2) return false
+        val letters = names.map { AlphabetIndex.LETTERS.indexOf(AlphabetIndex.letterOf(it)) }
+        return letters.zipWithNext().all { (a, b) -> a <= b } && letters.toSet().size >= 3
+    }
+
+    /**
+     * The label for an item named by [names] at [index] of [count]: its letter when the list runs A to Z by one
+     * of the names given (an album's artist, then its title), else its position.
+     */
+    fun nameLabel(index: Int, count: Int, letterBy: List<String>?): String =
+        letterBy?.getOrNull(index)?.let { AlphabetIndex.letterOf(it).toString() } ?: positionLabel(index, count)
+
+    /** "12 of 840": where you are in a list that has no better label. */
+    fun positionLabel(index: Int, count: Int): String = "${index + 1} of $count"
+
+    /**
+     * What the handle says for a song in a list sorted by [sort] (beta testers #24): its letter, or the month it
+     * was added or last played. Null for the list's own order, which the page labels itself.
+     */
+    fun songLabel(sort: ListSort, song: Song, dates: SongDates?, heardAt: Long?, now: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): String? =
+        when (sort) {
+            ListSort.TITLE -> AlphabetIndex.letterOf(song.title).toString()
+            ListSort.ARTIST -> AlphabetIndex.letterOf(song.artist).toString()
+            ListSort.ADDED -> monthLabel(isoMillis(dates?.created) ?: 0L, "No date", now, zone)
+            ListSort.PLAYED -> monthLabel(listOfNotNull(isoMillis(dates?.played), heardAt).maxOrNull() ?: 0L, "Not played", now, zone)
+            ListSort.DEFAULT -> null
+        }
+
+    /**
+     * Each item's position in a list that starts with [headers] rows and has a heading row before the items in
+     * [headed] (an album's disc headings).
+     */
+    fun positions(count: Int, headers: Int = 1, headed: Set<Int> = emptySet()): IntArray {
+        val out = IntArray(count.coerceAtLeast(0))
+        var at = headers
+        for (i in out.indices) {
+            if (i in headed) at++
+            out[i] = at++
+        }
+        return out
+    }
+
+    /** The item at list [position] (or the one whose heading it is) in [positions]; 0 above the first. */
+    fun itemAt(positions: IntArray, position: Int): Int {
+        if (positions.isEmpty()) return 0
+        var lo = 0
+        var hi = positions.size - 1
+        if (position <= positions[0]) return 0
+        while (lo < hi) {
+            val mid = (lo + hi + 1) / 2
+            if (positions[mid] <= position) lo = mid else hi = mid - 1
+        }
+        return lo
+    }
 }
+
+/**
+ * The quick-scroll handle for any long list or grid (beta testers #24), with a label for where you are.
+ * [count] items sit at the list positions [positions]; [firstVisible], [visible] and [scrollTo] work in list
+ * positions, [labelAt] by item. Lists shorter than [AlphabetIndex.MIN_ITEMS] don't need it: callers check [showFastScroll].
+ */
+@Composable
+fun ListFastScroll(
+    count: Int,
+    positions: IntArray,
+    firstVisible: () -> Int,
+    visible: () -> Int,
+    scrollTo: (Int) -> Unit,
+    labelAt: (Int) -> String?,
+    modifier: Modifier = Modifier,
+) {
+    val first by rememberUpdatedState(firstVisible)
+    val shown by rememberUpdatedState(visible)
+    val at by rememberUpdatedState(positions)
+    val fraction by remember(count) {
+        derivedStateOf { FastScroll.fractionOf(FastScroll.itemAt(at, first()), count, shown()) }
+    }
+    var last by remember { mutableIntStateOf(-1) }
+    FastScrollBar(
+        fraction = fraction,
+        labelAt = { f -> labelAt(FastScroll.indexAt(f, count)) },
+        onScroll = { f ->
+            val i = FastScroll.indexAt(f, count)
+            if (i != last) {
+                last = i
+                at.getOrNull(i)?.let(scrollTo)
+            }
+        },
+        modifier = modifier,
+    )
+}
+
+/** Whether a list of [count] gets the quick-scroll handle. */
+fun showFastScroll(count: Int): Boolean = count >= AlphabetIndex.MIN_ITEMS
 
 /**
  * A handle on the right of a long list: drag it, or touch anywhere along the bar, to move through the
