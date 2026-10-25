@@ -48,6 +48,32 @@ object Dlna {
     /** True from picking a device until it has started playing (or failed). */
     val connecting: StateFlow<Boolean> = _connecting.asStateFlow()
 
+    private var prefs: android.content.SharedPreferences? = null
+
+    private val _original = MutableStateFlow<Set<String>>(emptySet())
+    /**
+     * The TVs and speakers (by id) that get the original file instead of MP3 320 when they play its format, as
+     * set with the cog beside each in the device list (beta testers #23).
+     */
+    val original: StateFlow<Set<String>> = _original.asStateFlow()
+
+    /** Reads the devices' settings kept on the phone; called when the device list opens. */
+    fun load(context: Context) {
+        if (prefs != null) return
+        val p = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs = p
+        _original.value = p.getStringSet(ORIGINAL, emptySet()).orEmpty().toSet()
+    }
+
+    /** Turns sending the original file on or off for [device]; it applies from the next song. */
+    fun setOriginal(device: DlnaDevice, on: Boolean) {
+        val now = if (on) _original.value + device.id else _original.value - device.id
+        if (now == _original.value) return
+        _original.value = now
+        prefs?.edit()?.putStringSet(ORIGINAL, now)?.apply()
+        AppLog.i("DLNA", "${device.name}: " + if (on) "original files when it plays them" else "MP3 320")
+    }
+
     internal val http: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(4, TimeUnit.SECONDS)
         .readTimeout(8, TimeUnit.SECONDS)
@@ -82,6 +108,7 @@ object Dlna {
     fun startSearch(context: Context) {
         if (search?.isActive == true) return
         val app = context.applicationContext
+        load(app)
         val wifi = app.getSystemService(WifiManager::class.java)
         val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         search = scope.launch {
@@ -157,15 +184,43 @@ object Dlna {
     }
 
     private suspend fun describe(location: String): DlnaDevice? = withContext(Dispatchers.IO) {
-        runCatching {
+        val device = runCatching {
             http.newCall(Request.Builder().url(location).build()).execute().use { r ->
                 if (!r.isSuccessful) null else Upnp.parseDescription(r.body?.string().orEmpty(), location)
             }
-        }.getOrNull()
+        }.getOrNull() ?: return@withContext null
+        // Which formats it plays, for sending original files (beta testers #23); null when it doesn't say.
+        val formats = device.connectionUrl?.let { url ->
+            runCatching { Upnp.sinkFormats(Upnp.value(soap(url, Upnp.CONNECTION_MANAGER, "GetProtocolInfo"), "Sink")) }
+                .onFailure { AppLog.d("DLNA", "${device.name} didn't say which formats it plays: ${it.message}") }
+                .getOrNull()?.takeIf { it.isNotEmpty() }
+        }
+        device.copy(formats = formats)
     }
+
+    /**
+     * The type of a song's original file (e.g. audio/flac), asked once per song: from the file type the song came
+     * with ([suffix]), else the server's song details ([details], what Song details shows), else the type the
+     * server sends with the file's first byte. Null when none says.
+     */
+    internal suspend fun originalType(id: String, url: String, suffix: String?, details: suspend () -> String?): String? =
+        withContext(Dispatchers.IO) {
+            DlnaFormats.mimeOf(suffix)?.let { return@withContext it }
+            types[id]?.let { return@withContext it }
+            val found = DlnaFormats.mimeOf(runCatching { details() }.getOrNull())
+                ?: runCatching {
+                    http.newCall(Request.Builder().url(url).header("Range", "bytes=0-1").build()).execute().use { r ->
+                        if (r.isSuccessful) DlnaFormats.plain(r.header("Content-Type")) else null
+                    }
+                }.getOrNull()
+            found?.also { if (types.size > 500) types.clear(); types[id] = it }
+        }
+
+    private val types = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     private const val PREFS = "dlna"
     private const val KNOWN = "known_locations"
+    private const val ORIGINAL = "original_files"
     /** How long devices may wait before answering (SSDP's MX; 1 is the least it allows). */
     private const val SEARCH_WAIT_S = 1
     /** How long one search listens for answers. */
