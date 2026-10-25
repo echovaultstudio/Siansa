@@ -80,7 +80,7 @@ class SelectorStore(context: Context) {
     }
 }
 
-class MixStore(context: Context, private val currentScope: () -> String = { "" }) {
+class MixStore(context: Context) {
     private val json = JsonFile(
         File(context.filesDir, Users.scoped("mixes.json")),
         ListSerializer(Mix.serializer()),
@@ -90,11 +90,8 @@ class MixStore(context: Context, private val currentScope: () -> String = { "" }
 
     suspend fun all(): List<Mix> = json.read()
 
-    /** Whether [mix] was made for the music shown now (see [Mix.scope]). */
-    fun isCurrent(mix: Mix): Boolean = mix.scope == currentScope()
-
-    /** The mix, when it was made for the music shown now; an out-of-date one counts as not made yet. */
-    suspend fun get(id: String): Mix? = all().firstOrNull { it.id == id && isCurrent(it) }
+    /** The mix, whatever the source filter showed when it was made (issue #486). */
+    suspend fun get(id: String): Mix? = all().firstOrNull { it.id == id }
 
     /** Saves a mix and drops mixes older than two weeks. */
     suspend fun save(mix: Mix) {
