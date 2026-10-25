@@ -2,18 +2,10 @@ package app.siansa.ui
 
 import android.net.Uri
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.Icon
@@ -27,8 +19,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import app.siansa.data.SearchResults
 
@@ -93,27 +83,12 @@ fun SearchMoreScreen(nav: NavController, kindId: String?, query: String) {
             val results by loadState("search-more-names-$query") { byName() }
             Screen(title = title, nav = nav) { padding ->
                 LoadBox(results, Modifier.padding(top = padding.calculateTopPadding())) { r ->
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(150.dp),
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = Space.Small, end = Space.Small, bottom = bottomBarPadding(Space.Section)),
-                    ) {
-                        if (kind == SearchMore.ALBUMS) {
-                            items(r.albums, key = { it.id }) { album ->
-                                AlbumTile(album.name, album.artist, album.coverArt, onClick = { nav.navigate("album/${album.id}") })
-                            }
-                        } else {
-                            items(r.artists, key = { it.id }) { artist ->
-                                Column(
-                                    Modifier.clickable { nav.navigate("artist/${artist.id}") }.padding(Space.Small),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(Space.Small),
-                                ) {
-                                    Cover(artist.coverArt, 300, Modifier.size(132.dp), CircleShape)
-                                    Text(artist.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                }
-                            }
-                        }
+                    // The same grid of three (or list) as every other page of albums or artists (issue #289), so
+                    // they also get the quick-scroll handle on long lists.
+                    if (kind == SearchMore.ALBUMS) {
+                        AlbumsGridOrList(r.albums, page = "search-albums", onOpen = { nav.navigate("album/${it.id}") }, modifier = Modifier.fillMaxSize())
+                    } else {
+                        ArtistsGridOrList(r.artists, page = "search-artists", onOpen = { nav.navigate("artist/${it.id}") }, modifier = Modifier.fillMaxSize())
                     }
                 }
             }
