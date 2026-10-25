@@ -278,6 +278,23 @@ class SpacingTest {
         assertTrue("Find similar right next to Shuffle (${(shuffle.left - similar.right).value} dp)", shuffle.left - similar.right <= app.siansa.ui.Space.Small + 0.5.dp)
     }
 
+    /** Playlist page (beta #18): the turning cog sits on the title bar's line, the size of the ⋮ button beside it. */
+    @Test fun checkingCogSitsLevelWithTheMenuButton() {
+        compose.setContent {
+            SiansaTheme {
+                androidx.compose.foundation.layout.Row {
+                    app.siansa.ui.CheckingCog()
+                    androidx.compose.material3.IconButton(onClick = { }, modifier = Modifier.testTag("menu")) {
+                        androidx.compose.material3.Icon(Icons.Rounded.FavoriteBorder, "Menu")
+                    }
+                }
+            }
+        }
+        val cog = compose.onNodeWithTag("checkingPlaylist").getBoundsInRoot()
+        val menu = compose.onNodeWithTag("menu").getBoundsInRoot()
+        assertEven("Cog and menu, vertical centre", (cog.top + cog.bottom) / 2, (menu.top + menu.bottom) / 2, 1.dp)
+    }
+
     /** Album page (issue #240): room under the big Play button before the first song, marked when it's playing. */
     @Test fun roomBelowThePlayButton() {
         compose.setContent {
