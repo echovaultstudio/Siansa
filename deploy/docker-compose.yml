@@ -37,6 +37,7 @@ services:
       BETA_LIMIT: ${BETA_LIMIT:-12}
       PUBLIC_URL: https://${DOMAIN}
       NOTIFY_TO: ${NOTIFY_TO:-}
+      DIGEST_UTC: ${DIGEST_UTC:-21:55}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       REPORTS_REPO: ${REPORTS_REPO:-}
       REPORTS_TOKEN: ${REPORTS_TOKEN:-}

@@ -442,6 +442,150 @@ def valid_link(uri):
     return bool(m and code) and hmac.compare_digest(m.group(1), code)
 
 
+# ---- F-Droid stats and the daily summary (owner only) ----
+# Every F-Droid request passes /auth, so it's counted here: APK downloads per build, and devices checking the repo.
+# "Devices" are told apart by their address, scrambled with a key that only lives in memory for one day; only the
+# day's totals are written down, never an address or anything made from one.
+STATS_FILE = os.path.join(DATA_DIR, "stats.json")
+DIGEST_UTC = os.environ.get("DIGEST_UTC", "21:55")  # 23:55 in Helsinki in winter, 00:55 in summer
+INDEX_FILES = {"entry.jar", "index-v1.jar", "index.jar"}  # one of these per repo check by a phone
+APK_NAME = re.compile(r"^app\.siansa_(\d+)\.apk$")
+_stats_lock = threading.Lock()
+_today = {"day": None, "key": b"", "seen": {}}
+
+
+def utc_day(now=None):
+    return time.strftime("%Y-%m-%d", time.gmtime(time.time() if now is None else now))
+
+
+def load_stats():
+    try:
+        with open(STATS_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {"days": {}}
+
+
+def save_stats(stats):
+    tmp = STATS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(stats, f)
+    os.replace(tmp, STATS_FILE)
+
+
+def fetch_kind(uri):
+    """What an F-Droid request under the beta link is, for counting: "repo", "apk:<build>" or None."""
+    path = (uri or "").split("?", 1)[0]
+    name = path.rsplit("/repo/", 1)[-1] if "/repo/" in path else ""
+    m = APK_NAME.match(name)
+    if m:
+        return "apk:" + m.group(1)
+    return "repo" if name in INDEX_FILES else None
+
+
+def record_fetch(uri, client, now=None):
+    """Counts one F-Droid request under the beta link (after the link was checked). [client] is the address."""
+    kind = fetch_kind(uri)
+    if not kind:
+        return
+    day = utc_day(now)
+    with _stats_lock:
+        if _today["day"] != day:
+            _today.update(day=day, key=secrets.token_bytes(32), seen={})
+        visitor = hmac.new(_today["key"], client.encode(), hashlib.sha256).digest()
+        seen = _today["seen"].setdefault(kind, set())
+        stats = load_stats()
+        entry = stats.setdefault("days", {}).setdefault(day, {}).setdefault(kind, {"requests": 0, "devices": 0})
+        entry["requests"] += 1
+        if visitor not in seen:
+            seen.add(visitor)
+            entry["devices"] += 1
+        for old in sorted(stats["days"])[:-400]:  # about a year is plenty
+            del stats["days"][old]
+        save_stats(stats)
+
+
+def _since(path, day, key="time"):
+    return sum(1 for r in read_lines(path) if str(r.get(key, "")).startswith(day))
+
+
+def digest_text(day, now=None):
+    """The owner's summary of [day] (UTC): sign-ups, places, F-Droid downloads and devices, problem reports."""
+    stats = load_stats().get("days", {})
+    today = stats.get(day, {})
+    events = [r for r in read_lines(DECISIONS_FILE) if str(r.get("time", "")).startswith(day)]
+    lines = [f"Siansa on {day} (UTC)", "",
+             f"Sign-ups: {_since(DATA_FILE, day)} new, "
+             f"{sum(1 for e in events if e.get('status') == 'approved')} approved, "
+             f"{sum(1 for e in events if e.get('status') == 'denied')} denied, "
+             f"{sum(1 for e in events if e.get('status') == 'waiting')} put on the waiting list.",
+             places_line(), ""]
+    repo = today.get("repo", {"devices": 0, "requests": 0})
+    lines.append(f"F-Droid: {repo['devices']} device(s) checked the beta repo ({repo['requests']} checks).")
+    apks = sorted((k for k in today if k.startswith("apk:")), key=lambda k: int(k[4:]), reverse=True)
+    for k in apks:
+        lines.append(f"  build {k[4:]}: downloaded {today[k]['requests']} time(s) by {today[k]['devices']} device(s)")
+    if not apks:
+        lines.append("  No downloads today.")
+    week = sorted(stats)[-7:]
+    if week:
+        lines.append("Devices checking the repo, last 7 days: " +
+                     ", ".join(f"{d[5:]} {stats[d].get('repo', {}).get('devices', 0)}" for d in week))
+    totals = {}
+    for d in stats.values():
+        for k, v in d.items():
+            if k.startswith("apk:"):
+                totals[k] = totals.get(k, 0) + v["requests"]
+    if totals:
+        lines.append("Downloads so far: " + ", ".join(f"build {k[4:]} {n}" for k, n in sorted(totals.items(), key=lambda kv: -int(kv[0][4:]))))
+    reports = 0
+    try:
+        for e in os.scandir(REPORTS_DIR):
+            if e.name.endswith(".json"):
+                try:
+                    with open(e.path, encoding="utf-8") as f:
+                        reports += str(json.load(f).get("time", "")).startswith(day)
+                except (OSError, ValueError):
+                    pass
+    except OSError:
+        pass
+    lines += ["", f"Problem reports from the app: {reports}.", "",
+              "Devices are told apart by their internet address on the day, so phones sharing Wi-Fi count once and a "
+              "phone changing networks can count twice. No addresses are kept."]
+    return "\n".join(lines) + "\n"
+
+
+def send_digest(day=None):
+    to = mail_settings()["NOTIFY_TO"]
+    if not to:
+        return False
+    day = day or utc_day()
+    return send_mail(to, f"Siansa daily summary {day}", digest_text(day))
+
+
+def digest_due(now, sent_day, at=None):
+    """Whether today's summary should go now: past [at] (HH:MM, UTC) and not sent yet today."""
+    at = at or DIGEST_UTC
+    return time.strftime("%H:%M", time.gmtime(now)) >= at and sent_day != utc_day(now)
+
+
+def digest_loop():
+    while True:
+        try:
+            now = time.time()
+            with _stats_lock:
+                stats = load_stats()
+                due = digest_due(now, stats.get("digest_sent"))
+                if due:
+                    stats["digest_sent"] = utc_day(now)
+                    save_stats(stats)
+            if due:
+                print("daily summary", "sent" if send_digest(utc_day(now)) else "not sent", flush=True)
+        except Exception as e:  # never stop the loop
+            print("daily summary failed:", type(e).__name__, flush=True)
+        time.sleep(60)
+
+
 _fails = {}
 
 
@@ -628,6 +772,28 @@ def revoke(email, now=None):
     return n, promote(now)
 
 
+def _rewrite(path, lines):
+    tmp = path + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        for line in lines:
+            f.write(json.dumps(line) + "\n")
+    os.replace(tmp, path)
+
+
+def forget(email, now=None):
+    """Removes everyone's sign-ups for [email] completely (a test, or someone who asked to be removed), and their
+    decisions; no email is sent. If they had a place, the next one on the waiting list moves up."""
+    email = email.strip().lower()
+    with locked():
+        records = read_lines(DATA_FILE)
+        gone = {r["id"] for r in records if r["email"] == email}
+        if gone:
+            _rewrite(DATA_FILE, [r for r in records if r["id"] not in gone])
+            _rewrite(DECISIONS_FILE, [e for e in read_lines(DECISIONS_FILE) if e.get("id") not in gone])
+    return len(gone), promote(now) if gone else []
+
+
 def approved_fdroid_emails():
     st = statuses()
     return sorted({r["email"] for r in read_lines(DATA_FILE) if st.get(r["id"]) == "approved" and r["route"] == "fdroid"})
@@ -745,7 +911,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parts = urlsplit(self.path)
         if parts.path == "/auth":  # Caddy's forward_auth for /fdroid/t/<link>/repo
-            if valid_link(self.headers.get("X-Forwarded-Uri")):
+            uri = self.headers.get("X-Forwarded-Uri")
+            if valid_link(uri):
+                try:
+                    record_fetch(uri, self.headers.get("CF-Connecting-IP") or self.headers.get("X-Real-IP") or self.client_address[0])
+                except Exception as e:  # counting must never block a download
+                    print("stats failed:", type(e).__name__, flush=True)
                 return self._send(200, b"ok")
             if too_many_fails(self._client(), time.time()):
                 return self._send(429, b"slow down")
@@ -763,7 +934,15 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def cli(argv):
-    """Owner tools, run in the container: server.py revoke EMAIL, resend (the approval emails again), approve EMAIL, link EMAIL, notify-new-link."""
+    """Owner tools, run in the container: server.py revoke EMAIL, resend (the approval emails again), approve EMAIL,
+    link EMAIL, accept EMAIL (approve and email them), deny EMAIL, notify-new-link, stats (today's summary),
+    digest (send today's summary now)."""
+    if len(argv) == 2 and argv[1] == "stats":
+        print(digest_text(utc_day()), end="")
+        return True
+    if len(argv) == 2 and argv[1] == "digest":
+        print("sent" if send_digest() else "not sent (NOTIFY_TO or mail not set up)")
+        return True
     if len(argv) == 2 and argv[1] == "resend":
         st = statuses()
         pending = [r for r in read_lines(DATA_FILE) if st.get(r["id"]) is None and not expired(r)]
@@ -797,6 +976,29 @@ def cli(argv):
             print(f"Google Play tester: add {email} to the closed test's tester list in Play Console.")
         print(places_line())
         return True
+    if len(argv) == 3 and argv[1] in ("accept", "deny"):
+        # Like the Approve and Deny buttons in the owner's email: the tester gets the welcome email, or a short no.
+        email = argv[2].strip().lower()
+        rec, st = live_record_for(email)
+        if not rec:
+            st_all = statuses()
+            last = next((r for r in reversed(read_lines(DATA_FILE)) if r["email"] == email), None)
+            print(f"{email} is already {st_all.get(last['id'])}." if last else f"No sign-up for {email}.")
+            return True
+        if st in ("approved", "denied", "revoked"):
+            print(f"{email} is already {st}.")
+            return True
+        if argv[1] == "accept" and counts()["taken"] - (1 if st == "pending" else 0) >= LIMIT:
+            print(f"The beta is full ({LIMIT} places). Revoke someone first, or leave them on the waiting list.")
+            return True
+        print(decide(rec, "approve" if argv[1] == "accept" else "deny") or "Nothing to do.")
+        return True
+    if len(argv) == 3 and argv[1] == "forget":
+        n, promoted = forget(argv[2])
+        print(f"removed {argv[2].strip().lower()} completely ({n} sign-up(s))" if n else f"No sign-up for {argv[2]}.")
+        for line in promoted:
+            print("from the waiting list:", line)
+        return True
     if len(argv) == 3 and argv[1] == "revoke":
         n, promoted = revoke(argv[2])
         print(f"revoked {n} place(s) for {argv[2]}")
@@ -814,5 +1016,6 @@ if __name__ == "__main__":
         print("SIGNUP_SECRET is not set: approval links will not work", flush=True)
     for _ in promote():  # a raised BETA_LIMIT lets the waiting list move up
         print("moved someone up from the waiting list", flush=True)
+    threading.Thread(target=digest_loop, daemon=True).start()  # the owner's daily summary
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
