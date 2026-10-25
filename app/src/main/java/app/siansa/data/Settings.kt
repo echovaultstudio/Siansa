@@ -452,12 +452,6 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeHidden = hidden)
     }
 
-    /** This user's server name in AudioMuse, set from another user's Connections page. */
-    fun setAudioMuseServer(name: String) {
-        prefs.edit().putString("am_server", name.trim()).apply()
-        _state.value = _state.value.copy(audioMuseServer = name.trim())
-    }
-
     fun setSyncFolders(ids: Set<String>) {
         prefs.edit().putStringSet("sync_folders", ids).apply()
         _state.value = _state.value.copy(syncFolders = ids)

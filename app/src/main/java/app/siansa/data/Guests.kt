@@ -160,11 +160,26 @@ class Guests(
         }
     }
 
+    /** Whether [user] is on the same server as the user in use, so their music may be shown together. */
+    fun onSameServer(user: Int): Boolean {
+        val mine = settingsOf(Users.active).current
+        val theirs = settingsOf(user).current
+        return UserFiles.sameServer(mine.sourceKind, mine.navidromeUrl, theirs.sourceKind, theirs.navidromeUrl)
+    }
+
     /**
      * At start: forget the routes of users no longer shown, and load (or check for changes in) every
      * shown user's music.
      */
     fun start() {
+        // Only users on the same server show together: anyone else shown (from an earlier version, or a user
+        // whose server changed) is hidden again; their music is removed below like any hidden user's.
+        val elsewhere = (_shown.value - Users.active).filterNot { onSameServer(it) }.toSet()
+        if (elsewhere.isNotEmpty()) {
+            AppLog.i("Sources", "Users ${elsewhere.map { it + 1 }} are on another server; not shown together any more")
+            Users.setShown(context, _shown.value - elsewhere)
+            _shown.value = Users.shown(context)
+        }
         scope.launch {
             val guests = _shown.value - Users.active
             writing.withLock {
@@ -182,6 +197,10 @@ class Guests(
     /** Shows or hides [user]'s music. The user in use's own music is hidden by [LibraryRepository.setOwnHidden] (issue #427). */
     fun setShown(user: Int, show: Boolean) {
         if (user == Users.active) return
+        if (show && !onSameServer(user)) {
+            AppLog.w("Sources", "User ${user + 1} is on another server; switch to them instead of showing them together")
+            return
+        }
         val next = if (show) _shown.value + user else _shown.value - user
         Users.setShown(context, next)
         _shown.value = Users.shown(context)
@@ -299,16 +318,4 @@ class Guests(
         const val PAGE = 500
         const val KEPT_VERSION = "|v2"
     }
-}
-
-/**
- * Whose "Server name in AudioMuse" a request uses: the user whose song the first of [ids] is ([owner] gives
- * another user's, null for the user in use's), so each server's songs go with its own name. A request about
- * no song (a text search, a vibe, similar artists) uses the music shown: the user in use's when theirs shows,
- * else the first other user shown. [ownHidden]: the source filter hides the user in use's own music.
- */
-fun audioMuseUserFor(ids: List<String>, owner: (String) -> Int?, active: Int, shown: Set<Int>, ownHidden: Boolean = false): Int {
-    ids.firstOrNull()?.let { return owner(it) ?: active }
-    val others = shown - active
-    return if (others.isEmpty() || (active in shown && !ownHidden)) active else others.min()
 }
