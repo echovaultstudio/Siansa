@@ -1,5 +1,10 @@
 package app.siansa.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.ui.graphics.graphicsLayer
 import app.siansa.data.isFavouriteAlbum
@@ -558,10 +563,11 @@ internal fun playlistChanged(before: PlaylistDetail, now: PlaylistDetail): Boole
 /** A slowly turning cog in the title bar while the server is asked whether a playlist changed (beta #18). */
 @Composable
 internal fun CheckingCog() {
-    val turn = androidx.compose.animation.core.rememberInfiniteTransition(label = "checking")
+    val turn = rememberInfiniteTransition(label = "checking")
     val angle by turn.animateFloat(
-        0f, 360f,
-        androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1600, easing = androidx.compose.animation.core.LinearEasing)),
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 1600, easing = LinearEasing)),
         label = "cog",
     )
     Box(Modifier.size(48.dp).testTag("checkingPlaylist"), contentAlignment = Alignment.Center) {
