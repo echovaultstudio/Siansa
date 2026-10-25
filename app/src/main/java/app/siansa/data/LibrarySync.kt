@@ -119,7 +119,6 @@ class LibrarySync(
             // Navidrome hasn't scanned since: the music is the same. Refresh what changes without a scan.
             refreshExtras()
             library.putMeta(LibraryRepository.META_SYNCED_AT, System.currentTimeMillis().toString())
-        if (full) library.putMeta(LibraryRepository.META_SONG_FORMATS, "1")
             AppLog.i("Sync", "No scan since last sync, library unchanged", event = "sync.completed", fields = mapOf("changed_albums" to 0, "up_to_date" to true))
             _progress.update { it.copy(phase = SyncPhase.DONE, upToDate = true, changedAlbums = 0) }
             return
@@ -204,6 +203,7 @@ class LibrarySync(
         refreshExtras()
         lastScan?.takeIf { it != "scanning" }?.let { library.putMeta(LibraryRepository.META_LAST_SCAN, it) }
         library.putMeta(LibraryRepository.META_SYNCED_AT, System.currentTimeMillis().toString())
+        if (full) library.putMeta(LibraryRepository.META_SONG_FORMATS, "1")
         library.refreshStatus()
         val status = library.status.value
         AppLog.i("Sync", "Done: ${status?.artists} artists, ${status?.albums} albums, ${status?.songs} songs, $merged merged", event = "sync.completed",
