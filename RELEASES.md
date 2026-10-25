@@ -3,6 +3,10 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.30.5beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.30.5beta) — 2026-10-25
+
+- [#462](https://github.com/echovaultstudio/Siansa/pull/462) Hotfix: 0.30.4beta closes at start (@Th3K1ngP1n)
+
 ## [0.30.4beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.30.4beta) — 2026-10-25
 
 - [#455](https://github.com/echovaultstudio/Siansa/pull/455) AudioMuse: similar albums names its song's server; searches follow the source filter (@Th3K1ngP1n)
