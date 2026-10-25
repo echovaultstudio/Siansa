@@ -673,6 +673,23 @@ class SpacingTest {
         assertEven("Room above and below the title", text.top - row.top, row.bottom - text.bottom, 1.dp)
     }
 
+    /** Play on (beta testers #23): a DLNA row with its settings cog is as tall as the others, the cog centred in it. */
+    @Test fun castRowsWithACogKeepTheirHeight() {
+        compose.setContent {
+            SiansaTheme {
+                Column {
+                    Box(Modifier.testTag("plain")) { app.siansa.ui.TargetRow(Icons.Rounded.Palette, "Living Room", "Chromecast", selected = false) { } }
+                    Box(Modifier.testTag("withCog")) { app.siansa.ui.TargetRow(Icons.Rounded.Palette, "JBL BAR 800MK2", "DLNA · JBL", selected = true, onSettings = { }) { } }
+                }
+            }
+        }
+        val plain = compose.onNodeWithTag("plain").getBoundsInRoot()
+        val withCog = compose.onNodeWithTag("withCog").getBoundsInRoot()
+        assertEven("Row heights", plain.bottom - plain.top, withCog.bottom - withCog.top, 1.dp)
+        val cog = compose.onNodeWithTag("dlnaSettings", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Room above and below the cog", cog.top - withCog.top, withCog.bottom - cog.bottom, 1.dp)
+    }
+
     /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */
     @Test fun fastScrollHandleIsCentredAndReachesTheEnds() {
         var at by mutableFloatStateOf(0f)
