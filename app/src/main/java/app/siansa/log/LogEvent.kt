@@ -102,7 +102,7 @@ object Redactor {
     private val secretNames = setOf(
         "password", "passwd", "pass", "p", "token", "t", "s", "salt", "accesstoken", "refreshtoken", "sessionkey", "sk",
         "apikey", "apisig", "key", "secret", "authorization", "proxyauthorization", "cookie", "setcookie", "jwt",
-        "audiomusejwt", "credentials",
+        "audiomusejwt", "credentials", "xembytoken", "xmediabrowsertoken",
     )
 
     fun isSecretName(name: String): Boolean = name.lowercase().replace("-", "").replace("_", "") in secretNames
@@ -110,6 +110,9 @@ object Redactor {
     private val patterns = listOf(
         Regex("([?&](?:t|s|p|u|sk|token|apiKey|api_key|api_sig|key|secret|password)=)[^&\\s\"]+", RegexOption.IGNORE_CASE),
         Regex("(Authorization:?\\s*(?:Bearer|Basic)\\s+)\\S+", RegexOption.IGNORE_CASE),
+        // Emby's and Jellyfin's login header: Emby Client="Siansa", …, Token="…"
+        Regex("(\\bToken=\")[^\"]*", RegexOption.IGNORE_CASE),
+        Regex("(X-(?:Emby|MediaBrowser)-Token:\\s*)[^\\s·]+", RegexOption.IGNORE_CASE),
         Regex("(audiomuse_jwt=)[^;\\s]+"),
         Regex("(sk-or-[A-Za-z0-9-]{4})[A-Za-z0-9-]+"),
         Regex("(://)[^/@\\s]+:[^/@\\s]+@"),
