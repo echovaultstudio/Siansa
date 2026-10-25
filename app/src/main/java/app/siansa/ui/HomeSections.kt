@@ -84,19 +84,30 @@ fun HomeSectionScreen(nav: NavController, id: String) {
     // A grid of three or a list, switched at the top and kept per kind of page (issue #289). Playlists start
     // as a list, like Spotify; the rest as a grid.
     var grid by rememberGridMode("section-${section.id}", default = section != HomeSection.Playlists)
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
     Screen(section.title, nav) { padding ->
         Box(Modifier.padding(padding)) {
             LoadBox(items) { list ->
                 if (list.isEmpty()) {
                     Text("Nothing here yet.", Modifier.padding(Space.Page))
                 } else {
-                    LazyVerticalGrid(
-                        columns = gridCells(grid),
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = if (grid) Space.Small else 0.dp, end = if (grid) Space.Small else 0.dp, bottom = Space.Section),
-                    ) {
-                        item(span = { GridItemSpan(maxLineSpan) }) { GridListHeader("${list.size} ${if (list.size == 1) "item" else "items"}", grid) { grid = !grid } }
-                        items(list, key = { it.key }) { item -> if (grid) SectionTile(item, nav, launch, graph) else SectionRow(item, nav, launch, graph) }
+                    // Long lists get a handle on the right to move through them quickly (beta testers #24).
+                    val fast = showFastScroll(list.size)
+                    Box(Modifier.fillMaxSize()) {
+                        LazyVerticalGrid(
+                            columns = gridCells(grid),
+                            state = gridState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                start = if (grid) Space.Small else 0.dp,
+                                end = (if (grid) Space.Small else 0.dp) + (if (fast) AlphabetBarWidth else 0.dp),
+                                bottom = Space.Section,
+                            ),
+                        ) {
+                            item(span = { GridItemSpan(maxLineSpan) }) { GridListHeader("${list.size} ${if (list.size == 1) "item" else "items"}", grid) { grid = !grid } }
+                            items(list, key = { it.key }) { item -> if (grid) SectionTile(item, nav, launch, graph) else SectionRow(item, nav, launch, graph) }
+                        }
+                        if (fast) GridFastScroll(gridState, list.size) { i -> FastScroll.positionLabel(i, list.size) }
                     }
                 }
             }

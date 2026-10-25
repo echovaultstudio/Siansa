@@ -16,6 +16,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -138,20 +144,36 @@ fun AlbumsGridOrList(
     subtitle: (app.siansa.data.Album) -> String = { a -> listOfNotNull(a.artist.ifBlank { null }, a.year?.toString()).joinToString(" · ") },
 ) {
     var grid by rememberGridMode(page)
-    androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-        columns = gridCells(grid),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            start = if (grid) Space.Small else 0.dp,
-            end = if (grid) Space.Small else 0.dp,
-            bottom = bottomBarPadding(Space.Section),
-        ),
-        modifier = modifier.testTag("albumsGridOrList"),
-    ) {
-        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) { GridListHeader(title, grid) { grid = !grid } }
-        items(albums, key = { it.id }) { a ->
-            if (grid) AlbumTile(a.name, subtitle(a), a.coverArt, onClick = { onOpen(a) })
-            else MediaRow(a.name, subtitle(a), a.coverArt, onClick = { onOpen(a) })
+    val state = rememberLazyGridState()
+    val fast = showFastScroll(albums.size)
+    // A to Z by artist or by title shows the letter while you drag the handle (beta testers #24).
+    val letterBy = remember(albums) {
+        val artists = albums.map { it.artist }
+        val names = albums.map { it.name }
+        when {
+            FastScroll.inLetterOrder(artists) -> artists
+            FastScroll.inLetterOrder(names) -> names
+            else -> null
         }
+    }
+    Box(modifier) {
+        androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+            columns = gridCells(grid),
+            state = state,
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                start = if (grid) Space.Small else 0.dp,
+                end = (if (grid) Space.Small else 0.dp) + (if (fast) AlphabetBarWidth else 0.dp),
+                bottom = bottomBarPadding(Space.Section),
+            ),
+            modifier = Modifier.fillMaxSize().testTag("albumsGridOrList"),
+        ) {
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) { GridListHeader(title, grid) { grid = !grid } }
+            items(albums, key = { it.id }) { a ->
+                if (grid) AlbumTile(a.name, subtitle(a), a.coverArt, onClick = { onOpen(a) })
+                else MediaRow(a.name, subtitle(a), a.coverArt, onClick = { onOpen(a) })
+            }
+        }
+        if (fast) GridFastScroll(state, albums.size) { i -> FastScroll.nameLabel(i, albums.size, letterBy) }
     }
 }
 
@@ -168,22 +190,48 @@ fun ArtistsGridOrList(
     title: String? = null,
 ) {
     var grid by rememberGridMode(page)
+    val state = rememberLazyGridState()
+    val fast = showFastScroll(artists.size)
+    val letterBy = remember(artists) { artists.map { it.name }.takeIf { FastScroll.inLetterOrder(it) } }
     fun line(a: app.siansa.data.Artist) = if (a.albumCount > 0) "${a.albumCount} ${if (a.albumCount == 1) "album" else "albums"}" else "Artist"
-    androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-        columns = gridCells(grid),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            start = if (grid) Space.Small else 0.dp,
-            end = if (grid) Space.Small else 0.dp,
-            bottom = bottomBarPadding(Space.Section),
-        ),
-        modifier = modifier.testTag("artistsGridOrList"),
-    ) {
-        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) { GridListHeader(title, grid) { grid = !grid } }
-        items(artists, key = { it.id }) { a ->
-            val cover = a.coverArt ?: "ar-${a.id}"
-            if (grid) AlbumTile(a.name, line(a), cover, onClick = { onOpen(a) }, round = true)
-            else MediaRow(a.name, line(a), cover, onClick = { onOpen(a) }, round = true)
+    Box(modifier) {
+        androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+            columns = gridCells(grid),
+            state = state,
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                start = if (grid) Space.Small else 0.dp,
+                end = (if (grid) Space.Small else 0.dp) + (if (fast) AlphabetBarWidth else 0.dp),
+                bottom = bottomBarPadding(Space.Section),
+            ),
+            modifier = Modifier.fillMaxSize().testTag("artistsGridOrList"),
+        ) {
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) { GridListHeader(title, grid) { grid = !grid } }
+            items(artists, key = { it.id }) { a ->
+                val cover = a.coverArt ?: "ar-${a.id}"
+                if (grid) AlbumTile(a.name, line(a), cover, onClick = { onOpen(a) }, round = true)
+                else MediaRow(a.name, line(a), cover, onClick = { onOpen(a) }, round = true)
+            }
         }
+        if (fast) GridFastScroll(state, artists.size) { i -> FastScroll.nameLabel(i, artists.size, letterBy) }
     }
+}
+
+/**
+ * The quick-scroll handle over the right edge of a grid or list page whose first row is its header (beta testers
+ * #24). The grid leaves [AlphabetBarWidth] free on the right for it.
+ */
+@Composable
+fun BoxScope.GridFastScroll(state: LazyGridState, count: Int, labelAt: (Int) -> String?) {
+    val scope = rememberCoroutineScope()
+    val positions = remember(count) { FastScroll.positions(count, headers = 1) }
+    ListFastScroll(
+        count = count,
+        positions = positions,
+        firstVisible = { state.firstVisibleItemIndex },
+        visible = { state.layoutInfo.visibleItemsInfo.size },
+        scrollTo = { i -> scope.launch { state.scrollToItem(i) } },
+        labelAt = labelAt,
+        modifier = Modifier.align(Alignment.TopEnd).padding(bottom = bottomBarPadding(Space.Small)),
+    )
 }
 

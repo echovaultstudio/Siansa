@@ -148,6 +148,11 @@ fun LikedScreen(nav: NavController) {
             SortChips(sort, defaultLabel = "Recently liked") { sort = it; graph.listSort.set("liked", it) }
         },
         offline = remember { likedOfflineItem() },
+        // The quick-scroll handle says the letter or month of the order shown; liked first by when (beta testers #24).
+        scrollLabel = { _, song ->
+            FastScroll.songLabel(sort, song, SongDatesCache[song.id], heard.valueOrNull()?.get(song.id))
+                ?: FastScroll.monthLabel(isoMillis(SongDatesCache[song.id]?.starred) ?: 0L, "Just now")
+        },
     )
 }
 
@@ -257,6 +262,7 @@ fun PlaylistScreen(nav: NavController, id: String) {
             }
         },
         songMenu = if (editable) removeFromPlaylist else null,
+        scrollLabel = { _, song -> FastScroll.songLabel(sort, song, SongDatesCache[song.id], heard.valueOrNull()?.get(song.id)) },
     )
 }
 
