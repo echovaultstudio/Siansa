@@ -144,7 +144,7 @@ class EmbyApiTest {
         val api = EmbyApi(server.client, { settings })
         api.scrobble("s1", submission = true, timeMs = 0)
         api.scrobble("s1", submission = false)
-        assertEquals("1970-01-01T00:00:00Z", server.seen.first { it.path == "/Users/u1/PlayedItems/s1" }.query["DatePlayed"])
+        assertEquals("19700101000000", server.seen.first { it.path == "/Users/u1/PlayedItems/s1" }.query["DatePlayed"])
         assertTrue(server.seen.last { it.path == "/Sessions/Playing" }.body.contains("\"ItemId\":\"s1\""))
     }
 
@@ -256,5 +256,23 @@ class EmbyApiTest {
         assertEquals("mediasource_886400", start["MediaSourceId"]!!.jsonPrimitive.content)
         assertEquals(start["PlaySessionId"], progress["PlaySessionId"])
         assertTrue(start["PlaySessionId"] != next["PlaySessionId"])
+    }
+
+    @Test fun aPlayIsMarkedWithTheDateEmbyReads() = runBlocking {
+        // Beta #15: "DatePlayed=2026-10-25T06:41:34Z" made Emby answer HTTP 500, so plays never reached it.
+        assertEquals("20261025064134", embyDate(java.time.Instant.parse("2026-10-25T06:41:34Z").toEpochMilli()))
+        val server = FakeEmby { 200 to "{}" }
+        EmbyApi(server.client, { settings }).scrobble("s1", submission = true, timeMs = java.time.Instant.parse("2026-10-25T06:41:34Z").toEpochMilli())
+        val played = server.seen.last()
+        assertEquals("/Users/u1/PlayedItems/s1", played.path)
+        assertEquals("20261025064134", played.query["DatePlayed"])
+    }
+
+    @Test fun aRefusedDateStillCountsThePlay() = runBlocking {
+        val server = FakeEmby { seen -> if (seen.query.containsKey("DatePlayed")) 500 to "" else 200 to "{}" }
+        EmbyApi(server.client, { settings }).scrobble("s1", submission = true, timeMs = 0L)
+        val played = server.seen.last()
+        assertEquals("/Users/u1/PlayedItems/s1", played.path)
+        assertTrue(played.query.isEmpty())
     }
 }
