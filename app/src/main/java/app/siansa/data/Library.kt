@@ -311,7 +311,12 @@ class LibraryRepository(context: Context) {
 
     suspend fun playlists(): List<Playlist> = dao.playlists().map {
         Playlist(it.id, it.name, it.songCount, it.durationSec, it.coverArt, it.owner, it.comment, it.changed)
-    }.let { list -> onlyDownloaded()?.playlists(list) ?: list }
+    }.let { list ->
+        // The other users' ids are only needed (and read) while the user in use's own music is hidden.
+        val hidden = _ownHidden.value
+        shownPlaylists(list, hidden, if (hidden) dao.sources().mapTo(HashSet()) { it.id } else emptySet())
+    }
+        .let { list -> onlyDownloaded()?.playlists(list) ?: list }
 
     /**
      * Playlists fresh from Navidrome ([fetch], the user in use's) stored and returned together with other
@@ -573,3 +578,10 @@ class LibraryRepository(context: Context) {
 
 /** Songs from Navidrome that the phone has (by id), in their order, as the phone's copy; the rest left out. */
 internal fun keepKnown(songs: List<Song>, local: Map<String, Song>): List<Song> = songs.mapNotNull { local[it.id] }
+
+/**
+ * Only shown users' playlists: with the user in use's own music hidden, their own playlists go too, and only
+ * other shown users' ([othersIds], from the sources table) are left. Playlists on this phone are listed apart.
+ */
+internal fun shownPlaylists(playlists: List<Playlist>, ownHidden: Boolean, othersIds: Set<String>): List<Playlist> =
+    if (ownHidden) playlists.filter { it.id in othersIds } else playlists
