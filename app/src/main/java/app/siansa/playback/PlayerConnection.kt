@@ -300,8 +300,7 @@ class PlayerConnection(
     fun progress(): Progress {
         val c = controller ?: return Progress(null, 0, 0, false)
         val item = c.currentMediaItem
-        val duration = c.duration.takeIf { it != C.TIME_UNSET && it > 0 }
-            ?: ((item?.toSong()?.durationSec ?: 0) * 1000L)
+        val duration = songDurationMs(c.duration, item?.toSong()?.durationSec ?: 0)
         return Progress(item?.mediaId, c.currentPosition, duration, c.isPlaying)
     }
 
@@ -310,8 +309,7 @@ class PlayerConnection(
         val queue = (0 until c.mediaItemCount).map { c.getMediaItemAt(it).toSong() }
         val index = c.currentMediaItemIndex
         val current = queue.getOrNull(index)
-        val duration = c.duration.takeIf { it != C.TIME_UNSET && it > 0 }
-            ?: ((current?.durationSec ?: 0) * 1000L)
+        val duration = songDurationMs(c.duration, current?.durationSec ?: 0)
         _state.value = PlayerState(
             current = current,
             isPlaying = c.isPlaying,
@@ -360,4 +358,20 @@ internal fun playLimit(offline: Boolean, onlyDownloads: Boolean): String? = when
     offline -> "You're offline"
     onlyDownloads -> "Only downloaded music is on"
     else -> null
+}
+
+/**
+ * How long the playing song is, in ms: what the player read from the file, unless the server's length differs from it
+ * by more than half. Some .m4a files with E-AC3 (Dolby) sound carry a wrong length in their header, e.g. 34 minutes for
+ * a 4-minute song (beta report 7552a06d), which made the seek bar useless; the server's length is right for those.
+ */
+fun songDurationMs(playerMs: Long, serverSec: Int): Long {
+    val server = serverSec.coerceAtLeast(0) * 1000L
+    val player = if (playerMs == C.TIME_UNSET || playerMs <= 0) 0L else playerMs
+    return when {
+        player == 0L -> server
+        server == 0L -> player
+        player > server * 3 / 2 || player < server / 2 -> server
+        else -> player
+    }
 }

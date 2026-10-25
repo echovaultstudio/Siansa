@@ -341,8 +341,9 @@ class PlaybackService : MediaSessionService() {
 
     /** Time left in the current song, or -1 when its length isn't known yet. */
     private fun songLeftMs(player: Player): Long {
-        val duration = player.duration
-        if (duration == C.TIME_UNSET || duration <= 0) return -1
+        // The server's length when the file's header is wrong (beta report 7552a06d), so fades and the timer still fit.
+        val duration = songDurationMs(player.duration, player.currentMediaItem?.toSong()?.durationSec ?: 0)
+        if (duration <= 0) return -1
         return (duration - player.currentPosition).coerceAtLeast(0)
     }
 
