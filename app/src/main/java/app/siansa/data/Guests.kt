@@ -285,3 +285,14 @@ class Guests(
         const val PAGE = 500
     }
 }
+
+/**
+ * Whose "Server name in AudioMuse" a request uses: the user whose song the first of [ids] is ([owner] gives
+ * another user's, null for the user in use's), so each server's songs go with its own name. A request about
+ * no song (a text search, a mood radio) uses the music shown: the user in use's when theirs shows, else the
+ * first other user shown.
+ */
+fun audioMuseUserFor(ids: List<String>, owner: (String) -> Int?, active: Int, shown: Set<Int>): Int {
+    ids.firstOrNull()?.let { return owner(it) ?: active }
+    return if (active in shown || shown.isEmpty()) active else shown.min()
+}

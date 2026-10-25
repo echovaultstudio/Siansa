@@ -225,7 +225,14 @@ class AppGraph(val app: Application) {
         // Another shown user's songs, albums and covers go to their own server, of whatever kind (issue #427).
         route = { id -> guests.sourceFor(id) },
     )
-    val audioMuse = AudioMuseApi(http) { settings.current }
+    val audioMuse = AudioMuseApi(
+        http,
+        // Each music server's songs go to AudioMuse with that server's name (its user's), whichever user is in use.
+        serverFor = { ids ->
+            val user = app.siansa.data.audioMuseUserFor(ids, { guests.ownerOf(it) }, app.siansa.data.Users.active, guests.shown.value)
+            if (user == app.siansa.data.Users.active) settings.current.audioMuseServer else guests.settingsOf(user).current.audioMuseServer
+        },
+    ) { settings.current }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
     val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
     val openRouter = OpenRouterApi(http) { settings.current }

@@ -75,15 +75,24 @@ data class ClapHit(
  */
 class AudioMuseApi(
     private val http: OkHttpClient,
+    /**
+     * The server's name in AudioMuse for a request about [ids] (songs): the name kept by the user whose music
+     * they are, so each music server is named however many are shown; with no ids, the music shown's.
+     * Without it, the settings' own name.
+     */
+    private val serverFor: ((ids: List<String>) -> String)? = null,
     private val settings: () -> AppSettings,
 ) {
+    private fun server(ids: List<String>): String =
+        serverFor?.invoke(ids.filter { it.isNotBlank() }) ?: settings().audioMuseServer
     private val loginLock = Mutex()
     private var session: Pair<String, String>? = null // (login used, JWT)
 
-    private suspend fun request(path: String): Request.Builder {
+    /** A request to [path] (or the full address [at]), naming the server of the songs [about] (see [serverFor]). */
+    private suspend fun request(path: String, about: List<String> = emptyList(), at: okhttp3.HttpUrl? = null): Request.Builder {
         val s = settings()
         if (s.audioMuseUrl.isBlank()) throw ApiException("AudioMuse isn't set up yet")
-        val builder = Request.Builder().url(serverInUrl(s.audioMuseUrl + path, s.audioMuseServer))
+        val builder = Request.Builder().url(serverInUrl(at?.toString() ?: (s.audioMuseUrl + path), server(about)))
         when {
             s.audioMuseToken.isNotBlank() -> builder.header("Authorization", "Bearer ${s.audioMuseToken}")
             s.audioMuseUser.isNotBlank() -> builder.header("Cookie", "audiomuse_jwt=${login(s, force = false)}")
@@ -166,7 +175,9 @@ class AudioMuseApi(
         val path = if (pathAndQuery.startsWith(PLUGIN_PREFIX) && usesLegacyPlugin()) {
             LEGACY_PLUGIN_PREFIX + pathAndQuery.removePrefix(PLUGIN_PREFIX)
         } else pathAndQuery
-        return executeElement { request(path).get().build() }
+        val ids = pathAndQuery.substringAfter('?', "").split('&').firstOrNull { it.startsWith("ids=") }
+            ?.removePrefix("ids=")?.split(',', "%2C", "%2c").orEmpty()
+        return executeElement { request(path, ids).get().build() }
     }
 
     /** Per AudioMuse address: whether only the plugin's earlier version (before the rename, issue #360) is installed. */
@@ -218,7 +229,7 @@ class AudioMuseApi(
                 })
             }
         }.toString()
-        val root = execute { request("/api/clap/search").post(serverInBody(payload, settings().audioMuseServer).toRequestBody(JSON_TYPE)).build() }
+        val root = execute { request("/api/clap/search").post(serverInBody(payload, server(emptyList())).toRequestBody(JSON_TYPE)).build() }
         val hits = root.arr("results").mapNotNull { r ->
             val id = r.str("item_id") ?: return@mapNotNull null
             ClapHit(
@@ -246,7 +257,7 @@ class AudioMuseApi(
             .addQueryParameter("n", count.toString())
             .apply { sameMood?.let { addQueryParameter("mood_similarity", it.toString()) } }
             .build()
-        return neighbours(executeElement { request("").url(url).get().build() })
+        return neighbours(executeElement { request("", listOf(itemId), at = url).get().build() })
     }
 
     /** AudioMuse's mood centres (happy, relaxed…), each with the tags that describe it (issue #208). */
@@ -265,7 +276,7 @@ class AudioMuseApi(
             .addQueryParameter("centroid_index", centre.index.toString())
             .addQueryParameter("n", count.toString())
             .build()
-        return neighbours(executeElement { request("").url(url).get().build() })
+        return neighbours(executeElement { request("", at = url).get().build() })
     }
 
     /**
@@ -280,7 +291,7 @@ class AudioMuseApi(
             })
             count?.let { put("n", it) }
         }.toString()
-        val root = execute { request("/api/alchemy").post(serverInBody(payload, settings().audioMuseServer).toRequestBody(JSON_TYPE)).build() }
+        val root = execute { request("/api/alchemy", blend + avoid).post(serverInBody(payload, server(blend + avoid)).toRequestBody(JSON_TYPE)).build() }
         return neighbours(root["results"] ?: JsonArray(emptyList()))
     }
 
@@ -306,7 +317,7 @@ class AudioMuseApi(
             if (navidromeUser.isNotBlank()) put("navidrome_user", navidromeUser)
             if (navidromePassword.isNotBlank()) put("navidrome_password", navidromePassword)
         }.toString()
-        val root = executeElement { request("/api/sonic_fingerprint/generate").post(serverInBody(payload, settings().audioMuseServer).toRequestBody(JSON_TYPE)).build() }
+        val root = executeElement { request("/api/sonic_fingerprint/generate").post(serverInBody(payload, server(emptyList())).toRequestBody(JSON_TYPE)).build() }
         val rows = (root as? JsonArray) ?: JsonArray(emptyList())
         return rows.mapNotNull { element ->
             val r = element as? JsonObject ?: return@mapNotNull null
@@ -340,7 +351,7 @@ class AudioMuseApi(
             .addQueryParameter("max_steps", length.toString())
             .addQueryParameter("path_fix_size", "true")
             .build()
-        val root = executeElement { request("").url(url).get().build() }
+        val root = executeElement { request("", listOfNotNull(startId, endId), at = url).get().build() }
         val rows = (root as? JsonArray) ?: (root as? JsonObject)?.let { it["path"] as? JsonArray } ?: JsonArray(emptyList())
         return rows.mapNotNull { element ->
             val r = element as? JsonObject ?: return@mapNotNull null
@@ -371,7 +382,7 @@ class AudioMuseApi(
             .addQueryParameter("include_embeddings", "false")
             .addQueryParameter("limit", batch.size.toString())
             .build()
-        val root = execute { request("").url(url).get().build() }
+        val root = execute { request("", batch, at = url).get().build() }
         root.arr("tracks").mapNotNull(::parseFeatures)
     }
 
