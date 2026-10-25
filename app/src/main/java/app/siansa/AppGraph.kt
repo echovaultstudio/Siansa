@@ -231,7 +231,7 @@ class AppGraph(val app: Application) {
         http,
         // Each music server's songs go to AudioMuse with that server's name (its user's), whichever user is in use.
         serverFor = { ids ->
-            val user = audioMuseUserFor(ids, { guests.ownerOf(it) }, Users.active, guests.shown.value)
+            val user = audioMuseUserFor(ids, { guests.ownerOf(it) }, Users.active, guests.shown.value, library.ownHidden.value)
             if (user == Users.active) settings.current.audioMuseServer else guests.settingsOf(user).current.audioMuseServer
         },
     ) { settings.current }

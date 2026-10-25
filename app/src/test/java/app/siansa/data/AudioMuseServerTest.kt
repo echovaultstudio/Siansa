@@ -19,4 +19,12 @@ class AudioMuseServerTest {
         assertEquals(0, audioMuseUserFor(emptyList(), owner, active = 1, shown = setOf(0)))
         assertEquals(1, audioMuseUserFor(emptyList(), owner, active = 1, shown = emptySet()))
     }
+
+    @Test fun theSourceFilterHidingOwnMusicUsesTheOtherServer() {
+        // Navidrome user in use (0) with its own music hidden, Emby user (1) shown: searches go to Emby.
+        assertEquals(1, audioMuseUserFor(emptyList(), { null }, active = 0, shown = setOf(0, 1), ownHidden = true))
+        assertEquals(0, audioMuseUserFor(emptyList(), { null }, active = 0, shown = setOf(0, 1), ownHidden = false))
+        // Nothing else shown: the user in use's anyway.
+        assertEquals(0, audioMuseUserFor(emptyList(), { null }, active = 0, shown = setOf(0), ownHidden = true))
+    }
 }

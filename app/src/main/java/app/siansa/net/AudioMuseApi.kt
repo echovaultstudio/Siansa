@@ -175,9 +175,7 @@ class AudioMuseApi(
         val path = if (pathAndQuery.startsWith(PLUGIN_PREFIX) && usesLegacyPlugin()) {
             LEGACY_PLUGIN_PREFIX + pathAndQuery.removePrefix(PLUGIN_PREFIX)
         } else pathAndQuery
-        val ids = pathAndQuery.substringAfter('?', "").split('&').firstOrNull { it.startsWith("ids=") }
-            ?.removePrefix("ids=")?.replace("%2C", ",", ignoreCase = true)?.split(',').orEmpty()
-        return executeElement { request(path, ids).get().build() }
+        return executeElement { request(path, songIdsIn(pathAndQuery)).get().build() }
     }
 
     /** Per AudioMuse address: whether only the plugin's earlier version (before the rename, issue #360) is installed. */
@@ -480,6 +478,16 @@ const val LEGACY_PLUGIN_PREFIX = "/plugins/musix_analysis/"
  * in the address and, for JSON requests, in the body too, so ids come back as that server's. Nothing is added
  * for AudioMuse's default server ([server] empty).
  */
+/** The song (or album) ids a plugin address is about: `ids=a,b`, `track_id=`, `album_id=`, `item_id=` (similar albums…). */
+internal fun songIdsIn(pathAndQuery: String): List<String> =
+    pathAndQuery.substringAfter('?', "").split('&').mapNotNull { part ->
+        val name = part.substringBefore('=')
+        if (name !in SONG_ID_PARAMS) null
+        else java.net.URLDecoder.decode(part.substringAfter('=', ""), "UTF-8").split(',')
+    }.flatten().filter { it.isNotBlank() }
+
+private val SONG_ID_PARAMS = setOf("ids", "track_id", "item_id", "album_id", "id")
+
 internal fun serverInUrl(url: String, server: String): String {
     if (server.isBlank()) return url
     val parsed = url.toHttpUrlOrNull() ?: return url
