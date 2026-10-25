@@ -3,6 +3,20 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.30.6beta — 2026-10-25
+
+### Fixed
+- **Play and Shuffle for "Sounds like" sat halfway down the search results.** They're now at the top of the "Sounds like" page.
+- **Today's mix kept the music you'd hidden.** When you change what the source filter shows (your own music, other users, libraries), today's mixes are made again for what's shown, or hidden if AudioMuse isn't set up.
+- **Navidrome's log filled with "missing parameter: 'u'" warnings.** Siansa checks whether your server can be reached without signing in, and that check asked Navidrome's API. It now just knocks on the server's front page, which Navidrome answers without a warning.
+
+### Changed
+- **Playlists check for changes when you open them.** A playlist on your server opens straight away from the copy on your phone, while a turning cog at the top shows Siansa asking your server whether it changed. If it did (for example a playlist your server rewrites every hour), the new songs show at once, with no library sync needed.
+- **Search shows the top 5 of each kind.** Artists, albums, songs and "Sounds like" each show their best five; tap a section's title to see every match on a page of its own, with Play and Shuffle at the top for songs.
+- **Playlists follow the source filter.** With your own music hidden, your own playlists are hidden too, so you only see the playlists of the users shown.
+- **Add to playlist** only lets you pick playlists that can hold the songs: a server playlist takes its own user's songs, a playlist on this phone takes anyone's. The others are greyed out ("Only for songs from kids"), and shown users' own playlists are listed for their songs.
+- **Showing users together is now for users on the same server.** You can still add users on other servers (Navidrome or Emby) and switch between them in Settings › Users. In the source filter, only users on the same server as you can be shown next to your music, so everything plays, opens and finds similar music from one server. The AudioMuse server name is set once per user again.
+
 ## 0.30.5beta — 2026-10-25
 
 ### Fixed
