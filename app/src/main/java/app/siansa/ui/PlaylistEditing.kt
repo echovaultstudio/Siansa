@@ -195,6 +195,34 @@ fun PlaylistNameDialog(title: String, initial: String, confirm: String, onDismis
 fun NewPlaylistDialog(onDismiss: () -> Unit, serverAllowed: Boolean = true, onCreate: (name: String, onPhone: Boolean) -> Unit) =
     NameDialog("New playlist", "", "Create", askWhere = true, serverAllowed = serverAllowed, onDismiss = onDismiss, onConfirm = onCreate)
 
+/**
+ * "Save as playlist" on a mix, radio or card: its songs as a new playlist, named like the mix to start with, on
+ * your server or on this phone. With another shown user's songs in it, only a phone playlist can hold them.
+ */
+@Composable
+fun SaveAsPlaylistDialog(title: String, songs: List<Song>, onDone: () -> Unit) {
+    val graph = LocalGraph.current
+    val launcher = rememberPlayLauncher()
+    val scope = rememberCoroutineScope()
+    val serverTakes = remember(songs) { songs.all { graph.guests.ownerOf(it.id) == null } }
+    var busy by remember { mutableStateOf(false) }
+    NameDialog(
+        "Save as playlist", title, "Save", askWhere = true, serverAllowed = serverTakes,
+        onDismiss = onDone,
+        onConfirm = { name, onPhone ->
+            if (!busy) {
+                busy = true
+                scope.launch {
+                    val result = graph.playlists.create(name, songs, onPhone)
+                    result.onSuccess { AppLog.i("Playlist", "Saved \"$name\" with ${songs.size} songs" + if (onPhone) " on the phone" else "") }
+                    launcher.notify(result.fold({ "Saved as playlist “$name”" }, { it.message ?: "Couldn't save the playlist" }))
+                    onDone()
+                }
+            }
+        },
+    )
+}
+
 /** "Create memory" (issue #186): the playlist's name, ready filled in, and where to keep it. */
 @Composable
 fun MemoryDialog(initial: String, onDismiss: () -> Unit, onCreate: (name: String, onPhone: Boolean) -> Unit) =

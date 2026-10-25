@@ -70,6 +70,7 @@ fun CardScreen(nav: NavController, id: String) {
         color = lerp(colors.first, Color.Black, 0.25f),
         songs = songs.valueOrNull(),
         error = (card as? Load.Err)?.message ?: (songs as? Load.Err)?.message,
+        saveAsPlaylist = true,
         cover = { m -> GeneratedCover(title, colors, m) },
         header = {
             CollectionByline(null, null, null, listOfNotNull("Made for you", c?.detail, songs.valueOrNull()?.let { "${it.size} songs" }).joinToString(" · "))
