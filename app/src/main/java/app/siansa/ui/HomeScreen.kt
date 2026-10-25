@@ -177,14 +177,17 @@ fun HomeScreen(nav: NavController) {
         }
     }
 
-    LaunchedEffect(hour) {
+    // Showing other music (source filter) makes today's mixes out of date: they're made again for what's shown
+    // (with AudioMuse), and out-of-date ones aren't listed, so without AudioMuse they're hidden.
+    val mixScope = remember(shownUsers, ownHidden, libraryVersion) { graph.mixScope() }
+    LaunchedEffect(hour, mixScope) {
         graph.mixes.all()
         graph.selectors.all()
         current = null
         build(null, force = false, open = false)
     }
     // Today's personal mixes are made quietly in the background once the page is up.
-    LaunchedEffect(Unit) {
+    LaunchedEffect(mixScope) {
         delay(1500)
         val today = LocalDate.now().toString()
         for (kind in MixGenerator.Personal.entries) {
@@ -202,7 +205,7 @@ fun HomeScreen(nav: NavController) {
     val weekday = LocalDate.now().dayOfWeek.value
     val applicable = selectors.orEmpty().filter { it.enabled && it.appliesAt(hour, weekday) }.sortedByDescending { it.specificity }
     val todaysMixes = mixes.orEmpty().filter { m ->
-        m.date == today && (m.selectorId in personalIds || applicable.any { it.id == m.selectorId })
+        m.date == today && m.scope == mixScope && (m.selectorId in personalIds || applicable.any { it.id == m.selectorId })
     }
     val playlists by loadState(version to "playlists") { graph.library.refreshPlaylists { graph.source.playlists() }.let(graph.playlists.removed::visible) }
     val recentAlbums by loadState(version to "recent") { recentlyPlayedAlbums(graph) }
@@ -257,7 +260,7 @@ fun HomeScreen(nav: NavController) {
                     // Quick access, like the top grid in Spotify (issue #271): Liked songs always first, then what
                     // you played last; until there's enough of that, today's mixes, playlists and recent albums.
                     item(key = "quick") {
-                        val mixIds = mixes.orEmpty().mapTo(HashSet()) { it.id }
+                        val mixIds = mixes.orEmpty().filter { it.scope == mixScope }.mapTo(HashSet()) { it.id }
                         val fill = buildList {
                             todaysMixes.take(2).forEach { m -> add(RecentPlay("mix/${m.id}", m.title, m.songs.firstOrNull()?.cover)) }
                             playlists.valueOrNull().orEmpty().take(2).forEach { p -> add(RecentPlay("playlist/${p.id}", p.name, p.coverArt)) }

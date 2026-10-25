@@ -184,6 +184,7 @@ class MixGenerator(private val graph: AppGraph) {
             songs = spreadArtists(songs),
             createdAt = System.currentTimeMillis(),
             aiNamed = plan.ai,
+            scope = graph.mixScope(),
         )
     }
 
@@ -297,6 +298,7 @@ class MixGenerator(private val graph: AppGraph) {
             songs = songs,
             createdAt = System.currentTimeMillis(),
             aiNamed = false,
+            scope = graph.mixScope(),
         )
         graph.mixes.save(mix)
         mix
