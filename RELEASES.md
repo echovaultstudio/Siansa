@@ -3,6 +3,17 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.33.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.33.0beta) — 2026-10-25
+
+- [#459](https://github.com/echovaultstudio/Siansa/pull/459) Every user-visible change updates the docs (@Th3K1ngP1n)
+- [#477](https://github.com/echovaultstudio/Siansa/pull/477) Daily mixes from the library without AudioMuse (beta #25) (@Th3K1ngP1n)
+- [#478](https://github.com/echovaultstudio/Siansa/pull/478) DLNA: gapless next song, and original files (FLAC) per device (beta #23) (@Th3K1ngP1n)
+- [#479](https://github.com/echovaultstudio/Siansa/pull/479) Quick-scroll handle on every long list (beta #24) (@Th3K1ngP1n)
+- [#481](https://github.com/echovaultstudio/Siansa/pull/481) CI: full checks again now that jobs run on our own runner (@Th3K1ngP1n)
+- [#483](https://github.com/echovaultstudio/Siansa/pull/483) Server names: each user's own (@Th3K1ngP1n)
+- [#484](https://github.com/echovaultstudio/Siansa/pull/484) Hold releases while more fixes are merged (@Th3K1ngP1n)
+- [#485](https://github.com/echovaultstudio/Siansa/pull/485) Release: lift the hold, with today's changes in the notes (@Th3K1ngP1n)
+
 ## [0.32.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.32.0beta) — 2026-10-25
 
 - [#476](https://github.com/echovaultstudio/Siansa/pull/476) Name servers, shown instead of their address (@Th3K1ngP1n)
