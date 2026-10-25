@@ -264,6 +264,10 @@ fun SiansaRoot() {
             ) {
                 composable("home") { HomeScreen(nav) }
                 composable("search") { SearchScreen(nav) }
+                composable(
+                    "search/more/{kind}?q={q}",
+                    arguments = listOf(androidx.navigation.navArgument("q") { defaultValue = "" }),
+                ) { SearchMoreScreen(nav, it.arguments?.getString("kind"), it.arguments?.getString("q").orEmpty()) }
                 composable("library") { YourLibraryScreen(nav) }
                 composable("vibes") { VibesScreen(nav) }
                 composable("dscvr") { DscvrScreen(nav) }
