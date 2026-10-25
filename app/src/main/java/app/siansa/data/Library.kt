@@ -311,7 +311,11 @@ class LibraryRepository(context: Context) {
 
     suspend fun playlists(): List<Playlist> = dao.playlists().map {
         Playlist(it.id, it.name, it.songCount, it.durationSec, it.coverArt, it.owner, it.comment, it.changed)
-    }.let { list -> shownPlaylists(list, _ownHidden.value, dao.sources().mapTo(HashSet()) { it.id }) }
+    }.let { list ->
+        // The other users' ids are only needed (and read) while the user in use's own music is hidden.
+        val hidden = _ownHidden.value
+        shownPlaylists(list, hidden, if (hidden) dao.sources().mapTo(HashSet()) { it.id } else emptySet())
+    }
         .let { list -> onlyDownloaded()?.playlists(list) ?: list }
 
     /**
