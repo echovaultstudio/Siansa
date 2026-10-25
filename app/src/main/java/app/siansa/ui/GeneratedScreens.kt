@@ -85,6 +85,7 @@ fun RadioScreen(nav: NavController, kind: String, key: String) {
         color = lerp(colors.first, Color.Black, 0.25f),
         songs = songs.valueOrNull(),
         error = (songs as? Load.Err)?.message,
+        saveAsPlaylist = true,
         cover = { m -> GeneratedCover(title, colors, m) },
         header = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -136,6 +137,7 @@ fun BlendScreen(nav: NavController, playlistId: String) {
         color = lerp(colors.first, Color.Black, 0.25f),
         songs = songs.valueOrNull(),
         error = (source as? Load.Err)?.message ?: (songs as? Load.Err)?.message,
+        saveAsPlaylist = true,
         cover = { m -> GeneratedCover(title, colors, m) },
         header = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -171,6 +173,7 @@ fun MoodScreen(nav: NavController, text: String) {
         color = lerp(colors.first, Color.Black, 0.25f),
         songs = r?.songs,
         error = (result as? Load.Err)?.message,
+        saveAsPlaylist = true,
         cover = { m -> GeneratedCover(r?.title ?: text, colors, m) },
         header = {
             if (r != null) {
