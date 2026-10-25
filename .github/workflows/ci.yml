@@ -47,7 +47,9 @@ jobs:
           fetch-depth: 0
 
       - name: Release script tests
-        run: python3 -m unittest discover -s scripts -q
+        run: |
+          python3 -m unittest discover -s scripts -q
+          python3 -m unittest discover -s deploy/scripts -q
 
       # Fails if a password, token or API key is committed (the whole history is checked).
       - name: Secret scan
@@ -386,6 +388,13 @@ jobs:
           # Only the notes' files count (the downloaded APK and notes/ aren't part of the repository).
           if ! git diff --cached --quiet; then
             git commit -q -m "Release ${{ steps.version.outputs.version }} [skip ci]"
+          fi
+          # Siansa is GPL-3.0-or-later: each version's source goes with it. Archived before pulling, so it's exactly
+          # what was built, even if more was merged meanwhile. .gitattributes leaves the signing key out.
+          v=${{ steps.version.outputs.version }}
+          git archive --format=tar.gz --prefix="siansa-$v/" -o "siansa-$v-source.tar.gz" HEAD
+          if tar tzf "siansa-$v-source.tar.gz" | grep -q '\.keystore$'; then echo "::error::The source archive holds the signing key"; exit 1; fi
+          if [ "$(git rev-parse HEAD)" != "${{ github.sha }}" ]; then
             for i in 1 2 3; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 5; done
           fi
 
@@ -396,7 +405,9 @@ jobs:
           tag_name: v${{ steps.version.outputs.version }}
           name: Siansa ${{ steps.version.outputs.version }}
           body_path: notes/${{ steps.version.outputs.version }}.md
-          files: siansa-*.apk
+          files: |
+            siansa-*.apk
+            siansa-*-source.tar.gz
           make_latest: true
 
       # The beta F-Droid repo on our server (issue #410, deploy/): the APK goes over SSH to a key that can only
@@ -414,12 +425,18 @@ jobs:
             echo "::notice::No F-Droid beta repo set up (FDROID_HOST, FDROID_SSH_KEY, FDROID_KNOWN_HOSTS); skipped."
             exit 0
           fi
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$FDROID_SSH_KEY" > ~/.ssh/fdroid && chmod 600 ~/.ssh/fdroid
-          printf '%s\n' "$FDROID_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The key and known hosts live in this job's own temp folder, not ~/.ssh: our own runner keeps its home.
+          keys=$(mktemp -d "$RUNNER_TEMP/fdroid.XXXXXX")
+          trap 'rm -rf "$keys"' EXIT
+          printf '%s\n' "$FDROID_SSH_KEY" > "$keys/key" && chmod 600 "$keys/key"
+          printf '%s\n' "$FDROID_KNOWN_HOSTS" > "$keys/known_hosts"
+          to() { ssh -i "$keys/key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$keys/known_hosts" "siansa-deploy@$FDROID_HOST" "$@"; }
           apk=$(ls siansa-*.apk | head -n 1)
-          ssh -i ~/.ssh/fdroid -o BatchMode=yes -o StrictHostKeyChecking=yes "siansa-deploy@$FDROID_HOST" < "$apk"
-          rm -f ~/.ssh/fdroid
+          # The source first, so the repo lists it with the APK. A server without siansa-source yet refuses it;
+          # the APK still goes out.
+          # The APK's version code is this run's number (app/build.gradle.kts).
+          to "source $GITHUB_RUN_NUMBER" < siansa-*-source.tar.gz || echo "::warning::The server didn't take the source archive (run deploy/scripts/enable-site-deploy.sh there)."
+          to < "$apk"
 
       # Keeps the notes of every published version matching CHANGELOG.md, so fixes to the text show up too.
       - name: Sync release notes and titles

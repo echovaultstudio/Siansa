@@ -24,10 +24,12 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // A fixed key kept in this private repo, so every new APK installs over the last one.
+    // A fixed key kept in this private repo, so every new APK installs over the last one. It isn't in the source
+    // archive given out under the GPL (.gitattributes): built from there, the APK is unsigned or uses the debug key.
+    val siansaKey = file("siansa.keystore")
     signingConfigs {
-        create("siansa") {
-            storeFile = file("siansa.keystore")
+        if (siansaKey.exists()) create("siansa") {
+            storeFile = siansaKey
             storePassword = "REDACTED"
             keyAlias = "siansa"
             keyPassword = "REDACTED"
@@ -41,10 +43,10 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("siansa")
+            signingConfigs.findByName("siansa")?.let { signingConfig = it }
         }
         debug {
-            signingConfig = signingConfigs.getByName("siansa")
+            signingConfigs.findByName("siansa")?.let { signingConfig = it }
         }
     }
 
@@ -140,11 +142,16 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
-// CHANGELOG.md (updated by CI before the build) goes into the APK's assets, for Settings → What's new.
+// CHANGELOG.md (updated by CI before the build) goes into the APK's assets, for Settings → What's new, and the
+// GPL text as LICENSE.txt, for Settings → About and license.
 abstract class BundleChangelog : DefaultTask() {
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val changelog: RegularFileProperty
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val license: RegularFileProperty
 
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
@@ -155,11 +162,13 @@ abstract class BundleChangelog : DefaultTask() {
         dir.deleteRecursively()
         dir.mkdirs()
         changelog.get().asFile.copyTo(File(dir, "CHANGELOG.md"), overwrite = true)
+        license.get().asFile.copyTo(File(dir, "LICENSE.txt"), overwrite = true)
     }
 }
 
 val bundleChangelog = tasks.register<BundleChangelog>("bundleChangelog") {
     changelog.set(rootProject.layout.projectDirectory.file("CHANGELOG.md"))
+    license.set(rootProject.layout.projectDirectory.file("LICENSE"))
 }
 
 androidComponents {

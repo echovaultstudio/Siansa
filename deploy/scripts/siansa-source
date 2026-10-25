@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""Keeps the source code of one Siansa version next to its APK in the F-Droid repo (GPL, issue #473).
+
+Run by siansa-ci for CI's key, before the APK is published:
+    ssh siansa-deploy@server "source 1234" < siansa-0.31.0beta-source.tar.gz
+The archive comes from `git archive` (every file under one `siansa-<version>/` folder, with LICENSE, without the
+signing key). It's saved as repo/app.siansa_<versionCode>_src.tar.gz, F-Droid's own name for a version's source,
+so `fdroid update` lists it with the APK and testers download it from their private repo link.
+"""
+import io, os, re, sys, tarfile, tempfile
+
+FDROID_DIR = os.environ.get("FDROID_DIR", "/srv/fdroid")
+MAX_BYTES = 100 * 1024 * 1024
+CODE = re.compile(r"^[0-9]{1,9}$")
+TOP = re.compile(r"^siansa-[A-Za-z0-9._-]{1,40}$")
+
+
+def fail(msg):
+    print("rejected:", msg, file=sys.stderr)
+    sys.exit(2)
+
+
+def check(data):
+    """Fails unless data is a source archive as made by CI: one top folder, LICENSE in it, no key, no odd paths."""
+    try:
+        members = tarfile.open(fileobj=io.BytesIO(data), mode="r:gz").getmembers()
+    except (tarfile.TarError, OSError, EOFError):
+        fail("not a tar.gz")
+    tops, names = set(), set()
+    for m in members:
+        if m.name == "pax_global_header":  # git archive writes the commit id here
+            continue
+        parts = m.name.rstrip("/").split("/")
+        if m.name.startswith("/") or ".." in parts or not (m.isfile() or m.isdir() or m.issym()):
+            fail("odd entry " + m.name[:80])
+        tops.add(parts[0])
+        names.add("/".join(parts[1:]))
+    if len(tops) != 1 or not TOP.match(next(iter(tops))):
+        fail("not one siansa-<version>/ folder")
+    if "LICENSE" not in names:
+        fail("no LICENSE")
+    if any(n.endswith(".keystore") or n.endswith(".jks") for n in names):
+        fail("holds a signing key")
+
+
+def save(code, data):
+    dest = os.path.join(FDROID_DIR, "repo", "app.siansa_%s_src.tar.gz" % code)
+    if os.path.exists(dest):
+        print("already kept: %s" % code)
+        return dest
+    fd, tmp = tempfile.mkstemp(dir=os.path.join(FDROID_DIR, "tmp"), prefix="source.")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, dest)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    print("kept source: %s (%d bytes)" % (code, len(data)))
+    return dest
+
+
+def main(argv):
+    code = argv[1] if len(argv) > 1 else ""
+    if not CODE.match(code):
+        fail("version code")
+    data = sys.stdin.buffer.read(MAX_BYTES + 1)
+    if len(data) > MAX_BYTES:
+        fail("too big")
+    check(data)
+    save(code, data)
+
+
+if __name__ == "__main__":
+    main(sys.argv)

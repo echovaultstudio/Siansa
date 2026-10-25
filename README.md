@@ -56,6 +56,17 @@ Inside the app, with **Settings → Logs → Keep a log** on, the log records ea
 
 ## Building
 
-GitHub Actions builds a signed APK on every push to `main` and publishes it once all quality checks pass. The version comes from `version.txt` (e.g. `0.0.3beta`). Each change adds a note in `changelog.d/` (see its README). When changes are merged to `main` and the checks pass, CI raises the version by the size of the change (fixes 0.1.3 → 0.1.4, new features 0.1.3 → 0.2.0, 1.0 only when asked for; see `changelog.d/README.md`), publishes `v<version>` with `siansa-<version>.apk` and the notes, and records the section in `CHANGELOG.md` and the version in `version.txt`. Edits to older changelog sections are copied to their releases too. `RELEASES.md` lists every release with the pull requests in it and is updated after each release. The signing key is in `app/siansa.keystore`, so each new build installs over the previous one. Keep this repository private.
+GitHub Actions builds a signed APK on every push to `main` and publishes it once all quality checks pass. The version comes from `version.txt` (e.g. `0.0.3beta`). Each change adds a note in `changelog.d/` (see its README). When changes are merged to `main` and the checks pass, CI raises the version by the size of the change (fixes 0.1.3 → 0.1.4, new features 0.1.3 → 0.2.0, 1.0 only when asked for; see `changelog.d/README.md`), publishes `v<version>` with `siansa-<version>.apk` and the notes, and records the section in `CHANGELOG.md` and the version in `version.txt`. Edits to older changelog sections are copied to their releases too. `RELEASES.md` lists every release with the pull requests in it and is updated after each release. The signing key is in `app/siansa.keystore`, so each new build installs over the previous one; it's left out of the source archive (`.gitattributes`), and a build without it is unsigned. Keep this repository private: its build file also holds the key's password. Each release attaches `siansa-<version>-source.tar.gz`, and the beta F-Droid repo keeps it next to the APK (`deploy/scripts/siansa-source`).
 
 To build locally: `gradle :app:assembleRelease` with Gradle 8.14+, JDK 17 and the Android SDK (platform 36).
+
+## License
+
+Siansa is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+version. It is distributed WITHOUT ANY WARRANTY. See [`LICENSE`](LICENSE).
+
+The AudioMuse-AI plugin in [`audiomuse-plugin/`](audiomuse-plugin/) is under the GNU AGPL 3, like AudioMuse-AI itself
+([`audiomuse-plugin/LICENSE`](audiomuse-plugin/LICENSE)).
+
+Anyone who gets the app is entitled to its source: each release's source archive, or by email to help@siansa.app.

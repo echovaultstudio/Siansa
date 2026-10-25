@@ -30,6 +30,7 @@ import androidx.compose.material.icons.rounded.DownloadForOffline
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.People
@@ -114,6 +115,8 @@ fun SettingsHub(nav: NavController) {
             HubRow(Icons.Rounded.BugReport, "Report a problem") { nav.navigate("settings/report") }
             HubRow(Icons.Rounded.BugReport, "Logs") { nav.navigate("settings/logs") }
             HubRow(Icons.Rounded.NewReleases, "What's new") { nav.navigate("settings/whatsnew") }
+            // The GPL and where to get the source (Siansa is GPL-3.0-or-later, issue #473).
+            HubRow(Icons.Rounded.Info, "About and license") { nav.navigate("settings/about") }
         }
     }
 }
