@@ -3,6 +3,12 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.32.0beta — 2026-10-25
+
+### Added
+- **Name your servers.** In Settings › Users, tap the pencil next to a user to give their server a name, like
+  "Home Navidrome". Every user on that server then shows it instead of the address, here and in the source filter.
+
 ## 0.31.0beta — 2026-10-25
 
 ### Fixed
