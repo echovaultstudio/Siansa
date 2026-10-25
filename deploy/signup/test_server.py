@@ -81,6 +81,17 @@ class FlowTest(unittest.TestCase):
         self.assertIn("already denied", out.getvalue())
         self.assertIn("No sign-up for nobody@example.com", out.getvalue())
 
+    def test_forget_removes_someone_completely(self):
+        self.signup(1)
+        rec, _ = self.signup(2)
+        server.decide(rec, "approve")
+        n, _ = server.forget("P2@example.com")
+        self.assertEqual(n, 1)
+        self.assertNotIn("p2@example.com", [r["email"] for r in server.read_lines(server.DATA_FILE)])
+        self.assertNotIn(rec["id"], [e["id"] for e in server.read_lines(server.DECISIONS_FILE)])
+        self.assertEqual(server.forget("nobody@example.com")[0], 0)
+        self.assertEqual(oct(os.stat(server.DATA_FILE).st_mode & 0o777), "0o600")
+
     def test_links_are_signed_per_action(self):
         a, d = server.sign("abc", "approve"), server.sign("abc", "deny")
         self.assertNotEqual(a, d)

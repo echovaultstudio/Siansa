@@ -772,6 +772,28 @@ def revoke(email, now=None):
     return n, promote(now)
 
 
+def _rewrite(path, lines):
+    tmp = path + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        for line in lines:
+            f.write(json.dumps(line) + "\n")
+    os.replace(tmp, path)
+
+
+def forget(email, now=None):
+    """Removes everyone's sign-ups for [email] completely (a test, or someone who asked to be removed), and their
+    decisions; no email is sent. If they had a place, the next one on the waiting list moves up."""
+    email = email.strip().lower()
+    with locked():
+        records = read_lines(DATA_FILE)
+        gone = {r["id"] for r in records if r["email"] == email}
+        if gone:
+            _rewrite(DATA_FILE, [r for r in records if r["id"] not in gone])
+            _rewrite(DECISIONS_FILE, [e for e in read_lines(DECISIONS_FILE) if e.get("id") not in gone])
+    return len(gone), promote(now) if gone else []
+
+
 def approved_fdroid_emails():
     st = statuses()
     return sorted({r["email"] for r in read_lines(DATA_FILE) if st.get(r["id"]) == "approved" and r["route"] == "fdroid"})
@@ -970,6 +992,12 @@ def cli(argv):
             print(f"The beta is full ({LIMIT} places). Revoke someone first, or leave them on the waiting list.")
             return True
         print(decide(rec, "approve" if argv[1] == "accept" else "deny") or "Nothing to do.")
+        return True
+    if len(argv) == 3 and argv[1] == "forget":
+        n, promoted = forget(argv[2])
+        print(f"removed {argv[2].strip().lower()} completely ({n} sign-up(s))" if n else f"No sign-up for {argv[2]}.")
+        for line in promoted:
+            print("from the waiting list:", line)
         return True
     if len(argv) == 3 and argv[1] == "revoke":
         n, promoted = revoke(argv[2])

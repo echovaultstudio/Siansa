@@ -17,7 +17,8 @@ Siansa beta
 
   beta-accept EMAIL     approve someone and send their welcome email (like the Approve button)
   beta-deny EMAIL       turn someone down with a short, polite email (like the Deny button)
-  beta-remove EMAIL     take away a tester's place; the next one waiting moves up
+  beta-remove EMAIL     remove someone completely (tests, or anyone who asks); no email; the next one waiting moves up
+  beta-revoke EMAIL     take away a tester's place but keep their sign-up; the next one waiting moves up
   beta-link EMAIL       show the private F-Droid address for someone already approved
   beta-resend           send the Approve/Deny emails for undecided sign-ups again
 
@@ -39,7 +40,8 @@ beta-today() { _beta_server stats; }
 beta-mail-summary() { _beta_server digest; }
 beta-accept() { _beta_need "$1" beta-accept && _beta_server accept "$1"; }
 beta-deny() { _beta_need "$1" beta-deny && _beta_server deny "$1"; }
-beta-remove() { _beta_need "$1" beta-remove && sudo sh "$SIANSA_KIT/scripts/signups" revoke "$1"; }
+beta-remove() { _beta_need "$1" beta-remove && _beta_server forget "$1"; }
+beta-revoke() { _beta_need "$1" beta-revoke && sudo sh "$SIANSA_KIT/scripts/signups" revoke "$1"; }
 beta-link() { _beta_need "$1" beta-link && sudo sh "$SIANSA_KIT/scripts/signups" link "$1"; }
 beta-resend() { _beta_server resend; }
 beta-play() { sudo sh "$SIANSA_KIT/scripts/signups" play; }
