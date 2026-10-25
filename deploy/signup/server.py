@@ -913,7 +913,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def cli(argv):
     """Owner tools, run in the container: server.py revoke EMAIL, resend (the approval emails again), approve EMAIL,
-    link EMAIL, notify-new-link, stats (today's summary), digest (send today's summary now)."""
+    link EMAIL, accept EMAIL (approve and email them), deny EMAIL, notify-new-link, stats (today's summary),
+    digest (send today's summary now)."""
     if len(argv) == 2 and argv[1] == "stats":
         print(digest_text(utc_day()), end="")
         return True
@@ -952,6 +953,23 @@ def cli(argv):
         else:
             print(f"Google Play tester: add {email} to the closed test's tester list in Play Console.")
         print(places_line())
+        return True
+    if len(argv) == 3 and argv[1] in ("accept", "deny"):
+        # Like the Approve and Deny buttons in the owner's email: the tester gets the welcome email, or a short no.
+        email = argv[2].strip().lower()
+        rec, st = live_record_for(email)
+        if not rec:
+            st_all = statuses()
+            last = next((r for r in reversed(read_lines(DATA_FILE)) if r["email"] == email), None)
+            print(f"{email} is already {st_all.get(last['id'])}." if last else f"No sign-up for {email}.")
+            return True
+        if st in ("approved", "denied", "revoked"):
+            print(f"{email} is already {st}.")
+            return True
+        if argv[1] == "accept" and counts()["taken"] - (1 if st == "pending" else 0) >= LIMIT:
+            print(f"The beta is full ({LIMIT} places). Revoke someone first, or leave them on the waiting list.")
+            return True
+        print(decide(rec, "approve" if argv[1] == "accept" else "deny") or "Nothing to do.")
         return True
     if len(argv) == 3 and argv[1] == "revoke":
         n, promoted = revoke(argv[2])
