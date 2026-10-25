@@ -510,14 +510,14 @@ fun FavouriteArtistsScreen(nav: NavController) {
                     "No favourite artists yet. Tap the heart at the top of an artist's page to add them.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(padding).padding(Space.Page),
+                    modifier = Modifier.padding(Space.Page),
                 )
             } else {
                 ArtistsGridOrList(
                     list,
                     page = "favourite-artists",
                     onOpen = { nav.navigate("artist/${it.id}") },
-                    modifier = Modifier.padding(padding).fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                     title = "${list.size} ${if (list.size == 1) "artist" else "artists"}",
                 )
             }
@@ -548,14 +548,14 @@ fun FavouriteAlbumsScreen(nav: NavController) {
                     "No favourite albums yet. Tap the heart at the top of an album's page to add it.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(padding).padding(Space.Page),
+                    modifier = Modifier.padding(Space.Page),
                 )
             } else {
                 AlbumsGridOrList(
                     list,
                     page = "favourite-albums",
                     onOpen = { nav.navigate("album/${it.id}") },
-                    modifier = Modifier.padding(padding).fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                     title = "${list.size} ${if (list.size == 1) "album" else "albums"}",
                 )
             }

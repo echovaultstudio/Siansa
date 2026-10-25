@@ -341,7 +341,7 @@ fun AppearsOnScreen(nav: NavController, id: String) {
     val loaded = page.valueOrNull()
     Screen(title = loaded?.first?.name?.let { "$it appears on" } ?: "Appears on", nav = nav) { padding ->
         LoadBox(page, Modifier.padding(padding)) { (_, albums) ->
-          Box(Modifier.padding(padding)) {
+          Box {
             if (albums.isEmpty()) {
                 Text(
                     "No albums by other artists yet.",
