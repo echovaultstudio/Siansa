@@ -2,6 +2,7 @@ package app.siansa.ui
 
 import androidx.compose.ui.graphics.vector.ImageVector
 
+import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.AddCircleOutline
 
 import androidx.compose.ui.platform.testTag
@@ -835,13 +836,21 @@ private fun QueueView(state: PlayerState) {
         Text("The queue is empty", color = Color.White.copy(alpha = 0.7f))
         return
     }
+    var saving by remember { mutableStateOf(false) }
+    if (saving) SaveAsPlaylistDialog("Queue · ${java.time.LocalDate.now()}", state.queue) { saving = false }
     Column(Modifier.fillMaxSize()) {
-        Text(
-            "Up next · ${state.queue.size - state.index - 1} of ${state.queue.size}",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(Space.Page),
-        )
+        Row(Modifier.fillMaxWidth().padding(start = Space.Page), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Up next · ${state.queue.size - state.index - 1} of ${state.queue.size}",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f).padding(vertical = Space.Page),
+            )
+            // The whole queue as a playlist (beta #19); a filled circle, unlike a song's "Add to playlist".
+            IconButton(onClick = { saving = true }, modifier = Modifier.testTag("saveQueueAsPlaylist")) {
+                Icon(Icons.Rounded.AddCircle, "Save queue as playlist", tint = Color.White)
+            }
+        }
         Spacer(Modifier.height(Space.Tight))
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             itemsIndexed(state.queue, key = { i, s -> "$i-${s.id}" }) { index, song ->
