@@ -89,7 +89,7 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
     }
     val carousel: Carousel = found
     val today = LocalDate.now().toString()
-    // Only mixes made for the music shown now (source filter): others are made again, or hidden without AudioMuse.
+    // Only mixes made for the music shown now (source filter): others are made again (from the library without AudioMuse).
     val shownUsers by graph.guests.shown.collectAsStateWithLifecycle()
     val ownHidden by graph.library.ownHidden.collectAsStateWithLifecycle()
     val libraryVersion by graph.library.version.collectAsStateWithLifecycle()

@@ -16,10 +16,12 @@ class MixWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
     override suspend fun doWork(): Result {
         val graph = (applicationContext as SiansaApp).graph
         val settings = graph.settings.current
-        if (!settings.navidromeReady || !settings.audioMuseReady) return Result.success()
+        // Without AudioMuse the vibe's mix comes from the library (beta #25).
+        if (!settings.navidromeReady) return Result.success()
         runCatching { graph.generator.ensureCurrent(force = false) }
         // Today's personal mixes too (each is made once a day; later runs find them ready).
-        MixGenerator.Personal.entries.forEach { kind -> runCatching { graph.generator.ensurePersonal(kind) } }
+        MixGenerator.Personal.entries.filter { settings.audioMuseReady || !it.needsAudioMuse }
+            .forEach { kind -> runCatching { graph.generator.ensurePersonal(kind) } }
         return Result.success()
     }
 
