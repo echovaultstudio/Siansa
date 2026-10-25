@@ -146,7 +146,7 @@ class LibraryRepository(context: Context) {
      */
     suspend fun keepSyncedSongs(songs: List<Song>, why: String): List<Song> {
         onlyDownloaded()?.let { return it.songs(songs) }
-        if (songs.isEmpty() || !leavesOutLibraries()) return songs
+        if (songs.isEmpty() || !hidesSome()) return songs
         val kept = keepKnown(songs, songs(songs.map { it.id }).associateBy { it.id })
         if (kept.size < songs.size) AppLog.i("Library", "$why: left out ${songs.size - kept.size} of ${songs.size} songs from unchecked libraries")
         return kept
@@ -279,6 +279,19 @@ class LibraryRepository(context: Context) {
         val songs = only.shelf.songs.toList().chunked(CHUNK).flatMap { dao.songsWithGenre(it) }.map { it.toSong() }
         return OnlyDownloaded.genres(songs, limit)
     }
+
+    /** Random songs of what's shown: chosen libraries, shown users, and only downloads when that's on. */
+    suspend fun randomSongs(limit: Int): List<Song> {
+        val only = onlyDownloaded()
+        return dao.randomSongs(if (only != null) 100_000 else limit).map { it.toSong() }
+            .let { list -> only?.songs(list)?.take(limit) ?: list }
+    }
+
+    /**
+     * Whether some of the music on the phone is hidden (beta report 37b60d15): libraries not chosen, or the user in
+     * use's own music. Then lists straight from the server must be checked against what's shown.
+     */
+    suspend fun hidesSome(): Boolean = _ownHidden.value || leavesOutLibraries()
 
     suspend fun songsOfGenre(genre: String, limit: Int): List<Song> {
         val only = onlyDownloaded()
