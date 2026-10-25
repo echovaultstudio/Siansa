@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.rounded.Casino
 
 import app.siansa.mix.resumeStart
+import app.siansa.mix.MixRules
 import app.siansa.data.RecentPlay
 import app.siansa.data.cover
 import androidx.compose.foundation.background
@@ -177,20 +178,20 @@ fun HomeScreen(nav: NavController) {
         }
     }
 
-    // Showing other music (source filter) makes today's mixes out of date: they're made again for what's shown,
-    // with AudioMuse or from the library by genre (beta #25).
-    val mixScope = remember(shownUsers, ownHidden, libraryVersion) { graph.mixScope() }
-    LaunchedEffect(hour, mixScope) {
+    // Mixes are made when they aren't there yet for today and this hour's vibe, or when you tap refresh; showing
+    // other music in the source filter doesn't make them again (issue #486). AI mixes need AudioMuse.
+    val aiMixes = MixRules.showsAiMixes(homeSettings.audioMuseReady)
+    LaunchedEffect(hour, aiMixes) {
         graph.mixes.all()
         graph.selectors.all()
         current = null
-        build(null, force = false, open = false)
+        if (aiMixes) build(null, force = false, open = false)
     }
     // Today's personal mixes are made quietly in the background once the page is up.
-    LaunchedEffect(mixScope) {
+    LaunchedEffect(aiMixes) {
         delay(1500)
         val today = LocalDate.now().toString()
-        for (kind in MixGenerator.Personal.entries.filter { graph.settings.current.audioMuseReady || !it.needsAudioMuse }) {
+        for (kind in MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, graph.settings.current.audioMuseReady) }) {
             if (graph.mixes.get("$today-${kind.id}") != null) continue
             while (busySelector != null || personalBusy != null) delay(500)
             buildPersonal(kind, open = false, quiet = true)
@@ -204,9 +205,7 @@ fun HomeScreen(nav: NavController) {
     // Vibes for this hour and today, the most narrowly set first (issue #348).
     val weekday = LocalDate.now().dayOfWeek.value
     val applicable = selectors.orEmpty().filter { it.enabled && it.appliesAt(hour, weekday) }.sortedByDescending { it.specificity }
-    val todaysMixes = mixes.orEmpty().filter { m ->
-        m.date == today && m.scope == mixScope && (m.selectorId in personalIds || applicable.any { it.id == m.selectorId })
-    }
+    val todaysMixes = MixRules.todays(mixes.orEmpty(), today, personalIds, applicable.mapTo(HashSet()) { it.id })
     val playlists by loadState(version to "playlists") { graph.library.refreshPlaylists { graph.source.playlists() }.let(graph.playlists.removed::visible) }
     val recentAlbums by loadState(version to "recent") { recentlyPlayedAlbums(graph) }
     val recentArtists by loadState(version to "artists") { artistRadioArtists(graph) }
@@ -260,7 +259,7 @@ fun HomeScreen(nav: NavController) {
                     // Quick access, like the top grid in Spotify (issue #271): Liked songs always first, then what
                     // you played last; until there's enough of that, today's mixes, playlists and recent albums.
                     item(key = "quick") {
-                        val mixIds = mixes.orEmpty().filter { it.scope == mixScope }.mapTo(HashSet()) { it.id }
+                        val mixIds = mixes.orEmpty().mapTo(HashSet()) { it.id }
                         val fill = buildList {
                             todaysMixes.take(2).forEach { m -> add(RecentPlay("mix/${m.id}", m.title, m.songs.firstOrNull()?.cover)) }
                             playlists.valueOrNull().orEmpty().take(2).forEach { p -> add(RecentPlay("playlist/${p.id}", p.name, p.coverArt)) }
@@ -314,8 +313,8 @@ fun HomeScreen(nav: NavController) {
                         }
                     }
                     // While AudioMuse can't be reached the card above says so; no error and Try again as well. Without
-                    // AudioMuse at all, mixes come from the library (beta #25), so an error is worth showing.
-                    error?.takeIf { aiDown == null }?.let { message ->
+                    // AudioMuse at all there's no today's mix (issue #486).
+                    error?.takeIf { aiDown == null && aiMixes }?.let { message ->
                         item(key = "today_error") {
                             Column(Modifier.padding(horizontal = Space.Page)) {
                                 ErrorText(message, Modifier)
@@ -325,15 +324,16 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.CAROUSEL -> {
-                    // Your own mixes for this part of the day, set in Vibes (issue #253); from the library by genre
-                    // without AudioMuse (beta #25).
-                    if (homeSettings.navidromeReady) item(key = "carousel") { HomeCarousel(nav, aiDown) }
+                    // Your own mixes for this part of the day, set in Vibes (issue #253): AI mixes, so only with
+                    // AudioMuse (issue #486).
+                    if (homeSettings.navidromeReady && aiMixes) item(key = "carousel") { HomeCarousel(nav, aiDown) }
                 }
                 HomeSection.MADE_FOR_YOU -> {
                     // Made for you: the vibe for this hour, then mixes from your own listening.
                     item(key = "made") {
                         val tiles: List<Pair<String, @Composable () -> Unit>> = buildList {
-                            applicable.forEach { selector ->
+                            // The vibe's mix is an AI mix: only with AudioMuse (issue #486).
+                            applicable.filter { aiMixes }.forEach { selector ->
                                 add(selector.id to @Composable {
                                     val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
                                     // Just the title and track count (issue #338): the description is on the mix's page.
@@ -347,7 +347,7 @@ fun HomeScreen(nav: NavController) {
                                     )
                                 })
                             }
-                            MixGenerator.Personal.entries.filter { homeSettings.audioMuseReady || !it.needsAudioMuse }.forEach { kind ->
+                            MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, homeSettings.audioMuseReady) }.forEach { kind ->
                                 add(kind.id to @Composable {
                                     val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
                                     GradientTile(

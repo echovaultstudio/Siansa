@@ -239,8 +239,8 @@ class AppGraph(val app: Application) {
     val searchHistory = SearchHistory(app)
     /** Other users' music shown alongside the user in use's (issue #141). */
     val guests: Guests by lazy { Guests(app, http, library, scope) }
-    // Mixes are made for the music the source filter shows; showing something else makes them out of date.
-    val mixes = MixStore(app) { mixScope() }
+    // A mix stays as it was made when the source filter changes (issue #486).
+    val mixes = MixStore(app)
 
     /** The source filter's key for mixes ([mixScopeKey]). */
     fun mixScope(): String = mixScopeKey(library.ownHidden.value, guests.others(), settings.current.syncFolders)

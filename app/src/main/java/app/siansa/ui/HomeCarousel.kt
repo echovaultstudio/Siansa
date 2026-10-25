@@ -30,7 +30,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -89,14 +88,10 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
     }
     val carousel: Carousel = found
     val today = LocalDate.now().toString()
-    // Only mixes made for the music shown now (source filter): others are made again (from the library without AudioMuse).
-    val shownUsers by graph.guests.shown.collectAsStateWithLifecycle()
-    val ownHidden by graph.library.ownHidden.collectAsStateWithLifecycle()
-    val libraryVersion by graph.library.version.collectAsStateWithLifecycle()
-    val mixScope = remember(shownUsers, ownHidden, libraryVersion) { graph.mixScope() }
+    // Today's mixes as they were made: showing other music in the source filter doesn't make them again (issue #486).
     val made: List<Mix?> = carousel.usable.indices.map { i ->
         val id = "$today-${carousel.selectorFor(i).id}"
-        mixes.orEmpty().firstOrNull { it.id == id && it.scope == mixScope }
+        mixes.orEmpty().firstOrNull { it.id == id }
     }
 
     fun make(index: Int, open: Boolean) {
@@ -123,7 +118,7 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
     }
 
     // The day's mixes, one after another (each leaves out the songs of the ones made before it).
-    LaunchedEffect(carousel.id, carousel.version, today, aiDown, mixScope) {
+    LaunchedEffect(carousel.id, carousel.version, today, aiDown) {
         if (aiDown != null) return@LaunchedEffect
         val missing = carousel.usable.indices.filter { i -> graph.mixes.get("$today-${carousel.selectorFor(i).id}") == null }
         if (missing.isEmpty() || CarouselBuilding.ids.value.isNotEmpty()) return@LaunchedEffect

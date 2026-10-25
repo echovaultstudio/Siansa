@@ -18,9 +18,10 @@ class MixWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
         val settings = graph.settings.current
         // Without AudioMuse the vibe's mix comes from the library (beta #25).
         if (!settings.navidromeReady) return Result.success()
-        runCatching { graph.generator.ensureCurrent(force = false) }
+        // The vibe's mix is an AI mix: only with AudioMuse (issue #486).
+        if (MixRules.showsAiMixes(settings.audioMuseReady)) runCatching { graph.generator.ensureCurrent(force = false) }
         // Today's personal mixes too (each is made once a day; later runs find them ready).
-        MixGenerator.Personal.entries.filter { settings.audioMuseReady || !it.needsAudioMuse }
+        MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, settings.audioMuseReady) }
             .forEach { kind -> runCatching { graph.generator.ensurePersonal(kind) } }
         return Result.success()
     }

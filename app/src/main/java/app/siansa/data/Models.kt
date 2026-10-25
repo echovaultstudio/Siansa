@@ -210,8 +210,8 @@ data class Mix(
     val createdAt: Long,
     val aiNamed: Boolean,
     /**
-     * The music shown when it was made ([mixScopeKey]): when the source filter shows something else, the mix is
-     * out of date, made again with AudioMuse or hidden without it. "" is everything of the user in use's.
+     * The music shown when it was made ([mixScopeKey]), kept for the log and for later: a mix isn't made again
+     * because the source filter changed (issue #486). "" is everything of the user in use's.
      */
     val scope: String = "",
 )
