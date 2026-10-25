@@ -118,7 +118,10 @@ class Scrobbler(
                 LISTENBRAINZ -> if (s.listenBrainzReady) listenBrainz.listen(s.listenBrainzUrl, s.listenBrainzToken, item.song, item.startedAtSec) else Unit
                 else -> Unit
             }
-        }.onFailure { AppLog.w("Scrobble", "$target failed for ${item.song.title}: ${it.message}") }.isSuccess
+        }.onFailure {
+            val name = if (target == NAVIDROME) "Your server (${source.kind.name.lowercase()})" else target
+            AppLog.w("Scrobble", "$name failed for ${item.song.title}: ${it.message}")
+        }.isSuccess
     }
 
     /** Whether [song] may be scrobbled: not from a user whose songs are set not to be (issue #356). */
