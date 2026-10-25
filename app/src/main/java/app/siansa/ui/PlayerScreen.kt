@@ -2,6 +2,7 @@ package app.siansa.ui
 
 import androidx.compose.ui.graphics.vector.ImageVector
 
+import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.AddCircleOutline
 
 import androidx.compose.ui.platform.testTag
