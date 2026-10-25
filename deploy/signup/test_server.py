@@ -364,5 +364,52 @@ class MailHeadersTest(unittest.TestCase):
         self.assertTrue(msg["Message-ID"].endswith("@siansa.app>"))
 
 
+class FdroidStatsTest(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        server.STATS_FILE = os.path.join(self.dir, "stats.json")
+        server.DATA_FILE = os.path.join(self.dir, "signups.jsonl")
+        server.DECISIONS_FILE = os.path.join(self.dir, "decisions.jsonl")
+        server.REPORTS_DIR = os.path.join(self.dir, "reports")
+        server._today.update(day=None, key=b"", seen={})
+        self.day = 1_800_000_000  # a fixed moment
+
+    def test_kinds(self):
+        self.assertEqual(server.fetch_kind("/fdroid/t/abc/repo/app.siansa_650.apk"), "apk:650")
+        self.assertEqual(server.fetch_kind("/fdroid/t/abc/repo/entry.jar?x=1"), "repo")
+        self.assertEqual(server.fetch_kind("/fdroid/t/abc/repo/index-v1.jar"), "repo")
+        self.assertIsNone(server.fetch_kind("/fdroid/t/abc/repo/icons-640/icon.png"))
+        self.assertIsNone(server.fetch_kind("/fdroid/t/abc/repo/other.apk"))
+
+    def test_devices_are_counted_once_a_day_and_no_address_is_kept(self):
+        for ip in ["1.1.1.1", "1.1.1.1", "2.2.2.2"]:
+            server.record_fetch("/fdroid/t/abc/repo/entry.jar", ip, self.day)
+        server.record_fetch("/fdroid/t/abc/repo/app.siansa_650.apk", "1.1.1.1", self.day)
+        day = server.utc_day(self.day)
+        stats = server.load_stats()["days"][day]
+        self.assertEqual(stats["repo"], {"requests": 3, "devices": 2})
+        self.assertEqual(stats["apk:650"], {"requests": 1, "devices": 1})
+        raw = open(server.STATS_FILE).read()
+        self.assertNotIn("1.1.1.1", raw)
+        self.assertNotIn("2.2.2.2", raw)
+        # The next day starts afresh, with a new key.
+        server.record_fetch("/fdroid/t/abc/repo/entry.jar", "1.1.1.1", self.day + 86400)
+        self.assertEqual(server.load_stats()["days"][server.utc_day(self.day + 86400)]["repo"]["devices"], 1)
+
+    def test_summary(self):
+        server.record_fetch("/fdroid/t/abc/repo/entry.jar", "1.1.1.1", self.day)
+        server.record_fetch("/fdroid/t/abc/repo/app.siansa_650.apk", "1.1.1.1", self.day)
+        text = server.digest_text(server.utc_day(self.day))
+        self.assertIn("1 device(s) checked the beta repo", text)
+        self.assertIn("build 650: downloaded 1 time(s) by 1 device(s)", text)
+        self.assertIn("Problem reports from the app: 0.", text)
+
+    def test_due_once_a_day_after_the_time(self):
+        t = 1_800_000_000 - 1_800_000_000 % 86400 + 22 * 3600  # 22:00 UTC
+        self.assertTrue(server.digest_due(t, None, "21:55"))
+        self.assertFalse(server.digest_due(t, server.utc_day(t), "21:55"))
+        self.assertFalse(server.digest_due(t - 3600, None, "21:55"))
+
+
 if __name__ == "__main__":
     unittest.main()
