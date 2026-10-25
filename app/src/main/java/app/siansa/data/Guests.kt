@@ -34,8 +34,16 @@ data class GuestMusic(
         val albums: List<Album>,
         val songs: List<Song>,
         val playlists: List<Playlist>,
+        /** The songs' own artists and albums, not already the user in use's. */
+        val links: List<String> = emptyList(),
     ) {
-        val ids: List<String> get() = (artists.map { it.id } + albums.map { it.id } + songs.map { it.id } + playlists.map { it.id }).distinct()
+        /**
+         * Everything that goes to this user's server: their artists, albums, songs and playlists, and also each
+         * song's own artists and album, which their server's artist and album lists may not hold (an Emby
+         * song's "Skrillex & Bobby Raps"), so opening one from a song asks the right server.
+         */
+        val ids: List<String> get() =
+            (artists.map { it.id } + albums.map { it.id } + songs.map { it.id } + playlists.map { it.id } + links).distinct()
     }
 
     companion object {
@@ -54,7 +62,12 @@ data class GuestMusic(
             albums = music.albums.distinctBy { it.id }.filter { it.id !in knownAlbums },
             songs = music.songs.distinctBy { it.id }.filter { it.id !in knownSongs },
             playlists = music.playlists.distinctBy { it.id }.filter { it.id !in knownPlaylists },
+            links = music.songs.filter { it.id !in knownSongs }.flatMap { songLinks(it) }
+                .filter { it.isNotBlank() && it !in knownArtists && it !in knownAlbums }.distinct(),
         )
+
+        /** A song's own artists and album. */
+        fun songLinks(song: Song): List<String> = listOfNotNull(song.artistId, song.albumId) + song.artists.map { it.id }
 
         // Disc covers (issue #226) are "dc-<album id>:<disc>", sometimes with "_<stamp>" too.
         private val COVER = Regex("^(?:al|ar|mf|pl|dc)-([^_:]+)(?:[_:].*)?$")
@@ -226,7 +239,8 @@ class Guests(
         val all = api.musicFolders()
         val chosen = all.filter { it.id in s.syncFolders }
         val passes: List<MusicFolder?> = if (chosen.isEmpty() || chosen.size == all.size) listOf(null) else chosen
-        val folderKey = passes.joinToString(",") { it?.id ?: "*" }
+        // The marker loads everyone's music once more when what's kept changes (songs' own artists, v2).
+        val folderKey = passes.joinToString(",") { it?.id ?: "*" } + KEPT_VERSION
         val lastScan = runCatching { api.lastScan() }.getOrNull()
         val metaScan = "guest.$user.lastScan"
         val metaFolders = "guest.$user.folders"
@@ -283,6 +297,7 @@ class Guests(
 
     private companion object {
         const val PAGE = 500
+        const val KEPT_VERSION = "|v2"
     }
 }
 
