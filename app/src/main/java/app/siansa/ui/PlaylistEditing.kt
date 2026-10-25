@@ -154,7 +154,7 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
                                         Text(playlist.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text(
                                             when {
-                                                !takes -> "Only for ${playlistOwnerName(playlist)}'s songs"
+                                                !takes -> "Only for songs from ${playlistOwnerName(playlist)}"
                                                 LocalPlaylists.isLocal(playlist.id) -> "${playlist.songCount} songs · On this phone"
                                                 else -> "${playlist.songCount} songs"
                                             },
@@ -182,7 +182,7 @@ private fun PickerRow(onClick: () -> Unit, enabled: Boolean = true, content: @Co
     ) { content() }
 }
 
-/** Whose a server playlist is, for "Only for …'s songs": its owner on the server, when it says. */
+/** Whose a server playlist is, for "Only for songs from …": its owner on the server, when it says. */
 internal fun playlistOwnerName(playlist: Playlist): String = playlist.owner?.takeIf { it.isNotBlank() } ?: "its owner"
 
 /** Asks for a playlist's name; [onConfirm] gets it trimmed, and only when it isn't empty. */
