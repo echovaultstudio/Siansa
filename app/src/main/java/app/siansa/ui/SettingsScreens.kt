@@ -72,6 +72,10 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
     var navidromeTest by remember { mutableStateOf<String?>(null) }
     var audioMuseTest by remember { mutableStateOf<String?>(null) }
     var openRouterTest by remember { mutableStateOf<String?>(null) }
+    // Other users' servers, each with its own name in AudioMuse (their songs use it while they're shown).
+    val appContext = LocalContext.current.applicationContext
+    val others = remember { Users.all(appContext).filter { it.id != Users.active && it.connected } }
+    var otherNames by remember { mutableStateOf(others.associate { it.id to graph.guests.settingsOf(it.id).current.audioMuseServer }) }
 
     // Tests use what's typed, before it's saved.
     fun runTest(set: (String) -> Unit, block: suspend (AppSettings) -> String) {
@@ -107,6 +111,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
             problem = e.message
             return
         }
+        otherNames.forEach { (user, name) -> graph.guests.settingsOf(user).setAudioMuseServer(name) }
         problem = null
         val ready = graph.settings.current.navidromeReady
         when {
@@ -180,6 +185,14 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                     if (kind == SourceKind.EMBY) "AudioMuse reads your Emby library for everything smart. If AudioMuse has more than one music server, enter this Emby server's name as it is in AudioMuse. Each user keeps their own."
                     else "Only if AudioMuse has more than one music server: this server's name as it is in AudioMuse. Leave empty for its main one. Each user keeps their own."
                 )
+                if (others.isNotEmpty()) {
+                    Hint("Your other users' servers. Their songs use these names, also while you show their music here.")
+                    others.forEach { user ->
+                        Field(
+                            "${user.label}${if (user.emby) " (Emby)" else ""}", otherNames[user.id].orEmpty(), keyboard = KeyboardType.Text,
+                        ) { otherNames = otherNames + (user.id to it) }
+                    }
+                }
                 TestRow(audioMuseTest) {
                     runTest({ audioMuseTest = it }) { s ->
                         val hits = AudioMuseApi(graph.http) { s }.textSearch("calm piano", 3)
