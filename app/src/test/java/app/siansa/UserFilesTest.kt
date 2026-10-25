@@ -48,6 +48,25 @@ class UserFilesTest {
         assertEquals("New user, not connected yet", UserFiles.label("", ""))
     }
 
+    @Test fun aNamedServerShowsItsName() {
+        assertEquals("max on Home Navidrome", UserFiles.label("max", "http://192.168.1.106:4533", "Home Navidrome"))
+        assertEquals("max on 192.168.1.106", UserFiles.label("max", "http://192.168.1.106:4533", " "))
+        assertEquals("max on 192.168.1.106", UserFiles.label("max", "http://192.168.1.106:4533", null))
+    }
+
+    @Test fun serverNamesAreKeptByAddressAndCleaned() {
+        // Emby and Navidrome on one IP are two servers: their ports tell them apart.
+        val navidrome = UserFiles.serverKey("http://192.168.1.106:4533/")!!
+        val emby = UserFiles.serverKey("http://192.168.1.106:8096")!!
+        val names = mapOf(navidrome to "  Home\n Navidrome ", emby to "Emby", "x" to "   ")
+        val stored = UserFiles.formatServerNames(names)
+        assertEquals(mapOf(navidrome to "Home Navidrome", emby to "Emby"), UserFiles.parseServerNames(stored))
+        assertEquals(navidrome, UserFiles.serverKey("http://192.168.1.106:4533"))
+        // Odd entries are skipped; long names are cut.
+        assertEquals(emptyMap<String, String>(), UserFiles.parseServerNames(setOf("no name", "\nonly a name")))
+        assertEquals(UserFiles.SERVER_NAME_MAX, UserFiles.cleanServerName("a".repeat(100)).length)
+    }
+
     @Test fun backupsTreatEveryUserAlike() {
         assertTrue(BackupRules.isSecret("settings__u2", "nd_pass"))
         assertFalse(BackupRules.isSecret("settings__u2", "nd_user"))
