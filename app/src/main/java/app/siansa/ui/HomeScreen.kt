@@ -177,8 +177,8 @@ fun HomeScreen(nav: NavController) {
         }
     }
 
-    // Showing other music (source filter) makes today's mixes out of date: they're made again for what's shown
-    // (with AudioMuse), and out-of-date ones aren't listed, so without AudioMuse they're hidden.
+    // Showing other music (source filter) makes today's mixes out of date: they're made again for what's shown,
+    // with AudioMuse or from the library by genre (beta #25).
     val mixScope = remember(shownUsers, ownHidden, libraryVersion) { graph.mixScope() }
     LaunchedEffect(hour, mixScope) {
         graph.mixes.all()
@@ -190,7 +190,7 @@ fun HomeScreen(nav: NavController) {
     LaunchedEffect(mixScope) {
         delay(1500)
         val today = LocalDate.now().toString()
-        for (kind in MixGenerator.Personal.entries) {
+        for (kind in MixGenerator.Personal.entries.filter { graph.settings.current.audioMuseReady || !it.needsAudioMuse }) {
             if (graph.mixes.get("$today-${kind.id}") != null) continue
             while (busySelector != null || personalBusy != null) delay(500)
             buildPersonal(kind, open = false, quiet = true)
@@ -309,12 +309,13 @@ fun HomeScreen(nav: NavController) {
                                 onRegenerate = { build(null, force = true, open = false) },
                             )
                             busySelector == "current" -> BuildingCard()
-                            aiProblem != null -> AiUnavailable(aiProblem, Modifier.padding(horizontal = Space.Page, vertical = Space.Small))
+                            aiDown != null -> AiUnavailable(aiDown, Modifier.padding(horizontal = Space.Page, vertical = Space.Small))
                             else -> Unit
                         }
                     }
-                    // Without AudioMuse (or while it can't be reached) the card above says so; no error and Try again as well.
-                    error?.takeIf { aiProblem == null }?.let { message ->
+                    // While AudioMuse can't be reached the card above says so; no error and Try again as well. Without
+                    // AudioMuse at all, mixes come from the library (beta #25), so an error is worth showing.
+                    error?.takeIf { aiDown == null }?.let { message ->
                         item(key = "today_error") {
                             Column(Modifier.padding(horizontal = Space.Page)) {
                                 ErrorText(message, Modifier)
@@ -324,8 +325,9 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.CAROUSEL -> {
-                    // Your own mixes for this part of the day, set in Vibes (issue #253).
-                    if (homeSettings.audioMuseReady) item(key = "carousel") { HomeCarousel(nav, aiDown) }
+                    // Your own mixes for this part of the day, set in Vibes (issue #253); from the library by genre
+                    // without AudioMuse (beta #25).
+                    if (homeSettings.navidromeReady) item(key = "carousel") { HomeCarousel(nav, aiDown) }
                 }
                 HomeSection.MADE_FOR_YOU -> {
                     // Made for you: the vibe for this hour, then mixes from your own listening.
@@ -345,7 +347,7 @@ fun HomeScreen(nav: NavController) {
                                     )
                                 })
                             }
-                            MixGenerator.Personal.entries.forEach { kind ->
+                            MixGenerator.Personal.entries.filter { homeSettings.audioMuseReady || !it.needsAudioMuse }.forEach { kind ->
                                 add(kind.id to @Composable {
                                     val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
                                     GradientTile(
