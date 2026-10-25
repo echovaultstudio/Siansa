@@ -156,6 +156,13 @@ class PlaylistEditor(
         const val MAX_NAME = 100
 
         /** Whether you can change this playlist: Navidrome says so, or (older servers) it's yours. */
+        /**
+         * Whether songs of [songOwners] (each song's user) can go into a playlist of [playlistOwner] (null: a playlist
+         * on this phone, which takes anyone's). A server playlist only takes its own user's songs: another user's
+         * may be in a library that login can't reach.
+         */
+        fun takes(playlistOwner: Int?, songOwners: Set<Int>): Boolean = playlistOwner == null || songOwners.all { it == playlistOwner }
+
         fun canEdit(playlist: Playlist, user: String): Boolean =
             playlist.readonly?.not() ?: (playlist.owner.isNullOrBlank() || playlist.owner.equals(user, ignoreCase = true))
 
