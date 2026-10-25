@@ -88,9 +88,14 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
     }
     val carousel: Carousel = found
     val today = LocalDate.now().toString()
+    // Only mixes made for the music shown now (source filter): others are made again, or hidden without AudioMuse.
+    val shownUsers by graph.guests.shown.collectAsStateWithLifecycle()
+    val ownHidden by graph.library.ownHidden.collectAsStateWithLifecycle()
+    val libraryVersion by graph.library.version.collectAsStateWithLifecycle()
+    val mixScope = remember(shownUsers, ownHidden, libraryVersion) { graph.mixScope() }
     val made: List<Mix?> = carousel.usable.indices.map { i ->
         val id = "$today-${carousel.selectorFor(i).id}"
-        mixes.orEmpty().firstOrNull { it.id == id }
+        mixes.orEmpty().firstOrNull { it.id == id && it.scope == mixScope }
     }
 
     fun make(index: Int, open: Boolean) {
@@ -117,7 +122,7 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
     }
 
     // The day's mixes, one after another (each leaves out the songs of the ones made before it).
-    LaunchedEffect(carousel.id, carousel.version, today, aiDown) {
+    LaunchedEffect(carousel.id, carousel.version, today, aiDown, mixScope) {
         if (aiDown != null) return@LaunchedEffect
         val missing = carousel.usable.indices.filter { i -> graph.mixes.get("$today-${carousel.selectorFor(i).id}") == null }
         if (missing.isEmpty() || CarouselBuilding.ids.value.isNotEmpty()) return@LaunchedEffect
