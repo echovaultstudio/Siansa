@@ -87,6 +87,37 @@ object UserFiles {
     fun formatServerNames(names: Map<String, String>): Set<String> =
         names.mapNotNull { (key, name) -> cleanServerName(name).takeIf { it.isNotEmpty() }?.let { "$key\n$it" } }.toSet()
 
+    /**
+     * The name shown for user [id]'s server: the one that user gave it ([userNames], by user id), else one kept by
+     * server from before names were each user's own ([serverNames]).
+     */
+    fun nameFor(id: Int, server: String?, userNames: Map<String, String>, serverNames: Map<String, String>): String? =
+        userNames[id.toString()] ?: server?.let { serverNames[it] }
+
+    /**
+     * The names after user [id] names their server [name]; blank shows its address again. A name kept by server
+     * from before first goes to every user on that server without one of their own, so naming one user's server
+     * doesn't rename it for the others. [servers] is each user's server key. Returns (by user, by server).
+     */
+    fun withUserName(
+        id: Int,
+        name: String,
+        servers: Map<Int, String?>,
+        userNames: Map<String, String>,
+        serverNames: Map<String, String>,
+    ): Pair<Map<String, String>, Map<String, String>> {
+        val byUser = userNames.toMutableMap()
+        val byServer = serverNames.toMutableMap()
+        servers[id]?.let { server ->
+            byServer.remove(server)?.let { old ->
+                servers.forEach { (other, s) -> if (s == server) byUser.putIfAbsent(other.toString(), old) }
+            }
+        }
+        val clean = cleanServerName(name)
+        if (clean.isEmpty()) byUser.remove(id.toString()) else byUser[id.toString()] = clean
+        return byUser to byServer
+    }
+
     /** The stored list of users; before a second user is added, just the first. */
     fun parseIds(stored: String?): List<Int> =
         stored?.split(',')?.mapNotNull { it.trim().toIntOrNull() }?.distinct()?.sorted()?.ifEmpty { null } ?: listOf(FIRST)
@@ -128,7 +159,7 @@ data class UserEntry(
     val emby: Boolean = false,
     /** Their server's address as a key ([UserFiles.serverKey]), for naming it; null when not set up. */
     val server: String? = null,
-    /** The name given to their server, or null. */
+    /** The name this user gave their server, or null. */
     val serverName: String? = null,
 )
 
@@ -142,7 +173,10 @@ object Users {
     private const val KEY_ACTIVE = "active"
     private const val KEY_IDS = "ids"
     private const val KEY_SHOWN = "shown"
+    /** Names kept by server, from before each user named their own (still read until a user on it renames). */
     private const val KEY_SERVER_NAMES = "serverNames"
+    /** The name each user gave their server, by user id. */
+    private const val KEY_USER_NAMES = "userServerNames"
 
     /** The user whose files are in use, read once when the app starts. */
     @Volatile var active: Int = UserFiles.FIRST
@@ -161,16 +195,17 @@ object Users {
     fun ids(context: Context): List<Int> = UserFiles.parseIds(prefs(context).getString(KEY_IDS, null))
 
     fun all(context: Context): List<UserEntry> {
-        val names = serverNames(context)
-        return ids(context).map { id -> entry(context, id, names) }
+        val byServer = serverNames(context)
+        val byUser = userNames(context)
+        return ids(context).map { id -> entry(context, id, byUser, byServer) }
     }
 
-    private fun entry(context: Context, id: Int, names: Map<String, String>): UserEntry {
+    private fun entry(context: Context, id: Int, byUser: Map<String, String>, byServer: Map<String, String>): UserEntry {
         val settings = context.getSharedPreferences(UserFiles.scoped("settings", id), Context.MODE_PRIVATE)
         val user = settings.getString("nd_user", "").orEmpty()
         val address = settings.getString("nd_url", "").orEmpty()
         val server = UserFiles.serverKey(address)
-        val name = server?.let { names[it] }
+        val name = UserFiles.nameFor(id, server, byUser, byServer)
         return UserEntry(
             id, UserFiles.label(user, address, name), connected = user.isNotBlank() && address.isNotBlank(),
             emby = SourceKind.parse(settings.getString("source_kind", null)) == SourceKind.EMBY,
@@ -178,15 +213,25 @@ object Users {
         )
     }
 
-    /** Names given to servers, by server key: shown instead of the address for every user on that server. */
-    fun serverNames(context: Context): Map<String, String> =
+    /** Names kept by server key, from before each user named their own server. */
+    private fun serverNames(context: Context): Map<String, String> =
         UserFiles.parseServerNames(prefs(context).getStringSet(KEY_SERVER_NAMES, null).orEmpty())
 
-    /** Names the server at [server] (a server key); a blank name shows its address again. */
-    fun setServerName(context: Context, server: String, name: String) {
-        val clean = UserFiles.cleanServerName(name)
-        val next = serverNames(context) - server + (if (clean.isEmpty()) emptyMap() else mapOf(server to clean))
-        prefs(context).edit().putStringSet(KEY_SERVER_NAMES, UserFiles.formatServerNames(next)).commit()
+    /** The name each user gave their server, by user id. */
+    private fun userNames(context: Context): Map<String, String> =
+        UserFiles.parseServerNames(prefs(context).getStringSet(KEY_USER_NAMES, null).orEmpty())
+
+    /**
+     * Names user [id]'s server, for that user only: it tells logins apart in the app and changes nothing on the
+     * server. A blank name shows its address again.
+     */
+    fun setServerName(context: Context, id: Int, name: String) {
+        val servers = all(context).associate { it.id to it.server }
+        val (byUser, byServer) = UserFiles.withUserName(id, name, servers, userNames(context), serverNames(context))
+        prefs(context).edit()
+            .putStringSet(KEY_USER_NAMES, UserFiles.formatServerNames(byUser))
+            .putStringSet(KEY_SERVER_NAMES, UserFiles.formatServerNames(byServer))
+            .commit()
     }
 
     /** Users whose music shows; always includes the user in use (issue #141). */
@@ -237,7 +282,9 @@ object Users {
         UserFiles.CACHE_FILES.forEach { File(context.cacheDir, UserFiles.scoped(it, id)).delete() }
         context.deleteDatabase(UserFiles.scoped(UserFiles.DATABASE, id))
         prefs(context).edit().putString(KEY_IDS, (ids - id).joinToString(","))
-            .putString(KEY_SHOWN, UserFiles.formatShown(shown(context) - id)).commit()
+            .putString(KEY_SHOWN, UserFiles.formatShown(shown(context) - id))
+            .putStringSet(KEY_USER_NAMES, UserFiles.formatServerNames(userNames(context) - id.toString()))
+            .commit()
         AppLog.i("Users", "Removed a user and their library, history and settings")
     }
 

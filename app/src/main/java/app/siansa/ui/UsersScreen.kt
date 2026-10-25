@@ -133,6 +133,7 @@ fun UsersScreen(nav: NavController) {
 
     naming?.let { user ->
         val server = user.server ?: return@let
+        // Each user's own name: two logins on one server can be told apart (issue #482).
         var name by remember(user.id) { mutableStateOf(user.serverName.orEmpty()) }
         AlertDialog(
             onDismissRequest = { naming = null },
@@ -140,7 +141,7 @@ fun UsersScreen(nav: NavController) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                     Text(
-                        "Shown instead of its address for every user on it, like \"Home Navidrome\". Leave it empty to show the address.",
+                        "Shown instead of its address for this user only, like \"Home\" or \"Kids\", so you can tell them apart. It only changes what Siansa shows. Leave it empty to show the address.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     OutlinedTextField(
@@ -155,7 +156,7 @@ fun UsersScreen(nav: NavController) {
             confirmButton = {
                 TextButton(onClick = {
                     AppLog.i("Users", "Server of user ${user.id + 1} ${if (UserFiles.cleanServerName(name).isEmpty()) "unnamed" else "named"}")
-                    Users.setServerName(context, server, name)
+                    Users.setServerName(context, user.id, name)
                     naming = null
                     changes++
                 }) { Text("Save") }
