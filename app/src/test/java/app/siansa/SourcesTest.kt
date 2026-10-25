@@ -138,4 +138,18 @@ class SourcesTest {
         assertEquals(true, canToggleUser(connected = true, inUse = false, ownHidden = false, shownUsers = 1))
         assertEquals(false, canToggleUser(connected = false, inUse = false, ownHidden = false, shownUsers = 1))
     }
+
+    @Test fun homeShortcutsLeaveOutHiddenAlbums() {
+        // Beta #17: an Emby album played earlier stayed on Home after Emby was hidden, and opened on Navidrome.
+        val played = listOf(
+            app.siansa.data.RecentPlay("album/887226", "Emby album"),
+            app.siansa.data.RecentPlay("album/nav1", "Navidrome album"),
+            app.siansa.data.RecentPlay("mix/m1", "A mix"),
+        )
+        assertEquals(listOf("album/nav1", "mix/m1"), app.siansa.ui.shownRecents(played, setOf("nav1")).map { it.route })
+        // Before the first sync nothing is known: all stay.
+        assertEquals(3, app.siansa.ui.shownRecents(played, null).size)
+        assertEquals("887226", app.siansa.ui.recentAlbumId("album/887226"))
+        assertNull(app.siansa.ui.recentAlbumId("playlist/p1"))
+    }
 }

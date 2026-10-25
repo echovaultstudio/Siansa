@@ -162,6 +162,12 @@ class LibraryRepository(context: Context) {
         return kept
     }
 
+    /** Which of [ids] are albums shown now (not in a hidden library, not a hidden user's); null before the first sync. */
+    suspend fun shownAlbums(ids: Collection<String>): Set<String>? {
+        if (!isSynced) return null
+        return ids.distinct().chunked(500).flatMap { dao.shownAlbumIds(it) }.toSet()
+    }
+
     /** The album for any of its ids, with every id of the same album in other libraries. */
     suspend fun album(id: String): Album? {
         val entity = dao.album(id) ?: return null
