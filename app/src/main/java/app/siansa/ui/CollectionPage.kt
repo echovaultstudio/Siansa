@@ -1,5 +1,8 @@
 package app.siansa.ui
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material.icons.rounded.AddCircle
 import kotlinx.coroutines.launch
 import app.siansa.data.cover
 import androidx.compose.foundation.background
@@ -91,6 +94,8 @@ fun CollectionPage(
     actions: @Composable () -> Unit = {},
     // "Find similar albums" beside Shuffle (album pages, issue #228); null shows no button.
     onSimilar: (() -> Unit)? = null,
+    // Mixes, radios and cards: a button beside "Add all to queue" that saves the list as a playlist, named [title].
+    saveAsPlaylist: Boolean = false,
     // Extra items in a song's ⋮ menu, by its position in [songs].
     songMenu: (@Composable (index: Int, song: Song, close: () -> Unit) -> Unit)? = null,
     // The song heard last on an album you stopped part way (issue #367), by position, with its note.
@@ -157,7 +162,7 @@ fun CollectionPage(
                     Spacer(Modifier.height(Space.Small))
                     header()
                     Spacer(Modifier.height(Space.Tight))
-                    ActionRow(songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed)
+                    ActionRow(songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed, saveAs = title.takeIf { saveAsPlaylist })
                 }
             }
             when {
@@ -274,11 +279,14 @@ private fun DiscHeading(label: String, cover: Color) {
 
 /** Queue all and download on the left; find similar albums, shuffle and the big round play button on the right. */
 @Composable
-private fun ActionRow(songs: List<Song>, offline: OfflineItem?, onSimilar: (() -> Unit)?, onPlayed: () -> Unit = {}) {
+private fun ActionRow(songs: List<Song>, offline: OfflineItem?, onSimilar: (() -> Unit)?, onPlayed: () -> Unit = {}, saveAs: String? = null) {
     val graph = LocalGraph.current
+    var saving by remember { mutableStateOf(false) }
+    if (saving && saveAs != null) SaveAsPlaylistDialog(saveAs, songs) { saving = false }
     ActionButtons(
         enabled = songs.isNotEmpty(),
         onQueue = { songs.forEach { graph.player.addToQueue(it) } },
+        onSave = if (saveAs != null) ({ saving = true }) else null,
         download = { if (offline != null) DownloadButton(offline, songs) },
         onSimilar = onSimilar,
         onShuffle = { graph.player.play(songs, shuffle = true); onPlayed() },
@@ -295,10 +303,17 @@ internal fun ActionButtons(
     onSimilar: (() -> Unit)?,
     onShuffle: () -> Unit,
     onPlay: () -> Unit,
+    onSave: (() -> Unit)? = null,
 ) {
     PlayButtonRow {
-        IconButton(onClick = onQueue, enabled = enabled) {
+        IconButton(onClick = onQueue, enabled = enabled, modifier = Modifier.testTag("queueAll")) {
             Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add all to queue", Modifier.size(28.dp))
+        }
+        if (onSave != null) {
+            // A filled circle, so it isn't taken for a song's "Add to playlist" (an outlined circle in now playing).
+            IconButton(onClick = onSave, enabled = enabled, modifier = Modifier.testTag("saveAsPlaylist")) {
+                Icon(Icons.Rounded.AddCircle, "Save as playlist", Modifier.size(28.dp))
+            }
         }
         download()
         Spacer(Modifier.weight(1f))
