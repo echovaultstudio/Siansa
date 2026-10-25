@@ -3,6 +3,14 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.30.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.30.1beta) — 2026-10-25
+
+- [#445](https://github.com/echovaultstudio/Siansa/pull/445) Website: beta notice, beta testers link, check your spam folder (@Th3K1ngP1n)
+- [#446](https://github.com/echovaultstudio/Siansa/pull/446) Daily summary email to the owner, with F-Droid downloads and devices (@Th3K1ngP1n)
+- [#447](https://github.com/echovaultstudio/Siansa/pull/447) Dice only rolls from the music shown (@Th3K1ngP1n)
+- [#448](https://github.com/echovaultstudio/Siansa/pull/448) AudioMuse with Emby: per-user server name, results matched by title and artist (@Th3K1ngP1n)
+- [#449](https://github.com/echovaultstudio/Siansa/pull/449) Song length: use the server's when the file's is far off (@Th3K1ngP1n)
+
 ## [0.30.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.30.0beta) — 2026-10-24
 
 - [#428](https://github.com/echovaultstudio/Siansa/pull/428) Show users of any server type together; hide the user in use without a restart (#427) (@Th3K1ngP1n)
