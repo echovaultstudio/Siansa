@@ -332,7 +332,7 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
         var url = Streaming.forCast(Uri.parse(raw)).toString()
         var mime = Streaming.CAST_MIME
         if (device.id in Dlna.original.value) {
-            val type = Dlna.originalType(raw)
+            val type = Dlna.originalType(item.mediaId, raw, song.suffix) { api.songDetails(item.mediaId).codec }
             if (type != null && DlnaFormats.accepts(device.formats, type)) {
                 url = raw
                 mime = type

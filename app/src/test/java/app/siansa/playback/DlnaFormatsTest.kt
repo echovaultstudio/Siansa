@@ -31,6 +31,17 @@ class DlnaFormatsTest {
         assertTrue(DlnaFormats.accepts(setOf("audio/*"), "audio/x-ape"))
     }
 
+    @Test fun theFileTypeComesFromTheSongOrItsDetails() {
+        assertEquals("audio/flac", DlnaFormats.mimeOf("flac"))
+        // As Song details names it.
+        assertEquals("audio/flac", DlnaFormats.mimeOf("FLAC"))
+        assertEquals("audio/mp4", DlnaFormats.mimeOf("ALAC"))
+        assertEquals("audio/mp4", DlnaFormats.mimeOf(".m4a"))
+        assertEquals("audio/x-flac", DlnaFormats.mimeOf("audio/x-flac"))
+        assertNull(DlnaFormats.mimeOf("WavPack"))
+        assertNull(DlnaFormats.mimeOf(null))
+    }
+
     @Test fun contentTypesFromTheServerAreReadPlainly() {
         assertEquals("audio/flac", DlnaFormats.plain("Audio/FLAC; charset=binary"))
         assertNull(DlnaFormats.plain("flac"))

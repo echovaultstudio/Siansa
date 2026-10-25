@@ -199,17 +199,22 @@ object Dlna {
     }
 
     /**
-     * The type of a song's original file as the server sends it (e.g. audio/flac), asked once per song with a
-     * one-byte request; null when the server doesn't say.
+     * The type of a song's original file (e.g. audio/flac), asked once per song: from the file type the song came
+     * with ([suffix]), else the server's song details ([details], what Song details shows), else the type the
+     * server sends with the file's first byte. Null when none says.
      */
-    internal suspend fun originalType(url: String): String? = withContext(Dispatchers.IO) {
-        types[url]?.let { return@withContext it }
-        runCatching {
-            http.newCall(Request.Builder().url(url).header("Range", "bytes=0-1").build()).execute().use { r ->
-                if (r.isSuccessful) DlnaFormats.plain(r.header("Content-Type")) else null
-            }
-        }.getOrNull()?.also { if (types.size > 500) types.clear(); types[url] = it }
-    }
+    internal suspend fun originalType(id: String, url: String, suffix: String?, details: suspend () -> String?): String? =
+        withContext(Dispatchers.IO) {
+            DlnaFormats.mimeOf(suffix)?.let { return@withContext it }
+            types[id]?.let { return@withContext it }
+            val found = DlnaFormats.mimeOf(runCatching { details() }.getOrNull())
+                ?: runCatching {
+                    http.newCall(Request.Builder().url(url).header("Range", "bytes=0-1").build()).execute().use { r ->
+                        if (r.isSuccessful) DlnaFormats.plain(r.header("Content-Type")) else null
+                    }
+                }.getOrNull()
+            found?.also { if (types.size > 500) types.clear(); types[id] = it }
+        }
 
     private val types = java.util.concurrent.ConcurrentHashMap<String, String>()
 

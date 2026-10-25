@@ -26,6 +26,28 @@ internal object DlnaFormats {
         "audio/x-ms-wma" to "WMA", "audio/mpeg" to "MP3",
     )
 
+    /**
+     * The type of a file from its extension or the name Song details shows ("flac", "FLAC", "m4a", "ALAC"); a
+     * type already ("audio/flac") is kept. Null when unknown.
+     */
+    fun mimeOf(name: String?): String? {
+        val n = name?.trim()?.lowercase()?.removePrefix(".")?.takeIf { it.isNotEmpty() } ?: return null
+        if ('/' in n) return plain(n)
+        return when (n) {
+            "flac" -> "audio/flac"
+            "wav", "wave" -> "audio/wav"
+            "aif", "aiff" -> "audio/aiff"
+            "m4a", "mp4", "aac", "alac" -> "audio/mp4"
+            "mp3", "mpeg" -> "audio/mpeg"
+            "ogg", "oga", "vorbis" -> "audio/ogg"
+            "opus" -> "audio/opus"
+            "ape" -> "audio/x-ape"
+            "dsf", "dff", "dsd" -> "audio/x-dsf"
+            "wma" -> "audio/x-ms-wma"
+            else -> null
+        }
+    }
+
     /** [mime] without parameters, in lower case. */
     fun plain(mime: String?): String? = mime?.substringBefore(';')?.trim()?.lowercase()?.takeIf { '/' in it }
 
