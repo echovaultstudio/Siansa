@@ -118,6 +118,9 @@ class AudioMuseComplianceTest {
         // Older servers: only the HTTP status and "error".
         assertEquals("AudioMuse answered HTTP 500: boom", AudioMuseErrors.message(null, 500, "boom"))
         assertEquals("Odd", AudioMuseErrors.message(9999, 500, "Odd"))
+        // Beta report 810dc85c: a song AudioMuse doesn't know points to the server name setting too.
+        assertTrue(AudioMuseErrors.message(1004, 404, "x").contains("Server name in AudioMuse"))
+        assertEquals(AudioMuseErrors.NOT_KNOWN, AudioMuseErrors.message(null, 404, "x"))
     }
 
     @Test fun whereSimilarSongsComeFrom() {

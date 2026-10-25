@@ -65,7 +65,7 @@ class Radios(private val graph: AppGraph) {
     suspend fun centre(centre: MoodCentre): List<Song> {
         AppLog.i("Radio", "Mood centre radio ${centre.mood} ${centre.index} (${centre.tags.joinToString()})")
         val hits = graph.audioMuse.moodRadio(centre, 120)
-        val songs = graph.generator.resolveSongs(hits.map { it.id })
+        val songs = graph.generator.resolveHits(hits)
         if (songs.isEmpty()) throw MixException("AudioMuse found nothing for this mood")
         return varied(songs, 60)
     }
@@ -79,7 +79,7 @@ class Radios(private val graph: AppGraph) {
         if (seeds.isEmpty()) throw MixException("No songs to blend")
         AppLog.i("Radio", "Song alchemy of ${seeds.size} songs")
         val hits = graph.audioMuse.alchemy(seeds, count = 80).filter { it.id !in seeds }
-        val found = graph.generator.resolveSongs(hits.map { it.id })
+        val found = graph.generator.resolveHits(hits)
         if (found.isEmpty()) throw MixException("AudioMuse found nothing like these songs")
         return varied(found, 60)
     }
