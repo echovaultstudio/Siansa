@@ -583,7 +583,12 @@ class SpacingTest {
                     onBack = { },
                     color = androidx.compose.ui.graphics.Color.DarkGray,
                     image = { m -> Box(m) },
-                    actions = { Box(Modifier.size(48.dp).testTag("heart")) },
+                    // The artist page's heart is an IconButton like the back arrow (FavouriteArtistButton).
+                    actions = {
+                        androidx.compose.material3.IconButton(onClick = { }, modifier = Modifier.testTag("heart")) {
+                            androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.FavoriteBorder, "Heart")
+                        }
+                    },
                 ) { }
             }
         }
