@@ -159,7 +159,7 @@ class PlaybackService : MediaSessionService() {
         // Casting: playback moves to the TV when a Cast session starts and back when it ends.
         Cast.whenReady(this) { cast ->
             if (session == null) return@whenReady
-            val remote = RemoteCastPlayer.Builder(this).setMediaItemConverter(CastItems(graph.source)).build()
+            val remote = RemoteCastPlayer.Builder(this).setMediaItemConverter(CastItems(graph.source) { graph.settings.current.castSurround }).build()
             castPlayer = remote
             remote.setSessionAvailabilityListener(object : SessionAvailabilityListener {
                 override fun onCastSessionAvailable() {
@@ -403,7 +403,7 @@ class PlaybackService : MediaSessionService() {
             if (old?.deviceId == device.id && session.player === old) return
             // Casting to a Chromecast stops first; its music comes here instead.
             if (session.player === castPlayer) Cast.disconnect()
-            val player = DlnaPlayer(device, graph.source)
+            val player = DlnaPlayer(device, graph.source) { graph.settings.current.castSurround }
             dlnaPlayer = player
             moveTo(player)
         } else {

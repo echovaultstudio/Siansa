@@ -193,6 +193,9 @@ fun PlaybackSettingsScreen(nav: NavController) {
             QualityRow("On mobile data", settings.transcodeMobileKbps) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
             Hint("Siansa always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
             HorizontalDivider()
+            SwitchRow("Cast surround sound as it is", settings.castSurround) { on -> graph.settings.setCastSurround(on) }
+            Hint("TVs and speakers usually get every song as stereo MP3. With this on, songs with surround sound (Dolby Atmos, 5.1) are sent as they are, for a TV or soundbar that can play them. If a song doesn't play, turn this off. Applies from the next song; your library may need a sync first.")
+            HorizontalDivider()
             Heading("Song radio")
             Hint("A song radio always starts with its song. How far may it wander from it?")
             RadioDriftChips(settings.radioDrift) { graph.settings.setRadioDrift(it) }

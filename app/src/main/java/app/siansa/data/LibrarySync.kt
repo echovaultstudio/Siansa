@@ -108,15 +108,18 @@ class LibrarySync(
         val synced = library.meta(LibraryRepository.META_SYNCED_AT) != null
         val sameFolders = library.meta(LibraryRepository.META_SCOPE) == folderKey
         val lastScan = runCatching { api.lastScan() }.getOrNull()
+        // Songs synced before the library kept file types and channels get them with one full sync.
+        val needsFormats = library.meta(LibraryRepository.META_SONG_FORMATS) == null
         AppLog.i("Sync", "Start full=$forceFull quiet=$quiet lastScan=$lastScan libraries=${all.size}", event = "sync.started",
             fields = mapOf("full" to forceFull, "quiet" to quiet, "last_scan" to lastScan, "folders" to folderKey))
 
-        if (!forceFull && synced && sameFolders && lastScan != null && lastScan != "scanning" &&
+        if (!forceFull && !needsFormats && synced && sameFolders && lastScan != null && lastScan != "scanning" &&
             lastScan == library.meta(LibraryRepository.META_LAST_SCAN) && newestAlbumsKnown()
         ) {
             // Navidrome hasn't scanned since: the music is the same. Refresh what changes without a scan.
             refreshExtras()
             library.putMeta(LibraryRepository.META_SYNCED_AT, System.currentTimeMillis().toString())
+        if (full) library.putMeta(LibraryRepository.META_SONG_FORMATS, "1")
             AppLog.i("Sync", "No scan since last sync, library unchanged", event = "sync.completed", fields = mapOf("changed_albums" to 0, "up_to_date" to true))
             _progress.update { it.copy(phase = SyncPhase.DONE, upToDate = true, changedAlbums = 0) }
             return
@@ -151,7 +154,7 @@ class LibrarySync(
         if (added.isNotEmpty()) {
             AppLog.i("Sync", "New albums: " + added.take(8).joinToString("; ") { "${it.artist} – ${it.name}" } + if (added.size > 8) " and ${added.size - 8} more" else "")
         }
-        val full = forceFull || !synced || !sameFolders || changed.size > maxOf(300, albums.size / 3)
+        val full = forceFull || needsFormats || !synced || !sameFolders || changed.size > maxOf(300, albums.size / 3)
         AppLog.i("Sync", "${albums.size} albums on server, ${changed.size} new or changed, ${removed.size} removed, full=$full", event = "sync.progress",
             fields = mapOf("albums_on_server" to albums.size, "changed" to changed.size, "removed" to removed.size, "full" to full))
 

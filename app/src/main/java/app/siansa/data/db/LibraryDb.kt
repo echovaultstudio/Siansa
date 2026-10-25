@@ -42,6 +42,9 @@ data class SongEntity(
     val albumPeak: Float?,
     val starred: Boolean,
     val searchKey: String,
+    /** The file's type and sound channels, so casting knows a surround file (issue: cast surround untouched). */
+    val suffix: String? = null,
+    val channels: Int? = null,
 )
 
 /**
@@ -356,7 +359,7 @@ interface LibraryDao {
 
 @Database(
     entities = [SongEntity::class, AlbumEntity::class, ArtistEntity::class, PlaylistEntity::class, MetaEntity::class, SourceEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class LibraryDatabase : RoomDatabase() {
@@ -389,9 +392,17 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        /** Version 5 keeps each song's file type and sound channels; they fill in on the next sync. */
+        val ADD_SONG_FORMAT = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `songs` ADD COLUMN `suffix` TEXT")
+                db.execSQL("ALTER TABLE `songs` ADD COLUMN `channels` INTEGER")
+            }
+        }
+
         fun open(context: Context): LibraryDatabase =
             Room.databaseBuilder(context, LibraryDatabase::class.java, app.siansa.data.Users.scoped(app.siansa.data.UserFiles.DATABASE))
-                .addMigrations(ADD_SOURCES, ADD_ARTIST_MBID, ADD_ALBUM_FOLDERS)
+                .addMigrations(ADD_SOURCES, ADD_ARTIST_MBID, ADD_ALBUM_FOLDERS, ADD_SONG_FORMAT)
                 // The library can always be synced again, so any other schema change simply starts fresh.
                 .fallbackToDestructiveMigration()
                 .build()

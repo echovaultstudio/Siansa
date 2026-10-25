@@ -525,6 +525,7 @@ class SubsonicApi(
                 ArtistRef(artistId, a.str("name").orEmpty())
             },
             suffix = o.str("suffix")?.lowercase()?.takeIf { it.isNotBlank() },
+            channels = o.int("channelCount")?.takeIf { it > 0 },
         )
     }
 
