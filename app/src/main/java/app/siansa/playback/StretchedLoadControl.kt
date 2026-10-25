@@ -53,10 +53,12 @@ class StretchedSong {
 class StretchedLoadControl(
     private val delegate: LoadControl,
     private val stretched: () -> Boolean,
+    /** The bytes the player holds now (its allocator's). */
+    private val heldBytes: () -> Long,
 ) : LoadControl by delegate {
     override fun shouldContinueLoading(parameters: LoadControl.Parameters): Boolean =
         delegate.shouldContinueLoading(parameters) ||
-            keepLoading(stretched(), delegate.allocator.totalBytesAllocated.toLong())
+            keepLoading(stretched(), heldBytes())
 
     companion object {
         /** About 4 minutes of E-AC3 at 768 kbit/s on top of what's playing; well under the phone's memory budget. */

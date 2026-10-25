@@ -54,11 +54,14 @@ object PlayerFactory {
         // Start playing after one second of audio, for a snappy start. After running dry mid-song, wait for
         // five seconds' worth so a slow connection gives fewer, longer stretches instead of constant stops.
         val stretched = StretchedSong()
+        val allocator = androidx.media3.exoplayer.upstream.DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE)
         val loadControl = StretchedLoadControl(
             DefaultLoadControl.Builder()
+                .setAllocator(allocator)
                 .setBufferDurationsMs(15_000, 60_000, 1_000, 5_000)
                 .build(),
             stretched::now,
+            heldBytes = { allocator.totalBytesAllocated.toLong() },
         )
 
         // FFmpeg's decoders first (FLAC, ALAC, MP3, AAC...); the phone's own for the rest (Opus).
