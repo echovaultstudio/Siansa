@@ -47,6 +47,7 @@ fun mayFetchUnsynced(syncedFolders: String?): Boolean = syncedFolders == null ||
  * 1. optionally asks OpenRouter for a title and a sound description (small prompt, never the library),
  * 2. runs that description through AudioMuse's text-to-audio search,
  * 3. picks a varied set, skipping recent repeats, and resolves the songs in Navidrome.
+ * Without AudioMuse, or when its songs aren't in the music shown, the mix comes from the library by genre (beta #25).
  */
 class MixGenerator(private val graph: AppGraph) {
     private val mutex = Mutex()
@@ -119,7 +120,6 @@ class MixGenerator(private val graph: AppGraph) {
     ): Mix {
         val settings = graph.settings.current
         if (!settings.navidromeReady) throw MixException("Set up your server in Settings first")
-        if (!settings.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
 
         // The moment the mix is made in, as far as the Vibes panel allows (issue #247): read once, here.
         val situation = graph.situation.read(settings.situation)
@@ -132,6 +132,9 @@ class MixGenerator(private val graph: AppGraph) {
         }
         AppLog.i("Mix", "${selector.name}: \"${plan.title}\" · search \"${plan.query}\" · steer ${plan.steering.joinToString { (if (it.more) "+" else "-") + it.term }.ifEmpty { "none" }} · ai=${plan.ai}")
 
+        // Without AudioMuse, the mix is picked from the music shown by genre (beta #25).
+        if (!settings.audioMuseReady) return fromLibrary(selector, plan, date, id, exclude, otherArtists, emptyList())
+
         val pool = LinkedHashMap<String, ClapHit>()
         graph.audioMuse.textSearch(plan.query, selector.length * 5, plan.steering).forEach { pool.putIfAbsent(it.id, it) }
         val base = selector.baseQuery.ifBlank { selector.guidance }
@@ -141,7 +144,10 @@ class MixGenerator(private val graph: AppGraph) {
         }
         // Songs another mix of the same carousel has today stay out (issue #253).
         pool.keys.removeAll(exclude)
-        if (pool.isEmpty()) throw MixException("AudioMuse found no tracks for “${plan.query}”")
+        if (pool.isEmpty()) {
+            AppLog.i("Mix", "${selector.name}: AudioMuse found nothing; picking from the library")
+            return fromLibrary(selector, plan, date, id, exclude, otherArtists, emptyList())
+        }
 
         val dayMs = 24L * 60 * 60 * 1000
         val taste = taste()
@@ -171,9 +177,63 @@ class MixGenerator(private val graph: AppGraph) {
 
         val songs = resolveHits(picked)
         AppLog.i("Mix", "Resolved ${songs.size} of ${picked.size}")
-        if (songs.isEmpty()) {
-            throw MixException("Your server didn't recognise AudioMuse's tracks. Check both use the same music.")
+        // The music shown is mostly not what AudioMuse analysed (only kids' library shown, beta #25): the rest
+        // comes from the library, by genre.
+        if (songs.size < selector.length / 2) {
+            AppLog.i("Mix", "${selector.name}: only ${songs.size} of AudioMuse's songs are in the music shown; the rest from the library")
+            return fromLibrary(selector, plan, date, id, exclude, otherArtists, songs)
         }
+        return Mix(
+            id = id,
+            selectorId = selector.id,
+            date = date,
+            title = plan.title,
+            description = plan.description,
+            query = plan.query,
+            songs = spreadArtists(songs),
+            createdAt = System.currentTimeMillis(),
+            aiNamed = plan.ai,
+            scope = graph.mixScope(),
+        )
+    }
+
+    /**
+     * A mix picked from the music shown, by genre ([LibraryMix]): without AudioMuse, or to fill one whose songs are
+     * mostly not shown. [first] (AudioMuse's songs that are shown) stay at the start.
+     */
+    private suspend fun fromLibrary(
+        selector: Selector,
+        plan: Plan,
+        date: String,
+        id: String,
+        exclude: Set<String>,
+        otherArtists: Set<String>,
+        first: List<Song>,
+    ): Mix {
+        val dayMs = 24L * 60 * 60 * 1000
+        val taste = taste()
+        val recent = graph.history.playedSince(System.currentTimeMillis() - selector.repeatDays * dayMs) +
+            graph.mixes.recentSongIds(selector.id, selector.repeatDays, excludeId = id)
+        val leaveOut = taste?.favouriteSongs.orEmpty().take(selector.leaveOutTopPlayed.coerceAtLeast(0)).toSet()
+        val candidates = graph.library.randomSongs(LIBRARY_CANDIDATES)
+        val text = listOf(plan.query, plan.title, selector.baseQuery, selector.guidance, selector.name).joinToString(" ")
+        val more = LibraryMix.pick(
+            candidates,
+            vibeText = text,
+            hourGenres = taste?.hourGenres.orEmpty(),
+            length = selector.length - first.size,
+            avoid = recent + leaveOut + taste?.skipped.orEmpty(),
+            exclude = exclude + first.map { it.id },
+            otherArtists = otherArtists + graph.mixes.lastArtists(selector.id, excludeId = id),
+        )
+        val vibe = LibraryMix.words(text)
+        AppLog.i(
+            "Mix",
+            "${selector.name}: ${more.size} songs from the library (${more.count { LibraryMix.fit(it, vibe, emptySet()) == 2 }} " +
+                "by the vibe's genres) of ${candidates.size} looked at, after ${first.size} from AudioMuse",
+        )
+        val songs = first + more
+        if (songs.isEmpty()) throw MixException("There's no music to make a mix from. Check the source filter on Home.")
         return Mix(
             id = id,
             selectorId = selector.id,
@@ -266,10 +326,10 @@ class MixGenerator(private val graph: AppGraph) {
         runCatching { graph.taste.profile() }.onFailure { AppLog.w("Taste", "Couldn't build the taste profile: ${it.message}") }.getOrNull()
 
     /** Mixes made from your listening rather than a time of day. */
-    enum class Personal(val id: String, val title: String) {
-        SOUND("you-sound", "Your sound"),
-        REPEAT("you-repeat", "On repeat"),
-        DISCOVER("you-discover", "Discover for you"),
+    enum class Personal(val id: String, val title: String, val needsAudioMuse: Boolean) {
+        SOUND("you-sound", "Your sound", true),
+        REPEAT("you-repeat", "On repeat", false),
+        DISCOVER("you-discover", "Discover for you", true),
     }
 
     /** Today's personal mix of this kind, built if it doesn't exist yet. */
@@ -553,6 +613,8 @@ class MixGenerator(private val graph: AppGraph) {
 
     private companion object {
         const val DAY_MS = 24L * 60 * 60 * 1000
+        /** Songs of the music shown looked at for a mix from the library. */
+        const val LIBRARY_CANDIDATES = 3000
         val SYSTEM_PROMPT = """
             You plan one playlist for a personal music player. A text-to-audio search model (CLAP) will find tracks
             in the listener's own library from your search text, so describe how the music should SOUND.
