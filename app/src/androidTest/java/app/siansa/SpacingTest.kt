@@ -293,6 +293,23 @@ class SpacingTest {
         assertTrue("Only ${(song.top - play.bottom).value} dp under the Play button", song.top - play.bottom >= app.siansa.ui.Space.BelowPlayButton - 0.5.dp)
     }
 
+    /** Playlist page (beta #18): the turning cog sits on the title bar's line, the size of the ⋮ button beside it. */
+    @Test fun checkingCogSitsLevelWithTheMenuButton() {
+        compose.setContent {
+            SiansaTheme {
+                androidx.compose.foundation.layout.Row {
+                    app.siansa.ui.CheckingCog()
+                    androidx.compose.material3.IconButton(onClick = { }, modifier = Modifier.testTag("menu")) {
+                        androidx.compose.material3.Icon(Icons.Rounded.FavoriteBorder, "Menu")
+                    }
+                }
+            }
+        }
+        val cog = compose.onNodeWithTag("checkingPlaylist").getBoundsInRoot()
+        val menu = compose.onNodeWithTag("menu").getBoundsInRoot()
+        assertEven("Cog and menu, vertical centre", (cog.top + cog.bottom) / 2, (menu.top + menu.bottom) / 2, 1.dp)
+    }
+
     /** Downloads (issue #235): the ✕ that stops all downloads sits on the progress line's centre. */
     @Test fun stopAllSitsOnTheProgressLine() {
         compose.setContent { SiansaTheme { app.siansa.ui.ProgressWithStop(0.4f) { } } }

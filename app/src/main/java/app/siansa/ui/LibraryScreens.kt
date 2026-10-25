@@ -1,5 +1,12 @@
 package app.siansa.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.ui.graphics.graphicsLayer
 import app.siansa.data.isFavouriteAlbum
 import app.siansa.data.Album
 import androidx.compose.material.icons.rounded.FavoriteBorder
@@ -154,14 +161,21 @@ fun PlaylistScreen(nav: NavController, id: String) {
     var version by remember { mutableIntStateOf(0) }
     var removing by remember { mutableStateOf(false) }
     val onPhone = LocalPlaylists.isLocal(id)
+    // A server playlist opens at once from the copy on the phone, while the server is asked whether it changed
+    // (beta #18: playlists the server rewrites every hour). [checking] turns the cog in the title bar.
+    var checking by remember { mutableStateOf(false) }
+    var checked by remember { mutableStateOf(false) }
     val detail by loadState(id to version) {
         val remote = if (onPhone) {
             val local = graph.localPlaylists.get(id) ?: throw IllegalStateException("This playlist isn't on this phone any more")
             PlaylistDetail(local.toPlaylist(), local.songs)
         } else try {
-            // Kept on the phone while Navidrome's playlist list says it hasn't changed (issue #251); after a
-            // change made here ([version]), read again.
-            graph.playlistCache.get(id, force = version > 0)
+            // First the copy kept on the phone (issue #251), or the server when there's none. After the check
+            // found a change, the copy it just kept; after a change made here ([version]), the server again.
+            when {
+                version == 0 || checked -> graph.playlistCache.kept(id) ?: graph.playlistCache.get(id, force = true)
+                else -> graph.playlistCache.get(id, force = true)
+            }
         } catch (e: Exception) {
             // Without a connection, a downloaded playlist still opens with its songs on the phone.
             val key = OfflineItem.key(OfflineKind.PLAYLIST, id)
@@ -170,6 +184,18 @@ fun PlaylistScreen(nav: NavController, id: String) {
         }
         val local = graph.library.songs(remote.songs.map { it.id }).associateBy { it.id }
         remote.copy(songs = remote.songs.map { local[it.id] ?: it })
+    }
+    LaunchedEffect(id) {
+        if (onPhone) return@LaunchedEffect
+        val before = graph.playlistCache.kept(id) ?: return@LaunchedEffect // none kept: it was just read from the server
+        checking = true
+        val fresh = runCatching { graph.playlistCache.refresh(id) }.getOrNull()
+        checking = false
+        if (fresh != null && playlistChanged(before, fresh)) {
+            AppLog.i("Playlist", "Playlist $id changed on the server: ${before.songs.size} → ${fresh.songs.size} songs")
+            checked = true
+            version++
+        }
     }
     // While it loads again after a change, the page keeps showing the playlist as it was.
     var last by remember { mutableStateOf<PlaylistDetail?>(null) }
@@ -222,6 +248,7 @@ fun PlaylistScreen(nav: NavController, id: String) {
         // A phone playlist's songs download one by one (from their ⋮ menu); Downloads keeps Navidrome's playlists.
         offline = if (onPhone) null else d?.playlist?.offlineItem(),
         actions = {
+            if (checking) CheckingCog()
             if (d != null) {
                 PlaylistMenuButton(d.playlist, editable, notify = launcher::notify, onChanged = { version++ }, onDeleted = { nav.popBackStack() }, onMoved = { made ->
                     nav.popBackStack()
@@ -526,5 +553,28 @@ fun FavouriteAlbumsScreen(nav: NavController) {
                 )
             }
         }
+    }
+}
+
+/** Whether a playlist read again differs from the copy shown: its songs, their order, or its name. */
+internal fun playlistChanged(before: PlaylistDetail, now: PlaylistDetail): Boolean =
+    before.songs.map { it.id } != now.songs.map { it.id } || before.playlist.name != now.playlist.name
+
+/** A slowly turning cog in the title bar while the server is asked whether a playlist changed (beta #18). */
+@Composable
+internal fun CheckingCog() {
+    val turn = rememberInfiniteTransition(label = "checking")
+    val angle by turn.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 1600, easing = LinearEasing)),
+        label = "cog",
+    )
+    Box(Modifier.size(48.dp).testTag("checkingPlaylist"), contentAlignment = Alignment.Center) {
+        Icon(
+            Icons.Rounded.Settings, "Checking for changes",
+            Modifier.size(22.dp).graphicsLayer { rotationZ = angle },
+            tint = LocalContentColor.current.copy(alpha = 0.8f),
+        )
     }
 }
