@@ -69,7 +69,7 @@ fun SimilarAlbumsScreen(nav: NavController, songId: String) {
     val album = seed.valueOrNull()?.album?.ifBlank { null }
     Screen(title = album?.let { "Albums like $it" } ?: "Similar albums", nav = nav) { padding ->
         LoadBox(albums, Modifier.padding(padding)) { found ->
-            Box(Modifier.padding(padding)) {
+            Box {
                 if (found.isEmpty()) {
                     Text(
                         "No similar albums yet. The Siansa plugin on your AudioMuse server finds them once it has " +

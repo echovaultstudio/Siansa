@@ -26,6 +26,8 @@ import app.siansa.mix.VibeTuning
 import androidx.compose.material3.Text
 import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.test.onRoot
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -402,6 +404,34 @@ class SpacingTest {
         val chips = app.siansa.scrobble.SCROBBLE_PERCENTS.map { compose.onNodeWithTag("scrobblePercent-$it").getBoundsInRoot() }
         val gaps = chips.zipWithNext().map { (a, b) -> b.left - a.right }
         gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between scrobble choices", a, b, 1.dp) }
+    }
+
+    /**
+     * Pages that load their content (issue #488: search's "Albums for …" started under the title bar): once loaded,
+     * the page starts below its title bar, and nothing reaches past the screen's left or right edge.
+     */
+    @Test fun loadedPagesStartBelowTheTitleBarAndStayOnScreen() {
+        val albums = (1..9).map { app.siansa.data.Album("a$it", "Album $it", artist = "Artist") }
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalGraph provides graph) {
+                SiansaTheme {
+                    app.siansa.ui.Screen("Albums for test", nav = null) { padding ->
+                        app.siansa.ui.LoadBox(app.siansa.ui.Load.Ok(albums), Modifier.padding(top = padding.calculateTopPadding())) { list ->
+                            app.siansa.ui.AlbumsGridOrList(list, page = "spacing-loaded", onOpen = {}, modifier = Modifier.fillMaxSize())
+                        }
+                    }
+                }
+            }
+        }
+        val title = compose.onNodeWithText("Albums for test").getBoundsInRoot()
+        val grid = compose.onNodeWithTag("albumsGridOrList").getBoundsInRoot()
+        assertTrue("The page starts below the title bar: ${grid.top} vs ${title.bottom}", grid.top >= title.bottom)
+        val screen = compose.onRoot().getBoundsInRoot()
+        (1..3).forEach { i ->
+            val t = compose.onNodeWithText("Album $i").getBoundsInRoot()
+            assertTrue("Album $i on screen: ${t.left}..${t.right} of ${screen.left}..${screen.right}", t.left >= screen.left && t.right <= screen.right + 1.dp)
+        }
     }
 
     /** Every grid of albums is three across, evenly spaced (issue #289). */
