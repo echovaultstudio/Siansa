@@ -892,9 +892,9 @@ private suspend fun buildLibrary(graph: app.siansa.AppGraph, me: String): Librar
         )
     }
 
-    // Today's mixes, newest of each kind.
+    // Today's mixes, newest of each kind, whatever the source filter showed when they were made (issue #486).
     val personal = MixGenerator.Personal.entries.map { it.id }.toSet()
-    graph.mixes.all().filter(graph.mixes::isCurrent).groupBy { it.selectorId }.values.mapNotNull { list -> list.maxByOrNull { it.createdAt } }.forEach { m ->
+    graph.mixes.all().groupBy { it.selectorId }.values.mapNotNull { list -> list.maxByOrNull { it.createdAt } }.forEach { m ->
         val isPersonal = m.selectorId in personal
         entries += Entry(
             key = "mix-${m.id}",
