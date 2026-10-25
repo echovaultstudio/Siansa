@@ -6,6 +6,7 @@ import app.siansa.ui.PathMoodPicker
 import app.siansa.ui.Space
 import app.siansa.ui.HubRow
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Storage
 import app.siansa.ui.StateButton
@@ -583,7 +584,12 @@ class SpacingTest {
                     onBack = { },
                     color = androidx.compose.ui.graphics.Color.DarkGray,
                     image = { m -> Box(m) },
-                    actions = { Box(Modifier.size(48.dp).testTag("heart")) },
+                    // The artist page's heart is an IconButton like the back arrow (FavouriteArtistButton).
+                    actions = {
+                        androidx.compose.material3.IconButton(onClick = { }, modifier = Modifier.testTag("heart")) {
+                            androidx.compose.material3.Icon(Icons.Rounded.FavoriteBorder, "Heart")
+                        }
+                    },
                 ) { }
             }
         }
@@ -642,6 +648,8 @@ class SpacingTest {
         compose.waitForIdle()
         thumb = compose.onNodeWithTag("fastScrollThumb", useUnmergedTree = true).getBoundsInRoot()
         assertEven("Handle at the bottom", thumb.bottom, bar.bottom, 1.dp)
+    }
+
     /** First run (issue #113): every source in the picker is one row height, the text centred against its icon. */
     @Test fun sourceRowsAreOneHeight() {
         compose.setContent { MusicSourceRows() }

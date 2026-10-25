@@ -86,7 +86,11 @@ internal fun SourceRow(kind: SourceKind, onPick: () -> Unit) {
         }
         Column(Modifier.weight(1f).padding(start = Space.Medium)) {
             Text(kind.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(kind.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // Two lines for every source, so the rows are one height whether the text wraps or not.
+            Text(
+                kind.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                minLines = 2, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
         }
     }
 }
