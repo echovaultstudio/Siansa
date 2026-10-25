@@ -144,7 +144,7 @@ class EmbyApiTest {
         val api = EmbyApi(server.client, { settings })
         api.scrobble("s1", submission = true, timeMs = 0)
         api.scrobble("s1", submission = false)
-        assertEquals("1970-01-01T00:00:00Z", server.seen.first { it.path == "/Users/u1/PlayedItems/s1" }.query["DatePlayed"])
+        assertEquals("19700101000000", server.seen.first { it.path == "/Users/u1/PlayedItems/s1" }.query["DatePlayed"])
         assertTrue(server.seen.last { it.path == "/Sessions/Playing" }.body.contains("\"ItemId\":\"s1\""))
     }
 
