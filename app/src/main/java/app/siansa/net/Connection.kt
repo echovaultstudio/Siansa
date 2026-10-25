@@ -128,7 +128,7 @@ class Connection(
                 return@launch
             }
             val s = settings()
-            val server = if (s.navidromeUrl.isBlank()) null else answers(s.navidromeUrl.trimEnd('/') + "/rest/ping.view")
+            val server = if (s.navidromeUrl.isBlank()) null else answers(reachabilityUrl(s.navidromeUrl))
             val audioMuse = if (s.audioMuseUrl.isBlank()) null else answers(s.audioMuseUrl.trimEnd('/') + "/")
             // Replaced by a newer check while asking (the network changed): that one has the answer.
             ensureActive()
@@ -154,6 +154,12 @@ class Connection(
     private fun label(ok: Boolean?) = when (ok) { true -> "reachable"; false -> "not reachable"; null -> "not set up" }
 
 }
+
+/**
+ * Where the reachability check knocks: the server's front page. Any answer counts, so no login is sent; an
+ * unauthenticated `/rest/ping.view` made Navidrome log "missing parameter: 'u'" twice for every check.
+ */
+internal fun reachabilityUrl(serverUrl: String): String = serverUrl.trimEnd('/') + "/"
 
 /** How long to wait before looking again after [attempt] checks that couldn't reach the server or AudioMuse. */
 internal fun retryDelayMs(attempt: Int): Long = when (attempt) {
