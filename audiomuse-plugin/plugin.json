@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.2.3",
+      "min_core_version": "3.6.4",
+      "changelog": "Similar albums and artists now work for every music server in AudioMuse (for example Emby next to Navidrome): the server the app names is looked up the way AudioMuse does it, and only albums and artists on that server are listed.",
+      "imageUrl": ""
+    },
+    {
       "version": "0.2.2",
       "min_core_version": "3.6.4",
       "changelog": "Works with several music servers: loudness profiles and similar albums and artists follow the server the app names (for example an Emby server next to Navidrome).",

@@ -23,7 +23,7 @@ from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url,
 from . import generations, jobs, similarity, status, store
 
 PLUGIN_ID = "siansa_analysis"
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
@@ -52,25 +52,24 @@ def collect(db):
 
 
 def _server():
-    """The music server the app asks about, as AudioMuse's own endpoints take it (docs/MULTI_SERVER.md): ``server``
-    (its display name, or its id), or the older ``server_id``. None means AudioMuse's default server."""
+    """The music server's id for the server the app asks about, exactly as AudioMuse's own endpoints read it
+    (``app_server_context.resolve_request_server_id``): ``server`` or ``server_id``, as its display name or its id.
+    None means AudioMuse's default server, and also an unknown name (logged), like AudioMuse answers it."""
     asked = (request.args.get("server") or request.args.get("server_id") or "").strip()
     if not asked:
         return None
     try:
         from tasks.mediaserver import registry
 
-        # A display name becomes the server's id where AudioMuse has a lookup for it; an id passes through.
-        for lookup in ("resolve_server_id", "server_id_for", "resolve_server"):
-            fn = getattr(registry, lookup, None)
-            if fn:
-                found = fn(asked)
-                found = getattr(found, "id", None) or (found.get("id") if isinstance(found, dict) else found)
-                if found:
-                    return found
-    except Exception:
-        pass
-    return asked
+        # The same lookup as AudioMuse's resolve_request_server_id: the id, else the display name (any case).
+        server = registry.get_server(asked) or registry.get_server_by_name(asked)
+    except Exception as e:  # an AudioMuse without the multi-server registry
+        logger.warning("siansa_analysis: couldn't look up server %r: %s", asked, e)
+        return None
+    if not server:
+        logger.warning("siansa_analysis: AudioMuse has no music server named %r; using the default one", asked)
+        return None
+    return server["server_id"] if isinstance(server, dict) else getattr(server, "server_id", None)
 
 
 def _canonical(ids):
@@ -90,14 +89,14 @@ def _canonical(ids):
 
 
 def _server_ids(canonical_ids):
-    """``{canonical id: the asked server's id}`` (the default server's without one), leaving unmapped ids as they are."""
+    """``{canonical id: the asked server's id}`` for the ids on that server (the default one without a server)."""
     try:
         from tasks.mediaserver.registry import translate_ids
 
-        mapped = translate_ids(canonical_ids, _server())
+        # Only the ids that exist on the asked server (the default server keeps its own and legacy ids).
+        return translate_ids(canonical_ids, _server())
     except Exception:
-        mapped = {}
-    return {i: mapped.get(i, i) for i in canonical_ids}
+        return {i: i for i in canonical_ids}
 
 
 def _error(message, code):
@@ -165,7 +164,8 @@ def _similar_answer(kind, key, extra):
         return jsonify({"schema_version": SCHEMA_VERSION, "generation": built.get("generation", 0),
                         "similar": [], **extra})
     ids = _server_ids([c["track_id"] for c in row["candidates"]])
-    similar = [{**c, "track_id": ids.get(c["track_id"], c["track_id"])} for c in row["candidates"]]
+    # Like AudioMuse's own answers: only albums and artists with a song on the asked server, with that server's id.
+    similar = [{**c, "track_id": ids[c["track_id"]]} for c in row["candidates"] if c["track_id"] in ids]
     return jsonify({"schema_version": SCHEMA_VERSION, "generation": built.get("generation", 0),
                     "name": row["name"], "artist": row["artist"], "similar": similar, **extra})
 
