@@ -17,7 +17,7 @@ import java.net.InetSocketAddress
  */
 object NetLog {
     /** Headers that are never written, only that they were sent. */
-    private val hidden = setOf("authorization", "proxy-authorization", "cookie", "set-cookie")
+    private val hidden = setOf("authorization", "proxy-authorization", "cookie", "set-cookie", "x-emby-token", "x-mediabrowser-token")
     /** Siansa's own markers between its interceptors: not sent anywhere that matters. */
     private const val OWN_PREFIX = "x-siansa-"
 
