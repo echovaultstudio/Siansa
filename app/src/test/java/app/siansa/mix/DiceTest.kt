@@ -30,4 +30,13 @@ class DiceTest {
         val picks = (1..30).mapNotNull { pickNeverPlayed(batch, emptySet(), Random(it))?.id }.toSet()
         assertEquals(true, picks.size > 5)
     }
+
+    @Test fun rollsFromWhatIsShown() {
+        // Beta report 37b60d15: hidden libraries or the user in use's music hidden, or other users shown.
+        assertEquals(true, diceFromLibrary(synced = true, hidesSome = true, shownUsers = 1))
+        assertEquals(true, diceFromLibrary(synced = true, hidesSome = false, shownUsers = 2))
+        assertEquals(false, diceFromLibrary(synced = true, hidesSome = false, shownUsers = 1))
+        // Not synced yet: the server is all there is.
+        assertEquals(false, diceFromLibrary(synced = false, hidesSome = true, shownUsers = 2))
+    }
 }
