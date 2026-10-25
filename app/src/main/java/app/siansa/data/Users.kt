@@ -50,6 +50,24 @@ object UserFiles {
         }
     }
 
+    /**
+     * Which server an address is, for "show together": scheme, host, port (the scheme's default when none) and path,
+     * without case or a trailing slash. Null when it isn't an address.
+     */
+    fun serverKey(address: String): String? {
+        val url = address.trim().toHttpUrlOrNull() ?: return null
+        return "${url.scheme}://${url.host.lowercase()}:${url.port}${url.encodedPath.trimEnd('/').lowercase()}"
+    }
+
+    /**
+     * Whether two users are on the same server, the only ones whose music can be shown together: the same kind
+     * (Navidrome, Emby…) at the same address. Users on other servers are switched to instead.
+     */
+    fun sameServer(kindA: SourceKind, addressA: String, kindB: SourceKind, addressB: String): Boolean {
+        val a = serverKey(addressA) ?: return false
+        return kindA == kindB && a == serverKey(addressB)
+    }
+
     /** The stored list of users; before a second user is added, just the first. */
     fun parseIds(stored: String?): List<Int> =
         stored?.split(',')?.mapNotNull { it.trim().toIntOrNull() }?.distinct()?.sorted()?.ifEmpty { null } ?: listOf(FIRST)

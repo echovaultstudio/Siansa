@@ -113,6 +113,8 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
             users.forEach { user ->
                 val inUse = user.id == Users.active
                 val isShown = if (inUse) !ownHidden else user.id in shown
+                // Only users on the same server show together; others are switched to in Settings › Users.
+                val elsewhere = !inUse && !graph.guests.onSameServer(user.id)
                 val folders by loadState("folders-${user.id}-$isShown") {
                     if (!isShown || !user.connected) emptyList()
                     else if (inUse) graph.source.musicFolders()
@@ -127,6 +129,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                     name = user.label,
                     status = when {
                         !user.connected -> "Not connected yet. Set it up in Settings → Users."
+                        elsewhere -> "On another server. To listen, switch to this user in Settings → Users."
                         inUse && ownHidden -> "In use · their music is hidden. Their settings and history stay in use."
                         inUse -> inUseStatus(syncing, libraryStatus)
                         !isShown -> "Hidden"
@@ -136,7 +139,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                         else -> "Shown"
                     },
                     shown = isShown,
-                    canToggle = canToggleUser(user.connected, inUse, ownHidden, shown.size),
+                    canToggle = !elsewhere && canToggleUser(user.connected, inUse, ownHidden, shown.size),
                     syncing = syncing,
                     libraries = if (isShown && all.size > 1) all.map { it.name to (it.id in chosen) } else emptyList(),
                     onToggle = {
@@ -182,7 +185,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
             }
         }
         Text(
-            if (users.size > 1) "Shown users' music plays together. Your history, playlists and settings stay with the user in use."
+            if (users.size > 1) "Users on the same server can be shown together. Your history, playlists and settings stay with the user in use."
             else "Add another user in Settings → Users to show their music here too.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
