@@ -333,6 +333,10 @@ interface LibraryDao {
     @Query("SELECT id FROM songs WHERE id IN (:ids)")
     suspend fun knownSongIds(ids: List<String>): List<String>
 
+    /** Random songs of the user in use's own (not another shown user's). */
+    @Query("SELECT id FROM songs WHERE id NOT IN (SELECT id FROM sources) ORDER BY RANDOM() LIMIT :limit")
+    suspend fun randomOwnSongIds(limit: Int): List<String>
+
     @Query("SELECT id FROM artists WHERE id IN (:ids)")
     suspend fun knownArtistIds(ids: List<String>): List<String>
 

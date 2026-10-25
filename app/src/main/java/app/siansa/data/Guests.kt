@@ -166,17 +166,43 @@ class Guests(
     /** Whether [user] is on the same server as the user in use, so their music may be shown together. */
     fun onSameServer(user: Int): Boolean = sameServerNow(user) == true
 
+    /** How the pair of [user] and the user in use is remembered as one server, or null. */
+    private fun markOf(user: Int): String? {
+        val mine = settingsOf(Users.active).current
+        val theirs = settingsOf(user).current
+        return UserFiles.sameServerMark(mine.sourceKind, mine.navidromeUrl, theirs.sourceKind, theirs.navidromeUrl)
+    }
+
     /**
-     * Whether [user] is on the user in use's server: yes for the same kind at the same address, no for another
-     * kind; for the same kind at another address (a domain and an IP for one Navidrome), what [checkSameServers]
-     * found, or null until it has looked.
+     * Whether [user] is on the user in use's server: yes for the same kind at the same address, or at another address
+     * once found or confirmed to be the same server; no for another kind; for the same kind at another address (a
+     * domain and an IP for one Navidrome), what [checkSameServers] found, or null until it has looked.
      */
     fun sameServerNow(user: Int): Boolean? {
         val mine = settingsOf(Users.active).current
         val theirs = settingsOf(user).current
         if (mine.sourceKind != theirs.sourceKind) return false
         if (UserFiles.sameServer(mine.sourceKind, mine.navidromeUrl, theirs.sourceKind, theirs.navidromeUrl)) return true
+        if (markOf(user)?.let { it in Users.sameServers(context) } == true) return true
         return _sameServer.value[user]
+    }
+
+    /**
+     * Whether [user] could be on the same server though the check didn't find it (the same kind, at another address):
+     * then the person can say it is ([confirmSameServer]). Users with their own libraries share no songs to compare.
+     */
+    fun canConfirmSameServer(user: Int): Boolean {
+        val mine = settingsOf(Users.active).current
+        val theirs = settingsOf(user).current
+        return user != Users.active && mine.sourceKind == theirs.sourceKind && sameServerNow(user) == false && markOf(user) != null
+    }
+
+    /** The person says [user] is on the user in use's server: remembered for these two addresses, then they can show. */
+    fun confirmSameServer(user: Int) {
+        val mark = markOf(user) ?: return
+        AppLog.i("Sources", "User ${user + 1} confirmed as on the same server")
+        Users.addSameServer(context, mark)
+        _sameServer.update { it + (user to true) }
     }
 
     private val _sameServer = MutableStateFlow<Map<Int, Boolean>>(emptyMap())
@@ -185,20 +211,33 @@ class Guests(
 
     /**
      * For each user of the same kind at another address: whether it's the same server reached another way (kids on
-     * music.example.com, max on 192.168.1.10). A server gives a song the same id for every user, so it is when
-     * their songs are in the user in use's library by id. Unknown (no answer, no synced library) stays unknown.
+     * music.example.com, max on 192.168.1.10). A server gives a song the same id for every user, so it is when their
+     * songs are in the user in use's library by id, or the user in use's songs are on their server. Both ways, since
+     * one user may see only part of the music (kids only their own library). Unknown (no answer, no synced library)
+     * stays unknown. Once found, it's remembered for these two addresses.
      */
     suspend fun checkSameServers(users: Collection<Int> = Users.ids(context)) {
         users.filter { it != Users.active && it !in _sameServer.value }.forEach { user ->
             val mine = settingsOf(Users.active).current
             val theirs = settingsOf(user).current
             if (mine.sourceKind != theirs.sourceKind || theirs.navidromeUrl.isBlank()) return@forEach
-            if (UserFiles.sameServer(mine.sourceKind, mine.navidromeUrl, theirs.sourceKind, theirs.navidromeUrl)) return@forEach
-            val ids = runCatching { apiOf(user).randomSongs(SAME_SERVER_SAMPLE).map { it.id } }.getOrNull()
-            if (ids.isNullOrEmpty() || !library.isSynced) return@forEach
+            if (sameServerNow(user) == true) return@forEach
+            if (!library.isSynced) return@forEach
+            val api = apiOf(user)
+            // Their songs in the user in use's library…
+            val ids = runCatching { api.randomSongs(SAME_SERVER_SAMPLE).map { it.id } }.getOrNull() ?: return@forEach
             val known = library.knownSongIds(ids)
-            val same = sameServerBySongs(ids, known)
-            AppLog.i("Sources", "User ${user + 1} at another address: ${if (same) "the same server" else "another server"} (${known.size} of ${ids.size} songs known)")
+            var same = sameServerBySongs(ids, known)
+            var how = "${known.size} of ${ids.size} of their songs known"
+            // …or the user in use's songs on their server.
+            if (!same) {
+                val own = library.randomOwnSongIds(SAME_SERVER_SAMPLE)
+                val found = own.filter { id -> runCatching { api.song(id) }.getOrNull()?.id == id }
+                same = sameServerBySongs(own, found)
+                how += ", ${found.size} of ${own.size} of ours on theirs"
+            }
+            AppLog.i("Sources", "User ${user + 1} at another address: ${if (same) "the same server" else "another server"} ($how)")
+            if (same) markOf(user)?.let { Users.addSameServer(context, it) }
             _sameServer.update { it + (user to same) }
         }
     }

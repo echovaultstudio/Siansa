@@ -120,6 +120,9 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                 // Only users on the same server show together; others are switched to in Settings › Users.
                 val same = if (inUse) true else remember(sameServerFound) { graph.guests.sameServerNow(user.id) }
                 val elsewhere = same == false
+                // The check found no shared songs, but it's the same kind: the person may know better (kids seeing
+                // only their own library on the same Navidrome).
+                val confirmable = elsewhere && remember(sameServerFound) { graph.guests.canConfirmSameServer(user.id) }
                 val checking = same == null
                 val folders by loadState("folders-${user.id}-$isShown") {
                     if (!isShown || !user.connected) emptyList()
@@ -136,6 +139,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                     name = user.label + if (user.emby) " (Emby)" else "",
                     status = when {
                         !user.connected -> "Not connected yet. Set it up in Settings → Users."
+                        confirmable -> "Looks like another server. If it's yours too, tap the eye to show their music with yours."
                         elsewhere -> "On another server. To listen, switch to this user in Settings → Users."
                         checking -> "Checking whether it's your server…"
                         inUse && ownHidden -> "In use · their music is hidden. Their settings and history stay in use."
@@ -147,12 +151,16 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                         else -> "Shown"
                     },
                     shown = isShown,
-                    canToggle = !elsewhere && !checking && canToggleUser(user.connected, inUse, ownHidden, shown.size),
+                    canToggle = (confirmable || !elsewhere) && !checking && canToggleUser(user.connected, inUse, ownHidden, shown.size),
                     syncing = syncing,
                     libraries = if (isShown && all.size > 1) all.map { it.name to (it.id in chosen) } else emptyList(),
                     onToggle = {
                         when {
                             inUse -> graph.scope.launch { graph.library.setOwnHidden(!ownHidden, settings.syncFolders) }
+                            confirmable -> {
+                                graph.guests.confirmSameServer(user.id)
+                                graph.guests.setShown(user.id, true)
+                            }
                             else -> {
                                 AppLog.i("Sources", "${if (isShown) "Hiding" else "Showing"} user ${user.id + 1}")
                                 graph.guests.setShown(user.id, !isShown)

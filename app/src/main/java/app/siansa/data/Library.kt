@@ -165,6 +165,9 @@ class LibraryRepository(context: Context) {
     /** Which of [ids] are songs in the library (any user's, any library). */
     suspend fun knownSongIds(ids: List<String>): Set<String> = ids.distinct().chunked(500).flatMap { dao.knownSongIds(it) }.toSet()
 
+    /** Up to [limit] random ids of the user in use's own songs. */
+    suspend fun randomOwnSongIds(limit: Int): List<String> = dao.randomOwnSongIds(limit)
+
     /** Which of [ids] are albums shown now (not in a hidden library, not a hidden user's); null before the first sync. */
     suspend fun shownAlbums(ids: Collection<String>): Set<String>? {
         if (!isSynced) return null
