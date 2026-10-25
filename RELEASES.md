@@ -3,6 +3,10 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.32.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.32.0beta) — 2026-10-25
+
+- [#476](https://github.com/echovaultstudio/Siansa/pull/476) Name servers, shown instead of their address (@Th3K1ngP1n)
+
 ## [0.31.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.31.0beta) — 2026-10-25
 
 - [#471](https://github.com/echovaultstudio/Siansa/pull/471) Save mixes, radios, cards and the queue as a playlist (to main) (@Th3K1ngP1n)
