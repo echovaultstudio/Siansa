@@ -163,6 +163,17 @@ class AudioMuseComplianceTest {
         assertEquals("Emby", fake.seen.last().first.url.queryParameter("server"))
     }
 
+    @Test fun pluginCallsNameTheServerOfTheirSong() = runBlocking {
+        // Before: similar albums sent track_id=… without a server.
+        assertEquals(listOf("885028"), songIdsIn("/plugins/siansa_analysis/api/similar/albums?track_id=885028"))
+        assertEquals(listOf("a", "b"), songIdsIn("/plugins/x/api/profiles?ids=a%2Cb"))
+        assertTrue(songIdsIn("/plugins/x/api/similar/artists?artist=Overmono").isEmpty())
+        val fake = FakeAudioMuse { "[]" }
+        AudioMuseApi(fake.client, serverFor = { ids -> if ("885028" in ids) "Emby" else "" }) { settings }
+            .plugin("/plugins/x/api/similar/albums?track_id=885028")
+        assertEquals("Emby", fake.seen.last().first.url.queryParameter("server"))
+    }
+
     @Test fun withoutServerForTheSettingsNameIsUsed() = runBlocking {
         val fake = FakeAudioMuse { "[$row]" }
         AudioMuseApi(fake.client) { settings.copy(audioMuseServer = "Emby") }.similarTracks("s1", 10)
