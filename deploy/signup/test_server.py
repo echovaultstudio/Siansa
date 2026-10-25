@@ -63,6 +63,24 @@ class FlowTest(unittest.TestCase):
         rec, _ = server.check({**OK, "email": [f"p{n}@example.com"], "route": [route]})
         return server.accept(rec)
 
+    def test_accept_and_deny_from_the_server(self):
+        import io, contextlib
+        self.signup(1)
+        self.signup(2)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            server.cli(["server.py", "accept", "P1@example.com"])
+            server.cli(["server.py", "deny", "p2@example.com"])
+            server.cli(["server.py", "deny", "p2@example.com"])
+            server.cli(["server.py", "accept", "nobody@example.com"])
+        st = server.statuses()
+        ids = {r["email"]: r["id"] for r in server.read_lines(server.DATA_FILE)}
+        self.assertEqual((st.get(ids["p1@example.com"]), st.get(ids["p2@example.com"])), ("approved", "denied"))
+        self.assertIn("p1@example.com", [to for to, _, _ in self.sent])
+        self.assertIn("p2@example.com", [to for to, _, _ in self.sent])
+        self.assertIn("already denied", out.getvalue())
+        self.assertIn("No sign-up for nobody@example.com", out.getvalue())
+
     def test_links_are_signed_per_action(self):
         a, d = server.sign("abc", "approve"), server.sign("abc", "deny")
         self.assertNotEqual(a, d)
