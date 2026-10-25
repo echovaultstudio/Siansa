@@ -67,6 +67,18 @@ class SourcesTest {
         assertEquals(listOf("ar2", "al2", "s2", "p1"), plan.ids)
     }
 
+    @Test fun aSongsOwnArtistGoesToItsServer() {
+        // An Emby song's artist isn't in Emby's album artist list; opening it from the song asked the wrong server.
+        val music = GuestMusic(
+            songs = listOf(
+                Song(id = "s1", title = "a", artistId = "858791", albumId = "al9", artists = listOf(app.siansa.data.ArtistRef("858791", "Skrillex & Bobby Raps"))),
+                Song(id = "s2", title = "b", artistId = "mine"),
+            ),
+        )
+        val plan = GuestMusic.plan(music, knownSongs = emptySet(), knownAlbums = emptySet(), knownArtists = setOf("mine"), knownPlaylists = emptySet())
+        assertEquals(listOf("s1", "s2", "858791", "al9"), plan.ids)
+    }
+
     @Test fun coverIdsLeadToTheirItem() {
         assertEquals("abc123", GuestMusic.itemOfCover("al-abc123_6543fe"))
         assertEquals("abc123", GuestMusic.itemOfCover("mf-abc123"))

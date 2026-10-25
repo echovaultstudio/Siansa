@@ -432,8 +432,9 @@ class LibraryRepository(context: Context) {
             val plan = GuestMusic.plan(
                 music,
                 knownSongs = known(music.songs.map { it.id }) { dao.knownSongIds(it) },
-                knownAlbums = known(music.albums.map { it.id }) { dao.knownAlbumIds(it) },
-                knownArtists = known(music.artists.map { it.id }) { dao.knownArtistIds(it) },
+                // With the songs' own artists and albums (GuestMusic.Plan.links), which may be the user in use's.
+                knownAlbums = known(music.albums.map { it.id } + music.songs.mapNotNull { it.albumId }) { dao.knownAlbumIds(it) },
+                knownArtists = known(music.artists.map { it.id } + music.songs.flatMap { GuestMusic.songLinks(it) }) { dao.knownArtistIds(it) },
                 knownPlaylists = known(music.playlists.map { it.id }) { dao.knownPlaylistIds(it) },
             )
             plan.artists.chunked(CHUNK).forEach { chunk -> dao.putArtists(chunk.map { it.toEntity() }) }
