@@ -3,6 +3,14 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.30.4beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.30.4beta) — 2026-10-25
+
+- [#455](https://github.com/echovaultstudio/Siansa/pull/455) AudioMuse: similar albums names its song's server; searches follow the source filter (@Th3K1ngP1n)
+- [#456](https://github.com/echovaultstudio/Siansa/pull/456) Emby: plays reach the play history (@Th3K1ngP1n)
+- [#457](https://github.com/echovaultstudio/Siansa/pull/457) Home: recently played only shows what the source filter shows (@Th3K1ngP1n)
+- [#458](https://github.com/echovaultstudio/Siansa/pull/458) E-AC3 gapless: load the next song ahead while a stretched file plays (@Th3K1ngP1n)
+- [#460](https://github.com/echovaultstudio/Siansa/pull/460) Emulator tests compile and pass again; CI shows their compile errors (@Th3K1ngP1n)
+
 ## [0.30.3beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.30.3beta) — 2026-10-25
 
 - [#453](https://github.com/echovaultstudio/Siansa/pull/453) AudioMuse: every request names its songs' server, one name per music server (@Th3K1ngP1n)
