@@ -73,4 +73,17 @@ class NetLogTest {
         assertFalse(text, text.contains("SESSION") || text.contains("SIG") || text.contains("KEY"))
         assertTrue(text, text.contains("method=track.scrobble"))
     }
+
+    @Test fun hidesEmbysLoginToken() {
+        val emby = Request.Builder()
+            .url("http://192.168.1.106:8096/Sessions/Playing")
+            .header("X-Emby-Authorization", "Emby Client=\"Siansa\", Device=\"Android\", Version=\"1\", Token=\"94b8dc154124\"")
+            .header("X-Emby-Token", "94b8dc154124")
+            .build()
+        val text = NetLog.sent(emby, "192.168.1.106:8096", "http/1.1")
+        assertFalse(text, text.contains("94b8dc154124"))
+        assertTrue(text, text.contains("Client=\"Siansa\""))
+        assertTrue(text, text.contains("X-Emby-Token: •••"))
+        assertFalse(AppLog.redact("X-Emby-Token: 94b8dc154124 · Host: x").contains("94b8dc154124"))
+    }
 }
