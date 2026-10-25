@@ -6,6 +6,7 @@ import app.siansa.ui.PathMoodPicker
 import app.siansa.ui.Space
 import app.siansa.ui.HubRow
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Storage
 import app.siansa.ui.StateButton
@@ -586,7 +587,7 @@ class SpacingTest {
                     // The artist page's heart is an IconButton like the back arrow (FavouriteArtistButton).
                     actions = {
                         androidx.compose.material3.IconButton(onClick = { }, modifier = Modifier.testTag("heart")) {
-                            androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.FavoriteBorder, "Heart")
+                            androidx.compose.material3.Icon(Icons.Rounded.FavoriteBorder, "Heart")
                         }
                     },
                 ) { }
