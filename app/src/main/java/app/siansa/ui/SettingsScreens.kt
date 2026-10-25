@@ -177,8 +177,8 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                 SecretField("Password", draft.audioMusePassword) { draft = draft.copy(audioMusePassword = it) }
                 Field("Server name in AudioMuse", draft.audioMuseServer, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseServer = it) }
                 Hint(
-                    if (kind == SourceKind.EMBY) "AudioMuse reads your Emby library for everything smart. If AudioMuse has more than one music server, enter this Emby server's name as it is in AudioMuse."
-                    else "Only if AudioMuse has more than one music server: this server's name as it is in AudioMuse. Leave empty for its main one."
+                    if (kind == SourceKind.EMBY) "AudioMuse reads your Emby library for everything smart. If AudioMuse has more than one music server, enter this Emby server's name as it is in AudioMuse. Each user keeps their own."
+                    else "Only if AudioMuse has more than one music server: this server's name as it is in AudioMuse. Leave empty for its main one. Each user keeps their own."
                 )
                 TestRow(audioMuseTest) {
                     runTest({ audioMuseTest = it }) { s ->
