@@ -2,6 +2,8 @@ package app.siansa
 
 import app.siansa.mix.Dice
 import app.siansa.data.ArtistPhotos
+import app.siansa.data.Users
+import app.siansa.data.audioMuseUserFor
 import app.siansa.data.SavedVibes
 import app.siansa.mix.MixResume
 import app.siansa.data.RecentPlays
@@ -229,8 +231,8 @@ class AppGraph(val app: Application) {
         http,
         // Each music server's songs go to AudioMuse with that server's name (its user's), whichever user is in use.
         serverFor = { ids ->
-            val user = app.siansa.data.audioMuseUserFor(ids, { guests.ownerOf(it) }, app.siansa.data.Users.active, guests.shown.value)
-            if (user == app.siansa.data.Users.active) settings.current.audioMuseServer else guests.settingsOf(user).current.audioMuseServer
+            val user = audioMuseUserFor(ids, { guests.ownerOf(it) }, Users.active, guests.shown.value)
+            if (user == Users.active) settings.current.audioMuseServer else guests.settingsOf(user).current.audioMuseServer
         },
     ) { settings.current }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
