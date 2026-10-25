@@ -642,6 +642,8 @@ class SpacingTest {
         compose.waitForIdle()
         thumb = compose.onNodeWithTag("fastScrollThumb", useUnmergedTree = true).getBoundsInRoot()
         assertEven("Handle at the bottom", thumb.bottom, bar.bottom, 1.dp)
+    }
+
     /** First run (issue #113): every source in the picker is one row height, the text centred against its icon. */
     @Test fun sourceRowsAreOneHeight() {
         compose.setContent { MusicSourceRows() }
