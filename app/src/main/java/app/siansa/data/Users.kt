@@ -68,6 +68,16 @@ object UserFiles {
         return kindA == kindB && a == serverKey(addressB)
     }
 
+    /**
+     * What "these two are on one server" is remembered as, once found or confirmed: both servers' kinds and addresses,
+     * in either order, so a changed address asks again. Null when either isn't an address.
+     */
+    fun sameServerMark(kindA: SourceKind, addressA: String, kindB: SourceKind, addressB: String): String? {
+        val a = "${kindA.name}@${serverKey(addressA) ?: return null}"
+        val b = "${kindB.name}@${serverKey(addressB) ?: return null}"
+        return listOf(a, b).sorted().joinToString("|")
+    }
+
     /** The stored list of users; before a second user is added, just the first. */
     fun parseIds(stored: String?): List<Int> =
         stored?.split(',')?.mapNotNull { it.trim().toIntOrNull() }?.distinct()?.sorted()?.ifEmpty { null } ?: listOf(FIRST)
@@ -114,6 +124,7 @@ object Users {
     private const val KEY_ACTIVE = "active"
     private const val KEY_IDS = "ids"
     private const val KEY_SHOWN = "shown"
+    private const val KEY_SAME_SERVERS = "sameServers"
 
     /** The user whose files are in use, read once when the app starts. */
     @Volatile var active: Int = UserFiles.FIRST
@@ -147,6 +158,13 @@ object Users {
 
     /** Other users whose music shows alongside the user in use. */
     fun guests(context: Context): Set<Int> = shown(context) - active
+
+    /** Pairs of addresses known to be one server ([UserFiles.sameServerMark]): found by their songs or confirmed. */
+    fun sameServers(context: Context): Set<String> = prefs(context).getStringSet(KEY_SAME_SERVERS, null).orEmpty()
+
+    fun addSameServer(context: Context, mark: String) {
+        prefs(context).edit().putStringSet(KEY_SAME_SERVERS, sameServers(context) + mark).commit()
+    }
 
     fun setShown(context: Context, ids: Set<Int>) {
         prefs(context).edit().putString(KEY_SHOWN, UserFiles.formatShown(ids + active)).commit()

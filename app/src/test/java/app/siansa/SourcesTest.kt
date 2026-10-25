@@ -15,6 +15,7 @@ import app.siansa.ui.sourceChipLabels
 import app.siansa.ui.sourceFilterActive
 import app.siansa.ui.canToggleUser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -174,5 +175,25 @@ class SourcesTest {
         assertEquals(false, app.siansa.data.sameServerBySongs(ids, setOf("a")))
         assertEquals(false, app.siansa.data.sameServerBySongs(ids, emptySet()))
         assertEquals(false, app.siansa.data.sameServerBySongs(emptyList(), emptySet()))
+    }
+
+    @Test fun oneServerIsRememberedForBothAddressesEitherWay() {
+        val nav = app.siansa.net.SourceKind.OPENSUBSONIC
+        val emby = app.siansa.net.SourceKind.EMBY
+        val kidsFirst = UserFiles.sameServerMark(nav, "https://music.home.example.com", nav, "http://192.168.1.106:4533/")
+        val maxFirst = UserFiles.sameServerMark(nav, "http://192.168.1.106:4533", nav, "https://Music.home.example.com:443")
+        assertEquals(kidsFirst, maxFirst)
+        // Another address or kind is another pair, asked about again.
+        assertNotEquals(kidsFirst, UserFiles.sameServerMark(nav, "https://music.home.example.com", nav, "http://192.168.1.106:4534"))
+        assertNotEquals(kidsFirst, UserFiles.sameServerMark(nav, "https://music.home.example.com", emby, "http://192.168.1.106:4533"))
+        assertNull(UserFiles.sameServerMark(nav, "", nav, "http://192.168.1.106:4533"))
+    }
+
+    @Test fun kidsSeeingOnlyTheirLibraryAreFoundTheOtherWay() {
+        // kids in use: max's songs are mostly not in kids' small library, but kids' songs are all on max's server.
+        val maxSongs = listOf("m1", "m2", "m3", "m4", "k1")
+        assertEquals(false, app.siansa.data.sameServerBySongs(maxSongs, setOf("k1")))
+        val kidsSongs = listOf("k1", "k2", "k3")
+        assertEquals(true, app.siansa.data.sameServerBySongs(kidsSongs, setOf("k1", "k2", "k3")))
     }
 }
