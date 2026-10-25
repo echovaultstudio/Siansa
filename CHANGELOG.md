@@ -3,6 +3,14 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.31.0beta — 2026-10-25
+
+### Fixed
+- **A user on your own server, reached at another address, couldn't be shown with you.** For example kids on music.example.com and you on 192.168.1.10, both on one Navidrome. Siansa now recognises your server by its songs, whatever address it's reached by. Emby users in the list also say "(Emby)", so two users on one address are told apart.
+
+### Added
+- **Save a mix as a playlist.** Today's mix, your carousel mixes, Made for you, radios and your cards have a new button next to "Add all to queue" (a filled circle with a plus) that saves the songs as a playlist on your server or on this phone, named like the mix to start with. The queue can be saved the same way, from the button next to "Up next".
+
 ## 0.30.6beta — 2026-10-25
 
 ### Fixed
