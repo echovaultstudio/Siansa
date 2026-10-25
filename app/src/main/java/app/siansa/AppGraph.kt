@@ -93,6 +93,7 @@ import okhttp3.Protocol
 import app.siansa.playback.StreamStats
 import java.io.File
 import java.util.concurrent.TimeUnit
+import app.siansa.data.mixScopeKey
 
 /** Everything the app shares, created once in [SiansaApp]. */
 @OptIn(UnstableApi::class)
@@ -238,7 +239,11 @@ class AppGraph(val app: Application) {
     val searchHistory = SearchHistory(app)
     /** Other users' music shown alongside the user in use's (issue #141). */
     val guests: Guests by lazy { Guests(app, http, library, scope) }
-    val mixes = MixStore(app)
+    // Mixes are made for the music the source filter shows; showing something else makes them out of date.
+    val mixes = MixStore(app) { mixScope() }
+
+    /** The source filter's key for mixes ([mixScopeKey]). */
+    fun mixScope(): String = mixScopeKey(library.ownHidden.value, guests.others(), settings.current.syncFolders)
     /** Vibes made on Dscvr (issue #339). */
     val savedVibes = SavedVibes(app)
     val history = HistoryStore(app)

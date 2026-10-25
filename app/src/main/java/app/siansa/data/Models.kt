@@ -209,7 +209,20 @@ data class Mix(
     val songs: List<Song>,
     val createdAt: Long,
     val aiNamed: Boolean,
+    /**
+     * The music shown when it was made ([mixScopeKey]): when the source filter shows something else, the mix is
+     * out of date, made again with AudioMuse or hidden without it. "" is everything of the user in use's.
+     */
+    val scope: String = "",
 )
+
+/**
+ * What the source filter shows, as a key mixes are made for: "" while it shows all of the user in use's music and
+ * nothing else, otherwise whether their own music shows, which other users and which libraries.
+ */
+fun mixScopeKey(ownHidden: Boolean, guests: Set<Int>, folders: Set<String>): String =
+    if (!ownHidden && guests.isEmpty() && folders.isEmpty()) ""
+    else "own=${!ownHidden};users=${guests.sorted().joinToString(",")};libs=${folders.sorted().joinToString(",")}"
 
 @Serializable
 data class PlayEvent(
