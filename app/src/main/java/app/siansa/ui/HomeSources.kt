@@ -40,6 +40,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -77,6 +78,9 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
     val guestStates by graph.guests.state.collectAsStateWithLifecycle()
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
     val users = remember { Users.all(context) }
+    // Users at another address are asked whether they're the same server (a domain and an IP for one Navidrome).
+    val sameServerFound by graph.guests.sameServerFound.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { graph.guests.checkSameServers() }
     // The user in use's own music hidden (issue #427): instant, their settings and history stay in use.
     val ownHidden by graph.library.ownHidden.collectAsStateWithLifecycle()
     val libraryStatus by graph.library.status.collectAsStateWithLifecycle()
@@ -114,7 +118,9 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                 val inUse = user.id == Users.active
                 val isShown = if (inUse) !ownHidden else user.id in shown
                 // Only users on the same server show together; others are switched to in Settings › Users.
-                val elsewhere = !inUse && !graph.guests.onSameServer(user.id)
+                val same = if (inUse) true else remember(sameServerFound) { graph.guests.sameServerNow(user.id) }
+                val elsewhere = same == false
+                val checking = same == null
                 val folders by loadState("folders-${user.id}-$isShown") {
                     if (!isShown || !user.connected) emptyList()
                     else if (inUse) graph.source.musicFolders()
@@ -126,10 +132,12 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                 val guest = guestStates[user.id]
                 val syncing = if (inUse) progress.running else guest?.running == true
                 SourceCard(
-                    name = user.label,
+                    // Two users on one address but of different kinds (Navidrome and Emby) look alike without it.
+                    name = user.label + if (user.emby) " (Emby)" else "",
                     status = when {
                         !user.connected -> "Not connected yet. Set it up in Settings → Users."
                         elsewhere -> "On another server. To listen, switch to this user in Settings → Users."
+                        checking -> "Checking whether it's your server…"
                         inUse && ownHidden -> "In use · their music is hidden. Their settings and history stay in use."
                         inUse -> inUseStatus(syncing, libraryStatus)
                         !isShown -> "Hidden"
@@ -139,7 +147,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                         else -> "Shown"
                     },
                     shown = isShown,
-                    canToggle = !elsewhere && canToggleUser(user.connected, inUse, ownHidden, shown.size),
+                    canToggle = !elsewhere && !checking && canToggleUser(user.connected, inUse, ownHidden, shown.size),
                     syncing = syncing,
                     libraries = if (isShown && all.size > 1) all.map { it.name to (it.id in chosen) } else emptyList(),
                     onToggle = {
