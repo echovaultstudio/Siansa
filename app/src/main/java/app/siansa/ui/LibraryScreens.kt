@@ -384,6 +384,7 @@ fun MixScreen(nav: NavController, id: String) {
         songs = m?.songs,
         error = (mix as? Load.Err)?.message,
         cover = { mod -> if (m != null) CoverMosaic(m, mod) else Box(mod) },
+        saveAsPlaylist = true,
         header = {
             if (m != null) {
                 if (m.description.isNotBlank()) {

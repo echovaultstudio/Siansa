@@ -50,6 +50,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -61,6 +62,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.siansa.data.LocalPlaylists
+import app.siansa.data.Users
 import app.siansa.data.Playlist
 import app.siansa.data.PlaylistEditor
 import app.siansa.data.Song
@@ -84,13 +86,27 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
     var naming by remember { mutableStateOf(false) }
     // One tap at a time, so a double tap doesn't add the songs twice.
     var busy by remember { mutableStateOf(false) }
+    // Whose songs these are: a server playlist only takes its own user's songs (a phone playlist takes any).
+    val songOwners = remember(songs) { songs.mapTo(HashSet()) { graph.guests.ownerOf(it.id) ?: Users.active } }
+    val serverTakes = songOwners.all { it == Users.active }
     val playlists by loadState("editable-playlists") {
         val server = if (graph.connection.current.offline) graph.library.playlists()
         else runCatching { graph.source.playlists() }.getOrElse { graph.library.playlists() }
-        editablePlaylists(graph.playlists.removed.visible(server) + graph.localPlaylists.all().map { it.toPlaylist() }, graph.settings.current.navidromeUser)
+        val mine = editablePlaylists(graph.playlists.removed.visible(server).filter { graph.guests.ownerOf(it.id) == null }, graph.settings.current.navidromeUser)
+        // Other shown users' playlists they can edit, for their own songs.
+        val theirs = graph.library.playlists().filter { p ->
+            val owner = graph.guests.ownerOf(p.id) ?: return@filter false
+            PlaylistEditor.canEdit(p, graph.guests.settingsOf(owner).current.navidromeUser)
+        }.sortedBy { it.name.lowercase() }
+        val phone = graph.localPlaylists.all().map { it.toPlaylist() }.sortedBy { it.name.lowercase() }
+        (mine + theirs + phone).map { p ->
+            val owner = if (LocalPlaylists.isLocal(p.id)) null else graph.guests.ownerOf(p.id) ?: Users.active
+            p to PlaylistEditor.takes(owner, songOwners)
+        }.sortedBy { (_, ok) -> !ok }
     }
     if (naming) {
         NewPlaylistDialog(
+            serverAllowed = serverTakes,
             onDismiss = { naming = false },
             onCreate = { name, onPhone ->
                 if (!busy) {
@@ -121,9 +137,9 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
                         Text("You have no playlists of your own yet.", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = Space.Small))
                     } else {
                         LazyColumn(Modifier.height(320.dp)) {
-                            items(list, key = { it.id }) { playlist ->
-                                PickerRow(onClick = {
-                                    if (!busy) {
+                            items(list, key = { it.first.id }) { (playlist, takes) ->
+                                PickerRow(enabled = takes, onClick = {
+                                    if (!busy && takes) {
                                         busy = true
                                         scope.launch {
                                             val result = graph.playlists.add(playlist.id, songs)
@@ -136,7 +152,14 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
                                     Spacer(Modifier.width(Space.Medium))
                                     Column(Modifier.weight(1f)) {
                                         Text(playlist.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(if (LocalPlaylists.isLocal(playlist.id)) "${playlist.songCount} songs · On this phone" else "${playlist.songCount} songs", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(
+                                            when {
+                                                !takes -> "Only for songs from ${playlistOwnerName(playlist)}"
+                                                LocalPlaylists.isLocal(playlist.id) -> "${playlist.songCount} songs · On this phone"
+                                                else -> "${playlist.songCount} songs"
+                                            },
+                                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
                                     }
                                 }
                             }
@@ -151,22 +174,54 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
 }
 
 @Composable
-private fun PickerRow(onClick: () -> Unit, content: @Composable RowScope.() -> Unit) {
+private fun PickerRow(onClick: () -> Unit, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = Space.Small),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(enabled = enabled, onClick = onClick)
+            .alpha(if (enabled) 1f else 0.45f).padding(vertical = Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) { content() }
 }
 
+/** Whose a server playlist is, for "Only for songs from …": its owner on the server, when it says. */
+internal fun playlistOwnerName(playlist: Playlist): String = playlist.owner?.takeIf { it.isNotBlank() } ?: "its owner"
+
 /** Asks for a playlist's name; [onConfirm] gets it trimmed, and only when it isn't empty. */
 @Composable
 fun PlaylistNameDialog(title: String, initial: String, confirm: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) =
-    NameDialog(title, initial, confirm, askWhere = false, onDismiss = onDismiss) { name, _ -> onConfirm(name) }
+    NameDialog(title, initial, confirm, askWhere = false, onDismiss = onDismiss, onConfirm = { name, _ -> onConfirm(name) })
 
 /** Asks for a new playlist's name and where to keep it: on Navidrome (the default), or on this phone only. */
 @Composable
-fun NewPlaylistDialog(onDismiss: () -> Unit, onCreate: (name: String, onPhone: Boolean) -> Unit) =
-    NameDialog("New playlist", "", "Create", askWhere = true, onDismiss = onDismiss, onConfirm = onCreate)
+fun NewPlaylistDialog(onDismiss: () -> Unit, serverAllowed: Boolean = true, onCreate: (name: String, onPhone: Boolean) -> Unit) =
+    NameDialog("New playlist", "", "Create", askWhere = true, serverAllowed = serverAllowed, onDismiss = onDismiss, onConfirm = onCreate)
+
+/**
+ * "Save as playlist" on a mix, radio or card: its songs as a new playlist, named like the mix to start with, on
+ * your server or on this phone. With another shown user's songs in it, only a phone playlist can hold them.
+ */
+@Composable
+fun SaveAsPlaylistDialog(title: String, songs: List<Song>, onDone: () -> Unit) {
+    val graph = LocalGraph.current
+    val launcher = rememberPlayLauncher()
+    val scope = rememberCoroutineScope()
+    val serverTakes = remember(songs) { songs.all { graph.guests.ownerOf(it.id) == null } }
+    var busy by remember { mutableStateOf(false) }
+    NameDialog(
+        "Save as playlist", title, "Save", askWhere = true, serverAllowed = serverTakes,
+        onDismiss = onDone,
+        onConfirm = { name, onPhone ->
+            if (!busy) {
+                busy = true
+                scope.launch {
+                    val result = graph.playlists.create(name, songs, onPhone)
+                    result.onSuccess { AppLog.i("Playlist", "Saved \"$name\" with ${songs.size} songs" + if (onPhone) " on the phone" else "") }
+                    launcher.notify(result.fold({ "Saved as playlist “$name”" }, { it.message ?: "Couldn't save the playlist" }))
+                    onDone()
+                }
+            }
+        },
+    )
+}
 
 /** "Create memory" (issue #186): the playlist's name, ready filled in, and where to keep it. */
 @Composable
@@ -181,11 +236,13 @@ private fun NameDialog(
     askWhere: Boolean,
     onDismiss: () -> Unit,
     onConfirm: (String, Boolean) -> Unit,
+    /** False when the songs include another user's: only a phone playlist can hold them. */
+    serverAllowed: Boolean = true,
 ) {
     val graph = LocalGraph.current
     var text by remember { mutableStateOf(initial) }
-    // Offline, only a phone playlist can be made, so that's the one picked.
-    var onPhone by remember { mutableStateOf(graph.connection.current.offline) }
+    // Offline, or with another user's songs, only a phone playlist can be made, so that's the one picked.
+    var onPhone by remember { mutableStateOf(graph.connection.current.offline || !serverAllowed) }
     val name = PlaylistEditor.cleanName(text)
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
@@ -205,7 +262,11 @@ private fun NameDialog(
                 )
                 if (askWhere) {
                     Spacer(Modifier.height(Space.Medium))
-                    WhereOption("On Navidrome", "Syncs with your server and your other apps.", selected = !onPhone) { onPhone = false }
+                    WhereOption(
+                        "On your server",
+                        if (serverAllowed) "Syncs with your server and your other apps." else "Not for another user's songs. Keep it on this phone instead.",
+                        selected = !onPhone, enabled = serverAllowed,
+                    ) { onPhone = false }
                     WhereOption("On this phone only", "Its songs download to this phone so it works offline. Only this phone has it.", selected = onPhone) { onPhone = true }
                 }
             }
@@ -216,9 +277,10 @@ private fun NameDialog(
 }
 
 @Composable
-private fun WhereOption(label: String, detail: String, selected: Boolean, onClick: () -> Unit) {
+private fun WhereOption(label: String, detail: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).selectable(selected = selected, role = Role.RadioButton, onClick = onClick).padding(vertical = Space.Small),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
+            .alpha(if (enabled) 1f else 0.45f).padding(vertical = Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(selected = selected, onClick = null)
