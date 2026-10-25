@@ -164,10 +164,43 @@ class Guests(
     }
 
     /** Whether [user] is on the same server as the user in use, so their music may be shown together. */
-    fun onSameServer(user: Int): Boolean {
+    fun onSameServer(user: Int): Boolean = sameServerNow(user) == true
+
+    /**
+     * Whether [user] is on the user in use's server: yes for the same kind at the same address, no for another
+     * kind; for the same kind at another address (a domain and an IP for one Navidrome), what [checkSameServers]
+     * found, or null until it has looked.
+     */
+    fun sameServerNow(user: Int): Boolean? {
         val mine = settingsOf(Users.active).current
         val theirs = settingsOf(user).current
-        return UserFiles.sameServer(mine.sourceKind, mine.navidromeUrl, theirs.sourceKind, theirs.navidromeUrl)
+        if (mine.sourceKind != theirs.sourceKind) return false
+        if (UserFiles.sameServer(mine.sourceKind, mine.navidromeUrl, theirs.sourceKind, theirs.navidromeUrl)) return true
+        return _sameServer.value[user]
+    }
+
+    private val _sameServer = MutableStateFlow<Map<Int, Boolean>>(emptyMap())
+    /** What [checkSameServers] found for users of the same kind at another address. */
+    val sameServerFound: StateFlow<Map<Int, Boolean>> = _sameServer.asStateFlow()
+
+    /**
+     * For each user of the same kind at another address: whether it's the same server reached another way (kids on
+     * music.example.com, max on 192.168.1.10). A server gives a song the same id for every user, so it is when
+     * their songs are in the user in use's library by id. Unknown (no answer, no synced library) stays unknown.
+     */
+    suspend fun checkSameServers(users: Collection<Int> = Users.ids(context)) {
+        users.filter { it != Users.active && it !in _sameServer.value }.forEach { user ->
+            val mine = settingsOf(Users.active).current
+            val theirs = settingsOf(user).current
+            if (mine.sourceKind != theirs.sourceKind || theirs.navidromeUrl.isBlank()) return@forEach
+            if (UserFiles.sameServer(mine.sourceKind, mine.navidromeUrl, theirs.sourceKind, theirs.navidromeUrl)) return@forEach
+            val ids = runCatching { apiOf(user).randomSongs(SAME_SERVER_SAMPLE).map { it.id } }.getOrNull()
+            if (ids.isNullOrEmpty() || !library.isSynced) return@forEach
+            val known = library.knownSongIds(ids)
+            val same = sameServerBySongs(ids, known)
+            AppLog.i("Sources", "User ${user + 1} at another address: ${if (same) "the same server" else "another server"} (${known.size} of ${ids.size} songs known)")
+            _sameServer.update { it + (user to same) }
+        }
     }
 
     /**
@@ -175,15 +208,17 @@ class Guests(
      * shown user's music.
      */
     fun start() {
-        // Only users on the same server show together: anyone else shown (from an earlier version, or a user
-        // whose server changed) is hidden again; their music is removed below like any hidden user's.
-        val elsewhere = (_shown.value - Users.active).filterNot { onSameServer(it) }.toSet()
-        if (elsewhere.isNotEmpty()) {
-            AppLog.i("Sources", "Users ${elsewhere.map { it + 1 }} are on another server; not shown together any more")
-            Users.setShown(context, _shown.value - elsewhere)
-            _shown.value = Users.shown(context)
-        }
         scope.launch {
+            // Only users on the same server show together: anyone else shown (from an earlier version, or a user
+            // whose server changed) is hidden again; their music is removed below like any hidden user's. A user at
+            // another address is checked first, and only hidden when that found another server.
+            checkSameServers(_shown.value - Users.active)
+            val elsewhere = (_shown.value - Users.active).filter { sameServerNow(it) == false }.toSet()
+            if (elsewhere.isNotEmpty()) {
+                AppLog.i("Sources", "Users ${elsewhere.map { it + 1 }} are on another server; not shown together any more")
+                Users.setShown(context, _shown.value - elsewhere)
+                _shown.value = Users.shown(context)
+            }
             val guests = _shown.value - Users.active
             writing.withLock {
                 library.sourceUsers().filter { it !in guests }.forEach { gone ->
@@ -200,7 +235,7 @@ class Guests(
     /** Shows or hides [user]'s music. The user in use's own music is hidden by [LibraryRepository.setOwnHidden] (issue #427). */
     fun setShown(user: Int, show: Boolean) {
         if (user == Users.active) return
-        if (show && !onSameServer(user)) {
+        if (show && sameServerNow(user) != true) {
             AppLog.w("Sources", "User ${user + 1} is on another server; switch to them instead of showing them together")
             return
         }
@@ -319,6 +354,15 @@ class Guests(
 
     private companion object {
         const val PAGE = 500
+        /** Songs asked of another address to tell whether it's the same server. */
+        const val SAME_SERVER_SAMPLE = 10
         const val KEPT_VERSION = "|v2"
     }
 }
+
+/**
+ * The same server reached at another address: most of the songs it gave ([ids]) are in the user in use's library by
+ * id ([known]), since a server gives a song the same id for every user. Another server's ids aren't there.
+ */
+fun sameServerBySongs(ids: List<String>, known: Collection<String>): Boolean =
+    ids.isNotEmpty() && known.count { it in ids } * 2 >= ids.size

@@ -164,4 +164,15 @@ class SourcesTest {
         assertEquals(false, UserFiles.sameServer(nav, "http://192.168.1.106:30043", nav, "http://192.168.1.107:30043"))
         assertEquals(false, UserFiles.sameServer(nav, "", nav, ""))
     }
+
+    @Test fun aServerAtAnotherAddressIsKnownByItsSongs() {
+        // kids on music.home.example.com and max on 192.168.1.106: one Navidrome, the same song ids.
+        val ids = listOf("a", "b", "c", "d")
+        assertEquals(true, app.siansa.data.sameServerBySongs(ids, setOf("a", "b", "c", "d")))
+        assertEquals(true, app.siansa.data.sameServerBySongs(ids, setOf("a", "b")))
+        // Another server's ids aren't in the library.
+        assertEquals(false, app.siansa.data.sameServerBySongs(ids, setOf("a")))
+        assertEquals(false, app.siansa.data.sameServerBySongs(ids, emptySet()))
+        assertEquals(false, app.siansa.data.sameServerBySongs(emptyList(), emptySet()))
+    }
 }
