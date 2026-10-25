@@ -176,7 +176,7 @@ class AudioMuseApi(
             LEGACY_PLUGIN_PREFIX + pathAndQuery.removePrefix(PLUGIN_PREFIX)
         } else pathAndQuery
         val ids = pathAndQuery.substringAfter('?', "").split('&').firstOrNull { it.startsWith("ids=") }
-            ?.removePrefix("ids=")?.split(',', "%2C", "%2c").orEmpty()
+            ?.removePrefix("ids=")?.replace("%2C", ",", ignoreCase = true)?.split(',').orEmpty()
         return executeElement { request(path, ids).get().build() }
     }
 
