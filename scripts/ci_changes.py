@@ -1,4 +1,5 @@
-"""What a change needs CI to run (changed files, one path per line on stdin), to keep Actions minutes down.
+"""What a change needs CI to run (changed files, one path per line on stdin). CI only uses `emulator` now: the
+build and the plugin tests run every time since the jobs moved to the owner's own runner.
 
   git diff --name-only BASE HEAD | python3 scripts/ci_changes.py   prints app=…, emulator=…, plugin=…
 
