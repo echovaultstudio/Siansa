@@ -278,6 +278,21 @@ class SpacingTest {
         assertTrue("Find similar right next to Shuffle (${(shuffle.left - similar.right).value} dp)", shuffle.left - similar.right <= app.siansa.ui.Space.Small + 0.5.dp)
     }
 
+    /** Album page (issue #240): room under the big Play button before the first song, marked when it's playing. */
+    @Test fun roomBelowThePlayButton() {
+        compose.setContent {
+            SiansaTheme {
+                Column {
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = {}, onSimilar = {}, onShuffle = {}, onPlay = {})
+                    Box(Modifier.fillMaxWidth().height(60.dp).testTag("firstSong"))
+                }
+            }
+        }
+        val play = compose.onNodeWithTag("bigPlay").getBoundsInRoot()
+        val song = compose.onNodeWithTag("firstSong").getBoundsInRoot()
+        assertTrue("Only ${(song.top - play.bottom).value} dp under the Play button", song.top - play.bottom >= app.siansa.ui.Space.BelowPlayButton - 0.5.dp)
+    }
+
     /** Playlist page (beta #18): the turning cog sits on the title bar's line, the size of the ⋮ button beside it. */
     @Test fun checkingCogSitsLevelWithTheMenuButton() {
         compose.setContent {
@@ -293,21 +308,6 @@ class SpacingTest {
         val cog = compose.onNodeWithTag("checkingPlaylist").getBoundsInRoot()
         val menu = compose.onNodeWithTag("menu").getBoundsInRoot()
         assertEven("Cog and menu, vertical centre", (cog.top + cog.bottom) / 2, (menu.top + menu.bottom) / 2, 1.dp)
-    }
-
-    /** Album page (issue #240): room under the big Play button before the first song, marked when it's playing. */
-    @Test fun roomBelowThePlayButton() {
-        compose.setContent {
-            SiansaTheme {
-                Column {
-                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = {}, onSimilar = {}, onShuffle = {}, onPlay = {})
-                    Box(Modifier.fillMaxWidth().height(60.dp).testTag("firstSong"))
-                }
-            }
-        }
-        val play = compose.onNodeWithTag("bigPlay").getBoundsInRoot()
-        val song = compose.onNodeWithTag("firstSong").getBoundsInRoot()
-        assertTrue("Only ${(song.top - play.bottom).value} dp under the Play button", song.top - play.bottom >= app.siansa.ui.Space.BelowPlayButton - 0.5.dp)
     }
 
     /** Downloads (issue #235): the ✕ that stops all downloads sits on the progress line's centre. */
