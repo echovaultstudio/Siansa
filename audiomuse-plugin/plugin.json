@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.2.2",
+      "min_core_version": "3.6.4",
+      "changelog": "Works with several music servers: loudness profiles and similar albums and artists follow the server the app names (for example an Emby server next to Navidrome).",
+      "imageUrl": ""
+    },
+    {
       "version": "0.2.1",
       "min_core_version": "3.6.4",
       "changelog": "Siansa Analysis: volume and fade profiles for levelling and SmoothFade, and similar albums and artists from AudioMuse-AI's sound analysis.",

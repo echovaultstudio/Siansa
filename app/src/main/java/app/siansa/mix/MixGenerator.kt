@@ -106,7 +106,8 @@ class MixGenerator(private val graph: AppGraph) {
     /** A one-off sound search, used by the Search screen. */
     suspend fun soundSearch(query: String, limit: Int = 50, steering: List<Steer> = emptyList()): List<Song> {
         val hits = graph.audioMuse.textSearch(query, limit, steering)
-        return resolve(hits.map { it.id })
+        // By title and artist where AudioMuse's ids aren't this server's (an Emby user, beta report 810dc85c).
+        return resolveHits(hits)
     }
 
     private suspend fun generate(
@@ -498,7 +499,7 @@ class MixGenerator(private val graph: AppGraph) {
      * when the app is on another one (AudioMuse on Navidrome, the app on Emby), a track is matched by its
      * title and artist in the synced library instead. Ids that match are used as they are.
      */
-    private suspend fun resolveHits(hits: List<ClapHit>): List<Song> {
+    suspend fun resolveHits(hits: List<ClapHit>): List<Song> {
         val local = graph.library.songs(hits.map { it.id }).associateBy { it.id }
         val missing = hits.filter { it.id !in local }
         val byName = HashMap<String, String>()

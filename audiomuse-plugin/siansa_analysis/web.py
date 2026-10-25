@@ -9,7 +9,8 @@ API (JSON, for any logged-in user or API token):
 * ``GET api/similar/artists?track_id=…`` or ``?artist=…``: artists that sound like that one.
 
 Song ids may be the music server's ids or AudioMuse-AI's own; answers use the ids the app asked with, and
-the default music server's ids for songs in the similar lists.
+the asked music server's ids for songs in the similar lists. Like AudioMuse's own endpoints, each takes an optional
+``server`` (a server's display name or id, docs/MULTI_SERVER.md); without it, the default server.
 """
 
 import json
@@ -22,7 +23,7 @@ from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url,
 from . import generations, jobs, similarity, status, store
 
 PLUGIN_ID = "siansa_analysis"
-VERSION = "0.1.2.1"
+VERSION = "0.2.2"
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
@@ -50,22 +51,50 @@ def collect(db):
     }
 
 
+def _server():
+    """The music server the app asks about, as AudioMuse's own endpoints take it (docs/MULTI_SERVER.md): ``server``
+    (its display name, or its id), or the older ``server_id``. None means AudioMuse's default server."""
+    asked = (request.args.get("server") or request.args.get("server_id") or "").strip()
+    if not asked:
+        return None
+    try:
+        from tasks.mediaserver import registry
+
+        # A display name becomes the server's id where AudioMuse has a lookup for it; an id passes through.
+        for lookup in ("resolve_server_id", "server_id_for", "resolve_server"):
+            fn = getattr(registry, lookup, None)
+            if fn:
+                found = fn(asked)
+                found = getattr(found, "id", None) or (found.get("id") if isinstance(found, dict) else found)
+                if found:
+                    return found
+    except Exception:
+        pass
+    return asked
+
+
 def _canonical(ids):
-    """``{asked id: canonical id}``."""
+    """``{asked id: canonical id}``: the asked server's ids (or canonical ones) to AudioMuse's catalogue ids."""
     try:
         from tasks.mediaserver.registry import canonical_input_ids
 
+        server = _server()
+        if server:
+            try:
+                return canonical_input_ids(ids, server)
+            except TypeError:  # an AudioMuse that takes no server here
+                pass
         return canonical_input_ids(ids)
     except Exception:
         return {i: i for i in ids}
 
 
 def _server_ids(canonical_ids):
-    """``{canonical id: default server's id}``, leaving ids as they are when there is no mapping."""
+    """``{canonical id: the asked server's id}`` (the default server's without one), leaving unmapped ids as they are."""
     try:
         from tasks.mediaserver.registry import translate_ids
 
-        mapped = translate_ids(canonical_ids, request.args.get("server_id") or None)
+        mapped = translate_ids(canonical_ids, _server())
     except Exception:
         mapped = {}
     return {i: mapped.get(i, i) for i in canonical_ids}

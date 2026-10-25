@@ -224,7 +224,9 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         audioMuseToken = SecretBox.decrypt(shared.getString("am_token", "") ?: ""),
         audioMuseUser = shared.getString("am_user", "") ?: "",
         audioMusePassword = SecretBox.decrypt(shared.getString("am_pass", "") ?: ""),
-        audioMuseServer = shared.getString("am_server", "") ?: "",
+        // Which of AudioMuse's servers is this user's (beta report 810dc85c): per user, as a Navidrome user and an
+        // Emby user are different servers there. The shared value from before is the fallback.
+        audioMuseServer = prefs.getString("am_server", null) ?: shared.getString("am_server", "") ?: "",
         openRouterKey = SecretBox.decrypt(shared.getString("or_key", "") ?: ""),
         openRouterModel = shared.getString("or_model", AppSettings.DEFAULT_MODEL) ?: AppSettings.DEFAULT_MODEL,
         aiTitles = prefs.getBoolean("ai_titles", true),
@@ -353,10 +355,10 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putString("am_token", SecretBox.encrypt(s.audioMuseToken))
             .putString("am_user", s.audioMuseUser)
             .putString("am_pass", SecretBox.encrypt(s.audioMusePassword))
-            .putString("am_server", s.audioMuseServer)
             .putString("or_key", SecretBox.encrypt(s.openRouterKey))
             .putString("or_model", s.openRouterModel)
             .apply()
+        prefs.edit().putString("am_server", s.audioMuseServer).apply()
         _state.value = s
     }
 
