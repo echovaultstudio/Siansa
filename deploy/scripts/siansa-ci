@@ -1,11 +1,13 @@
 #!/bin/sh
-# The one command CI's SSH key can run (issue #410). It picks one of two jobs from what CI asks for:
+# The one command CI's SSH key can run (issue #410). It picks one of three jobs from what CI asks for:
 #   ssh siansa-deploy@server < app.apk         (nothing asked)  adds the APK to the F-Droid repo
 #   ssh siansa-deploy@server site < site.tar.gz                 updates the website pages and the emails
+#   ssh siansa-deploy@server "source 1234" < source.tar.gz      keeps that version's source next to its APK (GPL)
 # Anything else is refused. The jobs themselves check what they're given.
 set -eu
 case "${SSH_ORIGINAL_COMMAND:-}" in
 	"" | publish) exec /usr/local/bin/siansa-publish ;;
 	site) exec /usr/local/bin/siansa-site-update ;;
+	"source "*) exec /usr/local/bin/siansa-source "${SSH_ORIGINAL_COMMAND#source }" ;;
 	*) echo "refused" >&2; exit 2 ;;
 esac

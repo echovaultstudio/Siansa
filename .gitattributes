@@ -1,0 +1,2 @@
+# Left out of the source archive attached to each release (git archive): the signing key stays private.
+app/siansa.keystore export-ignore

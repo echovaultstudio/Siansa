@@ -28,6 +28,7 @@ the server; its key never leaves it. CI sends each new release's APK over SSH wi
 | `scripts/harden.sh` | Firewall, fail2ban, automatic security updates, SSH settings, small Docker logs |
 | `scripts/add-ci-key.sh` | Lets CI publish to the F-Droid repo, and nothing else |
 | `scripts/siansa-publish` | What CI's key runs: checks the APK (size, package, signature) and adds it to the repo |
+| `scripts/siansa-source` | Keeps each version's source (GPL) next to its APK, as `app.siansa_<code>_src.tar.gz` |
 
 ## Step by step
 
@@ -156,8 +157,9 @@ sudo sh scripts/enable-site-deploy.sh
 sudo docker compose up -d
 ```
 
-The first command installs the update scripts and makes the key run `siansa-ci`, which picks "publish an APK" or
-"update the site". The second mounts the emails folder (`/srv/siansa-emails`) into the sign-up service. Changes
+The first command installs the update scripts and makes the key run `siansa-ci`, which picks "publish an APK",
+"update the site" or "keep a version's source". Run it again after an update that adds a script (the source one
+came with issue #473); until then the server refuses the source and only the APK goes out. The second mounts the emails folder (`/srv/siansa-emails`) into the sign-up service. Changes
 to `docker-compose.yml`, `Caddyfile` and `.env` still need you to copy them and restart.
 
 ### Short commands on the server

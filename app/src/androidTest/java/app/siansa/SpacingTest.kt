@@ -292,6 +292,19 @@ class SpacingTest {
         assertTrue("Save as playlist right next to Queue all (${(save.left - queue.right).value} dp)", save.left - queue.right <= app.siansa.ui.Space.Small + 0.5.dp)
     }
 
+    /** About and license (issue #473): the same gap above and below Email for the source. */
+    @Test fun emailForTheSourceIsEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.AboutContent("0.32.0beta", 812, showLicense = false, license = null, onToggleLicense = {}, onAskForSource = {})
+            }
+        }
+        val text = compose.onNodeWithTag("sourceText").getBoundsInRoot()
+        val button = compose.onNodeWithTag("askForSource").getBoundsInRoot()
+        val next = compose.onNodeWithTag("otherSoftware").getBoundsInRoot()
+        assertEven("Email for the source", button.top - text.bottom, next.top - button.bottom, 1.dp)
+    }
+
     /** Album page (issue #240): room under the big Play button before the first song, marked when it's playing. */
     @Test fun roomBelowThePlayButton() {
         compose.setContent {

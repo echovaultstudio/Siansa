@@ -24,6 +24,7 @@ id siansa-deploy >/dev/null 2>&1 || useradd --system --create-home --home-dir /v
 install -m 755 "$HERE/scripts/siansa-publish" /usr/local/bin/siansa-publish
 install -m 755 "$HERE/scripts/siansa-ci" /usr/local/bin/siansa-ci
 install -m 755 "$HERE/scripts/siansa-site-update" /usr/local/bin/siansa-site-update
+install -m 755 "$HERE/scripts/siansa-source" /usr/local/bin/siansa-source
 mkdir -p /etc/siansa && printf '%s\n' "$DOMAIN" > /etc/siansa/domain
 
 echo "== F-Droid repo in $FDROID_DIR"

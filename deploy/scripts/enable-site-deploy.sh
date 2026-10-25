@@ -15,6 +15,7 @@ AUTH="$HOME_DIR/.ssh/authorized_keys"
 
 install -m 755 "$HERE/scripts/siansa-ci" /usr/local/bin/siansa-ci
 install -m 755 "$HERE/scripts/siansa-site-update" /usr/local/bin/siansa-site-update
+install -m 755 "$HERE/scripts/siansa-source" /usr/local/bin/siansa-source
 install -m 755 "$HERE/scripts/siansa-publish" /usr/local/bin/siansa-publish
 mkdir -p /etc/siansa && printf '%s\n' "$DOMAIN" > /etc/siansa/domain
 
