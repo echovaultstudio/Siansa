@@ -160,10 +160,6 @@ class Guests(
         }
     }
 
-    /**
-     * At start: forget the routes of users no longer shown, and load (or check for changes in) every
-     * shown user's music.
-     */
     /** Whether [user] is on the same server as the user in use, so their music may be shown together. */
     fun onSameServer(user: Int): Boolean {
         val mine = settingsOf(Users.active).current
@@ -171,6 +167,10 @@ class Guests(
         return UserFiles.sameServer(mine.sourceKind, mine.navidromeUrl, theirs.sourceKind, theirs.navidromeUrl)
     }
 
+    /**
+     * At start: forget the routes of users no longer shown, and load (or check for changes in) every
+     * shown user's music.
+     */
     fun start() {
         // Only users on the same server show together: anyone else shown (from an earlier version, or a user
         // whose server changed) is hidden again; their music is removed below like any hidden user's.
