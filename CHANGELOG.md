@@ -3,6 +3,12 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.30.3beta — 2026-10-25
+
+### Fixed
+- **AudioMuse with more than one music server.** Song radio, mood radio, paths and song details now name the right server to AudioMuse; before, only searches did. Each server's songs use their own "Server name in AudioMuse", also when you show another user's music next to yours, and Settings › Connections lets you fill in the names of your other users' servers on the same page.
+- **Opening an artist from another user's song showed "Not found".** With two users' music shown (for example Emby and Navidrome), a song's artist and album now open on the song's own server.
+
 ## 0.30.2beta — 2026-10-25
 
 ### Fixed
