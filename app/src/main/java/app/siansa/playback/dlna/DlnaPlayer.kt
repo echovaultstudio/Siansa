@@ -31,7 +31,8 @@ import kotlinx.coroutines.sync.withLock
 /**
  * Plays the queue on a UPnP/DLNA TV or speaker. The media session drives it like the phone's own player
  * (notification, lock screen, the app), while the device fetches each song from Navidrome itself as
- * MP3 320, which every DLNA device plays. It's asked every second where it is (four times a second near a
+ * MP3 320, which every DLNA device plays, or as the original file (FLAC…) when that's turned on for the device and it
+ * lists the format. It's asked every second where it is (four times a second near a
  * song's end).
  *
  * The next song is handed over ahead (SetNextAVTransportURI) so a device that supports it moves on by itself,
@@ -299,15 +300,12 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
         durationMs = C.TIME_UNSET
         playingSince = 0
         state = Player.STATE_BUFFERING
-        val song = item.toSong()
-        val url = Streaming.forCast(Uri.parse(api.streamUrl(item.mediaId))).toString()
-        val cover = song.cover?.let { api.coverUrl(it, COVER_PX) }
-        val metadata = Upnp.didl(item.mediaId, song.title, song.artist, song.album, url, Streaming.CAST_MIME, song.durationSec, cover)
         AppLog.i("DLNA", "Song ${item.mediaId} on ${device.name}" + if (startAt > 0) " from ${startAt / 1000}s" else "")
-        currentUrl = url
         // A new song replaces what the device had queued after the old one.
         sentNext = null
         send("Load") {
+            val (url, metadata) = streamFor(item)
+            currentUrl = url
             // Some devices refuse a new song while one plays.
             if (stopFirst) runCatching { transport("Stop", "InstanceID" to "0") }
             transport("SetAVTransportURI", "InstanceID" to "0", "CurrentURI" to url, "CurrentURIMetaData" to metadata)
@@ -323,6 +321,32 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
         }
         startPolling()
     }
+
+    /**
+     * The address the device gets for [item] and its DIDL description: the original file when that's turned on
+     * for this device (the cog in the device list) and it lists the file's format, else MP3 320 (beta testers #23).
+     */
+    private suspend fun streamFor(item: MediaItem): Pair<String, String> {
+        val song = item.toSong()
+        val raw = api.streamUrl(item.mediaId)
+        var url = Streaming.forCast(Uri.parse(raw)).toString()
+        var mime = Streaming.CAST_MIME
+        if (device.id in Dlna.original.value) {
+            val type = Dlna.originalType(raw)
+            if (type != null && DlnaFormats.accepts(device.formats, type)) {
+                url = raw
+                mime = type
+                if (loggedOriginal.add(type)) AppLog.i("DLNA", "${device.name} gets original files ($type)")
+            } else if (loggedOriginal.add("no:$type")) {
+                AppLog.i("DLNA", "${device.name} doesn't list ${type ?: "the file's format"}: MP3 320 instead")
+            }
+        }
+        val cover = song.cover?.let { api.coverUrl(it, COVER_PX) }
+        return url to Upnp.didl(item.mediaId, song.title, song.artist, song.album, url, mime, song.durationSec, cover)
+    }
+
+    /** Formats already logged, so each shows once. */
+    private val loggedOriginal = HashSet<String>()
 
     private fun setVolume(to: Int) {
         val url = device.renderingUrl ?: return
@@ -474,18 +498,20 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
             return
         }
         if (sent != null && sent.first == nextIndex && sent.second == item.mediaId) return
-        val song = item.toSong()
-        val url = Streaming.forCast(Uri.parse(api.streamUrl(item.mediaId))).toString()
-        if (DlnaQueue.sameStream(url, currentUrl)) return
-        val cover = song.cover?.let { api.coverUrl(it, COVER_PX) }
-        val metadata = Upnp.didl(item.mediaId, song.title, song.artist, song.album, url, Streaming.CAST_MIME, song.durationSec, cover)
         val forIndex = index
         nextSending = true
         scope.launch {
+            var url = ""
             val result = runCatching {
-                commands.withLock { transport("SetNextAVTransportURI", "InstanceID" to "0", "NextURI" to url, "NextURIMetaData" to metadata) }
+                val (address, metadata) = streamFor(item)
+                url = address
+                // Repeat all on a one-song queue: the same address again, which the device can't be told apart by.
+                if (!DlnaQueue.sameStream(address, currentUrl)) {
+                    commands.withLock { transport("SetNextAVTransportURI", "InstanceID" to "0", "NextURI" to address, "NextURIMetaData" to metadata) }
+                }
             }
             nextSending = false
+            if (result.isSuccess && DlnaQueue.sameStream(url, currentUrl)) return@launch
             val error = result.exceptionOrNull()
             when {
                 error is kotlinx.coroutines.CancellationException -> throw error

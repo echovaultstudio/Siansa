@@ -52,6 +52,14 @@ import app.siansa.playback.AudioOutput
 import app.siansa.playback.CastStatus
 import app.siansa.playback.OutputDevice
 import app.siansa.playback.dlna.Dlna
+import app.siansa.playback.dlna.DlnaDevice
+import app.siansa.playback.dlna.DlnaFormats
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 
 /**
  * The cast button: picks a TV or speaker to play on (Chromecast, or DLNA, which needs no Google Play services).
@@ -159,6 +167,8 @@ private fun CastSheet(onDismiss: () -> Unit) {
     val dlnaDevices by Dlna.devices.collectAsStateWithLifecycle()
     val dlna by Dlna.selected.collectAsStateWithLifecycle()
     val dlnaConnecting by Dlna.connecting.collectAsStateWithLifecycle()
+    // The DLNA device whose settings are open (the cog beside it).
+    var settingsOf by remember { mutableStateOf<DlnaDevice?>(null) }
 
     // DLNA devices are searched for only while the sheet is open.
     DisposableEffect(Unit) {
@@ -223,6 +233,7 @@ private fun CastSheet(onDismiss: () -> Unit) {
                     device.name,
                     if (selected && dlnaConnecting) "Connecting…" else listOfNotNull("DLNA", device.model).joinToString(" · "),
                     selected = selected && !dlnaConnecting,
+                    onSettings = { settingsOf = device },
                 ) {
                     if (!selected) {
                         if (status.device != null || status.connecting) Cast.disconnect()
@@ -239,19 +250,64 @@ private fun CastSheet(onDismiss: () -> Unit) {
                 }
             }
             Text(
-                "TVs and speakers show up when they're on the same Wi-Fi as this phone: Chromecast and Google TV, and DLNA ones (most smart TVs, Sonos, AV receivers). They play straight from your Navidrome server, as MP3 320 kbit/s.",
+                "TVs and speakers show up when they're on the same Wi-Fi as this phone: Chromecast and Google TV, and DLNA ones (most smart TVs, Sonos, AV receivers). They play straight from your server, as MP3 320 kbit/s. A DLNA one can get your original files instead: tap the cog beside it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Space.Section, vertical = Space.Medium),
             )
         }
     }
+    settingsOf?.let { device -> DlnaDeviceSettings(device) { settingsOf = null } }
+}
+
+/**
+ * A DLNA TV or speaker's settings (the cog beside it, beta testers #23): whether it gets the original file
+ * (FLAC, WAV…) instead of MP3 320, for the formats it says it plays. Lossless, and no encoder gap between songs.
+ */
+@Composable
+private fun DlnaDeviceSettings(device: DlnaDevice, onDismiss: () -> Unit) {
+    val original by Dlna.original.collectAsStateWithLifecycle()
+    val possible = DlnaFormats.playsMoreThanMp3(device.formats)
+    val on = device.id in original && possible
+    val names = DlnaFormats.names(device.formats)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(device.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                Row(
+                    Modifier.fillMaxWidth().clickable(enabled = possible) { Dlna.setOriginal(device, !on) }.testTag("dlnaOriginal"),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Space.Medium),
+                ) {
+                    Text("Send the original file", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    Switch(checked = on, enabled = possible, onCheckedChange = { Dlna.setOriginal(device, it) })
+                }
+                Text(
+                    if (possible) {
+                        "Plays your music as it is (for example FLAC) instead of MP3 320, when it can play that format. " +
+                            "Better sound, and songs follow without even a tiny gap. Uses more Wi-Fi. Changes from the next song."
+                    } else {
+                        "It didn't say it plays anything but MP3, so it gets MP3 320."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (names.isNotEmpty()) {
+                    Text("It plays: ${names.joinToString(", ")}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+    )
 }
 
 @Composable
-private fun TargetRow(icon: ImageVector, name: String, detail: String?, selected: Boolean, onClick: () -> Unit) {
+internal fun TargetRow(icon: ImageVector, name: String, detail: String?, selected: Boolean, onSettings: (() -> Unit)? = null, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Space.Section, vertical = Space.Page),
+        // The cog's touch area brings its own room on the right, so the cog lines up with the tick.
+        Modifier.fillMaxWidth().clickable(onClick = onClick)
+            .padding(start = Space.Section, end = if (onSettings != null) Space.Page else Space.Section, top = Space.Page, bottom = Space.Page),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.Page),
     ) {
@@ -269,6 +325,14 @@ private fun TargetRow(icon: ImageVector, name: String, detail: String?, selected
             }
         }
         if (selected) Icon(Icons.Rounded.Check, null, tint = Accent)
+        onSettings?.let {
+            // Not an IconButton: its 48 dp would make this row taller than the others.
+            Box(
+                Modifier.clip(CircleShape).clickable(onClickLabel = "Settings for $name", onClick = it).padding(Space.Small).testTag("dlnaSettings"),
+            ) {
+                Icon(Icons.Rounded.Settings, "Settings for $name", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
 

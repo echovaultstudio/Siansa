@@ -17,6 +17,7 @@ object Upnp {
     const val RENDERER = "urn:schemas-upnp-org:device:MediaRenderer:1"
     const val AV_TRANSPORT = "urn:schemas-upnp-org:service:AVTransport:1"
     const val RENDERING_CONTROL = "urn:schemas-upnp-org:service:RenderingControl:1"
+    const val CONNECTION_MANAGER = "urn:schemas-upnp-org:service:ConnectionManager:1"
 
     /** The multicast search for media renderers, answered by each one on the network. */
     fun searchRequest(waitSeconds: Int = 2): String =
@@ -50,6 +51,7 @@ object Upnp {
             val services = device.getElementsByTagName("service")
             var transport: String? = null
             var rendering: String? = null
+            var connection: String? = null
             for (j in 0 until services.length) {
                 val service = services.item(j) as? Element ?: continue
                 // Only the device's own services, not those of devices nested inside it.
@@ -59,6 +61,7 @@ object Upnp {
                 when {
                     type.startsWith("urn:schemas-upnp-org:service:AVTransport:") -> transport = resolve(base, control)
                     type.startsWith("urn:schemas-upnp-org:service:RenderingControl:") -> rendering = resolve(base, control)
+                    type.startsWith("urn:schemas-upnp-org:service:ConnectionManager:") -> connection = resolve(base, control)
                 }
             }
             if (transport == null) continue
@@ -70,6 +73,7 @@ object Upnp {
                 model = listOfNotNull(text(device, "manufacturer"), text(device, "modelName")).joinToString(" ").trim().ifEmpty { null },
                 transportUrl = transport,
                 renderingUrl = rendering,
+                connectionUrl = connection,
             )
         }
         return null
@@ -83,6 +87,17 @@ object Upnp {
         args.forEach { (name, value) -> append("<$name>").append(escape(value)).append("</$name>") }
         append("</u:$action></s:Body></s:Envelope>")
     }
+
+    /**
+     * The formats a renderer says it plays, from its GetProtocolInfo "Sink" list
+     * ("http-get:*:audio/flac:*,http-get:*:audio/mpeg:DLNA.ORG_PN=MP3,…"): lower-case types without parameters.
+     */
+    fun sinkFormats(sink: String?): Set<String> =
+        sink.orEmpty().split(',').mapNotNull { entry ->
+            val parts = entry.trim().split(':')
+            if (parts.size < 3 || !parts[0].equals("http-get", ignoreCase = true)) null
+            else parts[2].substringBefore(';').trim().lowercase().takeIf { it.isNotEmpty() }
+        }.toSet()
 
     /** The SOAPACTION header for [action] on [service]. */
     fun soapAction(service: String, action: String) = "\"$service#$action\""
@@ -167,4 +182,8 @@ data class DlnaDevice(
     val transportUrl: String,
     /** Where volume goes (RenderingControl), when it has one. */
     val renderingUrl: String?,
+    /** Where to ask which formats it plays (ConnectionManager), when it has one. */
+    val connectionUrl: String? = null,
+    /** The formats it says it plays (see [Upnp.sinkFormats]); null when it didn't say. */
+    val formats: Set<String>? = null,
 )
