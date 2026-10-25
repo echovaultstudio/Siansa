@@ -1,8 +1,11 @@
 package app.siansa.net
 
 import app.siansa.data.AppSettings
+import app.siansa.data.AppJson
 import app.siansa.data.Song
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -243,5 +246,15 @@ class EmbyApiTest {
         assertFalse(api.hasSonicMatch())
         assertTrue(api.sonicSimilar("s1", 10).isEmpty())
         assertNull(api.lastScan())
+    }
+
+    @Test fun nowPlayingNamesTheMediaSourceAndOneSessionPerSong() {
+        val api = EmbyApi(OkHttpClient(), { settings })
+        val start = AppJson.parseToJsonElement(api.timeline("886400", 0, paused = false, event = null)) as JsonObject
+        val progress = AppJson.parseToJsonElement(api.timeline("886400", 5000, paused = false, event = "TimeUpdate")) as JsonObject
+        val next = AppJson.parseToJsonElement(api.timeline("887221", 0, paused = false, event = null)) as JsonObject
+        assertEquals("mediasource_886400", start["MediaSourceId"]!!.jsonPrimitive.content)
+        assertEquals(start["PlaySessionId"], progress["PlaySessionId"])
+        assertTrue(start["PlaySessionId"] != next["PlaySessionId"])
     }
 }
