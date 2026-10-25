@@ -152,6 +152,10 @@ interface LibraryDao {
     @Query("SELECT * FROM songs WHERE genre = :genre COLLATE NOCASE" + VISIBLE_SONG + " ORDER BY RANDOM() LIMIT :limit")
     suspend fun songsOfGenre(genre: String, limit: Int): List<SongEntity>
 
+    /** Random songs of the libraries and users shown (beta report 37b60d15). */
+    @Query("SELECT * FROM songs WHERE 1 = 1" + VISIBLE_SONG + " ORDER BY RANDOM() LIMIT :limit")
+    suspend fun randomSongs(limit: Int): List<SongEntity>
+
     @Query("SELECT * FROM songs WHERE searchKey LIKE '%' || :term || '%'" + VISIBLE_SONG + " LIMIT :limit")
     suspend fun searchSongs(term: String, limit: Int): List<SongEntity>
 
