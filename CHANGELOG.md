@@ -3,6 +3,15 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.30.4beta — 2026-10-25
+
+### Fixed
+- **Similar albums, vibes and text search with Emby.** Similar albums now names the song's server to AudioMuse, and searches that aren't about one song (vibes, Flow, sound search, similar artists) use the server whose music you show. Before, with your own music hidden in the source filter, they asked your own server and every song they found was left out.
+- **Home showed recently played albums from music you'd hidden**, and opening one said "Not found". Recently played, the shortcuts at the top and recent artists now only show what the source filter shows.
+- **Songs played didn't reach Emby's play history.** Emby didn't accept the date Siansa sent with each play; it now gets the date in the form it reads, so your plays and play counts show up in Emby.
+- **Dolby (E-AC3) songs weren't gapless.** Their files claim to be far longer than they are, so the next song wasn't loaded ahead and started after a short silence. Siansa now loads ahead by size for these songs, so the next one follows straight on.
+- **The music sources at first setup were uneven**: rows with a longer description were taller. Every source now has the same height.
+
 ## 0.30.3beta — 2026-10-25
 
 ### Fixed
