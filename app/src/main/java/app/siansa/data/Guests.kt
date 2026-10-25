@@ -139,6 +139,9 @@ class Guests(
         return routes[id] ?: GuestMusic.itemOfCover(id)?.let { routes[it] }
     }
 
+    /** The other users whose music shows next to the user in use's. */
+    fun others(): Set<Int> = _shown.value - Users.active
+
     /** The source a request about [id] goes to when it's another user's music (their server, their login), else null. */
     fun sourceFor(id: String?): MusicSource? = ownerOf(id)?.let { apiOf(it) }
 
