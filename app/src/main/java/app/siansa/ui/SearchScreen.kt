@@ -284,11 +284,13 @@ private fun SearchResultsList(
                 Text("Nothing found", modifier = Modifier.padding(Space.Page), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        // A few of each kind (beta #21); the section's title opens every match on a page of its own.
+        fun more(kind: SearchMore) { onOpen(); nav.navigate(searchMoreRoute(kind, query.trim())) }
         if (results != null && results.artists.isNotEmpty()) {
-            item { SectionTitle("Artists") }
+            item { SearchSectionTitle("Artists") { more(SearchMore.ARTISTS) } }
             item {
                 LazyRow(contentPadding = PaddingValues(horizontal = Space.Medium)) {
-                    items(results.artists, key = { it.id }) { artist ->
+                    items(results.artists.take(SEARCH_PREVIEW), key = { it.id }) { artist ->
                         Column(
                             Modifier.width(96.dp).clickable { onOpen(); nav.navigate("artist/${artist.id}") }.padding(Space.Tight),
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -306,10 +308,10 @@ private fun SearchResultsList(
             }
         }
         if (results != null && results.albums.isNotEmpty()) {
-            item { SectionTitle("Albums") }
+            item { SearchSectionTitle("Albums") { more(SearchMore.ALBUMS) } }
             item {
                 LazyRow(contentPadding = PaddingValues(horizontal = Space.Small)) {
-                    items(results.albums, key = { it.id }) { album ->
+                    items(results.albums.take(SEARCH_PREVIEW), key = { it.id }) { album ->
                         Box(Modifier.width(150.dp)) {
                             AlbumTile(album.name, album.artist, album.coverArt, onClick = { onOpen(); nav.navigate("album/${album.id}") })
                         }
@@ -318,22 +320,22 @@ private fun SearchResultsList(
             }
         }
         if (results != null && results.songs.isNotEmpty()) {
-            item { SectionTitle("Songs") }
-            itemsIndexed(results.songs, key = { i, s -> "name-$i-${s.id}" }) { index, song ->
+            item { SearchSectionTitle("Songs") { more(SearchMore.SONGS) } }
+            itemsIndexed(results.songs.take(SEARCH_PREVIEW), key = { i, s -> "name-$i-${s.id}" }) { index, song ->
                 SongRow(song = song, onClick = { onOpen(); graph.player.play(results.songs, index) })
             }
         }
         if (canSound && (bySound || soundBusy)) {
-            item(key = "sound-title") { SectionTitle("Sounds like “$query”") }
+            item(key = "sound-title") { SearchSectionTitle("Sounds like “$query”") { more(SearchMore.SOUND) } }
             if (soundBusy && soundSongs == null) {
                 item(key = "sound-busy") {
                     Box(Modifier.fillMaxWidth().padding(Space.Page), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 }
             }
             val songs = soundSongs.orEmpty()
+            // Play and Shuffle are on the page the title opens, at the top (they sat halfway down here, beta #21).
             if (songs.isNotEmpty()) {
-                item(key = "sound-play") { Box(Modifier.padding(horizontal = Space.Page, vertical = Space.Small)) { PlayButtons(songs) } }
-                itemsIndexed(songs, key = { i, s -> "sound-$i-${s.id}" }) { index, song ->
+                itemsIndexed(songs.take(SEARCH_PREVIEW), key = { i, s -> "sound-$i-${s.id}" }) { index, song ->
                     SongRow(song = song, onClick = { onOpen(); graph.player.play(songs, index) })
                 }
             }

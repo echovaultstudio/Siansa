@@ -278,6 +278,16 @@ class SpacingTest {
         assertTrue("Find similar right next to Shuffle (${(shuffle.left - similar.right).value} dp)", shuffle.left - similar.right <= app.siansa.ui.Space.Small + 0.5.dp)
     }
 
+    /** Search (beta #21): a section's title and its "show all" arrow sit on one line. */
+    @Test fun searchSectionArrowSitsOnTheTitlesLine() {
+        compose.setContent { SiansaTheme { app.siansa.ui.SearchSectionTitle("Albums") { } } }
+        val row = compose.onNodeWithTag("searchMore-Albums").getBoundsInRoot()
+        val title = compose.onNodeWithText("Albums").getBoundsInRoot()
+        val arrow = compose.onNodeWithContentDescription("Show all").getBoundsInRoot()
+        assertEven("Title and arrow, vertical centre", (title.top + title.bottom) / 2, (arrow.top + arrow.bottom) / 2, 1.dp)
+        assertTrue("Arrow inside the row", arrow.right <= row.right + 0.5.dp)
+    }
+
     /** Album page (issue #240): room under the big Play button before the first song, marked when it's playing. */
     @Test fun roomBelowThePlayButton() {
         compose.setContent {
