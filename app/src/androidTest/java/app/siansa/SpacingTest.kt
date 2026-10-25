@@ -278,6 +278,20 @@ class SpacingTest {
         assertTrue("Find similar right next to Shuffle (${(shuffle.left - similar.right).value} dp)", shuffle.left - similar.right <= app.siansa.ui.Space.Small + 0.5.dp)
     }
 
+    /** Mix pages (beta #19): "Save as playlist" sits on the line of "Add all to queue", right next to it. */
+    @Test fun saveAsPlaylistSitsBesideQueueAll() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = {}, onSimilar = null, onShuffle = {}, onPlay = {}, onSave = {})
+            }
+        }
+        val queue = compose.onNodeWithTag("queueAll").getBoundsInRoot()
+        val save = compose.onNodeWithTag("saveAsPlaylist").getBoundsInRoot()
+        assertEven("Queue all and Save as playlist, vertical centre", (queue.top + queue.bottom) / 2, (save.top + save.bottom) / 2, 1.dp)
+        assertTrue("Save as playlist is right of Queue all and doesn't overlap it", queue.right <= save.left + 0.5.dp)
+        assertTrue("Save as playlist right next to Queue all (${(save.left - queue.right).value} dp)", save.left - queue.right <= app.siansa.ui.Space.Small + 0.5.dp)
+    }
+
     /** Album page (issue #240): room under the big Play button before the first song, marked when it's playing. */
     @Test fun roomBelowThePlayButton() {
         compose.setContent {
