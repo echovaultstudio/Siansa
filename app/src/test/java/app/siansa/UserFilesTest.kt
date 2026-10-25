@@ -3,6 +3,7 @@ package app.siansa
 import app.siansa.data.BackupRules
 import app.siansa.data.UserFiles
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -65,6 +66,38 @@ class UserFilesTest {
         // Odd entries are skipped; long names are cut.
         assertEquals(emptyMap<String, String>(), UserFiles.parseServerNames(setOf("no name", "\nonly a name")))
         assertEquals(UserFiles.SERVER_NAME_MAX, UserFiles.cleanServerName("a".repeat(100)).length)
+    }
+
+    @Test fun eachUserNamesTheirOwnServer() {
+        val server = UserFiles.serverKey("http://192.168.1.106:4533")!!
+        val servers = mapOf(0 to server, 3 to server)
+        // max names it "Kids": kids, on the same server, keeps the address.
+        val (byUser, byServer) = UserFiles.withUserName(0, "Kids", servers, emptyMap(), emptyMap())
+        assertEquals("Kids", UserFiles.nameFor(0, server, byUser, byServer))
+        assertNull(UserFiles.nameFor(3, server, byUser, byServer))
+        // Then kids names it "My server": max keeps "Kids".
+        val (byUser2, byServer2) = UserFiles.withUserName(3, "My server", servers, byUser, byServer)
+        assertEquals("Kids", UserFiles.nameFor(0, server, byUser2, byServer2))
+        assertEquals("My server", UserFiles.nameFor(3, server, byUser2, byServer2))
+        // A blank name shows the address again, for that user only.
+        val (byUser3, _) = UserFiles.withUserName(0, "  ", servers, byUser2, byServer2)
+        assertNull(UserFiles.nameFor(0, server, byUser3, byServer2))
+        assertEquals("My server", UserFiles.nameFor(3, server, byUser3, byServer2))
+    }
+
+    @Test fun aNameGivenToTheWholeServerBeforeStaysWithEachUser() {
+        val server = UserFiles.serverKey("http://192.168.1.106:4533")!!
+        val other = UserFiles.serverKey("http://192.168.1.106:8096")!!
+        val servers = mapOf(0 to server, 3 to server, 5 to other)
+        val before = mapOf(server to "Kids", other to "Emby")
+        // Read as before until someone renames.
+        assertEquals("Kids", UserFiles.nameFor(3, server, emptyMap(), before))
+        val (byUser, byServer) = UserFiles.withUserName(0, "Home", servers, emptyMap(), before)
+        assertEquals("Home", UserFiles.nameFor(0, server, byUser, byServer))
+        assertEquals("Kids", UserFiles.nameFor(3, server, byUser, byServer))
+        // Another server's name is left alone.
+        assertEquals(mapOf(other to "Emby"), byServer)
+        assertEquals("Emby", UserFiles.nameFor(5, other, byUser, byServer))
     }
 
     @Test fun backupsTreatEveryUserAlike() {
