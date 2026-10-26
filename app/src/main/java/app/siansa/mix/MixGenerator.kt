@@ -21,6 +21,8 @@ import app.siansa.net.str
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.jsonObject
@@ -475,7 +477,7 @@ class MixGenerator(private val graph: AppGraph) {
             val n = perArtist[hit.artist.lowercase()] ?: 0
             if (n >= 3) false else { perArtist[hit.artist.lowercase()] = n + 1; true }
         }.take(size)
-        val songs = spreadArtists(resolveHits(picked))
+        val songs = spreadArtists(resolveHits(picked)).ifEmpty { throw MixException(NOT_ON_THIS_SERVER) }
         return MoodResult(plan.title, plan.description, plan.query, songs, plan.ai)
     }
 
@@ -539,7 +541,7 @@ class MixGenerator(private val graph: AppGraph) {
             "Search \"$query\" · ${tuning.summary().ifEmpty { "no sliders moved" }} · ${hits.size} found, " +
                 "${features.size} with energy/tempo, ${picked.size} picked",
         )
-        return spreadArtists(resolveHits(picked))
+        return spreadArtists(resolveHits(picked)).ifEmpty { throw MixException(NOT_ON_THIS_SERVER) }
     }
 
     private suspend fun aiMoodPlan(mood: String): Plan {
@@ -611,7 +613,42 @@ class MixGenerator(private val graph: AppGraph) {
         val matched = graph.library.songs(byName.values.toList()).associateBy { it.id }
         val rest = missing.filter { it.id !in byName }.map { it.id }
         val fetched = if (rest.isEmpty()) emptyMap() else resolve(rest).associateBy { it.id }
-        return hits.mapNotNull { hit -> local[hit.id] ?: byName[hit.id]?.let { matched[it] } ?: fetched[hit.id] }.distinctBy { it.id }
+        // None of AudioMuse's ids are this server's, and the phone's library didn't have them by name (not
+        // synced yet, or synced only in part): the server is asked by title and artist (beta testers #40).
+        val unresolved = missing.filter { it.id !in byName && it.id !in fetched }
+        val onServer = if (local.isEmpty() && fetched.isEmpty() && unresolved.isNotEmpty()) searchServer(unresolved) else emptyMap()
+        if (missing.isNotEmpty()) {
+            AppLog.i(
+                "Mix",
+                "AudioMuse's ${hits.size} songs: ${local.size} by id, ${byName.size} by name in the library " +
+                    "(${songIndex().size} songs on the phone), ${fetched.size} fetched, ${onServer.size} found on the server by name, " +
+                    "${unresolved.size - onServer.size} not found",
+            )
+        }
+        return hits.mapNotNull { hit ->
+            local[hit.id] ?: byName[hit.id]?.let { matched[it] } ?: fetched[hit.id] ?: onServer[hit.id]
+        }.distinctBy { it.id }
+    }
+
+    /**
+     * AudioMuse's [hits] looked up on the server by title and artist (beta testers #40): a search for each title,
+     * the song by the same artist kept. At most [SERVER_SEARCH_MAX], a few at a time, and only what the libraries
+     * you sync show. By AudioMuse's id.
+     */
+    private suspend fun searchServer(hits: List<ClapHit>): Map<String, Song> = coroutineScope {
+        val permits = Semaphore(4)
+        val found = hits.take(SERVER_SEARCH_MAX).map { hit ->
+            async {
+                permits.withPermit {
+                    val results = runCatching { graph.source.search(hit.title).songs }
+                        .onFailure { AppLog.d("Mix", "Search for \"${hit.title}\" failed: ${it.message}") }
+                        .getOrDefault(emptyList())
+                    serverMatch(hit, results)?.let { hit.id to it }
+                }
+            }
+        }.awaitAll().filterNotNull()
+        val kept = graph.library.keepSyncedSongs(found.map { it.second }, "AudioMuse").map { it.id }.toSet()
+        found.filter { it.second.id in kept }.toMap()
     }
 
     /**
@@ -654,6 +691,8 @@ class MixGenerator(private val graph: AppGraph) {
 
     private companion object {
         const val DAY_MS = 24L * 60 * 60 * 1000
+        /** AudioMuse's songs looked up on the server by name at most, for one mix or vibe (beta testers #40). */
+        const val SERVER_SEARCH_MAX = 60
         /** Albums played lately whose songs On repeat looks at (issue #495). */
         const val RECENT_ALBUMS = 40
         /** Songs of the music shown looked at for a mix from the library. */
@@ -707,6 +746,18 @@ fun parseSteering(element: kotlinx.serialization.json.JsonElement?, concepts: Li
         val term = o.str("term")?.trim()?.lowercase()?.let { known[it] } ?: return@mapNotNull null
         Steer(term, o.str("direction")?.lowercase() != "less")
     }.distinctBy { it.term }.take(3)
+}
+
+/**
+ * What a vibe or mood playlist says when none of AudioMuse's songs could be found on this server, instead of an
+ * empty list (beta testers #40). The AudioMuse test in Settings says which case it is.
+ */
+const val NOT_ON_THIS_SERVER = "None of the songs AudioMuse found are on this server. Test AudioMuse in Settings › Connections to see why."
+
+/** The song in a server search's [results] with [hit]'s title and artist (beta testers #40), or null. */
+internal fun serverMatch(hit: ClapHit, results: List<Song>): Song? {
+    val id = SongIndex(results.map { SongIndex.Entry(it.id, it.title, it.artist) }).find(hit.artist, hit.title) ?: return null
+    return results.firstOrNull { it.id == id }
 }
 
 /** AudioMuse's tracks by their id → the id of the song with the same title and artist in the library (issue #416). */
