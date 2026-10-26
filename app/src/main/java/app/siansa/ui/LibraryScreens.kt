@@ -65,6 +65,7 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import app.siansa.mix.MixGenerator
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
@@ -408,7 +409,23 @@ fun PlayButtons(songs: List<Song>) {
 @Composable
 fun MixScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
-    val mix by loadState(id) { graph.mixes.get(id) ?: throw IllegalStateException("This mix is no longer saved") }
+    // Bumped when On repeat changed on the server, to show it again (issue #495).
+    var version by remember { mutableIntStateOf(0) }
+    var checking by remember { mutableStateOf(false) }
+    val mix by loadState(id to version) { graph.mixes.get(id) ?: throw IllegalStateException("This mix is no longer saved") }
+    // Today's On repeat opens at once from the phone, then asks the server what you played most in the last 30
+    // days, like a playlist (issue #495); the cog turns while it does.
+    LaunchedEffect(id) {
+        val shown = graph.mixes.get(id) ?: return@LaunchedEffect
+        if (shown.selectorId != MixGenerator.Personal.REPEAT.id || shown.date != java.time.LocalDate.now().toString()) return@LaunchedEffect
+        checking = true
+        val fresh = runCatching { graph.generator.ensurePersonal(MixGenerator.Personal.REPEAT, force = true) }.getOrNull()
+        checking = false
+        if (fresh != null && fresh.songs.map { it.id } != shown.songs.map { it.id }) {
+            AppLog.i("Mix", "On repeat changed: ${shown.songs.size} → ${fresh.songs.size} songs")
+            version++
+        }
+    }
     val m = mix.valueOrNull()
     CollectionPage(
         nav = nav,
@@ -418,13 +435,15 @@ fun MixScreen(nav: NavController, id: String) {
         error = (mix as? Load.Err)?.message,
         cover = { mod -> if (m != null) CoverMosaic(m, mod) else Box(mod) },
         saveAsPlaylist = true,
+        actions = { if (checking) CheckingCog() },
         header = {
             if (m != null) {
                 if (m.description.isNotBlank()) {
                     Text(m.description, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(Space.Small))
                 }
-                CollectionByline(null, null, null, "Made for you · ${m.songs.size} songs · sound search: ${m.query}")
+                // Mixes from your listening (On repeat) have no sound search to name.
+                CollectionByline(null, null, null, "Made for you · ${m.songs.size} songs" + if (m.query.isNotBlank()) " · sound search: ${m.query}" else "")
             }
         },
     )

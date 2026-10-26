@@ -1,5 +1,6 @@
 package app.siansa.net
 
+import app.siansa.mix.SongPlays
 import app.siansa.data.Album
 import app.siansa.data.AlbumDetail
 import app.siansa.data.Artist
@@ -47,6 +48,7 @@ class ActiveSource(
     override suspend fun songDetails(id: String): SongDetails = of(id).songDetails(id)
     override suspend fun randomSongs(size: Int, genre: String?, fromYear: Int?, toYear: Int?): List<Song> = pick().randomSongs(size, genre, fromYear, toYear)
     override suspend fun randomSongPlays(size: Int): List<Pair<Song, Long>> = pick().randomSongPlays(size)
+    override suspend fun recentSongPlays(albumCount: Int): List<SongPlays> = pick().recentSongPlays(albumCount)
     override suspend fun search(query: String): SearchResults = pick().search(query)
     override suspend fun lyrics(song: Song): Lyrics? = of(song.id).lyrics(song)
     override suspend fun similarSongs(songId: String, count: Int): List<Song> = of(songId).similarSongs(songId, count)

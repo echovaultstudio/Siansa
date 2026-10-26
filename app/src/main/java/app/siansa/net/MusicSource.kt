@@ -1,5 +1,6 @@
 package app.siansa.net
 
+import app.siansa.mix.SongPlays
 import app.siansa.data.Album
 import app.siansa.data.AlbumDetail
 import app.siansa.data.Artist
@@ -85,6 +86,12 @@ interface MusicSource {
     suspend fun song(id: String): Song
     suspend fun songDetails(id: String): SongDetails
     suspend fun randomSongs(size: Int, genre: String? = null, fromYear: Int? = null, toYear: Int? = null): List<Song>
+
+    /**
+     * Songs this user played lately, each with how often it was played and when last (On repeat, issue #495): the
+     * songs of the [albumCount] albums played most recently. Empty when the server can't say.
+     */
+    suspend fun recentSongPlays(albumCount: Int): List<SongPlays> = emptyList()
 
     /** Random songs with how often each was played, for the dice (issue #347). */
     suspend fun randomSongPlays(size: Int): List<Pair<Song, Long>>

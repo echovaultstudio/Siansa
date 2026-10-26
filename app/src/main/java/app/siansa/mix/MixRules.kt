@@ -15,6 +15,13 @@ object MixRules {
     fun showsPersonal(kind: MixGenerator.Personal, audioMuseReady: Boolean): Boolean = audioMuseReady || !kind.needsAudioMuse
 
     /**
+     * Its tile on Home: hidden once making it said there isn't enough to go on ([notEnough], e.g. On repeat without
+     * plays in the last 30 days, issue #495), unless a mix of it was made today anyway.
+     */
+    fun showsPersonalTile(kind: MixGenerator.Personal, audioMuseReady: Boolean, madeToday: Boolean, notEnough: Boolean): Boolean =
+        showsPersonal(kind, audioMuseReady) && (madeToday || !notEnough)
+
+    /**
      * Today's mixes Home lists: made [today], for a vibe that applies now ([applicableIds]) or from your listening
      * ([personalIds]), whatever music was shown when they were made.
      */
