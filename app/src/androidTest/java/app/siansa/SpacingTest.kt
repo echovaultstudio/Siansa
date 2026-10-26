@@ -26,6 +26,9 @@ import app.siansa.mix.VibeTuning
 import androidx.compose.material3.Text
 import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.layout.padding
+import app.siansa.ui.MoreChipsHint
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.test.onRoot
 import androidx.compose.foundation.layout.Row
@@ -733,6 +736,29 @@ class SpacingTest {
         assertEven("Row heights", plain.bottom - plain.top, withCog.bottom - withCog.top, 1.dp)
         val cog = compose.onNodeWithTag("dlnaSettings", useUnmergedTree = true).getBoundsInRoot()
         assertEven("Room above and below the cog", cog.top - withCog.top, withCog.bottom - cog.bottom, 1.dp)
+    }
+
+    /** Your Library (issue #497): a › shows while chips are hidden off the right edge, centred in the row, and goes at the end. */
+    @Test fun moreChipsHintShowsUntilTheEnd() {
+        lateinit var scroll: androidx.compose.foundation.ScrollState
+        compose.setContent {
+            SiansaTheme {
+                scroll = androidx.compose.foundation.rememberScrollState()
+                Box(Modifier.width(320.dp).testTag("chipRow")) {
+                    Row(
+                        Modifier.horizontalScroll(scroll).padding(horizontal = Space.Page, vertical = Space.Small),
+                        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+                    ) { listOf("Playlists", "Music", "Mixes", "Favourites", "Your listening").forEach { FilterChip(selected = false, onClick = {}, label = { Text(it) }) } }
+                    MoreChipsHint(scroll)
+                }
+            }
+        }
+        val row = compose.onNodeWithTag("chipRow").getBoundsInRoot()
+        val more = compose.onNodeWithTag("chipsMore").getBoundsInRoot()
+        assertEven("› centred in the row", more.top - row.top, row.bottom - more.bottom, 1.dp)
+        compose.runOnIdle { scroll.dispatchRawDelta(scroll.maxValue.toFloat()) }
+        compose.waitForIdle()
+        assertTrue("› gone at the end", compose.onAllNodesWithTag("chipsMore").fetchSemanticsNodes().isEmpty())
     }
 
     /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */

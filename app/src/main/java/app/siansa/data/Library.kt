@@ -128,6 +128,12 @@ class LibraryRepository(context: Context) {
     /** Every song's id, title and artist, for matching many songs from other services at once. */
     suspend fun songTitles(): List<SongTitleRow> = withContext(Dispatchers.IO) { dao.songTitles() }
 
+    /** Every song in the libraries you sync, only downloaded ones while that's on (Your Library's Songs, issue #497). */
+    suspend fun allSongs(): List<Song> {
+        val all = withContext(Dispatchers.IO) { dao.allSongs().map { it.toSong() } }
+        return onlyDownloaded()?.songs(all) ?: all
+    }
+
     suspend fun songs(ids: List<String>): List<Song> {
         if (ids.isEmpty()) return emptyList()
         val found = ids.distinct().chunked(CHUNK).flatMap { dao.songs(it) }.associateBy { it.id }

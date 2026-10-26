@@ -151,7 +151,7 @@ class AppTourTest {
                 libraryAll()
                 waitText("Liked songs")
                 shot("02-library")
-                click("Albums")
+                music("Albums")
                 waitText("WebP Animated")
                 shot("03-library-albums")
                 // Sort menu
@@ -167,7 +167,7 @@ class AppTourTest {
                 // Back to all, then the other filters
                 compose.onAllNodesWithContentDescription("Clear filter").onFirst().performClick()
                 // The chip row scrolls sideways (Favourites came first, issue #275): bring each chip into view first.
-                for (chip in listOf("Favourites", "Playlists", "Mixes", "Artists", "Your listening")) {
+                for (chip in listOf("Favourites", "Playlists", "Mixes", "Music", "Your listening")) {
                     node(chip).performScrollTo().performClick()
                     idle()
                     idle(600)
@@ -185,7 +185,7 @@ class AppTourTest {
             }
             step("album page and playing from it") {
                 libraryAll()
-                click("Albums")
+                music("Albums")
                 click("WebP Animated")
                 waitText("WebP Song")
                 idle(1500)
@@ -224,7 +224,7 @@ class AppTourTest {
             step("artist page and playing from it") {
                 // From Your Library's artists: every step starts with nothing open (issue #162).
                 libraryAll()
-                click("Artists")
+                music("Artists")
                 click("Test Artist")
                 waitText("Popular")
                 idle(1000)
@@ -235,7 +235,7 @@ class AppTourTest {
             }
             step("album with a big animated GIF") {
                 libraryAll()
-                click("Albums")
+                music("Albums")
                 click("Big Animated")
                 waitText("Long Song A")
                 idle(2000)
@@ -252,7 +252,7 @@ class AppTourTest {
             }
             step("your listening") {
                 libraryAll()
-                click("Your listening")
+                chip("Your listening")
                 val month = LocalDate.now().month.getDisplayName(TextStyle.FULL, Locale.getDefault())
                 click("Your $month")
                 idle(2500)
@@ -261,7 +261,7 @@ class AppTourTest {
             }
             step("time machine") {
                 libraryAll()
-                click("Your listening")
+                chip("Your listening")
                 idle(800)
                 shot("14b-your-listening-list")
                 // "Time machine" is also a filter chip above the list: open the entry by its own subtitle.
@@ -276,7 +276,7 @@ class AppTourTest {
             }
             step("other artists you might like") {
                 libraryAll()
-                click("Your listening")
+                chip("Your listening")
                 click("Other artists you might like")
                 idle(2500)
                 shot("14b-other-artists")
@@ -533,6 +533,18 @@ class AppTourTest {
     private fun click(text: String) {
         node(text).performClick()
         idle()
+    }
+
+    /** A chip in Your Library's row, scrolled into view first: chips come in the order last opened (issue #497). */
+    private fun chip(text: String) {
+        node(text).performScrollTo().performClick()
+        idle()
+    }
+
+    /** Your Library's Music chip, then one of its parts: Albums, Artists or Songs (issue #497). */
+    private fun music(part: String) {
+        chip("Music")
+        chip(part)
     }
 
     /**
