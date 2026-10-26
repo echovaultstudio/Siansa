@@ -3,6 +3,12 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.34.1beta — 2026-10-26
+
+### Changed
+- Each release now also comes as an Android App Bundle (`.aab`) next to the APK, ready for Google Play. The APK for
+  F-Droid and direct installs stays the same.
+
 ## 0.34.0beta — 2026-10-26
 
 ### Fixed
