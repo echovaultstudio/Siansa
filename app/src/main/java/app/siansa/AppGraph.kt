@@ -94,6 +94,7 @@ import app.siansa.playback.StreamStats
 import java.io.File
 import java.util.concurrent.TimeUnit
 import app.siansa.data.mixScopeKey
+import app.siansa.mix.PlayCountLog
 
 /** Everything the app shares, created once in [SiansaApp]. */
 @OptIn(UnstableApi::class)
@@ -241,6 +242,8 @@ class AppGraph(val app: Application) {
     val guests: Guests by lazy { Guests(app, http, library, scope) }
     // A mix stays as it was made when the source filter changes (issue #486).
     val mixes = MixStore(app)
+    /** Each song's play count per day as seen on the server, for On repeat's last 30 days (issue #495). */
+    val playCounts = PlayCountLog(app)
 
     /** The source filter's key for mixes ([mixScopeKey]). */
     fun mixScope(): String = mixScopeKey(library.ownHidden.value, guests.others(), settings.current.syncFolders)
