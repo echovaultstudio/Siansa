@@ -3,6 +3,13 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.33.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.33.1beta) — 2026-10-26
+
+- [#487](https://github.com/echovaultstudio/Siansa/pull/487) Daily mixes stay as made when the source filter changes; AI mixes need AudioMuse (@Th3K1ngP1n)
+- [#489](https://github.com/echovaultstudio/Siansa/pull/489) Search's show-all albums and artists start below the title bar (@Th3K1ngP1n)
+- [#492](https://github.com/echovaultstudio/Siansa/pull/492) Hold to stop ends casting too (@Th3K1ngP1n)
+- 2 commits pushed straight to main
+
 ## [0.33.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.33.0beta) — 2026-10-25
 
 - [#459](https://github.com/echovaultstudio/Siansa/pull/459) Every user-visible change updates the docs (@Th3K1ngP1n)
