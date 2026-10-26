@@ -790,11 +790,12 @@ class SpacingTest {
                 }
             }
         }
-        val pills = compose.onAllNodesWithTag("libraryPill", useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
+        // The chips' own size: their bounds on screen are clipped, so a chip scrolled out of the row measures 0.
+        val pills = compose.onAllNodesWithTag("libraryPill", useUnmergedTree = true).fetchSemanticsNodes().map { it.size }
         val density = compose.density.density
         fun dp(px: Float) = (px / density).dp
         // Full size: the text keeps its 14 sp height, so the chips are as tall as a lone full-size chip.
-        val tall = pills.map { dp(it.height) }.distinct()
+        val tall = pills.map { dp(it.height.toFloat()) }.distinct()
         assertTrue("One chip height: $tall", tall.size == 1)
         val more = compose.onNodeWithTag("chipsMore").getBoundsInRoot()
         val fade = compose.onNodeWithTag("chipsMoreFade", useUnmergedTree = true).getBoundsInRoot()
