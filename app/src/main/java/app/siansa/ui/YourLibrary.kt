@@ -90,6 +90,9 @@ import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -584,14 +587,17 @@ private fun FilterRow(
     // right, like Your listening, otherwise left the row scrolled with × out of sight).
     val scroll = rememberScrollState()
     LaunchedEffect(selected) { scroll.scrollTo(0) }
-    Box(Modifier.fillMaxWidth()) {
+    // The main chips shrink to fit the width (owner's comment on #497), so all of them show on a small phone too.
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val fitted = chipFit(chips.map { it.label }, maxWidth)
+        val fit = if (selected != null) FullChips else fitted
         Row(
             Modifier.fillMaxWidth().horizontalScroll(scroll).padding(horizontal = Space.Page, vertical = Space.Small).testTag("libraryChips"),
-            horizontalArrangement = Arrangement.spacedBy(Space.Small),
+            horizontalArrangement = Arrangement.spacedBy(fit.gap),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (selected == null) {
-                chips.forEach { k -> Pill(k.label, active = false) { onKind(k) } }
+                chips.forEach { k -> LibraryPill(k.label, active = false, fit = fit) { onKind(k) } }
             } else {
                 Surface(
                     onClick = { onKind(null) },
@@ -599,9 +605,9 @@ private fun FilterRow(
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     modifier = Modifier.size(36.dp),
                 ) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Close, "Clear filter", Modifier.size(20.dp)) } }
-                Pill(selected.label, active = true) { onKind(null) }
-                subFilters.forEach { s -> Pill(s, active = sub == s) { onSub(s) } }
-                tags.forEach { t -> Pill(t, active = tag == t, outlined = true) { onTag(t) } }
+                LibraryPill(selected.label, active = true) { onKind(null) }
+                subFilters.forEach { s -> LibraryPill(s, active = sub == s) { onSub(s) } }
+                tags.forEach { t -> LibraryPill(t, active = tag == t, outlined = true) { onTag(t) } }
             }
         }
         MoreChipsHint(scroll)
@@ -635,6 +641,39 @@ internal fun BoxScope.MoreChipsHint(scroll: ScrollState) {
     }
 }
 
+/** How the main chips are drawn: text scale, padding each side and gap (issue #497). */
+internal data class ChipFit(val scale: Float, val padding: androidx.compose.ui.unit.Dp, val gap: androidx.compose.ui.unit.Dp)
+
+/** Chips at full size: no shrinking. */
+internal val FullChips = ChipFit(1f, Space.Page, Space.Small)
+
+/**
+ * How chips with [labels] fit a row [width] wide with the page's edges (issue #497): measured at full size, then
+ * the room around and between them shrinks, then the text ([LibraryChips.fit]).
+ */
+@Composable
+internal fun chipFit(labels: List<String>, width: androidx.compose.ui.unit.Dp): ChipFit {
+    val measurer = rememberTextMeasurer()
+    val style = MaterialTheme.typography.labelLarge.copy(fontSize = PILL_FONT)
+    val density = LocalDensity.current
+    return remember(labels, width, style, density) {
+        with(density) {
+            val fit = LibraryChips.fit(
+                texts = labels.map { measurer.measure(it, style, maxLines = 1).size.width.toFloat() },
+                pad = Space.Page.toPx(),
+                padMin = Space.Small.toPx(),
+                gap = Space.Small.toPx(),
+                gapMin = Space.Tight.toPx(),
+                available = (width - Space.Page * 2).toPx(),
+            )
+            ChipFit(fit.text, fit.padding.toDp(), fit.gap.toDp())
+        }
+    }
+}
+
+/** The chips' text at full size; the main chips shrink from it to fit (issue #497). */
+private val PILL_FONT = 14.sp
+
 /** How wide the fade at the end of the chip row is. */
 private val MORE_FADE = 72.dp
 
@@ -642,7 +681,7 @@ private val MORE_FADE = 72.dp
 private const val SONG_QUEUE = 200
 
 @Composable
-private fun Pill(text: String, active: Boolean, outlined: Boolean = false, onClick: () -> Unit) {
+internal fun LibraryPill(text: String, active: Boolean, outlined: Boolean = false, fit: ChipFit = FullChips, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = CircleShape,
@@ -651,7 +690,14 @@ private fun Pill(text: String, active: Boolean, outlined: Boolean = false, onCli
         contentColor = if (active) OnSelected else MaterialTheme.colorScheme.onSurface,
         border = if (outlined && !active) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
     ) {
-        Text(text, style = MaterialTheme.typography.labelLarge, fontSize = 14.sp, modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small))
+        Text(
+            text,
+            style = MaterialTheme.typography.labelLarge,
+            fontSize = PILL_FONT * fit.scale,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(horizontal = fit.padding, vertical = Space.Small).testTag("libraryPill"),
+        )
     }
 }
 
