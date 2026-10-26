@@ -42,6 +42,11 @@ data class SongEntity(
     val albumPeak: Float?,
     val starred: Boolean,
     val searchKey: String,
+    /**
+     * Every artist credited on the song (Navidrome's OpenSubsonic "artists", Emby's ArtistItems) as JSON, so a
+     * featured or compilation artist is found and their page knows the song (beta testers #34).
+     */
+    @androidx.room.ColumnInfo(defaultValue = "") val credits: String = "",
 )
 
 /**
@@ -150,7 +155,10 @@ interface LibraryDao {
     suspend fun songsOfArtist(artistId: String, name: String): List<SongEntity>
 
     /** Songs whose artist is [artistId] or whose artist text contains [namePattern] (a LIKE pattern, escaped with '\\'). */
-    @Query("SELECT * FROM songs WHERE (artistId = :artistId OR artist LIKE :namePattern ESCAPE '\\')" + VISIBLE_SONG)
+    @Query(
+        "SELECT * FROM songs WHERE (artistId = :artistId OR artist LIKE :namePattern ESCAPE '\\' OR " +
+            "credits LIKE '%\"' || :artistId || '\"%')" + VISIBLE_SONG,
+    )
     suspend fun songsCrediting(artistId: String, namePattern: String): List<SongEntity>
 
     @Query("SELECT * FROM songs WHERE genre = :genre COLLATE NOCASE" + VISIBLE_SONG + " ORDER BY RANDOM() LIMIT :limit")
@@ -363,7 +371,7 @@ interface LibraryDao {
 
 @Database(
     entities = [SongEntity::class, AlbumEntity::class, ArtistEntity::class, PlaylistEntity::class, MetaEntity::class, SourceEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class LibraryDatabase : RoomDatabase() {
@@ -396,9 +404,20 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Version 5 keeps every artist credited on a song (beta testers #34). Forgetting the albums' signatures makes
+         * the next sync fetch every song again, so the credits fill in without starting over.
+         */
+        val ADD_SONG_CREDITS = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `songs` ADD COLUMN `credits` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("UPDATE `albums` SET `signature` = ''")
+            }
+        }
+
         fun open(context: Context): LibraryDatabase =
             Room.databaseBuilder(context, LibraryDatabase::class.java, app.siansa.data.Users.scoped(app.siansa.data.UserFiles.DATABASE))
-                .addMigrations(ADD_SOURCES, ADD_ARTIST_MBID, ADD_ALBUM_FOLDERS)
+                .addMigrations(ADD_SOURCES, ADD_ARTIST_MBID, ADD_ALBUM_FOLDERS, ADD_SONG_CREDITS)
                 // The library can always be synced again, so any other schema change simply starts fresh.
                 .fallbackToDestructiveMigration()
                 .build()

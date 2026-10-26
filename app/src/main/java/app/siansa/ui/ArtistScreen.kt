@@ -66,13 +66,37 @@ import app.siansa.data.Song
 import app.siansa.data.category
 import app.siansa.data.isTopSongsFresh
 import app.siansa.data.quickTopSongs
+import app.siansa.data.splitOwnAlbums
 import app.siansa.log.AppLog
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 
-private data class ArtistPage(val artist: Artist, val albums: List<Album>, val songs: List<Song>)
+/** An artist's page: their own [albums], and [others] they appear on as the server lists them (beta testers #34). */
+private data class ArtistPage(val artist: Artist, val albums: List<Album>, val songs: List<Song>, val others: List<Album> = emptyList())
+
+/**
+ * The page for artist [id]: from the synced library, or from the server for an artist who is no album artist
+ * (featured, on a compilation). The server lists every album they take part in; only their own are releases,
+ * the rest go to "Appears on" (beta testers #34).
+ */
+private suspend fun artistPage(graph: app.siansa.AppGraph, id: String): ArtistPage {
+    val local = graph.library.artist(id)
+    if (local != null) return ArtistPage(local, graph.library.albumsOf(local), graph.library.songsOf(local))
+    val remote = graph.source.artist(id)
+    val albums = graph.library.keepSyncedAlbums(remote.albums, "Artist page")
+    val (own, others) = splitOwnAlbums(remote.artist, albums)
+    AppLog.d("Artist", "${remote.artist.name} from the server: ${own.size} own albums, ${others.size} appears on")
+    return ArtistPage(remote.artist, own.sortedByDescending { it.year ?: 0 }, emptyList(), others)
+}
+
+/** Every album [page]'s artist appears on: the server's and those the library's songs credit them on, newest first. */
+private suspend fun appearsOnOf(graph: app.siansa.AppGraph, page: ArtistPage): List<Album> =
+    (page.others + graph.library.appearsOn(page.artist))
+        .distinctBy { it.id }
+        .filterNot { album -> page.albums.any { it.id == album.id } }
+        .sortedWith(compareByDescending<Album> { it.year ?: 0 }.thenBy { app.siansa.data.normalizeKey(it.name) })
 
 private val HERO = 380.dp
 
@@ -84,16 +108,7 @@ private val HERO = 380.dp
 fun ArtistScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
     val launch = rememberPlayLauncher()
-    val page by loadState(id) {
-        val local = graph.library.artist(id)
-        if (local != null) {
-            ArtistPage(local, graph.library.albumsOf(local), graph.library.songsOf(local))
-        } else {
-            val remote = graph.source.artist(id)
-            val albums = graph.library.keepSyncedAlbums(remote.albums, "Artist page")
-            ArtistPage(remote.artist, albums.sortedByDescending { it.year ?: 0 }, emptyList())
-        }
-    }
+    val page by loadState(id) { artistPage(graph, id) }
     val info by loadState("info-$id") { graph.source.artistInfo(id) }
     // Artists that sound alike, from the Siansa plugin (issue #223); nothing when it isn't there.
     val soundsAlike by loadState("sounds-alike-$id") {
@@ -169,7 +184,7 @@ fun ArtistScreen(nav: NavController, id: String) {
             Box(Modifier.statusBarsPadding().padding(top = HERO)) { LoadBox(page) { } }
             return@HeroPage
         }
-        val others by loadState("appears-$id") { graph.library.appearsOn(p.artist) }
+        val others by loadState("appears-$id") { appearsOnOf(graph, p) }
         val groups = p.albums.groupBy { it.category }.toList().sortedBy { it.first.ordinal }
         // An album in more than one library shows once for each, with the library's name (issue #376).
         val folderNames by loadState("folder-names") { graph.library.folderNames() }
@@ -196,7 +211,8 @@ fun ArtistScreen(nav: NavController, id: String) {
                 Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium)) {
                     Text(
                         listOfNotNull(
-                            "${p.albums.size} ${if (p.albums.size == 1) "release" else "releases"}",
+                            // An artist who only appears on others' albums has no releases to count.
+                            if (p.albums.isNotEmpty()) "${p.albums.size} ${if (p.albums.size == 1) "release" else "releases"}" else null,
                             if (p.songs.isNotEmpty()) "${p.songs.size} songs" else null,
                         ).joinToString(" · "),
                         style = MaterialTheme.typography.bodyMedium,
@@ -335,8 +351,8 @@ private fun AppearsOnTitle(onClick: () -> Unit) {
 fun AppearsOnScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
     val page by loadState(id) {
-        val artist = graph.library.artist(id)
-        artist to (artist?.let { graph.library.appearsOn(it) }.orEmpty())
+        val artist = artistPage(graph, id)
+        artist.artist to appearsOnOf(graph, artist)
     }
     val loaded = page.valueOrNull()
     Screen(title = loaded?.first?.name?.let { "$it appears on" } ?: "Appears on", nav = nav) { padding ->

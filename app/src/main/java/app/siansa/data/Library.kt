@@ -355,10 +355,18 @@ class LibraryRepository(context: Context) {
         val first = terms.maxBy { it.length }
         fun all(key: String) = terms.all { key.contains(it) }
         val only = onlyDownloaded()
-        val artists = dao.searchArtists(first, 200).filter { all(it.sortKey) }.map { it.toArtist() }
+        val albumArtists = dao.searchArtists(first, 200).filter { all(it.sortKey) }.map { it.toArtist() }
             .let { CombinedArtists.withoutCombined(it, combinedArtists()) }
+        // Artists only credited on songs (featured, or on a compilation) aren't album artists (beta testers #34).
+        val found = dao.searchSongs(first, 3000).filter { all(it.searchKey) }.map { it.toSong() }
+        val credited = Credits.matching(
+            found,
+            terms,
+            albumArtists.map { it.id }.toSet(),
+        ).map { (ref, _) -> Artist(ref.id, ref.name) }
+        val artists = rankByName(query, albumArtists + credited) { it.name }
         val albums = dao.searchAlbums(first, 400).filter { all(it.sortKey + " " + it.artistKey) }.map { it.toAlbum() }
-        val songs = dao.searchSongs(first, 1500).filter { all(it.searchKey) }.map { it.toSong() }.distinctBy { songKey(it) }
+        val songs = found.distinctBy { songKey(it) }
         SearchResults(
             artists = (only?.artists(artists) ?: artists).take(30),
             albums = (only?.albums(albums) ?: albums).take(40),
@@ -539,13 +547,14 @@ class LibraryRepository(context: Context) {
 
     private fun SongEntity.toSong() = Song(
         id, title, artist, artistId, album, albumId, coverArt, durationSec, track, disc, year, genre,
-        trackGain, albumGain, trackPeak, albumPeak, starred,
+        trackGain, albumGain, trackPeak, albumPeak, starred, artists = Credits.decode(credits),
     )
 
     private fun Song.toEntity() = SongEntity(
         id, title, artist, artistId, album, albumId, coverArt, durationSec, track, disc, year, genre,
         trackGain, albumGain, trackPeak, albumPeak, starred,
-        searchKey = normalizeKey("$title $artist $album"),
+        searchKey = normalizeKey("$title $artist $album ${artists.joinToString(" ") { it.name }}"),
+        credits = Credits.encode(this),
     )
 
     private fun AlbumEntity.toAlbum() = Album(
