@@ -3,6 +3,10 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.34.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.34.1beta) — 2026-10-26
+
+- [#516](https://github.com/echovaultstudio/Siansa/pull/516) Every release builds an app bundle (.aab) for Google Play too (#515) (@Th3K1ngP1n)
+
 ## [0.34.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.34.0beta) — 2026-10-26
 
 - [#498](https://github.com/echovaultstudio/Siansa/pull/498) Target Android 16 (API 36) for Google Play (@Th3K1ngP1n)
