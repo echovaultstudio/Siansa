@@ -3,6 +3,20 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.33.1beta — 2026-10-26
+
+### Fixed
+- **Search › show all albums or artists started under the title bar**, cutting the top row off. The page now starts
+  below it, and uses the same grid of three (or list, and the quick-scroll handle) as other album and artist pages.
+- **Hold to stop while casting kept the TV or speaker connected**, so the next song you picked played there again.
+  Pressing and holding play/pause now also ends casting: the queue is cleared and the next song plays on the phone.
+
+### Changed
+- **Daily mixes stay as they are when you change the source filter.** Showing or hiding a user's music no longer
+  makes every mix again. They're made once a day, when a new vibe starts, or when you tap refresh.
+- **Without AudioMuse-AI, the AI mixes are hidden.** A user without AudioMuse-AI set up no longer sees today's mix,
+  the carousel, the vibe tiles, Your sound or Discover for you. On repeat, made from your plays, stays.
+
 ## 0.33.0beta — 2026-10-25
 
 ### Fixed
