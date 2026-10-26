@@ -51,6 +51,11 @@ class BookRepository(private val api: AudiobookshelfApi, private val settings: (
     }
 
     /** A book with its chapters: from the server, then kept. */
+    /** Books and podcasts across every library matching [query]; a library that fails is skipped (issue #531). */
+    suspend fun search(query: String): List<Book> = libraries().flatMap { lib ->
+        runCatching { api.search(lib.id, query) }.onFailure { AppLog.w("Books", "Search in ${lib.name}: ${it.message}") }.getOrDefault(emptyList())
+    }.distinctBy { it.id }.also { list -> list.forEach { booksById[it.id] = it } }
+
     suspend fun book(id: String): Book = api.book(id).also { booksById[id] = it }
 
     /** The book as last seen, without asking the server; null when never loaded. */
