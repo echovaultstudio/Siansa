@@ -36,4 +36,22 @@ class CarouselDaysTest {
         val old = json.decodeFromString(Carousel.serializer(), """{"id":"day","title":"Your day","startHour":11,"endHour":17,"mixes":[]}""")
         assertTrue(old.days.isEmpty())
     }
+
+    @Test fun daysAndHoursAnotherCarouselHasCantBeSaved() {
+        val all = listOf(everyMorning, workdays)
+        // Your morning on weekends only overlaps nothing (Your day starts at 11).
+        assertNull(carouselClash(everyMorning.copy(days = listOf(6, 7)), all))
+        // Your day stretched to 9 on weekdays overlaps Your morning (all week, 6–11).
+        val clash = carouselClash(workdays.copy(startHour = 9), all)
+        assertTrue(clash.orEmpty(), clash.orEmpty().startsWith("\"Your morning\" already has 06:00–11:00, all week"))
+        // On weekends only, from 9, it overlaps Your morning too (all week includes weekends).
+        assertTrue(carouselClash(workdays.copy(startHour = 9, days = listOf(6, 7)), all) != null)
+        // A weekend morning next to a weekday morning is fine.
+        val weekdayMorning = everyMorning.copy(days = listOf(1, 2, 3, 4, 5))
+        assertNull(carouselClash(weekendMorning, listOf(weekdayMorning, workdays)))
+        // Saving a carousel doesn't clash with itself.
+        assertNull(carouselClash(everyMorning, all))
+        // The suggested carousels don't overlap each other.
+        DefaultCarousels.all.forEach { assertNull(it.title, carouselClash(it, DefaultCarousels.all)) }
+    }
 }

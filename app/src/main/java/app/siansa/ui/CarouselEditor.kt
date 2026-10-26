@@ -37,6 +37,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.data.Carousel
 import app.siansa.data.CarouselMix
+import app.siansa.data.carouselClash
+import app.siansa.log.AppLog
 import app.siansa.data.carouselProblem
 import app.siansa.data.daysLabel
 import app.siansa.data.normalDays
@@ -120,6 +122,12 @@ fun CarouselEditor(nav: NavController, id: String) {
         }
         if (problem != null) return
         scope.launch {
+            // Days and hours another carousel already has can't be saved: Home couldn't tell which to show (#512).
+            carouselClash(changed, graph.carousels.all())?.let {
+                AppLog.i("Carousel", "Not saved: $it")
+                problem = it
+                return@launch
+            }
             graph.carousels.save(changed)
             nav.popBackStack()
         }
@@ -146,7 +154,7 @@ fun CarouselEditor(nav: NavController, id: String) {
             DayChips(days, onAllWeek = { days = emptySet() }) { day -> days = if (day in days) days - day else days + day }
             Hint(
                 if (normalDays(days).isEmpty()) "All week. Pick days to use this carousel only on them, e.g. a weekend morning."
-                else "Only on " + daysLabel(days) + ". On other days, another carousel for these hours shows, if there is one."
+                else "Only on " + daysLabel(days) + ". Days and hours can't overlap another carousel's."
             )
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                 OutlinedTextField(
