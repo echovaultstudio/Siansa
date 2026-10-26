@@ -3,6 +3,30 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.35.0beta — 2026-10-26
+
+### Fixed
+- **Vibes on Emby when AudioMuse reads another server.** When only part of AudioMuse's music is on your Emby server,
+  vibes and mood playlists are now picked from the songs that are, instead of coming out with 1 or 2 songs. If the
+  library on your phone isn't synced yet, Siansa looks the songs up on your server by title and artist. A vibe that
+  still finds nothing says so, instead of being saved with no songs.
+- **Repeat looked on by default.** A repeat set on an earlier list stayed on in the player for hours after, so
+  the button showed orange for a new list. Repeat now turns off whenever a new list starts playing, like shuffle.
+- Artists found through a song's credits (featured on a song, or on a compilation) showed no picture in search.
+
+### Added
+- **Audiobooks and podcasts from your Audiobookshelf server.** Set it up in Settings › Connections. Home gets
+  **Your books** and **Your podcasts** carousels, Your Library gets **Books** and **Podcasts** chips, each book
+  has its own page with chapters, and books play in their own player with skip back and forward, chapters, speed
+  and a sleep timer to the end of the chapter. Where you are is kept on the server, so Audiobookshelf's own apps
+  show the same place.
+
+### Changed
+- Crashes in the audio decoder can now be read on Google Play: the app bundle carries the decoder's symbol names.
+  Nothing changes in the app itself.
+- **Your Library's chips are back at full size.** When more chips are hidden to the right, the last one in view
+  blends out and a **›** button sits after it to scroll on, instead of the chips shrinking to fit.
+
 ## 0.34.1beta — 2026-10-26
 
 ### Changed
