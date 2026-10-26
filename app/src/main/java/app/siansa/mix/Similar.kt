@@ -64,7 +64,7 @@ class Similar(private val graph: AppGraph) {
     /** Songs that sound like [song], without it, from the libraries you sync. */
     suspend fun songs(song: Song, count: Int = SONGS): List<Song> {
         val hits = graph.sonic.similar(song.id, count + 1)
-        val songs = graph.generator.resolveSongs(hits.map { it.id }.filter { it != song.id })
+        val songs = graph.generator.resolveHits(hits.filter { it.id != song.id })
         val kept = graph.library.keepSyncedSongs(songs, "Similar songs").take(count)
         AppLog.i("Similar", "Like \"${song.title}\": ${kept.size} songs")
         return kept

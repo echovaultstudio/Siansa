@@ -161,10 +161,11 @@ class SongRadio(private val graph: AppGraph) {
         RadioAnchor.SEED -> find(seed, TOP_UP).ifEmpty { find(current, TOP_UP) }
         RadioAnchor.CURRENT_NEAR_SEED -> {
             // Wide enough around the first song to still find new ones after a long listen.
-            val likeSeed = graph.sonic.similar(seed.id, (heard.size + 200).coerceAtMost(MAX_POOL)).map { it.id }
-            val likeCurrent = graph.sonic.similar(current.id, 80).map { it.id }
-            val ids = nearSeed(likeCurrent, likeSeed, heard + current.id, TOP_UP)
-            if (ids != null) graph.generator.resolveSongs(ids) else find(seed, TOP_UP)
+            val likeSeed = graph.sonic.similar(seed.id, (heard.size + 200).coerceAtMost(MAX_POOL))
+            val likeCurrent = graph.sonic.similar(current.id, 80)
+            val byId = (likeSeed + likeCurrent).associateBy { it.id }
+            val ids = nearSeed(likeCurrent.map { it.id }, likeSeed.map { it.id }, heard + current.id, TOP_UP)
+            if (ids != null) graph.generator.resolveHits(ids.mapNotNull { byId[it] }) else find(seed, TOP_UP)
         }
     }
 
@@ -174,8 +175,11 @@ class SongRadio(private val graph: AppGraph) {
 
     private suspend fun find(song: Song, count: Int): List<Song> {
         // Asks for enough to have [count] left after leaving out what's been heard (the seed's list repeats).
-        val ids = graph.sonic.similar(song.id, (count + 10 + heard.size).coerceAtMost(MAX_POOL)).map { it.id }
-        return graph.generator.resolveSongs(ids.filter { it != song.id && it !in heard }).take(count)
+        val hits = graph.sonic.similar(song.id, (count + 10 + heard.size).coerceAtMost(MAX_POOL))
+        // Matched by name (AudioMuse on another server), a song has this server's id only once resolved.
+        return graph.generator.resolveHits(hits.filter { it.id != song.id && it.id !in heard })
+            .filter { it.id != song.id && it.id !in heard }
+            .take(count)
     }
 
     private companion object {

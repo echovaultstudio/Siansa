@@ -18,7 +18,8 @@ android {
     defaultConfig {
         applicationId = "app.siansa"
         minSdk = 26
-        targetSdk = 35
+        // Google Play takes updates only for apps targeting Android 16 (API 36) since 31 August 2026 (issue #494).
+        targetSdk = 36
         versionCode = buildNumber
         versionName = appVersion
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -57,6 +58,13 @@ android {
                 create("ciPhone") {
                     device = "Pixel 6"
                     apiLevel = 33
+                    systemImageSource = "aosp"
+                }
+                // The Android the app targets (issue #494): used by the nightly run, so what changes for apps
+                // targeting Android 16 (edge to edge, predictive back) is tested without a second emulator per run.
+                create("android16") {
+                    device = "Pixel 6"
+                    apiLevel = 36
                     systemImageSource = "aosp"
                 }
             }

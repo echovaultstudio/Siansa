@@ -26,6 +26,9 @@ import app.siansa.mix.VibeTuning
 import androidx.compose.material3.Text
 import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.layout.padding
+import app.siansa.ui.MoreChipsHint
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.test.onRoot
 import androidx.compose.foundation.layout.Row
@@ -733,6 +736,81 @@ class SpacingTest {
         assertEven("Row heights", plain.bottom - plain.top, withCog.bottom - withCog.top, 1.dp)
         val cog = compose.onNodeWithTag("dlnaSettings", useUnmergedTree = true).getBoundsInRoot()
         assertEven("Room above and below the cog", cog.top - withCog.top, withCog.bottom - cog.bottom, 1.dp)
+    }
+
+    /** Time machine (issue #496): the chosen month's chip is scrolled into view, even far to the right. */
+    @Test fun chosenMonthChipIsOnScreen() {
+        compose.setContent {
+            SiansaTheme { app.siansa.ui.TimePicker(2025, 10, java.time.LocalDate.of(2026, 10, 18), onYear = {}, onMonth = {}) }
+        }
+        compose.waitForIdle()
+        val screen = compose.onRoot().getBoundsInRoot()
+        val october = compose.onNodeWithTag("month-10", useUnmergedTree = true).getBoundsInRoot()
+        assertTrue("October on screen: ${october.left}..${october.right} of ${screen.right}", october.left >= screen.left && october.right <= screen.right + 1.dp)
+    }
+
+    /** Your Library (issue #497): a › shows while chips are hidden off the right edge, centred in the row, and goes at the end. */
+    @Test fun moreChipsHintShowsUntilTheEnd() {
+        lateinit var scroll: androidx.compose.foundation.ScrollState
+        compose.setContent {
+            SiansaTheme {
+                scroll = androidx.compose.foundation.rememberScrollState()
+                Box(Modifier.width(320.dp).testTag("chipRow")) {
+                    Row(
+                        Modifier.horizontalScroll(scroll).padding(horizontal = Space.Page, vertical = Space.Small),
+                        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+                    ) { listOf("Playlists", "Music", "Mixes", "Favourites", "Your listening").forEach { FilterChip(selected = false, onClick = {}, label = { Text(it) }) } }
+                    MoreChipsHint(scroll)
+                }
+            }
+        }
+        val row = compose.onNodeWithTag("chipRow").getBoundsInRoot()
+        val more = compose.onNodeWithTag("chipsMore").getBoundsInRoot()
+        assertEven("› centred in the row", more.top - row.top, row.bottom - more.bottom, 1.dp)
+        compose.runOnIdle { scroll.dispatchRawDelta(scroll.maxValue.toFloat()) }
+        compose.waitForIdle()
+        assertTrue("› gone at the end", compose.onAllNodesWithTag("chipsMore").fetchSemanticsNodes().isEmpty())
+    }
+
+    /**
+     * Your Library (owner's comment on #497): on a small phone the main chips shrink so all five fit, with the
+     * same gap between each and the page's edge at both ends.
+     */
+    @Test fun mainChipsFitASmallPhone() {
+        val labels = listOf("Playlists", "Music", "Mixes", "Favourites", "Your listening")
+        compose.setContent {
+            SiansaTheme {
+                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.width(360.dp).testTag("fitRow")) {
+                    val fit = app.siansa.ui.chipFit(labels, maxWidth)
+                    Row(
+                        Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
+                        horizontalArrangement = Arrangement.spacedBy(fit.gap),
+                    ) { labels.forEach { app.siansa.ui.LibraryPill(it, active = false, fit = fit) { } } }
+                }
+            }
+        }
+        val row = compose.onNodeWithTag("fitRow").getBoundsInRoot()
+        val pills = compose.onAllNodesWithTag("libraryPill", useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(labels.size, pills.size)
+        val density = compose.density.density
+        fun dp(px: Float) = (px / density).dp
+        val last = pills.maxBy { it.right }
+        assertTrue("All chips inside the row: ${dp(last.right)} of ${row.right}", row.right - dp(last.right) >= Space.Page - 1.dp)
+        assertEven("Row top and bottom", dp(pills.first().top) - row.top, row.bottom - dp(pills.first().bottom), 1.dp)
+        val sorted = pills.sortedBy { it.left }
+        assertEven("Gaps between chips", dp(sorted[1].left - sorted[0].right), dp(sorted[4].left - sorted[3].right), 1.dp)
+    }
+
+    /** Days (issue #512): "All week" sits in the row of days with the same gap as between the days. */
+    @Test fun allWeekChipIsEvenlySpacedWithTheDays() {
+        compose.setContent {
+            SiansaTheme { Box(Modifier.width(480.dp)) { app.siansa.ui.DayChips(setOf(6, 7), onAllWeek = { }) { } } }
+        }
+        val all = compose.onNodeWithTag("day-all").getBoundsInRoot()
+        val mon = compose.onNodeWithTag("day-1").getBoundsInRoot()
+        val tue = compose.onNodeWithTag("day-2").getBoundsInRoot()
+        assertEven("Gaps between chips", mon.left - all.right, tue.left - mon.right, 1.dp)
+        assertEven("Chip tops", all.top, mon.top, 1.dp)
     }
 
     /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */

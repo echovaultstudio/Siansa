@@ -1,6 +1,11 @@
 package app.siansa.ui
 
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -159,6 +164,13 @@ private fun TimeMachinePage(nav: NavController) {
     }
 }
 
+/**
+ * Where to scroll a row of chips so the chip at [left] (from the row's start, padding included) and [width] sits in
+ * the middle of a [viewport]-wide window, within 0..[max] (issue #496).
+ */
+internal fun chipScrollTarget(left: Int, width: Int, viewport: Int, max: Int): Int =
+    (left + width / 2 - viewport / 2).coerceIn(0, max.coerceAtLeast(0))
+
 /** The year, with arrows either side, and the months under it (the whole year first). */
 @Composable
 internal fun TimePicker(year: Int, month: Int?, today: LocalDate, onYear: (Int) -> Unit, onMonth: (Int?) -> Unit) {
@@ -180,14 +192,38 @@ internal fun TimePicker(year: Int, month: Int?, today: LocalDate, onYear: (Int) 
             }
         }
         val available = monthsAvailable(year, today)
+        // The chosen month's chip is scrolled into view, centred (issue #496): October sat far off to the right.
+        val scroll = rememberScrollState()
+        val chips = remember { mutableStateMapOf<Int, Pair<Int, Int>>() } // month (0 = whole year) → left, width
+        val pad = with(LocalDensity.current) { Space.Page.roundToPx() }
+        var shown by remember { mutableStateOf(false) }
+        val key = month ?: 0
+        LaunchedEffect(year, key, chips[key], scroll.viewportSize) {
+            val (left, width) = chips[key] ?: return@LaunchedEffect
+            if (scroll.viewportSize <= 0) return@LaunchedEffect
+            val to = chipScrollTarget(left + pad, width, scroll.viewportSize, scroll.maxValue)
+            // Straight there when the page opens; a short glide when you pick one.
+            if (shown) scroll.animateScrollTo(to) else scroll.scrollTo(to)
+            shown = true
+        }
         Row(
-            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Space.Page).testTag("months"),
+            Modifier.horizontalScroll(scroll).padding(horizontal = Space.Page).testTag("months"),
             horizontalArrangement = Arrangement.spacedBy(Space.Small),
         ) {
-            FilterChip(selected = month == null, onClick = { onMonth(null) }, label = { Text("Whole year") })
+            FilterChip(
+                selected = month == null,
+                onClick = { onMonth(null) },
+                label = { Text("Whole year") },
+                modifier = Modifier.onPlaced { chips[0] = it.positionInParent().x.toInt() to it.size.width }.testTag("month-0"),
+            )
             for (m in available) {
                 val name = Month.of(m).getDisplayName(TextStyle.SHORT, Locale.getDefault()).trimEnd('.')
-                FilterChip(selected = month == m, onClick = { onMonth(m) }, label = { Text(name) })
+                FilterChip(
+                    selected = month == m,
+                    onClick = { onMonth(m) },
+                    label = { Text(name) },
+                    modifier = Modifier.onPlaced { chips[m] = it.positionInParent().x.toInt() to it.size.width }.testTag("month-$m"),
+                )
             }
         }
     }
