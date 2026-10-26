@@ -211,6 +211,31 @@ fun PlaybackSettingsScreen(nav: NavController) {
             Hint("While a song plays, Siansa loads the next ones, one at a time, so they start at once and keep playing if the connection drops. Fewer means less data. Only original files are loaded ahead.")
             PreloadRow("On Wi-Fi", settings.preloadWifi, "preload-wifi") { graph.settings.save(graph.settings.current.copy(preloadWifi = it)) }
             PreloadRow("On mobile data", settings.preloadMobile, "preload-mobile") { graph.settings.save(graph.settings.current.copy(preloadMobile = it)) }
+            // Only with an Audiobookshelf server (issue #521): how far the book player's skip buttons jump.
+            if (settings.booksReady) {
+                HorizontalDivider()
+                Heading("Books")
+                Hint("How far the book player's skip buttons jump.")
+                Text("Back", style = MaterialTheme.typography.bodyMedium)
+                SkipChips(settings.bookSkipBackSec, "bookSkipBack") { graph.settings.save(graph.settings.current.copy(bookSkipBackSec = it)) }
+                Text("Forward", style = MaterialTheme.typography.bodyMedium)
+                SkipChips(settings.bookSkipForwardSec, "bookSkipForward") { graph.settings.save(graph.settings.current.copy(bookSkipForwardSec = it)) }
+            }
+        }
+    }
+}
+
+/** 10 to 90 seconds for a book player's skip (issue #521). */
+@Composable
+internal fun SkipChips(selected: Int, tag: String, onPick: (Int) -> Unit) {
+    Row(Modifier.horizontalScroll(rememberScrollState()).testTag(tag), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        AppSettings.BOOK_SKIP_CHOICES.forEach { n ->
+            FilterChip(
+                selected = selected == n,
+                onClick = { onPick(n) },
+                label = { Text("$n s") },
+                modifier = Modifier.testTag("$tag-$n"),
+            )
         }
     }
 }
