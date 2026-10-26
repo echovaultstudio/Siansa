@@ -3,6 +3,10 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.35.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.35.1beta) — 2026-10-26
+
+- [#541](https://github.com/echovaultstudio/Siansa/pull/541) Keep the Audiobookshelf login when saving Connections (@Th3K1ngP1n)
+
 ## [0.35.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.35.0beta) — 2026-10-26
 
 - [#518](https://github.com/echovaultstudio/Siansa/pull/518) Vibes on Emby: pick from the songs on this server; find them by name when not synced (beta #40, #41) (@Th3K1ngP1n)
