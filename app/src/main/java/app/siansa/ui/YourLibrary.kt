@@ -90,9 +90,6 @@ import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -587,17 +584,16 @@ private fun FilterRow(
     // right, like Your listening, otherwise left the row scrolled with × out of sight).
     val scroll = rememberScrollState()
     LaunchedEffect(selected) { scroll.scrollTo(0) }
-    // The main chips shrink to fit the width (owner's comment on #497), so all of them show on a small phone too.
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val fitted = chipFit(chips.map { it.label }, maxWidth)
-        val fit = if (selected != null) FullChips else fitted
+    // Chips at full size (owner's decision on #521, replacing the shrinking from #501): a row with more than fits
+    // blends its last chip out under the fade, with the › button in its own space after it.
+    Box(Modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().horizontalScroll(scroll).padding(horizontal = Space.Page, vertical = Space.Small).testTag("libraryChips"),
-            horizontalArrangement = Arrangement.spacedBy(fit.gap),
+            horizontalArrangement = Arrangement.spacedBy(Space.Small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (selected == null) {
-                chips.forEach { k -> LibraryPill(k.label, active = false, fit = fit) { onKind(k) } }
+                chips.forEach { k -> LibraryPill(k.label, active = false) { onKind(k) } }
             } else {
                 Surface(
                     onClick = { onKind(null) },
@@ -615,7 +611,8 @@ private fun FilterRow(
 }
 
 /**
- * A row of chips with more hidden off its right edge (issue #497): the row fades there, with a › that scrolls on.
+ * A row of chips with more hidden off its right edge (issue #497): the last chip in view blends out under a
+ * fade, and a › button that scrolls on sits after it in its own clear space, over the page's colour (#521).
  * Gone once the row is at its end. Goes in the Box around the row.
  */
 @Composable
@@ -624,9 +621,10 @@ internal fun BoxScope.MoreChipsHint(scroll: ScrollState) {
     val rowScope = rememberCoroutineScope()
     val surface = MaterialTheme.colorScheme.surface
     Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
+        // Clear to the page's colour from the middle of the fade: the button's space, nothing shows through.
         Box(
             Modifier.fillMaxHeight().width(MORE_FADE).testTag("chipsMoreFade")
-                .background(Brush.horizontalGradient(0f to surface.copy(alpha = 0f), 0.6f to surface)),
+                .background(Brush.horizontalGradient(0f to surface.copy(alpha = 0f), 0.45f to surface, 1f to surface)),
         )
     }
     Surface(
@@ -641,47 +639,17 @@ internal fun BoxScope.MoreChipsHint(scroll: ScrollState) {
     }
 }
 
-/** How the main chips are drawn: text scale, padding each side and gap (issue #497). */
-internal data class ChipFit(val scale: Float, val padding: androidx.compose.ui.unit.Dp, val gap: androidx.compose.ui.unit.Dp)
-
-/** Chips at full size: no shrinking. */
-internal val FullChips = ChipFit(1f, Space.Page, Space.Small)
-
-/**
- * How chips with [labels] fit a row [width] wide with the page's edges (issue #497): measured at full size, then
- * the room around and between them shrinks, then the text ([LibraryChips.fit]).
- */
-@Composable
-internal fun chipFit(labels: List<String>, width: androidx.compose.ui.unit.Dp): ChipFit {
-    val measurer = rememberTextMeasurer()
-    val style = MaterialTheme.typography.labelLarge.copy(fontSize = PILL_FONT)
-    val density = LocalDensity.current
-    return remember(labels, width, style, density) {
-        with(density) {
-            val fit = LibraryChips.fit(
-                texts = labels.map { measurer.measure(it, style, maxLines = 1).size.width.toFloat() },
-                pad = Space.Page.toPx(),
-                padMin = Space.Small.toPx(),
-                gap = Space.Small.toPx(),
-                gapMin = Space.Tight.toPx(),
-                available = (width - Space.Page * 2).toPx(),
-            )
-            ChipFit(fit.text, fit.padding.toDp(), fit.gap.toDp())
-        }
-    }
-}
-
-/** The chips' text at full size; the main chips shrink from it to fit (issue #497). */
+/** The chips' text size. */
 private val PILL_FONT = 14.sp
 
-/** How wide the fade at the end of the chip row is. */
-private val MORE_FADE = 72.dp
+/** How wide the fade at the end of the chip row is: the blend, then the › button's own space. */
+private val MORE_FADE = 96.dp
 
 /** Songs played at once from Your Library's Songs: the tapped one and those after it. */
 private const val SONG_QUEUE = 200
 
 @Composable
-internal fun LibraryPill(text: String, active: Boolean, outlined: Boolean = false, fit: ChipFit = FullChips, onClick: () -> Unit) {
+internal fun LibraryPill(text: String, active: Boolean, outlined: Boolean = false, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = CircleShape,
@@ -693,10 +661,10 @@ internal fun LibraryPill(text: String, active: Boolean, outlined: Boolean = fals
         Text(
             text,
             style = MaterialTheme.typography.labelLarge,
-            fontSize = PILL_FONT * fit.scale,
+            fontSize = PILL_FONT,
             maxLines = 1,
             softWrap = false,
-            modifier = Modifier.padding(horizontal = fit.padding, vertical = Space.Small).testTag("libraryPill"),
+            modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small).testTag("libraryPill"),
         )
     }
 }

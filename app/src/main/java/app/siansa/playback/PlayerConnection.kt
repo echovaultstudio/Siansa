@@ -161,6 +161,12 @@ class PlayerConnection(
         val start = if (shuffle) Random.nextInt(songs.size) else startIndex.coerceIn(0, songs.size - 1)
         withController { c ->
             c.shuffleModeEnabled = shuffle
+            // Repeat belongs to the list it was set on: a new list starts with it off, like shuffle. The player
+            // service outlives the app, so a repeat set hours ago otherwise showed as on by default (beta #42).
+            if (QueueRules.repeatForNewQueue(c.repeatMode) != c.repeatMode) {
+                AppLog.i("Player", "Repeat: off for the new list")
+                c.repeatMode = QueueRules.repeatForNewQueue(c.repeatMode)
+            }
             c.setMediaItems(items, start, if (shuffle) 0L else startMs.coerceAtLeast(0L))
             c.prepare()
             c.play()
