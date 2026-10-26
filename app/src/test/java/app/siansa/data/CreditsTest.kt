@@ -56,4 +56,10 @@ class CreditsTest {
         assertEquals(listOf(own, byName), mine)
         assertEquals(listOf(mixtape), others)
     }
+
+    @Test fun anArtistFromSongCreditsStillHasAPicture() {
+        // Found through "feat. DJ Fresh" only: no cover from the server, so the artist's own picture address.
+        assertEquals("ar-f", Artist("f", "DJ Fresh").picture)
+        assertEquals("ar-f_abc", Artist("f", "DJ Fresh", coverArt = "ar-f_abc").picture)
+    }
 }

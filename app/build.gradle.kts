@@ -14,6 +14,9 @@ val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 android {
     namespace = "app.siansa"
     compileSdk = 36
+    // Extracting the FFmpeg decoder's symbols for the app bundle needs the NDK's objcopy (issue #519): the
+    // version the Android Gradle Plugin 8.13 expects, installed by Gradle when it's missing.
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "app.siansa"
@@ -43,6 +46,10 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("siansa")
+            // The FFmpeg decoder is native code: its symbols go into the app bundle, so Google Play can read a
+            // crash or ANR in it (issue #519). SYMBOL_TABLE gives function names; the libraries come prebuilt, so
+            // files and lines (FULL) aren't there to keep.
+            ndk.debugSymbolLevel = "SYMBOL_TABLE"
         }
         debug {
             signingConfig = signingConfigs.getByName("siansa")
