@@ -14,6 +14,8 @@ data class SongDetails(
     val sizeBytes: Long? = null,
     val path: String? = null,
     val playCount: Long? = null,
+    /** What the tags say: artists, roles, genres, dates… (issue #504). */
+    val tags: SongTags = SongTags(),
 )
 
 /** Reads the details out of a Subsonic song object (OpenSubsonic adds sample rate, bit depth and channels). */
@@ -26,6 +28,7 @@ fun parseSongDetails(o: JsonObject) = SongDetails(
     sizeBytes = o.long("size")?.takeIf { it > 0 },
     path = o.str("path")?.takeIf { it.isNotBlank() },
     playCount = o.long("playCount"),
+    tags = Tags.subsonicSong(o),
 )
 
 /** "FLAC", "MP3", "ALAC"… from the file's extension, or from its MIME type when there is none. */

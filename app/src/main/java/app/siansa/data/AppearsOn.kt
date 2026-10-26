@@ -1,8 +1,11 @@
 package app.siansa.data
 
-/** Between the names in a song's artist credit: "A feat. B", "A, B & C", "A ft B", "A vs. B", "A / B", "A; B". */
+/**
+ * Between the names in a song's artist credit: "A feat. B", "A, B & C", "A ft B", "A vs. B", "A / B", "A; B", and
+ * "A • B", how Navidrome joins several artists by default (issue #504).
+ */
 private val CREDIT_SEPARATORS = Regex(
-    "\\s*(?:,|;|/|&|\\+|\\bfeat\\b\\.?|\\bft\\b\\.?|\\bfeaturing\\b|\\bvs\\b\\.?)\\s*",
+    "\\s*(?:,|;|/|•|&|\\+|\\bfeat\\b\\.?|\\bft\\b\\.?|\\bfeaturing\\b|\\bvs\\b\\.?)\\s*",
     RegexOption.IGNORE_CASE,
 )
 
