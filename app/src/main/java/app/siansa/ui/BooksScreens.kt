@@ -175,6 +175,9 @@ fun BookScreen(nav: NavController, id: String) {
         LoadBox(page, Modifier.padding(padding)) { b ->
             val current = if (playing.book?.id == b.id) playing.positionSec else progress?.currentSec ?: 0.0
             val chapterNow = b.chapterAt(current)
+            // Loaded here: a list's content block isn't composable (issue #521).
+            val episodes by loadState("episodes-${b.id}") { if (b.podcast) graph.audiobookshelf.episodes(b.id) else emptyList() }
+            val bookmarks by loadState("bookmarks-${b.id}") { runCatching { graph.audiobookshelf.bookmarks(b.id) }.getOrDefault(emptyList()) }
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
                 item {
                     Row(Modifier.fillMaxWidth().padding(Space.Page), verticalAlignment = Alignment.Bottom) {
@@ -261,7 +264,6 @@ fun BookScreen(nav: NavController, id: String) {
                 }
                 if (b.podcast) {
                     // A podcast's episodes, newest first (issue #521); tap one to play it.
-                    val episodes by loadState("episodes-${b.id}") { graph.audiobookshelf.episodes(b.id) }
                     val list = episodes.valueOrNull().orEmpty()
                     if (list.isNotEmpty()) {
                         item { SectionTitle("${list.size} episodes") }
@@ -285,7 +287,6 @@ fun BookScreen(nav: NavController, id: String) {
                         }
                     }
                 }
-                val bookmarks by loadState("bookmarks-${b.id}") { runCatching { graph.audiobookshelf.bookmarks(b.id) }.getOrDefault(emptyList()) }
                 val marks = bookmarks.valueOrNull().orEmpty()
                 if (marks.isNotEmpty()) {
                     item { SectionTitle("Bookmarks") }
