@@ -5,7 +5,7 @@ Source: `app/src/main/java/app/siansa/`. Unit tests: `app/src/test/`. Emulator t
 
 ## Every change
 
-- Build and test before opening a pull request: `gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease`.
+- Build and test before opening a pull request: `gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease :app:bundleRelease`.
   Lint errors fail the build.
 - Add or update unit tests in `app/src/test/` for any logic you change.
 - Add a note file in `changelog.d/` (e.g. `changelog.d/issue-42.md`, see its README) with `### Fixed` /
