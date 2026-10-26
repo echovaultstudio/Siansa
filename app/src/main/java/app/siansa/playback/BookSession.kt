@@ -3,10 +3,12 @@ package app.siansa.playback
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -25,6 +27,7 @@ import com.google.common.util.concurrent.ListenableFuture
  *
  * Starting a book pauses the music and the other way round, so the two never play at once.
  */
+@OptIn(UnstableApi::class)
 class BookSession(private val service: PlaybackService, private val graph: AppGraph, private val pauseMusic: () -> Unit) {
     val player: ExoPlayer = ExoPlayer.Builder(service)
         .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(service, OkHttpDataSource.Factory(graph.streamHttp))))
