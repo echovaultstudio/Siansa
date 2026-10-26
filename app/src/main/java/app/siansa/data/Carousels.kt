@@ -66,6 +66,21 @@ data class Carousel(
 fun carouselFor(carousels: List<Carousel>, hour: Int, day: Int): Carousel? =
     carousels.filter { it.covers(hour) && it.coversDay(day) }.sortedBy { if (it.days.isEmpty()) 1 else 0 }.firstOrNull()
 
+/**
+ * Why [c] can't be saved next to [others] (owner's comment on #512): another carousel already has some of its
+ * hours on some of its days, so Home couldn't tell which to show. Null when no other overlaps.
+ */
+fun carouselClash(c: Carousel, others: List<Carousel>): String? {
+    fun hours(x: Carousel) = (0..23).filter { x.covers(it) }.toSet()
+    fun days(x: Carousel) = x.days.ifEmpty { (1..7).toList() }.toSet()
+    val mine = hours(c)
+    val myDays = days(c)
+    val other = others.firstOrNull { o -> o.id != c.id && (hours(o) intersect mine).isNotEmpty() && (days(o) intersect myDays).isNotEmpty() }
+        ?: return null
+    val onDays = if (other.days.isEmpty()) "all week" else daysLabel(other.days)
+    return "\"${other.title}\" already has %02d:00–%02d:00, %s. Pick other days or hours.".format(other.startHour, other.endHour, onDays)
+}
+
 /** Days as kept: none for all week, also when every day is picked; otherwise each once, in week order. */
 fun normalDays(days: Collection<Int>): List<Int> = days.filter { it in 1..7 }.distinct().sorted().takeIf { it.size in 1..6 }.orEmpty()
 
