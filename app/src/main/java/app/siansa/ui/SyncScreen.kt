@@ -165,13 +165,13 @@ internal fun ProgressCard(p: SyncProgress) {
                 Text(
                     when (p.phase) {
                         SyncPhase.DONE -> when {
-                            p.upToDate -> "Up to date: Navidrome hasn't scanned since the last sync"
+                            p.upToDate -> "Up to date: your server hasn't scanned since the last sync"
                             p.changedAlbums in 1 until p.albums -> "Updated ${p.changedAlbums} new or changed albums"
                             p.changedAlbums == 0 -> "Up to date: no albums changed"
                             else -> "Sync finished"
                         }
                         SyncPhase.FAILED -> "Sync failed"
-                        SyncPhase.CONNECTING -> "Connecting to Navidrome…"
+                        SyncPhase.CONNECTING -> "Connecting to your server…"
                         SyncPhase.SAVING -> "Saving to the phone…"
                         else -> "Syncing " + (p.libraryName ?: "library") +
                             if (p.libraryCount > 1) " (${p.libraryIndex} of ${p.libraryCount})" else ""

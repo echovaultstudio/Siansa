@@ -301,7 +301,7 @@ fun DownloadsScreen(nav: NavController) {
                             )
                         }
                     }
-                    Hint("Opus is converted by Navidrome and takes far less space than the original file. Applies to songs downloaded from now on.")
+                    Hint(ServerWords.downloadHint(LocalGraph.current.settings.current.sourceKind))
                     Text("Storage limit", style = MaterialTheme.typography.bodyLarge)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                         downloadLimits.forEach { mb ->
@@ -674,7 +674,7 @@ private fun CoverDownloadSection() {
         when {
             !settings.coverDownloadWifiOnly -> "Downloads on any connection, including mobile data and a VPN."
             settings.coverDownloadAnyWifi -> "Downloads on any Wi-Fi network. A VPN counts as mobile data, so nothing downloads while one is on."
-            else -> "Home means the phone is on Wi-Fi and reaches Navidrome's address on that network. A VPN counts as mobile data, so nothing downloads while one is on. If Navidrome is reached by a domain name, this can't be told apart; use any Wi-Fi instead."
+            else -> "Home means the phone is on Wi-Fi and reaches your server's address on that network. A VPN counts as mobile data, so nothing downloads while one is on. If your server is reached by a domain name, this can't be told apart; use any Wi-Fi instead."
         },
     )
     Text(

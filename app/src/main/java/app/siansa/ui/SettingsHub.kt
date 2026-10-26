@@ -188,7 +188,7 @@ fun PlaybackSettingsScreen(nav: NavController) {
             }
             HorizontalDivider()
             Heading("Streaming quality")
-            Hint("Opus is converted by Navidrome with its own \"opus\" transcoding profile. It saves data on mobile; the original file is best on Wi-Fi. Applies from the next song.")
+            Hint(ServerWords.streamingHint(settings.sourceKind))
             QualityRow("On Wi-Fi", settings.transcodeWifiKbps) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
             QualityRow("On mobile data", settings.transcodeMobileKbps) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
             Hint("Siansa always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
@@ -398,7 +398,7 @@ fun StorageScreen(nav: NavController) {
             }) { Text("Clear image cache") }
 
             SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
-            Hint("When an album folder has an animated cover (cover.gif or cover.webp), it moves on the album page and in now playing; lists show its first frame. Navidrome can't shrink an animated WebP, so it's downloaded once in full and kept on the phone.")
+            Hint("When an album folder has an animated cover (cover.gif or cover.webp), it moves on the album page and in now playing; lists show its first frame. Your server may not shrink an animated WebP (Navidrome can't), so it's downloaded once in full and kept on the phone.")  // server-name: ok (an example of a server that can't)
 
             if (settings.imageCacheMb != imagesAtStart || settings.songCacheMb != songsAtStart) {
                 Card(Modifier.fillMaxWidth()) {
