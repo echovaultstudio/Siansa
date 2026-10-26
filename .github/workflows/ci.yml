@@ -249,7 +249,10 @@ jobs:
       - name: Run tests on a managed emulator
         run: |
           set -o pipefail
-          gradle :app:ciPhoneDebugAndroidTest \
+          # After merges: Android 13. Nightly: Android 16, the version the app targets (issue #494). One emulator a run.
+          device=ciPhone; [ "${{ github.event_name }}" = "schedule" ] && device=android16
+          echo "::notice::Emulator: $device"
+          gradle ":app:${device}DebugAndroidTest" \
             -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
             -Pandroid.experimental.testOptions.managedDevices.setupTimeoutMinutes=20 \
             -Pandroid.testInstrumentationRunnerArguments.navidromeUrl=http://10.0.2.2:5533 2>&1 | tee gradle.txt
