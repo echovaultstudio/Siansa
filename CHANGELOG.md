@@ -3,6 +3,12 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.35.1beta — 2026-10-26
+
+### Fixed
+- **The Audiobookshelf login wasn't kept.** Test worked, but Save cleared the address, token, username and
+  password again. They're saved now.
+
 ## 0.35.0beta — 2026-10-26
 
 ### Fixed
