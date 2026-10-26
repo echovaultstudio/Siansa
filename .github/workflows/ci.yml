@@ -34,7 +34,9 @@ jobs:
   quick:
     name: Quick checks
     # Your own runner when the RUNS_ON variable names it (e.g. ["self-hosted", "siansa"]), else GitHub's.
-    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
+    # QUICK_RUNS_ON can send these light checks to a second runner (e.g. ["self-hosted", "quick"]), so they don't
+    # wait behind a 10-minute build on a single runner.
+    runs-on: ${{ fromJSON(vars.QUICK_RUNS_ON || vars.RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 15
     outputs:
       app: ${{ steps.diff.outputs.app }}
