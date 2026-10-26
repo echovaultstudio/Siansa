@@ -232,4 +232,26 @@ class SubsonicComplianceTest {
         val path = server.seen.single { it.endpoint == "findSonicPath" }
         assertEquals(listOf("a", "b", "3"), listOf(path.one("startSongId"), path.one("endSongId"), path.one("count")))
     }
+
+    /** On repeat (issue #495): the songs of the albums played lately, with their play counts and last-played dates. */
+    @Test fun recentSongPlaysCarryCountsAndDates() = runBlocking {
+        val server = FakeServer {
+            when (it.endpoint) {
+                "getAlbumList2" -> ok(""""albumList2":{"album":[{"id":"al1","name":"Even in Arcadia","artist":"Sleep Token"}]}""")
+                "getAlbum" -> ok(
+                    """"album":{"id":"al1","name":"Even in Arcadia","song":[""" +
+                        """{"id":"s1","title":"Emergence","playCount":12,"played":"2026-10-20T21:04:22Z"},""" +
+                        """{"id":"s2","title":"Caramel"}]}""",
+                )
+                else -> ok()
+            }
+        }
+        val plays = api(server).recentSongPlays(10)
+        assertEquals(listOf("s1", "s2"), plays.map { it.song.id })
+        assertEquals(12L, plays[0].playCount)
+        assertEquals(java.time.Instant.parse("2026-10-20T21:04:22Z").toEpochMilli(), plays[0].playedAt)
+        assertEquals(0L, plays[1].playCount)
+        assertEquals(null, plays[1].playedAt)
+        assertTrue(server.seen.any { it.endpoint == "getAlbumList2" && it.params.contains("type" to "recent") })
+    }
 }
