@@ -131,6 +131,10 @@ interface LibraryDao {
     @Query("SELECT id, title, artist FROM songs WHERE 1 = 1" + VISIBLE_SONG)
     suspend fun songTitles(): List<SongTitleRow>
 
+    /** Every song, for Your Library's Songs (issue #497). */
+    @Query("SELECT * FROM songs WHERE 1 = 1" + VISIBLE_SONG)
+    suspend fun allSongs(): List<SongEntity>
+
     /** The album cover id for a song's cover id (a song without its own picture shows its album's). */
     @Query("SELECT a.coverArt FROM songs s JOIN albums a ON a.id = s.albumId WHERE s.coverArt = :songCover LIMIT 1")
     suspend fun albumCoverOfSongCover(songCover: String): String?
