@@ -3,6 +3,56 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.34.0beta — 2026-10-26
+
+### Fixed
+- **Siansa said "Navidrome" to people using Emby.** Playlists, settings, sync, downloads and favourites now say
+  "your server", and playlists without an owner show "Emby" or "Navidrome" as fits. On Emby, Settings › Playback and
+  Downloads now say that Emby sends the original file, so the quality choices don't change anything there.
+- **Vibes and AudioMuse mixes came out empty when AudioMuse knows your music from another server** (for example
+  AudioMuse reads Navidrome and Siansa plays from Emby). Siansa now finds those songs in your library by title and
+  artist, for vibes, mood playlists, the sound and discover mixes, song radio, Keep playing and Similar songs.
+- **The AudioMuse test in Settings now says whether its songs are in your library**, instead of only that it
+  answers. If they aren't, it says what to change.
+- **Search finds every artist, not only album artists.** Artists who are only featured on a song, or only on
+  a compilation, now show up, and the closest name comes first.
+- **An artist's releases are their own albums.** Albums they only take part in (a feature, a mixtape by someone
+  else) are under "Appears on" instead.
+- The next sync after updating fetches every song again, once, to learn who is credited on each.
+- **Siansa couldn't be updated on Google Play.** Play only takes updates for apps made for Android 16 now; Siansa is
+  made for Android 16 again. Nothing changes on F-Droid.
+- **Time machine: the chosen month was out of sight.** The month row now scrolls so the month you're looking at is
+  in view, for example October when the page opens in October.
+- Albums by "Various Artists" count as compilations, also on Emby.
+- Songs whose artists Navidrome joins with " • " are split into each artist again (for "Appears on" and the
+  artists under a track).
+
+### Added
+- **Every song in Your Library.** Albums, artists and the new **Songs** now sit under one **Music** chip; tap a song
+  to play it and the songs after it.
+- **Song details shows what the song's tags say:** all its artists, album artist, composer, lyricist and other
+  roles, genres, moods, release date, BPM, ISRC, explicit or clean, comment and MusicBrainz ID, as far as your
+  server passes them on.
+- **An album's page shows its version** (for example "Deluxe edition"), the year it first came out when this is
+  a later release, all its genres and its label.
+- **Home carousels for certain days.** In **Home carousel**, pick the days a carousel is for, or **All week**.
+  Two carousels can't have the same hours on the same day: Siansa says which one already has them. Vibes get the
+  **All week** chip too.
+
+### Changed
+- **Today's mix stays until you tap refresh.** It's made once a day; when the hour's vibe moves on, the mix you
+  have stays, and refresh makes one for the vibe of the hour. Your mixes carousel still changes with the part of
+  the day, as set in Vibes.
+- **On repeat is the songs you played most in the last 30 days.** It asks your server how often you played the songs
+  of the albums you played lately (also played on other apps), adds what you played on this phone and on Koito,
+  ListenBrainz or Last.fm, and checks again whenever you open it, like a playlist. Until there's enough to go on,
+  its tile isn't shown on Home.
+- **Your Library's chips fit better.** They shrink to fit your screen, so all of them show on smaller phones too.
+  They come in the order you last opened them, and if some still don't fit, the row fades with a **›** that
+  scrolls on.
+- **Each chip keeps its own sort** until you change it, also after a restart: sorting Music by name no longer sorts
+  your playlists the same way.
+
 ## 0.33.1beta — 2026-10-26
 
 ### Fixed
