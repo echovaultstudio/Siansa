@@ -1,5 +1,6 @@
 package app.siansa.net
 
+import app.siansa.mix.SongPlays
 import app.siansa.data.SongDates
 import app.siansa.data.SongDatesCache
 import app.siansa.data.Album
@@ -21,6 +22,9 @@ import app.siansa.data.SearchResults
 import app.siansa.data.SimilarArtist
 import app.siansa.data.Song
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import app.siansa.data.isoMillis
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -349,6 +353,29 @@ class SubsonicApi(
                 "musicFolderId" to folderId,
             ),
         ).obj("searchResult3")?.arr("song").orEmpty().map(::parseSong)
+
+    /**
+     * The songs of the albums played most recently, with Navidrome's play count and last-played date for each (On
+     * repeat, issue #495). A few albums at a time, so a slow server isn't flooded.
+     */
+    override suspend fun recentSongPlays(albumCount: Int): List<SongPlays> {
+        val recent = albums("recent", albumCount, 0)
+        val out = ArrayList<SongPlays>()
+        for (chunk in recent.chunked(6)) {
+            out += kotlinx.coroutines.coroutineScope {
+                chunk.map { album ->
+                    async {
+                        runCatching {
+                            call("getAlbum", mapOf("id" to album.id)).obj("album")?.arr("song").orEmpty().map { o ->
+                                SongPlays(parseSong(o), o.long("playCount") ?: 0L, isoMillis(o.str("played")))
+                            }
+                        }.getOrDefault(emptyList())
+                    }
+                }.awaitAll().flatten()
+            }
+        }
+        return out.distinctBy { it.song.id }
+    }
 
     /**
      * Random songs with Navidrome's play count for each (for Roll the dice, issue #347): how often this user

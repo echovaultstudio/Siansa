@@ -375,12 +375,31 @@ class MixGenerator(private val graph: AppGraph) {
         return spreadArtists(resolve(picked.map { it.id })) to "The sound of what you play most, found by AudioMuse"
     }
 
-    /** Your most-played songs lately, from Siansa, Koito / ListenBrainz and Last.fm. */
+    /**
+     * Your most-played songs of the last 30 days (issue #495): from the server (the songs of the albums played
+     * lately, with their play counts), this phone, and Koito / ListenBrainz / Last.fm.
+     */
     private suspend fun repeatMix(taste: TasteProfile?, skipped: Set<String>): Pair<List<Song>, String> {
-        val ids = taste?.favouriteSongs.orEmpty().filter { it !in skipped }
-        if (ids.size < 8) return emptyList<Song>() to ""
-        val songs = resolve(ids.take(50))
-        return songs to "Your most-played songs lately"
+        val now = System.currentTimeMillis()
+        val today = LocalDate.now().toEpochDay()
+        val server = runCatching { graph.source.recentSongPlays(RECENT_ALBUMS) }
+            .onFailure { AppLog.w("Mix", "On repeat: the server's play counts failed: ${it.message}") }
+            .getOrDefault(emptyList())
+        runCatching { graph.playCounts.record(server, today) }
+        val before = graph.playCounts.countsOn(today - OnRepeat.WINDOW_DAYS)
+        val fromServer = server.mapNotNull { p -> OnRepeat.serverScore(p, before[p.song.id], now)?.let { p.song.id to it } }.toMap()
+        val fromPhone = graph.history.all()
+            .filter { !it.skipped && now - it.at < OnRepeat.WINDOW_DAYS * DAY_MS }
+            .groupingBy { it.id }.eachCount()
+        val ids = OnRepeat.rank(fromServer, fromPhone, taste?.favouriteSongs.orEmpty(), skipped)
+        AppLog.i(
+            "Mix",
+            "On repeat: ${fromServer.size} songs from the server (${server.count { before.containsKey(it.song.id) }} with a count from 30 days ago), " +
+                "${fromPhone.size} from this phone, ${taste?.favouriteSongs?.size ?: 0} from history services",
+        )
+        if (ids.size < OnRepeat.MIN_SONGS) return emptyList<Song>() to ""
+        val songs = resolve(ids)
+        return songs to "Your most-played songs of the last 30 days"
     }
 
     /**
@@ -613,6 +632,8 @@ class MixGenerator(private val graph: AppGraph) {
 
     private companion object {
         const val DAY_MS = 24L * 60 * 60 * 1000
+        /** Albums played lately whose songs On repeat looks at (issue #495). */
+        const val RECENT_ALBUMS = 40
         /** Songs of the music shown looked at for a mix from the library. */
         const val LIBRARY_CANDIDATES = 3000
         val SYSTEM_PROMPT = """

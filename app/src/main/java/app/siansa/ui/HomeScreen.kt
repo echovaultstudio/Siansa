@@ -8,6 +8,7 @@ import androidx.compose.material.icons.rounded.Casino
 
 import app.siansa.mix.resumeStart
 import app.siansa.mix.MixRules
+import app.siansa.mix.MixException
 import app.siansa.data.RecentPlay
 import app.siansa.data.cover
 import androidx.compose.foundation.background
@@ -156,6 +157,9 @@ fun HomeScreen(nav: NavController) {
     }
     var personalBusy by remember { mutableStateOf<String?>(null) }
 
+    // Personal mixes that couldn't be made for lack of plays (issue #495).
+    var notEnough by remember { mutableStateOf(emptySet<String>()) }
+
     fun buildPersonal(kind: MixGenerator.Personal, open: Boolean, quiet: Boolean = false) {
         if (personalBusy != null) return
         aiDown?.let { problem ->
@@ -171,6 +175,8 @@ fun HomeScreen(nav: NavController) {
                 throw e
             } catch (e: Exception) {
                 AppLog.w("Home", "${kind.title} failed: ${e.message}")
+                // Not enough to make it (On repeat without recent plays): its tile goes until it can be made (issue #495).
+                if (e is MixException) notEnough = notEnough + kind.id
                 if (!quiet) launch.notify(e.message ?: "Couldn't make ${kind.title}")
             } finally {
                 personalBusy = null
@@ -347,7 +353,13 @@ fun HomeScreen(nav: NavController) {
                                     )
                                 })
                             }
-                            MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, homeSettings.audioMuseReady) }.forEach { kind ->
+                            MixGenerator.Personal.entries.filter { kind ->
+                                MixRules.showsPersonalTile(
+                                    kind, homeSettings.audioMuseReady,
+                                    madeToday = todaysMixes.any { it.selectorId == kind.id },
+                                    notEnough = kind.id in notEnough,
+                                )
+                            }.forEach { kind ->
                                 add(kind.id to @Composable {
                                     val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
                                     GradientTile(

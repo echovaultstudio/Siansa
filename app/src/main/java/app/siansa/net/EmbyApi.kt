@@ -1,5 +1,7 @@
 package app.siansa.net
 
+import app.siansa.data.isoMillis
+import app.siansa.mix.SongPlays
 import app.siansa.data.Album
 import app.siansa.data.AlbumDetail
 import app.siansa.data.AppJson
@@ -301,6 +303,16 @@ class EmbyApi(
         return items("IncludeItemTypes" to "Audio", "SortBy" to "Random", "Limit" to size, "Genres" to genre, "Years" to years)
             .map(::parseSong)
     }
+
+    /** Songs this user played lately, most recent first, with Emby's play count and last-played date (issue #495). */
+    override suspend fun recentSongPlays(albumCount: Int): List<SongPlays> =
+        items(
+            "IncludeItemTypes" to "Audio", "SortBy" to "DatePlayed", "SortOrder" to "Descending", "Filters" to "IsPlayed",
+            "Limit" to albumCount * 10,
+        ).map { o ->
+            val data = o.obj("UserData")
+            SongPlays(parseSong(o), data?.long("PlayCount") ?: 0L, isoMillis(data?.str("LastPlayedDate")))
+        }
 
     override suspend fun randomSongPlays(size: Int): List<Pair<Song, Long>> =
         items("IncludeItemTypes" to "Audio", "SortBy" to "Random", "Limit" to size)
