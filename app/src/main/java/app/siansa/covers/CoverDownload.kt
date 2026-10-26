@@ -172,7 +172,7 @@ object CoverDownload {
 
     /** Why covers can't be downloaded on this network right now, or null when they can. */
     fun whyNot(context: Context, settings: AppSettings): String? {
-        if (!settings.navidromeReady) return "Navidrome isn't set up"
+        if (!settings.navidromeReady) return "Your server isn't set up"
         val cm = context.getSystemService(ConnectivityManager::class.java) ?: return "No network information"
         val nets = cm.allNetworks.mapNotNull { network ->
             val caps = cm.getNetworkCapabilities(network) ?: return@mapNotNull null
@@ -192,7 +192,7 @@ object CoverDownload {
         }
         networkProblem(nets, settings.coverDownloadWifiOnly)?.let { return it }
         if (!settings.coverDownloadWifiOnly || settings.coverDownloadAnyWifi) return null
-        val host = settings.navidromeUrl.toHttpUrlOrNull()?.host ?: return "Navidrome's address isn't valid"
+        val host = settings.navidromeUrl.toHttpUrlOrNull()?.host ?: return "Your server's address isn't valid"
         val addresses = runCatching { InetAddress.getAllByName(host).toList() }.getOrElse { return "Couldn't look up $host" }
         val how = homeRoute(nets, addresses)
         if (how != null) {
@@ -206,7 +206,7 @@ object CoverDownload {
             "Navidrome ($host, ${addresses.joinToString { it.hostAddress.orEmpty() }}) isn't on this Wi-Fi or a VPN over it: " +
                 nets.joinToString("; ") { it.describe() },
         )
-        return "Not on the same network as Navidrome ($host)"
+        return "Not on the same network as your server ($host)"
     }
 
     @Volatile private var lastHow: String? = null

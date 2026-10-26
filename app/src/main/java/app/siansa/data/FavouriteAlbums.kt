@@ -41,7 +41,7 @@ class FavouriteAlbums(
                 .onFailure {
                     AppLog.w("Favorites", "Navidrome ${if (on) "star" else "unstar"} for album ${album.id} failed: ${it.message}")
                     set(if (on) _ids.value - ids.toSet() else _ids.value + ids)
-                    onError("Couldn't change the favourite in Navidrome: ${it.message}")
+                    onError("Couldn't change the favourite on your server: ${it.message}")
                 }
         }
     }

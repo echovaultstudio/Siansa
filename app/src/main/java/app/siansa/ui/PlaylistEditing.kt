@@ -370,13 +370,13 @@ fun PlaylistMenuButton(
             }
             if (onPhone) {
                 DropdownMenuItem(
-                    text = { Text("Send to Navidrome") },
+                    text = { Text("Send to your server") },
                     leadingIcon = { Icon(Icons.Rounded.CloudUpload, null) },
                     onClick = {
                         menu = false
                         scope.launch {
                             graph.playlists.moveToServer(playlist.id)
-                                .onSuccess { notify("Sent to Navidrome"); onMoved(it) }
+                                .onSuccess { notify("Sent to your server"); onMoved(it) }
                                 .onFailure { notify(it.message?.takeIf { m -> m.isNotBlank() } ?: "Couldn't send it") }
                         }
                     },
@@ -415,7 +415,7 @@ fun PlaylistMenuButton(
         AlertDialog(
             onDismissRequest = { deleting = false },
             title = { Text(if (onPhone) "Delete “${playlist.name}”?" else "Remove “${playlist.name}”?") },
-            text = { Text(if (onPhone) "It's only on this phone, so it's gone for good. The songs stay in your library." else "It stays on Navidrome. To get it back, use + then Import from Navidrome in Your Library.") },
+            text = { Text(if (onPhone) "It's only on this phone, so it's gone for good. The songs stay in your library." else "It stays on your server. To get it back, use + then Import from your server in Your Library.") },
             confirmButton = {
                 TextButton(onClick = {
                     deleting = false
@@ -443,11 +443,11 @@ fun ImportPlaylistsDialog(onDone: (String?) -> Unit) {
     }
     AlertDialog(
         onDismissRequest = { onDone(null) },
-        title = { Text("Import from Navidrome") },
+        title = { Text("Import from your server") },
         text = {
             LoadBox(removed) { list ->
                 if (list.isEmpty()) {
-                    Text("Every Navidrome playlist is already in Siansa. New ones show up by themselves.", style = MaterialTheme.typography.bodyMedium)
+                    Text("Every playlist on your server is already in Siansa. New ones show up by themselves.", style = MaterialTheme.typography.bodyMedium)
                 } else {
                     LazyColumn(Modifier.height(320.dp)) {
                         items(list, key = { it.id }) { playlist ->
@@ -459,7 +459,7 @@ fun ImportPlaylistsDialog(onDone: (String?) -> Unit) {
                                 Spacer(Modifier.width(Space.Medium))
                                 Column(Modifier.weight(1f)) {
                                     Text(playlist.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(playlistSubtitle(playlist, fallbackOwner = "Navidrome"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(playlistSubtitle(playlist, fallbackOwner = ServerWords.name(LocalGraph.current.settings.current.sourceKind)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                             }
                         }
