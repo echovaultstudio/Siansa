@@ -33,8 +33,9 @@ jobs:
   # emulator tests are needed (for the jobs below).
   quick:
     name: Quick checks
-    # Your own runner when the RUNS_ON variable names it (e.g. ["self-hosted", "siansa"]), else GitHub's.
-    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
+    # Always GitHub's runners: they start straight away, where on a single own runner these one-minute checks
+    # waited behind every build. The build below stays on your own runner.
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
       app: ${{ steps.diff.outputs.app }}
