@@ -3,6 +3,20 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.35.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.35.0beta) — 2026-10-26
+
+- [#518](https://github.com/echovaultstudio/Siansa/pull/518) Vibes on Emby: pick from the songs on this server; find them by name when not synced (beta #40, #41) (@Th3K1ngP1n)
+- [#520](https://github.com/echovaultstudio/Siansa/pull/520) App bundle carries the decoder's native symbols for Google Play (#519) (@Th3K1ngP1n)
+- [#523](https://github.com/echovaultstudio/Siansa/pull/523) A new list starts with repeat off (beta #42) (@Th3K1ngP1n)
+- [#524](https://github.com/echovaultstudio/Siansa/pull/524) Your Library: chips at full size, the last one blends out before the › (#521) (@Th3K1ngP1n)
+- [#525](https://github.com/echovaultstudio/Siansa/pull/525) Search: a picture for artists found through song credits (@Th3K1ngP1n)
+- [#526](https://github.com/echovaultstudio/Siansa/pull/526) Merge five ready pull requests for one release (@Th3K1ngP1n)
+- [#527](https://github.com/echovaultstudio/Siansa/pull/527) Audiobookshelf, step 1: connection, settings, model, API, covers (#521) (@Th3K1ngP1n)
+- [#528](https://github.com/echovaultstudio/Siansa/pull/528) Audiobookshelf, step 2: Home carousels, Books and Podcasts chips, the book page (#521) (@Th3K1ngP1n)
+- [#529](https://github.com/echovaultstudio/Siansa/pull/529) Audiobookshelf, step 3: the book player (#521) (@Th3K1ngP1n)
+- [#530](https://github.com/echovaultstudio/Siansa/pull/530) Audiobookshelf, step 4: bookmarks, whole-book downloads, podcasts (#521) (@Th3K1ngP1n)
+- [#537](https://github.com/echovaultstudio/Siansa/pull/537) Release 0.35.0: audiobooks and podcasts, plus five ready fixes (@Th3K1ngP1n)
+
 ## [0.34.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.34.1beta) — 2026-10-26
 
 - [#516](https://github.com/echovaultstudio/Siansa/pull/516) Every release builds an app bundle (.aab) for Google Play too (#515) (@Th3K1ngP1n)
