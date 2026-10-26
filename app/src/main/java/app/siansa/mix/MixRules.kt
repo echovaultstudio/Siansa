@@ -30,17 +30,4 @@ object MixRules {
         val made = mixes.filter { it.date == today && it.selectorId in vibeIds }
         return made.firstOrNull { it.selectorId == currentId } ?: made.maxByOrNull { it.createdAt }
     }
-
-    /**
-     * Whether Home makes [carouselId]'s mixes by itself (beta testers #37): only for the day's first carousel,
-     * and again when that carousel was changed in Vibes. When a later part of the day begins ("Your day" after
-     * "Your morning"), its cards wait for a tap.
-     */
-    fun makesCarouselByItself(mixes: List<Mix>, today: String, carouselId: String): Boolean =
-        mixes.none { m ->
-            m.date == today && m.selectorId.startsWith(CAROUSEL_PREFIX) && !m.selectorId.startsWith("$CAROUSEL_PREFIX$carouselId-")
-        }
-
-    /** How a carousel's mixes are named: "carousel-<id>-v<version>-<index>" ([app.siansa.data.Carousel.selectorFor]). */
-    private const val CAROUSEL_PREFIX = "carousel-"
 }

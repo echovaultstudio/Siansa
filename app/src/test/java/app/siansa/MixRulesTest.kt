@@ -52,17 +52,4 @@ class MixRulesTest {
         val others = listOf(made("y", "morning", "2026-10-25", 1), made("c", "carousel-day-v0-0", today, 1), made("p", "you-sound", today, 1))
         assertEquals(null, MixRules.todaysMix(others, today, "morning", vibes))
     }
-
-    @Test fun onlyTheDaysFirstCarouselIsMadeByItself() {
-        val today = "2026-10-26"
-        // Nothing yet today: Your morning is made when Home shows it.
-        assertTrue(MixRules.makesCarouselByItself(emptyList(), today, "morning"))
-        val morning = listOf(made("1", "carousel-morning-v0-0", today, 1), made("2", "carousel-morning-v0-1", today, 2))
-        // Changed in Vibes (a new version) or one still missing: made again by itself.
-        assertTrue(MixRules.makesCarouselByItself(morning, today, "morning"))
-        // Your day after Your morning waits for a tap.
-        assertFalse(MixRules.makesCarouselByItself(morning, today, "day"))
-        // Yesterday's don't count.
-        assertTrue(MixRules.makesCarouselByItself(listOf(made("3", "carousel-morning-v0-0", "2026-10-25", 1)), today, "day"))
-    }
 }
