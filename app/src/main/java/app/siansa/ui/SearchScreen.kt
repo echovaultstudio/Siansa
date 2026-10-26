@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import app.siansa.data.RecentSearch
+import app.siansa.data.picture
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -295,7 +296,7 @@ private fun SearchResultsList(
                             Modifier.width(96.dp).clickable { onOpen(); nav.navigate("artist/${artist.id}") }.padding(Space.Tight),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Cover(artist.coverArt, 150, Modifier.size(80.dp), CircleShape)
+                            Cover(artist.picture, 150, Modifier.size(80.dp), CircleShape)
                             Text(
                                 artist.name,
                                 style = MaterialTheme.typography.bodySmall,
