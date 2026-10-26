@@ -8,6 +8,9 @@ enum class HomeSection(val id: String, val label: String) {
     QUICK("quick", "Shortcuts"),
     TODAY("today", "Today's mix"),
     CAROUSEL("carousel", "Your mixes carousel"),
+    /** Audiobookshelf's books and podcasts (issue #521); only with a server set up. */
+    BOOKS("books", "Your books"),
+    PODCASTS("podcasts", "Your podcasts"),
     MADE_FOR_YOU("made", "Made for you"),
     REDISCOVER("rediscover", "Rediscover"),
     RADIOS("radios", "Radios"),
