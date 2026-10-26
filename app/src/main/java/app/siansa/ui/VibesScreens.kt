@@ -310,7 +310,7 @@ fun SelectorEditor(nav: NavController, id: String) {
             OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             // Days (issue #348): none picked means every day.
             Text("Days", style = MaterialTheme.typography.bodyLarge)
-            DayChips(days) { day -> days = if (day in days) days - day else days + day }
+            DayChips(days, onAllWeek = { days = emptySet() }) { day -> days = if (day in days) days - day else days + day }
             Hint(if (days.isEmpty()) "Every day. Pick days to make this vibe only for them, e.g. a Friday afternoon vibe." else "Only on " + daysLabel(days) + ".")
             SwitchRow("Any time of day", anyTime) { anyTime = it }
             if (!anyTime) Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
@@ -377,13 +377,24 @@ fun SelectorEditor(nav: NavController, id: String) {
     }
 }
 
-/** Monday to Sunday as chips; tap one to pick it or leave it out (issue #348). */
+/**
+ * Monday to Sunday as chips; tap one to pick it or leave it out (issue #348). With [onAllWeek], an "All week" chip
+ * comes first, on while no day is picked, and tapping it clears the days (issue #512).
+ */
 @Composable
-internal fun DayChips(days: Set<Int>, onToggle: (Int) -> Unit) {
+internal fun DayChips(days: Set<Int>, onAllWeek: (() -> Unit)? = null, onToggle: (Int) -> Unit) {
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("dayChips"),
         horizontalArrangement = Arrangement.spacedBy(Space.Tight),
     ) {
+        if (onAllWeek != null) {
+            FilterChip(
+                selected = days.isEmpty() || days.size == 7,
+                onClick = onAllWeek,
+                label = { Text("All week") },
+                modifier = Modifier.testTag("day-all"),
+            )
+        }
         DAY_SHORT.forEachIndexed { i, label ->
             FilterChip(
                 selected = (i + 1) in days,
