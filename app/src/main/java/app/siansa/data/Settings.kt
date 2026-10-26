@@ -139,6 +139,21 @@ data class AppSettings(
         get() = audioMuseUrl.isNotBlank()
     val aiReady: Boolean
         get() = aiTitles && openRouterKey.isNotBlank() && openRouterModel.isNotBlank()
+    /**
+     * These settings with the Connections page's fields taken from [page]: the music server, its proxy login,
+     * AudioMuse, OpenRouter and Audiobookshelf. Everything else keeps its value here.
+     */
+    fun withConnectionsFrom(page: AppSettings, kind: SourceKind = sourceKind): AppSettings = copy(
+        sourceKind = kind,
+        navidromeUrl = page.navidromeUrl, navidromeUser = page.navidromeUser, navidromePassword = page.navidromePassword,
+        proxyUser = page.proxyUser, proxyPassword = page.proxyPassword,
+        audioMuseUrl = page.audioMuseUrl, audioMuseToken = page.audioMuseToken,
+        audioMuseUser = page.audioMuseUser, audioMusePassword = page.audioMusePassword, audioMuseServer = page.audioMuseServer,
+        openRouterKey = page.openRouterKey, openRouterModel = page.openRouterModel, aiTitles = page.aiTitles,
+        audiobookshelfUrl = page.audiobookshelfUrl, audiobookshelfToken = page.audiobookshelfToken,
+        audiobookshelfUser = page.audiobookshelfUser, audiobookshelfPassword = page.audiobookshelfPassword,
+    )
+
     /** Books show once an Audiobookshelf server with a login is set (issue #521). */
     val booksReady: Boolean
         get() = audiobookshelfUrl.isNotBlank() && (audiobookshelfToken.isNotBlank() || (audiobookshelfUser.isNotBlank() && audiobookshelfPassword.isNotBlank()))
