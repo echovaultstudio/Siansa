@@ -340,6 +340,9 @@ fun HomeScreen(nav: NavController) {
                     // AudioMuse (issue #486).
                     if (homeSettings.navidromeReady && aiMixes) item(key = "carousel") { HomeCarousel(nav, aiDown) }
                 }
+                // Audiobookshelf's books and podcasts (issue #521): only with a server set up.
+                HomeSection.BOOKS -> if (homeSettings.booksReady) item(key = "books") { BooksCarousel(nav, podcasts = false) }
+                HomeSection.PODCASTS -> if (homeSettings.booksReady) item(key = "podcasts") { BooksCarousel(nav, podcasts = true) }
                 HomeSection.MADE_FOR_YOU -> {
                     // Made for you: the vibe for this hour, then mixes from your own listening.
                     item(key = "made") {

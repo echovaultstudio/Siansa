@@ -124,6 +124,8 @@ private enum class Kind(val label: String, val chip: Boolean = true) {
     FAVOURITES("Favourites"), PLAYLIST("Playlists"), MIX("Mixes"), MUSIC("Music"),
     ALBUM("Albums", chip = false), ARTIST("Artists", chip = false), SONG("Songs", chip = false),
     LISTENING("Your listening"),
+    /** Audiobookshelf's (issue #521): chips only while a server is set up. */
+    BOOKS("Books"), PODCASTS("Podcasts"),
 }
 
 /** Music's parts, its sub-chips (issue #497). */
@@ -181,6 +183,7 @@ fun YourLibraryScreen(nav: NavController) {
     val version by graph.library.version.collectAsStateWithLifecycle()
     val mixes by graph.mixes.state.collectAsStateWithLifecycle()
     val settings by graph.settings.state.collectAsStateWithLifecycle()
+    val booksReady = settings.booksReady
 
     var kind by rememberSaveable { mutableStateOf<String?>(null) }
     // A chip's sub-chip: a tag ("By you", "EPs"), or under Music the part shown (Albums, Artists, Songs).
@@ -345,7 +348,7 @@ fun YourLibraryScreen(nav: NavController) {
             )
         }
         FilterRow(
-            chips = LibraryChips.order(chipOrder, Kind.entries.filter { it.chip }.map { it.name }).map { Kind.valueOf(it) },
+            chips = LibraryChips.order(chipOrder, Kind.entries.filter { it.chip && (booksReady || (it != Kind.BOOKS && it != Kind.PODCASTS)) }.map { it.name }).map { Kind.valueOf(it) },
             selected = selectedKind,
             sub = sub,
             subFilters = when (selectedKind) {
@@ -921,9 +924,47 @@ private suspend fun refreshFromServer(graph: app.siansa.AppGraph, me: String): B
     return true
 }
 
+/** A book or podcast as a library row (issue #521): by title, author as the creator, its progress in the subtitle. */
+private fun bookEntry(book: app.siansa.data.Book, progress: app.siansa.data.BookProgress?): Entry {
+    val state = when {
+        progress?.finished == true -> "Finished"
+        progress?.started == true -> "Listening"
+        book.podcast -> "New"
+        else -> "Not started"
+    }
+    val where = when {
+        progress?.finished == true -> "finished"
+        progress?.started == true -> book.chapterAt(progress.currentSec)?.let { "chapter ${it.index + 1} of ${book.chapters.size}" } ?: "${(progress.fraction * 100).toInt()} %"
+        else -> app.siansa.data.bookLength(book.durationSec.toDouble())
+    }
+    return Entry(
+        key = "book-${book.id}",
+        kind = if (book.podcast) Kind.PODCASTS else Kind.BOOKS,
+        title = book.title,
+        subtitle = listOfNotNull(book.author.takeIf { it.isNotBlank() }, where).joinToString(" · "),
+        route = "book/${book.id}",
+        coverArt = book.cover,
+        recentAt = progress?.updatedAt ?: 0L,
+        addedAt = book.addedAt,
+        creator = book.author,
+        tags = setOf(state) + (if (book.podcast) setOf("All") else emptySet()),
+    )
+}
+
 private suspend fun buildLibrary(graph: app.siansa.AppGraph, me: String): LibraryData {
     val entries = ArrayList<Entry>()
     val now = LocalDate.now()
+    // Audiobookshelf's books and podcasts (issue #521), live from the server: a server that can't be reached
+    // leaves the rest of the library as it is.
+    if (graph.settings.current.booksReady && !graph.connection.current.offline) {
+        runCatching { graph.books.refreshProgress() }
+        for (podcasts in listOf(false, true)) {
+            runCatching { graph.books.all(podcasts, app.siansa.data.BookSort.TITLE) }
+                .onFailure { AppLog.w("Library", "${if (podcasts) "Podcasts" else "Books"} not loaded: ${it.message}") }
+                .getOrDefault(emptyList())
+                .forEach { book -> entries += bookEntry(book, graph.books.progress.value[book.id]) }
+        }
+    }
     // Favourite albums as Navidrome last sent them (refreshed in refreshFromServer), or the phone's copy (issue #275).
     val favouriteAlbums = graph.favouriteAlbums.albums
     // And favourite artists the same way (issue #397).
@@ -1169,6 +1210,8 @@ private suspend fun buildLibrary(graph: app.siansa.AppGraph, me: String): Librar
         Kind.ALBUM to present(Kind.ALBUM, albumOrder),
         Kind.ARTIST to present(Kind.ARTIST, listOf("Played", "Not played yet")),
         Kind.LISTENING to present(Kind.LISTENING, listOf("This month", "Last month", "This year", "This time last year")),
+        Kind.BOOKS to present(Kind.BOOKS, listOf("Listening", "Not started", "Finished")),
+        Kind.PODCASTS to present(Kind.PODCASTS, listOf("Listening", "New", "All")),
     )
     return LibraryData(entries, subFilters)
 }

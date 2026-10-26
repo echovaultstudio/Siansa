@@ -815,6 +815,24 @@ class SpacingTest {
         assertEven("Chip tops", all.top, mon.top, 1.dp)
     }
 
+    /** The book player (issue #521): the skip buttons sit evenly either side of play, all centred on one line. */
+    @Test fun bookPlayerControlsAreEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                Row(Modifier.testTag("bookControls"), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    app.siansa.ui.SkipButton(back = true, seconds = 10, tag = "skipBack") { }
+                    Box(Modifier.size(72.dp).testTag("playBig"))
+                    app.siansa.ui.SkipButton(back = false, seconds = 30, tag = "skipForward") { }
+                }
+            }
+        }
+        val back = compose.onNodeWithTag("skipBack").getBoundsInRoot()
+        val play = compose.onNodeWithTag("playBig").getBoundsInRoot()
+        val fwd = compose.onNodeWithTag("skipForward").getBoundsInRoot()
+        assertEven("Gaps either side of play", play.left - back.right, fwd.left - play.right, 1.dp)
+        assertEven("Skip buttons centred on play", (back.top + back.bottom) / 2 - (play.top + play.bottom) / 2, 0.dp, 1.dp)
+    }
+
     /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */
     @Test fun fastScrollHandleIsCentredAndReachesTheEnds() {
         var at by mutableFloatStateOf(0f)

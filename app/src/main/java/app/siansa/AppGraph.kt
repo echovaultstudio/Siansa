@@ -9,6 +9,9 @@ import app.siansa.data.FavouriteAlbums
 import app.siansa.data.FavouriteArtists
 import app.siansa.mix.MadeForYouCards
 import app.siansa.playback.ProfileStore
+import app.siansa.playback.BookPlayer
+import app.siansa.data.BookSpeeds
+import app.siansa.offline.BookDownloads
 import app.siansa.covers.CoverStore
 import kotlinx.coroutines.runBlocking
 
@@ -47,6 +50,10 @@ import app.siansa.mix.ContinuousPlay
 import app.siansa.mix.WindDown
 import app.siansa.mix.Taste
 import app.siansa.net.AudioMuseApi
+import app.siansa.net.AudiobookshelfApi
+import app.siansa.net.BookCoverSource
+import app.siansa.data.Book
+import app.siansa.data.BookRepository
 import app.siansa.net.DeezerApi
 import app.siansa.net.HistoryApi
 import app.siansa.net.LastFmApi
@@ -224,11 +231,22 @@ class AppGraph(val app: Application) {
      */
     val source: MusicSource = ActiveSource(
         pick = { if (settings.current.sourceKind == SourceKind.EMBY) emby else subsonic },
-        // Another shown user's songs, albums and covers go to their own server, of whatever kind (issue #427).
-        route = { id -> guests.sourceFor(id) },
+        // Another shown user's songs, albums and covers go to their own server, of whatever kind (issue #427);
+        // a book's cover ("bk-…") to Audiobookshelf (issue #521), through the same cover cache as everything.
+        route = { id -> if (id != null && id.startsWith(Book.COVER_PREFIX)) bookCovers else guests.sourceFor(id) },
     )
+    /** Only [MusicSource.coverUrl] is ever asked of it: book cover ids are routed here and nowhere else. */
+    private val bookCovers: MusicSource by lazy { BookCoverSource(audiobookshelf, subsonic) }
     // Users shown together are on one server (Guests.onSameServer), so one AudioMuse server name serves them all.
     val audioMuse = AudioMuseApi(http) { settings.current }
+    /** Audiobooks and podcasts (issue #521): one login for the whole app, like AudioMuse. */
+    val audiobookshelf = AudiobookshelfApi(http) { settings.current }
+    val books = BookRepository(audiobookshelf) { settings.current }
+    val bookSpeeds = BookSpeeds(app)
+    /** Whole-book downloads (issue #521). */
+    val bookDownloads: BookDownloads by lazy { BookDownloads(app, streamHttp, audiobookshelf) }
+    /** Plays books and podcasts, apart from the music player (issue #521). */
+    val bookPlayer: BookPlayer by lazy { BookPlayer(this) }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
     val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
     val openRouter = OpenRouterApi(http) { settings.current }
