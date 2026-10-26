@@ -57,8 +57,8 @@ class Radios(private val graph: AppGraph) {
     /** Songs similar to [song]: Navidrome's sonic similarity, AudioMuse, or Navidrome's similar songs (issue #208). */
     suspend fun songMore(song: Song): List<Song> {
         AppLog.i("Radio", "Song radio ${song.id} ${song.title}")
-        val ids = graph.sonic.similar(song.id, 60).map { it.id }.filter { it != song.id }
-        return graph.library.keepSyncedSongs(graph.generator.resolveSongs(ids), "Radio")
+        val hits = graph.sonic.similar(song.id, 60).filter { it.id != song.id }
+        return graph.library.keepSyncedSongs(graph.generator.resolveHits(hits), "Radio")
     }
 
     /** A radio around one of AudioMuse's own mood centres (issue #208). */

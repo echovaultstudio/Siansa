@@ -46,6 +46,9 @@ import androidx.navigation.NavController
 import app.siansa.data.AppSettings
 import app.siansa.data.ReplayGainMode
 import app.siansa.data.Users
+import app.siansa.log.AppLog
+import app.siansa.mix.audioMuseCheck
+import app.siansa.net.ApiException
 import app.siansa.net.AudioMuseApi
 import app.siansa.net.OpenRouterApi
 import app.siansa.net.SubsonicApi
@@ -182,8 +185,16 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                 )
                 TestRow(audioMuseTest) {
                     runTest({ audioMuseTest = it }) { s ->
-                        val hits = AudioMuseApi(graph.http) { s }.textSearch("calm piano", 3)
-                        "Text search works (${hits.size} matches for \"calm piano\")"
+                        val hits = AudioMuseApi(graph.http) { s }.textSearch("calm piano", 10)
+                        // Is AudioMuse's music this server's? Only known once this server's library is synced.
+                        val now = graph.settings.current
+                        val otherServer = s.sourceKind != now.sourceKind || s.navidromeUrl != now.navidromeUrl ||
+                            s.navidromeUser != now.navidromeUser
+                        val match = graph.generator.libraryMatch(hits)
+                        AppLog.i("Settings", "AudioMuse test: $match, other server=$otherServer")
+                        val (ok, words) = audioMuseCheck(match, otherServer)
+                        if (!ok) throw ApiException(words)
+                        words
                     }
                 }
 
