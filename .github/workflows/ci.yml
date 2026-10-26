@@ -109,7 +109,12 @@ jobs:
       - name: Unit tests, lint and release build
         run: |
           set -o pipefail
-          gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease :app:bundleRelease --continue --stacktrace 2>&1 | tee gradle-build.txt
+          gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease :app:bundleRelease --continue --stacktrace --profile 2>&1 | tee gradle-build.txt
+
+      # Where the build's time went: the slowest steps from Gradle's profile, on the run's summary.
+      - name: Build timing
+        if: always()
+        run: python3 scripts/build_timing.py build/reports/profile/*.html || true
 
       - name: Test and lint results
         if: always()
