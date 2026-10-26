@@ -96,7 +96,7 @@ class PlaylistEditor(
      */
     suspend fun moveToServer(playlistId: String): Result<Playlist?> {
         val playlist = local.get(playlistId) ?: return Result.failure(IllegalStateException("That playlist isn't on this phone any more"))
-        return onTheServer("Moving a playlist to Navidrome") {
+        return onTheServer("Moving a playlist to your server") {
             val made = source.createPlaylist(playlist.name, playlist.songs.map { it.id })
             val picture = playlist.picture?.let { java.io.File(it) }?.takeIf { it.exists() }
             if (made != null && picture != null) {
@@ -150,7 +150,7 @@ class PlaylistEditor(
     }
 
     companion object {
-        const val OFFLINE = "You're offline. This playlist is on Navidrome, so try again when you're connected."
+        const val OFFLINE = "You're offline. This playlist is on your server, so try again when you're connected."
 
         /** Longest name the app sends; Navidrome takes more, but it wouldn't fit anywhere. */
         const val MAX_NAME = 100

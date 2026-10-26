@@ -514,7 +514,7 @@ class Downloads(
             coroutineContext.ensureActive()
             val song = _list.value.waiting.firstOrNull() ?: break
             val s = settings.current
-            if (!s.navidromeReady) return stopped("Navidrome isn't set up")
+            if (!s.navidromeReady) return stopped("Your server isn't set up")
             // A VPN counts as mobile data (issue #299): with Wi-Fi only on, nothing downloads through one.
             if (s.downloadWifiOnly && (!Streaming.isUnmetered(context) || Streaming.vpnOn(context))) {
                 val vpn = Streaming.vpnOn(context)
@@ -535,7 +535,7 @@ class Downloads(
                 AppLog.w("Downloads", "Download of ${song.id} stopped: ${e.javaClass.simpleName}: ${e.message}", event = "download.failed",
                     fields = mapOf("song_id" to song.id, "error_type" to e.javaClass.simpleName))
                 later(if (s.downloadWifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
-                return stopped("Couldn't reach Navidrome, will try again")
+                return stopped("Couldn't reach your server, will try again")
             }
             if (bytes == null) {
                 // Navidrome doesn't have it (any more): no point trying again.

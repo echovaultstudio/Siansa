@@ -474,7 +474,7 @@ private fun LibraryHeader(
                     onClick = { menu = false; onNewPlaylist() },
                 )
                 DropdownMenuItem(
-                    text = { Text("Import from Navidrome") },
+                    text = { Text("Import from your server") },
                     leadingIcon = { Icon(Icons.Rounded.CloudDownload, null) },
                     onClick = { menu = false; onImportPlaylists() },
                 )
@@ -882,7 +882,7 @@ private suspend fun buildLibrary(graph: app.siansa.AppGraph, me: String): Librar
             key = "playlist-${p.id}",
             kind = Kind.PLAYLIST,
             title = p.name,
-            subtitle = playlistSubtitle(p, fallbackOwner = "Navidrome"),
+            subtitle = playlistSubtitle(p, fallbackOwner = ServerWords.name(graph.settings.current.sourceKind)),
             route = "playlist/${p.id}",
             coverArt = p.coverArt,
             recentAt = parseTime(p.changed),

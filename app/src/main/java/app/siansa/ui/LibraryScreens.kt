@@ -276,7 +276,7 @@ fun SyncPrompt(nav: NavController) {
     ) {
         Text("Your library isn't on the phone yet", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         Text(
-            "Sync it once to browse albums and artists. You choose which Navidrome libraries to include (Settings → Library sync).",
+            "Sync it once to browse albums and artists. You choose which libraries on your server to include (Settings → Library sync).",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
