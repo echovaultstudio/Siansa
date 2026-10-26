@@ -773,32 +773,34 @@ class SpacingTest {
     }
 
     /**
-     * Your Library (owner's comment on #497): on a small phone the main chips shrink so all five fit, with the
-     * same gap between each and the page's edge at both ends.
+     * Your Library (#521): chips stay at full size; on a narrow phone the › button sits in its own clear space at the
+     * row's end, no chip under it, and the fade's clear part is as wide as the button plus its edge.
      */
-    @Test fun mainChipsFitASmallPhone() {
-        val labels = listOf("Playlists", "Music", "Mixes", "Favourites", "Your listening")
+    @Test fun moreButtonSitsInClearSpaceAfterTheChips() {
+        lateinit var scroll: androidx.compose.foundation.ScrollState
         compose.setContent {
             SiansaTheme {
-                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.width(360.dp).testTag("fitRow")) {
-                    val fit = app.siansa.ui.chipFit(labels, maxWidth)
+                scroll = androidx.compose.foundation.rememberScrollState()
+                Box(Modifier.width(360.dp).testTag("fitRow")) {
                     Row(
-                        Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
-                        horizontalArrangement = Arrangement.spacedBy(fit.gap),
-                    ) { labels.forEach { app.siansa.ui.LibraryPill(it, active = false, fit = fit) { } } }
+                        Modifier.horizontalScroll(scroll).padding(horizontal = Space.Page, vertical = Space.Small),
+                        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+                    ) { listOf("Playlists", "Music", "Mixes", "Favourites", "Your listening").forEach { app.siansa.ui.LibraryPill(it, active = false) { } } }
+                    MoreChipsHint(scroll)
                 }
             }
         }
-        val row = compose.onNodeWithTag("fitRow").getBoundsInRoot()
         val pills = compose.onAllNodesWithTag("libraryPill", useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
-        assertEquals(labels.size, pills.size)
         val density = compose.density.density
         fun dp(px: Float) = (px / density).dp
-        val last = pills.maxBy { it.right }
-        assertTrue("All chips inside the row: ${dp(last.right)} of ${row.right}", row.right - dp(last.right) >= Space.Page - 1.dp)
-        assertEven("Row top and bottom", dp(pills.first().top) - row.top, row.bottom - dp(pills.first().bottom), 1.dp)
-        val sorted = pills.sortedBy { it.left }
-        assertEven("Gaps between chips", dp(sorted[1].left - sorted[0].right), dp(sorted[4].left - sorted[3].right), 1.dp)
+        // Full size: the text keeps its 14 sp height, so the chips are as tall as a lone full-size chip.
+        val tall = pills.map { dp(it.height) }.distinct()
+        assertTrue("One chip height: $tall", tall.size == 1)
+        val more = compose.onNodeWithTag("chipsMore").getBoundsInRoot()
+        val fade = compose.onNodeWithTag("chipsMoreFade", useUnmergedTree = true).getBoundsInRoot()
+        assertTrue("Button inside the fade's clear half", more.left >= fade.left + (fade.right - fade.left) * 0.45f)
+        val row = compose.onNodeWithTag("fitRow").getBoundsInRoot()
+        assertEven("Button centred in the row", more.top - row.top, row.bottom - more.bottom, 1.dp)
     }
 
     /** Days (issue #512): "All week" sits in the row of days with the same gap as between the days. */
@@ -811,6 +813,24 @@ class SpacingTest {
         val tue = compose.onNodeWithTag("day-2").getBoundsInRoot()
         assertEven("Gaps between chips", mon.left - all.right, tue.left - mon.right, 1.dp)
         assertEven("Chip tops", all.top, mon.top, 1.dp)
+    }
+
+    /** The book player (issue #521): the skip buttons sit evenly either side of play, all centred on one line. */
+    @Test fun bookPlayerControlsAreEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                Row(Modifier.testTag("bookControls"), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    app.siansa.ui.SkipButton(back = true, seconds = 10, tag = "skipBack") { }
+                    Box(Modifier.size(72.dp).testTag("playBig"))
+                    app.siansa.ui.SkipButton(back = false, seconds = 30, tag = "skipForward") { }
+                }
+            }
+        }
+        val back = compose.onNodeWithTag("skipBack").getBoundsInRoot()
+        val play = compose.onNodeWithTag("playBig").getBoundsInRoot()
+        val fwd = compose.onNodeWithTag("skipForward").getBoundsInRoot()
+        assertEven("Gaps either side of play", play.left - back.right, fwd.left - play.right, 1.dp)
+        assertEven("Skip buttons centred on play", (back.top + back.bottom) / 2 - (play.top + play.bottom) / 2, 0.dp, 1.dp)
     }
 
     /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */

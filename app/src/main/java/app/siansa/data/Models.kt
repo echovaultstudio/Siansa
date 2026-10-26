@@ -83,6 +83,13 @@ data class Artist(
     val mbid: String? = null,
 )
 
+/**
+ * The id to draw an artist's picture by: the one the server gave, else the artist's own picture address
+ * (Navidrome's artist art through getCoverArt, "ar-<id>"), which works for any artist. An artist found
+ * through a song's credits only has no [Artist.coverArt], so search showed a placeholder (owner's report).
+ */
+val Artist.picture: String get() = coverArt ?: "ar-$id"
+
 @Serializable
 data class Playlist(
     val id: String,

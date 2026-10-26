@@ -1,6 +1,7 @@
 package app.siansa.ui
 
 import androidx.compose.foundation.lazy.grid.items
+import app.siansa.data.picture
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import android.content.Context
@@ -207,7 +208,7 @@ fun ArtistsGridOrList(
         ) {
             item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) { GridListHeader(title, grid) { grid = !grid } }
             items(artists, key = { it.id }) { a ->
-                val cover = a.coverArt ?: "ar-${a.id}"
+                val cover = a.picture
                 if (grid) AlbumTile(a.name, line(a), cover, onClick = { onOpen(a) }, round = true)
                 else MediaRow(a.name, line(a), cover, onClick = { onOpen(a) }, round = true)
             }

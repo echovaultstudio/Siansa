@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import app.siansa.AppGraph
 import app.siansa.data.Artist
+import app.siansa.data.picture
 import app.siansa.data.Song
 import app.siansa.data.normalizeKey
 import app.siansa.data.splitArtists
@@ -107,7 +108,7 @@ fun rememberArtistsOpener(beforeOpen: () -> Unit = {}): (find: suspend () -> Lis
 /** A small round artist photo: Navidrome's artist image through its cover endpoint (issue #206). */
 @Composable
 fun ArtistCircle(artist: Artist, modifier: Modifier) {
-    Cover(artist.coverArt ?: "ar-${artist.id}", 150, modifier, CircleShape)
+    Cover(artist.picture, 150, modifier, CircleShape)
 }
 
 /** The artist with [id], or the artists it names when it's several artists in one name (issue #359). */

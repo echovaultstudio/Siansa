@@ -37,6 +37,14 @@ data class AppSettings(
     val audioMuseServer: String = "",
     val openRouterKey: String = "",
     val openRouterModel: String = DEFAULT_MODEL,
+    /** The Audiobookshelf server (issue #521): one login for the whole app, like AudioMuse. Empty: no books. */
+    val audiobookshelfUrl: String = "",
+    val audiobookshelfToken: String = "",
+    val audiobookshelfUser: String = "",
+    val audiobookshelfPassword: String = "",
+    /** Skipping in the book player, in seconds (issue #521): back 10, forward 30 by default; 10 to 90. */
+    val bookSkipBackSec: Int = 10,
+    val bookSkipForwardSec: Int = 30,
     val aiTitles: Boolean = true,
     val replayGain: ReplayGainMode = ReplayGainMode.TRACK,
     val preampDb: Float = 0f,
@@ -131,8 +139,13 @@ data class AppSettings(
         get() = audioMuseUrl.isNotBlank()
     val aiReady: Boolean
         get() = aiTitles && openRouterKey.isNotBlank() && openRouterModel.isNotBlank()
+    /** Books show once an Audiobookshelf server with a login is set (issue #521). */
+    val booksReady: Boolean
+        get() = audiobookshelfUrl.isNotBlank() && (audiobookshelfToken.isNotBlank() || (audiobookshelfUser.isNotBlank() && audiobookshelfPassword.isNotBlank()))
 
     companion object {
+        /** The skips the book player offers, in seconds (issue #521). */
+        val BOOK_SKIP_CHOICES = listOf(10, 15, 30, 45, 60, 90)
         const val DEFAULT_MODEL = "google/gemini-2.5-flash"
         /** Close to what ReplayGain tags aim for, so switching where loudness comes from doesn't change the overall level. */
         const val DEFAULT_LOUDNESS_TARGET = -18
@@ -190,7 +203,7 @@ private fun decode(value: String): String = runCatching { URLDecoder.decode(valu
 /** The store for AudioMuse and OpenRouter, shared by every user and server (issue #416). */
 private const val CONNECTIONS = "connections"
 private const val SEEDED = "seeded"
-private val CONNECTION_STRINGS = listOf("am_url", "am_token", "am_user", "am_pass", "am_server", "or_key", "or_model")
+private val CONNECTION_STRINGS = listOf("am_url", "am_token", "am_user", "am_pass", "am_server", "or_key", "or_model", "abs_url", "abs_token", "abs_user", "abs_pass")
 
 /** One user's settings: by default the user in use, or another user's (to show their music too). */
 class SettingsRepository(context: Context, user: Int = Users.active) {
@@ -229,6 +242,12 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         audioMuseServer = prefs.getString("am_server", null) ?: shared.getString("am_server", "") ?: "",
         openRouterKey = SecretBox.decrypt(shared.getString("or_key", "") ?: ""),
         openRouterModel = shared.getString("or_model", AppSettings.DEFAULT_MODEL) ?: AppSettings.DEFAULT_MODEL,
+        audiobookshelfUrl = shared.getString("abs_url", "") ?: "",
+        audiobookshelfToken = SecretBox.decrypt(shared.getString("abs_token", "") ?: ""),
+        audiobookshelfUser = shared.getString("abs_user", "") ?: "",
+        audiobookshelfPassword = SecretBox.decrypt(shared.getString("abs_pass", "") ?: ""),
+        bookSkipBackSec = prefs.getInt("book_skip_back", 10),
+        bookSkipForwardSec = prefs.getInt("book_skip_fwd", 30),
         aiTitles = prefs.getBoolean("ai_titles", true),
         replayGain = runCatching { ReplayGainMode.valueOf(prefs.getString("rg", "TRACK") ?: "TRACK") }
             .getOrDefault(ReplayGainMode.TRACK),
@@ -308,6 +327,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             audioMuseServer = input.audioMuseServer.trim(),
             openRouterKey = input.openRouterKey.trim(),
             openRouterModel = input.openRouterModel.trim(),
+            audiobookshelfUrl = parseAddress(input.audiobookshelfUrl).url,
+            audiobookshelfToken = input.audiobookshelfToken.trim(),
+            audiobookshelfUser = input.audiobookshelfUser.trim(),
+            bookSkipBackSec = input.bookSkipBackSec.coerceIn(10, 90),
+            bookSkipForwardSec = input.bookSkipForwardSec.coerceIn(10, 90),
         )
     }
 
@@ -357,8 +381,15 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putString("am_pass", SecretBox.encrypt(s.audioMusePassword))
             .putString("or_key", SecretBox.encrypt(s.openRouterKey))
             .putString("or_model", s.openRouterModel)
+            .putString("abs_url", s.audiobookshelfUrl)
+            .putString("abs_token", SecretBox.encrypt(s.audiobookshelfToken))
+            .putString("abs_user", s.audiobookshelfUser)
+            .putString("abs_pass", SecretBox.encrypt(s.audiobookshelfPassword))
             .apply()
-        prefs.edit().putString("am_server", s.audioMuseServer).apply()
+        prefs.edit().putString("am_server", s.audioMuseServer)
+            .putInt("book_skip_back", s.bookSkipBackSec)
+            .putInt("book_skip_fwd", s.bookSkipForwardSec)
+            .apply()
         _state.value = s
     }
 
