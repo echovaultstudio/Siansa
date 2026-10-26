@@ -761,6 +761,35 @@ class SpacingTest {
         assertTrue("› gone at the end", compose.onAllNodesWithTag("chipsMore").fetchSemanticsNodes().isEmpty())
     }
 
+    /**
+     * Your Library (owner's comment on #497): on a small phone the main chips shrink so all five fit, with the
+     * same gap between each and the page's edge at both ends.
+     */
+    @Test fun mainChipsFitASmallPhone() {
+        val labels = listOf("Playlists", "Music", "Mixes", "Favourites", "Your listening")
+        compose.setContent {
+            SiansaTheme {
+                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.width(360.dp).testTag("fitRow")) {
+                    val fit = app.siansa.ui.chipFit(labels, maxWidth)
+                    Row(
+                        Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
+                        horizontalArrangement = Arrangement.spacedBy(fit.gap),
+                    ) { labels.forEach { app.siansa.ui.LibraryPill(it, active = false, fit = fit) { } } }
+                }
+            }
+        }
+        val row = compose.onNodeWithTag("fitRow").getBoundsInRoot()
+        val pills = compose.onAllNodesWithTag("libraryPill", useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(labels.size, pills.size)
+        val density = compose.density.density
+        fun dp(px: Float) = (px / density).dp
+        val last = pills.maxBy { it.right }
+        assertTrue("All chips inside the row: ${dp(last.right)} of ${row.right}", row.right - dp(last.right) >= Space.Page - 1.dp)
+        assertEven("Row top and bottom", dp(pills.first().top) - row.top, row.bottom - dp(pills.first().bottom), 1.dp)
+        val sorted = pills.sortedBy { it.left }
+        assertEven("Gaps between chips", dp(sorted[1].left - sorted[0].right), dp(sorted[4].left - sorted[3].right), 1.dp)
+    }
+
     /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */
     @Test fun fastScrollHandleIsCentredAndReachesTheEnds() {
         var at by mutableFloatStateOf(0f)
