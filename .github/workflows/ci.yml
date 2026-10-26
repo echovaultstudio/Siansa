@@ -104,11 +104,12 @@ jobs:
           awk '/^## /{ v=$2; f="notes/" v ".md"; next } v { print > f }' CHANGELOG.md
 
       # Compiling catches syntax and type errors; unit tests check the app's own logic; Android Lint
-      # finds likely crashes, wrong API use and security issues.
+      # finds likely crashes, wrong API use and security issues. The release is built twice from the same code:
+      # the APK for GitHub and F-Droid, and the app bundle (.aab) Google Play takes (issue #515).
       - name: Unit tests, lint and release build
         run: |
           set -o pipefail
-          gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --continue --stacktrace 2>&1 | tee gradle-build.txt
+          gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease :app:bundleRelease --continue --stacktrace 2>&1 | tee gradle-build.txt
 
       - name: Test and lint results
         if: always()
@@ -179,18 +180,20 @@ jobs:
           git add -A && git commit -q -m "Build log for ${GITHUB_SHA::7}"
           git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-logs
 
-      - name: APK name
+      - name: APK and bundle names
         id: version
         run: |
           VERSION=$(tr -d '[:space:]' < version.txt)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           mv app/build/outputs/apk/release/app-release.apk siansa-$VERSION.apk
+          mv app/build/outputs/bundle/release/app-release.aab siansa-$VERSION.aab
 
       - uses: actions/upload-artifact@v7
         with:
           name: apk
           path: |
             siansa-*.apk
+            siansa-*.aab
             notes/
           retention-days: 30
 
@@ -370,14 +373,17 @@ jobs:
             for i in 1 2 3; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 5; done
           fi
 
-      # One release per version, so the APK can be downloaded straight from the Releases page on a phone.
+      # One release per version, so the APK can be downloaded straight from the Releases page on a phone. The
+      # .aab beside it is for uploading to Google Play (issue #515), signed with the same key (Play's upload key).
       - uses: softprops/action-gh-release@v3
         if: steps.version.outputs.exists != 'true'
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: Siansa ${{ steps.version.outputs.version }}
           body_path: notes/${{ steps.version.outputs.version }}.md
-          files: siansa-*.apk
+          files: |
+            siansa-*.apk
+            siansa-*.aab
           make_latest: true
 
       # The beta F-Droid repo on our server (issue #410, deploy/): the APK goes over SSH to a key that can only
