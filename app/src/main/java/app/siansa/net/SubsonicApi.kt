@@ -21,6 +21,7 @@ import app.siansa.data.PlaylistDetail
 import app.siansa.data.SearchResults
 import app.siansa.data.SimilarArtist
 import app.siansa.data.Song
+import app.siansa.data.isVariousArtists
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -247,7 +248,7 @@ class SubsonicApi(
 
     override suspend fun album(id: String): AlbumDetail {
         val album = call("getAlbum", mapOf("id" to id)).obj("album") ?: throw ApiException("Album not found")
-        return AlbumDetail(parseAlbum(album), album.arr("song").map(::parseSong), parseDiscTitles(album))
+        return AlbumDetail(parseAlbum(album), album.arr("song").map(::parseSong), parseDiscTitles(album), Tags.subsonicAlbum(album))
     }
 
     /** OpenSubsonic "discTitles": [{"disc": 1, "title": "…"}], which Navidrome fills from the disctitle tag. */
@@ -568,7 +569,8 @@ class SubsonicApi(
         created = o.str("created"),
         playCount = o.long("playCount") ?: 0,
         releaseTypes = (o["releaseTypes"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content } ?: emptyList(),
-        isCompilation = o.bool("isCompilation") == true,
+        // Servers without the flag (older Navidrome, other Subsonic servers): "Various Artists" (issue #504).
+        isCompilation = o.bool("isCompilation") == true || isVariousArtists(o.str("artist") ?: o.str("displayArtist").orEmpty()),
         played = o.str("played"),
     )
 

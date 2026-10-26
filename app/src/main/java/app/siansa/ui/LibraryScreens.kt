@@ -86,6 +86,7 @@ import app.siansa.AppGraph
 import app.siansa.data.AlbumCategory
 import app.siansa.data.AlbumDetail
 import app.siansa.data.category
+import app.siansa.net.AlbumInfo
 import app.siansa.data.Playlist
 import app.siansa.data.PlaylistDetail
 import app.siansa.data.LocalPlaylists
@@ -305,13 +306,14 @@ fun AlbumScreen(nav: NavController, id: String) {
     val detail by loadState(id) {
         val album = graph.library.album(id)
         val songs = album?.let { graph.library.songsOf(it) }.orEmpty()
-        if (album != null && songs.isNotEmpty()) AlbumDetail(album, songs) else graph.source.album(id)
+        if (album != null && songs.isNotEmpty()) AlbumDetail(album, songs) else graph.source.album(id).also { ServerAlbums.put(id, it) }
     }
     val d = detail.valueOrNull()
     val artistCover by loadState(d?.album?.artistId) { d?.album?.artistId?.let { graph.library.artist(it)?.coverArt } }
-    // Disc titles aren't kept in the synced library: for an album with several discs, ask Navidrome.
-    // Without them (offline, older server) the discs are simply headed "Disc 1", "Disc 2"…
-    val discTitles by loadState(d) { d?.let { discTitlesOf(graph, it) }.orEmpty() }
+    // Disc titles, the version, original year, labels and genres aren't kept in the synced library: ask the
+    // server once (issue #504). Without them (offline, older server) discs are "Disc 1", "Disc 2"…
+    val serverAlbum by loadState(d) { d?.let { serverAlbumOf(graph, it) } }
+    val fromServer = serverAlbum.valueOrNull()
     // Library artists by name, so a name like "Chase & Status" isn't split into two artists.
     val knownArtists by loadState("artist-names") { graph.library.artists().map { normalizeKey(it.name) }.toSet() }
     // Where you stopped on an album you were listening to, from this phone's plays (issue #367). Not while
@@ -327,7 +329,7 @@ fun AlbumScreen(nav: NavController, id: String) {
         songs = d?.songs,
         error = (detail as? Load.Err)?.message,
         numbered = true,
-        discTitles = discTitles.valueOrNull() ?: d?.discTitles.orEmpty(),
+        discTitles = fromServer?.discTitles ?: d?.discTitles.orEmpty(),
         showCovers = false,
         // Only artists beyond the album's own, as Navidrome's artist tags list them.
         subtitleOf = d?.album?.let { album ->
@@ -344,13 +346,7 @@ fun AlbumScreen(nav: NavController, id: String) {
                     d.album.artist,
                     artistCover.valueOrNull(),
                     d.album.artistId?.let { artistId -> { openArtists { artistsNamedBy(graph, artistId, d.album.artist) } } },
-                    listOfNotNull(
-                        d.album.category.single,
-                        d.album.year?.toString(),
-                        d.album.genre,
-                        "${d.songs.size} songs",
-                        formatDuration(d.songs.sumOf { it.durationSec.toLong() }),
-                    ).joinToString(" · "),
+                    albumFacts(d.album, fromServer?.info ?: d.info, d.songs.size, formatDuration(d.songs.sumOf { it.durationSec.toLong() })),
                 )
                 if (pick != null) {
                     ContinueButton(PickUps.trackLabel(d.songs, pick.continueIndex)) {
@@ -369,24 +365,61 @@ fun AlbumScreen(nav: NavController, id: String) {
     )
 }
 
-private suspend fun discTitlesOf(graph: AppGraph, detail: AlbumDetail): Map<Int, String> {
-    if (detail.discTitles.isNotEmpty()) return detail.discTitles
-    if (detail.songs.map { it.disc ?: 1 }.distinct().size < 2) return emptyMap()
-    for (id in detail.album.allIds) {
-        val titles = try {
-            graph.source.album(id).discTitles
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            AppLog.w("Album", "Disc titles not loaded: ${e.message}")
-            return emptyMap()
+/**
+ * The album as the server has it, for what the synced library doesn't keep: disc titles, its version, the year
+ * it first came out, labels, every genre (issue #504). Asked once per album while the app runs; null offline
+ * or when the server can't be reached, and the page shows what the library has.
+ */
+private suspend fun serverAlbumOf(graph: AppGraph, detail: AlbumDetail): AlbumDetail? {
+    val id = detail.album.id
+    ServerAlbums.get(id)?.let { return it }
+    if (graph.connection.current.offline) return null
+    return try {
+        graph.source.album(id).also {
+            ServerAlbums.put(id, it)
+            AppLog.d("Album", "From the server: ${it.discTitles.size} disc titles, ${it.info}")
         }
-        if (titles.isNotEmpty()) {
-            AppLog.d("Album", "${titles.size} disc titles")
-            return titles
-        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        AppLog.w("Album", "Album details not loaded: ${e.message}")
+        null
     }
-    return emptyMap()
+}
+
+/** Albums as the server last gave them, the most recent few. */
+private object ServerAlbums {
+    private const val KEEP = 40
+    private val map = object : LinkedHashMap<String, AlbumDetail>(KEEP, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, AlbumDetail>?) = size > KEEP
+    }
+
+    @Synchronized fun get(id: String): AlbumDetail? = map[id]
+
+    @Synchronized fun put(id: String, detail: AlbumDetail) {
+        map[id] = detail
+    }
+}
+
+/**
+ * The line under an album's artist (issue #504): its kind, version ("Deluxe edition"), year (with the year it
+ * first came out when this is a later release), genres, label, songs and length.
+ */
+fun albumFacts(album: Album, info: AlbumInfo, songCount: Int, length: String): String {
+    val year = when {
+        info.originalYear != null && album.year != null && info.originalYear < album.year -> "${info.originalYear} · reissued ${album.year}"
+        else -> (album.year ?: info.originalYear)?.toString()
+    }
+    val genres = info.genres.take(3).joinToString(", ").ifEmpty { album.genre.orEmpty() }
+    return listOfNotNull(
+        album.category.single,
+        info.version,
+        year,
+        genres.takeIf { it.isNotEmpty() },
+        info.labels.firstOrNull(),
+        "$songCount songs",
+        length,
+    ).joinToString(" · ")
 }
 
 @Composable
