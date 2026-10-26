@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.data.Carousel
+import app.siansa.data.carouselFor
 import app.siansa.data.Mix
 import app.siansa.log.AppLog
 import kotlinx.coroutines.CancellationException
@@ -81,7 +82,8 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
     val saved by graph.savedVibes.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { graph.savedVibes.all() }
     val pinned = pinnedVibes(saved.orEmpty())
-    val found = carousels.orEmpty().firstOrNull { it.covers(hour) }?.takeIf { it.usable.size >= Carousel.MIN }
+    // For this hour and this day of the week (issue #512).
+    val found = carouselFor(carousels.orEmpty(), hour, LocalDate.now().dayOfWeek.value)?.takeIf { it.usable.size >= Carousel.MIN }
     if (found == null) {
         if (pinned.isNotEmpty()) PinnedVibesCarousel(nav, pinned)
         return
