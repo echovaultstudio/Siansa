@@ -10,6 +10,7 @@ import app.siansa.data.FavouriteArtists
 import app.siansa.mix.MadeForYouCards
 import app.siansa.playback.ProfileStore
 import app.siansa.playback.BookPlayer
+import app.siansa.data.BookSpeeds
 import app.siansa.covers.CoverStore
 import kotlinx.coroutines.runBlocking
 
@@ -240,7 +241,7 @@ class AppGraph(val app: Application) {
     /** Audiobooks and podcasts (issue #521): one login for the whole app, like AudioMuse. */
     val audiobookshelf = AudiobookshelfApi(http) { settings.current }
     val books = BookRepository(audiobookshelf) { settings.current }
-    val bookSpeeds = app.siansa.data.BookSpeeds(app)
+    val bookSpeeds = BookSpeeds(app)
     /** Plays books and podcasts, apart from the music player (issue #521). */
     val bookPlayer: BookPlayer by lazy { BookPlayer(this) }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
