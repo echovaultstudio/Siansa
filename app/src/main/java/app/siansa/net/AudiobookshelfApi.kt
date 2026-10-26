@@ -61,8 +61,9 @@ class AudiobookshelfApi(private val http: OkHttpClient, private val settings: ()
             val builder = Request.Builder().url("${base()}$path").header("Authorization", "Bearer $t")
             when (method) {
                 "GET" -> builder.get()
+                "DELETE" -> builder.delete()
                 "PATCH" -> builder.patch((body ?: JsonObject(emptyMap())).toString().toRequestBody(JSON))
-                else -> builder.post((body ?: JsonObject(emptyMap())).toString().toRequestBody(JSON))
+                else -> builder.post((body ?: JSON_EMPTY).toString().toRequestBody(JSON))
             }
             return send(builder.build(), authed = true)
         }
@@ -204,6 +205,48 @@ class AudiobookshelfApi(private val http: OkHttpClient, private val settings: ()
         return url.build().toString()
     }
 
+    /** The listener's bookmarks in a book, by time. */
+    suspend fun bookmarks(bookId: String): List<Bookmark> =
+        (call("/api/me/bookmarks/$bookId") as? JsonArray)?.mapNotNull { it as? JsonObject }?.mapNotNull { b ->
+            Bookmark(bookId, b.dbl("time") ?: return@mapNotNull null, b.str("title").orEmpty(), b.long("createdAt") ?: 0L)
+        }?.sortedBy { it.timeSec }.orEmpty()
+
+    suspend fun addBookmark(bookId: String, timeSec: Double, title: String): Bookmark {
+        val body = buildJsonObject { put("time", timeSec.toInt()); put("title", title) }
+        val b = call("/api/me/item/$bookId/bookmark", body).jsonObject
+        return Bookmark(bookId, b.dbl("time") ?: timeSec, b.str("title") ?: title, b.long("createdAt") ?: System.currentTimeMillis())
+    }
+
+    suspend fun removeBookmark(bookId: String, timeSec: Double) {
+        call("/api/me/item/$bookId/bookmark/${timeSec.toInt()}", method = "DELETE")
+    }
+
+    /** A podcast's episodes, newest first, with each one's progress when the user has any. */
+    suspend fun episodes(podcastId: String): List<Episode> {
+        val root = call("/api/items/$podcastId?expanded=1").jsonObject
+        val media = root.obj("media") ?: return emptyList()
+        return media.arr("episodes").mapNotNull { e ->
+            val id = e.str("id") ?: return@mapNotNull null
+            Episode(
+                id = id,
+                podcastId = podcastId,
+                title = e.str("title") ?: "Episode",
+                description = e.str("description"),
+                publishedAt = e.long("publishedAt") ?: e.long("pubDate") ?: 0L,
+                durationSec = (e.obj("audioFile")?.dbl("duration") ?: e.dbl("duration") ?: 0.0).toInt(),
+                season = e.str("season"),
+                number = e.str("episode"),
+            )
+        }.sortedByDescending { it.publishedAt }
+    }
+
+    /** Progress in a podcast episode, or null when never started. */
+    suspend fun episodeProgress(podcastId: String, episodeId: String): BookProgress? = try {
+        parseProgress(call("/api/me/progress/$podcastId/$episodeId").jsonObject, "$podcastId/$episodeId")
+    } catch (e: ApiException) {
+        if (e.code == 404) null else throw e
+    }
+
     /** The address of a book's cover, for the cover loader ([Book.COVER_PREFIX] ids). */
     fun coverUrl(bookId: String, size: Int?): String {
         val url = "${base()}/api/items/$bookId/cover".toHttpUrl().newBuilder()
@@ -221,6 +264,7 @@ class AudiobookshelfApi(private val http: OkHttpClient, private val settings: ()
 
     companion object {
         private val JSON = "application/json; charset=utf-8".toMediaType()
+        private val JSON_EMPTY = JsonObject(emptyMap())
 
         /** A library item as a [Book]; null when it isn't a book or podcast. */
         fun parseBook(o: JsonObject): Book? {
@@ -273,6 +317,21 @@ data class AbsLibrary(val id: String, val name: String, val podcasts: Boolean)
 
 /** An open playback session: the files to play one after another and where the listener was. */
 data class PlaySession(val id: String, val startSec: Double, val durationSec: Double, val tracks: List<PlayTrack>)
+
+/** A bookmark the listener set in a book, kept on the server (issue #521). */
+data class Bookmark(val bookId: String, val timeSec: Double, val title: String, val createdAt: Long)
+
+/** One episode of a podcast (issue #521). */
+data class Episode(
+    val id: String,
+    val podcastId: String,
+    val title: String,
+    val description: String?,
+    val publishedAt: Long,
+    val durationSec: Int,
+    val season: String?,
+    val number: String?,
+)
 
 /** One of a book's files: where it starts in the whole book and how long it is, in seconds. */
 data class PlayTrack(val index: Int, val startOffsetSec: Double, val durationSec: Double, val contentUrl: String, val mimeType: String?)

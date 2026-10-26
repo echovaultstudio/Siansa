@@ -145,9 +145,23 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
         return offset + c.currentPosition / 1000.0
     }
 
+    /** The episode playing, when it's a podcast (issue #521); null for a book. */
+    private var episode: app.siansa.net.Episode? = null
+
+    /** Plays one episode of a podcast: its own session on the server, its own progress. */
+    fun playEpisode(podcast: Book, ep: app.siansa.net.Episode) {
+        episode = ep
+        val asBook = podcast.copy(title = ep.title, subtitle = podcast.title, durationSec = ep.durationSec, chapters = emptyList())
+        graph.scope.launch {
+            val p = runCatching { graph.audiobookshelf.episodeProgress(podcast.id, ep.id) }.getOrNull()
+            handler.post { play(asBook, p?.currentSec?.takeIf { !p.finished } ?: 0.0, ep.id) }
+        }
+    }
+
     /** Starts [book] at [fromSec]: the first chapter, where the listener was, or a chapter they tapped. */
-    fun play(book: Book, fromSec: Double) {
+    fun play(book: Book, fromSec: Double, episodeId: String? = null) {
         AppLog.i("BookPlayer", "Play \"${book.title}\" from ${fromSec.toInt()} s")
+        if (episodeId == null) episode = null
         endedId = null
         _state.value = BookPlayerState(book = book, positionSec = fromSec, playing = true, speed = graph.bookSpeeds.speedOf(book.id))
         graph.books.noteProgress(progressAt(book, fromSec))
@@ -155,14 +169,18 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
         graph.player.pause()
         graph.scope.launch {
             try {
-                val session = graph.audiobookshelf.startSession(book.id)
+                val session = graph.audiobookshelf.startSession(book.id, episodeId)
                 sessionId = session.id
                 lastSynced = System.currentTimeMillis()
                 listenedSinceSync = 0.0
+                val offline = graph.bookDownloads.isDownloaded(book.id)
                 val items = session.tracks.map { t ->
+                    // From the phone when the whole book is downloaded, else streamed (issue #521).
+                    val uri = graph.bookDownloads.fileFor(book.id, t.index)?.let { android.net.Uri.fromFile(it).toString() }
+                        ?: graph.audiobookshelf.trackUrl(t.contentUrl)
                     MediaItem.Builder()
                         .setMediaId("${BookSession.ID_PREFIX}${book.id}:${t.index}")
-                        .setUri(graph.audiobookshelf.trackUrl(t.contentUrl))
+                        .setUri(uri)
                         .setMediaMetadata(
                             MediaMetadata.Builder()
                                 .setTitle(book.title)
@@ -186,7 +204,7 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
                         c.play()
                     }
                 }
-                AppLog.i("BookPlayer", "Session ${session.id}: ${items.size} files, starting in file ${index + 1} at ${inFile.toInt()} s")
+                AppLog.i("BookPlayer", "Session ${session.id}: ${items.size} files${if (offline) " from the phone" else ""}, starting in file ${index + 1} at ${inFile.toInt()} s")
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -277,6 +295,24 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
                 throw e
             } catch (e: Exception) {
                 AppLog.w("BookPlayer", "Couldn't sync \"${book.title}\" ($reason): ${e.message}")
+            }
+        }
+    }
+
+    /** A bookmark at the current time, named for the chapter and time, kept on the server (issue #521). */
+    fun bookmark(onDone: (String) -> Unit) {
+        val s = _state.value; val book = s.book ?: return
+        val title = (s.chapter?.let { "Chapter ${it.index + 1} · " } ?: "") + app.siansa.ui.formatDuration(s.positionSec.toLong())
+        graph.scope.launch {
+            try {
+                graph.audiobookshelf.addBookmark(book.id, s.positionSec, title)
+                AppLog.i("BookPlayer", "Bookmark \"$title\" in \"${book.title}\"")
+                handler.post { onDone("Bookmarked $title") }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("BookPlayer", "Couldn't bookmark: ${e.message}")
+                handler.post { onDone(e.message ?: "Couldn't add the bookmark") }
             }
         }
     }

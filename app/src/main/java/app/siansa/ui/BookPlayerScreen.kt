@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Forward30
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -129,13 +130,20 @@ fun BookPlayerScreen(nav: NavController) {
             Spacer(Modifier.height(Space.Section))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalAlignment = Alignment.CenterVertically) {
                 SpeedChip(state.speed) { graph.bookPlayer.setSpeed(it) }
-                val sleep by graph.sleepTimer.state.collectAsStateWithLifecycle()
                 FilterChip(
                     selected = graph.bookPlayer.sleepAtChapterEnd,
                     onClick = { graph.bookPlayer.toggleSleepAtChapterEnd() },
                     label = { Text(if (graph.bookPlayer.sleepAtChapterEnd) "Sleep · end of chapter" else "Sleep") },
                     leadingIcon = { Icon(Icons.Rounded.Bedtime, null, Modifier.size(18.dp)) },
                     modifier = Modifier.testTag("bookSleep"),
+                )
+                val launch = rememberPlayLauncher()
+                FilterChip(
+                    selected = false,
+                    onClick = { graph.bookPlayer.bookmark { launch.notify(it) } },
+                    label = { Text("Bookmark") },
+                    leadingIcon = { Icon(Icons.Rounded.Bookmark, null, Modifier.size(18.dp)) },
+                    modifier = Modifier.testTag("bookBookmark"),
                 )
             }
             Spacer(Modifier.height(Space.Section))

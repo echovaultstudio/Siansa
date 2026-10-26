@@ -240,6 +240,8 @@ class AppGraph(val app: Application) {
     val audiobookshelf = AudiobookshelfApi(http) { settings.current }
     val books = BookRepository(audiobookshelf) { settings.current }
     val bookSpeeds = app.siansa.data.BookSpeeds(app)
+    /** Whole-book downloads (issue #521). */
+    val bookDownloads by lazy { app.siansa.offline.BookDownloads(app, streamHttp, audiobookshelf) }
     /** Plays books and podcasts, apart from the music player (issue #521). */
     val bookPlayer by lazy { app.siansa.playback.BookPlayer(this) }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
