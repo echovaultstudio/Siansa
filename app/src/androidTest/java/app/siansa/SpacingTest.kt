@@ -735,6 +735,17 @@ class SpacingTest {
         assertEven("Room above and below the cog", cog.top - withCog.top, withCog.bottom - cog.bottom, 1.dp)
     }
 
+    /** Time machine (issue #496): the chosen month's chip is scrolled into view, even far to the right. */
+    @Test fun chosenMonthChipIsOnScreen() {
+        compose.setContent {
+            SiansaTheme { app.siansa.ui.TimePicker(2025, 10, java.time.LocalDate.of(2026, 10, 18), onYear = {}, onMonth = {}) }
+        }
+        compose.waitForIdle()
+        val screen = compose.onRoot().getBoundsInRoot()
+        val october = compose.onNodeWithTag("month-10", useUnmergedTree = true).getBoundsInRoot()
+        assertTrue("October on screen: ${october.left}..${october.right} of ${screen.right}", october.left >= screen.left && october.right <= screen.right + 1.dp)
+    }
+
     /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */
     @Test fun fastScrollHandleIsCentredAndReachesTheEnds() {
         var at by mutableFloatStateOf(0f)
