@@ -1,6 +1,14 @@
 package app.siansa.ui
 
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.ScrollState
+import app.siansa.data.Song
+import app.siansa.data.isoMillis
+import app.siansa.data.SongDatesCache
+import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import app.siansa.data.cover
 import app.siansa.data.toPlaylist
 import android.content.Context
@@ -82,6 +90,9 @@ import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -108,9 +119,18 @@ import java.util.Locale
  * Navidrome's recently played albums, so the things you listen to come to the top.
  */
 
-private enum class Kind(val label: String) {
-    FAVOURITES("Favourites"), PLAYLIST("Playlists"), MIX("Mixes"), ALBUM("Albums"), ARTIST("Artists"), LISTENING("Your listening")
+/**
+ * What an entry is, and the chips above the list. Albums, artists and songs sit under one Music chip (issue #497),
+ * so the row of chips fits better; [chip] is false for those three.
+ */
+private enum class Kind(val label: String, val chip: Boolean = true) {
+    FAVOURITES("Favourites"), PLAYLIST("Playlists"), MIX("Mixes"), MUSIC("Music"),
+    ALBUM("Albums", chip = false), ARTIST("Artists", chip = false), SONG("Songs", chip = false),
+    LISTENING("Your listening"),
 }
+
+/** Music's parts, its sub-chips (issue #497). */
+private val MUSIC_PARTS = listOf(Kind.ALBUM, Kind.ARTIST, Kind.SONG)
 
 private enum class Sort(val label: String) {
     RECENTS("Recents"), ADDED("Recently added"), ALPHABETICAL("Alphabetical"), CREATOR("Creator"), PLAYS("Most played")
@@ -151,6 +171,9 @@ private fun NavController.goToTab(route: String) = navigate(route) {
 
 private fun pins(context: Context) = context.getSharedPreferences(app.siansa.data.Users.scoped("library_pins"), Context.MODE_PRIVATE)
 
+/** The chips' order and each page's sort, kept per user (issue #497). */
+private fun libraryPrefs(context: Context) = context.getSharedPreferences(app.siansa.data.Users.scoped("library_view"), Context.MODE_PRIVATE)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun YourLibraryScreen(nav: NavController) {
@@ -163,8 +186,13 @@ fun YourLibraryScreen(nav: NavController) {
     val settings by graph.settings.state.collectAsStateWithLifecycle()
 
     var kind by rememberSaveable { mutableStateOf<String?>(null) }
+    // A chip's sub-chip: a tag ("By you", "EPs"), or under Music the part shown (Albums, Artists, Songs).
     var sub by rememberSaveable { mutableStateOf<String?>(null) }
-    var sort by rememberSaveable { mutableStateOf(Sort.RECENTS.name) }
+    // Under Music's Albums or Artists, their own tags ("EPs", "Not played yet").
+    var tag by rememberSaveable { mutableStateOf<String?>(null) }
+    // Chips in the order last opened, and a sort kept for each page until it's changed (issue #497).
+    var chipOrder by remember { mutableStateOf(LibraryChips.parse(libraryPrefs(context).getString("chips", null))) }
+    var sorts by remember { mutableStateOf(LibraryChips.parseSorts(libraryPrefs(context).getString("sorts", null))) }
     // Grid or list, kept for next time (issue #289).
     var grid by rememberGridMode("library", default = false)
     var searching by rememberSaveable { mutableStateOf(false) }
@@ -187,15 +215,29 @@ fun YourLibraryScreen(nav: NavController) {
     }
 
     val selectedKind = kind?.let { runCatching { Kind.valueOf(it) }.getOrNull() }
-    val selectedSort = runCatching { Sort.valueOf(sort) }.getOrDefault(Sort.RECENTS)
+    val sortKey = LibraryChips.sortKey(selectedKind?.name)
+    val selectedSort = sorts[sortKey]?.let { runCatching { Sort.valueOf(it) }.getOrNull() } ?: Sort.RECENTS
+    // Under Music: Albums, Artists or Songs, when one is picked.
+    val musicPart = if (selectedKind == Kind.MUSIC) MUSIC_PARTS.firstOrNull { it.label == sub } else null
+    // Every song, only while Music is shown: there can be tens of thousands (issue #497).
+    val showSongs = selectedKind == Kind.MUSIC && (musicPart == null || musicPart == Kind.SONG)
+    val songs by produceState<SongEntries?>(null, showSongs, version) {
+        value = if (showSongs) runCatching { songEntries(graph) }.onFailure { AppLog.w("Library", "Songs failed: ${it.message}") }.getOrNull() else null
+    }
     val all = data.valueOrNull()
-    val ordered = remember(all, selectedKind, sub, selectedSort, query, pinned) {
-        val list = all?.entries.orEmpty()
+    val ordered = remember(all, songs, selectedKind, sub, tag, selectedSort, query, pinned) {
+        val list = (all?.entries.orEmpty() + (if (showSongs) songs?.entries.orEmpty() else emptyList()))
             .filter {
-                selectedKind == null || it.kind == selectedKind || (it.alwaysPinned && selectedKind == Kind.PLAYLIST && it.heart) ||
-                    (selectedKind == Kind.FAVOURITES && it.favourite)
+                when {
+                    // Songs only under Music.
+                    it.kind == Kind.SONG -> selectedKind == Kind.MUSIC && (musicPart == null || musicPart == Kind.SONG)
+                    selectedKind == null -> true
+                    selectedKind == Kind.MUSIC -> it.kind in MUSIC_PARTS && (musicPart == null || it.kind == musicPart)
+                    else -> it.kind == selectedKind || (it.alwaysPinned && selectedKind == Kind.PLAYLIST && it.heart) ||
+                        (selectedKind == Kind.FAVOURITES && it.favourite)
+                }
             }
-            .filter { e -> sub.let { it == null || it in e.tags } }
+            .filter { e -> (if (selectedKind == Kind.MUSIC) tag else sub).let { it == null || it in e.tags } }
             .filter { query.isBlank() || it.title.contains(query, true) || it.subtitle.contains(query, true) }
         val sorted = when (selectedSort) {
             Sort.RECENTS -> list.sortedWith(compareByDescending<Entry> { it.recentAt }.thenByDescending { it.addedAt })
@@ -306,20 +348,51 @@ fun YourLibraryScreen(nav: NavController) {
             )
         }
         FilterRow(
+            chips = LibraryChips.order(chipOrder, Kind.entries.filter { it.chip }.map { it.name }).map { Kind.valueOf(it) },
             selected = selectedKind,
             sub = sub,
-            subFilters = selectedKind?.let { all?.subFilters?.get(it) }.orEmpty(),
-            onKind = { k -> kind = k?.name; sub = null },
-            onSub = { s -> sub = if (sub == s) null else s },
+            subFilters = when (selectedKind) {
+                null -> emptyList()
+                Kind.MUSIC -> MUSIC_PARTS.map { it.label }
+                else -> all?.subFilters?.get(selectedKind).orEmpty()
+            },
+            tag = tag,
+            tags = musicPart?.let { all?.subFilters?.get(it) }.orEmpty(),
+            onKind = { k ->
+                kind = k?.name; sub = null; tag = null
+                // Opened chips come first next time (issue #497).
+                if (k != null) {
+                    chipOrder = LibraryChips.used(chipOrder, k.name)
+                    libraryPrefs(context).edit().putString("chips", LibraryChips.format(chipOrder)).apply()
+                }
+            },
+            onSub = { s -> sub = if (sub == s) null else s; tag = null },
+            onTag = { t -> tag = if (tag == t) null else t },
         )
         when {
             status == null && loaded -> SyncPrompt(nav)
             all == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             else -> {
                 // While an item is held, a tap anywhere on a row only puts it back.
-                val open = { e: Entry -> if (held != null) held = null else nav.navigate(e.route) }
+                val open = { e: Entry ->
+                    when {
+                        held != null -> held = null
+                        // A song plays, with the songs after it in the list (up to a couple of hundred).
+                        e.kind == Kind.SONG -> {
+                            val list = shown.filter { it.kind == Kind.SONG }
+                            val at = list.indexOfFirst { it.key == e.key }.coerceAtLeast(0)
+                            val queue = list.drop(at).take(SONG_QUEUE).mapNotNull { songs?.byKey?.get(it.key) }
+                            if (queue.isNotEmpty()) graph.player.play(queue, 0)
+                        }
+                        else -> nav.navigate(e.route)
+                    }
+                }
                 val sortBar: @Composable () -> Unit = {
-                    SortBar(selectedSort, grid, onSort = { sort = it.name }, onGrid = { grid = !grid })
+                    SortBar(selectedSort, grid, onSort = {
+                        // Kept for this page only (issue #497).
+                        sorts = sorts + (sortKey to it.name)
+                        libraryPrefs(context).edit().putString("sorts", LibraryChips.formatSorts(sorts)).apply()
+                    }, onGrid = { grid = !grid })
                 }
                 val covers = remember(shown) { shown.map { it.coverArt } }
                 if (grid) {
@@ -474,7 +547,7 @@ private fun LibraryHeader(
                     onClick = { menu = false; onNewPlaylist() },
                 )
                 DropdownMenuItem(
-                    text = { Text("Import from Navidrome") },
+                    text = { Text("Import from your server") },
                     leadingIcon = { Icon(Icons.Rounded.CloudDownload, null) },
                     onClick = { menu = false; onImportPlaylists() },
                 )
@@ -493,42 +566,138 @@ private fun LibraryHeader(
     }
 }
 
-/** Spotify's chip row: all kinds, or ✕ + the chosen kind + its own sub-filters. */
+/**
+ * Spotify's chip row: all chips (in the order last opened), or ✕ + the chosen chip + its own sub-chips, and under
+ * Music's Albums or Artists their tags. While chips are hidden off the right edge, the row fades there with a ›
+ * that scrolls on (issue #497).
+ */
 @Composable
-private fun FilterRow(selected: Kind?, sub: String?, subFilters: List<String>, onKind: (Kind?) -> Unit, onSub: (String) -> Unit) {
+private fun FilterRow(
+    chips: List<Kind>,
+    selected: Kind?,
+    sub: String?,
+    subFilters: List<String>,
+    tag: String?,
+    tags: List<String>,
+    onKind: (Kind?) -> Unit,
+    onSub: (String) -> Unit,
+    onTag: (String) -> Unit,
+) {
     // Back to the start when the filter changes, so the clear (×) chip at the left is in view (a chip far to the
     // right, like Your listening, otherwise left the row scrolled with × out of sight).
     val scroll = rememberScrollState()
     LaunchedEffect(selected) { scroll.scrollTo(0) }
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(scroll).padding(horizontal = Space.Page, vertical = Space.Small),
-        horizontalArrangement = Arrangement.spacedBy(Space.Small),
-        verticalAlignment = Alignment.CenterVertically,
+    // The main chips shrink to fit the width (owner's comment on #497), so all of them show on a small phone too.
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val fitted = chipFit(chips.map { it.label }, maxWidth)
+        val fit = if (selected != null) FullChips else fitted
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(scroll).padding(horizontal = Space.Page, vertical = Space.Small).testTag("libraryChips"),
+            horizontalArrangement = Arrangement.spacedBy(fit.gap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (selected == null) {
+                chips.forEach { k -> LibraryPill(k.label, active = false, fit = fit) { onKind(k) } }
+            } else {
+                Surface(
+                    onClick = { onKind(null) },
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.size(36.dp),
+                ) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Close, "Clear filter", Modifier.size(20.dp)) } }
+                LibraryPill(selected.label, active = true) { onKind(null) }
+                subFilters.forEach { s -> LibraryPill(s, active = sub == s) { onSub(s) } }
+                tags.forEach { t -> LibraryPill(t, active = tag == t, outlined = true) { onTag(t) } }
+            }
+        }
+        MoreChipsHint(scroll)
+    }
+}
+
+/**
+ * A row of chips with more hidden off its right edge (issue #497): the row fades there, with a › that scrolls on.
+ * Gone once the row is at its end. Goes in the Box around the row.
+ */
+@Composable
+internal fun BoxScope.MoreChipsHint(scroll: ScrollState) {
+    if (!scroll.canScrollForward) return
+    val rowScope = rememberCoroutineScope()
+    val surface = MaterialTheme.colorScheme.surface
+    Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
+        Box(
+            Modifier.fillMaxHeight().width(MORE_FADE).testTag("chipsMoreFade")
+                .background(Brush.horizontalGradient(0f to surface.copy(alpha = 0f), 0.6f to surface)),
+        )
+    }
+    Surface(
+        onClick = { rowScope.launch { scroll.animateScrollBy(scroll.viewportSize * 0.7f) } },
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.align(Alignment.CenterEnd).padding(end = Space.Small).size(32.dp).testTag("chipsMore"),
     ) {
-        if (selected == null) {
-            Kind.entries.forEach { k -> Pill(k.label, active = false) { onKind(k) } }
-        } else {
-            Surface(
-                onClick = { onKind(null) },
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.size(36.dp),
-            ) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Close, "Clear filter", Modifier.size(20.dp)) } }
-            Pill(selected.label, active = true) { onKind(null) }
-            subFilters.forEach { s -> Pill(s, active = sub == s) { onSub(s) } }
+        Box(contentAlignment = Alignment.Center) {
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, "More filters", Modifier.size(20.dp), tint = Accent)
         }
     }
 }
 
+/** How the main chips are drawn: text scale, padding each side and gap (issue #497). */
+internal data class ChipFit(val scale: Float, val padding: androidx.compose.ui.unit.Dp, val gap: androidx.compose.ui.unit.Dp)
+
+/** Chips at full size: no shrinking. */
+internal val FullChips = ChipFit(1f, Space.Page, Space.Small)
+
+/**
+ * How chips with [labels] fit a row [width] wide with the page's edges (issue #497): measured at full size, then
+ * the room around and between them shrinks, then the text ([LibraryChips.fit]).
+ */
 @Composable
-private fun Pill(text: String, active: Boolean, onClick: () -> Unit) {
+internal fun chipFit(labels: List<String>, width: androidx.compose.ui.unit.Dp): ChipFit {
+    val measurer = rememberTextMeasurer()
+    val style = MaterialTheme.typography.labelLarge.copy(fontSize = PILL_FONT)
+    val density = LocalDensity.current
+    return remember(labels, width, style, density) {
+        with(density) {
+            val fit = LibraryChips.fit(
+                texts = labels.map { measurer.measure(it, style, maxLines = 1).size.width.toFloat() },
+                pad = Space.Page.toPx(),
+                padMin = Space.Small.toPx(),
+                gap = Space.Small.toPx(),
+                gapMin = Space.Tight.toPx(),
+                available = (width - Space.Page * 2).toPx(),
+            )
+            ChipFit(fit.text, fit.padding.toDp(), fit.gap.toDp())
+        }
+    }
+}
+
+/** The chips' text at full size; the main chips shrink from it to fit (issue #497). */
+private val PILL_FONT = 14.sp
+
+/** How wide the fade at the end of the chip row is. */
+private val MORE_FADE = 72.dp
+
+/** Songs played at once from Your Library's Songs: the tapped one and those after it. */
+private const val SONG_QUEUE = 200
+
+@Composable
+internal fun LibraryPill(text: String, active: Boolean, outlined: Boolean = false, fit: ChipFit = FullChips, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = CircleShape,
-        color = if (active) Selected else MaterialTheme.colorScheme.surfaceContainerHigh,
+        // A tag under Music's Albums or Artists is outlined, a step below the sub-chips.
+        color = if (active) Selected else if (outlined) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = if (active) OnSelected else MaterialTheme.colorScheme.onSurface,
+        border = if (outlined && !active) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
     ) {
-        Text(text, style = MaterialTheme.typography.labelLarge, fontSize = 14.sp, modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small))
+        Text(
+            text,
+            style = MaterialTheme.typography.labelLarge,
+            fontSize = PILL_FONT * fit.scale,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(horizontal = fit.padding, vertical = Space.Small).testTag("libraryPill"),
+        )
     }
 }
 
@@ -720,6 +889,40 @@ private fun parseTime(text: String?): Long =
  */
 @Volatile private var lastRecent: Pair<String, List<Album>>? = null
 
+/** Your Library's songs (issue #497): an entry for each, and the song behind each entry, to play it. */
+private class SongEntries(val entries: List<Entry>, val byKey: Map<String, Song>)
+
+/** Every song shown, as entries: when it was last heard and how often, from Siansa's history. */
+private suspend fun songEntries(graph: app.siansa.AppGraph): SongEntries {
+    val list = graph.library.allSongs()
+    val heardAt = HashMap<String, Long>()
+    val plays = HashMap<String, Long>()
+    graph.history.all().forEach { e ->
+        if (e.skipped) return@forEach
+        heardAt.merge(e.id, e.at) { a, b -> maxOf(a, b) }
+        plays.merge(e.id, 1L) { a, b -> a + b }
+    }
+    val byKey = HashMap<String, Song>(list.size)
+    val entries = list.map { song ->
+        val key = "song-${song.id}"
+        byKey[key] = song
+        Entry(
+            key = key,
+            kind = Kind.SONG,
+            title = song.title,
+            subtitle = "Song · ${song.artist}",
+            route = song.albumId?.let { "album/$it" } ?: "liked",
+            coverArt = song.cover,
+            recentAt = heardAt[song.id] ?: 0L,
+            addedAt = isoMillis(SongDatesCache[song.id]?.created) ?: 0L,
+            plays = plays[song.id] ?: 0L,
+            creator = song.artist,
+        )
+    }
+    AppLog.i("Library", "Songs: ${entries.size}")
+    return SongEntries(entries, byKey)
+}
+
 private suspend fun loadLibrary(graph: app.siansa.AppGraph, me: String): Load<LibraryData> = try {
     Load.Ok(buildLibrary(graph, me))
 } catch (e: CancellationException) {
@@ -882,7 +1085,7 @@ private suspend fun buildLibrary(graph: app.siansa.AppGraph, me: String): Librar
             key = "playlist-${p.id}",
             kind = Kind.PLAYLIST,
             title = p.name,
-            subtitle = playlistSubtitle(p, fallbackOwner = "Navidrome"),
+            subtitle = playlistSubtitle(p, fallbackOwner = ServerWords.name(graph.settings.current.sourceKind)),
             route = "playlist/${p.id}",
             coverArt = p.coverArt,
             recentAt = parseTime(p.changed),

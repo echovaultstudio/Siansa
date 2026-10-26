@@ -23,7 +23,12 @@ data class Carousel(
     val mixes: List<CarouselMix>,
     /** Raised on each change, so the day's mixes are made again from the new names and sounds. */
     val version: Int = 0,
+    /** Days it's for (issue #512), as ISO days of the week (1 Monday … 7 Sunday); empty means all week. */
+    val days: List<Int> = emptyList(),
 ) {
+    /** Whether it's for [day] (ISO day of the week). */
+    fun coversDay(day: Int): Boolean = days.isEmpty() || day in days
+
     fun covers(hour: Int): Boolean = when {
         startHour == endHour -> true
         startHour < endHour -> hour in startHour until endHour
@@ -53,6 +58,31 @@ data class Carousel(
         const val MIX_LENGTH = 30
     }
 }
+
+/**
+ * Home's carousel for [hour] on [day] (issue #512): one for those hours and that day, one picked for certain days
+ * before one for all week (a weekend morning carousel before the everyday one), otherwise in list order.
+ */
+fun carouselFor(carousels: List<Carousel>, hour: Int, day: Int): Carousel? =
+    carousels.filter { it.covers(hour) && it.coversDay(day) }.sortedBy { if (it.days.isEmpty()) 1 else 0 }.firstOrNull()
+
+/**
+ * Why [c] can't be saved next to [others] (owner's comment on #512): another carousel already has some of its
+ * hours on some of its days, so Home couldn't tell which to show. Null when no other overlaps.
+ */
+fun carouselClash(c: Carousel, others: List<Carousel>): String? {
+    fun hours(x: Carousel) = (0..23).filter { x.covers(it) }.toSet()
+    fun days(x: Carousel) = x.days.ifEmpty { (1..7).toList() }.toSet()
+    val mine = hours(c)
+    val myDays = days(c)
+    val other = others.firstOrNull { o -> o.id != c.id && (hours(o) intersect mine).isNotEmpty() && (days(o) intersect myDays).isNotEmpty() }
+        ?: return null
+    val onDays = if (other.days.isEmpty()) "all week" else daysLabel(other.days)
+    return "\"${other.title}\" already has %02d:00–%02d:00, %s. Pick other days or hours.".format(other.startHour, other.endHour, onDays)
+}
+
+/** Days as kept: none for all week, also when every day is picked; otherwise each once, in week order. */
+fun normalDays(days: Collection<Int>): List<Int> = days.filter { it in 1..7 }.distinct().sorted().takeIf { it.size in 1..6 }.orEmpty()
 
 /** What a carousel needs before it can be saved, or null when it's fine. */
 fun carouselProblem(c: Carousel): String? = when {
@@ -117,8 +147,8 @@ class CarouselStore(context: Context) {
 
     suspend fun get(id: String): Carousel? = all().firstOrNull { it.id == id }
 
-    /** The carousel for [hour], if any. */
-    suspend fun forHour(hour: Int): Carousel? = all().firstOrNull { it.covers(hour) }
+    /** The carousel for [hour] on [day], if any ([carouselFor]). */
+    suspend fun forHour(hour: Int, day: Int): Carousel? = carouselFor(all(), hour, day)
 
     suspend fun save(carousel: Carousel) {
         json.update { list -> list.map { if (it.id == carousel.id) carousel.copy(version = it.version + 1) else it } }

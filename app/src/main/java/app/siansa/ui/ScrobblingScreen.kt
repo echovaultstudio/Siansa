@@ -106,15 +106,15 @@ fun ScrobblingScreen(nav: NavController) {
                         graph.settings.save(graph.settings.current.copy(scrobbleOffUsers = off))
                     }
                 }
-                Hint("Turn a user off and songs from their library aren't sent to Navidrome, Last.fm or ListenBrainz, while you listen as you.")
+                Hint("Turn a user off and songs from their library aren't sent to your server, Last.fm or ListenBrainz, while you listen as you.")
                 HorizontalDivider()
             }
 
-            Heading("Navidrome")
-            SwitchRow("Record plays in Navidrome", settings.scrobbleNavidrome) {
+            Heading("Your server")
+            SwitchRow("Record plays on your server", settings.scrobbleNavidrome) {
                 graph.settings.save(graph.settings.current.copy(scrobbleNavidrome = it))
             }
-            Hint("Keeps play counts and \"recently played\" in Navidrome. If Navidrome itself is linked to Last.fm or ListenBrainz, leave the matching option below off, or plays are counted twice.")
+            Hint("Keeps play counts and \"recently played\" on your server. If your server itself is linked to Last.fm or ListenBrainz, leave the matching option below off, or plays are counted twice.")
 
             HorizontalDivider()
             Heading("Last.fm")

@@ -1,5 +1,7 @@
 package app.siansa.net
 
+import app.siansa.data.isoMillis
+import app.siansa.mix.SongPlays
 import app.siansa.data.Album
 import app.siansa.data.AlbumDetail
 import app.siansa.data.AppJson
@@ -8,6 +10,7 @@ import app.siansa.data.Artist
 import app.siansa.data.ArtistDetail
 import app.siansa.data.ArtistInfo
 import app.siansa.data.ArtistRef
+import app.siansa.data.isVariousArtists
 import app.siansa.data.LyricLine
 import app.siansa.data.Lyrics
 import app.siansa.data.LyricsFormats
@@ -227,7 +230,7 @@ class EmbyApi(
         val songs = items("ParentId" to id, "IncludeItemTypes" to "Audio", "SortBy" to "SortName")
             .map(::parseSong)
             .sortedWith(compareBy({ it.disc ?: 1 }, { it.track ?: Int.MAX_VALUE }))
-        return AlbumDetail(parseAlbum(album), songs)
+        return AlbumDetail(parseAlbum(album), songs, info = Tags.embyAlbum(album))
     }
 
     override suspend fun artists(folderId: String?): List<Artist> =
@@ -276,7 +279,7 @@ class EmbyApi(
     }
 
     override suspend fun songDetails(id: String): SongDetails {
-        val o = call("/Users/{user}/Items/" + enc(id) + "?" + q("Fields" to "$FIELDS,MediaSources,Path"))
+        val o = call("/Users/{user}/Items/" + enc(id) + "?" + q("Fields" to "$FIELDS,MediaSources,Path,People,Studios"))
         val source = o.arr("MediaSources").firstOrNull()
         val audio = source?.arr("MediaStreams")?.firstOrNull { it.str("Type") == "Audio" }
         return SongDetails(
@@ -288,6 +291,7 @@ class EmbyApi(
             sizeBytes = source?.long("Size")?.takeIf { it > 0 },
             path = (source?.str("Path") ?: o.str("Path"))?.takeIf { it.isNotBlank() },
             playCount = o.obj("UserData")?.long("PlayCount"),
+            tags = Tags.embySong(o),
         )
     }
 
@@ -301,6 +305,16 @@ class EmbyApi(
         return items("IncludeItemTypes" to "Audio", "SortBy" to "Random", "Limit" to size, "Genres" to genre, "Years" to years)
             .map(::parseSong)
     }
+
+    /** Songs this user played lately, most recent first, with Emby's play count and last-played date (issue #495). */
+    override suspend fun recentSongPlays(albumCount: Int): List<SongPlays> =
+        items(
+            "IncludeItemTypes" to "Audio", "SortBy" to "DatePlayed", "SortOrder" to "Descending", "Filters" to "IsPlayed",
+            "Limit" to albumCount * 10,
+        ).map { o ->
+            val data = o.obj("UserData")
+            SongPlays(parseSong(o), data?.long("PlayCount") ?: 0L, isoMillis(data?.str("LastPlayedDate")))
+        }
 
     override suspend fun randomSongPlays(size: Int): List<Pair<Song, Long>> =
         items("IncludeItemTypes" to "Audio", "SortBy" to "Random", "Limit" to size)
@@ -524,6 +538,8 @@ class EmbyApi(
             created = o.str("DateCreated"),
             playCount = user?.long("PlayCount") ?: 0,
             played = user?.str("LastPlayedDate"),
+            // Emby has no compilation flag: an album by "Various Artists" is one (issue #504).
+            isCompilation = isVariousArtists(o.str("AlbumArtist") ?: albumArtist?.str("Name").orEmpty()),
         )
     }
 

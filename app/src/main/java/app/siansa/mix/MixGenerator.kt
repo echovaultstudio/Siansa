@@ -22,9 +22,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.jsonObject
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -65,6 +63,19 @@ class MixGenerator(private val graph: AppGraph) {
         val now = LocalDateTime.now()
         // The most fitting vibe for the hour and the day (issue #348).
         return fittingSelector(graph.selectors.all(), now.hour, now.dayOfWeek.value)
+    }
+
+    /**
+     * Home's "Today's mix" (beta testers #37): the one already made today, kept when the hour's vibe moves on
+     * ([MixRules.todaysMix]); only the day's first is made here. ↻ makes a new one with [ensureCurrent] (force).
+     */
+    suspend fun ensureToday(): Mix? {
+        val today = LocalDate.now().toString()
+        val vibes = graph.selectors.all()
+        val current = currentSelector()
+        MixRules.todaysMix(graph.mixes.all(), today, current?.id, vibes.map { it.id }.toSet())?.let { return it }
+        AppLog.i("Mix", "No mix yet today: making the first, for ${current?.name ?: "no vibe"}")
+        return current?.let { ensure(it, force = false) }
     }
 
     /** Today's mix for the selector covering this hour, built if it doesn't exist yet. */
@@ -372,15 +383,34 @@ class MixGenerator(private val graph: AppGraph) {
         val hits = graph.audioMuse.sonicFingerprint(150, s.fingerprintUser, s.fingerprintPassword)
             .filter { it.id !in skipped && it.id !in recent }
         val picked = capPerArtist(hits.map { it to it.similarity * (0.85 + Random.nextDouble() * 0.15) }, 3, 40)
-        return spreadArtists(resolve(picked.map { it.id })) to "The sound of what you play most, found by AudioMuse"
+        return spreadArtists(resolveHits(picked)) to "The sound of what you play most, found by AudioMuse"
     }
 
-    /** Your most-played songs lately, from Siansa, Koito / ListenBrainz and Last.fm. */
+    /**
+     * Your most-played songs of the last 30 days (issue #495): from the server (the songs of the albums played
+     * lately, with their play counts), this phone, and Koito / ListenBrainz / Last.fm.
+     */
     private suspend fun repeatMix(taste: TasteProfile?, skipped: Set<String>): Pair<List<Song>, String> {
-        val ids = taste?.favouriteSongs.orEmpty().filter { it !in skipped }
-        if (ids.size < 8) return emptyList<Song>() to ""
-        val songs = resolve(ids.take(50))
-        return songs to "Your most-played songs lately"
+        val now = System.currentTimeMillis()
+        val today = LocalDate.now().toEpochDay()
+        val server = runCatching { graph.source.recentSongPlays(RECENT_ALBUMS) }
+            .onFailure { AppLog.w("Mix", "On repeat: the server's play counts failed: ${it.message}") }
+            .getOrDefault(emptyList())
+        runCatching { graph.playCounts.record(server, today) }
+        val before = graph.playCounts.countsOn(today - OnRepeat.WINDOW_DAYS)
+        val fromServer = server.mapNotNull { p -> OnRepeat.serverScore(p, before[p.song.id], now)?.let { p.song.id to it } }.toMap()
+        val fromPhone = graph.history.all()
+            .filter { !it.skipped && now - it.at < OnRepeat.WINDOW_DAYS * DAY_MS }
+            .groupingBy { it.id }.eachCount()
+        val ids = OnRepeat.rank(fromServer, fromPhone, taste?.favouriteSongs.orEmpty(), skipped)
+        AppLog.i(
+            "Mix",
+            "On repeat: ${fromServer.size} songs from the server (${server.count { before.containsKey(it.song.id) }} with a count from 30 days ago), " +
+                "${fromPhone.size} from this phone, ${taste?.favouriteSongs?.size ?: 0} from history services",
+        )
+        if (ids.size < OnRepeat.MIN_SONGS) return emptyList<Song>() to ""
+        val songs = resolve(ids)
+        return songs to "Your most-played songs of the last 30 days"
     }
 
     /**
@@ -408,7 +438,7 @@ class MixGenerator(private val graph: AppGraph) {
             if ((pool[hit.id]?.second ?: -1.0) < score) pool[hit.id] = hit to score
         }
         val picked = capPerArtist(pool.values.toList(), 2, 40)
-        return spreadArtists(resolve(picked.map { it.id })) to "New to you, close to the sound of your favourites"
+        return spreadArtists(resolveHits(picked)) to "New to you, close to the sound of your favourites"
     }
 
     private fun capPerArtist(scored: List<Pair<ClapHit, Double>>, perArtist: Int, size: Int): List<ClapHit> {
@@ -445,7 +475,7 @@ class MixGenerator(private val graph: AppGraph) {
             val n = perArtist[hit.artist.lowercase()] ?: 0
             if (n >= 3) false else { perArtist[hit.artist.lowercase()] = n + 1; true }
         }.take(size)
-        val songs = spreadArtists(resolve(picked.map { it.id }))
+        val songs = spreadArtists(resolveHits(picked))
         return MoodResult(plan.title, plan.description, plan.query, songs, plan.ai)
     }
 
@@ -509,7 +539,7 @@ class MixGenerator(private val graph: AppGraph) {
             "Search \"$query\" · ${tuning.summary().ifEmpty { "no sliders moved" }} · ${hits.size} found, " +
                 "${features.size} with energy/tempo, ${picked.size} picked",
         )
-        return spreadArtists(resolve(picked.map { it.id }))
+        return spreadArtists(resolveHits(picked))
     }
 
     private suspend fun aiMoodPlan(mood: String): Plan {
@@ -541,6 +571,14 @@ class MixGenerator(private val graph: AppGraph) {
         val description = obj.str("description")?.trim()?.take(200).orEmpty()
         if (title.isEmpty() || query.length < 3) throw MixException("The AI's answer was incomplete")
         return Plan(title, query, description.ifBlank { "Made from your mood" }, ai = true, steering = steeringOf(obj, concepts))
+    }
+
+    /** How many of AudioMuse's [hits] are in the synced library, by id or by title and artist (beta testers #32). */
+    suspend fun libraryMatch(hits: List<ClapHit>): LibraryMatch {
+        val index = songIndex()
+        val byId = graph.library.songs(hits.map { it.id }).map { it.id }.toSet()
+        val byName = matchByName(hits.filter { it.id !in byId }, index)
+        return LibraryMatch(hits.size, hits.count { it.id in byId }, byName.size, index.size)
     }
 
     /** Songs for AudioMuse ids, from the synced library where possible. */
@@ -580,23 +618,26 @@ class MixGenerator(private val graph: AppGraph) {
      * Songs from the synced library where possible, otherwise fetched from Navidrome. AudioMuse knows every
      * library on the server, so when only some libraries are synced, songs outside them are left out.
      */
-    private suspend fun resolve(ids: List<String>): List<Song> = coroutineScope {
+    private suspend fun resolve(ids: List<String>): List<Song> {
         val local = graph.library.songs(ids).associateBy { it.id }
         val fetchMissing = mayFetchUnsynced(graph.library.meta(LibraryRepository.META_FOLDERS))
         if (!fetchMissing) {
             val skipped = ids.distinct().count { it !in local }
             if (skipped > 0) AppLog.i("Mix", "Left out $skipped songs that aren't in the libraries you sync")
         }
-        val permits = Semaphore(6)
-        ids.map { id ->
-            async {
-                local[id] ?: if (fetchMissing) {
-                    permits.withPermit { runCatching { graph.source.song(id) }.getOrNull() }
-                } else {
-                    null
-                }
+        val missing = ids.filter { it !in local }
+        val fetched = if (fetchMissing && missing.isNotEmpty()) {
+            val result = fetchUnlessForeign(missing) { id -> runCatching { graph.source.song(id) }.getOrNull() }
+            if (result.foreign) {
+                AppLog.w(
+                    "Mix",
+                    "The server knows none of AudioMuse's songs (${missing.size} asked about): AudioMuse may have " +
+                        "analysed another server; not asking for the rest",
+                )
             }
-        }.awaitAll().filterNotNull().distinctBy { it.id }
+            result.songs.associateBy { it.id }
+        } else emptyMap()
+        return ids.mapNotNull { local[it] ?: fetched[it] }.distinctBy { it.id }
     }
 
     /** Keeps the same artist from playing twice in a row where possible. */
@@ -613,6 +654,8 @@ class MixGenerator(private val graph: AppGraph) {
 
     private companion object {
         const val DAY_MS = 24L * 60 * 60 * 1000
+        /** Albums played lately whose songs On repeat looks at (issue #495). */
+        const val RECENT_ALBUMS = 40
         /** Songs of the music shown looked at for a mix from the library. */
         const val LIBRARY_CANDIDATES = 3000
         val SYSTEM_PROMPT = """

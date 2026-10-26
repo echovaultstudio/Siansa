@@ -28,6 +28,7 @@ import app.siansa.data.Song
 import app.siansa.data.cover
 import app.siansa.log.AppLog
 import app.siansa.net.SongDetails
+import app.siansa.net.SongTags
 import app.siansa.net.channelsLabel
 import app.siansa.net.formatFileSize
 import app.siansa.net.formatSampleRate
@@ -37,7 +38,7 @@ fun NavController.openSongDetails(songId: String) = navigate("song/${Uri.encode(
 
 private data class SongDetailsPage(val song: Song, val details: SongDetails, val skips: Int)
 
-/** "Show details" from a song's menu: format, bit rate, plays, skips and the file's path on the server. */
+/** "Show details" from a song's menu: what its tags say, format, bit rate, plays, skips and the file's path on the server. */
 @Composable
 fun SongDetailsScreen(nav: NavController, songId: String) {
     val graph = LocalGraph.current
@@ -87,7 +88,7 @@ fun songDetailRows(d: SongDetails, skips: Int): List<Pair<String, String>> {
         d.bitDepth?.let { "$it-bit" },
         d.channels?.let(::channelsLabel),
     ).joinToString(" · ")
-    return listOfNotNull(
+    return tagRows(d.tags) + listOfNotNull(
         "Format" to (d.codec ?: "Unknown"),
         "Bit rate" to (d.bitRateKbps?.let { "$it kbps" } ?: "Unknown"),
         quality.takeIf { it.isNotEmpty() }?.let { "Quality" to it },
@@ -96,6 +97,27 @@ fun songDetailRows(d: SongDetails, skips: Int): List<Pair<String, String>> {
         "Skips on this phone" to skips.toString(),
         "File" to (d.path ?: "Unknown"),
     )
+}
+
+/**
+ * What the song's tags say (issue #504), only what's there: artists when more than one, album artists, roles
+ * (Composer, Lyricist…), genres, moods, release, BPM, ISRC, explicit, comment and MusicBrainz id.
+ */
+fun tagRows(t: SongTags): List<Pair<String, String>> {
+    fun names(list: List<String>) = list.joinToString(", ")
+    return buildList {
+        if (t.artists.size > 1) add("Artists" to names(t.artists))
+        if (t.albumArtists.isNotEmpty()) add((if (t.albumArtists.size > 1) "Album artists" else "Album artist") to names(t.albumArtists))
+        t.roles.forEach { (role, who) -> add(role to names(who)) }
+        if (t.genres.isNotEmpty()) add((if (t.genres.size > 1) "Genres" else "Genre") to names(t.genres))
+        if (t.moods.isNotEmpty()) add((if (t.moods.size > 1) "Moods" else "Mood") to names(t.moods))
+        (t.released ?: t.year?.toString())?.let { add("Released" to it) }
+        t.bpm?.let { add("BPM" to it.toString()) }
+        if (t.isrc.isNotEmpty()) add("ISRC" to names(t.isrc))
+        t.explicit?.let { add("Lyrics" to if (it) "Explicit" else "Clean") }
+        t.comment?.let { add("Comment" to it) }
+        t.musicBrainzId?.let { add("MusicBrainz ID" to it) }
+    }
 }
 
 @Composable
