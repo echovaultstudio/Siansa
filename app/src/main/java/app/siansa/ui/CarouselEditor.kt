@@ -38,6 +38,8 @@ import androidx.navigation.NavController
 import app.siansa.data.Carousel
 import app.siansa.data.CarouselMix
 import app.siansa.data.carouselProblem
+import app.siansa.data.daysLabel
+import app.siansa.data.normalDays
 import kotlinx.coroutines.launch
 
 /**
@@ -61,6 +63,8 @@ fun CarouselPanel(nav: NavController) {
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text("${c.title} · %02d:00–%02d:00".format(c.startHour, c.endHour), style = MaterialTheme.typography.bodyLarge)
+                        // Which days (issue #512): "All week", "Weekdays", "Sat, Sun"…
+                        Hint(if (c.days.isEmpty()) "All week" else daysLabel(c.days))
                         Hint(c.usable.joinToString(" · ") { it.name })
                     }
                 }
@@ -80,12 +84,14 @@ fun CarouselEditor(nav: NavController, id: String) {
     var end by remember { mutableStateOf("") }
     val names = remember { mutableStateListOf("", "", "", "") }
     val sounds = remember { mutableStateListOf("", "", "", "") }
+    var days by remember { mutableStateOf(emptySet<Int>()) }
     var problem by remember { mutableStateOf<String?>(null) }
 
     fun fill(c: Carousel) {
         title = c.title
         start = c.startHour.toString()
         end = c.endHour.toString()
+        days = c.days.toSet()
         repeat(Carousel.MAX) { i ->
             names[i] = c.mixes.getOrNull(i)?.name.orEmpty()
             sounds[i] = c.mixes.getOrNull(i)?.sound.orEmpty()
@@ -104,6 +110,7 @@ fun CarouselEditor(nav: NavController, id: String) {
             title = title.trim(),
             startHour = startHour ?: -1,
             endHour = endHour ?: -1,
+            days = normalDays(days),
             mixes = (0 until Carousel.MAX).map { CarouselMix(names[it].trim(), sounds[it].trim()) }.filter { it.name.isNotEmpty() || it.sound.isNotEmpty() },
         )
         problem = when {
@@ -134,6 +141,13 @@ fun CarouselEditor(nav: NavController, id: String) {
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             OutlinedTextField(title, { title = it }, label = { Text("Name on Home") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            // Days (issue #512): all week, or only the days picked.
+            Text("Days", style = MaterialTheme.typography.bodyLarge)
+            DayChips(days, onAllWeek = { days = emptySet() }) { day -> days = if (day in days) days - day else days + day }
+            Hint(
+                if (normalDays(days).isEmpty()) "All week. Pick days to use this carousel only on them, e.g. a weekend morning."
+                else "Only on " + daysLabel(days) + ". On other days, another carousel for these hours shows, if there is one."
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                 OutlinedTextField(
                     start, { start = it.filter(Char::isDigit).take(2) },

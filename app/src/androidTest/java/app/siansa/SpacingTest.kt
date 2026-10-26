@@ -735,6 +735,18 @@ class SpacingTest {
         assertEven("Room above and below the cog", cog.top - withCog.top, withCog.bottom - cog.bottom, 1.dp)
     }
 
+    /** Days (issue #512): "All week" sits in the row of days with the same gap as between the days. */
+    @Test fun allWeekChipIsEvenlySpacedWithTheDays() {
+        compose.setContent {
+            SiansaTheme { Box(Modifier.width(480.dp)) { app.siansa.ui.DayChips(setOf(6, 7), onAllWeek = { }) { } } }
+        }
+        val all = compose.onNodeWithTag("day-all").getBoundsInRoot()
+        val mon = compose.onNodeWithTag("day-1").getBoundsInRoot()
+        val tue = compose.onNodeWithTag("day-2").getBoundsInRoot()
+        assertEven("Gaps between chips", mon.left - all.right, tue.left - mon.right, 1.dp)
+        assertEven("Chip tops", all.top, mon.top, 1.dp)
+    }
+
     /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */
     @Test fun fastScrollHandleIsCentredAndReachesTheEnds() {
         var at by mutableFloatStateOf(0f)
