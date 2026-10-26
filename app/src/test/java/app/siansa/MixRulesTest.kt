@@ -34,4 +34,22 @@ class MixRulesTest {
         assertTrue(MixGenerator.Personal.REPEAT in withoutAudioMuse)
         assertEquals(MixGenerator.Personal.entries, MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, true) })
     }
+
+    private fun made(id: String, selector: String, date: String, at: Long) = Mix(id, selector, date, "t", "d", "q", emptyList(), at, false)
+
+    @Test fun todaysMixStaysWhenTheHoursVibeMovesOn() {
+        val today = "2026-10-26"
+        val vibes = setOf("morning", "daytime", "evening")
+        val morning = made("m", "morning", today, at = 1)
+        // 11:49: the vibe is now Daytime, but this morning's mix is the one you have (beta testers #37).
+        assertEquals(morning, MixRules.todaysMix(listOf(morning), today, currentId = "daytime", vibeIds = vibes))
+        // Once Daytime's is made (you tapped ↻), that's it.
+        val daytime = made("d", "daytime", today, at = 2)
+        assertEquals(daytime, MixRules.todaysMix(listOf(morning, daytime), today, "daytime", vibes))
+        // The vibe for the hour first, even if another was made later (a vibe tile you tapped).
+        assertEquals(daytime, MixRules.todaysMix(listOf(daytime, made("e", "evening", today, at = 3)), today, "daytime", vibes))
+        // Yesterday's, carousel and personal mixes don't count: the day's first is made.
+        val others = listOf(made("y", "morning", "2026-10-25", 1), made("c", "carousel-day-v0-0", today, 1), made("p", "you-sound", today, 1))
+        assertEquals(null, MixRules.todaysMix(others, today, "morning", vibes))
+    }
 }

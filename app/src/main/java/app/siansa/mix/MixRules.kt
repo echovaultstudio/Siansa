@@ -27,4 +27,14 @@ object MixRules {
      */
     fun todays(mixes: List<Mix>, today: String, personalIds: Set<String>, applicableIds: Set<String>): List<Mix> =
         mixes.filter { m -> m.date == today && (m.selectorId in personalIds || m.selectorId in applicableIds) }
+
+    /**
+     * Home's "Today's mix" without making one (beta testers #37): the mix of this hour's vibe ([currentId]) when
+     * it was made today, otherwise the vibe mix made last today ([vibeIds]), so the mix you have stays when the
+     * hour's vibe moves on. Null before the day's first: then it's made. A new one otherwise only with ↻.
+     */
+    fun todaysMix(mixes: List<Mix>, today: String, currentId: String?, vibeIds: Set<String>): Mix? {
+        val made = mixes.filter { it.date == today && it.selectorId in vibeIds }
+        return made.firstOrNull { it.selectorId == currentId } ?: made.maxByOrNull { it.createdAt }
+    }
 }
