@@ -190,6 +190,7 @@ fun BookScreen(nav: NavController, id: String) {
                             onClick = {
                                 graph.bookPlayer.play(b, if (started) current else 0.0)
                                 AppLog.i("Books", "${if (started) "Continue" else "Play"} \"${b.title}\" from its page")
+                                nav.navigate("bookplayer")
                             },
                             modifier = Modifier.testTag("bookPlay"),
                         ) {
@@ -234,6 +235,7 @@ fun BookScreen(nav: NavController, id: String) {
                         }) {
                             graph.bookPlayer.play(b, c.startSec)
                             AppLog.i("Books", "Play \"${b.title}\" from chapter ${c.index + 1}")
+                            nav.navigate("bookplayer")
                         }
                     }
                 }

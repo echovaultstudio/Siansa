@@ -129,10 +129,13 @@ class PlayerConnection(
     /** Why only downloaded songs can play right now, or null when anything can. */
     private fun limited(): String? = playLimit(isOffline(), onlyDownloads())
 
-    private fun notice(message: String) {
+    fun notice(message: String) {
         AppLog.i("Player", message)
         _notices.tryEmit(message)
     }
+
+    /** Pauses the music; a book starting does this, so the two never play at once (issue #521). */
+    fun pause() = withController { c -> if (c.isPlaying) c.pause() }
 
     /** Plays [songs] from [startIndex]; [startMs] starts that song part-way (a mix carried on, issue #269). */
     fun play(songs: List<Song>, startIndex: Int = 0, shuffle: Boolean = false, startMs: Long = 0L) {

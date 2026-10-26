@@ -158,6 +158,52 @@ class AudiobookshelfApi(private val http: OkHttpClient, private val settings: ()
         call("/api/me/progress/$bookId", body, method = "PATCH")
     }
 
+    /**
+     * Opens a playback session for [bookId]: Audiobookshelf's record of this listen, with the files to play (direct,
+     * as the phone plays every format Siansa's decoder knows) and where the listener was.
+     */
+    suspend fun startSession(bookId: String, episodeId: String? = null): PlaySession {
+        val body = buildJsonObject {
+            put("deviceInfo", buildJsonObject {
+                put("clientName", "Siansa")
+                put("deviceId", "siansa-android")
+                put("manufacturer", android.os.Build.MANUFACTURER)
+                put("model", android.os.Build.MODEL)
+                put("sdkVersion", android.os.Build.VERSION.SDK_INT)
+            })
+            put("mediaPlayer", "exoplayer")
+            put("forceDirectPlay", true)
+            put("supportedMimeTypes", kotlinx.serialization.json.buildJsonArray {
+                listOf("audio/flac", "audio/mpeg", "audio/mp4", "audio/ogg", "audio/aac", "audio/webm", "audio/x-m4b").forEach { add(JsonPrimitive(it)) }
+            })
+        }
+        val root = call("/api/items/$bookId/play" + (episodeId?.let { "/$it" } ?: ""), body).jsonObject
+        val id = root.str("id") ?: throw ApiException("Audiobookshelf opened no playback session")
+        val tracks = root.arr("audioTracks").mapIndexedNotNull { i, t ->
+            PlayTrack(i, t.dbl("startOffset") ?: 0.0, t.dbl("duration") ?: 0.0, t.str("contentUrl") ?: return@mapIndexedNotNull null, t.str("mimeType"))
+        }
+        if (tracks.isEmpty()) throw ApiException("This book has no audio files Audiobookshelf can send")
+        return PlaySession(id, root.dbl("startTime") ?: 0.0, root.dbl("duration") ?: 0.0, tracks)
+    }
+
+    /** Where the listener is in an open session, [listenedSec] since the last sync; [close] ends the session. */
+    suspend fun syncSession(sessionId: String, currentSec: Double, listenedSec: Double, durationSec: Double, close: Boolean) {
+        val body = buildJsonObject {
+            put("currentTime", currentSec)
+            put("timeListened", listenedSec)
+            put("duration", durationSec)
+        }
+        call("/api/session/$sessionId/${if (close) "close" else "sync"}", body)
+    }
+
+    /** A track's address with the login, for the player ([PlayTrack.contentUrl] is a server path). */
+    fun trackUrl(contentUrl: String): String {
+        val t = settings().audiobookshelfToken.ifBlank { session?.second.orEmpty() }
+        val url = (if (contentUrl.startsWith("http")) contentUrl else base() + contentUrl).toHttpUrl().newBuilder()
+        if (t.isNotBlank()) url.addQueryParameter("token", t)
+        return url.build().toString()
+    }
+
     /** The address of a book's cover, for the cover loader ([Book.COVER_PREFIX] ids). */
     fun coverUrl(bookId: String, size: Int?): String {
         val url = "${base()}/api/items/$bookId/cover".toHttpUrl().newBuilder()
@@ -224,3 +270,9 @@ class AudiobookshelfApi(private val http: OkHttpClient, private val settings: ()
 
 /** One of Audiobookshelf's libraries. */
 data class AbsLibrary(val id: String, val name: String, val podcasts: Boolean)
+
+/** An open playback session: the files to play one after another and where the listener was. */
+data class PlaySession(val id: String, val startSec: Double, val durationSec: Double, val tracks: List<PlayTrack>)
+
+/** One of a book's files: where it starts in the whole book and how long it is, in seconds. */
+data class PlayTrack(val index: Int, val startOffsetSec: Double, val durationSec: Double, val contentUrl: String, val mimeType: String?)

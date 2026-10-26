@@ -229,7 +229,10 @@ fun SiansaRoot() {
                             )
                         )
                     ) {
+                        // A book's mini player while a book is loaded and the music isn't (issue #521).
+                        val bookState by graph.bookPlayer.state.collectAsStateWithLifecycle()
                         if (player.hasMedia) MiniPlayer(player) { sheet.open() }
+                        else if (bookState.book != null) BookMiniPlayer(bookState) { nav.navigate("bookplayer") }
                         NavigationBar(containerColor = Color.Transparent, tonalElevation = 0.dp) {
                             tabs.forEach { tab ->
                                 NavigationBarItem(
@@ -343,6 +346,7 @@ fun SiansaRoot() {
                 composable("similar/albums/{id}") { SimilarAlbumsScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("book/{id}") { BookScreen(nav, it.arguments?.getString("id").orEmpty()) }
+                composable("bookplayer") { BookPlayerScreen(nav) }
                 composable("artist/{id}/appears-on") { AppearsOnScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("playlist/{id}") { PlaylistScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("mix/{id}") { MixScreen(nav, it.arguments?.getString("id").orEmpty()) }

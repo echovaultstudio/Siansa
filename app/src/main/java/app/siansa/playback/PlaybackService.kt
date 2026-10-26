@@ -524,11 +524,30 @@ class PlaybackService : MediaSessionService() {
         return indices
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
+    /** The book session (issue #521), made when the first book controller connects. */
+    private var books: BookSession? = null
+
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+        if (controllerInfo.connectionHints.getBoolean(BookSession.HINT_BOOKS, false)) {
+            val b = books ?: BookSession(this, graph, pauseMusic = { session?.player?.pause() }).also {
+                books = it
+                addSession(it.session)
+                // A book starting pauses the music (in BookSession); music starting pauses the book.
+                session?.player?.addListener(object : Player.Listener {
+                    override fun onIsPlayingChanged(isPlaying: Boolean) { if (isPlaying) it.player.pause() }
+                })
+            }
+            return b.session
+        }
+        return session
+    }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         val player = session?.player
-        if (player == null || !player.playWhenReady || player.mediaItemCount == 0) stopSelf()
+        val book = books?.player
+        val busy = (player != null && player.playWhenReady && player.mediaItemCount > 0) ||
+            (book != null && book.playWhenReady && book.mediaItemCount > 0)
+        if (!busy) stopSelf()
     }
 
     override fun onDestroy() {
@@ -547,6 +566,8 @@ class PlaybackService : MediaSessionService() {
         crossfader?.release()
         crossfader = null
         exo.release()
+        books?.release()
+        books = null
         session?.release()
         session = null
         scope.cancel()
