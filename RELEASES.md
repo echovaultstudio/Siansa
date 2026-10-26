@@ -3,6 +3,20 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.34.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.34.0beta) — 2026-10-26
+
+- [#498](https://github.com/echovaultstudio/Siansa/pull/498) Target Android 16 (API 36) for Google Play (@Th3K1ngP1n)
+- [#499](https://github.com/echovaultstudio/Siansa/pull/499) Time machine: scroll the chosen month into view (@Th3K1ngP1n)
+- [#500](https://github.com/echovaultstudio/Siansa/pull/500) On repeat: most played in the last 30 days, checked on the server when opened (@Th3K1ngP1n)
+- [#501](https://github.com/echovaultstudio/Siansa/pull/501) Your Library: Music chip with Albums, Artists, Songs; chips in last-used order; a sort per chip (@Th3K1ngP1n)
+- [#503](https://github.com/echovaultstudio/Siansa/pull/503) Say "your server", not "Navidrome", to people on Emby (beta #31) (@Th3K1ngP1n)
+- [#506](https://github.com/echovaultstudio/Siansa/pull/506) Find AudioMuse songs by title and artist everywhere (beta #32, #35) (@Th3K1ngP1n)
+- [#508](https://github.com/echovaultstudio/Siansa/pull/508) Find featured and compilation artists; others' albums under Appears on (beta #34) (@Th3K1ngP1n)
+- [#509](https://github.com/echovaultstudio/Siansa/pull/509) Read common tags from Navidrome and Emby: song details, album version and year (#504) (@Th3K1ngP1n)
+- [#511](https://github.com/echovaultstudio/Siansa/pull/511) Today's mix stays until you tap refresh (beta #37) (@Th3K1ngP1n)
+- [#513](https://github.com/echovaultstudio/Siansa/pull/513) Home carousel: pick its days or all week (#512) (@Th3K1ngP1n)
+- [#514](https://github.com/echovaultstudio/Siansa/pull/514) Merge all ready pull requests for one release (@Th3K1ngP1n)
+
 ## [0.33.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.33.1beta) — 2026-10-26
 
 - [#487](https://github.com/echovaultstudio/Siansa/pull/487) Daily mixes stay as made when the source filter changes; AI mixes need AudioMuse (@Th3K1ngP1n)
