@@ -466,8 +466,9 @@ class MixGenerator(private val graph: AppGraph) {
                 .onFailure { AppLog.w("Mood", "AI couldn't interpret the mood, searching the words directly: ${it.message}") }
         }
         AppLog.i("Mood", "\"$text\" → \"${plan.title}\" · search \"${plan.query}\" · ai=${plan.ai}")
-        val hits = graph.audioMuse.textSearch(plan.query, size * 3, plan.steering)
-        if (hits.isEmpty()) throw MixException("AudioMuse found nothing for that mood")
+        val found = searchHere(plan.query, size, plan.steering)
+        if (found.hits.isEmpty()) throw MixException("AudioMuse found nothing for that mood")
+        val hits = hitsToPick(found)
         val ranked = hits
             .map { it to it.similarity * (0.85 + Random.nextDouble() * 0.15) }
             .sortedByDescending { it.second }
@@ -477,7 +478,7 @@ class MixGenerator(private val graph: AppGraph) {
             val n = perArtist[hit.artist.lowercase()] ?: 0
             if (n >= 3) false else { perArtist[hit.artist.lowercase()] = n + 1; true }
         }.take(size)
-        val songs = spreadArtists(resolveHits(picked)).ifEmpty { throw MixException(NOT_ON_THIS_SERVER) }
+        val songs = spreadArtists(songsFor(picked, found)).ifEmpty { throw MixException(NOT_ON_THIS_SERVER) }
         return MoodResult(plan.title, plan.description, plan.query, songs, plan.ai)
     }
 
@@ -520,8 +521,9 @@ class MixGenerator(private val graph: AppGraph) {
         val dials = tuning.steering()
         // The dials start at the AI's concepts, so once any is shown they say everything; before that, the AI's.
         val steering = if (tuning.sounds.isNotEmpty()) dials else aiSteering
-        val hits = graph.audioMuse.textSearch(query, size * 3, steering)
-        if (hits.isEmpty()) throw MixException("AudioMuse found nothing for that vibe")
+        val found = searchHere(query, size, steering)
+        if (found.hits.isEmpty()) throw MixException("AudioMuse found nothing for that vibe")
+        val hits = hitsToPick(found)
         val features = if (tuning.energy != 0 || tuning.tempo != 0) {
             runCatching { graph.audioMuse.features(hits.map { it.id }).associateBy { it.id } }
                 .onFailure { AppLog.w("Vibe", "Couldn't load energy and tempo, leaving them out: ${it.message}") }
@@ -541,8 +543,43 @@ class MixGenerator(private val graph: AppGraph) {
             "Search \"$query\" · ${tuning.summary().ifEmpty { "no sliders moved" }} · ${hits.size} found, " +
                 "${features.size} with energy/tempo, ${picked.size} picked",
         )
-        return spreadArtists(resolveHits(picked)).ifEmpty { throw MixException(NOT_ON_THIS_SERVER) }
+        return spreadArtists(songsFor(picked, found)).ifEmpty { throw MixException(NOT_ON_THIS_SERVER) }
     }
+
+    /**
+     * AudioMuse's sound search for a vibe or mood, with which of its songs are here (beta testers #41). When its
+     * songs are another server's (AudioMuse reads Navidrome, the app is on Emby) and only some of that music is
+     * on this one, picking first and looking them up after left 1 or 2 of 50. So when fewer than [size] are in
+     * the library, AudioMuse is asked for many more ([WIDE_SEARCH]) and the vibe is picked from those that are.
+     */
+    private suspend fun searchHere(query: String, size: Int, steering: List<Steer>): HereSearch {
+        val hits = graph.audioMuse.textSearch(query, size * 3, steering)
+        if (hits.isEmpty()) return HereSearch(hits, emptyMap(), foreign = false)
+        val first = inLibrary(hits)
+        if (!first.foreign || first.here.size >= size || !graph.library.isSynced) return first
+        val more = runCatching { graph.audioMuse.textSearch(query, WIDE_SEARCH, steering) }
+            .onFailure { AppLog.w("Mix", "Couldn't ask AudioMuse for more songs: ${it.message}") }
+            .getOrDefault(emptyList())
+        if (more.size <= hits.size) return first
+        val wide = inLibrary(more)
+        AppLog.i("Mix", "AudioMuse's songs are another server's: ${first.here.size} of ${hits.size} here, so asked for ${more.size}: ${wide.here.size} here")
+        return if (wide.here.size > first.here.size) wide else first
+    }
+
+    /** Which of [hits] are songs in the synced library, by id or by title and artist, without asking the server. */
+    private suspend fun inLibrary(hits: List<ClapHit>): HereSearch {
+        val byId = graph.library.songs(hits.map { it.id }).associateBy { it.id }
+        val missing = hits.filter { it.id !in byId }
+        val byName = if (missing.isEmpty()) emptyMap() else matchByName(missing, songIndex())
+        val named = graph.library.songs(byName.values.toList()).associateBy { it.id }
+        val here = hits.mapNotNull { h -> (byId[h.id] ?: byName[h.id]?.let { named[it] })?.let { h.id to it } }.toMap()
+        return HereSearch(hits, here, foreign = byId.isEmpty())
+    }
+
+    /** The songs for [picked]: those already found here, or looked up as before ([resolveHits]). */
+    private suspend fun songsFor(picked: List<ClapHit>, found: HereSearch): List<Song> =
+        if (found.foreign && found.here.isNotEmpty()) picked.mapNotNull { found.here[it.id] }.distinctBy { it.id }
+        else resolveHits(picked)
 
     private suspend fun aiMoodPlan(mood: String): Plan {
         val now = LocalDateTime.now()
@@ -693,6 +730,8 @@ class MixGenerator(private val graph: AppGraph) {
         const val DAY_MS = 24L * 60 * 60 * 1000
         /** AudioMuse's songs looked up on the server by name at most, for one mix or vibe (beta testers #40). */
         const val SERVER_SEARCH_MAX = 60
+        /** AudioMuse's songs asked for when its songs are another server's and few are here (beta testers #41). */
+        const val WIDE_SEARCH = 800
         /** Albums played lately whose songs On repeat looks at (issue #495). */
         const val RECENT_ALBUMS = 40
         /** Songs of the music shown looked at for a mix from the library. */
@@ -753,6 +792,19 @@ fun parseSteering(element: kotlinx.serialization.json.JsonElement?, concepts: Li
  * empty list (beta testers #40). The AudioMuse test in Settings says which case it is.
  */
 const val NOT_ON_THIS_SERVER = "None of the songs AudioMuse found are on this server. Test AudioMuse in Settings › Connections to see why."
+
+/**
+ * A sound search's [hits], and which of them are songs here ([here], by AudioMuse's id); [foreign] when none of
+ * its ids is this server's, so AudioMuse reads another server (beta testers #41).
+ */
+internal data class HereSearch(val hits: List<ClapHit>, val here: Map<String, Song>, val foreign: Boolean)
+
+/**
+ * The songs a vibe is picked from (beta testers #41): with another server's songs, only those that are here, so
+ * none of the 50 picks is lost; otherwise all, as before (songs outside the synced libraries are fetched then).
+ */
+internal fun hitsToPick(found: HereSearch): List<ClapHit> =
+    if (found.foreign && found.here.isNotEmpty()) found.hits.filter { it.id in found.here } else found.hits
 
 /** The song in a server search's [results] with [hit]'s title and artist (beta testers #40), or null. */
 internal fun serverMatch(hit: ClapHit, results: List<Song>): Song? {
