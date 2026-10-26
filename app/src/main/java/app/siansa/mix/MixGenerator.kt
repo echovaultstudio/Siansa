@@ -65,6 +65,19 @@ class MixGenerator(private val graph: AppGraph) {
         return fittingSelector(graph.selectors.all(), now.hour, now.dayOfWeek.value)
     }
 
+    /**
+     * Home's "Today's mix" (beta testers #37): the one already made today, kept when the hour's vibe moves on
+     * ([MixRules.todaysMix]); only the day's first is made here. ↻ makes a new one with [ensureCurrent] (force).
+     */
+    suspend fun ensureToday(): Mix? {
+        val today = LocalDate.now().toString()
+        val vibes = graph.selectors.all()
+        val current = currentSelector()
+        MixRules.todaysMix(graph.mixes.all(), today, current?.id, vibes.map { it.id }.toSet())?.let { return it }
+        AppLog.i("Mix", "No mix yet today: making the first, for ${current?.name ?: "no vibe"}")
+        return current?.let { ensure(it, force = false) }
+    }
+
     /** Today's mix for the selector covering this hour, built if it doesn't exist yet. */
     suspend fun ensureCurrent(force: Boolean = false): Mix? {
         val selector = currentSelector() ?: return null
