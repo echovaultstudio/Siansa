@@ -191,7 +191,8 @@ class ContinuousPlay(private val graph: AppGraph) {
                 ContinuousMode.DJ -> djIds(last, hits) ?: hits.take(TOP_UP).map { it.id }
                 else -> hits.take(TOP_UP).map { it.id }
             }
-            var songs = graph.generator.resolveSongs(ids)
+            val byId = hits.associateBy { it.id }
+            var songs = graph.generator.resolveHits(ids.mapNotNull { byId[it] })
             // Offline, or with "Only downloaded music" on, only songs on the phone can play.
             if (graph.connection.current.offline || graph.settings.current.downloadedOnly) {
                 songs = songs.filter { graph.downloads.isDownloaded(it.id) }

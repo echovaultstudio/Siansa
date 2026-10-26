@@ -22,9 +22,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.jsonObject
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -372,7 +370,7 @@ class MixGenerator(private val graph: AppGraph) {
         val hits = graph.audioMuse.sonicFingerprint(150, s.fingerprintUser, s.fingerprintPassword)
             .filter { it.id !in skipped && it.id !in recent }
         val picked = capPerArtist(hits.map { it to it.similarity * (0.85 + Random.nextDouble() * 0.15) }, 3, 40)
-        return spreadArtists(resolve(picked.map { it.id })) to "The sound of what you play most, found by AudioMuse"
+        return spreadArtists(resolveHits(picked)) to "The sound of what you play most, found by AudioMuse"
     }
 
     /** Your most-played songs lately, from Siansa, Koito / ListenBrainz and Last.fm. */
@@ -408,7 +406,7 @@ class MixGenerator(private val graph: AppGraph) {
             if ((pool[hit.id]?.second ?: -1.0) < score) pool[hit.id] = hit to score
         }
         val picked = capPerArtist(pool.values.toList(), 2, 40)
-        return spreadArtists(resolve(picked.map { it.id })) to "New to you, close to the sound of your favourites"
+        return spreadArtists(resolveHits(picked)) to "New to you, close to the sound of your favourites"
     }
 
     private fun capPerArtist(scored: List<Pair<ClapHit, Double>>, perArtist: Int, size: Int): List<ClapHit> {
@@ -445,7 +443,7 @@ class MixGenerator(private val graph: AppGraph) {
             val n = perArtist[hit.artist.lowercase()] ?: 0
             if (n >= 3) false else { perArtist[hit.artist.lowercase()] = n + 1; true }
         }.take(size)
-        val songs = spreadArtists(resolve(picked.map { it.id }))
+        val songs = spreadArtists(resolveHits(picked))
         return MoodResult(plan.title, plan.description, plan.query, songs, plan.ai)
     }
 
@@ -509,7 +507,7 @@ class MixGenerator(private val graph: AppGraph) {
             "Search \"$query\" · ${tuning.summary().ifEmpty { "no sliders moved" }} · ${hits.size} found, " +
                 "${features.size} with energy/tempo, ${picked.size} picked",
         )
-        return spreadArtists(resolve(picked.map { it.id }))
+        return spreadArtists(resolveHits(picked))
     }
 
     private suspend fun aiMoodPlan(mood: String): Plan {
@@ -541,6 +539,14 @@ class MixGenerator(private val graph: AppGraph) {
         val description = obj.str("description")?.trim()?.take(200).orEmpty()
         if (title.isEmpty() || query.length < 3) throw MixException("The AI's answer was incomplete")
         return Plan(title, query, description.ifBlank { "Made from your mood" }, ai = true, steering = steeringOf(obj, concepts))
+    }
+
+    /** How many of AudioMuse's [hits] are in the synced library, by id or by title and artist (beta testers #32). */
+    suspend fun libraryMatch(hits: List<ClapHit>): LibraryMatch {
+        val index = songIndex()
+        val byId = graph.library.songs(hits.map { it.id }).map { it.id }.toSet()
+        val byName = matchByName(hits.filter { it.id !in byId }, index)
+        return LibraryMatch(hits.size, hits.count { it.id in byId }, byName.size, index.size)
     }
 
     /** Songs for AudioMuse ids, from the synced library where possible. */
@@ -580,23 +586,26 @@ class MixGenerator(private val graph: AppGraph) {
      * Songs from the synced library where possible, otherwise fetched from Navidrome. AudioMuse knows every
      * library on the server, so when only some libraries are synced, songs outside them are left out.
      */
-    private suspend fun resolve(ids: List<String>): List<Song> = coroutineScope {
+    private suspend fun resolve(ids: List<String>): List<Song> {
         val local = graph.library.songs(ids).associateBy { it.id }
         val fetchMissing = mayFetchUnsynced(graph.library.meta(LibraryRepository.META_FOLDERS))
         if (!fetchMissing) {
             val skipped = ids.distinct().count { it !in local }
             if (skipped > 0) AppLog.i("Mix", "Left out $skipped songs that aren't in the libraries you sync")
         }
-        val permits = Semaphore(6)
-        ids.map { id ->
-            async {
-                local[id] ?: if (fetchMissing) {
-                    permits.withPermit { runCatching { graph.source.song(id) }.getOrNull() }
-                } else {
-                    null
-                }
+        val missing = ids.filter { it !in local }
+        val fetched = if (fetchMissing && missing.isNotEmpty()) {
+            val result = fetchUnlessForeign(missing) { id -> runCatching { graph.source.song(id) }.getOrNull() }
+            if (result.foreign) {
+                AppLog.w(
+                    "Mix",
+                    "The server knows none of AudioMuse's songs (${missing.size} asked about): AudioMuse may have " +
+                        "analysed another server; not asking for the rest",
+                )
             }
-        }.awaitAll().filterNotNull().distinctBy { it.id }
+            result.songs.associateBy { it.id }
+        } else emptyMap()
+        return ids.mapNotNull { local[it] ?: fetched[it] }.distinctBy { it.id }
     }
 
     /** Keeps the same artist from playing twice in a row where possible. */
