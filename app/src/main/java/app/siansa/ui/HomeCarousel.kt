@@ -43,7 +43,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.data.Carousel
 import app.siansa.data.Mix
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.TextButton
 import app.siansa.log.AppLog
+import app.siansa.mix.MixRules
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -60,8 +65,9 @@ private object CarouselBuilding {
 
 /**
  * Home's carousel (issue #253): the 3 or 4 mixes set in Vibes for this part of the day ("Your morning":
- * Wake up, Caffeine kick, Mellow morning…), one big card each to swipe through. They're made one after
- * another the first time Home shows them each day, each leaving out the songs of the ones before.
+ * Wake up, Caffeine kick, Mellow morning…), one big card each to swipe through. The day's first carousel is made
+ * one mix after another when Home first shows it, each leaving out the songs of the ones before; a later part of
+ * the day's waits for a tap on a card, so mixes don't change unasked (beta testers #37).
  */
 @Composable
 fun HomeCarousel(nav: NavController, aiDown: String?) {
@@ -86,8 +92,11 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
         if (pinned.isNotEmpty()) PinnedVibesCarousel(nav, pinned)
         return
     }
-    val carousel: Carousel = found
     val today = LocalDate.now().toString()
+    // When a later part of the day begins, the mixes you have stay until you ask for the new ones (beta testers #37).
+    var asked by rememberSaveable(found.id, found.version, today) { mutableStateOf(false) }
+    val earlier = if (asked) null else CarouselChoice.earlier(found, carousels.orEmpty(), mixes.orEmpty(), today)
+    val carousel: Carousel = earlier ?: found
     // Today's mixes as they were made: showing other music in the source filter doesn't make them again (issue #486).
     val made: List<Mix?> = carousel.usable.indices.map { i ->
         val id = "$today-${carousel.selectorFor(i).id}"
@@ -117,9 +126,17 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
         }
     }
 
+    // Made by itself only for the day's first carousel (or after changing it in Vibes); a later part of the day's
+    // cards wait for a tap (beta testers #37).
+    val byItself = asked || MixRules.makesCarouselByItself(mixes.orEmpty(), today, carousel.id)
+
     // The day's mixes, one after another (each leaves out the songs of the ones made before it).
-    LaunchedEffect(carousel.id, carousel.version, today, aiDown) {
+    LaunchedEffect(carousel.id, carousel.version, today, aiDown, asked) {
         if (aiDown != null) return@LaunchedEffect
+        if (!asked && !MixRules.makesCarouselByItself(graph.mixes.all(), today, carousel.id)) {
+            AppLog.i("Home", "Carousel \"${carousel.title}\": made when you tap a card (today's mixes stay as they are)")
+            return@LaunchedEffect
+        }
         val missing = carousel.usable.indices.filter { i -> graph.mixes.get("$today-${carousel.selectorFor(i).id}") == null }
         if (missing.isEmpty() || CarouselBuilding.ids.value.isNotEmpty()) return@LaunchedEffect
         graph.scope.launch {
@@ -144,6 +161,13 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
     // Room under the dots before the next panel (issue #312): with that panel's own margin, a section's gap.
     Column(Modifier.fillMaxWidth().padding(bottom = Space.Page).testTag("homeCarousel")) {
         SectionTitle(carousel.title)
+        if (earlier != null) {
+            // The new part of the day's mixes, only when you ask (beta testers #37).
+            MakeCarouselButton(found.title) {
+                AppLog.i("Home", "Making \"${found.title}\" mixes, asked for")
+                asked = true
+            }
+        }
         HorizontalPager(
             state = pager,
             contentPadding = PaddingValues(horizontal = Space.Page),
@@ -162,6 +186,7 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
                     mix != null -> "${mix.songs.size} tracks · ${mix.description}"
                     selector.id in building -> "Making it…"
                     aiDown != null -> "AI backend not available :("
+                    !byItself -> "Tap to make it · ${carousel.usable[page].sound}"
                     else -> carousel.usable[page].sound
                 },
                 colors = tileColors(selector.id.substringBeforeLast("-v") + page),
@@ -173,6 +198,36 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
             )
         }
         CarouselDots(count = mixCount + pinned.size, current = pager.currentPage)
+    }
+}
+
+/**
+ * "Make Your day mixes" under the earlier carousel's title (beta testers #37): its words start at the page's edge,
+ * in line with the title.
+ */
+@Composable
+internal fun MakeCarouselButton(title: String, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = Space.Small, vertical = Space.Small),
+        modifier = Modifier.padding(horizontal = Space.Small).testTag("makeCarousel"),
+    ) { Text("Make $title mixes", modifier = Modifier.testTag("makeCarouselText")) }
+}
+
+/** Which carousel Home shows (beta testers #37). */
+internal object CarouselChoice {
+    /**
+     * Today's earlier carousel to keep showing instead of [forHour]: when none of [forHour]'s mixes is made yet and
+     * Home wouldn't make them by itself, the carousel whose mixes were made last today. Null to show [forHour].
+     */
+    fun earlier(forHour: Carousel, all: List<Carousel>, mixes: List<Mix>, today: String): Carousel? {
+        fun madeAt(c: Carousel): Long? = c.usable.indices
+            .mapNotNull { i -> mixes.firstOrNull { it.id == "$today-${c.selectorFor(i).id}" }?.createdAt }
+            .maxOrNull()
+        if (madeAt(forHour) != null || MixRules.makesCarouselByItself(mixes, today, forHour.id)) return null
+        return all.filter { it.id != forHour.id && it.usable.size >= Carousel.MIN }
+            .mapNotNull { c -> madeAt(c)?.let { c to it } }
+            .maxByOrNull { it.second }?.first
     }
 }
 

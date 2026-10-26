@@ -735,6 +735,21 @@ class SpacingTest {
         assertEven("Room above and below the cog", cog.top - withCog.top, withCog.bottom - cog.bottom, 1.dp)
     }
 
+    /** Home (beta testers #37): "Make Your day mixes" lines up with the carousel's title at the page's edge. */
+    @Test fun makeCarouselButtonLinesUpWithTheTitle() {
+        compose.setContent {
+            SiansaTheme {
+                androidx.compose.foundation.layout.Column(Modifier.width(360.dp)) {
+                    app.siansa.ui.SectionTitle("Your morning")
+                    app.siansa.ui.MakeCarouselButton("Your day") { }
+                }
+            }
+        }
+        val title = compose.onNodeWithText("Your morning").getBoundsInRoot()
+        val words = compose.onNodeWithTag("makeCarouselText", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Title and button at the page's edge", title.left, words.left, 1.dp)
+    }
+
     /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */
     @Test fun fastScrollHandleIsCentredAndReachesTheEnds() {
         var at by mutableFloatStateOf(0f)
