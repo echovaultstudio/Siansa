@@ -239,6 +239,7 @@ class AppGraph(val app: Application) {
     /** Audiobooks and podcasts (issue #521): one login for the whole app, like AudioMuse. */
     val audiobookshelf = AudiobookshelfApi(http) { settings.current }
     val books = BookRepository(audiobookshelf) { settings.current }
+    val bookSpeeds = app.siansa.data.BookSpeeds(app)
     /** Plays books and podcasts, apart from the music player (issue #521). */
     val bookPlayer by lazy { app.siansa.playback.BookPlayer(this) }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
