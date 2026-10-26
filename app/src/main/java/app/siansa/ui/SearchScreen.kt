@@ -76,6 +76,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import app.siansa.data.Book
 import app.siansa.data.SearchResults
 import app.siansa.data.Song
 import kotlinx.coroutines.CancellationException
@@ -94,6 +95,8 @@ fun SearchScreen(nav: NavController) {
     var soundBusy by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // Books and podcasts from Audiobookshelf, with the music (issue #531); null without a server.
+    var books by remember { mutableStateOf<List<Book>?>(null) }
     // Recent searches show under the box while you're typing into it, before there's anything to search.
     var focused by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
@@ -111,6 +114,7 @@ fun SearchScreen(nav: NavController) {
         if (!pending) return@LaunchedEffect
         query = ""
         results = null
+        books = null
         soundSongs = null
         error = null
         runCatching { focus.requestFocus() }
@@ -127,6 +131,7 @@ fun SearchScreen(nav: NavController) {
         val q = query.trim()
         if (q.length < 2) {
             results = null
+            books = null
             return@LaunchedEffect
         }
         delay(NAME_SEARCH_DELAY_MS)
@@ -134,6 +139,8 @@ fun SearchScreen(nav: NavController) {
         error = null
         try {
             results = if (graph.library.isSynced) graph.library.search(q) else graph.source.search(q)
+            // Books too, after the music so a slow Audiobookshelf never holds the names back.
+            books = if (graph.books.ready) runCatching { graph.books.search(q) }.onFailure { AppLog.w("Search", "Books for \"$q\": ${it.message}") }.getOrDefault(emptyList()) else null
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -228,6 +235,7 @@ fun SearchScreen(nav: NavController) {
                 query.trim().length < 2 -> BrowseGrid(nav)
                 else -> SearchResultsList(
                     results,
+                    books,
                     soundSongs,
                     soundBusy,
                     nav,
@@ -264,6 +272,7 @@ internal fun oneSearchList(history: List<app.siansa.data.RecentSearch>): List<ap
 @Composable
 private fun SearchResultsList(
     results: SearchResults?,
+    books: List<Book>?,
     soundSongs: List<Song>?,
     soundBusy: Boolean,
     nav: NavController,
@@ -276,6 +285,7 @@ private fun SearchResultsList(
     // One search box for names and for vibes (issue #339): the same words can make a vibe.
     val vibe = canSound && query.length >= 3
     val byName = results != null && (results.artists.isNotEmpty() || results.albums.isNotEmpty() || results.songs.isNotEmpty())
+        || !books.isNullOrEmpty()
     val bySound = !soundSongs.isNullOrEmpty()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
         if (vibe) item(key = "make-vibe") { MakeVibeRow(query, nav, onOpen) }
@@ -323,6 +333,21 @@ private fun SearchResultsList(
             item { SearchSectionTitle("Songs") { more(SearchMore.SONGS) } }
             itemsIndexed(results.songs.take(SEARCH_PREVIEW), key = { i, s -> "name-$i-${s.id}" }) { index, song ->
                 SongRow(song = song, onClick = { onOpen(); graph.player.play(results.songs, index) })
+            }
+        }
+        // Books and podcasts from Audiobookshelf, a row each, like albums (issue #531); a tile opens the book's page.
+        for ((podcast, title) in listOf(false to "Books", true to "Podcasts")) {
+            val hits = books.orEmpty().filter { it.podcast == podcast }
+            if (hits.isEmpty()) continue
+            item(key = "$title-title") { SectionTitle(title) }
+            item(key = "$title-row") {
+                LazyRow(contentPadding = PaddingValues(horizontal = Space.Small)) {
+                    items(hits.take(SEARCH_PREVIEW), key = { it.id }) { book ->
+                        Box(Modifier.width(150.dp).testTag("searchBook-${book.id}")) {
+                            AlbumTile(book.title, book.authors.joinToString(), book.cover, onClick = { onOpen(); nav.navigate("book/${book.id}") })
+                        }
+                    }
+                }
             }
         }
         if (canSound && (bySound || soundBusy)) {

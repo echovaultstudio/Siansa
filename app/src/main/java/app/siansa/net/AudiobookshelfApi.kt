@@ -129,6 +129,10 @@ class AudiobookshelfApi(private val http: OkHttpClient, private val settings: ()
         return root.arr("results").mapNotNull { parseBook(it) }
     }
 
+    /** Books or podcasts in one library whose title, author or narrator has [query] (issue #531). */
+    suspend fun search(libraryId: String, query: String, limit: Int = 10): List<Book> =
+        parseSearch(call("/api/libraries/$libraryId/search?q=${java.net.URLEncoder.encode(query, "UTF-8")}&limit=$limit").jsonObject)
+
     /** One book with everything, chapters included. */
     suspend fun book(id: String): Book = parseBook(call("/api/items/$id?expanded=1").jsonObject)
         ?: throw ApiException("Book not found on Audiobookshelf")
@@ -267,6 +271,10 @@ class AudiobookshelfApi(private val http: OkHttpClient, private val settings: ()
         private val JSON_EMPTY = JsonObject(emptyMap())
 
         /** A library item as a [Book]; null when it isn't a book or podcast. */
+        /** A library search reply: its "book" and "podcast" lists, each entry's libraryItem, in that order. */
+        fun parseSearch(root: JsonObject): List<Book> =
+            (root.arr("book") + root.arr("podcast")).mapNotNull { hit -> hit.obj("libraryItem")?.let { parseBook(it) } }
+
         fun parseBook(o: JsonObject): Book? {
             val id = o.str("id") ?: return null
             val mediaType = o.str("mediaType") ?: return null
