@@ -342,6 +342,7 @@ fun SiansaRoot() {
                 composable("similar/songs/{id}") { SimilarSongsScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("similar/albums/{id}") { SimilarAlbumsScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }
+                composable("book/{id}") { BookScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("artist/{id}/appears-on") { AppearsOnScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("playlist/{id}") { PlaylistScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("mix/{id}") { MixScreen(nav, it.arguments?.getString("id").orEmpty()) }
