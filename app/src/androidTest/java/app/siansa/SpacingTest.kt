@@ -773,32 +773,34 @@ class SpacingTest {
     }
 
     /**
-     * Your Library (owner's comment on #497): on a small phone the main chips shrink so all five fit, with the
-     * same gap between each and the page's edge at both ends.
+     * Your Library (#521): chips stay at full size; on a narrow phone the › button sits in its own clear space at the
+     * row's end, no chip under it, and the fade's clear part is as wide as the button plus its edge.
      */
-    @Test fun mainChipsFitASmallPhone() {
-        val labels = listOf("Playlists", "Music", "Mixes", "Favourites", "Your listening")
+    @Test fun moreButtonSitsInClearSpaceAfterTheChips() {
+        lateinit var scroll: androidx.compose.foundation.ScrollState
         compose.setContent {
             SiansaTheme {
-                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.width(360.dp).testTag("fitRow")) {
-                    val fit = app.siansa.ui.chipFit(labels, maxWidth)
+                scroll = androidx.compose.foundation.rememberScrollState()
+                Box(Modifier.width(360.dp).testTag("fitRow")) {
                     Row(
-                        Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
-                        horizontalArrangement = Arrangement.spacedBy(fit.gap),
-                    ) { labels.forEach { app.siansa.ui.LibraryPill(it, active = false, fit = fit) { } } }
+                        Modifier.horizontalScroll(scroll).padding(horizontal = Space.Page, vertical = Space.Small),
+                        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+                    ) { listOf("Playlists", "Music", "Mixes", "Favourites", "Your listening").forEach { app.siansa.ui.LibraryPill(it, active = false) { } } }
+                    MoreChipsHint(scroll)
                 }
             }
         }
-        val row = compose.onNodeWithTag("fitRow").getBoundsInRoot()
         val pills = compose.onAllNodesWithTag("libraryPill", useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
-        assertEquals(labels.size, pills.size)
         val density = compose.density.density
         fun dp(px: Float) = (px / density).dp
-        val last = pills.maxBy { it.right }
-        assertTrue("All chips inside the row: ${dp(last.right)} of ${row.right}", row.right - dp(last.right) >= Space.Page - 1.dp)
-        assertEven("Row top and bottom", dp(pills.first().top) - row.top, row.bottom - dp(pills.first().bottom), 1.dp)
-        val sorted = pills.sortedBy { it.left }
-        assertEven("Gaps between chips", dp(sorted[1].left - sorted[0].right), dp(sorted[4].left - sorted[3].right), 1.dp)
+        // Full size: the text keeps its 14 sp height, so the chips are as tall as a lone full-size chip.
+        val tall = pills.map { dp(it.height) }.distinct()
+        assertTrue("One chip height: $tall", tall.size == 1)
+        val more = compose.onNodeWithTag("chipsMore").getBoundsInRoot()
+        val fade = compose.onNodeWithTag("chipsMoreFade", useUnmergedTree = true).getBoundsInRoot()
+        assertTrue("Button inside the fade's clear half", more.left >= fade.left + (fade.right - fade.left) * 0.45f)
+        val row = compose.onNodeWithTag("fitRow").getBoundsInRoot()
+        assertEven("Button centred in the row", more.top - row.top, row.bottom - more.bottom, 1.dp)
     }
 
     /** Days (issue #512): "All week" sits in the row of days with the same gap as between the days. */
