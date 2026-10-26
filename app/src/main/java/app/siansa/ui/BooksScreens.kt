@@ -20,6 +20,12 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.rounded.DownloadDone
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
@@ -209,6 +215,31 @@ fun BookScreen(nav: NavController, id: String) {
                     }
                 }
                 item {
+                    // The whole book on the phone, or not (issue #521).
+                    val downloads by graph.bookDownloads.state.collectAsStateWithLifecycle()
+                    val scope = rememberCoroutineScope()
+                    val launch = rememberPlayLauncher()
+                    Row(Modifier.padding(horizontal = Space.Page, vertical = Space.Small), horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalAlignment = Alignment.CenterVertically) {
+                        when {
+                            downloads.fetching == b.id -> {
+                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                Text("Downloading, file ${downloads.fetched} of ${downloads.of}…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            b.id in downloads.done -> OutlinedButton(onClick = { graph.bookDownloads.remove(b.id) }, modifier = Modifier.testTag("bookRemoveDownload")) {
+                                Icon(Icons.Rounded.DownloadDone, null); Spacer(Modifier.width(Space.Tight)); Text("On this phone · remove")
+                            }
+                            else -> OutlinedButton(
+                                onClick = {
+                                    scope.launch {
+                                        try { graph.bookDownloads.download(b) } catch (e: Exception) { launch.notify(e.message ?: "Couldn't download the book") }
+                                    }
+                                },
+                                modifier = Modifier.testTag("bookDownload"),
+                            ) { Icon(Icons.Rounded.Download, null); Spacer(Modifier.width(Space.Tight)); Text("Download") }
+                        }
+                    }
+                }
+                item {
                     Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium)) {
                         val fraction = if (b.durationSec > 0) (current / b.durationSec).toFloat().coerceIn(0f, 1f) else 0f
                         LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth(), color = Accent)
@@ -223,6 +254,49 @@ fun BookScreen(nav: NavController, id: String) {
                 }
                 b.description?.takeIf { it.isNotBlank() }?.let { text ->
                     item { Text(stripHtml(text), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = Space.Page), maxLines = 8, overflow = TextOverflow.Ellipsis) }
+                }
+                if (b.podcast) {
+                    // A podcast's episodes, newest first (issue #521); tap one to play it.
+                    val episodes by loadState("episodes-${b.id}") { graph.audiobookshelf.episodes(b.id) }
+                    val list = episodes.valueOrNull().orEmpty()
+                    if (list.isNotEmpty()) {
+                        item { SectionTitle("${list.size} episodes") }
+                        items(list.size, key = { "ep-${list[it].id}" }) { i ->
+                            val e = list[i]
+                            Row(
+                                Modifier.fillMaxWidth().clickable {
+                                    graph.bookPlayer.playEpisode(b, e)
+                                    AppLog.i("Books", "Play episode \"${e.title}\" of \"${b.title}\"")
+                                    nav.navigate("bookplayer")
+                                }.padding(horizontal = Space.Page, vertical = Space.Small).testTag("episode-${e.id}"),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(Space.Medium),
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(e.title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    Text(episodeLine(e), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Text(formatDuration(e.durationSec.toLong()), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+                val bookmarks by loadState("bookmarks-${b.id}") { runCatching { graph.audiobookshelf.bookmarks(b.id) }.getOrDefault(emptyList()) }
+                val marks = bookmarks.valueOrNull().orEmpty()
+                if (marks.isNotEmpty()) {
+                    item { SectionTitle("Bookmarks") }
+                    items(marks.size, key = { "bm-${marks[it].timeSec}" }) { i ->
+                        val m = marks[i]
+                        Row(
+                            Modifier.fillMaxWidth().clickable { graph.bookPlayer.play(b, m.timeSec); nav.navigate("bookplayer") }.padding(horizontal = Space.Page, vertical = Space.Small).testTag("bookmark-$i"),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Space.Medium),
+                        ) {
+                            Icon(Icons.Rounded.Bookmark, null, tint = Accent, modifier = Modifier.size(20.dp))
+                            Text(m.title.ifBlank { "Bookmark" }, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(bookLength(m.timeSec), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
                 if (b.chapters.isNotEmpty()) {
                     item { SectionTitle("${b.chapters.size} chapters") }
@@ -263,6 +337,12 @@ private fun ChapterRow(c: Chapter, state: ChapterState, onClick: () -> Unit) {
         Text(formatDuration(c.durationSec.toLong()), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
+
+/** "S2 E14 · 12 Oct 2026", as much as the episode has. */
+internal fun episodeLine(e: app.siansa.net.Episode): String = listOfNotNull(
+    listOfNotNull(e.season?.let { "S$it" }, e.number?.let { "E$it" }).joinToString(" ").takeIf { it.isNotBlank() },
+    e.publishedAt.takeIf { it > 0 }?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate().format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy")) },
+).joinToString(" · ")
 
 /** Audiobookshelf descriptions can carry HTML; the words only. */
 internal fun stripHtml(text: String): String =
