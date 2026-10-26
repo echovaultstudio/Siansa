@@ -1,7 +1,8 @@
 package app.siansa.data
 
-// How artist names are joined in tags: "A feat. B", "A & B", "A, B", "A x B", "A vs. B"…
-private val JOINS = Regex("""\s*(?:,|;|/|\s&\s|\sx\s|\sand\s|\bfeat\.?|\bft\.?|\bfeaturing\b|\bvs\.?|\bwith\b)\s*""", RegexOption.IGNORE_CASE)
+// How artist names are joined in tags: "A feat. B", "A & B", "A, B", "A x B", "A vs. B"… and Navidrome's own
+// joiner, "A • B" (its Scanner.ArtistJoiner, issue #504).
+private val JOINS = Regex("""\s*(?:,|;|/|•|\s&\s|\sx\s|\sand\s|\bfeat\.?|\bft\.?|\bfeaturing\b|\bvs\.?|\bwith\b)\s*""", RegexOption.IGNORE_CASE)
 
 /**
  * The artists in a tagged name, split where names are joined, but keeping names that are one artist in
