@@ -53,6 +53,8 @@ android {
     testOptions {
         // Unit tests run on a plain JVM: Android calls they touch return defaults instead of failing.
         unitTests.isReturnDefaultValues = true
+        // The unit tests in a few JVMs at once: each test class keeps to itself (temporary folders, read-only sources).
+        unitTests.all { it.maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1) }
         managedDevices {
             localDevices {
                 create("ciPhone") {
