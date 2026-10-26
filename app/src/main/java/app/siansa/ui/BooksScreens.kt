@@ -97,6 +97,9 @@ internal fun booksForCarousel(shelved: List<Pair<String, Book>>, progress: Map<S
 
 private const val CAROUSEL_MAX = 8
 
+/** The cover on a book card; the words start after it and a page's gap. */
+private val CARD_COVER_WIDTH = 100.dp
+
 @Composable
 private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen: () -> Unit) {
     val graph = LocalGraph.current
@@ -112,7 +115,7 @@ private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen:
             .testTag("bookCard"),
     ) {
         Box(Modifier.align(Alignment.CenterStart).padding(Space.Page)) {
-            Cover(book.cover, 300, Modifier.size(width = 100.dp, height = 148.dp), RoundedCornerShape(8.dp))
+            Cover(book.cover, 300, Modifier.size(width = CARD_COVER_WIDTH, height = 148.dp), RoundedCornerShape(8.dp))
             if (progress?.started == true && !progress.finished) {
                 // ▶ on the cover continues where you were (owner's decision on #521).
                 FilledIconButton(
@@ -122,7 +125,8 @@ private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen:
                 ) { Icon(Icons.Rounded.PlayArrow, "Continue ${book.title}", Modifier.size(24.dp)) }
             }
         }
-        Column(Modifier.align(Alignment.TopStart).padding(start = 132.dp, top = Space.Page, end = Space.Page)) {
+        // The words start a page's gap after the cover, which sits a page's gap in: the cover's width plus both.
+        Column(Modifier.align(Alignment.TopStart).padding(start = CARD_COVER_WIDTH + Space.Page + Space.Page, top = Space.Page, end = Space.Page)) {
             Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = Accent, fontWeight = FontWeight.Bold)
             Text(book.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(
@@ -138,7 +142,7 @@ private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen:
             )
         }
         if (progress?.started == true && !progress.finished) {
-            Column(Modifier.align(Alignment.BottomStart).padding(start = 132.dp, end = Space.Page, bottom = Space.Page)) {
+            Column(Modifier.align(Alignment.BottomStart).padding(start = CARD_COVER_WIDTH + Space.Page + Space.Page, end = Space.Page, bottom = Space.Page)) {
                 Text("${bookLength(progress.leftSec)} left", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f))
                 Spacer(Modifier.height(Space.Tight))
                 LinearProgressIndicator(
