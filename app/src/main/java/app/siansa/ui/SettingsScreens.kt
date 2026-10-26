@@ -98,16 +98,8 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
         try {
             // Only the connection fields come from this page; everything else keeps its current value.
             val d = draft
-            graph.settings.save(
-                graph.settings.current.copy(
-                    sourceKind = kind,
-                    navidromeUrl = d.navidromeUrl, navidromeUser = d.navidromeUser, navidromePassword = d.navidromePassword,
-                    proxyUser = d.proxyUser, proxyPassword = d.proxyPassword,
-                    audioMuseUrl = d.audioMuseUrl, audioMuseToken = d.audioMuseToken,
-                    audioMuseUser = d.audioMuseUser, audioMusePassword = d.audioMusePassword, audioMuseServer = d.audioMuseServer,
-                    openRouterKey = d.openRouterKey, openRouterModel = d.openRouterModel, aiTitles = d.aiTitles,
-                )
-            )
+            graph.settings.save(graph.settings.current.withConnectionsFrom(d, kind))
+            if (d.booksReady) AppLog.i("Settings", "Audiobookshelf saved: ${AppLog.redact(d.audiobookshelfUrl)}")
         } catch (e: Exception) {
             problem = e.message
             return
