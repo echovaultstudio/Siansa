@@ -11,7 +11,7 @@ import androidx.work.WorkerParameters
 import app.siansa.SiansaApp
 import java.util.concurrent.TimeUnit
 
-/** Prepares the current time slot's mix and today's personal mixes in the background, so it's ready when the app opens. */
+/** Prepares the day's first mix and today's personal mixes in the background, so they're ready when the app opens. */
 class MixWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val graph = (applicationContext as SiansaApp).graph
@@ -19,7 +19,8 @@ class MixWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
         // Without AudioMuse the vibe's mix comes from the library (beta #25).
         if (!settings.navidromeReady) return Result.success()
         // The vibe's mix is an AI mix: only with AudioMuse (issue #486).
-        if (MixRules.showsAiMixes(settings.audioMuseReady)) runCatching { graph.generator.ensureCurrent(force = false) }
+        // Only the day's first mix: a new vibe for the hour doesn't replace the one you have (beta testers #37).
+        if (MixRules.showsAiMixes(settings.audioMuseReady)) runCatching { graph.generator.ensureToday() }
         // Today's personal mixes too (each is made once a day; later runs find them ready).
         MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, settings.audioMuseReady) }
             .forEach { kind -> runCatching { graph.generator.ensurePersonal(kind) } }

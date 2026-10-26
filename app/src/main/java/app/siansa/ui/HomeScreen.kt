@@ -129,7 +129,12 @@ fun HomeScreen(nav: NavController) {
             busySelector = selector?.id ?: "current"
             error = null
             try {
-                val mix = if (selector == null) graph.generator.ensureCurrent(force) else graph.generator.ensure(selector, force)
+                // Today's mix stays all day; ↻ (force) makes a new one for this hour's vibe (beta testers #37).
+                val mix = when {
+                    selector != null -> graph.generator.ensure(selector, force)
+                    force -> graph.generator.ensureCurrent(force = true)
+                    else -> graph.generator.ensureToday()
+                }
                 if (selector == null || selector.id == current?.selectorId) current = mix
                 if (mix == null) error = "No vibe covers this hour. Add one in Settings, under Vibes."
                 if (open && mix != null) nav.navigate("mix/${mix.id}")
@@ -178,8 +183,9 @@ fun HomeScreen(nav: NavController) {
         }
     }
 
-    // Mixes are made when they aren't there yet for today and this hour's vibe, or when you tap refresh; showing
-    // other music in the source filter doesn't make them again (issue #486). AI mixes need AudioMuse.
+    // Today's mix is made once a day; after that only when you tap refresh, also when the hour's vibe moves on
+    // (beta testers #37). Showing other music in the source filter doesn't make it again (issue #486). AI mixes
+    // need AudioMuse.
     val aiMixes = MixRules.showsAiMixes(homeSettings.audioMuseReady)
     LaunchedEffect(hour, aiMixes) {
         graph.mixes.all()
