@@ -310,7 +310,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         navTabs = NavTab.parse(prefs.getString("nav_tabs", null)),
         nowPlayingLyricsButton = prefs.getBoolean("now_playing_lyrics_button", true),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
-        homeGap = prefs.getInt("home_gap", HOME_GAP_DEFAULT).coerceIn(0, HOME_GAP_MAX),
+        homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
         timeMachineMissing = prefs.getBoolean("time_machine_missing", true),
         themeMode = prefs.getString("theme_mode", "AUTO") ?: "AUTO",
@@ -500,7 +500,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     }
 
     fun setHomeGap(step: Int) {
-        val gap = step.coerceIn(0, HOME_GAP_MAX)
+        val gap = step.coerceIn(0, AppSettings.HOME_GAP_MAX)
         prefs.edit().putInt("home_gap", gap).apply()
         _state.value = _state.value.copy(homeGap = gap)
     }
