@@ -3,6 +3,19 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.38.1beta — 2026-10-27
+
+### Fixed
+- **Podcasts wouldn't play from Home or their page.** The ▶ said the podcast had no audio files; it now plays the episode you were in the middle of, or the newest one.
+- **A book's mini player came back over the music's.** When a book or podcast couldn't start, its mini player stayed and popped up in front of the music's whenever a song paused. It's gone now, and starting music pauses a book, like a book starting pauses music.
+- **Siansa could close when Audiobookshelf was removed.** A book shown on Home or its page now shows a plain cover
+  instead.
+
+### Changed
+- **The time machine and Your listening open much faster.** A finished month or year is kept on the phone and
+  shows at once; the current one shows what it had and then updates with the latest plays. The listening clock now
+  counts every play of a year, not just the last 5,000.
+
 ## 0.38.0beta — 2026-10-27
 
 ### Added
