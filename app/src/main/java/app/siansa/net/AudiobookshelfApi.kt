@@ -19,6 +19,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -163,8 +164,7 @@ class AudiobookshelfApi(private val http: OkHttpClient, private val settings: ()
 
     /** Every progress the user has, by book id, in one call (the user's own record). */
     suspend fun allProgress(): Map<String, BookProgress> =
-        call("/api/me").jsonObject.arr("mediaProgress").mapNotNull { p -> p.str("libraryItemId")?.let { parseProgress(p, it) } }
-            .associateBy { it.bookId }
+        latestProgress(call("/api/me").jsonObject.arr("mediaProgress").mapNotNull { p -> p.str("libraryItemId")?.let { parseProgress(p, it) } })
 
     /** Sets where the listener is in a book, as the server's record. */
     suspend fun setProgress(bookId: String, currentSec: Double, durationSec: Double, finished: Boolean? = null) {
@@ -267,7 +267,11 @@ class AudiobookshelfApi(private val http: OkHttpClient, private val settings: ()
 
     /** The address of a book's cover, for the cover loader ([Book.COVER_PREFIX] ids). */
     fun coverUrl(bookId: String, size: Int?): String {
-        val url = "${base()}/api/items/$bookId/cover".toHttpUrl().newBuilder()
+        val address = "${base()}/api/items/$bookId/cover"
+        // No Audiobookshelf address (its login removed, or never set): the address as it is, which the cover loader
+        // fails on quietly and shows the placeholder, as for a song cover without a server. Parsing it crashed the
+        // screen showing a book's cover, such as a book shortcut on Home.
+        val url = address.toHttpUrlOrNull()?.newBuilder() ?: return address
         size?.let { url.addQueryParameter("width", it.toString()) }
         url.addQueryParameter("format", "webp")
         // Image loaders can't add a header: the token goes in the address, which Audiobookshelf accepts on GET.
@@ -330,7 +334,21 @@ class AudiobookshelfApi(private val http: OkHttpClient, private val settings: ()
             fraction = p.dbl("progress") ?: 0.0,
             finished = p.bool("isFinished") == true,
             updatedAt = p.long("lastUpdate") ?: 0L,
+            episodeId = p.str("episodeId"),
         )
+
+        /**
+         * One progress per book (beta #45): a podcast has one per episode, and the one that counts is the episode
+         * last listened to that isn't finished, so "Continue" picks up where the listener was.
+         */
+        fun latestProgress(all: List<BookProgress>): Map<String, BookProgress> =
+            all.groupBy { it.bookId }.mapValues { (_, list) ->
+                list.filter { !it.finished }.maxByOrNull { it.updatedAt } ?: list.maxBy { it.updatedAt }
+            }
+
+        /** The episode a podcast plays from its ▶ (beta #45): the one in progress, else the newest. */
+        fun episodeToPlay(episodes: List<Episode>, inProgressId: String?): Episode? =
+            episodes.firstOrNull { it.id == inProgressId } ?: episodes.firstOrNull()
 
         private fun strings(e: JsonElement?): List<String> =
             (e as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content?.takeIf(String::isNotBlank) }.orEmpty()

@@ -114,18 +114,19 @@ private fun TimeMachinePage(nav: NavController) {
     // The month or year's report, as on Your month (#578): the big numbers, top artists, top albums, the listening
     // clock and how the taste moved, with the time machine's songs in the middle. It can't hold the songs back:
     // when it fails (Koito out of reach) the songs show on their own.
+    // A finished month or year shows at once from the phone; the current one shows what the phone kept, then the
+    // fresh report when it arrives (#592).
     val report by produceState<Load<app.siansa.mix.ListeningReport?>>(Load.Loading, year, month) {
         value = Load.Loading
-        value = Load.Ok(
-            try {
-                graph.insights.report(app.siansa.mix.timeMachineReportWindow(year, month, today), "time-machine")
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                AppLog.w("TimeMachine", "Report not made: ${e.message}")
-                null
-            },
-        )
+        try {
+            graph.insights.reportUpdates(app.siansa.mix.timeMachineReportWindow(year, month, today), "time-machine")
+                .collect { value = Load.Ok(it) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.w("TimeMachine", "Report not made: ${e.message}")
+            if (value !is Load.Ok) value = Load.Ok(null)
+        }
     }
     val songs: @Composable () -> Unit = {
         LoadBox(result) { tm ->
