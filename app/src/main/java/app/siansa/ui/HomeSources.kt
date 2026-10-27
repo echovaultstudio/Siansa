@@ -132,7 +132,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                 val guest = guestStates[user.id]
                 val syncing = if (inUse) progress.running else guest?.running == true
                 SourceCard(
-                    // The user, and under it the kind of server, then how it stands (#571): "max", "Navidrome · In use · …".
+                    // The user, and under it the kind of server, then how it stands (#571): "max", "OpenSubsonic · In use · …".
                     name = user.title,
                     status = (if (user.connected) user.serverLine + " · " else "") + when {
                         !user.connected -> "Not connected yet. Set it up in Settings → Users."
