@@ -34,9 +34,9 @@ class PlayUploadTest(unittest.TestCase):
         self.assertTrue(draft_only("HTTP 400: Only releases with status draft may be created on draft app."))
         self.assertFalse(draft_only("HTTP 400: Track not found"))
 
-    def test_both_tracks_unless_set(self):
-        self.assertEqual(["alpha", "internal"], tracks_of(""))
-        self.assertEqual(["alpha", "internal"], tracks_of(None))
+    def test_open_testing_unless_set(self):
+        self.assertEqual(["beta"], tracks_of(""))
+        self.assertEqual(["beta"], tracks_of(None))
         self.assertEqual(["internal"], tracks_of(" internal "))
         self.assertEqual(["alpha", "internal"], tracks_of("alpha, internal,alpha"))
 

@@ -13,7 +13,7 @@ import java.net.InetAddress
 class HomeNetworkTest {
     private fun ip(s: String) = InetAddress.getByName(s)
     private fun p(s: String, length: Int) = Prefix(ip(s), length)
-    private val server = listOf(ip("192.168.1.106"))
+    private val server = listOf(ip("192.168.1.20"))
 
     private val homeWifi = NetInfo(vpn = false, wifi = true, cellular = false, addresses = listOf(p("192.168.1.20", 24)))
     private val otherWifi = NetInfo(vpn = false, wifi = true, cellular = false, addresses = listOf(p("10.20.0.5", 24)))
@@ -58,7 +58,7 @@ class HomeNetworkTest {
 
     @Test fun tailscaleAddressesArePrivate() {
         assertTrue(CoverDownload.isPrivate(ip("100.101.5.6")))
-        assertTrue(CoverDownload.isPrivate(ip("192.168.1.106")))
+        assertTrue(CoverDownload.isPrivate(ip("192.168.1.20")))
         assertTrue(CoverDownload.isPrivate(ip("fd7a:115c:a1e0::1")))
         assertFalse(CoverDownload.isPrivate(ip("203.0.113.7")))
         assertFalse(CoverDownload.isPrivate(ip("100.200.1.1")))

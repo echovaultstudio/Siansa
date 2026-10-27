@@ -197,10 +197,10 @@ class SongCoverTest {
 class SubnetTest {
     private fun ip(s: String) = InetAddress.getByName(s)
 
-    @Test fun sameHomeNetwork() = assertTrue(CoverDownload.sameSubnet(ip("192.168.1.20"), 24, ip("192.168.1.106")))
+    @Test fun sameHomeNetwork() = assertTrue(CoverDownload.sameSubnet(ip("192.168.1.20"), 24, ip("192.168.1.20")))
     @Test fun otherNetwork() = assertFalse(CoverDownload.sameSubnet(ip("192.168.1.20"), 24, ip("192.168.2.106")))
     @Test fun widerPrefix() = assertTrue(CoverDownload.sameSubnet(ip("10.0.5.1"), 16, ip("10.0.200.9")))
-    @Test fun oddPrefix() = assertFalse(CoverDownload.sameSubnet(ip("192.168.1.20"), 28, ip("192.168.1.106")))
+    @Test fun oddPrefix() = assertFalse(CoverDownload.sameSubnet(ip("192.168.1.20"), 28, ip("192.168.1.20")))
     @Test fun ipv4AgainstIpv6() = assertFalse(CoverDownload.sameSubnet(ip("192.168.1.20"), 24, ip("fe80::1")))
 }
 

@@ -16,7 +16,7 @@ class CopyWholeLogTest {
         "  Accept-Encoding: gzip · Authorization: •••",
         "  ← 200 · application/json · in 81ms",
         "2026-10-18 20:57:59.923 I/TimeMachine: April 2015: 11 songs",
-        "2026-10-18 20:58:00.074 W/Http: GET 192.168.1.106/share/img failed: IOException: Canceled",
+        "2026-10-18 20:58:00.074 W/Http: GET 192.168.1.20/share/img failed: IOException: Canceled",
     )
 
     @Test fun everythingWhenItFits() {
