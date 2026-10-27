@@ -218,7 +218,6 @@ private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen:
 @Composable
 fun BookScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
-    val bookSheet = LocalBookSheet.current
     val progressAll by graph.books.progress.collectAsStateWithLifecycle()
     val page by loadState(id) { graph.books.book(id) }
     val book = page.valueOrNull()
@@ -248,7 +247,6 @@ fun BookScreen(nav: NavController, id: String) {
                             onClick = {
                                 graph.bookPlayer.playOrToggle(b, if (started) current else 0.0)
                                 AppLog.i("Books", "${if (started) "Continue" else "Play"} \"${b.title}\" from its page")
-                                bookSheet.open()
                             },
                             modifier = Modifier.testTag("bookPlay"),
                         ) {
@@ -319,7 +317,6 @@ fun BookScreen(nav: NavController, id: String) {
                                 Modifier.fillMaxWidth().clickable {
                                     graph.bookPlayer.playEpisode(b, e)
                                     AppLog.i("Books", "Play episode \"${e.title}\" of \"${b.title}\"")
-                                    bookSheet.open()
                                 }.padding(horizontal = Space.Page, vertical = Space.Small).testTag("episode-${e.id}"),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(Space.Medium),
@@ -339,7 +336,7 @@ fun BookScreen(nav: NavController, id: String) {
                     items(marks.size, key = { "bm-${marks[it].timeSec}" }) { i ->
                         val m = marks[i]
                         Row(
-                            Modifier.fillMaxWidth().clickable { graph.bookPlayer.play(b, m.timeSec); bookSheet.open() }.padding(horizontal = Space.Page, vertical = Space.Small).testTag("bookmark-$i"),
+                            Modifier.fillMaxWidth().clickable { graph.bookPlayer.play(b, m.timeSec) }.padding(horizontal = Space.Page, vertical = Space.Small).testTag("bookmark-$i"),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(Space.Medium),
                         ) {
@@ -360,7 +357,6 @@ fun BookScreen(nav: NavController, id: String) {
                         }) {
                             graph.bookPlayer.play(b, c.startSec)
                             AppLog.i("Books", "Play \"${b.title}\" from chapter ${c.index + 1}")
-                            bookSheet.open()
                         }
                     }
                 }
