@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -74,6 +73,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -228,7 +228,13 @@ fun BookPlayerScreen(nav: NavController, onClose: () -> Unit) {
                         BookTopRow(state, onClose = onClose, onBook = ::openBookPage, onMenu = { menuOpen = true })
 
                         Box(Modifier.weight(1f).fillMaxWidth().padding(top = Space.Page, bottom = Space.Medium), contentAlignment = Alignment.Center) {
-                            Cover(book?.cover, LARGE_COVER, Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true).clickable(enabled = book != null, onClick = ::openBookPage), RoundedCornerShape(10.dp))
+                            // The same size as an album's cover in now playing: the page's width, square (beta #44: it was larger).
+                            Cover(
+                                book?.cover,
+                                LARGE_COVER,
+                                Modifier.fillMaxWidth().aspectRatio(1f).shadow(24.dp, RoundedCornerShape(10.dp)).clickable(enabled = book != null, onClick = ::openBookPage).testTag("bookPlayerCover"),
+                                RoundedCornerShape(10.dp),
+                            )
                         }
 
                         BookTitleRow(book) { graph.bookPlayer.bookmark { launch.notify(it) } }
