@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /** What the book player is doing (issue #521), for the book page, the mini player and the player page. */
+enum class BookTap { TOGGLE, START }
+
 data class BookPlayerState(
     val book: Book? = null,
     /** Where in the whole book, in seconds. */
@@ -158,13 +160,27 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
         }
     }
 
+    /**
+     * A ▶ on a card or a page (#553): the book that's loaded plays or pauses; another book starts at [fromSec].
+     * Tapping a card twice no longer starts the book twice over.
+     */
+    fun playOrToggle(book: Book, fromSec: Double) {
+        if (bookTap(_state.value.book?.id, book.id) == BookTap.TOGGLE) togglePlay() else play(book, fromSec)
+    }
+
     /** Starts [book] at [fromSec]: the first chapter, where the listener was, or a chapter they tapped. */
     fun play(book: Book, fromSec: Double, episodeId: String? = null) {
         AppLog.i("BookPlayer", "Play \"${book.title}\" from ${fromSec.toInt()} s")
+        // The session of whatever was playing is closed with where it got to, so the server isn't left with
+        // one open session per tap (#553: a card tapped three times opened three).
+        if (sessionId != null) sync("replaced", close = true)
         if (episodeId == null) episode = null
         endedId = null
         _state.value = BookPlayerState(book = book, positionSec = fromSec, playing = true, speed = graph.bookSpeeds.speedOf(book.id))
         graph.books.noteProgress(progressAt(book, fromSec))
+        // A shortcut at the top of Home, like an album played (#548).
+        val shortcut = app.siansa.data.bookShortcut(book, episode = episodeId != null)
+        graph.scope.launch { graph.recentPlays.note(shortcut.route, shortcut.title, shortcut.cover) }
         // Music and a book never play at once (issue #521).
         graph.player.pause()
         graph.scope.launch {
@@ -263,6 +279,8 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
     fun stop() {
         sync("stopped", close = true)
         withController { c -> c.stop(); c.clearMediaItems() }
+        sleepAtChapterEnd = false
+        sleepChapter = null
         _state.value = BookPlayerState(speed = _state.value.speed)
     }
 
@@ -335,6 +353,9 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
     }
 
     companion object {
+        /** What a ▶ for [tapped] does while [loaded] is the book in the player. */
+        fun bookTap(loaded: String?, tapped: String): BookTap = if (loaded == tapped) BookTap.TOGGLE else BookTap.START
+
         const val TICK_MS = 1000L
         /** How often Audiobookshelf hears where the listener is while a book plays. */
         const val SYNC_MS = 15_000L

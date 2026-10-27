@@ -230,7 +230,7 @@ fun PlayerMenu(
 }
 
 @Composable
-private fun MenuRow(icon: ImageVector, label: String, tint: Color? = null, enabled: Boolean = true, tag: String? = null, onClick: () -> Unit) =
+internal fun MenuRow(icon: ImageVector, label: String, tint: Color? = null, enabled: Boolean = true, tag: String? = null, onClick: () -> Unit) =
     MenuRow(rememberVectorPainter(icon), label, tint, enabled, tag, onClick)
 
 /** A row of the menu with a drawn icon, such as [SimilarAlbumsPainter]. */

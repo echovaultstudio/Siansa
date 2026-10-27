@@ -52,6 +52,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.siansa.data.AlbumCategory
@@ -790,11 +791,12 @@ class SpacingTest {
                 }
             }
         }
-        val pills = compose.onAllNodesWithTag("libraryPill", useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
+        // The chips' own size: their bounds on screen are clipped, so a chip scrolled out of the row measures 0.
+        val pills = compose.onAllNodesWithTag("libraryPill", useUnmergedTree = true).fetchSemanticsNodes().map { it.size }
         val density = compose.density.density
         fun dp(px: Float) = (px / density).dp
         // Full size: the text keeps its 14 sp height, so the chips are as tall as a lone full-size chip.
-        val tall = pills.map { dp(it.height) }.distinct()
+        val tall = pills.map { dp(it.height.toFloat()) }.distinct()
         assertTrue("One chip height: $tall", tall.size == 1)
         val more = compose.onNodeWithTag("chipsMore").getBoundsInRoot()
         val fade = compose.onNodeWithTag("chipsMoreFade", useUnmergedTree = true).getBoundsInRoot()
@@ -815,22 +817,52 @@ class SpacingTest {
         assertEven("Chip tops", all.top, mon.top, 1.dp)
     }
 
-    /** The book player (issue #521): the skip buttons sit evenly either side of play, all centred on one line. */
+    /**
+     * The book player (issue #521, now in now playing's style, #542): the real controls row at a phone's width.
+     * The skips sit evenly either side of play, the chapter buttons evenly outside them, all centred on one line.
+     */
     @Test fun bookPlayerControlsAreEvenlySpaced() {
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
+        val book = app.siansa.data.Book(id = "b1", title = "A book", durationSec = 3600, chapters = listOf(app.siansa.data.Chapter(0, "One", 0.0, 1800.0), app.siansa.data.Chapter(1, "Two", 1800.0, 3600.0)))
         compose.setContent {
-            SiansaTheme {
-                Row(Modifier.testTag("bookControls"), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                    app.siansa.ui.SkipButton(back = true, seconds = 10, tag = "skipBack") { }
-                    Box(Modifier.size(72.dp).testTag("playBig"))
-                    app.siansa.ui.SkipButton(back = false, seconds = 30, tag = "skipForward") { }
+            androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalGraph provides graph) {
+                SiansaTheme {
+                    Box(Modifier.width(360.dp).padding(horizontal = Space.Section)) {
+                        app.siansa.ui.BookControls(app.siansa.playback.BookPlayerState(book = book, positionSec = 10.0), backSec = 10, forwardSec = 30)
+                    }
                 }
             }
         }
-        val back = compose.onNodeWithTag("skipBack").getBoundsInRoot()
-        val play = compose.onNodeWithTag("playBig").getBoundsInRoot()
-        val fwd = compose.onNodeWithTag("skipForward").getBoundsInRoot()
+        val prev = compose.onNodeWithTag("bookPrevChapter").getBoundsInRoot()
+        val back = compose.onNodeWithTag("bookSkipBack").getBoundsInRoot()
+        val play = compose.onNodeWithTag("bookPlayPause").getBoundsInRoot()
+        val fwd = compose.onNodeWithTag("bookSkipForward").getBoundsInRoot()
+        val next = compose.onNodeWithTag("bookNextChapter").getBoundsInRoot()
         assertEven("Gaps either side of play", play.left - back.right, fwd.left - play.right, 1.dp)
-        assertEven("Skip buttons centred on play", (back.top + back.bottom) / 2 - (play.top + play.bottom) / 2, 0.dp, 1.dp)
+        assertEven("Gaps outside the skips", back.left - prev.right, next.left - fwd.right, 1.dp)
+        listOf(prev, back, fwd, next).forEach { assertEven("Centred on play", (it.top + it.bottom) / 2 - (play.top + play.bottom) / 2, 0.dp, 1.dp) }
+    }
+
+    /**
+     * A book's page (#550, styled like an album's): the cover's top lines up with the title's, a page's gap at the
+     * left edge, and the words start a page's gap after the cover.
+     */
+    @Test fun bookPageCoverLinesUpWithItsWords() {
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
+        val book = app.siansa.data.Book(id = "b1", title = "A long title", authors = listOf("An author"), narrators = (1..8).map { "Reader $it" })
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalGraph provides graph) {
+                SiansaTheme {
+                    Box(Modifier.width(360.dp).testTag("bookHeader")) { app.siansa.ui.BookPageHeader(book, Color.DarkGray, Color.Black) }
+                }
+            }
+        }
+        val header = compose.onNodeWithTag("bookHeader").getBoundsInRoot()
+        val cover = compose.onNodeWithTag("bookCover", useUnmergedTree = true).getBoundsInRoot()
+        val words = compose.onNodeWithTag("bookWords", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Cover and words start at the same height", cover.top, words.top, 1.dp)
+        assertEven("A page's gap at the left", cover.left - header.left, Space.Page, 1.dp)
+        assertEven("A page's gap between cover and words", words.left - cover.right, Space.Page, 1.dp)
     }
 
     /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */

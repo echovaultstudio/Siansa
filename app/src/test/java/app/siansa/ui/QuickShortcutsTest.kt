@@ -23,6 +23,14 @@ class QuickShortcutsTest {
         assertEquals("album/1", shown.first().route)
     }
 
+    @Test fun aBookPlayedIsAShortcutToItsPage() {
+        val book = app.siansa.data.Book(id = "b1", title = "The Tide Keeper", subtitle = "A novel")
+        assertEquals(RecentPlay("book/b1", "The Tide Keeper", "bk-b1"), app.siansa.data.bookShortcut(book, episode = false))
+        // An episode plays as a book named after it, with the podcast's name as the subtitle: the shortcut is the podcast.
+        val episode = app.siansa.data.Book(id = "p1", title = "Episode 12", subtitle = "Tide Talk", podcast = true)
+        assertEquals("Tide Talk", app.siansa.data.bookShortcut(episode, episode = true).title)
+    }
+
     @Test fun playingSomethingAgainMovesItToTheTop() {
         val list = listOf(p("album/1"), p("album/2"), p("album/3"))
         assertEquals(listOf("album/3", "album/1", "album/2"), notedPlay(list, p("album/3")).map { it.route })
