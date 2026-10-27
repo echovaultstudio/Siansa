@@ -103,7 +103,7 @@ def call(method, url, tok, body=None, data=None, content_type="application/json"
 
 
 def tracks_of(setting):
-    """The tracks a release goes to: PLAY_TRACK as "alpha,internal", each once, in order; both when unset (#557)."""
+    """The tracks a release goes to: PLAY_TRACK as "alpha,internal", each once, in order; open testing when unset (#584)."""
     tracks = []
     for t in (setting or "").split(","):
         t = t.strip()
