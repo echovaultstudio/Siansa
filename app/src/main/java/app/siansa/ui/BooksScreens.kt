@@ -37,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,11 +71,11 @@ import app.siansa.log.AppLog
 fun BooksCarousel(nav: NavController, podcasts: Boolean) {
     val graph = LocalGraph.current
     val progress by graph.books.progress.collectAsStateWithLifecycle()
-    val shelves by loadState("book-shelves-$podcasts") {
-        graph.books.refreshProgress()
-        graph.books.shelves(podcasts)
-    }
-    val cards = booksForCarousel(shelves.valueOrNull().orEmpty().flatMap { shelf -> shelf.books.map { shelf.id to it } }, progress)
+    // The shelves as last read, so scrolling back to the carousel shows it at once, at its height (#569: it was
+    // empty for a moment, then grew, pushing the page down). Read again only when a minute old.
+    val shelvesAll by graph.books.shelvesState.collectAsStateWithLifecycle()
+    LaunchedEffect(podcasts) { graph.books.refreshShelves(podcasts) }
+    val cards = booksForCarousel(shelvesAll[podcasts].orEmpty().flatMap { shelf -> shelf.books.map { shelf.id to it } }, progress)
     if (cards.isEmpty()) return
     val pager = rememberPagerState { cards.size }
     Column(Modifier.fillMaxWidth().testTag(if (podcasts) "homePodcasts" else "homeBooks")) {
