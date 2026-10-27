@@ -120,6 +120,8 @@ class PlayerConnection(
     var isOffline: () -> Boolean = { false }
     /** True while "Only downloaded music" is on (issue #141): then too only downloaded songs play. */
     var onlyDownloads: () -> Boolean = { false }
+    /** Called as music starts or resumes: the book player pauses, so the two never play at once (beta #45). */
+    var onPlayStarted: () -> Unit = {}
     var isDownloaded: (String) -> Boolean = { false }
 
     private val _notices = MutableSharedFlow<String>(extraBufferCapacity = 4)
@@ -158,6 +160,7 @@ class PlayerConnection(
 
     private fun playNow(songs: List<Song>, startIndex: Int, shuffle: Boolean, startMs: Long = 0L) {
         queueGeneration++
+        onPlayStarted()
         onNewQueue?.invoke()
         SongRegistry.register(songs)
         val items = songs.map { it.toMediaItem(api) }
@@ -257,6 +260,7 @@ class PlayerConnection(
         } else {
             if (c.playbackState == Player.STATE_IDLE) c.prepare()
             if (c.playbackState == Player.STATE_ENDED) c.seekTo(0, 0L)
+            onPlayStarted()
             c.play()
         }
     }
