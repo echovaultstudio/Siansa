@@ -6,6 +6,8 @@ A music player for your own **Navidrome**, **OpenSubsonic** or **Emby** server, 
 
 Siansa is **open source** under the GNU GPL, version 3 or later ([LICENSE](LICENSE)): the code is here to read, build and improve. Website: [siansa.app](https://siansa.app). Docs: [docs.siansa.app](https://docs.siansa.app) (the [beta testers repository](https://github.com/echovaultstudio/siansa-beta-testers) until then).
 
+<p align="center"><img src="docs/screenshots/hero.png" alt="Siansa: Your year, Home and Flow" width="900"></p>
+
 ## What it does
 
 - **Library**: albums (A–Z, recently added, most played, random), artists, album and artist pages, search.
@@ -19,6 +21,23 @@ Siansa is **open source** under the GNU GPL, version 3 or later ([LICENSE](LICEN
   3. AudioMuse's text search finds matching tracks by sound. The app picks a varied set, skips songs from recent days, limits tracks per artist and avoids the same artist twice in a row.
   4. The mix is saved **only on the phone**. Nothing is written to Navidrome's playlists.
 - **Sound search**: the Search tab can also describe a sound ("rainy jazz piano") and play what AudioMuse finds.
+
+## A look around
+
+<table align="center">
+<tr>
+<td align="center" width="33%"><img src="docs/screenshots/home-more.png" alt="Home: your podcasts, Made for you, recently added" width="240"><br><sub><b>Home</b>: podcasts, Made for you, recently added</sub></td>
+<td align="center" width="33%"><img src="docs/screenshots/listening-clock.png" alt="Your listening clock and how your taste moved" width="240"><br><sub><b>Your year</b>: listening clock, how your taste moved</sub></td>
+<td align="center" width="33%"><img src="docs/screenshots/search.png" alt="Search with mood radios" width="240"><br><sub><b>Search</b>: a sound, or a mood radio</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screenshots/books.png" alt="Audiobooks in Your Library" width="240"><br><sub><b>Audiobooks</b> from Audiobookshelf</sub></td>
+<td align="center"><img src="docs/screenshots/podcasts.png" alt="Podcasts in Your Library" width="240"><br><sub><b>Podcasts</b>, with your progress</sub></td>
+<td align="center"><img src="docs/screenshots/settings.png" alt="Settings" width="240"><br><sub><b>Settings</b></sub></td>
+</tr>
+</table>
+
+<p align="center"><sub>Album, artist, book and podcast pictures are blurred in these screenshots; in the app you see your own.</sub></p>
 
 ## Getting it
 
