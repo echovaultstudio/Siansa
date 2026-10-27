@@ -29,8 +29,17 @@ git clone --mirror https://github.com/echovaultstudio/Siansa.git siansa-rewrite
 cd siansa-rewrite
 printf 'siansapass==>REDACTED\nmusixpass==>REDACTED\nsiansa@srvmax.com==>help@siansa.app\n' > /tmp/replacements.txt
 git filter-repo --invert-paths --path app/siansa.keystore --path app/musix.keystore --replace-text /tmp/replacements.txt
-git push --force --mirror https://github.com/echovaultstudio/Siansa.git
+git push --force --all
+git push --force --tags
 ```
+
+Not `git push --mirror`: a mirror clone carries GitHub's own `refs/pull/*`, which GitHub refuses on push. The
+two pushes above send every branch and tag. A practice run first, without pushing, takes seconds: clone with
+`--mirror`, run filter-repo and the checks below, then delete the folder.
+
+If `pip install` refuses (macOS: "externally-managed-environment"), use a small environment of its own:
+`python3 -m venv ~/filter-repo-env && ~/filter-repo-env/bin/pip install git-filter-repo`, then run
+`~/filter-repo-env/bin/git-filter-repo` in place of `git filter-repo`.
 
 `--invert-paths --path` drops both keystores from every commit (the retired Musix key too: a different key, but no
 reason to publish it); `--replace-text` turns its password into `REDACTED`
