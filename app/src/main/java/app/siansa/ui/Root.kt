@@ -312,6 +312,7 @@ fun SiansaRoot() {
                 composable("downloads/add") { DownloadPickerScreen(nav) }
                 composable("downloads/songs") { DownloadedSongsScreen(nav) }
                 composable("settings/help") { HelpScreen(nav) }
+                composable("settings/audiobookshelf") { AudiobookshelfScreen(nav) }
                 composable("settings/logs") { LogsScreen(nav) }
                 composable("settings/report") { ProblemReportScreen(nav) }
                 composable("settings/backup") { BackupScreen(nav) }

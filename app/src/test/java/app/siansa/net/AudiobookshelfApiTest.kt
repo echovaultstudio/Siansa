@@ -86,4 +86,12 @@ class AudiobookshelfApiTest {
     @Test fun aSearchReplyWithoutHitsIsEmpty() {
         assertEquals(emptyList<Any>(), AudiobookshelfApi.parseSearch(json("""{"authors":[]}""")))
     }
+
+    /** #582: only an admin (or root) login may ask the server to scan. */
+    @Test fun adminsMayScan() {
+        assertEquals(true, AudiobookshelfApi.userMayScan(json("""{"user":{"id":"u1","type":"admin"}}""")))
+        assertEquals(true, AudiobookshelfApi.userMayScan(json("""{"user":{"type":"root"}}""")))
+        assertEquals(false, AudiobookshelfApi.userMayScan(json("""{"user":{"type":"user"}}""")))
+        assertEquals(false, AudiobookshelfApi.userMayScan(json("""{}""")))
+    }
 }
