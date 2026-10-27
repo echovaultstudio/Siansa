@@ -37,4 +37,11 @@ class SettingsNamesTest {
         assertFalse("Report a problem is still its own entry", rows.any { it.second == "Report a problem" })
         assertFalse("Logs is still its own entry", rows.any { it.second == "Logs" })
     }
+
+    /** #576: About sits just above Help, with the info icon. */
+    @Test fun aboutIsJustAboveHelp() {
+        val hub = File(ui, "SettingsHub.kt").readText()
+        val rows = Regex("""HubRow\(Icons\.Rounded\.(\w+), "([^"]+)"\)""").findAll(hub).map { it.groupValues[1] to it.groupValues[2] }.toList()
+        assertTrue("About isn't just above Help: ${rows.takeLast(2)}", rows.takeLast(2) == listOf("Info" to "About", "BugReport" to "Help"))
+    }
 }
