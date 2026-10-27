@@ -50,6 +50,18 @@ button { font: inherit; font-weight: 600; padding: 10px 20px; border: 0; border-
 .licences .meta { font-size: 0.85rem; }
 .site-nav nav a[aria-current="page"] { border-color: var(--accent); color: var(--accent); }
 
+.open-source { margin: 24px 0 8px; padding: 16px; border-radius: 16px; background: rgba(127, 127, 127, 0.08); }
+.open-source h2 { margin: 0 0 8px; }
+.open-source p { margin: 0; }
+
 .why-closed { margin: 8px 0 16px; }
 .why-closed h3 { margin: 0 0 4px; font-size: 1.05rem; }
 .why-closed p { margin: 0; color: var(--muted); }
+
+.tracking { list-style: none; padding: 0; margin: 8px 0 24px; display: grid; gap: 8px; }
+.tracking li { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; border-radius: 12px; background: rgba(127, 127, 127, 0.08); }
+.tracking .tick { flex: none; width: 20px; height: 20px; margin-top: 2px; border-radius: 6px; border: 2px solid var(--muted); box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; line-height: 1; }
+.tracking .tick.done { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.tracking .meta { font-size: 0.9rem; }
+.open-source p + p { margin-top: 12px; }
