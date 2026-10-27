@@ -20,6 +20,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Checkbox
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,8 +64,10 @@ fun ProblemReportScreen(nav: NavController) {
     val scope = rememberCoroutineScope()
     var happened by rememberSaveable { mutableStateOf("") }
     var expected by rememberSaveable { mutableStateOf("") }
+    var repeated by rememberSaveable { mutableStateOf(false) }
     var sending by remember { mutableStateOf<Sending>(Sending.Idle) }
-    val problem = Report.problem(happened, expected)
+    val logBytes = AppLog.sizeBytes()
+    val problem = Report.problem(happened, expected, settings.logging, logBytes, repeated)
 
     fun send() {
         sending = Sending.Busy
@@ -128,13 +134,16 @@ fun ProblemReportScreen(nav: NavController) {
                         graph.settings.setLogging(on)
                         AppLog.setEnabled(on)
                     },
-                    logSize = formatBytes(AppLog.sizeBytes()),
+                    logSize = formatBytes(logBytes),
+                    repeated = repeated,
+                    onRepeated = { repeated = it },
                     busy = state is Sending.Busy,
                     error = (state as? Sending.Failed)?.why,
                     ready = problem == null,
                     onSend = ::send,
                 )
-                problem?.let { if (happened.isNotEmpty() || expected.isNotEmpty()) Hint(it) }
+                // The log comes first: what's missing there shows straight away; the words once some are typed.
+                problem?.let { if (!settings.logging || logBytes <= 0 || happened.isNotEmpty() || expected.isNotEmpty()) Hint(it) }
             }
         }
     }
@@ -150,12 +159,27 @@ internal fun ReportBody(
     logging: Boolean,
     onLogging: (Boolean) -> Unit,
     logSize: String,
+    repeated: Boolean,
+    onRepeated: (Boolean) -> Unit,
     busy: Boolean,
     error: String?,
     ready: Boolean,
     onSend: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+        // Before anything else (#567): a report always carries the log, and one that shows the problem a few times.
+        Text(
+            "Before you send: turn on debug logs, then make the problem happen a few times. The log goes with every " +
+                "report, so we can see exactly what went wrong.",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.testTag("report-steps"),
+        )
+        SwitchRow("Debug logs", logging, onLogging)
+        Hint(
+            if (logging) "The log is $logSize and goes with your report."
+            else "Debug logs are off, so nothing is being recorded. Turn them on and repeat the problem.",
+        )
         Hint(
             "Tell us what went wrong. Your words are posted as a short note in the public beta testers repo. " +
                 "The whole log stays private: it's kept on the Siansa server and in a private GitHub repository, and may be " +
@@ -176,11 +200,14 @@ internal fun ReportBody(
             supportingText = { Text("${expected.length} / ${Report.MAX_TEXT}") },
             modifier = Modifier.fillMaxWidth().testTag("report-expected"),
         )
-        SwitchRow("Keep a log", logging, onLogging)
-        Hint(
-            if (logging) "The log is $logSize and goes with your report."
-            else "Logging is off, so nothing was recorded. Turn it on, repeat the problem, then send the report.",
-        )
+        Row(
+            Modifier.fillMaxWidth().toggleable(value = repeated, enabled = logging, role = Role.Checkbox, onValueChange = onRepeated).testTag("report-repeated"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(checked = repeated, onCheckedChange = null, enabled = logging)
+            Spacer(Modifier.width(Space.Small))
+            Text("I made the problem happen a few times with debug logs on", style = MaterialTheme.typography.bodyMedium)
+        }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = onSend, enabled = ready && !busy, modifier = Modifier.testTag("report-send")) { Text("Send report") }

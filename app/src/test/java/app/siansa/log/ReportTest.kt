@@ -20,6 +20,17 @@ class ReportTest {
         assertNull(Report.problem("The song stops after a minute", "It keeps playing"))
     }
 
+    /** #567: the log is mandatory, and the tester confirms they repeated the problem with it on. */
+    @Test fun aReportNeedsTheLogAndTheProblemRepeated() {
+        val words = arrayOf("The song stops after a minute", "It keeps playing")
+        assertTrue(Report.problem(words[0], words[1], logging = false, logBytes = 0, repeated = true)!!.startsWith("Turn on debug logs"))
+        assertTrue(Report.problem(words[0], words[1], logging = true, logBytes = 0, repeated = true)!!.startsWith("The log is empty"))
+        assertTrue(Report.problem(words[0], words[1], logging = true, logBytes = 4096, repeated = false)!!.contains("tick the box"))
+        assertNull(Report.problem(words[0], words[1], logging = true, logBytes = 4096, repeated = true))
+        // The log comes first: with it off, that's what's asked for, even before the words.
+        assertTrue(Report.problem("", "", logging = false, logBytes = 0, repeated = false)!!.startsWith("Turn on debug logs"))
+    }
+
     @Test fun headerCarriesWordsAndDetails() {
         val h = Report.header(
             " It stops ", "It plays",
