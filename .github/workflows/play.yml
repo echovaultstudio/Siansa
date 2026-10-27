@@ -31,6 +31,8 @@ jobs:
     runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -44,8 +46,13 @@ jobs:
           if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then echo "::notice::No Google Play key (PLAY_SERVICE_ACCOUNT_JSON); skipped."; exit 0; fi
           [ -n "$TAG" ] || TAG=$(gh release view --json tagName --jq .tagName)
           VERSION="${TAG#v}"
-          mkdir -p play && cd play
-          gh release download "$TAG" --pattern '*.aab' --clobber
+          # The bundle is the CI run's artifact (releases carry no files, #584): the run on the commit the tag
+          # points at, which is the one that published it. Artifacts are kept 30 days; older ones by hand.
+          SHA=$(git rev-parse "$TAG^{commit}")
+          RUN=$(gh run list --workflow CI --branch main --limit 100 --json databaseId,headSha --jq ".[] | select(.headSha == \"$SHA\") | .databaseId" | head -n 1)
+          [ -n "$RUN" ] || { echo "::error::No CI run for $TAG ($SHA); its bundle is gone (artifacts are kept 30 days)."; exit 1; }
+          mkdir -p play && gh run download "$RUN" --name apk --dir play
+          cd play && ls siansa-*.aab
           gh release view "$TAG" --json body --jq .body > notes.md
           pip install --quiet google-auth==2.40.3 requests==2.32.4
           python3 ../scripts/play_upload.py "$(ls siansa-*.aab | head -n 1)" "$VERSION" notes.md

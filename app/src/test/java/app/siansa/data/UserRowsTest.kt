@@ -25,7 +25,7 @@ class UserRowsTest {
     }
 
     @Test fun theEntryReadsTheSame() {
-        val e = UserEntry(1, "max on 192.168.1.106", connected = true, user = "max", kind = SourceKind.OPENSUBSONIC)
+        val e = UserEntry(1, "max on 192.168.1.20", connected = true, user = "max", kind = SourceKind.OPENSUBSONIC)
         assertEquals("max", e.title)
         assertEquals("OpenSubsonic", e.serverLine)
     }

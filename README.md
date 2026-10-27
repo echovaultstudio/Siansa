@@ -2,7 +2,9 @@
 
 <p align="center"><img src="docs/brand/siansa-banner.png" alt="Siansa" width="720"></p>
 
-A personal Android music player for **Navidrome**, with daily mixes built on the phone from **AudioMuse-AI** text search and, optionally, titles and searches written by an **OpenRouter** model.
+A music player for your own **Navidrome**, **OpenSubsonic** or **Emby** server, with daily mixes built on the phone from **AudioMuse-AI** text search and, optionally, titles and searches written by an **OpenRouter** model. Audiobooks and podcasts from **Audiobookshelf** play alongside.
+
+Siansa is **open source** under the GNU GPL, version 3 or later ([LICENSE](LICENSE)): the code is here to read, build and improve. Website: [siansa.app](https://siansa.app). Docs: [docs.siansa.app](https://docs.siansa.app) (the [beta testers repository](https://github.com/echovaultstudio/siansa-beta-testers) until then).
 
 ## What it does
 
@@ -18,21 +20,28 @@ A personal Android music player for **Navidrome**, with daily mixes built on the
   4. The mix is saved **only on the phone**. Nothing is written to Navidrome's playlists.
 - **Sound search**: the Search tab can also describe a sound ("rainy jazz piano") and play what AudioMuse finds.
 
+## Getting it
+
+Siansa is in beta. There's no APK to download here: the app comes from
+
+- **Google Play's open beta**: join at [siansa.app](https://siansa.app), or
+- the **Siansa F-Droid repository** for testers, also from [siansa.app](https://siansa.app).
+
+Both update on their own. Or build it from this source (below): a build of your own is signed with your own key, so it can't update an installed copy from Play or F-Droid, and the other way round.
+
 ## Setup
 
-1. Install the latest APK from the repo's **Releases** page.
-2. In Settings, enter:
-   - **Navidrome**: address (e.g. `http://192.168.1.10:4533`), username, password.
+1. In Settings, enter:
+   - **Your server**: address (e.g. `http://192.168.1.10:4533`), username, password.
    - **AudioMuse-AI**: address of its web/API port (e.g. `http://192.168.1.10:8000`) and its API token if authentication is on. Text search (CLAP) must be enabled.
    - **OpenRouter** (optional): API key and model id (default `google/gemini-2.5-flash`; any OpenRouter model id works).
-3. Use **Test** next to each section, then **Save**.
-4. Optional: install the **Siansa plugin** on AudioMuse-AI (see [`audiomuse-plugin/`](audiomuse-plugin/README.md)) and choose it
+   - **Audiobookshelf** (optional, under Settings › Users): address and an API token or login.
+2. Use **Test** next to each section, then **Save**.
+3. Optional: install the **Siansa plugin** on AudioMuse-AI (see [`audiomuse-plugin/`](audiomuse-plugin/README.md)) and choose it
    under Settings › Crossfade and levelling. It measures each song's loudness and how it starts and ends, for
    levelling and smooth crossfades, and finds similar albums and artists.
 
-Outside your home network the phone needs to reach both servers, for example over a VPN such as WireGuard or Tailscale.
-
-Passwords, tokens and the API key are stored encrypted with a key from the Android Keystore and are excluded from backups.
+Inside the app, with **Settings › Help › Debug logs** on, the log records each start (version, phone, settings that change behaviour), why the app last closed (crash, freeze, killed for memory, swiped away; Android 11+), every error in background work, playback decisions, downloads and covers. **Report a problem** on the same page sends it with your words.
 
 ## Quality checks
 
@@ -56,6 +65,16 @@ Inside the app, with **Settings → Logs → Keep a log** on, the log records ea
 
 ## Building
 
-GitHub Actions builds a signed APK on every push to `main` and publishes it once all quality checks pass. The version comes from `version.txt` (e.g. `0.0.3beta`). Each change adds a note in `changelog.d/` (see its README). When changes are merged to `main` and the checks pass, CI raises the version by the size of the change (fixes 0.1.3 → 0.1.4, new features 0.1.3 → 0.2.0, 1.0 only when asked for; see `changelog.d/README.md`), publishes `v<version>` with `siansa-<version>.apk` and the notes, and records the section in `CHANGELOG.md` and the version in `version.txt`. Edits to older changelog sections are copied to their releases too. `RELEASES.md` lists every release with the pull requests in it and is updated after each release. The signing key is in `app/siansa.keystore`, so each new build installs over the previous one. Keep this repository private.
+GitHub Actions builds the app on every push to `main` and publishes a release once all quality checks pass. The version comes from `version.txt` (e.g. `0.0.3beta`). Each change adds a note in `changelog.d/` (see its README). When changes are merged to `main` and the checks pass, CI raises the version by the size of the change (fixes 0.1.3 → 0.1.4, new features 0.1.3 → 0.2.0, 1.0 only when asked for; see `changelog.d/README.md`), tags `v<version>` with the notes, records the section in `CHANGELOG.md` and the version in `version.txt`, sends the APK to the F-Droid repository and the app bundle to Google Play's open beta. Edits to older changelog sections are copied to their releases too. `RELEASES.md` lists every release with the pull requests in it and is updated after each release.
 
-To build locally: `gradle :app:assembleRelease` with Gradle 8.14+, JDK 17 and the Android SDK (platform 36).
+The release signing key isn't in the repository: CI gets it from the secrets `SIGNING_KEYSTORE_BASE64`, `SIGNING_KEYSTORE_PASSWORD`, `SIGNING_KEY_ALIAS` and `SIGNING_KEY_PASSWORD`, and a build without them is unsigned.
+
+To build locally: `gradle :app:assembleRelease` with Gradle 8.14+, JDK 17 and the Android SDK (platform 36). To sign it with a key of your own, set `SIANSA_KEYSTORE` (the file's path), `SIANSA_KEYSTORE_PASSWORD`, `SIANSA_KEY_ALIAS` and `SIANSA_KEY_PASSWORD` in the environment.
+
+## Contributing and reporting
+
+Bug reports and feature requests go to the [beta testers repository](https://github.com/echovaultstudio/siansa-beta-testers/issues), or **Settings › Help › Report a problem** in the app, which sends the log along. Pull requests are welcome here: one issue per pull request, with a note in `changelog.d/` and tests for what changes (see `CLAUDE.md` for the conventions CI checks).
+
+## Licence
+
+Siansa is free software under the [GNU General Public License, version 3 or later](LICENSE). The AudioMuse-AI plugin in `audiomuse-plugin/` is under the [AGPL 3](audiomuse-plugin/LICENSE), as AudioMuse-AI is. The libraries the app is built on and their licences are listed at [siansa.app/licenses](https://siansa.app/licenses).

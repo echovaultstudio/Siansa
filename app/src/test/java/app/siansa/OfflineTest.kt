@@ -61,7 +61,7 @@ class OfflineTest {
 
     @Test fun theReachabilityCheckSendsNoSubsonicRequest() {
         // Navidrome logged "missing parameter: 'u'" twice for every check of /rest/ping.view without a login.
-        org.junit.Assert.assertEquals("http://192.168.1.106:30043/", app.siansa.net.reachabilityUrl("http://192.168.1.106:30043/"))
+        org.junit.Assert.assertEquals("http://192.168.1.20:30043/", app.siansa.net.reachabilityUrl("http://192.168.1.20:30043/"))
         org.junit.Assert.assertEquals("https://music.example.com/navidrome/", app.siansa.net.reachabilityUrl("https://music.example.com/navidrome"))
         org.junit.Assert.assertFalse(app.siansa.net.reachabilityUrl("http://nd:4533").contains("/rest/"))
     }

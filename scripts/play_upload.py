@@ -3,10 +3,10 @@
 
   python3 scripts/play_upload.py siansa-0.37.0beta.aab 0.37.0beta notes.md
 
-The bundle goes to the testing tracks in PLAY_TRACK, comma-separated; unset, both closed testing ("alpha", Play's
-name for it) and internal testing. It's one release on each, named after the version, with the version's notes as
-"What's new" (plain text, at most 500 characters). Internal testing has it at once; closed testing goes through
-Google's review.
+The bundle goes to the testing tracks in PLAY_TRACK, comma-separated; unset, open testing ("beta", Play's name
+for it), the public beta (#584). It's one release on each, named after the version, with the version's notes as
+"What's new" (plain text, at most 500 characters). Open and closed testing go through Google's review; internal
+testing has it at once.
 
 Needs PLAY_SERVICE_ACCOUNT_JSON: a Google Cloud service account's JSON key, invited in Play Console with
 "Release apps to testing tracks" for Siansa only. Without it nothing is sent. The key stays in that secret; this
@@ -27,8 +27,8 @@ API = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/
 UPLOAD = "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/" + PACKAGE
 SCOPE = "https://www.googleapis.com/auth/androidpublisher"
 NOTES_MAX = 500
-# Closed testing ("alpha" in the API) and internal testing, both with every release (#557).
-DEFAULT_TRACKS = ("alpha", "internal")
+# Open testing ("beta" in the API): the public beta anyone can join (#584). PLAY_TRACK names others.
+DEFAULT_TRACKS = ("beta",)
 TRACK_NAMES = {"alpha": "closed testing", "internal": "internal testing", "beta": "open testing", "production": "production"}
 
 
@@ -177,7 +177,7 @@ def upload(aab, version, notes_md, tracks, key_json):
         status = "draft"
         put(status)
     print(f"::notice::Google Play: {version} (version code {code}) is on {', '.join(TRACK_NAMES.get(t, t) for t in tracks)} as {status}."
-          + (" Roll it out in Play Console." if status == "draft" else " Internal testing has it now; closed testing after Google's review."))
+          + (" Roll it out in Play Console." if status == "draft" else " Testers get it after Google's review (internal testing at once)."))
     return status
 
 
