@@ -94,4 +94,15 @@ class AudiobookshelfApiTest {
         assertEquals(false, AudiobookshelfApi.userMayScan(json("""{"user":{"type":"user"}}""")))
         assertEquals(false, AudiobookshelfApi.userMayScan(json("""{}""")))
     }
+
+    // A book's cover with no Audiobookshelf address no longer throws (it crashed the book page and Home's shortcuts).
+    @Test fun aCoverWithoutAServerDoesNotThrow() {
+        val api = AudiobookshelfApi(okhttp3.OkHttpClient()) { app.siansa.data.AppSettings(audiobookshelfUrl = "") }
+        assertEquals("/api/items/b1/cover", api.coverUrl("b1", 300))
+    }
+
+    @Test fun aCoverAddressHasItsSizeAndFormat() {
+        val api = AudiobookshelfApi(okhttp3.OkHttpClient()) { app.siansa.data.AppSettings(audiobookshelfUrl = "http://abs.local:13378/") }
+        assertEquals("http://abs.local:13378/api/items/b1/cover?width=300&format=webp", api.coverUrl("b1", 300))
+    }
 }
