@@ -37,7 +37,7 @@ Siansa is **open source** under the GNU GPL, version 3 or later ([LICENSE](LICEN
 </tr>
 </table>
 
-<p align="center"><sub>Album, artist, book and podcast pictures are blurred in these screenshots; in the app you see your own.</sub></p>
+<p align="center"><sub>Album, artist, book and podcast pictures are blurred and their names made up in these screenshots; in the app you see your own.</sub></p>
 
 ## Getting it
 
