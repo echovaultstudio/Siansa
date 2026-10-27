@@ -42,6 +42,9 @@ import app.siansa.data.UserEntry
 import app.siansa.data.UserFiles
 import app.siansa.data.Users
 import app.siansa.log.AppLog
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 
 /**
  * Settings → Users: every Navidrome login on this phone. Tap one to switch to it (the app restarts with
@@ -115,6 +118,9 @@ fun UsersScreen(nav: NavController) {
                     )
                 }
             }
+            // Audiobookshelf (#582): its login, in the same two lines as a user, and Scan for an admin login.
+            HorizontalDivider()
+            AudiobookshelfRows(nav)
             // The library of the user in use, synced to the phone (issue #273, was on the Settings start page).
             HorizontalDivider()
             Row(
@@ -184,5 +190,84 @@ fun UsersScreen(nav: NavController) {
             },
             dismissButton = { TextButton(onClick = { removing = null }) { Text("Cancel") } },
         )
+    }
+}
+
+/** The first line of the Audiobookshelf row: the username, or how it's logged in without one (#582). */
+internal fun absTitle(user: String, token: String, url: String): String = when {
+    url.isBlank() -> "Audiobookshelf"
+    user.isNotBlank() -> user
+    token.isNotBlank() -> "API token"
+    else -> "Audiobookshelf"
+}
+
+/** The second line: the kind of server, and whether it's set up. */
+internal fun absLine(ready: Boolean): String = if (ready) "Audiobookshelf" else "Audiobookshelf · Not set up yet"
+
+/**
+ * Audiobookshelf on the Users page (#582): the login as a row like a user's (tap to change it), and, with a server
+ * set up, "Scan for new books", which asks Audiobookshelf to scan its libraries, as its own web page does, then
+ * reads the books again. Only an admin login may ask for a scan; with another the row says so.
+ */
+@Composable
+private fun AudiobookshelfRows(nav: NavController) {
+    val graph = LocalGraph.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    var scan by remember { mutableStateOf<String?>(null) }
+    var scanning by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().clickable { nav.navigate("settings/audiobookshelf") }.padding(horizontal = Space.Page, vertical = Space.Page).testTag("absUser"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.AutoMirrored.Rounded.MenuBook, null, tint = MaterialTheme.colorScheme.primary)
+        Column(Modifier.weight(1f).padding(start = Space.Page)) {
+            Text(absTitle(settings.audiobookshelfUser, settings.audiobookshelfToken, settings.audiobookshelfUrl), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(absLine(settings.booksReady), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Icon(Icons.Rounded.Edit, "Change the Audiobookshelf login", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    if (settings.booksReady) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(enabled = !scanning) {
+                    scanning = true
+                    scan = "Asking Audiobookshelf to scan…"
+                    scope.launch {
+                        scan = try {
+                            if (!graph.audiobookshelf.isAdmin()) {
+                                "Only an admin login can ask for a scan. Scan from Audiobookshelf's own page, or log Siansa in as an admin."
+                            } else {
+                                val n = graph.audiobookshelf.scanLibraries()
+                                graph.books.forget()
+                                graph.books.refreshShelves(podcasts = false, force = true)
+                                graph.books.refreshShelves(podcasts = true, force = true)
+                                AppLog.i("Books", "Scan asked for $n libraries; books read again")
+                                "Scanning $n ${if (n == 1) "library" else "libraries"} on the server. New books show once it's done."
+                            }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            AppLog.w("Books", "Scan not asked: ${e.message}")
+                            "Couldn't ask for a scan: ${e.message}"
+                        }
+                        scanning = false
+                    }
+                }
+                .padding(horizontal = Space.Page, vertical = Space.Page)
+                .testTag("absScan"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Rounded.Sync, null, tint = MaterialTheme.colorScheme.primary)
+            Column(Modifier.weight(1f).padding(start = Space.Page)) {
+                Text("Scan for new books", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    scan ?: "Asks Audiobookshelf to look for new and changed books in its libraries.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }

@@ -76,7 +76,6 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
     var navidromeTest by remember { mutableStateOf<String?>(null) }
     var audioMuseTest by remember { mutableStateOf<String?>(null) }
     var openRouterTest by remember { mutableStateOf<String?>(null) }
-    var audiobookshelfTest by remember { mutableStateOf<String?>(null) }
 
     // Tests use what's typed, before it's saved.
     fun runTest(set: (String) -> Unit, block: suspend (AppSettings) -> String) {
@@ -193,29 +192,6 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                 }
 
                 HorizontalDivider()
-                Heading("Audiobookshelf (optional)")
-                Hint("Audiobooks and podcasts from your Audiobookshelf server, next to your music. One login for the whole app.")
-                Field("Server address", draft.audiobookshelfUrl, "192.168.1.10:13378") { draft = draft.copy(audiobookshelfUrl = it) }
-                Hint("Use either an API token (Audiobookshelf › your user › API token) or the username and password.")
-                SecretField("API token", draft.audiobookshelfToken) { draft = draft.copy(audiobookshelfToken = it) }
-                Field("Username", draft.audiobookshelfUser, keyboard = KeyboardType.Text) { draft = draft.copy(audiobookshelfUser = it) }
-                SecretField("Password", draft.audiobookshelfPassword) { draft = draft.copy(audiobookshelfPassword = it) }
-                TestRow(audiobookshelfTest) {
-                    runTest({ audiobookshelfTest = it }) { s ->
-                        if (!s.booksReady) throw ApiException("Enter the server address and a token, or a username and password")
-                        val api = AudiobookshelfApi(graph.http) { s }
-                        val who = api.ping()
-                        val libraries = api.libraries()
-                        val books = libraries.count { !it.podcasts }
-                        val podcasts = libraries.size - books
-                        "Connected to $who · " + listOfNotNull(
-                            "$books book ${if (books == 1) "library" else "libraries"}".takeIf { books > 0 },
-                            "$podcasts podcast ${if (podcasts == 1) "library" else "libraries"}".takeIf { podcasts > 0 },
-                        ).joinToString(", ").ifEmpty { "no libraries this user can see" }
-                    }
-                }
-
-                HorizontalDivider()
                 Heading("OpenRouter (optional)")
                 Hint("Writes the mix titles and sound searches. Only the vibe's guidance, the time and your last 20 plays are sent.")
                 SecretField("API key", draft.openRouterKey) { draft = draft.copy(openRouterKey = it) }
@@ -243,7 +219,7 @@ internal fun Heading(text: String) {
 }
 
 @Composable
-private fun Field(
+internal fun Field(
     label: String,
     value: String,
     placeholder: String? = null,
@@ -262,7 +238,7 @@ private fun Field(
 }
 
 @Composable
-private fun SecretField(label: String, value: String, onChange: (String) -> Unit) {
+internal fun SecretField(label: String, value: String, onChange: (String) -> Unit) {
     var visible by remember { mutableStateOf(false) }
     OutlinedTextField(
         value = value,
@@ -281,7 +257,7 @@ private fun SecretField(label: String, value: String, onChange: (String) -> Unit
 }
 
 @Composable
-private fun TestRow(result: String?, onTest: () -> Unit) {
+internal fun TestRow(result: String?, onTest: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
         OutlinedButton(onClick = onTest) { Text("Test") }
         if (result != null) {

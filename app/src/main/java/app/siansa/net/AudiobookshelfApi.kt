@@ -105,6 +105,20 @@ class AudiobookshelfApi(private val http: OkHttpClient, private val settings: ()
         return "Audiobookshelf $version as $name".trim()
     }
 
+    /** Whether this login may ask the server to scan (#582): Audiobookshelf's admin and root users can. */
+    suspend fun isAdmin(): Boolean = userMayScan(call("/api/authorize", body = JsonObject(emptyMap())).jsonObject)
+
+    /**
+     * Asks Audiobookshelf to scan every library for new and changed books (#582), as its web page's Scan does. The scan
+     * runs on the server; this returns once it's asked, with how many libraries were asked. Admin users only.
+     */
+    suspend fun scanLibraries(): Int {
+        val libs = libraries()
+        libs.forEach { call("/api/libraries/${it.id}/scan", body = JsonObject(emptyMap())) }
+        AppLog.i("Audiobookshelf", "Scan asked for ${libs.size} libraries")
+        return libs.size
+    }
+
     /** The libraries the user can see: books and podcasts. */
     suspend fun libraries(): List<AbsLibrary> = call("/api/libraries").jsonObject.arr("libraries").mapNotNull { l ->
         AbsLibrary(l.str("id") ?: return@mapNotNull null, l.str("name").orEmpty(), l.str("mediaType") == "podcast")
@@ -274,6 +288,9 @@ class AudiobookshelfApi(private val http: OkHttpClient, private val settings: ()
         /** A library search reply: its "book" and "podcast" lists, each entry's libraryItem, in that order. */
         fun parseSearch(root: JsonObject): List<Book> =
             (root.arr("book") + root.arr("podcast")).mapNotNull { hit -> hit.obj("libraryItem")?.let { parseBook(it) } }
+
+        /** Whether an /api/authorize answer is an admin's: type "admin" or "root" (a plain "user" can't scan). */
+        fun userMayScan(authorize: JsonObject): Boolean = authorize.obj("user")?.str("type") in setOf("admin", "root")
 
         fun parseBook(o: JsonObject): Book? {
             val id = o.str("id") ?: return null
