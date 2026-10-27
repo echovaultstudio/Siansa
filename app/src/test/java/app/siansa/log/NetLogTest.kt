@@ -14,7 +14,7 @@ import org.junit.Test
 /** Issue #180: every request logged in full, without its secrets. */
 class NetLogTest {
     private val request = Request.Builder()
-        .url("http://192.168.1.106:4533/rest/stream?id=59oa&u=max&t=abc123token&s=salt99&v=1.16.1&c=Siansa&f=json&maxBitRate=0")
+        .url("http://192.168.1.20:4533/rest/stream?id=59oa&u=max&t=abc123token&s=salt99&v=1.16.1&c=Siansa&f=json&maxBitRate=0")
         .header("Authorization", "Basic bWF4OnNlY3JldA==")
         .header("Range", "bytes=0-")
         .header("Cookie", "audiomuse_jwt=eyJhbGciOi")
@@ -33,16 +33,16 @@ class NetLogTest {
         .build()
 
     @Test fun showsWhereItWentAndWhatCameBack() {
-        val text = NetLog.describe(request, response(), "192.168.1.106:4533", "http/1.1", 326)
-        assertTrue(text, text.startsWith("→ GET http://192.168.1.106:4533/rest/stream?id=59oa"))
-        assertTrue(text, text.contains("(to 192.168.1.106:4533 · http/1.1)"))
+        val text = NetLog.describe(request, response(), "192.168.1.20:4533", "http/1.1", 326)
+        assertTrue(text, text.startsWith("→ GET http://192.168.1.20:4533/rest/stream?id=59oa"))
+        assertTrue(text, text.contains("(to 192.168.1.20:4533 · http/1.1)"))
         assertTrue(text, text.contains("v=1.16.1") && text.contains("maxBitRate=0"))
         assertTrue(text, text.contains("Range: bytes=0-"))
         assertTrue(text, text.contains("← 206 Partial Content · audio/flac · 65.3 MB · range bytes 0-68499999/68500000 · in 326ms"))
     }
 
     @Test fun leavesOutSecrets() {
-        val text = NetLog.describe(request, response(), "192.168.1.106:4533", null, 1)
+        val text = NetLog.describe(request, response(), "192.168.1.20:4533", null, 1)
         for (secret in listOf("abc123token", "salt99", "bWF4OnNlY3JldA", "eyJhbGciOi", "u=max")) {
             assertFalse("$secret in: $text", text.contains(secret))
         }
@@ -76,11 +76,11 @@ class NetLogTest {
 
     @Test fun hidesEmbysLoginToken() {
         val emby = Request.Builder()
-            .url("http://192.168.1.106:8096/Sessions/Playing")
+            .url("http://192.168.1.20:8096/Sessions/Playing")
             .header("X-Emby-Authorization", "Emby Client=\"Siansa\", Device=\"Android\", Version=\"1\", Token=\"94b8dc154124\"")
             .header("X-Emby-Token", "94b8dc154124")
             .build()
-        val text = NetLog.sent(emby, "192.168.1.106:8096", "http/1.1")
+        val text = NetLog.sent(emby, "192.168.1.20:8096", "http/1.1")
         assertFalse(text, text.contains("94b8dc154124"))
         assertTrue(text, text.contains("Client=\"Siansa\""))
         assertTrue(text, text.contains("X-Emby-Token: •••"))

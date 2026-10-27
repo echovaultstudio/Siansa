@@ -17,12 +17,12 @@ class DlnaQueueTest {
         assertEquals(-1, DlnaQueue.nextIndex(0, 0, Player.REPEAT_MODE_ALL))
     }
 
-    private val navidrome = "http://192.168.1.106:30043/rest/stream?u=max&t=abc&s=salt&v=1.16.1&c=siansa&f=json&id=5kEZ&format=mp3&maxBitRate=320&estimateContentLength=true"
+    private val navidrome = "http://192.168.1.20:30043/rest/stream?u=max&t=abc&s=salt&v=1.16.1&c=siansa&f=json&id=5kEZ&format=mp3&maxBitRate=320&estimateContentLength=true"
 
     @Test fun theSameSongIsRecognisedHowEverTheDeviceWritesIt() {
         assertTrue(DlnaQueue.sameStream(navidrome, navidrome))
         // XML-escaped, parts in another order, another login.
-        val back = "http://192.168.1.106:30043/rest/stream?id=5kEZ&amp;format=mp3&amp;maxBitRate=320&amp;estimateContentLength=true&amp;u=max&amp;t=zzz&amp;s=other&amp;v=1.16.1&amp;c=siansa&amp;f=json"
+        val back = "http://192.168.1.20:30043/rest/stream?id=5kEZ&amp;format=mp3&amp;maxBitRate=320&amp;estimateContentLength=true&amp;u=max&amp;t=zzz&amp;s=other&amp;v=1.16.1&amp;c=siansa&amp;f=json"
         assertTrue(DlnaQueue.sameStream(navidrome, back))
         // Percent-encoded id.
         assertTrue(DlnaQueue.sameStream("http://h:1/rest/stream?id=a%3Ab&format=mp3", "http://h:1/rest/stream?format=mp3&id=a:b"))

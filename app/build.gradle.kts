@@ -28,13 +28,16 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // A fixed key kept in this private repo, so every new APK installs over the last one.
+    // The release key comes from outside the repository (public since #584): SIANSA_KEYSTORE (a path),
+    // SIANSA_KEYSTORE_PASSWORD, SIANSA_KEY_ALIAS and SIANSA_KEY_PASSWORD, which CI fills from its secrets. Without
+    // them a release build is unsigned and the debug build uses the debug key, so anyone can build from source.
+    val keystorePath = System.getenv("SIANSA_KEYSTORE")?.takeIf { it.isNotBlank() }
     signingConfigs {
-        create("siansa") {
-            storeFile = file("siansa.keystore")
-            storePassword = "siansapass"
-            keyAlias = "siansa"
-            keyPassword = "siansapass"
+        if (keystorePath != null) create("siansa") {
+            storeFile = file(keystorePath)
+            storePassword = System.getenv("SIANSA_KEYSTORE_PASSWORD").orEmpty()
+            keyAlias = System.getenv("SIANSA_KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "siansa"
+            keyPassword = System.getenv("SIANSA_KEY_PASSWORD").orEmpty()
         }
     }
 
@@ -45,14 +48,15 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("siansa")
+            signingConfigs.findByName("siansa")?.let { signingConfig = it }
             // The FFmpeg decoder is native code: its symbols go into the app bundle, so Google Play can read a
             // crash or ANR in it (issue #519). SYMBOL_TABLE gives function names; the libraries come prebuilt, so
             // files and lines (FULL) aren't there to keep.
             ndk.debugSymbolLevel = "SYMBOL_TABLE"
         }
         debug {
-            signingConfig = signingConfigs.getByName("siansa")
+            // The same key as the release when there is one, so a debug build installs over a release build.
+            signingConfigs.findByName("siansa")?.let { signingConfig = it }
         }
     }
 

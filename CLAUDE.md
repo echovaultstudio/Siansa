@@ -48,4 +48,4 @@ implements them and opens a pull request. Labels show where each one is: `claude
 
 - Don't upgrade Android Gradle Plugin, Compose, androidx.core, navigation, Coil or Media3 (see issue #23 and
   `.github/dependabot.yml`).
-- Don't commit secrets. The signing keystore in `app/` is intentional while the repository is private.
+- Don't commit secrets: the repository is public. The signing key lives only in CI's secrets (`SIGNING_KEYSTORE_BASE64`); a local build is unsigned unless `SIANSA_KEYSTORE` points at a key of your own.
