@@ -436,6 +436,28 @@ fun homeGap(step: Int): Dp = when (step.coerceIn(0, app.siansa.data.AppSettings.
     else -> Space.Large
 }
 
+/**
+ * Whether the music player's queue is [songs] (#562): the same songs, in any order (shuffled counts), leaving out the
+ * ones keep playing or a radio added by itself ([auto]). How a card on Home knows its mix is the one playing.
+ */
+internal fun queueIsList(queue: List<app.siansa.data.Song>, auto: Set<Int>, songs: List<app.siansa.data.Song>): Boolean {
+    if (songs.isEmpty() || queue.isEmpty()) return false
+    val own = queue.filterIndexed { i, _ -> i !in auto }
+    if (own.size != songs.size) return false
+    val ids = own.mapTo(HashSet()) { it.id }
+    return songs.all { it.id in ids }
+}
+
+/** A card's play button for [songs] (#562): ⏸ while they're the queue and playing; a tap then pauses or plays on. */
+data class CardPlay(val loaded: Boolean, val playing: Boolean)
+
+@Composable
+fun rememberCardPlay(songs: List<app.siansa.data.Song>): CardPlay {
+    val state by LocalGraph.current.player.state.collectAsStateWithLifecycle()
+    val loaded = remember(state.queue, state.auto, songs) { queueIsList(state.queue, state.auto, songs) }
+    return CardPlay(loaded, loaded && state.isPlaying)
+}
+
 /** What the slider's step is called. */
 fun homeGapLabel(step: Int): String = listOf("Tight", "Compact", "Normal", "Roomy", "Airy")[step.coerceIn(0, app.siansa.data.AppSettings.HOME_GAP_MAX)]
 
