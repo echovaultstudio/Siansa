@@ -43,9 +43,12 @@ object UserFiles {
     /** A user's row, first line (#571): their login name, or a note when not set up yet. */
     fun title(user: String): String = user.ifBlank { "New user" }
 
-    /** What kind of server, as people call it (#571): Navidrome for an OpenSubsonic server, Emby… */
+    /**
+     * What kind of server (#571): OpenSubsonic, Emby… An OpenSubsonic server isn't called Navidrome, as it may be
+     * Gonic, Airsonic or another; the app doesn't know which.
+     */
     fun kindName(kind: SourceKind): String = when (kind) {
-        SourceKind.OPENSUBSONIC -> "Navidrome"
+        SourceKind.OPENSUBSONIC -> "OpenSubsonic"
         SourceKind.EMBY -> "Emby"
         SourceKind.JELLYFIN -> "Jellyfin"
         SourceKind.LOCAL -> "This phone"

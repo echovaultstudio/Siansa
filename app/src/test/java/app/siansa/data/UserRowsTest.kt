@@ -12,7 +12,7 @@ class UserRowsTest {
     }
 
     @Test fun theSecondLineIsTheKindOfServer() {
-        assertEquals("Navidrome", UserFiles.serverLine(SourceKind.OPENSUBSONIC, null, connected = true))
+        assertEquals("OpenSubsonic", UserFiles.serverLine(SourceKind.OPENSUBSONIC, null, connected = true))
         assertEquals("Emby", UserFiles.serverLine(SourceKind.EMBY, " ", connected = true))
     }
 
@@ -27,6 +27,6 @@ class UserRowsTest {
     @Test fun theEntryReadsTheSame() {
         val e = UserEntry(1, "max on 192.168.1.106", connected = true, user = "max", kind = SourceKind.OPENSUBSONIC)
         assertEquals("max", e.title)
-        assertEquals("Navidrome", e.serverLine)
+        assertEquals("OpenSubsonic", e.serverLine)
     }
 }
