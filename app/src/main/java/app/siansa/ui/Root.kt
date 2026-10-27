@@ -312,11 +312,13 @@ fun SiansaRoot() {
                 composable("downloads/add") { DownloadPickerScreen(nav) }
                 composable("downloads/songs") { DownloadedSongsScreen(nav) }
                 composable("settings/help") { HelpScreen(nav) }
+                composable("settings/audiobookshelf") { AudiobookshelfScreen(nav) }
                 composable("settings/logs") { LogsScreen(nav) }
                 composable("settings/report") { ProblemReportScreen(nav) }
                 composable("settings/backup") { BackupScreen(nav) }
                 composable("settings/scrobbling") { ScrobblingScreen(nav) }
                 composable("settings/whatsnew") { WhatsNewScreen(nav) }
+                composable("settings/about") { AboutScreen(nav) }
                 composable("home/{section}") { HomeSectionScreen(nav, it.arguments?.getString("section").orEmpty()) }
                 composable("liked") { LikedScreen(nav) }
                 composable("radio/{kind}/{key}") {
