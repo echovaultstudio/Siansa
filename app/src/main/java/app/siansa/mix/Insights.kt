@@ -101,6 +101,17 @@ fun reportWindow(range: ReportRange, today: LocalDate): ReportWindow {
     }
 }
 
+/**
+ * The report window for a time machine month or year (#578): that month or year, up to today for one still going,
+ * compared with the month or year before it, titled like the time machine ("May 2025", "2025").
+ */
+fun timeMachineReportWindow(year: Int, month: Int?, today: LocalDate): ReportWindow {
+    val w = timeWindow(year, month)
+    val to = if (w.to.isAfter(today)) today.plusDays(1) else w.to
+    val prevFrom = if (month == null) w.from.minusYears(1) else w.from.minusMonths(1)
+    return ReportWindow(w.from, to, prevFrom, w.label, if (to != w.to) "So far" else w.label)
+}
+
 /** How many top songs and albums are asked from Koito, to still have 10 after leaving out ones not in the library. */
 private const val TOP_FETCH = 40
 
@@ -204,10 +215,12 @@ class Insights(private val graph: AppGraph) {
 
     // ---------------- Your month ----------------
 
-    suspend fun report(range: ReportRange): ListeningReport = coroutineScope {
+    suspend fun report(range: ReportRange): ListeningReport = report(reportWindow(range, LocalDate.now()), range.id)
+
+    /** The report for any window: Your month's ranges, or a time machine month or year (#578). */
+    suspend fun report(window: ReportWindow, tag: String): ListeningReport = coroutineScope {
         val s = graph.settings.current
-        val today = LocalDate.now()
-        val (from, to, prevFrom, title, subtitle) = reportWindow(range, today)
+        val (from, to, prevFrom, title, subtitle) = window
         val fromSec = from.atStartOfDay(zone).toEpochSecond()
         val toSec = to.atStartOfDay(zone).toEpochSecond()
         val prevSec = prevFrom.atStartOfDay(zone).toEpochSecond()
@@ -223,7 +236,7 @@ class Insights(private val graph: AppGraph) {
         } else null
 
         val (genresUp, genresDown) = genreShift(inRange, before)
-        AppLog.d("Report", "${range.id}: $from to $to")
+        AppLog.d("Report", "$tag: $from to $to")
         val report = if (remote != null) {
             ListeningReport(
                 title = title, subtitle = subtitle,
