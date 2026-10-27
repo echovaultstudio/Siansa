@@ -46,6 +46,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -245,6 +246,8 @@ fun HomeScreen(nav: NavController) {
         listState.animateScrollToItem(0)
     }
 
+    // The gap between sections, from Arrange Home's spacing slider (#554).
+    CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap)) {
     LazyColumn(
         Modifier.fillMaxSize().aboveKeyboard(),
         state = listState,
@@ -482,8 +485,12 @@ fun HomeScreen(nav: NavController) {
             }
         }
     }
+    }
     if (arranging) {
-        ArrangeHomeSheet(homeOrder, homeHidden, onChange = {
+        ArrangeHomeSheet(homeOrder, homeHidden, gap = homeSettings.homeGap, onGapChange = {
+            AppLog.i("Home", "Spacing: ${homeGapLabel(it)}")
+            graph.settings.setHomeGap(it)
+        }, onChange = {
             AppLog.i("Home", "Arranged: ${HomeSection.format(it)}")
             graph.settings.setHomeOrder(it)
         }, onHiddenChange = {
