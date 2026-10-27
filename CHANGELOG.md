@@ -3,6 +3,34 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.36.0beta — 2026-10-27
+
+### Fixed
+- **Press and hold play to stop a book.** As with music, holding the play button in the book player or its mini
+  player stops the book and clears the mini player. Before, holding it did nothing.
+- **The last book you played is in Home's shortcuts.** Playing a book or a podcast adds it to the shortcuts at the
+  top of Home, like an album, playlist or mix; the shortcut opens the book's page.
+- **▶ on a book card pauses the book that's playing** instead of starting it again from the server. Tapping it twice
+  used to open a new session on Audiobookshelf each time and leave the old ones open. The card and the book's page
+  show ⏸ while that book plays.
+
+### Added
+- **A spacing slider in Arrange Home.** One slider, from Tight to Airy, sets the gap between every section on Home.
+  Home starts out a step tighter than before.
+
+### Changed
+- **Search finds books and podcasts too.** With an Audiobookshelf server set up, a search shows **Books** and
+  **Podcasts** rows under the music matches, by title, author or narrator; a tile opens the book's page.
+- **The book player looks like Now Playing.** It slides up over the page like the music player, with the cover's
+  colours behind it, the chapter at the top, the chapter's bar, chapter and skip buttons around play, and the speed,
+  where you are in the whole book and the sleep timer underneath. Bookmark is next to the title; everything else is
+  in the ⋮ menu. Drag it down to close.
+- **Home's books and podcasts carousels show five cards**, not eight: what you're in the middle of, then up next
+  and new. The rest are under Books and Podcasts in Your Library.
+- **A book's page looks like an album's.** The cover's colour fades down from the top behind the cover and title,
+  and the title bar turns solid in that colour as you scroll. The cover now lines up with the title instead of
+  sitting low under a long list of narrators.
+
 ## 0.35.1beta — 2026-10-26
 
 ### Fixed
