@@ -159,6 +159,27 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
     /** The episode playing, when it's a podcast (issue #521); null for a book. */
     private var episode: app.siansa.net.Episode? = null
 
+    /**
+     * A podcast's ▶ on Home or its page (beta #45): a podcast itself has no audio, its episodes do, so this plays
+     * the episode in progress, else the newest one.
+     */
+    private fun playPodcast(podcast: Book) {
+        val inProgress = graph.books.progress.value[podcast.id]?.takeIf { !it.finished }?.episodeId
+        graph.scope.launch {
+            val episodes = runCatching { graph.audiobookshelf.episodes(podcast.id) }
+                .onFailure { AppLog.w("BookPlayer", "Couldn't read the episodes of \"${podcast.title}\": ${it.message}") }
+                .getOrDefault(emptyList())
+            val ep = app.siansa.net.AudiobookshelfApi.episodeToPlay(episodes, inProgress)
+            handler.post {
+                if (ep == null) graph.player.notice("This podcast has no episodes to play")
+                else {
+                    AppLog.i("BookPlayer", "Podcast \"${podcast.title}\": playing ${if (ep.id == inProgress) "the episode in progress" else "the newest episode"} \"${ep.title}\"")
+                    playEpisode(podcast, ep)
+                }
+            }
+        }
+    }
+
     /** Plays one episode of a podcast: its own session on the server, its own progress. */
     fun playEpisode(podcast: Book, ep: app.siansa.net.Episode) {
         episode = ep
@@ -179,6 +200,7 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
 
     /** Starts [book] at [fromSec]: the first chapter, where the listener was, or a chapter they tapped. */
     fun play(book: Book, fromSec: Double, episodeId: String? = null) {
+        if (book.podcast && episodeId == null) return playPodcast(book)
         AppLog.i("BookPlayer", "Play \"${book.title}\" from ${fromSec.toInt()} s")
         startAskedAt = System.currentTimeMillis()
         // The session of whatever was playing is closed with where it got to, so the server isn't left with
@@ -235,13 +257,18 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
                 throw e
             } catch (e: Exception) {
                 AppLog.w("BookPlayer", "Couldn't start \"${book.title}\": ${e.message}")
-                _state.value = _state.value.copy(playing = false)
+                // Nothing is loaded, so nothing stays on the screen: a book that never started otherwise kept a
+                // mini player that came back over the music's whenever a song paused (beta #45).
+                sessionId = null
+                _state.value = BookPlayerState()
                 graph.player.notice(e.message ?: "Couldn't play the book")
             }
         }
     }
 
-    fun togglePlay() = withController { c -> if (c.isPlaying) { c.pause(); sync("paused") } else c.play() }
+    fun togglePlay() = withController { c ->
+        if (c.isPlaying) { c.pause(); sync("paused") } else { graph.player.pause(); c.play() }
+    }
     fun pause() = withController { c -> if (c.isPlaying) { c.pause(); sync("paused") } }
 
     /** Jumps to [sec] in the whole book, across its files. */

@@ -61,6 +61,8 @@ data class BookProgress(
     val finished: Boolean = false,
     /** When it was last updated, epoch ms. */
     val updatedAt: Long = 0L,
+    /** The episode this is for, when the "book" is a podcast (beta #45); null for a book. */
+    val episodeId: String? = null,
 ) {
     val started: Boolean get() = currentSec > 0.0 || finished
     val leftSec: Double get() = (durationSec - currentSec).coerceAtLeast(0.0)
