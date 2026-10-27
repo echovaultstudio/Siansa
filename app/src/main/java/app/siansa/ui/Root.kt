@@ -317,6 +317,7 @@ fun SiansaRoot() {
                 composable("settings/backup") { BackupScreen(nav) }
                 composable("settings/scrobbling") { ScrobblingScreen(nav) }
                 composable("settings/whatsnew") { WhatsNewScreen(nav) }
+                composable("settings/about") { AboutScreen(nav) }
                 composable("home/{section}") { HomeSectionScreen(nav, it.arguments?.getString("section").orEmpty()) }
                 composable("liked") { LikedScreen(nav) }
                 composable("radio/{kind}/{key}") {
