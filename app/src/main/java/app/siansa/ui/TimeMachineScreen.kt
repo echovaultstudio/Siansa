@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -112,10 +111,35 @@ private fun TimeMachinePage(nav: NavController) {
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val showMissing = settings.timeMachineMissing
 
+    // The month or year's report, as on Your month (#578): the big numbers, top artists, top albums, the listening
+    // clock and how the taste moved, with the time machine's songs in the middle. It can't hold the songs back:
+    // when it fails (Koito out of reach) the songs show on their own.
+    val report by produceState<Load<app.siansa.mix.ListeningReport?>>(Load.Loading, year, month) {
+        value = Load.Loading
+        value = Load.Ok(
+            try {
+                graph.insights.report(app.siansa.mix.timeMachineReportWindow(year, month, today), "time-machine")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("TimeMachine", "Report not made: ${e.message}")
+                null
+            },
+        )
+    }
+    val songs: @Composable () -> Unit = {
+        LoadBox(result) { tm ->
+            Column {
+                TimeMachineSongs(tm, showMissing, onShowMissing = graph.settings::setTimeMachineMissing, onCreate = { creating = true })
+                TimeMachineSongRows(tm, showMissing)
+            }
+        }
+    }
+
     Box(Modifier.fillMaxSize().background(Brand.Plum)) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item {
-                ListeningHeader(nav, "Time machine", "The songs you played most, any month or year.") {
+                ListeningHeader(nav, "Time machine", "How you listened, any month or year.") {
                     Spacer(Modifier.height(Space.Small))
                     TimePicker(
                         year = year,
@@ -130,31 +154,11 @@ private fun TimeMachinePage(nav: NavController) {
                     )
                 }
             }
-            item {
-                LoadBox(result) { tm ->
-                    TimeMachineSongs(tm, showMissing, onShowMissing = graph.settings::setTimeMachineMissing, onCreate = { creating = true })
-                }
-            }
-            val tm = result.valueOrNull()
-            if (tm != null && tm.tracks.isNotEmpty()) {
-                val songs = tm.songs
-                // The rank is the place in the list as shown, with or without the missing songs.
-                val shown = tm.tracks.withIndex().filter { showMissing || it.value.song != null }
-                itemsIndexed(shown, key = { _, (i, t) -> "$i-${t.song?.id}" }) { place, (_, t) ->
-                    val song = t.song
-                    if (song == null) {
-                        MissingSongRow(t, leading = "${place + 1}")
-                    } else {
-                        SongRow(song = song, onClick = { graph.player.play(songs, songs.indexOf(song)) }, leading = "${place + 1}")
+            item(key = "report-$year-$month") {
+                LoadBox(report) { r ->
+                    Column(Modifier.padding(top = Space.Medium)) {
+                        if (r == null) songs() else ReportBody(r, nav, songs = songs)
                     }
-                }
-                item {
-                    Text(
-                        tm.source,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Section),
-                    )
                 }
             }
         }
@@ -247,8 +251,9 @@ private fun TimeMachineSongs(tm: TimeMachine, showMissing: Boolean, onShowMissin
         }
         return
     }
-    Column(Modifier.padding(top = Space.Small)) {
-        SectionTitle("Top songs of ${tm.label}", top = 8.dp)
+    Column {
+        // A section of the report like Top artists and Top albums (#578), with the same gap above.
+        SectionTitle("Top songs")
         Row(
             Modifier.fillMaxWidth().padding(horizontal = Space.Page).padding(bottom = TIME_MACHINE_GAP).testTag("memoryButtons"),
             horizontalArrangement = Arrangement.spacedBy(TIME_MACHINE_GAP),
@@ -271,6 +276,25 @@ private fun TimeMachineSongs(tm: TimeMachine, showMissing: Boolean, onShowMissin
             Box(Modifier.padding(horizontal = Space.Page).padding(bottom = Space.Small)) { MissingSwitch(tm.missing, showMissing, onShowMissing) }
         }
     }
+}
+
+/** The time machine's songs, numbered as shown (with or without the ones not in the library), and where they came from. */
+@Composable
+private fun TimeMachineSongRows(tm: TimeMachine, showMissing: Boolean) {
+    val graph = LocalGraph.current
+    if (tm.tracks.isEmpty() || tm.songs.isEmpty()) return
+    val songs = tm.songs
+    tm.tracks.filter { showMissing || it.song != null }.forEachIndexed { place, t ->
+        val song = t.song
+        if (song == null) MissingSongRow(t, leading = "${place + 1}")
+        else SongRow(song = song, onClick = { graph.player.play(songs, songs.indexOf(song)) }, leading = "${place + 1}")
+    }
+    Text(
+        tm.source,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Medium),
+    )
 }
 
 /** Shows or hides the songs that aren't in your library (issue #234); remembered for next time. */
