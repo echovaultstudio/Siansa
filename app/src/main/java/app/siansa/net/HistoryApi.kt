@@ -2,6 +2,10 @@ package app.siansa.net
 
 import app.siansa.data.AppJson
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
@@ -120,9 +124,9 @@ class HistoryApi(private val http: OkHttpClient) {
         var more = true
         val known = listenPages(expected, max)
         if (known > 1) {
-            val semaphore = kotlinx.coroutines.sync.Semaphore(PARALLEL)
-            val pages = kotlinx.coroutines.coroutineScope {
-                (1..known).map { n -> kotlinx.coroutines.async { semaphore.withPermit { page(n) } } }.map { it.await() }
+            val semaphore = Semaphore(PARALLEL)
+            val pages = coroutineScope {
+                (1..known).map { n -> async { semaphore.withPermit { page(n) } } }.awaitAll()
             }
             pages.forEach { times += it.first }
             more = pages.last().second
