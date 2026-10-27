@@ -1,6 +1,6 @@
 import unittest
 
-from play_upload import already_uploaded, draft_only, plain_notes, track_body
+from play_upload import already_uploaded, code_of_uploaded, track_has, draft_only, plain_notes, track_body, tracks_of
 
 
 class PlayUploadTest(unittest.TestCase):
@@ -33,6 +33,23 @@ class PlayUploadTest(unittest.TestCase):
         self.assertFalse(already_uploaded("HTTP 401: invalid credentials"))
         self.assertTrue(draft_only("HTTP 400: Only releases with status draft may be created on draft app."))
         self.assertFalse(draft_only("HTTP 400: Track not found"))
+
+    def test_both_tracks_unless_set(self):
+        self.assertEqual(["alpha", "internal"], tracks_of(""))
+        self.assertEqual(["alpha", "internal"], tracks_of(None))
+        self.assertEqual(["internal"], tracks_of(" internal "))
+        self.assertEqual(["alpha", "internal"], tracks_of("alpha, internal,alpha"))
+
+    def test_an_uploaded_bundle_is_found_by_its_file(self):
+        bundles = [{"versionCode": 866, "sha256": "aa"}, {"versionCode": 899, "sha256": "BB"}]
+        self.assertEqual(899, code_of_uploaded(bundles, "bb"))
+        self.assertIsNone(code_of_uploaded(bundles, "cc"))
+
+    def test_a_track_with_the_release_is_left_alone(self):
+        alpha = {"track": "alpha", "releases": [{"versionCodes": ["899"], "status": "inProgress"}]}
+        self.assertTrue(track_has(alpha, 899))
+        self.assertFalse(track_has({"track": "internal", "releases": [{"versionCodes": ["866"]}]}, 899))
+        self.assertFalse(track_has({"track": "internal"}, 899))
 
 
 if __name__ == "__main__":

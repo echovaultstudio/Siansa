@@ -386,7 +386,7 @@ jobs:
             siansa-*.aab
           make_latest: true
 
-      # Google Play's closed testing (issue #557): the .aab with the version's notes, through a service account that
+      # Google Play's closed and internal testing (issue #557): the .aab with the version's notes, through a service account that
       # can only release to testing tracks. Skipped until PLAY_SERVICE_ACCOUNT_JSON is set.
       - uses: actions/setup-python@v6
         if: steps.version.outputs.exists != 'true'
