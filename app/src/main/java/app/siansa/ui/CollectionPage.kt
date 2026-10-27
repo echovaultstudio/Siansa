@@ -243,31 +243,39 @@ fun CollectionPage(
             }
         }
 
-        // Title bar: just a back button over the colour, then a solid bar in the cover's colour.
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .background(color.copy(alpha = barAlpha))
-                .statusBarsPadding()
-                .padding(horizontal = Space.Tight, vertical = Space.Tight),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // No shading behind the arrow (issue #228).
-            IconButton(onClick = { nav.popBackStack() }) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White)
-            }
-            Spacer(Modifier.width(Space.Small))
-            Text(
-                title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).graphicsLayer { alpha = barAlpha },
-            )
-            actions()
+        FadingTitleBar(nav, title, color, barAlpha, actions)
+    }
+}
+
+/**
+ * The title bar over a page tinted with its cover's colour (albums, playlists, books): just a back button over the
+ * colour until the page scrolls, then a solid bar in that colour with the title.
+ */
+@Composable
+internal fun FadingTitleBar(nav: NavController, title: String, color: Color, barAlpha: Float, actions: @Composable () -> Unit = {}) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(color.copy(alpha = barAlpha))
+            .statusBarsPadding()
+            .padding(horizontal = Space.Tight, vertical = Space.Tight),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // No shading behind the arrow (issue #228).
+        IconButton(onClick = { nav.popBackStack() }) {
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White)
         }
+        Spacer(Modifier.width(Space.Small))
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).graphicsLayer { alpha = barAlpha },
+        )
+        actions()
     }
 }
 

@@ -29,6 +29,13 @@ class BooksCarouselTest {
         assertEquals(listOf("1", "2", "3", "4", "5"), cards.map { it.second.id })
     }
 
+    @Test fun theTitleBarTurnsSolidAsTheCoverScrollsAway() {
+        assertEquals(0f, titleBarAlpha(0f, 200f))
+        assertEquals(0f, titleBarAlpha(160f, 200f))
+        assertEquals(0.5f, titleBarAlpha(190f, 200f), 0.001f)
+        assertEquals(1f, titleBarAlpha(400f, 200f))
+    }
+
     @Test fun descriptionsLoseTheirHtml() {
         assertEquals("A lighthouse & a lamp.\nLine two", stripHtml("<p>A lighthouse &amp; a lamp.<br/>Line two</p>"))
     }

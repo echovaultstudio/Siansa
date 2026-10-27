@@ -52,6 +52,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.siansa.data.AlbumCategory
@@ -840,6 +841,28 @@ class SpacingTest {
         assertEven("Gaps either side of play", play.left - back.right, fwd.left - play.right, 1.dp)
         assertEven("Gaps outside the skips", back.left - prev.right, next.left - fwd.right, 1.dp)
         listOf(prev, back, fwd, next).forEach { assertEven("Centred on play", (it.top + it.bottom) / 2 - (play.top + play.bottom) / 2, 0.dp, 1.dp) }
+    }
+
+    /**
+     * A book's page (#550, styled like an album's): the cover's top lines up with the title's, a page's gap at the
+     * left edge, and the words start a page's gap after the cover.
+     */
+    @Test fun bookPageCoverLinesUpWithItsWords() {
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
+        val book = app.siansa.data.Book(id = "b1", title = "A long title", authors = listOf("An author"), narrators = (1..8).map { "Reader $it" })
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalGraph provides graph) {
+                SiansaTheme {
+                    Box(Modifier.width(360.dp).testTag("bookHeader")) { app.siansa.ui.BookPageHeader(book, Color.DarkGray, Color.Black) }
+                }
+            }
+        }
+        val header = compose.onNodeWithTag("bookHeader").getBoundsInRoot()
+        val cover = compose.onNodeWithTag("bookCover", useUnmergedTree = true).getBoundsInRoot()
+        val words = compose.onNodeWithTag("bookWords", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Cover and words start at the same height", cover.top, words.top, 1.dp)
+        assertEven("A page's gap at the left", cover.left - header.left, Space.Page, 1.dp)
+        assertEven("A page's gap between cover and words", words.left - cover.right, Space.Page, 1.dp)
     }
 
     /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */
