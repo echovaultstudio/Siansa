@@ -165,6 +165,9 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
         endedId = null
         _state.value = BookPlayerState(book = book, positionSec = fromSec, playing = true, speed = graph.bookSpeeds.speedOf(book.id))
         graph.books.noteProgress(progressAt(book, fromSec))
+        // A shortcut at the top of Home, like an album played (#548).
+        val shortcut = app.siansa.data.bookShortcut(book, episode = episodeId != null)
+        graph.scope.launch { graph.recentPlays.note(shortcut.route, shortcut.title, shortcut.cover) }
         // Music and a book never play at once (issue #521).
         graph.player.pause()
         graph.scope.launch {
