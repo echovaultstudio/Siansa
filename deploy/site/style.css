@@ -43,6 +43,13 @@ button { font: inherit; font-weight: 600; padding: 10px 20px; border: 0; border-
 .beta-note { margin: 0 0 24px; padding: 12px 16px; border-radius: 12px; font-size: 0.95rem;
   background: rgba(255, 181, 71, 0.12); border: 1px solid rgba(255, 181, 71, 0.45); }
 
+.licences { display: grid; gap: 12px; margin: 16px 0 8px; }
+.licences section { background: rgba(127, 127, 127, 0.08); border-radius: 16px; padding: 16px; }
+.licences h3 { margin: 0; font-size: 1.05rem; color: var(--accent); }
+.licences p { margin: 4px 0 0; font-size: 0.95rem; }
+.licences .meta { font-size: 0.85rem; }
+.site-nav nav a[aria-current="page"] { border-color: var(--accent); color: var(--accent); }
+
 .why-closed { margin: 8px 0 16px; }
 .why-closed h3 { margin: 0 0 4px; font-size: 1.05rem; }
 .why-closed p { margin: 0; color: var(--muted); }

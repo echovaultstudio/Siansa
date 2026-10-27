@@ -6,6 +6,7 @@ One server for the closed beta (issue #410):
 |---|---|
 | `https://siansa.app` | Home page for testers |
 | `https://siansa.app/privacy` | Privacy policy (for the Play listing) |
+| `https://siansa.app/licenses` | Open-source licences of the libraries in the app (Settings › About links here) |
 | `https://siansa.app/fdroid/repo` | F-Droid repo with every release, for testers outside Play |
 | `https://demo.siansa.app` | Demo Navidrome with a small free library, for Google's reviewers and testers |
 
@@ -22,7 +23,7 @@ the server; its key never leaves it. CI sends each new release's APK over SSH wi
 | `docker-compose.yml` | Caddy and the demo Navidrome, locked down: read-only containers, no extra capabilities, Navidrome reachable only through Caddy |
 | `Caddyfile` | The sites, security headers (HSTS, CSP, no framing, no referrer), compression, logs without IP addresses |
 | `.env.example` | Your domain, e-mail, folders and the demo admin password: copy to `.env` |
-| `site/` | Home page, privacy policy, styles and the icon |
+| `site/` | Home page, privacy policy, open-source licences, styles and the icon |
 | `fdroid/` | The F-Droid repo settings and the app's listing |
 | `scripts/setup.sh` | One-time setup: packages, the F-Droid repo and its key, the publish user, folders |
 | `scripts/harden.sh` | Firewall, fail2ban, automatic security updates, SSH settings, small Docker logs |

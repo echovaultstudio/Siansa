@@ -26,6 +26,13 @@ class BookRepository(private val api: AudiobookshelfApi, private val settings: (
 
     suspend fun libraries(): List<AbsLibrary> = libraries ?: api.libraries().also { libraries = it }
 
+    /** After a scan or a new login (#582): the next read asks the server for everything again. */
+    suspend fun forget() {
+        libraries = null
+        shelvesAt.clear()
+        progressAt = 0L
+    }
+
     private val _shelves = MutableStateFlow<Map<Boolean, List<BookShelf>>>(emptyMap())
     /**
      * Home's shelves as last read, books under false and podcasts under true (#569). Kept while the app runs, so the

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Siansa open source</title>
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/style.css?v=6">
+</head>
+<body>
+<header class="site-nav">
+<a class="brand" href="/"><img src="/favicon-32.png" alt="" width="24" height="24">Siansa</a>
+<nav><a href="/features">What Siansa can do</a><a href="/licenses" aria-current="page">Open source</a><a href="https://github.com/echovaultstudio/siansa-beta-testers">Beta testers on GitHub</a><a href="/#join">Join the beta</a></nav>
+</header>
+<main>
+<h1>Open source</h1>
+<p>Siansa is built on open-source software. These are the libraries inside the Android app, and their licences.
+Thank you to everyone who makes them.</p>
+
+<h2>In the app</h2>
+<div class="licences">
+<section>
+<h3>FFmpeg decoder for Media3</h3>
+<p class="meta">Jellyfin · <code>org.jellyfin.media3:media3-ffmpeg-decoder</code></p>
+<p>Plays the formats a phone can't play itself, such as ALAC. It contains <a href="https://ffmpeg.org/">FFmpeg</a>
+(LGPL 2.1 or later, with parts under the GPL).</p>
+<p><a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL 3.0</a> ·
+<a href="https://github.com/jellyfin/jellyfin-androidx-media">Source</a> ·
+<a href="https://ffmpeg.org/legal.html">FFmpeg licence</a></p>
+</section>
+<section>
+<h3>AndroidX Media3</h3>
+<p class="meta">Google · ExoPlayer, Session, OkHttp data source, Database, Cast</p>
+<p>Plays music and books, and the media notification.</p>
+<p><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a> · <a href="https://github.com/androidx/media">Source</a></p>
+</section>
+<section>
+<h3>Jetpack Compose</h3>
+<p class="meta">Google · UI, Foundation, Material 3, Material Icons Extended</p>
+<p>Every screen in the app.</p>
+<p><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a> · <a href="https://github.com/androidx/androidx">Source</a></p>
+</section>
+<section>
+<h3>AndroidX libraries</h3>
+<p class="meta">Google · Core, Activity, Lifecycle, Navigation, WorkManager, Room, Palette, Profile Installer, MediaRouter</p>
+<p>The app's building blocks: pages, background work, the library database, colours from covers.</p>
+<p><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a> · <a href="https://github.com/androidx/androidx">Source</a></p>
+</section>
+<section>
+<h3>Coil</h3>
+<p class="meta">Coil contributors · Compose, OkHttp network, GIF</p>
+<p>Loads and shows covers, animated ones too.</p>
+<p><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a> · <a href="https://github.com/coil-kt/coil">Source</a></p>
+</section>
+<section>
+<h3>OkHttp and Okio</h3>
+<p class="meta">Square</p>
+<p>Talks to your servers.</p>
+<p><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a> ·
+<a href="https://github.com/square/okhttp">OkHttp</a> · <a href="https://github.com/square/okio">Okio</a></p>
+</section>
+<section>
+<h3>Kotlin</h3>
+<p class="meta">JetBrains · standard library, kotlinx.coroutines, kotlinx.serialization</p>
+<p>The language the app is written in, and its libraries.</p>
+<p><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a> ·
+<a href="https://github.com/JetBrains/kotlin">Kotlin</a> · <a href="https://github.com/Kotlin/kotlinx.coroutines">coroutines</a> ·
+<a href="https://github.com/Kotlin/kotlinx.serialization">serialization</a></p>
+</section>
+<section>
+<h3>Guava</h3>
+<p class="meta">Google · through Media3</p>
+<p>Helpers Media3 is built on.</p>
+<p><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a> · <a href="https://github.com/google/guava">Source</a></p>
+</section>
+<section>
+<h3>Material Design icons</h3>
+<p class="meta">Google</p>
+<p>The icons throughout the app.</p>
+<p><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a> · <a href="https://github.com/google/material-design-icons">Source</a></p>
+</section>
+</div>
+
+<h2>Not open source</h2>
+<p>Casting to a TV or speaker uses the <strong>Google Cast SDK</strong> (<code>play-services-cast-framework</code>,
+through Media3 Cast), under the <a href="https://developer.android.com/studio/terms">Android Software Development
+Kit License</a> and the <a href="https://developers.google.com/terms">Google APIs Terms of Service</a>.</p>
+
+<h2>Licence texts</h2>
+<ul>
+<li><a href="https://www.apache.org/licenses/LICENSE-2.0">Apache License 2.0</a></li>
+<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">GNU General Public License 3.0</a></li>
+<li><a href="https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html">GNU Lesser General Public License 2.1</a></li>
+</ul>
+
+<p class="hint">Something missing or wrong here? Tell us on <a href="https://github.com/echovaultstudio/siansa-beta-testers/issues">GitHub</a>.</p>
+<p><a href="/privacy">Privacy policy</a></p>
+</main>
+</body>
+</html>
