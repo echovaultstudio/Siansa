@@ -68,6 +68,8 @@ data class Album(
     val played: String? = null,
     /** Which Navidrome library it's in (issue #376), when the server has several; null otherwise. */
     val folderId: String? = null,
+    /** Its record labels (Navidrome's recordLabels, Emby's Studios), kept so a label's page can list its albums (#558). */
+    val labels: List<String> = emptyList(),
 ) {
     val allIds: List<String> get() = ids.ifEmpty { listOf(id) }
 }

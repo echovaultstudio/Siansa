@@ -11,6 +11,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
@@ -33,6 +34,13 @@ class BookSession(private val service: PlaybackService, private val graph: AppGr
         .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(service, OkHttpDataSource.Factory(graph.streamHttp))))
         .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).build(), true)
         .setHandleAudioBecomingNoisy(true)
+        // Starts once a second is buffered instead of 2.5 (beta #44: books took a few seconds to start on mobile data).
+        // Speech needs little to play smoothly, and the buffer keeps filling to a minute ahead while it plays.
+        .setLoadControl(
+            DefaultLoadControl.Builder()
+                .setBufferDurationsMs(BUFFER_MIN_MS, BUFFER_MAX_MS, START_AFTER_MS, RESTART_AFTER_MS)
+                .build(),
+        )
         .build()
 
     val session: MediaSession
@@ -65,6 +73,11 @@ class BookSession(private val service: PlaybackService, private val graph: AppGr
     }
 
     companion object {
+        /** Buffering for books (beta #44): play once [START_AFTER_MS] is in; keep [BUFFER_MIN_MS] to [BUFFER_MAX_MS] ahead. */
+        const val START_AFTER_MS = 1_000
+        const val RESTART_AFTER_MS = 2_000
+        const val BUFFER_MIN_MS = 30_000
+        const val BUFFER_MAX_MS = 60_000
         const val SESSION_ID = "siansa-books"
         /** A controller's connection hint asking for the book session. */
         const val HINT_BOOKS = "siansa.books"

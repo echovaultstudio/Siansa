@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.data.Song
 import app.siansa.data.SavedVibe
 import app.siansa.data.pinnedVibes
 
@@ -19,6 +20,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
@@ -143,8 +145,8 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
 
     val mixCount = carousel.usable.size
     val pager = rememberPagerState { mixCount + pinned.size }
-    // Room under the dots before the next panel (issue #312): with that panel's own margin, a section's gap.
-    Column(Modifier.fillMaxWidth().padding(bottom = Space.Page).testTag("homeCarousel")) {
+    // Nothing under the dots: the next section's gap is the room below, as under every other row on Home (#560).
+    Column(Modifier.fillMaxWidth().testTag("homeCarousel")) {
         SectionTitle(carousel.title)
         HorizontalPager(
             state = pager,
@@ -172,6 +174,7 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
                 onOpen = { if (mix != null) nav.navigate("mix/${mix.id}") else make(page, open = true) },
                 // Carries on where the mix was left (issue #269).
                 onPlay = if (mix != null) ({ graph.mixResume.play(mix) }) else null,
+                songs = mix?.songs.orEmpty(),
             )
         }
         CarouselDots(count = mixCount + pinned.size, current = pager.currentPage)
@@ -182,7 +185,7 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
 @Composable
 private fun PinnedVibesCarousel(nav: NavController, pinned: List<SavedVibe>) {
     val pager = rememberPagerState { pinned.size }
-    Column(Modifier.fillMaxWidth().padding(bottom = Space.Page).testTag("homeCarousel")) {
+    Column(Modifier.fillMaxWidth().testTag("homeCarousel")) {
         SectionTitle("Your vibes")
         HorizontalPager(
             state = pager,
@@ -206,6 +209,7 @@ private fun PinnedVibeCard(nav: NavController, vibe: SavedVibe) {
         busy = false,
         onOpen = { nav.navigate("vibe/${vibe.id}") },
         onPlay = { graph.player.play(vibe.songs) },
+        songs = vibe.songs,
     )
 }
 
@@ -218,7 +222,11 @@ private fun CarouselCard(
     busy: Boolean,
     onOpen: () -> Unit,
     onPlay: (() -> Unit)?,
+    // Its songs, so the button shows ⏸ while they're playing (#562).
+    songs: List<Song> = emptyList(),
 ) {
+    val graph = LocalGraph.current
+    val card = rememberCardPlay(songs)
     Box(
         Modifier
             .fillMaxWidth()
@@ -239,10 +247,10 @@ private fun CarouselCard(
             when {
                 busy -> CircularProgressIndicator(Modifier.size(28.dp), color = Color.White, strokeWidth = 2.dp) // spacing: exact
                 onPlay != null -> FilledIconButton(
-                    onClick = onPlay,
-                    modifier = Modifier.size(48.dp),
+                    onClick = { if (card.loaded) graph.player.togglePlay() else onPlay() },
+                    modifier = Modifier.size(48.dp).testTag("carouselPlay"),
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = OnAccent),
-                ) { Icon(Icons.Rounded.PlayArrow, "Play $name", Modifier.size(28.dp)) }
+                ) { Icon(if (card.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (card.playing) "Pause $name" else "Play $name", Modifier.size(28.dp)) }
             }
         }
     }

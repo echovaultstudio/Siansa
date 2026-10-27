@@ -120,10 +120,19 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
         connect()
     }
 
+    /** When the last [play] was asked for, until sound starts: logged, to see how long a book takes to start (beta #44). */
+    private var startAskedAt: Long? = null
+
     /** The state from the controller: the position across the book's files, playing, speed. */
     private fun refresh() {
         val c = controller ?: return
         val book = _state.value.book ?: return
+        startAskedAt?.let { asked ->
+            if (c.isPlaying) {
+                AppLog.i("BookPlayer", "Started playing ${System.currentTimeMillis() - asked} ms after it was chosen")
+                startAskedAt = null
+            }
+        }
         val sec = positionOf(c, book)
         _state.value = _state.value.copy(
             positionSec = sec,
@@ -171,6 +180,7 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
     /** Starts [book] at [fromSec]: the first chapter, where the listener was, or a chapter they tapped. */
     fun play(book: Book, fromSec: Double, episodeId: String? = null) {
         AppLog.i("BookPlayer", "Play \"${book.title}\" from ${fromSec.toInt()} s")
+        startAskedAt = System.currentTimeMillis()
         // The session of whatever was playing is closed with where it got to, so the server isn't left with
         // one open session per tap (#553: a card tapped three times opened three).
         if (sessionId != null) sync("replaced", close = true)

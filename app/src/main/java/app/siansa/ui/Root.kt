@@ -233,10 +233,17 @@ fun SiansaRoot() {
                             )
                         )
                     ) {
-                        // A book's mini player while a book is loaded and the music isn't (issue #521).
+                        // The mini player of whichever played last, music or a book (beta #44: a paused song's kept
+                        // showing over a book that was playing).
                         val bookState by graph.bookPlayer.state.collectAsStateWithLifecycle()
-                        if (player.hasMedia) MiniPlayer(player) { sheet.open() }
-                        else if (bookState.book != null) BookMiniPlayer(bookState) { bookSheet.open() }
+                        var lastPlayed by rememberSaveable { mutableStateOf(MiniFor.MUSIC) }
+                        LaunchedEffect(player.isPlaying) { if (player.isPlaying) lastPlayed = MiniFor.MUSIC }
+                        LaunchedEffect(bookState.playing, bookState.book?.id) { if (bookState.playing) lastPlayed = MiniFor.BOOK }
+                        when (miniPlayerFor(player.hasMedia, player.isPlaying, bookState.book != null, bookState.playing, lastPlayed)) {
+                            MiniFor.MUSIC -> MiniPlayer(player) { sheet.open() }
+                            MiniFor.BOOK -> BookMiniPlayer(bookState) { bookSheet.open() }
+                            MiniFor.NONE -> Unit
+                        }
                         NavigationBar(containerColor = Color.Transparent, tonalElevation = 0.dp) {
                             tabs.forEach { tab ->
                                 NavigationBarItem(
@@ -304,6 +311,7 @@ fun SiansaRoot() {
                 composable("downloads") { DownloadsScreen(nav) }
                 composable("downloads/add") { DownloadPickerScreen(nav) }
                 composable("downloads/songs") { DownloadedSongsScreen(nav) }
+                composable("settings/help") { HelpScreen(nav) }
                 composable("settings/logs") { LogsScreen(nav) }
                 composable("settings/report") { ProblemReportScreen(nav) }
                 composable("settings/backup") { BackupScreen(nav) }
@@ -346,6 +354,11 @@ fun SiansaRoot() {
                 composable("fingerprint") { FingerprintScreen(nav) }
                 composable("song/{id}/details") { SongDetailsScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }
+                // Every album with a genre or record label, from an album page's tags (#558).
+                composable(
+                    "albums/{tag}?value={value}",
+                    arguments = listOf(androidx.navigation.navArgument("value") { defaultValue = "" }),
+                ) { AlbumsWithTagScreen(nav, it.arguments?.getString("tag"), it.arguments?.getString("value").orEmpty()) }
                 composable("similar/songs/{id}") { SimilarSongsScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("similar/albums/{id}") { SimilarAlbumsScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }
@@ -386,6 +399,22 @@ fun SiansaRoot() {
         }
       }
     }
+}
+
+/** Which mini player shows above the tabs. */
+enum class MiniFor { MUSIC, BOOK, NONE }
+
+/**
+ * The mini player to show (beta #44): what's playing; when nothing is, what played last; else whatever is loaded.
+ * A song paused by a book starting no longer hides the book's mini player.
+ */
+internal fun miniPlayerFor(musicLoaded: Boolean, musicPlaying: Boolean, bookLoaded: Boolean, bookPlaying: Boolean, last: MiniFor): MiniFor = when {
+    bookLoaded && bookPlaying -> MiniFor.BOOK
+    musicLoaded && musicPlaying -> MiniFor.MUSIC
+    last == MiniFor.BOOK && bookLoaded -> MiniFor.BOOK
+    musicLoaded -> MiniFor.MUSIC
+    bookLoaded -> MiniFor.BOOK
+    else -> MiniFor.NONE
 }
 
 /** Opens another tab where it was left, keeping each tab's own history. */

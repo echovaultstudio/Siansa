@@ -7,6 +7,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Books and podcasts from Audiobookshelf for the screens (issue #521): the libraries, the Books panel's shelves,
@@ -23,6 +25,35 @@ class BookRepository(private val api: AudiobookshelfApi, private val settings: (
     val ready: Boolean get() = settings().booksReady
 
     suspend fun libraries(): List<AbsLibrary> = libraries ?: api.libraries().also { libraries = it }
+
+    private val _shelves = MutableStateFlow<Map<Boolean, List<BookShelf>>>(emptyMap())
+    /**
+     * Home's shelves as last read, books under false and podcasts under true (#569). Kept while the app runs, so the
+     * carousel comes back with its cards, at its full height, when it scrolls into view again.
+     */
+    val shelvesState: StateFlow<Map<Boolean, List<BookShelf>>> = _shelves.asStateFlow()
+    private val shelvesAt = HashMap<Boolean, Long>()
+    private var progressAt = 0L
+    private val refreshing = Mutex()
+
+    /**
+     * Reads Home's shelves and the progress again when the last read is older than [FRESH_MS] (#569), else keeps them.
+     * Once at a time, so the books and podcasts carousels don't both ask. With no library of that kind, nothing is
+     * asked at all.
+     */
+    suspend fun refreshShelves(podcasts: Boolean, force: Boolean = false) = refreshing.withLock {
+        val now = System.currentTimeMillis()
+        if (!force && isFresh(shelvesAt[podcasts], now)) return@withLock
+        val libs = attempt("Libraries") { libraries() } ?: return@withLock
+        if (libs.none { it.podcasts == podcasts }) {
+            shelvesAt[podcasts] = now
+            _shelves.value = _shelves.value + (podcasts to emptyList())
+            return@withLock
+        }
+        refreshProgressLocked(force, now)
+        _shelves.value = _shelves.value + (podcasts to shelves(podcasts))
+        shelvesAt[podcasts] = now
+    }
 
     /** The shelves of every book library, then every podcast library (Audiobookshelf's own home order). */
     suspend fun shelves(podcasts: Boolean): List<BookShelf> {
@@ -75,10 +106,14 @@ class BookRepository(private val api: AudiobookshelfApi, private val settings: (
         null
     }
 
-    /** Reads every progress the user has, once per app start or when asked. */
-    suspend fun refreshProgress() {
+    /** Reads every progress the user has, unless read within [FRESH_MS] (#569); the player keeps it current between. */
+    suspend fun refreshProgress(force: Boolean = false) = refreshing.withLock { refreshProgressLocked(force, System.currentTimeMillis()) }
+
+    private suspend fun refreshProgressLocked(force: Boolean, now: Long) {
+        if (!force && isFresh(progressAt, now)) return
         val all = attempt("Progress") { api.allProgress() } ?: return
         _progress.value = all
+        progressAt = now
     }
 
     /** What the player found out, kept here so the screens follow. */
@@ -91,6 +126,11 @@ class BookRepository(private val api: AudiobookshelfApi, private val settings: (
 
     companion object {
         const val PAGE = 100
+        /** How long Home's shelves and the progress count as fresh: scrolling past doesn't ask the server again (#569). */
+        const val FRESH_MS = 60_000L
+
+        /** Whether something read at [at] is still fresh at [now]; never read is never fresh. */
+        fun isFresh(at: Long?, now: Long, freshMs: Long = FRESH_MS): Boolean = at != null && at > 0 && now - at in 0 until freshMs
     }
 }
 

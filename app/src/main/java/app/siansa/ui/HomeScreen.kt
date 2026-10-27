@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
@@ -641,12 +642,15 @@ private fun HeroMix(
                 }
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onShuffle) { Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Color.White) }
+                // ⏸ while this mix plays: a tap pauses it, or plays on (#562).
+                val graph = LocalGraph.current
+                val card = rememberCardPlay(mix.songs)
                 FilledIconButton(
-                    onClick = onPlay,
-                    modifier = Modifier.size(52.dp),
+                    onClick = { if (card.loaded) graph.player.togglePlay() else onPlay() },
+                    modifier = Modifier.size(52.dp).testTag("heroPlay"),
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = OnAccent),
                 ) {
-                    Icon(Icons.Rounded.PlayArrow, "Play", Modifier.size(30.dp))
+                    Icon(if (card.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (card.playing) "Pause" else "Play", Modifier.size(30.dp))
                 }
             }
         }
