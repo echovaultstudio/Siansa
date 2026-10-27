@@ -1,0 +1,51 @@
+# Uploads a published release's app bundle to Google Play (issue #557). New releases are uploaded by CI's release
+# job; this is for one already published: Actions › Google Play › Run workflow, with its tag (the latest when empty).
+# A change to this workflow or its script on main uploads the latest release too, so setting it up needs no clicks.
+# Play refuses a version it has, which the script reports as nothing to do, so running it twice is harmless.
+name: Google Play
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to upload, e.g. v0.37.0beta (empty: the latest)"
+        required: false
+        default: ""
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/play.yml"
+      - "scripts/play_upload.py"
+
+concurrency:
+  group: play
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    name: Upload to Google Play
+    # Your own runner when the RUNS_ON variable names it (e.g. ["self-hosted", "siansa"]), else GitHub's.
+    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PLAY_TRACK: ${{ vars.PLAY_TRACK }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then echo "::notice::No Google Play key (PLAY_SERVICE_ACCOUNT_JSON); skipped."; exit 0; fi
+          [ -n "$TAG" ] || TAG=$(gh release view --json tagName --jq .tagName)
+          VERSION="${TAG#v}"
+          mkdir -p play && cd play
+          gh release download "$TAG" --pattern '*.aab' --clobber
+          gh release view "$TAG" --json body --jq .body > notes.md
+          pip install --quiet google-auth==2.40.3 requests==2.32.4
+          python3 ../scripts/play_upload.py "$(ls siansa-*.aab | head -n 1)" "$VERSION" notes.md
