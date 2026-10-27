@@ -143,8 +143,8 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
 
     val mixCount = carousel.usable.size
     val pager = rememberPagerState { mixCount + pinned.size }
-    // Room under the dots before the next panel (issue #312): with that panel's own margin, a section's gap.
-    Column(Modifier.fillMaxWidth().padding(bottom = Space.Page).testTag("homeCarousel")) {
+    // Nothing under the dots: the next section's gap is the room below, as under every other row on Home (#560).
+    Column(Modifier.fillMaxWidth().testTag("homeCarousel")) {
         SectionTitle(carousel.title)
         HorizontalPager(
             state = pager,
@@ -182,7 +182,7 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
 @Composable
 private fun PinnedVibesCarousel(nav: NavController, pinned: List<SavedVibe>) {
     val pager = rememberPagerState { pinned.size }
-    Column(Modifier.fillMaxWidth().padding(bottom = Space.Page).testTag("homeCarousel")) {
+    Column(Modifier.fillMaxWidth().testTag("homeCarousel")) {
         SectionTitle("Your vibes")
         HorizontalPager(
             state = pager,
