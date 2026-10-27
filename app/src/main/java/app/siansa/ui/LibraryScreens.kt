@@ -346,7 +346,7 @@ fun AlbumScreen(nav: NavController, id: String) {
                     d.album.artist,
                     artistCover.valueOrNull(),
                     d.album.artistId?.let { artistId -> { openArtists { artistsNamedBy(graph, artistId, d.album.artist) } } },
-                    albumFacts(d.album, fromServer?.info ?: d.info, d.songs.size, formatDuration(d.songs.sumOf { it.durationSec.toLong() })),
+                    albumHeadline(d.album, fromServer?.info ?: d.info),
                 )
                 if (pick != null) {
                     ContinueButton(PickUps.trackLabel(d.songs, pick.continueIndex)) {
@@ -362,6 +362,12 @@ fun AlbumScreen(nav: NavController, id: String) {
         actions = { d?.album?.let { FavouriteAlbumButton(it) } },
         // "Find similar albums" beside Shuffle (issue #228), through any of its songs; needs AudioMuse.
         onSimilar = d?.songs?.firstOrNull()?.id?.takeIf { graph.settings.current.audioMuseReady }?.let { id -> { nav.openSimilarAlbums(id) } },
+        // Genres, labels, the version and the length at the foot of the page (#558).
+        footer = {
+            if (d != null) item(key = "album-foot") {
+                AlbumFootSection(albumFoot(d.album, fromServer?.info ?: d.info, d.songs.size, formatDuration(d.songs.sumOf { it.durationSec.toLong() })), nav)
+            }
+        },
     )
 }
 
@@ -402,25 +408,26 @@ private object ServerAlbums {
 }
 
 /**
- * The line under an album's artist (issue #504): its kind, version ("Deluxe edition"), year (with the year it
- * first came out when this is a later release), genres, label, songs and length.
+ * The line under an album's artist (#558): its type and year only ("Album · 2011", "Album · 1977 · reissued 2013").
+ * Genres, labels, the version and the length are at the foot of the page.
  */
-fun albumFacts(album: Album, info: AlbumInfo, songCount: Int, length: String): String {
+fun albumHeadline(album: Album, info: AlbumInfo): String {
     val year = when {
         info.originalYear != null && album.year != null && info.originalYear < album.year -> "${info.originalYear} · reissued ${album.year}"
         else -> (album.year ?: info.originalYear)?.toString()
     }
-    val genres = info.genres.take(3).joinToString(", ").ifEmpty { album.genre.orEmpty() }
-    return listOfNotNull(
-        album.category.single,
-        info.version,
-        year,
-        genres.takeIf { it.isNotEmpty() },
-        info.labels.firstOrNull(),
-        "$songCount songs",
-        length,
-    ).joinToString(" · ")
+    return listOfNotNull(album.category.single, year).joinToString(" · ")
 }
+
+/** What the foot of an album's page lists (#558): its genres and labels (each opens its albums), version, length. */
+data class AlbumFoot(val genres: List<String>, val labels: List<String>, val version: String?, val length: String)
+
+fun albumFoot(album: Album, info: AlbumInfo, songCount: Int, length: String): AlbumFoot = AlbumFoot(
+    genres = info.genres.ifEmpty { listOfNotNull(album.genre?.trim()?.takeIf { it.isNotEmpty() }) },
+    labels = info.labels.ifEmpty { album.labels },
+    version = info.version,
+    length = "$songCount ${if (songCount == 1) "song" else "songs"} · $length",
+)
 
 @Composable
 fun PlayButtons(songs: List<Song>) {
