@@ -3,6 +3,19 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.36.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.36.0beta) — 2026-10-27
+
+- [#532](https://github.com/echovaultstudio/Siansa/pull/532) Books and podcasts in Search (@Th3K1ngP1n)
+- [#539](https://github.com/echovaultstudio/Siansa/pull/539) Emulator test: chip height check measures the chips, not their clipped bounds (@Th3K1ngP1n)
+- [#543](https://github.com/echovaultstudio/Siansa/pull/543) Book player in Now Playing's style (@Th3K1ngP1n)
+- [#545](https://github.com/echovaultstudio/Siansa/pull/545) Press and hold play stops the book (@Th3K1ngP1n)
+- [#547](https://github.com/echovaultstudio/Siansa/pull/547) Home's books carousel shows five cards (@Th3K1ngP1n)
+- [#549](https://github.com/echovaultstudio/Siansa/pull/549) The last played book is a shortcut on Home (@Th3K1ngP1n)
+- [#551](https://github.com/echovaultstudio/Siansa/pull/551) A book's page in the album page's style (@Th3K1ngP1n)
+- [#552](https://github.com/echovaultstudio/Siansa/pull/552) A book card's ▶ pauses the playing book; replaced sessions are closed (@Th3K1ngP1n)
+- [#555](https://github.com/echovaultstudio/Siansa/pull/555) Arrange Home: a spacing slider (@Th3K1ngP1n)
+- [#556](https://github.com/echovaultstudio/Siansa/pull/556) Release 0.36.0: book player in Now Playing's style, Home spacing slider, book fixes (@Th3K1ngP1n)
+
 ## [0.35.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.35.1beta) — 2026-10-26
 
 - [#541](https://github.com/echovaultstudio/Siansa/pull/541) Keep the Audiobookshelf login when saving Connections (@Th3K1ngP1n)
