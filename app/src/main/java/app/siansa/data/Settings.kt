@@ -97,6 +97,8 @@ data class AppSettings(
     /** On: now playing's lyrics, device and queue buttons (issue #294). Off: the earlier look, lyrics card peeking in. */
     val nowPlayingLyricsButton: Boolean = true,
     val homeHidden: Set<HomeSection> = emptySet(),
+    /** The gap between Home's sections (#554), as a step of the spacing scale: 0 tight … 4 airy. 2 is the default. */
+    val homeGap: Int = HOME_GAP_DEFAULT,
     /** Show only music on the phone, across the whole app (issue #141). */
     val downloadedOnly: Boolean = false,
     /** The time machine lists songs that aren't in your library, marked (issue #234). */
@@ -159,6 +161,9 @@ data class AppSettings(
         get() = audiobookshelfUrl.isNotBlank() && (audiobookshelfToken.isNotBlank() || (audiobookshelfUser.isNotBlank() && audiobookshelfPassword.isNotBlank()))
 
     companion object {
+        const val HOME_GAP_DEFAULT = 2
+        const val HOME_GAP_MAX = 4
+
         /** The skips the book player offers, in seconds (issue #521). */
         val BOOK_SKIP_CHOICES = listOf(10, 15, 30, 45, 60, 90)
         const val DEFAULT_MODEL = "google/gemini-2.5-flash"
@@ -305,6 +310,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         navTabs = NavTab.parse(prefs.getString("nav_tabs", null)),
         nowPlayingLyricsButton = prefs.getBoolean("now_playing_lyrics_button", true),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
+        homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
         timeMachineMissing = prefs.getBoolean("time_machine_missing", true),
         themeMode = prefs.getString("theme_mode", "AUTO") ?: "AUTO",
@@ -491,6 +497,12 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setHomeOrder(order: List<HomeSection>) {
         prefs.edit().putString("home_order", HomeSection.format(order)).apply()
         _state.value = _state.value.copy(homeOrder = order)
+    }
+
+    fun setHomeGap(step: Int) {
+        val gap = step.coerceIn(0, AppSettings.HOME_GAP_MAX)
+        prefs.edit().putInt("home_gap", gap).apply()
+        _state.value = _state.value.copy(homeGap = gap)
     }
 
     fun setHomeHidden(hidden: Set<HomeSection>) {

@@ -3,6 +3,7 @@ package app.siansa.data
 import app.siansa.log.AppLog
 import app.siansa.net.AbsLibrary
 import app.siansa.net.AudiobookshelfApi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +27,7 @@ class BookRepository(private val api: AudiobookshelfApi, private val settings: (
     /** The shelves of every book library, then every podcast library (Audiobookshelf's own home order). */
     suspend fun shelves(podcasts: Boolean): List<BookShelf> {
         val libs = libraries().filter { it.podcasts == podcasts }
-        val shelves = libs.flatMap { lib -> runCatching { api.shelves(lib.id) }.onFailure { AppLog.w("Books", "Shelves of ${lib.name}: ${it.message}") }.getOrDefault(emptyList()) }
+        val shelves = libs.flatMap { lib -> attempt("Shelves of ${lib.name}") { api.shelves(lib.id) } ?: emptyList() }
         shelves.forEach { s -> s.books.forEach { booksById[it.id] = it } }
         AppLog.i("Books", "${if (podcasts) "Podcast" else "Book"} shelves: ${shelves.size} from ${libs.size} libraries, ${shelves.sumOf { it.books.size }} items")
         return shelves
@@ -51,14 +52,32 @@ class BookRepository(private val api: AudiobookshelfApi, private val settings: (
     }
 
     /** A book with its chapters: from the server, then kept. */
+    /** Books and podcasts across every library matching [query]; a library that fails is skipped (issue #531). */
+    suspend fun search(query: String): List<Book> = libraries().flatMap { lib ->
+        runCatching { api.search(lib.id, query) }.onFailure { AppLog.w("Books", "Search in ${lib.name}: ${it.message}") }.getOrDefault(emptyList())
+    }.distinctBy { it.id }.also { list -> list.forEach { booksById[it.id] = it } }
+
     suspend fun book(id: String): Book = api.book(id).also { booksById[id] = it }
 
     /** The book as last seen, without asking the server; null when never loaded. */
     fun known(id: String): Book? = booksById[id]
 
+    /**
+     * [block]'s answer, or null with a warning when the server fails. A cancelled call (the screen asking for it has
+     * gone) is passed on, not logged as the server's failure (#553).
+     */
+    private suspend fun <T> attempt(what: String, block: suspend () -> T): T? = try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        AppLog.w("Books", "$what: ${e.message}")
+        null
+    }
+
     /** Reads every progress the user has, once per app start or when asked. */
     suspend fun refreshProgress() {
-        val all = runCatching { api.allProgress() }.onFailure { AppLog.w("Books", "Progress: ${it.message}") }.getOrNull() ?: return
+        val all = attempt("Progress") { api.allProgress() } ?: return
         _progress.value = all
     }
 

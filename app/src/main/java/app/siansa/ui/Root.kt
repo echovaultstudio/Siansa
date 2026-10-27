@@ -158,6 +158,9 @@ class PlayerSheet {
 
 val LocalPlayerSheet = staticCompositionLocalOf { PlayerSheet() }
 
+/** The book player's sheet (issue #542), opened from the book mini player and the book pages. */
+val LocalBookSheet = staticCompositionLocalOf { PlayerSheet() }
+
 private val SheetEnter = tween<IntOffset>(250, easing = FastOutSlowInEasing)
 private val SheetExit = tween<IntOffset>(190, easing = FastOutLinearInEasing)
 
@@ -169,6 +172,7 @@ fun SiansaRoot() {
     // Messages from the player, e.g. a song that can't play while offline.
     LaunchedEffect(Unit) { graph.player.notices.collect { snack.showSnackbar(it) } }
     val sheet = remember { PlayerSheet() }
+    val bookSheet = remember { PlayerSheet() }
     val player by graph.player.state.collectAsStateWithLifecycle()
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
@@ -212,7 +216,7 @@ fun SiansaRoot() {
 
     AskForNotifications()
 
-    CompositionLocalProvider(LocalNav provides nav, LocalSnack provides snack, LocalPlayerSheet provides sheet) {
+    CompositionLocalProvider(LocalNav provides nav, LocalSnack provides snack, LocalPlayerSheet provides sheet, LocalBookSheet provides bookSheet) {
       Box(Modifier.fillMaxSize()) {
         Scaffold(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -232,7 +236,7 @@ fun SiansaRoot() {
                         // A book's mini player while a book is loaded and the music isn't (issue #521).
                         val bookState by graph.bookPlayer.state.collectAsStateWithLifecycle()
                         if (player.hasMedia) MiniPlayer(player) { sheet.open() }
-                        else if (bookState.book != null) BookMiniPlayer(bookState) { nav.navigate("bookplayer") }
+                        else if (bookState.book != null) BookMiniPlayer(bookState) { bookSheet.open() }
                         NavigationBar(containerColor = Color.Transparent, tonalElevation = 0.dp) {
                             tabs.forEach { tab ->
                                 NavigationBarItem(
@@ -346,7 +350,6 @@ fun SiansaRoot() {
                 composable("similar/albums/{id}") { SimilarAlbumsScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("book/{id}") { BookScreen(nav, it.arguments?.getString("id").orEmpty()) }
-                composable("bookplayer") { BookPlayerScreen(nav) }
                 composable("artist/{id}/appears-on") { AppearsOnScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("playlist/{id}") { PlaylistScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("mix/{id}") { MixScreen(nav, it.arguments?.getString("id").orEmpty()) }
@@ -359,6 +362,19 @@ fun SiansaRoot() {
         // "Start song radio" from any menu asks Steady or DJ here (issue #337).
         RadioChooserHost()
         BackHandler(enabled = sheet.isOpen) { sheet.close() }
+        // The book player slides up like now playing (issue #542); without a book loaded it closes itself.
+        val bookLoaded by graph.bookPlayer.state.collectAsStateWithLifecycle()
+        LaunchedEffect(bookLoaded.book) { if (bookLoaded.book == null) bookSheet.close() }
+        BackHandler(enabled = bookSheet.isOpen) { bookSheet.close() }
+        AnimatedVisibility(
+            visible = bookSheet.isOpen,
+            enter = slideInVertically(SheetEnter) { it },
+            exit = slideOutVertically(SheetExit) { it },
+        ) {
+            CompositionLocalProvider(LocalContentColor provides Color.White) {
+                BookPlayerScreen(nav, onClose = { bookSheet.close() })
+            }
+        }
         AnimatedVisibility(
             visible = sheet.isOpen,
             enter = slideInVertically(SheetEnter) { it },
