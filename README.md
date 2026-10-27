@@ -24,7 +24,7 @@ Siansa is **open source** under the GNU GPL, version 3 or later ([LICENSE](LICEN
 
 Siansa is in beta. There's no APK to download here: the app comes from
 
-- **Google Play's open beta**: join at [siansa.app](https://siansa.app), or
+- **Google Play's beta**: sign up at [siansa.app](https://siansa.app), or
 - the **Siansa F-Droid repository** for testers, also from [siansa.app](https://siansa.app).
 
 Both update on their own. Or build it from this source (below): a build of your own is signed with your own key, so it can't update an installed copy from Play or F-Droid, and the other way round.
@@ -65,7 +65,7 @@ Inside the app, with **Settings → Logs → Keep a log** on, the log records ea
 
 ## Building
 
-GitHub Actions builds the app on every push to `main` and publishes a release once all quality checks pass. The version comes from `version.txt` (e.g. `0.0.3beta`). Each change adds a note in `changelog.d/` (see its README). When changes are merged to `main` and the checks pass, CI raises the version by the size of the change (fixes 0.1.3 → 0.1.4, new features 0.1.3 → 0.2.0, 1.0 only when asked for; see `changelog.d/README.md`), tags `v<version>` with the notes, records the section in `CHANGELOG.md` and the version in `version.txt`, sends the APK to the F-Droid repository and the app bundle to Google Play's open beta. Edits to older changelog sections are copied to their releases too. `RELEASES.md` lists every release with the pull requests in it and is updated after each release.
+GitHub Actions builds the app on every push to `main` and publishes a release once all quality checks pass. The version comes from `version.txt` (e.g. `0.0.3beta`). Each change adds a note in `changelog.d/` (see its README). When changes are merged to `main` and the checks pass, CI raises the version by the size of the change (fixes 0.1.3 → 0.1.4, new features 0.1.3 → 0.2.0, 1.0 only when asked for; see `changelog.d/README.md`), tags `v<version>` with the notes, records the section in `CHANGELOG.md` and the version in `version.txt`, sends the APK to the F-Droid repository and the app bundle to Google Play's beta (closed and internal testing). Edits to older changelog sections are copied to their releases too. `RELEASES.md` lists every release with the pull requests in it and is updated after each release.
 
 The release signing key isn't in the repository: CI gets it from the secrets `SIGNING_KEYSTORE_BASE64`, `SIGNING_KEYSTORE_PASSWORD`, `SIGNING_KEY_ALIAS` and `SIGNING_KEY_PASSWORD`, and a build without them is unsigned.
 

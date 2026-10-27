@@ -52,7 +52,14 @@ git log --all -S REDACTED --oneline               # must print nothing
 - Delete the `claude/*` branches that are already merged (Settings › Branches, or `git push origin --delete`), so
   the public branch list is just main and open work.
 
-## 4. Not covered by this
+## 4. Google Play: open testing later
+
+A new Play developer account can't use open testing (or production) until a closed test has had at least 12
+testers opted in for 14 days. Until then releases go to closed and internal testing, as before, and testers sign
+up at siansa.app. Once Play Console allows it: set up Open testing (countries, feedback address), then add the
+repository variable `PLAY_TRACK` = `beta` (or `beta,internal`) so releases go there.
+
+## 5. Not covered by this
 
 - `deploy/` holds the server kit (Caddy, the signup service, the F-Droid repo). It has no secrets (they're in
   `.env`, which is ignored), but it describes the server; keep it or move it to a private repository as you prefer.
