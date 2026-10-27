@@ -23,6 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Download
@@ -112,6 +113,8 @@ fun SettingsHub(nav: NavController) {
             HubRow(Icons.Rounded.Storage, "Storage") { nav.navigate("settings/storage") }
             HubRow(Icons.Rounded.Backup, "Backup") { nav.navigate("settings/backup") }
             HubRow(Icons.Rounded.NewReleases, "What's new") { nav.navigate("settings/whatsnew") }
+            // The version and links to the open-source licences, the docs and the privacy policy (#576).
+            HubRow(Icons.Rounded.Info, "About") { nav.navigate("settings/about") }
             // Debug logs and Report a problem in one place, last (#567).
             HubRow(Icons.Rounded.BugReport, "Help") { nav.navigate("settings/help") }
         }
