@@ -3,6 +3,15 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.38.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.38.0beta) — 2026-10-27
+
+- [#577](https://github.com/echovaultstudio/Siansa/pull/577) Settings › About and an open-source licences page on siansa.app (@Th3K1ngP1n)
+- [#579](https://github.com/echovaultstudio/Siansa/pull/579) Time machine: the whole report of a month or year, with its songs (@Th3K1ngP1n)
+- [#580](https://github.com/echovaultstudio/Siansa/pull/580) Upload each release's app bundle to Google Play's closed testing (@Th3K1ngP1n)
+- [#581](https://github.com/echovaultstudio/Siansa/pull/581) Google Play: each release on closed and internal testing (@Th3K1ngP1n)
+- [#583](https://github.com/echovaultstudio/Siansa/pull/583) Audiobookshelf under Settings › Users, with Scan for new books (@Th3K1ngP1n)
+- [#588](https://github.com/echovaultstudio/Siansa/pull/588) Release 0.38.0beta: About and licences, time machine report, Audiobookshelf under Users (@Th3K1ngP1n)
+
 ## [0.37.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.37.0beta) — 2026-10-27
 
 - [#559](https://github.com/echovaultstudio/Siansa/pull/559) Album page: type and year at the top; genre and label tags at the foot (@Th3K1ngP1n)
