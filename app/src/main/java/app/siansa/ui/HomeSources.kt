@@ -132,12 +132,11 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                 val guest = guestStates[user.id]
                 val syncing = if (inUse) progress.running else guest?.running == true
                 SourceCard(
-                    // Two users on one address but of different kinds (Navidrome and Emby) look alike without it,
-                    // unless their servers have names (Settings › Users).
-                    name = user.label + if (user.emby && user.serverName == null) " (Emby)" else "",
-                    status = when {
+                    // The user, and under it the kind of server, then how it stands (#571): "max", "OpenSubsonic · In use · …".
+                    name = user.title,
+                    status = (if (user.connected) user.serverLine + " · " else "") + when {
                         !user.connected -> "Not connected yet. Set it up in Settings → Users."
-                        elsewhere -> "On another server. To listen, switch to this user in Settings → Users."
+                        elsewhere -> "on another server. To listen, switch to this user in Settings → Users."
                         checking -> "Checking whether it's your server…"
                         inUse && ownHidden -> "In use · their music is hidden. Their settings and history stay in use."
                         inUse -> inUseStatus(syncing, libraryStatus)

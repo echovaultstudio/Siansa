@@ -156,7 +156,7 @@ class SubsonicApi(
         params: Map<String, String?> = emptyMap(),
         repeated: List<Pair<String, String>> = emptyList(),
     ): JsonObject {
-        if (settings().navidromeUrl.isBlank()) throw ApiException("Navidrome isn't set up yet")
+        if (settings().navidromeUrl.isBlank()) throw ApiException("Your server isn't set up yet")
         // A long list of songs as a form POST, so the address doesn't get too long for proxies.
         val post = repeated.size > POST_OVER && endpoint != "getOpenSubsonicExtensions" && supports("formPost")
         return try {
@@ -193,12 +193,12 @@ class SubsonicApi(
             if (response.code == 401 || response.code == 407) {
                 throw ApiException("The server asked for a login (HTTP ${response.code}). Fill in the proxy login in Settings.")
             }
-            if (!response.isSuccessful) throw ApiException("Navidrome answered HTTP ${response.code}")
+            if (!response.isSuccessful) throw ApiException("Your server answered HTTP ${response.code}")
             val root = try {
                 AppJson.parseToJsonElement(body).jsonObject["subsonic-response"]?.jsonObject
             } catch (e: Exception) {
                 null
-            } ?: throw ApiException("That address doesn't look like a Navidrome server")
+            } ?: throw ApiException("That address doesn't look like an OpenSubsonic server")
             if (root.str("status") != "ok") {
                 val error = root.obj("error")
                 val code = error?.int("code")
@@ -572,6 +572,7 @@ class SubsonicApi(
         // Servers without the flag (older Navidrome, other Subsonic servers): "Various Artists" (issue #504).
         isCompilation = o.bool("isCompilation") == true || isVariousArtists(o.str("artist") ?: o.str("displayArtist").orEmpty()),
         played = o.str("played"),
+        labels = o.arr("recordLabels").mapNotNull { it.str("name")?.trim()?.takeIf(String::isNotEmpty) }.distinct(),
     )
 
     private fun parsePlaylist(o: JsonObject) = Playlist(

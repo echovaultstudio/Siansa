@@ -37,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,14 +71,14 @@ import app.siansa.log.AppLog
 fun BooksCarousel(nav: NavController, podcasts: Boolean) {
     val graph = LocalGraph.current
     val progress by graph.books.progress.collectAsStateWithLifecycle()
-    val shelves by loadState("book-shelves-$podcasts") {
-        graph.books.refreshProgress()
-        graph.books.shelves(podcasts)
-    }
-    val cards = booksForCarousel(shelves.valueOrNull().orEmpty().flatMap { shelf -> shelf.books.map { shelf.id to it } }, progress)
+    // The shelves as last read, so scrolling back to the carousel shows it at once, at its height (#569: it was
+    // empty for a moment, then grew, pushing the page down). Read again only when a minute old.
+    val shelvesAll by graph.books.shelvesState.collectAsStateWithLifecycle()
+    LaunchedEffect(podcasts) { graph.books.refreshShelves(podcasts) }
+    val cards = booksForCarousel(shelvesAll[podcasts].orEmpty().flatMap { shelf -> shelf.books.map { shelf.id to it } }, progress)
     if (cards.isEmpty()) return
     val pager = rememberPagerState { cards.size }
-    Column(Modifier.fillMaxWidth().padding(bottom = Space.Page).testTag(if (podcasts) "homePodcasts" else "homeBooks")) {
+    Column(Modifier.fillMaxWidth().testTag(if (podcasts) "homePodcasts" else "homeBooks")) {
         SectionTitle(if (podcasts) "Your podcasts" else "Your books")
         HorizontalPager(
             state = pager,
@@ -218,7 +219,6 @@ private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen:
 @Composable
 fun BookScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
-    val bookSheet = LocalBookSheet.current
     val progressAll by graph.books.progress.collectAsStateWithLifecycle()
     val page by loadState(id) { graph.books.book(id) }
     val book = page.valueOrNull()
@@ -248,7 +248,6 @@ fun BookScreen(nav: NavController, id: String) {
                             onClick = {
                                 graph.bookPlayer.playOrToggle(b, if (started) current else 0.0)
                                 AppLog.i("Books", "${if (started) "Continue" else "Play"} \"${b.title}\" from its page")
-                                bookSheet.open()
                             },
                             modifier = Modifier.testTag("bookPlay"),
                         ) {
@@ -319,7 +318,6 @@ fun BookScreen(nav: NavController, id: String) {
                                 Modifier.fillMaxWidth().clickable {
                                     graph.bookPlayer.playEpisode(b, e)
                                     AppLog.i("Books", "Play episode \"${e.title}\" of \"${b.title}\"")
-                                    bookSheet.open()
                                 }.padding(horizontal = Space.Page, vertical = Space.Small).testTag("episode-${e.id}"),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(Space.Medium),
@@ -339,7 +337,7 @@ fun BookScreen(nav: NavController, id: String) {
                     items(marks.size, key = { "bm-${marks[it].timeSec}" }) { i ->
                         val m = marks[i]
                         Row(
-                            Modifier.fillMaxWidth().clickable { graph.bookPlayer.play(b, m.timeSec); bookSheet.open() }.padding(horizontal = Space.Page, vertical = Space.Small).testTag("bookmark-$i"),
+                            Modifier.fillMaxWidth().clickable { graph.bookPlayer.play(b, m.timeSec) }.padding(horizontal = Space.Page, vertical = Space.Small).testTag("bookmark-$i"),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(Space.Medium),
                         ) {
@@ -360,7 +358,6 @@ fun BookScreen(nav: NavController, id: String) {
                         }) {
                             graph.bookPlayer.play(b, c.startSec)
                             AppLog.i("Books", "Play \"${b.title}\" from chapter ${c.index + 1}")
-                            bookSheet.open()
                         }
                     }
                 }

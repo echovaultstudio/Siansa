@@ -80,7 +80,12 @@ data class AlbumEntity(
     val folderId: String? = null,
     /** Whether its library is chosen to show; every library is kept, so switching one is instant (issue #376). */
     @androidx.room.ColumnInfo(defaultValue = "1") val visible: Boolean = true,
+    /** Its record labels, each between two [LABEL_MARK]s ("‹A›‹B›"), so one can be matched whole (#558). */
+    @androidx.room.ColumnInfo(defaultValue = "''") val labels: String = "",
 )
+
+/** What brackets each label in [AlbumEntity.labels]; a character no label has. */
+const val LABEL_MARK = "\u001F"
 
 @Entity(tableName = "artists", indices = [Index("sortKey")])
 data class ArtistEntity(
@@ -236,6 +241,17 @@ interface LibraryDao {
     @Query("SELECT * FROM albums WHERE isPrimary = 1 AND (sortKey LIKE '%' || :term || '%' OR artistKey LIKE '%' || :term || '%') ORDER BY sortKey LIMIT :limit")
     suspend fun searchAlbums(term: String, limit: Int): List<AlbumEntity>
 
+    /** Albums tagged with [genre] (#558): the album's own genre, or any of its songs'; newest first. */
+    @Query(
+        "SELECT * FROM albums WHERE isPrimary = 1 AND (genre = :genre COLLATE NOCASE OR id IN " +
+            "(SELECT albumId FROM songs WHERE genre = :genre COLLATE NOCASE AND albumId IS NOT NULL)) ORDER BY year DESC, sortKey"
+    )
+    suspend fun albumsWithGenre(genre: String): List<AlbumEntity>
+
+    /** Albums on the record label [marked] (the label between two [LABEL_MARK]s) (#558); newest first. */
+    @Query("SELECT * FROM albums WHERE isPrimary = 1 AND labels LIKE '%' || :marked || '%' ESCAPE '\\' ORDER BY year DESC, sortKey")
+    suspend fun albumsWithLabel(marked: String): List<AlbumEntity>
+
     @Query("SELECT releaseTypes, isCompilation FROM albums WHERE isPrimary = 1")
     suspend fun albumTypes(): List<AlbumTypeRow>
 
@@ -371,7 +387,7 @@ interface LibraryDao {
 
 @Database(
     entities = [SongEntity::class, AlbumEntity::class, ArtistEntity::class, PlaylistEntity::class, MetaEntity::class, SourceEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class LibraryDatabase : RoomDatabase() {
@@ -415,9 +431,20 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Version 6 keeps each album's record labels (#558). Forgetting the last scan makes the next sync read the album
+         * list again (which carries the labels) without fetching any songs.
+         */
+        val ADD_ALBUM_LABELS = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `albums` ADD COLUMN `labels` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("DELETE FROM `meta` WHERE `key` = 'lastScan'")
+            }
+        }
+
         fun open(context: Context): LibraryDatabase =
             Room.databaseBuilder(context, LibraryDatabase::class.java, app.siansa.data.Users.scoped(app.siansa.data.UserFiles.DATABASE))
-                .addMigrations(ADD_SOURCES, ADD_ARTIST_MBID, ADD_ALBUM_FOLDERS, ADD_SONG_CREDITS)
+                .addMigrations(ADD_SOURCES, ADD_ARTIST_MBID, ADD_ALBUM_FOLDERS, ADD_SONG_CREDITS, ADD_ALBUM_LABELS)
                 // The library can always be synced again, so any other schema change simply starts fresh.
                 .fallbackToDestructiveMigration()
                 .build()

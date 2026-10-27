@@ -40,6 +40,28 @@ object UserFiles {
 
     const val DATABASE = "library.db"
 
+    /** A user's row, first line (#571): their login name, or a note when not set up yet. */
+    fun title(user: String): String = user.ifBlank { "New user" }
+
+    /**
+     * What kind of server (#571): OpenSubsonic, Emby… An OpenSubsonic server isn't called Navidrome, as it may be
+     * Gonic, Airsonic or another; the app doesn't know which.
+     */
+    fun kindName(kind: SourceKind): String = when (kind) {
+        SourceKind.OPENSUBSONIC -> "OpenSubsonic"
+        SourceKind.EMBY -> "Emby"
+        SourceKind.JELLYFIN -> "Jellyfin"
+        SourceKind.LOCAL -> "This phone"
+    }
+
+    /**
+     * A user's row, second line in smaller type (#571): the kind of server, then the name the user gave it (the pencil
+     * in Settings › Users), if any: "OpenSubsonic", "Emby · Living room". "Not connected yet" before set-up.
+     */
+    fun serverLine(kind: SourceKind, serverName: String?, connected: Boolean): String =
+        if (!connected) "Not connected yet"
+        else listOfNotNull(kindName(kind), serverName?.takeIf { it.isNotBlank() }).joinToString(" · ")
+
     /**
      * How a user is shown in the list: "anna on music.example.com", or "anna on Home Navidrome" when their server has
      * a name ([serverName]), or a note when not set up yet.
@@ -161,7 +183,15 @@ data class UserEntry(
     val server: String? = null,
     /** The name this user gave their server, or null. */
     val serverName: String? = null,
-)
+    /** Their login name, the first line of their row (#571). */
+    val user: String = "",
+    val kind: SourceKind = SourceKind.OPENSUBSONIC,
+) {
+    /** Their row's first line: the user. */
+    val title: String get() = UserFiles.title(user)
+    /** Their row's second line: the kind of server and its name, if given. */
+    val serverLine: String get() = UserFiles.serverLine(kind, serverName, connected)
+}
 
 /**
  * Several Navidrome logins (on the same or different servers), each with its own settings, library and
@@ -206,10 +236,11 @@ object Users {
         val address = settings.getString("nd_url", "").orEmpty()
         val server = UserFiles.serverKey(address)
         val name = UserFiles.nameFor(id, server, byUser, byServer)
+        val kind = SourceKind.parse(settings.getString("source_kind", null))
         return UserEntry(
             id, UserFiles.label(user, address, name), connected = user.isNotBlank() && address.isNotBlank(),
-            emby = SourceKind.parse(settings.getString("source_kind", null)) == SourceKind.EMBY,
-            server = server, serverName = name,
+            emby = kind == SourceKind.EMBY,
+            server = server, serverName = name, user = user, kind = kind,
         )
     }
 
