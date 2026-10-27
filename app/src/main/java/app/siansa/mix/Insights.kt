@@ -112,6 +112,16 @@ fun timeMachineReportWindow(year: Int, month: Int?, today: LocalDate): ReportWin
     return ReportWindow(w.from, to, prevFrom, w.label, if (to != w.to) "So far" else w.label)
 }
 
+/** How long the current period's Koito data counts as fresh (#592); finished periods are kept for good. */
+const val REPORT_FRESH_MS = 15 * 60_000L
+
+/** The key a report window's Koito data is kept under: the server and the three instants that define the window. */
+internal fun reportKey(serverUrl: String, fromSec: Long, toSec: Long, prevSec: Long): String =
+    "${serverUrl.trimEnd('/')}|$fromSec|$toSec|$prevSec"
+
+/** Whether [window] has ended by [today]: a finished month or year, whose data can't change any more (#592). */
+internal fun reportIsFinished(window: ReportWindow, today: LocalDate): Boolean = !window.to.isAfter(today)
+
 /** How many top songs and albums are asked from Koito, to still have 10 after leaving out ones not in the library. */
 private const val TOP_FETCH = 40
 
@@ -218,7 +228,16 @@ class Insights(private val graph: AppGraph) {
     suspend fun report(range: ReportRange): ListeningReport = report(reportWindow(range, LocalDate.now()), range.id)
 
     /** The report for any window: Your month's ranges, or a time machine month or year (#578). */
-    suspend fun report(window: ReportWindow, tag: String): ListeningReport = coroutineScope {
+    suspend fun report(window: ReportWindow, tag: String): ListeningReport = reportUpdates(window, tag).last()
+
+    /**
+     * The report for [window] as it comes in (#592): what the phone kept first, then a fresh one when that's stale.
+     * A finished month or year never changes, so its Koito data is kept on the phone for good and the report shows
+     * at once; the current one is asked again after [REPORT_FRESH_MS], the kept one showing meanwhile so the page
+     * isn't blank. The library may change in between, so the plays are matched against it again each time, from
+     * the song and album indexes (a few ms).
+     */
+    fun reportUpdates(window: ReportWindow, tag: String): Flow<ListeningReport> = channelFlow {
         val s = graph.settings.current
         val (from, to, prevFrom, title, subtitle) = window
         val fromSec = from.atStartOfDay(zone).toEpochSecond()
@@ -227,42 +246,84 @@ class Insights(private val graph: AppGraph) {
         val history = graph.history.all()
         val inRange = history.filter { it.at / 1000 in fromSec until toSec && !it.skipped }
         val before = history.filter { it.at / 1000 in prevSec until fromSec && !it.skipped }
-
-        val koito = s.listenBrainzReady && graph.historyApi.isKoito(s.listenBrainzUrl)
-        val remote = if (koito) {
-            runCatching { koitoReport(s.listenBrainzUrl, s.listenBrainzToken, fromSec, toSec, prevSec) }
-                .onFailure { AppLog.w("Report", "Koito failed, using Siansa history: ${it.message}") }
-                .getOrNull()
-        } else null
-
         val (genresUp, genresDown) = genreShift(inRange, before)
         AppLog.d("Report", "$tag: $from to $to")
-        val report = if (remote != null) {
-            ListeningReport(
-                title = title, subtitle = subtitle,
-                minutes = remote.totals.minutes, plays = remote.totals.plays,
-                artistCount = remote.totals.artists, trackCount = remote.totals.tracks,
-                newArtists = remote.totals.newArtists,
-                topArtists = remote.artists.take(10).map { RankedArtist(it.artist, it.count, findArtist(it.artist)) },
-                // Koito also counts plays from other apps and services: only songs and albums in your library are shown.
-                topTracks = keepInLibrary(remote.tracks, 10) { matchSong(it.artist, it.title.orEmpty()) }
-                    .map { (p, song) -> RankedTrack(p.title.orEmpty(), p.artist, p.count, song) },
-                topAlbums = keepInLibrary(remote.albums, 10) { matchAlbum(it.artist, it.title.orEmpty()) }
-                    .map { (p, album) -> RankedAlbum(p.title.orEmpty(), p.artist, p.count, album) },
-                byHour = hours(remote.times.map { it * 1000 }),
-                rising = rising(remote.artists, remote.previous).map { RankedArtist(it.artist, it.count, findArtist(it.artist)) },
-                fading = fading(remote.artists, remote.previous),
-                genresUp = genresUp, genresDown = genresDown,
-                source = "From Koito, with genres from Siansa",
-            )
-        } else {
-            localReport(title, subtitle, inRange, before, genresUp, genresDown)
+
+        suspend fun build(remote: KoitoData?): ListeningReport {
+            val report = if (remote != null) {
+                ListeningReport(
+                    title = title, subtitle = subtitle,
+                    minutes = remote.totals.minutes, plays = remote.totals.plays,
+                    artistCount = remote.totals.artists, trackCount = remote.totals.tracks,
+                    newArtists = remote.totals.newArtists,
+                    topArtists = remote.artists.take(10).map { RankedArtist(it.artist, it.count, findArtist(it.artist)) },
+                    // Koito also counts plays from other apps and services: only songs and albums in your library are shown.
+                    topTracks = keepInLibrary(remote.tracks, 10) { matchSong(it.artist, it.title.orEmpty()) }
+                        .map { (p, song) -> RankedTrack(p.title.orEmpty(), p.artist, p.count, song) },
+                    topAlbums = keepInLibrary(remote.albums, 10) { matchAlbum(it.artist, it.title.orEmpty()) }
+                        .map { (p, album) -> RankedAlbum(p.title.orEmpty(), p.artist, p.count, album) },
+                    byHour = hours(remote.times.map { it * 1000 }),
+                    rising = rising(remote.artists, remote.previous).map { RankedArtist(it.artist, it.count, findArtist(it.artist)) },
+                    fading = fading(remote.artists, remote.previous),
+                    genresUp = genresUp, genresDown = genresDown,
+                    source = "From Koito, with genres from Siansa",
+                )
+            } else {
+                localReport(title, subtitle, inRange, before, genresUp, genresDown)
+            }
+            AppLog.i("Report", "${report.title}: ${report.plays} plays, ${report.minutes} min, top ${report.topArtists.take(3).map { it.name }} · ${report.source}")
+            return report
         }
-        AppLog.i("Report", "${report.title}: ${report.plays} plays, ${report.minutes} min, top ${report.topArtists.take(3).map { it.name }} · ${report.source}")
-        report
+
+        val koito = s.listenBrainzReady && graph.historyApi.isKoito(s.listenBrainzUrl)
+        if (!koito) {
+            send(build(null))
+            return@channelFlow
+        }
+        val key = reportKey(s.listenBrainzUrl, fromSec, toSec, prevSec)
+        val finished = reportIsFinished(window, LocalDate.now(zone))
+        val kept = keptReport(key, finished)
+        if (kept != null) {
+            AppLog.d("Report", "$tag: Koito data from the phone${if (kept.fresh) "" else ", asking again"}")
+            send(build(kept.data))
+            if (kept.fresh) return@channelFlow
+        }
+        val started = System.currentTimeMillis()
+        val remote = runCatching { koitoReport(s.listenBrainzUrl, s.listenBrainzToken, fromSec, toSec, prevSec) }
+            .onFailure { AppLog.w("Report", "Koito failed${if (kept != null) ", keeping what the phone had" else ", using Siansa history"}: ${it.message}") }
+            .getOrNull()
+        if (remote == null) {
+            if (kept == null) send(build(null))
+            return@channelFlow
+        }
+        AppLog.d("Report", "$tag: Koito answered in ${System.currentTimeMillis() - started}ms (${remote.times.size} listens)")
+        keepReport(key, finished, remote)
+        send(build(remote))
     }
 
-    private class KoitoData(
+    /** A kept report's Koito data, and whether it's fresh enough to show without asking Koito again. */
+    private class Kept(val data: KoitoData, val fresh: Boolean)
+
+    // Koito's data per report window (#592). Finished windows never change, so they're kept on the phone for good;
+    // the current one for REPORT_FRESH_MS, then shown while a fresh one is fetched.
+    private val recentReports = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, KoitoData>>()
+    private val keptReports = app.siansa.data.JsonFile(
+        java.io.File(graph.app.filesDir, app.siansa.data.Users.scoped("report_koito.json")),
+        kotlinx.serialization.builtins.MapSerializer(String.serializer(), KoitoData.serializer()),
+    ) { emptyMap() }
+
+    private suspend fun keptReport(key: String, finished: Boolean): Kept? {
+        if (finished) keptReports.read()[key]?.let { return Kept(it, fresh = true) }
+        val recent = recentReports[key] ?: return null
+        return Kept(recent.second, fresh = System.currentTimeMillis() - recent.first < REPORT_FRESH_MS)
+    }
+
+    private suspend fun keepReport(key: String, finished: Boolean, data: KoitoData) {
+        if (finished) keptReports.update { it + (key to data) } else recentReports[key] = System.currentTimeMillis() to data
+    }
+
+    @kotlinx.serialization.Serializable
+    internal class KoitoData(
         val totals: HistoryApi.Totals,
         val artists: List<Played>,
         val tracks: List<Played>,
@@ -279,7 +340,8 @@ class Insights(private val graph: AppGraph) {
         val tracks = async { api.koitoTop(url, token, "tracks", from, to, TOP_FETCH) }
         val albums = async { api.koitoTop(url, token, "albums", from, to, TOP_FETCH) }
         val previous = async { api.koitoTop(url, token, "artists", prev, from, 40) }
-        val times = async { api.koitoListenTimes(url, token, from, to) }
+        // The listens, every page at once (#592), once the summary has said how many there are.
+        val times = async { api.koitoListenTimes(url, token, from, to, expected = totals.await().plays) }
         KoitoData(totals.await(), artists.await(), tracks.await(), albums.await(), previous.await(), times.await())
     }
 
@@ -331,6 +393,18 @@ class Insights(private val graph: AppGraph) {
             val index = SongIndex(graph.library.songTitles().map { SongIndex.Entry(it.id, it.title, it.artist) })
             AppLog.d("TimeMachine", "Song index: ${index.size} songs in ${System.currentTimeMillis() - started}ms")
             cachedIndex = version to index
+            index
+        }
+    }
+
+    /** Every album by name, built once per library version, for a report's top albums (#592). */
+    private var cachedAlbums: Pair<Int, Map<String, List<Album>>>? = null
+
+    private suspend fun albumIndex(): Map<String, List<Album>> = indexLock.withLock {
+        val version = graph.library.version.value
+        cachedAlbums?.takeIf { it.first == version }?.second ?: run {
+            val index = graph.library.albums("name").groupBy { normalizeKey(it.name) }.filterKeys { it.isNotEmpty() }
+            cachedAlbums = version to index
             index
         }
     }
@@ -505,26 +579,20 @@ class Insights(private val graph: AppGraph) {
 
     private suspend fun findArtist(name: String): Artist? = runCatching { graph.library.artistByName(name) }.getOrNull()
 
+    /** The library's album with this title by this artist, from the album index (#592: one query per album before). */
     private suspend fun matchAlbum(artist: String, title: String): Album? {
         if (!graph.library.isSynced || title.isBlank()) return null
         val a = normalizeKey(artist)
-        return runCatching { graph.library.search(title).albums }.getOrDefault(emptyList()).firstOrNull { album ->
-            normalizeKey(album.name) == normalizeKey(title) &&
-                (a.isEmpty() || normalizeKey(album.artist).contains(a) || a.contains(normalizeKey(album.artist)))
+        return albumIndex()[normalizeKey(title)]?.firstOrNull { album ->
+            a.isEmpty() || normalizeKey(album.artist).contains(a) || a.contains(normalizeKey(album.artist))
         }
     }
 
+    /** The library's song with this title by this artist, from the song index (#592: two searches per song before). */
     private suspend fun matchSong(artist: String, title: String): Song? {
         if (!graph.library.isSynced || title.isBlank()) return null
-        val a = normalizeKey(artist)
-        fun matches(song: Song) = normalizeKey(song.title) == normalizeKey(title) &&
-            (a.isEmpty() || normalizeKey(song.artist).contains(a) || a.contains(normalizeKey(song.artist)))
-        // Title and artist together first: a common title ("Ghost") alone has more hits than a search returns.
-        val queries = listOfNotNull("$title $artist".takeIf { artist.isNotBlank() }, title)
-        for (q in queries) {
-            runCatching { graph.library.search(q).songs }.getOrDefault(emptyList()).firstOrNull(::matches)?.let { return it }
-        }
-        return null
+        val id = songIndex().find(artist, title) ?: return null
+        return runCatching { graph.library.song(id) }.getOrNull()
     }
 
     private fun key(artist: String, title: String) = normalizeKey(artist) + "|" + normalizeKey(title)
