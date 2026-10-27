@@ -23,6 +23,12 @@ class BooksCarouselTest {
         assertEquals(listOf("New" to "1"), cards.map { it.first to it.second.id })
     }
 
+    @Test fun atMostFiveCards() {
+        val shelved = (1..9).map { "recently-added" to book("$it") }
+        val cards = booksForCarousel(shelved, emptyMap())
+        assertEquals(listOf("1", "2", "3", "4", "5"), cards.map { it.second.id })
+    }
+
     @Test fun descriptionsLoseTheirHtml() {
         assertEquals("A lighthouse & a lamp.\nLine two", stripHtml("<p>A lighthouse &amp; a lamp.<br/>Line two</p>"))
     }

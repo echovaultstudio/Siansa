@@ -101,7 +101,8 @@ internal fun booksForCarousel(shelved: List<Pair<String, Book>>, progress: Map<S
     return out.take(CAROUSEL_MAX)
 }
 
-private const val CAROUSEL_MAX = 8
+// The five that matter (owner, 27 Oct): what you're in, then up next and new; the rest are in Your Library.
+private const val CAROUSEL_MAX = 5
 
 /** The cover on a book card; the words start after it and a page's gap. */
 private val CARD_COVER_WIDTH = 100.dp
