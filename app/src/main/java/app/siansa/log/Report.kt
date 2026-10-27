@@ -27,10 +27,17 @@ object Report {
     fun clean(text: String): String =
         text.trim().replace(Regex("[ \\t]+\\n"), "\n").replace(Regex("\\n{3,}"), "\n\n").take(MAX_TEXT).trim()
 
-    /** What's missing before the report can go, in plain words; null when it's ready. */
-    fun problem(happened: String, expected: String): String? = when {
+    /**
+     * What's missing before the report can go, in plain words; null when it's ready. A report always carries the log
+     * (#567): debug logs must be on and have recorded something, and the tester confirms they repeated the problem a
+     * few times with them on, so the log shows it more than once.
+     */
+    fun problem(happened: String, expected: String, logging: Boolean = true, logBytes: Long = 1, repeated: Boolean = true): String? = when {
+        !logging -> "Turn on debug logs, repeat the problem a few times, then send the report."
+        logBytes <= 0 -> "The log is empty. Repeat the problem a few times with debug logs on, then send the report."
         clean(happened).length < MIN_HAPPENED -> "Say what happened, in a few words."
         clean(expected).length < MIN_EXPECTED -> "Say what you expected to happen."
+        !repeated -> "Repeat the problem a few times with debug logs on, then tick the box."
         else -> null
     }
 
