@@ -103,10 +103,19 @@ private fun ReportPage(nav: NavController, rangeId: String) {
     }
 }
 
+/**
+ * A period's report: the big numbers, top artists, top songs, top albums, the listening clock and how the taste moved.
+ * The time machine puts its own song list in [songs] (#578), with its Play, Create memory and songs not in the library;
+ * when the report has no plays (only Last.fm has that time), just those songs show.
+ */
 @Composable
-private fun ReportBody(r: ListeningReport, nav: NavController) {
+internal fun ReportBody(r: ListeningReport, nav: NavController, songs: (@Composable () -> Unit)? = null) {
     val graph = LocalGraph.current
     if (r.plays == 0) {
+        if (songs != null) {
+            songs()
+            return
+        }
         Text(
             "Nothing played in this period.",
             style = MaterialTheme.typography.bodyLarge,
@@ -176,8 +185,10 @@ private fun ReportBody(r: ListeningReport, nav: NavController) {
         }
     }
 
-    // Top songs, playable as a list.
-    if (r.topTracks.isNotEmpty()) {
+    // Top songs, playable as a list; the time machine's own list when it gives one.
+    if (songs != null) {
+        songs()
+    } else if (r.topTracks.isNotEmpty()) {
         Row(Modifier.fillMaxWidth().padding(end = Space.Page), verticalAlignment = Alignment.CenterVertically) {
             SectionTitle("Top songs", Modifier.weight(1f))
             val playable = r.topTracks.mapNotNull { it.song }
