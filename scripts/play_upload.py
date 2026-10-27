@@ -3,16 +3,17 @@
 
   python3 scripts/play_upload.py siansa-0.37.0beta.aab 0.37.0beta notes.md
 
-The bundle goes to the testing track in PLAY_TRACK ("alpha", Play's name for closed testing, unless set otherwise),
-as a release named after the version, with the version's notes as "What's new" (plain text, at most 500 characters).
-Closed testing still goes through Google's review; the upload just saves doing it by hand.
+The bundle goes to the testing tracks in PLAY_TRACK, comma-separated; unset, both closed testing ("alpha", Play's
+name for it) and internal testing. It's one release on each, named after the version, with the version's notes as
+"What's new" (plain text, at most 500 characters). Internal testing has it at once; closed testing goes through
+Google's review.
 
 Needs PLAY_SERVICE_ACCOUNT_JSON: a Google Cloud service account's JSON key, invited in Play Console with
 "Release apps to testing tracks" for Siansa only. Without it nothing is sent. The key stays in that secret; this
 script never prints it.
 
-A version Play already has (its version code was used) isn't an error: the script says so and stops, so running it
-twice for one release is harmless.
+A bundle Play already has isn't an error: it's found by its SHA-256 and put on the tracks, so running this again
+for a release adds it to a track it wasn't on, and otherwise changes nothing.
 """
 import json
 import os
@@ -26,6 +27,9 @@ API = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/
 UPLOAD = "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/" + PACKAGE
 SCOPE = "https://www.googleapis.com/auth/androidpublisher"
 NOTES_MAX = 500
+# Closed testing ("alpha" in the API) and internal testing, both with every release (#557).
+DEFAULT_TRACKS = ("alpha", "internal")
+TRACK_NAMES = {"alpha": "closed testing", "internal": "internal testing", "beta": "open testing", "production": "production"}
 
 
 def plain_notes(markdown):
@@ -98,35 +102,82 @@ def call(method, url, tok, body=None, data=None, content_type="application/json"
         raise PlayError(f"HTTP {e.code}: {e.read().decode(errors='replace')[:800]}") from None
 
 
-def upload(aab, version, notes_md, track, key_json):
+def tracks_of(setting):
+    """The tracks a release goes to: PLAY_TRACK as "alpha,internal", each once, in order; both when unset (#557)."""
+    tracks = []
+    for t in (setting or "").split(","):
+        t = t.strip()
+        if t and t not in tracks:
+            tracks.append(t)
+    return tracks or list(DEFAULT_TRACKS)
+
+
+def sha256_of(path):
+    import hashlib
+
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def code_of_uploaded(bundles, sha256):
+    """The version code of the bundle Play already has with this file's SHA-256, or None."""
+    for b in bundles:
+        if b.get("sha256", "").lower() == sha256.lower():
+            return b.get("versionCode")
+    return None
+
+
+def track_has(track, code):
+    """Whether a track (as Play's API gives it) has a release with this version code."""
+    return any(str(code) in (r.get("versionCodes") or []) for r in track.get("releases", []))
+
+
+def upload(aab, version, notes_md, tracks, key_json):
+    """Uploads [aab] once and puts it on every one of [tracks] in one edit. A bundle Play already has (uploaded for
+    an earlier run) is found by its SHA-256 and put on the tracks it isn't on yet."""
     tok = token(key_json)
     edit = call("POST", f"{API}/edits", tok, body={})["id"]
-    print(f"Upload {aab} ({os.path.getsize(aab) // 1024} KB) for {version} to {track}")
+    print(f"Upload {aab} ({os.path.getsize(aab) // 1024} KB) for {version} to {', '.join(tracks)}")
     try:
         with open(aab, "rb") as f:
-            bundle = call("POST", f"{UPLOAD}/edits/{edit}/bundles?uploadType=media", tok, data=f.read(), content_type="application/octet-stream")
+            code = call("POST", f"{UPLOAD}/edits/{edit}/bundles?uploadType=media", tok, data=f.read(), content_type="application/octet-stream")["versionCode"]
     except PlayError as e:
-        if already_uploaded(str(e)):
-            print(f"::notice::Google Play already has {version} (its version code was used); nothing to upload.")
+        if not already_uploaded(str(e)):
+            raise
+        code = code_of_uploaded(call("GET", f"{API}/edits/{edit}/bundles", tok).get("bundles", []), sha256_of(aab))
+        if code is None:
+            print(f"::notice::Google Play already has {version}'s version code, from another file; nothing to do.")
             call("DELETE", f"{API}/edits/{edit}", tok)
             return "already"
-        raise
-    code = bundle["versionCode"]
+        # Only the tracks without it: one that has it (perhaps still in review) is left as it is.
+        tracks = [t for t in tracks if not track_has(call("GET", f"{API}/edits/{edit}/tracks/{t}", tok), code)]
+        if not tracks:
+            print(f"::notice::Google Play already has {version} (version code {code}) on every track; nothing to do.")
+            call("DELETE", f"{API}/edits/{edit}", tok)
+            return "already"
+        print(f"Google Play already has {version} (version code {code}); adding it to {', '.join(tracks)}.")
     notes = plain_notes(notes_md)
+
+    def put(status):
+        for track in tracks:
+            call("PUT", f"{API}/edits/{edit}/tracks/{track}", tok, body=track_body(track, version, code, notes, status))
+        call("POST", f"{API}/edits/{edit}:commit", tok)
+
     status = "completed"
     try:
-        call("PUT", f"{API}/edits/{edit}/tracks/{track}", tok, body=track_body(track, version, code, notes, status))
-        call("POST", f"{API}/edits/{edit}:commit", tok)
+        put(status)
     except PlayError as e:
         if not draft_only(str(e)):
             raise
         # An app Play still treats as a draft takes draft releases only: one to roll out by hand in Play Console.
         # Same edit, so the bundle uploaded to it is still there.
         status = "draft"
-        call("PUT", f"{API}/edits/{edit}/tracks/{track}", tok, body=track_body(track, version, code, notes, status))
-        call("POST", f"{API}/edits/{edit}:commit", tok)
-    print(f"::notice::Google Play: {version} (version code {code}) is on the {track} track as {status}."
-          + (" Roll it out in Play Console." if status == "draft" else " Closed testing goes through Google's review first."))
+        put(status)
+    print(f"::notice::Google Play: {version} (version code {code}) is on {', '.join(TRACK_NAMES.get(t, t) for t in tracks)} as {status}."
+          + (" Roll it out in Play Console." if status == "draft" else " Internal testing has it now; closed testing after Google's review."))
     return status
 
 
@@ -141,9 +192,9 @@ def main(argv):
     aab, version, notes_path = argv[1:]
     with open(notes_path, encoding="utf-8") as f:
         notes_md = f.read()
-    track = os.environ.get("PLAY_TRACK", "").strip() or "alpha"
+    tracks = tracks_of(os.environ.get("PLAY_TRACK", ""))
     try:
-        upload(aab, version, notes_md, track, key)
+        upload(aab, version, notes_md, tracks, key)
     except PlayError as e:
         print(f"::error::Google Play refused the upload: {e}")
         return 1
