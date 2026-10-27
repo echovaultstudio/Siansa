@@ -111,9 +111,46 @@ fun SettingsHub(nav: NavController) {
             HubRow(Icons.Rounded.DownloadForOffline, "Downloads") { nav.navigate("downloads") }
             HubRow(Icons.Rounded.Storage, "Storage") { nav.navigate("settings/storage") }
             HubRow(Icons.Rounded.Backup, "Backup") { nav.navigate("settings/backup") }
-            HubRow(Icons.Rounded.BugReport, "Report a problem") { nav.navigate("settings/report") }
-            HubRow(Icons.Rounded.BugReport, "Logs") { nav.navigate("settings/logs") }
             HubRow(Icons.Rounded.NewReleases, "What's new") { nav.navigate("settings/whatsnew") }
+            // Debug logs and Report a problem in one place, last (#567).
+            HubRow(Icons.Rounded.BugReport, "Help") { nav.navigate("settings/help") }
+        }
+    }
+}
+
+/**
+ * Help (#567): debug logs and reporting a problem, in one place at the foot of Settings. The steps to a useful report
+ * are on the page: turn on debug logs, make the problem happen a few times, then send it. The full log, to read,
+ * save or share, is a tap away.
+ */
+@Composable
+fun HelpScreen(nav: NavController) {
+    val graph = LocalGraph.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    Screen(title = "Help", nav = nav) { padding ->
+        Column(
+            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
+            verticalArrangement = Arrangement.spacedBy(Space.Medium),
+        ) {
+            Heading("Debug logs")
+            SwitchRow("Debug logs", settings.logging) { on ->
+                graph.settings.setLogging(on)
+                AppLog.setEnabled(on)
+                AppLog.i("Help", "Debug logs ${if (on) "on" else "off"}")
+            }
+            Hint(
+                "While on, Siansa records what it does, to trace problems. Nothing leaves the phone unless you send a " +
+                    "report or share the log. Passwords, tokens and API keys are removed.",
+            )
+            OutlinedButton(onClick = { nav.navigate("settings/logs") }, modifier = Modifier.testTag("helpLogs")) { Text("Show the log") }
+            HorizontalDivider()
+            Heading("Report a problem")
+            Hint("1. Turn on debug logs above.\n2. Make the problem happen a few times.\n3. Send a report: the log goes with it.")
+            Button(onClick = { nav.navigate("settings/report") }, modifier = Modifier.testTag("helpReport")) {
+                Icon(Icons.Rounded.BugReport, null)
+                Spacer(Modifier.width(Space.Small))
+                Text("Report a problem")
+            }
         }
     }
 }
@@ -493,7 +530,7 @@ fun LogsScreen(nav: NavController) {
         ) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                    SwitchRow("Keep a log", settings.logging) { on ->
+                    SwitchRow("Debug logs", settings.logging) { on ->
                         graph.settings.setLogging(on)
                         AppLog.setEnabled(on)
                         refresh++
