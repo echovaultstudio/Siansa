@@ -540,6 +540,8 @@ class EmbyApi(
             played = user?.str("LastPlayedDate"),
             // Emby has no compilation flag: an album by "Various Artists" is one (issue #504).
             isCompilation = isVariousArtists(o.str("AlbumArtist") ?: albumArtist?.str("Name").orEmpty()),
+            // Emby's Studios are the labels (#558).
+            labels = o.arr("Studios").mapNotNull { it.str("Name")?.trim()?.takeIf(String::isNotEmpty) }.distinct(),
         )
     }
 
@@ -563,7 +565,7 @@ class EmbyApi(
 
     internal companion object {
         /** The extra fields Siansa reads on lists (Emby leaves most out unless asked). */
-        const val FIELDS = "Genres,DateCreated,ProductionYear,ChildCount,ProviderIds,Overview,Container,AlbumArtist,ParentId"
+        const val FIELDS = "Genres,DateCreated,ProductionYear,ChildCount,ProviderIds,Overview,Container,AlbumArtist,ParentId,Studios"
 
         /** `{user}` once it has been through [enc] as a parameter value. */
         const val USER_ENCODED = "%7Buser%7D"
