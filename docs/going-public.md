@@ -2,7 +2,10 @@
 
 The code is ready for a public repository once #584 is merged: the signing key is gone from the tree, releases
 carry no files, the licence is in. What's left is the **git history**, which still holds `app/siansa.keystore` and
-its password in every commit since the rename (#360). Making the repository public with that history would give
+its password in every commit since the rename (#360), and the retired `app/musix.keystore` (password
+`musixpass`) before it. A scan of all 1,066 commits found no other keys, tokens or passwords: only made-up ones in
+tests, home-network addresses (192.168.x.x, not reachable from outside) and the notify address in an old
+`deploy/.env.example`, which the rewrite replaces too. Making the repository public with that history would give
 everyone the key that signs the app. So the history is rewritten first, once, by the owner, on a machine with a
 fresh clone. Nothing below runs in CI.
 
@@ -24,18 +27,20 @@ On a computer with [git-filter-repo](https://github.com/newren/git-filter-repo) 
 ```sh
 git clone --mirror https://github.com/echovaultstudio/Siansa.git siansa-rewrite
 cd siansa-rewrite
-printf 'siansapass==>REDACTED\n' > /tmp/replacements.txt
-git filter-repo --invert-paths --path app/siansa.keystore --replace-text /tmp/replacements.txt
+printf 'siansapass==>REDACTED\nmusixpass==>REDACTED\nsiansa@srvmax.com==>you@example.com\n' > /tmp/replacements.txt
+git filter-repo --invert-paths --path app/siansa.keystore --path app/musix.keystore --replace-text /tmp/replacements.txt
 git push --force --mirror https://github.com/echovaultstudio/Siansa.git
 ```
 
-`--invert-paths --path` drops the keystore from every commit; `--replace-text` turns its password into `REDACTED`
+`--invert-paths --path` drops both keystores from every commit (the retired Musix key too: a different key, but no
+reason to publish it); `--replace-text` turns its password into `REDACTED`
 wherever it was written (old `build.gradle.kts`). Tags are rewritten with their commits, so releases keep pointing
 at the right code. Check afterwards:
 
 ```sh
-git log --all --oneline -- app/siansa.keystore     # must print nothing
-git log --all -S siansapass --oneline               # must print nothing
+git log --all --oneline -- app/siansa.keystore app/musix.keystore   # must print nothing
+git log --all -S siansapass --oneline                               # must print nothing
+git log --all -S musixpass --oneline                                # must print nothing
 ```
 
 ## 3. After the rewrite
