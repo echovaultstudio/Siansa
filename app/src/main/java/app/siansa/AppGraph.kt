@@ -335,6 +335,7 @@ class AppGraph(val app: Application) {
         isOffline = { connection.current.offline }
         onlyDownloads = { settings.current.downloadedOnly }
         isDownloaded = { downloads.isDownloaded(it) }
+        onPlayStarted = { bookPlayer.pause() }
     }
     init {
         // The playing artist's popular songs, fetched ahead so their page shows them at once (issue #398). After

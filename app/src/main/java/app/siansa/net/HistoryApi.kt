@@ -2,6 +2,11 @@ package app.siansa.net
 
 import app.siansa.data.AppJson
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -18,6 +23,21 @@ data class Played(val artist: String, val title: String? = null, val count: Long
  * with the same API key used for scrobbling), ListenBrainz, or Last.fm. Read-only.
  */
 class HistoryApi(private val http: OkHttpClient) {
+    companion object {
+        /** Listens per page, Koito's largest. */
+        const val PAGE = 500
+        /** Pages asked for at once (#592). */
+        const val PARALLEL = 5
+        /** More listens than any period is asked for; a year is about 10,000. */
+        const val MAX_LISTENS = 50_000
+
+        /** How many pages hold [expected] listens (none when it isn't known), at most [max] listens' worth. */
+        fun listenPages(expected: Int?, max: Int = MAX_LISTENS, pageSize: Int = PAGE): Int {
+            if (expected == null || expected <= 0) return 0
+            return ((minOf(expected, max) + pageSize - 1) / pageSize).coerceAtLeast(1)
+        }
+    }
+
 
     /** Top artists and tracks from Koito or ListenBrainz, for the last month. */
     suspend fun listenServerTop(listenBrainzUrl: String, token: String): Pair<List<Played>, List<Played>> {
@@ -58,6 +78,7 @@ class HistoryApi(private val http: OkHttpClient) {
         ListenBrainzApi.apiRoot(listenBrainzUrl).substringBefore("/apis/listenbrainz") + "/apis/web/v1"
 
     /** Totals for a time range from Koito's summary. */
+    @kotlinx.serialization.Serializable
     data class Totals(val minutes: Int, val plays: Int, val artists: Int, val tracks: Int, val albums: Int, val newArtists: Int, val newTracks: Int)
 
     suspend fun koitoTotals(url: String, token: String, fromSec: Long, toSec: Long): Totals {
@@ -84,17 +105,38 @@ class HistoryApi(private val http: OkHttpClient) {
             }
         }
 
-    /** When each listen in a time range happened (epoch seconds), up to [max] listens. */
-    suspend fun koitoListenTimes(url: String, token: String, fromSec: Long, toSec: Long, max: Int = 5000): List<Long> {
-        val times = ArrayList<Long>()
-        var page = 1
-        while (times.size < max) {
-            val o = get("${koitoWeb(url)}/listens?from=$fromSec&to=$toSec&limit=500&page=$page", token)
-            o.arr("items").forEach { row ->
-                row.str("time")?.let { t -> runCatching { java.time.OffsetDateTime.parse(t).toEpochSecond() }.getOrNull() }?.let(times::add)
+    /**
+     * When each listen in a time range happened (epoch seconds), up to [max] listens. With [expected] (the period's
+     * play count from the summary) the pages are asked for [PARALLEL] at a time instead of one after the other: a
+     * year of 10,000 plays is 20 pages, which took 4 s in a row (#592). Any pages beyond the expected count are
+     * read one by one, as before, until the last.
+     */
+    suspend fun koitoListenTimes(url: String, token: String, fromSec: Long, toSec: Long, expected: Int? = null, max: Int = MAX_LISTENS): List<Long> {
+        suspend fun page(n: Int): Pair<List<Long>, Boolean> {
+            val o = get("${koitoWeb(url)}/listens?from=$fromSec&to=$toSec&limit=$PAGE&page=$n", token)
+            val times = o.arr("items").mapNotNull { row ->
+                row.str("time")?.let { t -> runCatching { java.time.OffsetDateTime.parse(t).toEpochSecond() }.getOrNull() }
             }
-            if (o.bool("has_next_page") != true) break
-            page++
+            return times to (o.bool("has_next_page") == true)
+        }
+        val times = ArrayList<Long>()
+        var next = 1
+        var more = true
+        val known = listenPages(expected, max)
+        if (known > 1) {
+            val semaphore = Semaphore(PARALLEL)
+            val pages = coroutineScope {
+                (1..known).map { n -> async { semaphore.withPermit { page(n) } } }.awaitAll()
+            }
+            pages.forEach { times += it.first }
+            more = pages.last().second
+            next = known + 1
+        }
+        while (more && times.size < max) {
+            val (batch, hasNext) = page(next)
+            times += batch
+            more = hasNext
+            next++
         }
         return times
     }
