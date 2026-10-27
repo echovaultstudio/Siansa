@@ -10,6 +10,13 @@ import java.io.File
 @Serializable
 data class RecentPlay(val route: String, val title: String, val cover: String? = null, val at: Long = 0)
 
+/**
+ * A book (or a podcast, when [episode] is one of its episodes) as a shortcut on Home (#548): its page, its cover.
+ * An episode plays as a book titled after the episode, with the podcast's name as its subtitle.
+ */
+fun bookShortcut(book: Book, episode: Boolean): RecentPlay =
+    RecentPlay("book/${book.id}", if (episode) book.subtitle ?: book.title else book.title, book.cover)
+
 /** [list] with [play] at the top, once, at most [max] long. */
 fun notedPlay(list: List<RecentPlay>, play: RecentPlay, max: Int = RecentPlays.MAX): List<RecentPlay> =
     (listOf(play) + list.filter { it.route != play.route }).take(max)
