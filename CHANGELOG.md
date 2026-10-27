@@ -3,6 +3,12 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.38.2beta — 2026-10-27
+
+### Changed
+- **Siansa is open source**, under the GNU GPL version 3 or later. The code is at github.com/echovaultstudio/Siansa.
+  Releases now come from Google Play's beta and the F-Droid repository, not as a download from GitHub.
+
 ## 0.38.1beta — 2026-10-27
 
 ### Fixed
