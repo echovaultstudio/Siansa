@@ -215,10 +215,11 @@ fun BookPlayerScreen(nav: NavController, onClose: () -> Unit) {
 
             val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             BoxWithConstraints(Modifier.fillMaxSize()) {
+                val pageHeight = maxHeight
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                     Column(
                         Modifier
-                            .height(maxHeight)
+                            .height(pageHeight)
                             .statusBarsPadding()
                             .padding(horizontal = Space.Section)
                             .padding(bottom = navBar),
