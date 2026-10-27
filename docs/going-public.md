@@ -27,7 +27,7 @@ On a computer with [git-filter-repo](https://github.com/newren/git-filter-repo) 
 ```sh
 git clone --mirror https://github.com/echovaultstudio/Siansa.git siansa-rewrite
 cd siansa-rewrite
-printf 'siansapass==>REDACTED\nmusixpass==>REDACTED\nsiansa@srvmax.com==>you@example.com\n' > /tmp/replacements.txt
+printf 'siansapass==>REDACTED\nmusixpass==>REDACTED\nsiansa@srvmax.com==>help@siansa.app\n' > /tmp/replacements.txt
 git filter-repo --invert-paths --path app/siansa.keystore --path app/musix.keystore --replace-text /tmp/replacements.txt
 git push --force --mirror https://github.com/echovaultstudio/Siansa.git
 ```
