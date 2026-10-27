@@ -154,7 +154,7 @@ class SubsonicComplianceTest {
             fail("expected an error")
         } catch (e: ApiException) {
             assertEquals(70, e.code)
-            assertEquals("Not found on Navidrome. It may have been removed.", e.message)
+            assertEquals("Not found on your server. It may have been removed.", e.message)
         }
         assertEquals("Wrong username or password for your server.", SubsonicErrors.message(40, "Wrong username or password"))
         assertEquals("Something odd", SubsonicErrors.message(0, "Something odd"))
