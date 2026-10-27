@@ -3,6 +3,19 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.38.2beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.38.2beta) — 2026-10-27
+
+- [#585](https://github.com/echovaultstudio/Siansa/pull/585) Prepare the repository for public: GPL, the signing key out, no APKs on GitHub (@Th3K1ngP1n)
+- [#595](https://github.com/echovaultstudio/Siansa/pull/595) README: screenshots of the app, covers and photos blurred (@Th3K1ngP1n)
+
+## [0.38.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.38.1beta) — 2026-10-27
+
+- [#586](https://github.com/echovaultstudio/Siansa/pull/586) Website: we believe in open source, and a Donate page (@Th3K1ngP1n)
+- [#587](https://github.com/echovaultstudio/Siansa/pull/587) Podcasts play from ▶, and a book that can't start leaves no mini player (@Th3K1ngP1n)
+- [#590](https://github.com/echovaultstudio/Siansa/pull/590) A book's cover without an Audiobookshelf address shows the placeholder instead of crashing (@Th3K1ngP1n)
+- [#591](https://github.com/echovaultstudio/Siansa/pull/591) Release 0.38.1beta: podcasts play from ▶, no stray book mini player, no crash on a book cover, faster time machine (@Th3K1ngP1n)
+- [#593](https://github.com/echovaultstudio/Siansa/pull/593) Time machine and Your listening: finished periods kept on the phone, listens read in parallel, matching from the indexes (@Th3K1ngP1n)
+
 ## [0.38.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.38.0beta) — 2026-10-27
 
 - [#577](https://github.com/echovaultstudio/Siansa/pull/577) Settings › About and an open-source licences page on siansa.app (@Th3K1ngP1n)
