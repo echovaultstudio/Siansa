@@ -263,6 +263,8 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
     fun stop() {
         sync("stopped", close = true)
         withController { c -> c.stop(); c.clearMediaItems() }
+        sleepAtChapterEnd = false
+        sleepChapter = null
         _state.value = BookPlayerState(speed = _state.value.speed)
     }
 
