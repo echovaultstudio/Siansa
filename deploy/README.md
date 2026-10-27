@@ -8,6 +8,7 @@ One server for the closed beta (issue #410):
 | `https://siansa.app/privacy` | Privacy policy (for the Play listing) |
 | `https://siansa.app/licenses` | Open source: Siansa's licence and the libraries in the app (Settings › About links here) |
 | `https://siansa.app/donate` | Donations (Ko-fi) |
+| `https://siansa.app/tracking` | Feature tracking: servers done (ticked) and coming |
 | `https://siansa.app/fdroid/repo` | F-Droid repo with every release, for testers outside Play |
 | `https://demo.siansa.app` | Demo Navidrome with a small free library, for Google's reviewers and testers |
 
