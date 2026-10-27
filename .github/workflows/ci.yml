@@ -386,6 +386,24 @@ jobs:
             siansa-*.aab
           make_latest: true
 
+      # Google Play's closed testing (issue #557): the .aab with the version's notes, through a service account that
+      # can only release to testing tracks. Skipped until PLAY_SERVICE_ACCOUNT_JSON is set.
+      - uses: actions/setup-python@v6
+        if: steps.version.outputs.exists != 'true'
+        with:
+          python-version: "3.12"
+      - name: Upload to Google Play
+        if: steps.version.outputs.exists != 'true'
+        # Play out of reach or refusing mustn't stop the release notes and history below; the error shows on the run.
+        continue-on-error: true
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PLAY_TRACK: ${{ vars.PLAY_TRACK }}
+        run: |
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then echo "::notice::No Google Play key (PLAY_SERVICE_ACCOUNT_JSON); skipped."; exit 0; fi
+          pip install --quiet google-auth==2.40.3 requests==2.32.4
+          python3 scripts/play_upload.py "$(ls siansa-*.aab | head -n 1)" "${{ steps.version.outputs.version }}" "notes/${{ steps.version.outputs.version }}.md"
+
       # The beta F-Droid repo on our server (issue #410, deploy/): the APK goes over SSH to a key that can only
       # publish (deploy/scripts/siansa-publish). Skipped until the FDROID_* secrets are set.
       - name: Publish to the F-Droid beta repo
