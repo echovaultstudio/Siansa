@@ -3,6 +3,7 @@ package app.siansa.data
 import android.content.Context
 import androidx.room.withTransaction
 import app.siansa.data.db.AlbumEntity
+import app.siansa.data.db.LABEL_MARK
 import app.siansa.data.db.SongTitleRow
 import app.siansa.data.db.ArtistEntity
 import app.siansa.data.db.LibraryDatabase
@@ -205,6 +206,13 @@ class LibraryRepository(context: Context) {
         "random" -> dao.albumsRandom(100_000)
         else -> dao.albumsByName()
     }.map { it.toAlbum() }.onlyDownloadedAlbums()
+
+    /** Every album tagged with [genre] (#558), newest first; what's shown only, as the other album lists. */
+    suspend fun albumsWithGenre(genre: String): List<Album> = dao.albumsWithGenre(genre.trim()).map { it.toAlbum() }.onlyDownloadedAlbums()
+
+    /** Every album on the record label [label] (#558), newest first. Empty until a sync has read the labels. */
+    suspend fun albumsWithLabel(label: String): List<Album> =
+        dao.albumsWithLabel(likeLiteral(LABEL_MARK + label.trim() + LABEL_MARK)).map { it.toAlbum() }.onlyDownloadedAlbums()
 
     suspend fun randomAlbums(count: Int): List<Album> {
         val only = onlyDownloaded() ?: return dao.albumsRandom(count).map { it.toAlbum() }
@@ -561,6 +569,7 @@ class LibraryRepository(context: Context) {
         id = id, name = name, artist = artist, artistId = artistId, coverArt = coverArt, songCount = songCount,
         durationSec = durationSec, year = year, genre = genre, created = created, playCount = playCount,
         releaseTypes = splitTypes(releaseTypes), isCompilation = isCompilation, folderId = folderId,
+        labels = unmarkLabels(labels),
     )
 
     private fun Album.toEntity() = AlbumEntity(
@@ -572,6 +581,7 @@ class LibraryRepository(context: Context) {
         groupKey = albumGroupKey(name, artist, folderId),
         signature = signature(),
         folderId = folderId,
+        labels = markLabels(labels),
     )
 
     private fun ArtistEntity.toArtist() = Artist(id, name, albumCount, coverArt, imageUrl, mbid)
@@ -593,6 +603,15 @@ class LibraryRepository(context: Context) {
                 .joinToString("|")
     }
 }
+
+/** Labels as the library keeps them: each between two [LABEL_MARK]s, so a LIKE matches a whole label (#558). */
+internal fun markLabels(labels: List<String>): String =
+    labels.map { it.trim() }.filter { it.isNotEmpty() && LABEL_MARK !in it }.distinct().joinToString("") { LABEL_MARK + it + LABEL_MARK }
+
+internal fun unmarkLabels(stored: String): List<String> = stored.split(LABEL_MARK).filter { it.isNotBlank() }
+
+/** [text] for a LIKE with ESCAPE '\\': its own % and _ match only themselves ("100% Records"). */
+internal fun likeLiteral(text: String): String = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 /** Songs from Navidrome that the phone has (by id), in their order, as the phone's copy; the rest left out. */
 internal fun keepKnown(songs: List<Song>, local: Map<String, Song>): List<Song> = songs.mapNotNull { local[it.id] }

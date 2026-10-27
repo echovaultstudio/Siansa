@@ -4,7 +4,9 @@ import app.siansa.data.Album
 import app.siansa.data.creditedNames
 import app.siansa.data.splitArtists
 import app.siansa.data.isVariousArtists
-import app.siansa.ui.albumFacts
+import app.siansa.ui.AlbumFoot
+import app.siansa.ui.albumFoot
+import app.siansa.ui.albumHeadline
 import app.siansa.ui.tagRows
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -105,13 +107,19 @@ class TagsTest {
         assertEquals("120", rows["BPM"])
     }
 
-    @Test fun albumLineShowsVersionOriginalYearAndLabel() {
+    @Test fun albumHeadlineShowsOnlyTypeAndYear() {
         val album = Album("a", "Rumours", "Fleetwood Mac", year = 2013, genre = "Rock")
         val info = AlbumInfo(version = "Super Deluxe", originalYear = 1977, labels = listOf("Warner"), genres = listOf("Rock", "Soft Rock"))
-        val line = albumFacts(album, info, 38, "2 h 40 min")
-        assertTrue(line, line.contains("Super Deluxe · 1977 · reissued 2013 · Rock, Soft Rock · Warner · 38 songs · 2 h 40 min"))
-        // From the library alone, as before.
-        assertTrue(albumFacts(album, AlbumInfo(), 10, "40 min").endsWith("2013 · Rock · 10 songs · 40 min"))
+        assertEquals("Album · 1977 · reissued 2013", albumHeadline(album, info))
+        assertEquals("Album · 2013", albumHeadline(album, AlbumInfo()))
+    }
+
+    @Test fun albumFootHasGenresLabelsVersionAndLength() {
+        val album = Album("a", "Rumours", "Fleetwood Mac", year = 2013, genre = "Rock", labels = listOf("Reprise"))
+        val info = AlbumInfo(version = "Super Deluxe", labels = listOf("Warner"), genres = listOf("Rock", "Soft Rock"))
+        assertEquals(AlbumFoot(listOf("Rock", "Soft Rock"), listOf("Warner"), "Super Deluxe", "38 songs · 2 h 40 min"), albumFoot(album, info, 38, "2 h 40 min"))
+        // From the library alone: its one genre and the labels the sync read.
+        assertEquals(AlbumFoot(listOf("Rock"), listOf("Reprise"), null, "1 song · 4 min"), albumFoot(album, AlbumInfo(), 1, "4 min"))
     }
 
     @Test fun navidromesOwnJoinerSplitsArtists() {

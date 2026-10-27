@@ -572,6 +572,7 @@ class SubsonicApi(
         // Servers without the flag (older Navidrome, other Subsonic servers): "Various Artists" (issue #504).
         isCompilation = o.bool("isCompilation") == true || isVariousArtists(o.str("artist") ?: o.str("displayArtist").orEmpty()),
         played = o.str("played"),
+        labels = o.arr("recordLabels").mapNotNull { it.str("name")?.trim()?.takeIf(String::isNotEmpty) }.distinct(),
     )
 
     private fun parsePlaylist(o: JsonObject) = Playlist(
