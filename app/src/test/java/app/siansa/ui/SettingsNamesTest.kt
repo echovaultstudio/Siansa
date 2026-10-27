@@ -1,6 +1,7 @@
 package app.siansa.ui
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -17,5 +18,13 @@ class SettingsNamesTest {
         for (name in listOf("SettingsHub.kt", "StyleScreens.kt", "UsersScreen.kt", "CarouselEditor.kt", "DownloadsScreens.kt")) {
             assertFalse("$name still draws an arrow beside a setting", File(ui, name).readText().contains("KeyboardArrowRight"))
         }
+    }
+
+    /** The entry for users is called what its page is called (#565): "Users", not "Users and library sync". */
+    @Test fun theUsersEntryIsCalledUsers() {
+        val hub = File(ui, "SettingsHub.kt").readText()
+        assertTrue("Settings has no \"Users\" entry", hub.contains("HubRow(Icons.Rounded.People, \"Users\")"))
+        assertFalse("The old name is still there", hub.contains("Users and library sync"))
+        assertTrue("The page isn't called Users", File(ui, "UsersScreen.kt").readText().contains("Screen(title = \"Users\""))
     }
 }
