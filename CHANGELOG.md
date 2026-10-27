@@ -3,6 +3,38 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.37.0beta — 2026-10-27
+
+### Fixed
+- **A book's mini player shows while the book plays**, also when a song was paused to start it. Before, the song's
+  mini player stayed on top and the book's was hidden behind it. Now the mini player is whatever is playing, or
+  what played last.
+- **Playing from a book's page no longer opens the player.** Tap the mini player to open it, as with music.
+- **The book's cover in the player is the size of an album's** in Now Playing, not larger.
+- **Books start sooner**: they begin once a second is loaded instead of two and a half.
+- **Home's rows are spaced alike.** Album rows (Rediscover, Recently played, Random picks…) had extra room around
+  each cover, so they sat further in, further apart and lower than the genre and radio rows. Every row now starts
+  at the page's edge with the same gaps, and the mix and book carousels no longer leave extra room under their dots.
+- **Play buttons on Home's mix cards show when that mix is playing.** Today's mix and the mixes and vibes in the
+  carousel show ⏸ while their songs play, and a tap pauses them or plays on, as the book cards already do.
+- **Home no longer jumps at the books carousel.** It used to load again every time it scrolled into view, appearing
+  a moment later and pushing the page down. It now keeps its books and shows straight away, and asks Audiobookshelf
+  again at most once a minute. Without podcast libraries, nothing is asked for podcasts at all.
+
+### Added
+- **Genre and record label pages.** At the foot of an album's page, its genres and record labels are tags: tap one
+  to see every album in your library with that genre or label. Labels are read during the library sync, so a
+  label's page fills after the first sync on this version.
+
+### Changed
+- **A cleaner album header.** Under the artist, an album now shows just its type and year. Its version, number of
+  songs, length, genres and labels are at the foot of the page.
+- **"Users and library sync" in Settings is now just "Users"**, the same as its page.
+- **Help in Settings.** Report a problem and Logs are now one entry, **Help**, at the bottom of Settings. It has the
+  **Debug logs** switch, the log itself, and Report a problem, with the steps to a useful report.
+- **A report always carries the log.** It can only be sent with debug logs on and something recorded, after you
+  confirm you made the problem happen a few times, so we can see it more than once.
+
 ## 0.36.0beta — 2026-10-27
 
 ### Fixed
