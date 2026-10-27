@@ -4,13 +4,14 @@ import app.siansa.net.SourceKind
 
 /**
  * How Siansa names the user's server in what it shows (beta testers #31): someone on Emby shouldn't read "Navidrome".
- * Most texts just say "your server"; these are the few where the server's own name or abilities matter.
+ * Most texts just say "your server"; these are the few where the server's own name or abilities matter. A Subsonic
+ * server is called OpenSubsonic, not Navidrome: it may be Gonic, Airsonic or another, and the app doesn't know (#573).
  */
 internal object ServerWords {
     /** The server's own name, e.g. for a playlist without an owner: "Playlist · Emby · 12 songs". */
     fun name(kind: SourceKind): String = when (kind) {
         SourceKind.EMBY -> "Emby"
-        else -> "Navidrome"
+        else -> "OpenSubsonic"
     }
 
     /** Whether Siansa can have the server convert songs (Opus, MP3): Subsonic servers yes, Emby sends the original. */
@@ -19,9 +20,9 @@ internal object ServerWords {
     /** Settings › Playback, above the streaming quality. */
     fun streamingHint(kind: SourceKind): String =
         if (converts(kind)) {
-            "Opus is converted by your server (Navidrome uses its own \"opus\" transcoding profile). It saves data on mobile; the original file is best on Wi-Fi. Applies from the next song."
+            "Opus is converted by your server (on Navidrome, with its \"opus\" transcoding profile). It saves data on mobile; the original file is best on Wi-Fi. Applies from the next song."  // server-name: ok (how Navidrome does it)
         } else {
-            "${name(kind)} sends the original file, so the quality chosen here doesn't change anything for your music. It applies to Navidrome and other Subsonic servers."
+            "${name(kind)} sends the original file, so the quality chosen here doesn't change anything for your music. It applies to OpenSubsonic servers."
         }
 
     /** Downloads, under the download quality. */
