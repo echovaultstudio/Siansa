@@ -892,6 +892,43 @@ class SpacingTest {
         assertEven("Genres to labels", labels.top - genres.bottom, Space.Medium, 1.dp)
     }
 
+    /**
+     * Home's rows (#560): an album row and a genre row are spaced alike. The first tile starts at the page's edge,
+     * the title is the same gap above it, and the tiles are a medium gap apart; album tiles add nothing around them.
+     */
+    @Test fun albumAndGenreRowsAreSpacedAlike() {
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalGraph provides graph) {
+                SiansaTheme {
+                    androidx.compose.foundation.layout.Column(Modifier.width(400.dp)) {
+                        Box(Modifier.testTag("albumShelf")) {
+                            app.siansa.ui.Shelf("Albums", listOf("a", "b", "c"), key = { it }) { id ->
+                                app.siansa.ui.AlbumTile("Album $id", "Artist", null, {}, Modifier.width(150.dp))
+                            }
+                        }
+                        Box(Modifier.testTag("genreShelf")) {
+                            app.siansa.ui.Shelf("Genres", listOf("x", "y", "z"), key = { it }) { g ->
+                                app.siansa.ui.GradientTile(g, Color.Red to Color.Blue, {}, size = 130.dp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        val albumBox = compose.onNodeWithTag("albumShelf").getBoundsInRoot()
+        val genreBox = compose.onNodeWithTag("genreShelf").getBoundsInRoot()
+        val covers = compose.onAllNodesWithTag("albumTileCover", useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }.sortedBy { it.left }
+        val tiles = compose.onAllNodesWithTag("gradientTileArt", useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }.sortedBy { it.left }
+        val density = compose.density.density
+        fun dp(px: Float) = (px / density).dp
+        assertEven("Album row starts at the page's edge", dp(covers[0].left) - albumBox.left, Space.Page, 1.dp)
+        assertEven("Genre row starts at the page's edge", dp(tiles[0].left) - genreBox.left, Space.Page, 1.dp)
+        assertEven("Gap between albums", dp(covers[1].left - covers[0].right), Space.Medium, 1.dp)
+        assertEven("Gap between genres", dp(tiles[1].left - tiles[0].right), Space.Medium, 1.dp)
+        assertEven("Title to the row, albums and genres alike", dp(covers[0].top) - albumBox.top, dp(tiles[0].top) - genreBox.top, 1.dp)
+    }
+
     /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */
     @Test fun fastScrollHandleIsCentredAndReachesTheEnds() {
         var at by mutableFloatStateOf(0f)

@@ -77,7 +77,7 @@ fun BooksCarousel(nav: NavController, podcasts: Boolean) {
     val cards = booksForCarousel(shelves.valueOrNull().orEmpty().flatMap { shelf -> shelf.books.map { shelf.id to it } }, progress)
     if (cards.isEmpty()) return
     val pager = rememberPagerState { cards.size }
-    Column(Modifier.fillMaxWidth().padding(bottom = Space.Page).testTag(if (podcasts) "homePodcasts" else "homeBooks")) {
+    Column(Modifier.fillMaxWidth().testTag(if (podcasts) "homePodcasts" else "homeBooks")) {
         SectionTitle(if (podcasts) "Your podcasts" else "Your books")
         HorizontalPager(
             state = pager,
