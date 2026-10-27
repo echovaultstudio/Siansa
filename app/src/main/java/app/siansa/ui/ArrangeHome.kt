@@ -28,6 +28,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import kotlin.math.roundToInt
+import androidx.compose.ui.platform.testTag
+import app.siansa.data.AppSettings
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Slider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +67,9 @@ fun ArrangeHomeSheet(
     onHiddenChange: (Set<HomeSection>) -> Unit,
     onDismiss: () -> Unit,
     startOnSources: Boolean = false,
+    // The gap between Home's sections, a step of the spacing scale (#554).
+    gap: Int = AppSettings.HOME_GAP_DEFAULT,
+    onGapChange: (Int) -> Unit = {},
 ) {
     var sources by remember { mutableStateOf(startOnSources) }
     var items by remember { mutableStateOf(order) }
@@ -118,8 +126,9 @@ fun ArrangeHomeSheet(
                             hiddenItems = emptySet()
                             onHiddenChange(hiddenItems)
                         }
+                        if (gap != AppSettings.HOME_GAP_DEFAULT) onGapChange(AppSettings.HOME_GAP_DEFAULT)
                     },
-                    enabled = items != HomeSection.default || hiddenItems.isNotEmpty(),
+                    enabled = items != HomeSection.default || hiddenItems.isNotEmpty() || gap != AppSettings.HOME_GAP_DEFAULT,
                 ) { Text("Reset") }
             }
             SheetTabs(sources) { sources = it }
@@ -128,6 +137,7 @@ fun ArrangeHomeSheet(
                 SourcesPanel()
                 return@Column
             }
+            SpacingRow(gap, onGapChange)
             LazyColumn(state = list, userScrollEnabled = dragging == null) {
                 items(items, key = { it.id }) { section ->
                     val lifted = section == dragging
@@ -194,6 +204,28 @@ fun ArrangeHomeSheet(
                 }
             }
         }
+    }
+}
+
+/**
+ * One slider for the gaps between Home's sections (#554): five steps of the spacing scale, from tight to airy, so
+ * every gap on Home grows or shrinks together.
+ */
+@Composable
+private fun SpacingRow(gap: Int, onChange: (Int) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = Space.Page).testTag("homeSpacing"), verticalAlignment = Alignment.CenterVertically) {
+        Text("Spacing", style = MaterialTheme.typography.bodyLarge)
+        Spacer(Modifier.width(Space.Page))
+        Slider(
+            value = gap.toFloat(),
+            onValueChange = { onChange(it.roundToInt()) },
+            valueRange = 0f..AppSettings.HOME_GAP_MAX.toFloat(),
+            steps = AppSettings.HOME_GAP_MAX - 1,
+            colors = SliderDefaults.colors(thumbColor = Accent, activeTrackColor = Accent),
+            modifier = Modifier.weight(1f).testTag("homeSpacingSlider"),
+        )
+        Spacer(Modifier.width(Space.Page))
+        Text(homeGapLabel(gap), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(56.dp))
     }
 }
 

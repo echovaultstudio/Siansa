@@ -52,6 +52,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -408,7 +409,7 @@ fun Screen(
 }
 
 @Composable
-fun SectionTitle(text: String, modifier: Modifier = Modifier, top: Dp = SECTION_GAP) {
+fun SectionTitle(text: String, modifier: Modifier = Modifier, top: Dp = LocalSectionGap.current) {
     Text(
         text,
         style = MaterialTheme.typography.titleLarge,
@@ -419,6 +420,24 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier, top: Dp = SECTION_
 
 /** The space above a section's heading: between one section's last row and the next heading. */
 val SECTION_GAP = Space.Section
+
+/**
+ * The gap above a section's title. Home sets it from Arrange Home's spacing slider (#554); everywhere else it's
+ * [SECTION_GAP].
+ */
+val LocalSectionGap = compositionLocalOf { SECTION_GAP }
+
+/** Home's section gap for a step of the slider (0 tight … 4 airy): the spacing scale's steps, [Space.Page] by default. */
+fun homeGap(step: Int): Dp = when (step.coerceIn(0, app.siansa.data.AppSettings.HOME_GAP_MAX)) {
+    0 -> Space.Small
+    1 -> Space.Medium
+    2 -> Space.Page
+    3 -> Space.Section
+    else -> Space.Large
+}
+
+/** What the slider's step is called. */
+fun homeGapLabel(step: Int): String = listOf("Tight", "Compact", "Normal", "Roomy", "Airy")[step.coerceIn(0, app.siansa.data.AppSettings.HOME_GAP_MAX)]
 
 /** Room for a song length up to "59:59", so the lengths in a list line up (issue #309). */
 internal val DURATION_WIDTH = 36.dp
@@ -817,7 +836,7 @@ fun <T> Shelf(
                 Modifier
                     .fillMaxWidth()
                     .clickable(onClickLabel = "Show all", onClick = onOpenAll)
-                    .padding(start = Space.Page, end = Space.Page, top = Space.Section, bottom = Space.Medium),
+                    .padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current, bottom = Space.Medium),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
