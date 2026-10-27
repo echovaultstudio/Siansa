@@ -35,4 +35,11 @@ class BookSessionTest {
         assertEquals("0.75×", speedLabel(0.75f))
         assertEquals(SPEEDS.size, SPEEDS.distinct().size)
     }
+
+    /** ▶ on a card or page (#553): the loaded book plays or pauses, any other starts. */
+    @Test fun aTapOnTheLoadedBookTogglesAndOnAnotherStarts() {
+        assertEquals(BookTap.TOGGLE, BookPlayer.bookTap("b1", "b1"))
+        assertEquals(BookTap.START, BookPlayer.bookTap("b1", "b2"))
+        assertEquals(BookTap.START, BookPlayer.bookTap(null, "b2"))
+    }
 }

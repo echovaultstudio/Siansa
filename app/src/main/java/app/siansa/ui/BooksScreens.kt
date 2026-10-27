@@ -26,6 +26,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
@@ -125,10 +126,15 @@ private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen:
             if (progress?.started == true && !progress.finished) {
                 // ▶ on the cover continues where you were (owner's decision on #521).
                 FilledIconButton(
-                    onClick = { graph.bookPlayer.play(book, progress.currentSec); AppLog.i("Books", "Continue \"${book.title}\" from Home") },
+                    onClick = { graph.bookPlayer.playOrToggle(book, progress.currentSec); AppLog.i("Books", "Continue \"${book.title}\" from Home") },
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Space.Small).size(40.dp).testTag("bookContinue"),
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = OnAccent),
-                ) { Icon(Icons.Rounded.PlayArrow, "Continue ${book.title}", Modifier.size(24.dp)) }
+                ) {
+                    // ⏸ while this book plays: the button pauses it (#553).
+                    val playing by graph.bookPlayer.state.collectAsStateWithLifecycle()
+                    val now = playing.book?.id == book.id && playing.playing
+                    Icon(if (now) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (now) "Pause ${book.title}" else "Continue ${book.title}", Modifier.size(24.dp))
+                }
             }
         }
         // The words start a page's gap after the cover, which sits a page's gap in: the cover's width plus both.
@@ -201,15 +207,16 @@ fun BookScreen(nav: NavController, id: String) {
                         val started = progress?.started == true && progress.finished != true
                         Button(
                             onClick = {
-                                graph.bookPlayer.play(b, if (started) current else 0.0)
+                                graph.bookPlayer.playOrToggle(b, if (started) current else 0.0)
                                 AppLog.i("Books", "${if (started) "Continue" else "Play"} \"${b.title}\" from its page")
                                 nav.navigate("bookplayer")
                             },
                             modifier = Modifier.testTag("bookPlay"),
                         ) {
-                            Icon(Icons.Rounded.PlayArrow, null)
+                            val now = playing.book?.id == b.id && playing.playing
+                            Icon(if (now) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null)
                             Spacer(Modifier.width(Space.Tight))
-                            Text(if (started) "Continue" + (chapterNow?.let { " · chapter ${it.index + 1}" } ?: "") else "Play")
+                            Text(if (now) "Pause" else if (started) "Continue" + (chapterNow?.let { " · chapter ${it.index + 1}" } ?: "") else "Play")
                         }
                         OutlinedButton(
                             onClick = { graph.bookPlayer.markFinished(b, finished = progress?.finished != true) },
