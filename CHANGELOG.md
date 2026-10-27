@@ -3,6 +3,20 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.38.0beta — 2026-10-27
+
+### Added
+- **About in Settings.** It shows the version and links to the open-source licences of the libraries Siansa is
+  built on, the docs and the privacy policy. The licences also have their own page on siansa.app.
+
+### Changed
+- **The time machine shows the whole picture of a month or year**, as Your month does: minutes, plays, artists and
+  songs at the top, your top artists with their plays, your top songs (with Play, Create memory and the songs not in
+  your library, as before), top albums, your listening clock and how your taste moved compared with the period before.
+- **Audiobookshelf moved to Settings › Users**, next to your music logins, with a new **Scan for new books** that
+  asks the server to look for new and changed books, as its own Scan button does. An admin login is needed for the
+  scan; the login itself can be any user.
+
 ## 0.37.0beta — 2026-10-27
 
 ### Fixed
