@@ -37,9 +37,18 @@ class ServerWordingTest {
         assertFalse(ServerWording.namesNavidrome("""val scrobble = settings.scrobbleNavidrome"""))
     }
 
+    /** #573: an OpenSubsonic server's errors say "your server", as it may not be Navidrome. */
+    @Test fun subsonicErrorsDontNameNavidrome() {
+        val codes = listOf(null, 0, 10, 20, 30, 40, 41, 42, 43, 44, 50, 60, 70, 99)
+        codes.forEach { code ->
+            val text = app.siansa.net.SubsonicErrors.message(code, null)
+            assertFalse("Error $code names Navidrome: $text", text.contains("Navidrome"))
+        }
+    }
+
     @Test fun embyIsCalledEmbyAndToldItsQualityDoesntApply() {
         assertEquals("Emby", ServerWords.name(SourceKind.EMBY))
-        assertEquals("Navidrome", ServerWords.name(SourceKind.OPENSUBSONIC))
+        assertEquals("OpenSubsonic", ServerWords.name(SourceKind.OPENSUBSONIC))
         assertFalse(ServerWords.converts(SourceKind.EMBY))
         assertTrue("Emby" in ServerWords.streamingHint(SourceKind.EMBY))
         assertFalse(ServerWords.streamingHint(SourceKind.EMBY).contains("converted by"))

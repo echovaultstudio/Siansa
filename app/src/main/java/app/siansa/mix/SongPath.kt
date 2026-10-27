@@ -60,7 +60,7 @@ class SongPath(private val graph: AppGraph) {
                 throw MixException("Set up AudioMuse in Settings to end a path on a mood or follow the lyrics")
             graph.source.hasSonicMatch() -> {
                 val steps = graph.source.sonicPath(fromId, toId, length).map { it.id }
-                if (steps.isEmpty()) throw MixException("Navidrome found no path between these songs")
+                if (steps.isEmpty()) throw MixException("Your server found no path between these songs")
                 songPathIds(fromId, toId, steps, length)
             }
             // Emby has no sonic plugin (issue #113): its paths come from AudioMuse alone.
