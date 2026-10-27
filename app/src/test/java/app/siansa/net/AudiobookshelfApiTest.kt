@@ -73,4 +73,17 @@ class AudiobookshelfApiTest {
     @Test fun theCoverIdCarriesThePrefix() {
         assertEquals("bk-abc", Book(id = "abc", title = "T").cover)
     }
+
+    @Test fun aSearchReplyListsBooksThenPodcasts() {
+        val reply = """{"book":[{"libraryItem":$item,"matchKey":"title","matchText":"Tide"}],
+            "podcast":[{"libraryItem":{"id":"li_2","libraryId":"lib_2","mediaType":"podcast","media":{"metadata":{"title":"Tide Talk"}}}}],
+            "authors":[{"name":"Ada Quill"}],"series":[],"tags":[],"narrators":[]}"""
+        val hits = AudiobookshelfApi.parseSearch(json(reply))
+        assertEquals(listOf("The Tide Keeper", "Tide Talk"), hits.map { it.title })
+        assertEquals(listOf(false, true), hits.map { it.podcast })
+    }
+
+    @Test fun aSearchReplyWithoutHitsIsEmpty() {
+        assertEquals(emptyList<Any>(), AudiobookshelfApi.parseSearch(json("""{"authors":[]}""")))
+    }
 }
