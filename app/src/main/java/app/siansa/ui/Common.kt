@@ -52,6 +52,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -436,6 +437,12 @@ fun homeGap(step: Int): Dp = when (step.coerceIn(0, app.siansa.data.AppSettings.
     else -> Space.Large
 }
 
+/**
+ * The space an [AlbumTile] keeps around itself: a small gap in grids, where it makes the gutters, and none in Home's
+ * rows (#560), so an album's cover lines up with the page's edge and the row's gaps as a genre or radio tile does.
+ */
+val LocalTileInset = compositionLocalOf { Space.Small }
+
 /** What the slider's step is called. */
 fun homeGapLabel(step: Int): String = listOf("Tight", "Compact", "Normal", "Roomy", "Airy")[step.coerceIn(0, app.siansa.data.AppSettings.HOME_GAP_MAX)]
 
@@ -677,11 +684,11 @@ fun AlbumTile(
 ) {
     // The name sits a step under the cover, and the subtitle straight under the name, as one block (issue #338):
     // an even gap between all three left the artist floating away from the album name.
-    Column(modifier.clickable(onClick = onClick).padding(Space.Small)) {
+    Column(modifier.clickable(onClick = onClick).padding(LocalTileInset.current)) {
         Cover(
             coverArt,
             300,
-            Modifier.fillMaxWidth().aspectRatio(1f),
+            Modifier.fillMaxWidth().aspectRatio(1f).testTag("albumTileCover"),
             if (round) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(8.dp),
         )
         Spacer(Modifier.height(Space.Small))
@@ -852,8 +859,11 @@ fun <T> Shelf(
         } else {
             SectionTitle(title)
         }
-        LazyRow(contentPadding = PaddingValues(horizontal = Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-            items(items, key = key) { content(it) }
+        // Every row the same (#560): tiles start at the page's edge, a medium gap apart, with nothing added around them.
+        CompositionLocalProvider(LocalTileInset provides 0.dp) {
+            LazyRow(contentPadding = PaddingValues(horizontal = Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium), modifier = Modifier.testTag("shelfRow")) {
+                items(items, key = key) { content(it) }
+            }
         }
     }
 }
