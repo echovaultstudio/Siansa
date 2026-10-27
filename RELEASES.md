@@ -3,6 +3,19 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.37.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.37.0beta) — 2026-10-27
+
+- [#559](https://github.com/echovaultstudio/Siansa/pull/559) Album page: type and year at the top; genre and label tags at the foot (@Th3K1ngP1n)
+- [#561](https://github.com/echovaultstudio/Siansa/pull/561) Home: every row spaced like the genre row (@Th3K1ngP1n)
+- [#563](https://github.com/echovaultstudio/Siansa/pull/563) Home's mix cards show ⏸ while their mix plays (@Th3K1ngP1n)
+- [#564](https://github.com/echovaultstudio/Siansa/pull/564) Book player: the right mini player, no auto-open, cover size, faster start (@Th3K1ngP1n)
+- [#566](https://github.com/echovaultstudio/Siansa/pull/566) Settings: "Users and library sync" is now "Users" (@Th3K1ngP1n)
+- [#568](https://github.com/echovaultstudio/Siansa/pull/568) Settings: Help holds debug logs and Report a problem; a report needs the log (@Th3K1ngP1n)
+- [#570](https://github.com/echovaultstudio/Siansa/pull/570) Books carousel keeps its shelves: no jump when it scrolls into view (@Th3K1ngP1n)
+- [#572](https://github.com/echovaultstudio/Siansa/pull/572) Users and the Home filter: the user, with the kind of server under it (@Th3K1ngP1n)
+- [#574](https://github.com/echovaultstudio/Siansa/pull/574) Call an OpenSubsonic server OpenSubsonic, not Navidrome (@Th3K1ngP1n)
+- [#575](https://github.com/echovaultstudio/Siansa/pull/575) Release 0.37.0: genre and label pages, Help, book player fixes, Home spacing (@Th3K1ngP1n)
+
 ## [0.36.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.36.0beta) — 2026-10-27
 
 - [#532](https://github.com/echovaultstudio/Siansa/pull/532) Books and podcasts in Search (@Th3K1ngP1n)
