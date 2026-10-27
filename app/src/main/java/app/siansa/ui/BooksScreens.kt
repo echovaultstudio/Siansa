@@ -42,6 +42,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.shadow
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -104,6 +110,41 @@ internal fun booksForCarousel(shelved: List<Pair<String, Book>>, progress: Map<S
 
 // The five that matter (owner, 27 Oct): what you're in, then up next and new; the rest are in Your Library.
 private const val CAROUSEL_MAX = 5
+
+/** The top of a book's page: the cover's colour fading down behind the cover (left) and the words (right). */
+@Composable
+internal fun BookPageHeader(b: Book, color: Color, surface: Color) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(0f to color, 0.75f to color.copy(alpha = 0.35f), 1f to surface))
+            .statusBarsPadding()
+            .padding(top = 56.dp, start = Space.Page, end = Space.Page, bottom = Space.Page),  // spacing: exact (below the top bar)
+        // The cover's top lines up with the title's (it sat low under a long list of narrators, #550).
+        verticalAlignment = Alignment.Top,
+    ) {
+        Cover(b.cover, LARGE_COVER, Modifier.size(width = BOOK_PAGE_COVER_WIDTH, height = BOOK_PAGE_COVER_HEIGHT).shadow(18.dp, RoundedCornerShape(10.dp)).testTag("bookCover"), RoundedCornerShape(10.dp))
+        Spacer(Modifier.width(Space.Page))
+        Column(Modifier.weight(1f).testTag("bookWords")) {
+            Text(b.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            b.subtitle?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Spacer(Modifier.height(Space.Small))
+            val by = listOfNotNull(
+                b.author.takeIf { it.isNotBlank() }?.let { "by $it" },
+                b.narrator.takeIf { it.isNotBlank() }?.let { "read by $it" },
+                listOfNotNull(b.series?.let { s -> s + (b.sequence?.let { ", book $it" } ?: "") }, b.year?.toString()).joinToString(" · ").takeIf { it.isNotBlank() },
+            )
+            by.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 4, overflow = TextOverflow.Ellipsis) }
+        }
+    }
+}
+
+/** The cover on a book's page, a portrait like most audiobook covers; the words sit to its right. */
+private val BOOK_PAGE_COVER_WIDTH = 128.dp
+private val BOOK_PAGE_COVER_HEIGHT = 184.dp
+
+/** How solid the title bar is as the page scrolls past its cover: clear until most of it has gone, then solid. */
+internal fun titleBarAlpha(scrolledPx: Float, coverPx: Float): Float = ((scrolledPx - coverPx * 0.8f) / (coverPx * 0.3f)).coerceIn(0f, 1f)
 
 /** The cover on a book card; the words start after it and a page's gap. */
 private val CARD_COVER_WIDTH = 100.dp
@@ -169,7 +210,11 @@ private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen:
     }
 }
 
-/** A book's page (issue #521): cover, who made it, Continue or Play, progress, description and chapters. */
+/**
+ * A book's page (issue #521): cover, who made it, Continue or Play, progress, description and chapters. Styled like an
+ * album's page (#550): the cover's colour fades down from the top behind the cover and title, with just a back arrow
+ * over it until the page scrolls, then a solid bar in that colour. The cover sits left, the words to its right.
+ */
 @Composable
 fun BookScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
@@ -179,31 +224,23 @@ fun BookScreen(nav: NavController, id: String) {
     val book = page.valueOrNull()
     val progress = progressAll[id]
     val playing by graph.bookPlayer.state.collectAsStateWithLifecycle()
-    Screen(title = book?.title ?: "Book", nav = nav) { padding ->
-        LoadBox(page, Modifier.padding(padding)) { b ->
+    val color = rememberCoverColor(book?.cover)
+    val surface = MaterialTheme.colorScheme.surface
+    val listState = rememberLazyListState()
+    val headerPx = with(LocalDensity.current) { BOOK_PAGE_COVER_HEIGHT.toPx() }
+    val scrolled by remember {
+        derivedStateOf { if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 100_000f }
+    }
+    val barAlpha = titleBarAlpha(scrolled, headerPx)
+    Box(Modifier.fillMaxSize().background(surface)) {
+        LoadBox(page, Modifier) { b ->
             val current = if (playing.book?.id == b.id) playing.positionSec else progress?.currentSec ?: 0.0
             val chapterNow = b.chapterAt(current)
             // Loaded here: a list's content block isn't composable (issue #521).
             val episodes by loadState("episodes-${b.id}") { if (b.podcast) graph.audiobookshelf.episodes(b.id) else emptyList() }
             val bookmarks by loadState("bookmarks-${b.id}") { runCatching { graph.audiobookshelf.bookmarks(b.id) }.getOrDefault(emptyList()) }
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
-                item {
-                    Row(Modifier.fillMaxWidth().padding(Space.Page), verticalAlignment = Alignment.Bottom) {
-                        Cover(b.cover, LARGE_COVER, Modifier.size(width = 128.dp, height = 184.dp), RoundedCornerShape(10.dp))
-                        Spacer(Modifier.width(Space.Page))
-                        Column(Modifier.weight(1f)) {
-                            Text(b.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                            b.subtitle?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                            Spacer(Modifier.height(Space.Small))
-                            val by = listOfNotNull(
-                                b.author.takeIf { it.isNotBlank() }?.let { "by $it" },
-                                b.narrator.takeIf { it.isNotBlank() }?.let { "read by $it" },
-                                listOfNotNull(b.series?.let { s -> s + (b.sequence?.let { ", book $it" } ?: "") }, b.year?.toString()).joinToString(" · ").takeIf { it.isNotBlank() },
-                            )
-                            by.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                        }
-                    }
-                }
+            LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
+                item { BookPageHeader(b, color, surface) }
                 item {
                     Row(Modifier.padding(horizontal = Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalAlignment = Alignment.CenterVertically) {
                         val started = progress?.started == true && progress.finished != true
@@ -329,6 +366,7 @@ fun BookScreen(nav: NavController, id: String) {
                 }
             }
         }
+        FadingTitleBar(nav, book?.title ?: "Book", color, barAlpha)
     }
 }
 
