@@ -815,22 +815,30 @@ class SpacingTest {
         assertEven("Chip tops", all.top, mon.top, 1.dp)
     }
 
-    /** The book player (issue #521): the skip buttons sit evenly either side of play, all centred on one line. */
+    /**
+     * The book player (issue #521, now in now playing's style, #542): the real controls row at a phone's width.
+     * The skips sit evenly either side of play, the chapter buttons evenly outside them, all centred on one line.
+     */
     @Test fun bookPlayerControlsAreEvenlySpaced() {
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
+        val book = app.siansa.data.Book(id = "b1", title = "A book", durationSec = 3600, chapters = listOf(app.siansa.data.Chapter(0, "One", 0.0, 1800.0), app.siansa.data.Chapter(1, "Two", 1800.0, 3600.0)))
         compose.setContent {
-            SiansaTheme {
-                Row(Modifier.testTag("bookControls"), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                    app.siansa.ui.SkipButton(back = true, seconds = 10, tag = "skipBack") { }
-                    Box(Modifier.size(72.dp).testTag("playBig"))
-                    app.siansa.ui.SkipButton(back = false, seconds = 30, tag = "skipForward") { }
+            androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalGraph provides graph) {
+                SiansaTheme {
+                    Box(Modifier.width(360.dp).padding(horizontal = Space.Section)) {
+                        app.siansa.ui.BookControls(app.siansa.playback.BookPlayerState(book = book, positionSec = 10.0), backSec = 10, forwardSec = 30)
+                    }
                 }
             }
         }
-        val back = compose.onNodeWithTag("skipBack").getBoundsInRoot()
-        val play = compose.onNodeWithTag("playBig").getBoundsInRoot()
-        val fwd = compose.onNodeWithTag("skipForward").getBoundsInRoot()
+        val prev = compose.onNodeWithTag("bookPrevChapter").getBoundsInRoot()
+        val back = compose.onNodeWithTag("bookSkipBack").getBoundsInRoot()
+        val play = compose.onNodeWithTag("bookPlayPause").getBoundsInRoot()
+        val fwd = compose.onNodeWithTag("bookSkipForward").getBoundsInRoot()
+        val next = compose.onNodeWithTag("bookNextChapter").getBoundsInRoot()
         assertEven("Gaps either side of play", play.left - back.right, fwd.left - play.right, 1.dp)
-        assertEven("Skip buttons centred on play", (back.top + back.bottom) / 2 - (play.top + play.bottom) / 2, 0.dp, 1.dp)
+        assertEven("Gaps outside the skips", back.left - prev.right, next.left - fwd.right, 1.dp)
+        listOf(prev, back, fwd, next).forEach { assertEven("Centred on play", (it.top + it.bottom) / 2 - (play.top + play.bottom) / 2, 0.dp, 1.dp) }
     }
 
     /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */
