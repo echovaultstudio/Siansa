@@ -6,9 +6,11 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -77,6 +79,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -84,6 +87,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -383,11 +387,13 @@ private fun BookSeekBar(state: BookPlayerState) {
 
 /**
  * The controls, laid out as now playing's: a small button at each end (the chapter before and after), the skips
- * either side of the big play button.
+ * either side of the big play button. Press and hold play to stop the book, as with the music.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun BookControls(state: BookPlayerState, backSec: Int, forwardSec: Int) {
     val graph = LocalGraph.current
+    val haptics = LocalHapticFeedback.current
     val chapters = state.book?.chapters?.isNotEmpty() == true
     Row(
         Modifier.fillMaxWidth().padding(vertical = Space.Small).testTag("bookControls"),
@@ -401,7 +407,14 @@ internal fun BookControls(state: BookPlayerState, backSec: Int, forwardSec: Int)
                 .size(68.dp)
                 .clip(CircleShape)
                 .background(Accent)
-                .clickable { graph.bookPlayer.togglePlay() }
+                .combinedClickable(
+                    onClick = { graph.bookPlayer.togglePlay() },
+                    onLongClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        AppLog.i("BookPlayer", "Stopped from the player (press and hold)")
+                        graph.bookPlayer.stop()
+                    },
+                )
                 .testTag("bookPlayPause"),
             contentAlignment = Alignment.Center,
         ) {
@@ -539,11 +552,13 @@ private val SIDE_WIDTH = 72.dp
 
 /**
  * The mini player while a book is loaded and no music is (issue #521): the cover, the chapter, ↺ play/pause ↻.
- * Tap it to open the book player.
+ * Tap it to open the book player; press and hold play to stop the book, as with the music.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun BookMiniPlayer(state: BookPlayerState, onOpen: () -> Unit) {
     val graph = LocalGraph.current
+    val haptics = LocalHapticFeedback.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val book = state.book ?: return
     val tone = rememberCoverColor(book.cover)
@@ -564,7 +579,14 @@ internal fun BookMiniPlayer(state: BookPlayerState, onOpen: () -> Unit) {
                 Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .clickable { graph.bookPlayer.togglePlay() }
+                    .combinedClickable(
+                        onClick = { graph.bookPlayer.togglePlay() },
+                        onLongClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            AppLog.i("BookPlayer", "Stopped from the mini player (press and hold)")
+                            graph.bookPlayer.stop()
+                        },
+                    )
                     .testTag("bookMiniPlay"),
                 contentAlignment = Alignment.Center,
             ) {
