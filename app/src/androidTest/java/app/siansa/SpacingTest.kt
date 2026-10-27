@@ -865,6 +865,33 @@ class SpacingTest {
         assertEven("A page's gap between cover and words", words.left - cover.right, Space.Page, 1.dp)
     }
 
+    /**
+     * The foot of an album's page (#558): the length line, the genres and the labels each a medium gap apart, the
+     * page's gap at the left, and the tags a small gap below their heading.
+     */
+    @Test fun albumFootIsEvenlySpaced() {
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalGraph provides graph) {
+                SiansaTheme {
+                    Box(Modifier.width(360.dp).testTag("footBox")) {
+                        app.siansa.ui.AlbumFootSection(
+                            app.siansa.ui.AlbumFoot(listOf("Pop", "Folk"), listOf("Warner Music Japan"), "Deluxe", "16 songs · 1:05:35"),
+                            androidx.navigation.compose.rememberNavController(),
+                        )
+                    }
+                }
+            }
+        }
+        val box = compose.onNodeWithTag("footBox").getBoundsInRoot()
+        val length = compose.onNodeWithTag("albumLength", useUnmergedTree = true).getBoundsInRoot()
+        val genres = compose.onNodeWithTag("albumGenres", useUnmergedTree = true).getBoundsInRoot()
+        val labels = compose.onNodeWithTag("albumLabels", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Page gap at the left", length.left - box.left, Space.Page, 1.dp)
+        assertEven("Length to genres", genres.top - length.bottom, Space.Medium, 1.dp)
+        assertEven("Genres to labels", labels.top - genres.bottom, Space.Medium, 1.dp)
+    }
+
     /** Your Library (issue #374): the quick-scroll handle is centred in its bar and reaches both ends. */
     @Test fun fastScrollHandleIsCentredAndReachesTheEnds() {
         var at by mutableFloatStateOf(0f)

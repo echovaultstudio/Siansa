@@ -346,6 +346,11 @@ fun SiansaRoot() {
                 composable("fingerprint") { FingerprintScreen(nav) }
                 composable("song/{id}/details") { SongDetailsScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }
+                // Every album with a genre or record label, from an album page's tags (#558).
+                composable(
+                    "albums/{tag}?value={value}",
+                    arguments = listOf(androidx.navigation.navArgument("value") { defaultValue = "" }),
+                ) { AlbumsWithTagScreen(nav, it.arguments?.getString("tag"), it.arguments?.getString("value").orEmpty()) }
                 composable("similar/songs/{id}") { SimilarSongsScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("similar/albums/{id}") { SimilarAlbumsScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }
