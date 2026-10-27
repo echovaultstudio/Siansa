@@ -1,0 +1,81 @@
+# Making the repository public
+
+The code is ready for a public repository once #584 is merged: the signing key is gone from the tree, releases
+carry no files, the licence is in. What's left is the **git history**, which still holds `app/siansa.keystore` and
+its password in every commit since the rename (#360), and the retired `app/musix.keystore` (password
+`REDACTED`) before it. A scan of all 1,066 commits found no other keys, tokens or passwords: only made-up ones in
+tests, home-network addresses (192.168.x.x, not reachable from outside) and the notify address in an old
+`deploy/.env.example`, which the rewrite replaces too. Making the repository public with that history would give
+everyone the key that signs the app. So the history is rewritten first, once, by the owner, on a machine with a
+fresh clone. Nothing below runs in CI.
+
+## 1. Before the rewrite
+
+- Merge #584 (this), and any open pull requests you want to keep. **Every branch is rewritten**, so open pull
+  requests survive, but anyone with a clone must clone again afterwards.
+- Add the signing secrets to the repository (Settings › Secrets and variables › Actions):
+  `SIGNING_KEYSTORE_BASE64` (`base64 -w0 app/siansa.keystore` from an old clone), `SIGNING_KEYSTORE_PASSWORD`,
+  `SIGNING_KEY_ALIAS` (`siansa`), `SIGNING_KEY_PASSWORD`. Keep the keystore file itself in a password manager:
+  after the rewrite, GitHub no longer has it.
+- Run one release build on main with the secrets in place and check the Play upload and F-Droid publish still
+  work (the APK is signed with the same key as before, so testers update as usual).
+
+## 2. The rewrite
+
+On a computer with [git-filter-repo](https://github.com/newren/git-filter-repo) installed:
+
+```sh
+git clone --mirror https://github.com/echovaultstudio/Siansa.git siansa-rewrite
+cd siansa-rewrite
+printf 'REDACTED==>REDACTED\nREDACTED==>REDACTED\nhelp@siansa.app==>help@siansa.app\n' > /tmp/replacements.txt
+git filter-repo --invert-paths --path app/siansa.keystore --path app/musix.keystore --replace-text /tmp/replacements.txt
+git push --force --all
+git push --force --tags
+```
+
+Not `git push --mirror`: a mirror clone carries GitHub's own `refs/pull/*`, which GitHub refuses on push. The
+two pushes above send every branch and tag. A practice run first, without pushing, takes seconds: clone with
+`--mirror`, run filter-repo and the checks below, then delete the folder.
+
+If `pip install` refuses (macOS: "externally-managed-environment"), use a small environment of its own:
+`python3 -m venv ~/filter-repo-env && ~/filter-repo-env/bin/pip install git-filter-repo`, then run
+`~/filter-repo-env/bin/git-filter-repo` in place of `git filter-repo`.
+
+`--invert-paths --path` drops both keystores from every commit (the retired Musix key too: a different key, but no
+reason to publish it); `--replace-text` turns its password into `REDACTED`
+wherever it was written (old `build.gradle.kts`). Tags are rewritten with their commits, so releases keep pointing
+at the right code. Check afterwards:
+
+```sh
+git log --all --oneline -- app/siansa.keystore app/musix.keystore   # must print nothing
+git log --all -S REDACTED --oneline                               # must print nothing
+git log --all -S REDACTED --oneline                                # must print nothing
+```
+
+## 3. After the rewrite
+
+- **The self-hosted runner's clone:** GitHub's runner re-clones on its own; nothing to do.
+- **Every pull request branch** was rewritten with the rest, so open pull requests stay open. Anyone with a
+  local clone (including Claude's sessions) must clone again; a push from an old clone would bring the key back.
+- **GitHub keeps old commits reachable by hash for a while** (cached views, pull request pages). Ask GitHub
+  Support to run garbage collection on the repository, or wait for it; until then don't rely on the old hashes
+  being gone. The key's password is `REDACTED` in the rewritten history either way.
+- **Make the repository public:** Settings › General › Danger zone › Change visibility. GitHub then warns about
+  secrets it scans for; the keystore isn't one it recognises, which is why the rewrite comes first.
+- **Turn on** Settings › Code security › Secret scanning and Push protection, so a key can't be pushed again.
+- Delete the `claude/*` branches that are already merged (Settings › Branches, or `git push origin --delete`), so
+  the public branch list is just main and open work.
+
+## 4. Google Play: open testing later
+
+A new Play developer account can't use open testing (or production) until a closed test has had at least 12
+testers opted in for 14 days. Until then releases go to closed and internal testing, as before, and testers sign
+up at siansa.app. Once Play Console allows it: set up Open testing (countries, feedback address), then add the
+repository variable `PLAY_TRACK` = `beta` (or `beta,internal`) so releases go there.
+
+## 5. Not covered by this
+
+- `deploy/` holds the server kit (Caddy, the signup service, the F-Droid repo). It has no secrets (they're in
+  `.env`, which is ignored), but it describes the server; keep it or move it to a private repository as you prefer.
+- The beta testers' logs stay in the private `siansa-logs` repository; nothing links there from the public code
+  except the report id in an issue.

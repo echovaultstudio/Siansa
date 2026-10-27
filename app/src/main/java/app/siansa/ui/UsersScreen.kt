@@ -84,7 +84,7 @@ fun UsersScreen(nav: NavController) {
                         tint = if (inUse) Accent else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Column(Modifier.weight(1f).padding(start = Space.Page, top = Space.Small, bottom = Space.Small)) {
-                        // The user, and under it in smaller type the kind of server (#571), instead of "max on 192.168.1.106".
+                        // The user, and under it in smaller type the kind of server (#571), instead of "anna on 192.168.1.10".
                         Text(user.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             user.serverLine + if (inUse) " · In use" else "",

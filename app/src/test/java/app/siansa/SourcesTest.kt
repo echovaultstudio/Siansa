@@ -156,17 +156,17 @@ class SourcesTest {
     @Test fun onlyUsersOnTheSameServerShowTogether() {
         val nav = app.siansa.net.SourceKind.OPENSUBSONIC
         val emby = app.siansa.net.SourceKind.EMBY
-        assertEquals(true, UserFiles.sameServer(nav, "http://192.168.1.106:30043", nav, "http://192.168.1.106:30043/"))
+        assertEquals(true, UserFiles.sameServer(nav, "http://192.168.1.20:30043", nav, "http://192.168.1.20:30043/"))
         assertEquals(true, UserFiles.sameServer(nav, "https://Music.example.com/nd", nav, "https://music.example.com/nd/"))
         assertEquals(true, UserFiles.sameServer(nav, "https://music.example.com", nav, "https://music.example.com:443"))
         // Another server, or another kind on the same host: switched to, not shown together.
-        assertEquals(false, UserFiles.sameServer(nav, "http://192.168.1.106:30043", emby, "http://192.168.1.106:8096"))
-        assertEquals(false, UserFiles.sameServer(nav, "http://192.168.1.106:30043", nav, "http://192.168.1.107:30043"))
+        assertEquals(false, UserFiles.sameServer(nav, "http://192.168.1.20:30043", emby, "http://192.168.1.20:8096"))
+        assertEquals(false, UserFiles.sameServer(nav, "http://192.168.1.20:30043", nav, "http://192.168.1.107:30043"))
         assertEquals(false, UserFiles.sameServer(nav, "", nav, ""))
     }
 
     @Test fun aServerAtAnotherAddressIsKnownByItsSongs() {
-        // kids on music.home.example.com and max on 192.168.1.106: one Navidrome, the same song ids.
+        // kids on music.home.example.com and max on 192.168.1.20: one Navidrome, the same song ids.
         val ids = listOf("a", "b", "c", "d")
         assertEquals(true, app.siansa.data.sameServerBySongs(ids, setOf("a", "b", "c", "d")))
         assertEquals(true, app.siansa.data.sameServerBySongs(ids, setOf("a", "b")))

@@ -10,3 +10,7 @@ captures/
 # Python bytecode from the release scripts
 __pycache__/
 *.pyc
+
+# Signing keys never go in the repository (public since #584): CI gets its key from a secret.
+*.keystore
+*.jks

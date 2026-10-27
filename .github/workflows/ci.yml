@@ -106,7 +106,25 @@ jobs:
       # Compiling catches syntax and type errors; unit tests check the app's own logic; Android Lint
       # finds likely crashes, wrong API use and security issues. The release is built twice from the same code:
       # the APK for GitHub and F-Droid, and the app bundle (.aab) Google Play takes (issue #515).
+      # The release key from the repository's secrets (public repo since #584): SIGNING_KEYSTORE_BASE64 is the
+      # keystore file, base64; the passwords are secrets too. Without them (a fork's pull request) the build is
+      # unsigned, which still checks everything but can't be published.
+      - name: Signing key
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$SIGNING_KEYSTORE_BASE64" ]; then
+            printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/siansa.keystore"
+            echo "SIANSA_KEYSTORE=$RUNNER_TEMP/siansa.keystore" >> "$GITHUB_ENV"
+          else
+            echo "::notice::No signing key (SIGNING_KEYSTORE_BASE64); the build is unsigned."
+          fi
+
       - name: Unit tests, lint and release build
+        env:
+          SIANSA_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+          SIANSA_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIANSA_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           set -o pipefail
           gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease :app:bundleRelease --continue --stacktrace 2>&1 | tee gradle-build.txt
@@ -373,20 +391,18 @@ jobs:
             for i in 1 2 3; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 5; done
           fi
 
-      # One release per version, so the APK can be downloaded straight from the Releases page on a phone. The
-      # .aab beside it is for uploading to Google Play (issue #515), signed with the same key (Play's upload key).
+      # One release per version with its notes. No files on it (#584): the app is had from the F-Droid repo and
+      # Google Play's open testing, both below, and built from this source. The APK and bundle stay a workflow
+      # artifact for 30 days (the Google Play workflow takes the bundle from there).
       - uses: softprops/action-gh-release@v3
         if: steps.version.outputs.exists != 'true'
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: Siansa ${{ steps.version.outputs.version }}
           body_path: notes/${{ steps.version.outputs.version }}.md
-          files: |
-            siansa-*.apk
-            siansa-*.aab
           make_latest: true
 
-      # Google Play's closed and internal testing (issue #557): the .aab with the version's notes, through a service account that
+      # Google Play's open testing (issue #557, #584): the .aab with the version's notes, through a service account that
       # can only release to testing tracks. Skipped until PLAY_SERVICE_ACCOUNT_JSON is set.
       - uses: actions/setup-python@v6
         if: steps.version.outputs.exists != 'true'
@@ -435,12 +451,6 @@ jobs:
             v=$(basename "$f" .md)
             if gh release view "v$v" > /dev/null 2>&1; then
               gh release edit "v$v" --title "Siansa $v" --notes-file "$f"
-              # Releases from before the rename (issue #360): their APK gets the app's name too. One-time; it
-              # finds nothing to do once every old file is renamed.
-              gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$v" --jq '.assets[] | select(.name | startswith("musix-")) | "\(.id) \(.name)"' |
-                while read -r id name; do
-                  gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/assets/$id" -f name="siansa-${name#musix-}" > /dev/null
-                done
             fi
           done
 
