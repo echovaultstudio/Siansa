@@ -488,6 +488,7 @@ private fun BookMenu(book: Book, onDismiss: () -> Unit, onOpenBook: () -> Unit, 
     val graph = LocalGraph.current
     val progress by graph.books.progress.collectAsStateWithLifecycle()
     val finished = progress[book.id]?.finished == true
+    val playerState by graph.bookPlayer.state.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     SiansaDarkTheme {
         ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -509,8 +510,8 @@ private fun BookMenu(book: Book, onDismiss: () -> Unit, onOpenBook: () -> Unit, 
                     graph.bookPlayer.toggleSleepAtChapterEnd()
                     onDismiss()
                 }
-                MenuRow(Icons.Rounded.Speed, "Speed ${speedLabel(graph.bookPlayer.state.value.speed)} · tap for the next") {
-                    graph.bookPlayer.setSpeed(nextSpeed(graph.bookPlayer.state.value.speed))
+                MenuRow(Icons.Rounded.Speed, "Speed ${speedLabel(playerState.speed)} · tap for the next") {
+                    graph.bookPlayer.setSpeed(nextSpeed(playerState.speed))
                 }
                 MenuRow(Icons.Rounded.Check, if (finished) "Mark not finished" else "Mark finished") {
                     graph.bookPlayer.markFinished(book, finished = !finished)
