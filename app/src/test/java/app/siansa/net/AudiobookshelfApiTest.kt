@@ -1,6 +1,7 @@
 package app.siansa.net
 
 import app.siansa.data.Book
+import app.siansa.data.BookProgress
 import app.siansa.data.bookLength
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -93,5 +94,36 @@ class AudiobookshelfApiTest {
         assertEquals(true, AudiobookshelfApi.userMayScan(json("""{"user":{"type":"root"}}""")))
         assertEquals(false, AudiobookshelfApi.userMayScan(json("""{"user":{"type":"user"}}""")))
         assertEquals(false, AudiobookshelfApi.userMayScan(json("""{}""")))
+    }
+
+    // Beta #45: a podcast has one progress per episode; "Continue" needs the episode last listened to.
+    @Test fun aPodcastsProgressIsTheEpisodeLastListenedTo() {
+        val old = BookProgress("pod", currentSec = 10.0, updatedAt = 1L, episodeId = "e1")
+        val done = BookProgress("pod", currentSec = 0.0, finished = true, updatedAt = 3L, episodeId = "e2")
+        val latest = BookProgress("pod", currentSec = 20.0, updatedAt = 2L, episodeId = "e3")
+        val book = BookProgress("book", currentSec = 5.0, updatedAt = 9L)
+        val byBook = AudiobookshelfApi.latestProgress(listOf(old, done, latest, book))
+        assertEquals("e3", byBook.getValue("pod").episodeId)
+        assertNull(byBook.getValue("book").episodeId)
+    }
+
+    @Test fun aPodcastWithEveryEpisodeFinishedKeepsTheLatest() {
+        val a = BookProgress("pod", finished = true, updatedAt = 1L, episodeId = "e1")
+        val b = BookProgress("pod", finished = true, updatedAt = 2L, episodeId = "e2")
+        assertEquals("e2", AudiobookshelfApi.latestProgress(listOf(a, b)).getValue("pod").episodeId)
+    }
+
+    @Test fun progressReadsTheEpisode() {
+        val p = AudiobookshelfApi.parseProgress(json("""{"currentTime":1,"duration":2,"episodeId":"e9"}"""), "pod")
+        assertEquals("e9", p.episodeId)
+    }
+
+    @Test fun thePodcastPlaysTheEpisodeInProgressElseTheNewest() {
+        fun ep(id: String) = Episode(id, "pod", id, null, 0L, 0, null, null)
+        val eps = listOf(ep("new"), ep("mid"), ep("old"))
+        assertEquals("mid", AudiobookshelfApi.episodeToPlay(eps, "mid")?.id)
+        assertEquals("new", AudiobookshelfApi.episodeToPlay(eps, null)?.id)
+        assertEquals("new", AudiobookshelfApi.episodeToPlay(eps, "gone")?.id)
+        assertNull(AudiobookshelfApi.episodeToPlay(emptyList(), "mid"))
     }
 }
