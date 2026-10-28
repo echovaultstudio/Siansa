@@ -10,12 +10,25 @@ import app.siansa.data.AppSettings
 object Preload {
     /** The choices offered: none, or one to five songs. */
     val CHOICES = 0..5
+    /**
+     * With the song cache off: none, or one to three songs. They're held on the phone only until they've played
+     * ([songCacheKeysToDrop]), so this caps the space they take.
+     */
+    val CHOICES_WITHOUT_CACHE = 0..3
     const val DEFAULT_WIFI = 2
     const val DEFAULT_MOBILE = 1
 
-    /** None while the song cache is off: songs loaded ahead are kept in it, so there'd be nowhere to put them. */
+    /** Separate from the song cache: with it off, up to three songs are still loaded ahead ([CHOICES_WITHOUT_CACHE]). */
     fun count(s: AppSettings, unmetered: Boolean): Int =
-        if (!songCacheOn(s)) 0 else (if (unmetered) s.preloadWifi else s.preloadMobile).coerceIn(CHOICES)
+        (if (unmetered) s.preloadWifi else s.preloadMobile).coerceIn(choices(s))
+
+    fun choices(s: AppSettings): IntRange = if (songCacheOn(s)) CHOICES else CHOICES_WITHOUT_CACHE
+
+    /**
+     * Whether original streams go through the song cache's store at all: while it's on, or while songs are loaded
+     * ahead with it off (they're held there until they've played). With both off, nothing touches the disk.
+     */
+    fun usesCacheStore(s: AppSettings, unmetered: Boolean): Boolean = songCacheOn(s) || count(s, unmetered) > 0
 
     /**
      * Songs ahead to fetch loudness and fade shapes for: one more than are loaded, so each is ready before

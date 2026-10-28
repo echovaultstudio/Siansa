@@ -249,9 +249,10 @@ fun PlaybackSettingsScreen(nav: NavController) {
             HorizontalDivider()
             Heading("Load songs ahead")
             Hint("While a song plays, Siansa loads the next ones, one at a time, so they start at once and keep playing if the connection drops. Fewer means less data. Only original files are loaded ahead.")
-            if (settings.songCacheMb <= 0) Hint("Nothing is loaded ahead while the song cache is off (Settings › Storage).")
-            PreloadRow("On Wi-Fi", settings.preloadWifi, "preload-wifi") { graph.settings.save(graph.settings.current.copy(preloadWifi = it)) }
-            PreloadRow("On mobile data", settings.preloadMobile, "preload-mobile") { graph.settings.save(graph.settings.current.copy(preloadMobile = it)) }
+            val preloadChoices = Preload.choices(settings)
+            if (settings.songCacheMb <= 0) Hint("The song cache is off (Settings › Storage), so up to 3 songs are loaded ahead, and each is removed once it has played.")
+            PreloadRow("On Wi-Fi", settings.preloadWifi.coerceIn(preloadChoices), "preload-wifi", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadWifi = it)) }
+            PreloadRow("On mobile data", settings.preloadMobile.coerceIn(preloadChoices), "preload-mobile", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadMobile = it)) }
             // Only with an Audiobookshelf server (issue #521): how far the book player's skip buttons jump.
             if (settings.booksReady) {
                 HorizontalDivider()
@@ -332,10 +333,10 @@ internal fun WindDownChips(selected: Int, onPick: (Int) -> Unit) {
 
 /** None to five songs loaded ahead (issue #254). */
 @Composable
-internal fun PreloadRow(label: String, value: Int, tag: String, onPick: (Int) -> Unit) {
+internal fun PreloadRow(label: String, value: Int, tag: String, choices: IntRange = Preload.CHOICES, onPick: (Int) -> Unit) {
     Text(label, style = MaterialTheme.typography.bodyLarge)
     Row(Modifier.horizontalScroll(rememberScrollState()).testTag(tag), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-        Preload.CHOICES.forEach { n ->
+        choices.forEach { n ->
             FilterChip(
                 selected = value == n,
                 onClick = { onPick(n) },
@@ -405,10 +406,10 @@ fun StorageScreen(nav: NavController) {
 
             HorizontalDivider()
             Heading("Song cache")
-            Hint("Songs are kept on the phone as they play, and the next song in the queue is fetched ahead, so replays and skips start at once and survive a bad connection. Only original-quality streams are cached. Off keeps nothing: every song streams from the server each time.")
+            Hint("Songs are kept on the phone as they play, and the next song in the queue is fetched ahead, so replays and skips start at once and survive a bad connection. Only original-quality streams are cached. Off keeps nothing once it has played; songs loaded ahead (Settings › Playback) are held only until they play.")
             usage.valueOrNull()?.let { u ->
                 Text(
-                    if (settings.songCacheMb <= 0) "Off: songs aren't kept on the phone"
+                    if (settings.songCacheMb <= 0) "Off: songs aren't kept after they play"
                     else "In use: ${formatBytes(u.songs)} of ${formatMb(settings.songCacheMb)}",
                     style = MaterialTheme.typography.bodyLarge,
                 )

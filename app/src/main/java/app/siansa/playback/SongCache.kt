@@ -24,10 +24,17 @@ fun songCacheKey(uri: Uri): String {
 fun songCacheOn(settings: AppSettings): Boolean = settings.songCacheMb > 0
 
 /**
- * Whether a stream in [format] goes through the song cache: only originals (no format, or raw), and only while the
- * cache is on ([cacheOn]). With it off, every song streams straight from the server and nothing is kept.
+ * Whether a stream in [format] goes through the song cache's store: only originals (no format, or raw), and only
+ * while the store is in use ([storeInUse], see [Preload.usesCacheStore]). Otherwise it streams straight from the server.
  */
-fun goesThroughCache(format: String?, cacheOn: Boolean): Boolean = cacheOn && (format == null || format == "raw")
+fun goesThroughCache(format: String?, storeInUse: Boolean): Boolean = storeInUse && (format == null || format == "raw")
+
+/**
+ * With the song cache off, the songs to remove from its store: everything but the songs in [keepIds] (the one
+ * playing and those loaded ahead). Keys are [songCacheKey]s, `song:<id>:<format>:<rate>`; any other key goes too.
+ */
+fun songCacheKeysToDrop(keys: Collection<String>, keepIds: Set<String>): List<String> =
+    keys.filter { key -> key.split(':').let { it.size < 2 || it[0] != "song" || it[1] !in keepIds } }
 
 /**
  * Original files go through the song cache, unless it's switched off ([useCache], checked as each song opens, so

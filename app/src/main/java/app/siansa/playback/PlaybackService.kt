@@ -336,6 +336,24 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    /**
+     * With the song cache off, songs are held only while they play or wait to (loaded ahead): everything else is
+     * removed from its store, so nothing is kept once played.
+     */
+    private fun dropPlayedSongs(player: Player) {
+        val s = graph.settings.current
+        if (songCacheOn(s)) return
+        val keep = upcomingIndices(player, Preload.count(s, Streaming.isUnmetered(this))).map { player.getMediaItemAt(it).mediaId }.toSet()
+        scope.launch {
+            runCatching {
+                val cache = graph.songCache
+                val drop = songCacheKeysToDrop(cache.keys.toList(), keep)
+                drop.forEach { key -> runCatching { cache.removeResource(key) } }
+                if (drop.isNotEmpty()) AppLog.d("Cache", "Song cache off: removed ${drop.size} played song(s), kept ${keep.size}")
+            }.onFailure { AppLog.w("Cache", "Removing played songs failed: ${it.message}") }
+        }
+    }
+
     // ---- Sleep timer: finish the song, fade out over its last seconds, then pause ----
 
     /** The ReplayGain volume of the current song, and how far the sleep timer has faded it (1 = not at all). */
@@ -642,6 +660,7 @@ class PlaybackService : MediaSessionService() {
             precacheWriter?.cancel()
             precacheJob?.cancel()
             precachedFor = null
+            dropPlayedSongs(player)
             finishCurrent()
             val song = mediaItem?.toSong() ?: return
             current = song
