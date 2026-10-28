@@ -35,8 +35,9 @@ jobs:
   # emulator tests are needed (for the jobs below).
   quick:
     name: Quick checks
-    # Your own runner when the RUNS_ON variable names it (e.g. ["self-hosted", "siansa"]), else GitHub's.
-    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
+    # Always on GitHub's runners (free for a public repository): they start at once instead of waiting behind a
+    # ten-minute build on the one self-hosted runner (issue #535).
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
       app: ${{ steps.diff.outputs.app }}
@@ -82,8 +83,10 @@ jobs:
 
   checks:
     name: Build, lint and unit tests
-    # Your own runner when the RUNS_ON variable names it (e.g. ["self-hosted", "siansa"]), else GitHub's.
-    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
+    # Pull requests build on GitHub's runners, so nobody's pull request runs on the self-hosted runner at home (issue
+    # #535). Pushes to main and the nightly run use your own runner when the RUNS_ON variable names it (e.g.
+    # ["self-hosted", "siansa"]), else GitHub's. Clear RUNS_ON to put everything on GitHub's while your runner is down.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
