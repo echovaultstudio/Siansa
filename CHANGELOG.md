@@ -3,6 +3,17 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.38.3beta — 2026-10-28
+
+### Fixed
+- **Only one mini player at a time.** The bar shows whatever you started last, music or a book or podcast.
+  Pausing keeps it there; stopping it leaves no mini player, instead of the other one appearing from behind.
+
+### Changed
+- **Now playing and the book player open and close more smoothly.** The mini player fades and recedes as the
+  player rises over it, and comes back the same way as the player goes. Swipe up on the mini player to open it,
+  and both follow your finger: a hard swipe is quick, a gentle one settles.
+
 ## 0.38.2beta — 2026-10-27
 
 ### Changed
