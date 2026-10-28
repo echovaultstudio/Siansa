@@ -3,6 +3,12 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.38.5beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.38.5beta) — 2026-10-28
+
+- [#612](https://github.com/echovaultstudio/Siansa/pull/612) F-Droid repo and listing for the public project: name, icon, licence, links (@Th3K1ngP1n)
+- [#616](https://github.com/echovaultstudio/Siansa/pull/616) Website: "Get Siansa" in the menu leads to F-Droid first (@Th3K1ngP1n)
+- [#617](https://github.com/echovaultstudio/Siansa/pull/617) Arrange Home: a section moved to the top stays in view (@Th3K1ngP1n)
+
 ## [0.38.4beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.38.4beta) — 2026-10-28
 
 - [#603](https://github.com/echovaultstudio/Siansa/pull/603) Don't crash when a song waits for data in the background (@Th3K1ngP1n)
