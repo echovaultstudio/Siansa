@@ -391,6 +391,35 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
         }
     }
 
+    /**
+     * Marks one episode of [podcast] finished, or not (issue #626): a podcast as a whole can't be finished, its
+     * episodes are. On the server and in the screens.
+     */
+    fun markEpisodeFinished(podcast: Book, episodeId: String, durationSec: Double, finished: Boolean) {
+        val sec = if (finished) durationSec else 0.0
+        graph.books.noteProgress(
+            BookProgress(
+                bookId = podcast.id,
+                currentSec = sec,
+                durationSec = durationSec,
+                fraction = if (finished) 1.0 else 0.0,
+                finished = finished,
+                updatedAt = System.currentTimeMillis(),
+                episodeId = episodeId,
+            ),
+        )
+        graph.scope.launch {
+            try {
+                graph.audiobookshelf.setProgress("${podcast.id}/$episodeId", sec, durationSec, finished)
+                AppLog.i("BookPlayer", "Episode $episodeId of \"${podcast.title}\" marked ${if (finished) "finished" else "unfinished"}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("BookPlayer", "Couldn't mark episode $episodeId: ${e.message}")
+            }
+        }
+    }
+
     companion object {
         /** What a ▶ for [tapped] does while [loaded] is the book in the player. */
         fun bookTap(loaded: String?, tapped: String): BookTap = if (loaded == tapped) BookTap.TOGGLE else BookTap.START

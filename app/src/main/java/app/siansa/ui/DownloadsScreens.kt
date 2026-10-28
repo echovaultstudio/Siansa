@@ -139,7 +139,7 @@ fun SongDownloadMenuItem(song: Song, close: () -> Unit) {
 }
 
 @Composable
-private fun RemoveDialog(name: String, onDismiss: () -> Unit, onRemove: () -> Unit) {
+internal fun RemoveDialog(name: String, onDismiss: () -> Unit, onRemove: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Remove download?") },

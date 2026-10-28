@@ -36,6 +36,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
 import app.siansa.data.normalizeKey
@@ -369,7 +370,7 @@ internal fun ActionButtons(
             Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
         }
         Spacer(Modifier.width(Space.Small))
-        BigPlayButton(enabled, onPlay)
+        BigPlayButton(enabled, onPlay = onPlay)
     }
 }
 
@@ -388,7 +389,7 @@ fun PlayButtonRow(modifier: Modifier = Modifier, content: @Composable RowScope.(
 
 /** The big round Play button of album, playlist, mix and artist pages. Only ever inside a [PlayButtonRow]. */
 @Composable
-fun BigPlayButton(enabled: Boolean, onPlay: () -> Unit) {
+fun BigPlayButton(enabled: Boolean, playing: Boolean = false, onPlay: () -> Unit) {
     Box(
         Modifier
             .size(56.dp)
@@ -398,7 +399,8 @@ fun BigPlayButton(enabled: Boolean, onPlay: () -> Unit) {
             .testTag("bigPlay"),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Rounded.PlayArrow, "Play", tint = OnAccent, modifier = Modifier.size(32.dp))
+        // ⏸ while what the page shows is playing (a book's page, issue #626): the same button pauses it.
+        Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (playing) "Pause" else "Play", tint = OnAccent, modifier = Modifier.size(32.dp))
     }
 }
 

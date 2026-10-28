@@ -37,9 +37,15 @@ open its page.
 
 ## A book's page
 
-The cover, author, narrator, series and year, then **Continue** (or **Play** for a new book), download, mark as
-finished and more. The line under them shows how far you are and how long is left. Chapters follow, with the
-ones you've heard muted and the current one highlighted; tap any chapter to play from there.
+Laid out like an album's page: the cover's colours fade down behind the cover (a portrait for a book, a square for a
+podcast), then the title, the author, and a line with the narrator, series, genres, year and length (or the number of
+episodes for a podcast). Audiobookshelf's description follows, folded to a few lines: tap it for the rest. Under it,
+how far you are, with a bar and how much is left; on a podcast that's the episode you're on.
+
+The row of buttons is the album page's: **download** (tap again to remove it from the phone) and **✓ mark finished**
+(✕ takes it back; on a podcast it's the episode you're on) on the left, the big round **Play** on the right. It
+continues where you were, and pauses while the book plays. Chapters or episodes follow: chapters you've heard muted,
+the current one highlighted; tap any to play from there.
 
 ## The book player
 
