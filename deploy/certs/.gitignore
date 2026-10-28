@@ -1,3 +1,0 @@
-# Certificates for TLS_MODE=cloudflare (see tls/cloudflare.caddy). Never commit them.
-*
-!.gitignore

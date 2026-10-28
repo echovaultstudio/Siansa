@@ -416,8 +416,8 @@ jobs:
           pip install --quiet google-auth==2.40.3 requests==2.32.4
           python3 scripts/play_upload.py "$(ls siansa-*.aab | head -n 1)" "${{ steps.version.outputs.version }}" "notes/${{ steps.version.outputs.version }}.md"
 
-      # The beta F-Droid repo on our server (issue #410, deploy/): the APK goes over SSH to a key that can only
-      # publish (deploy/scripts/siansa-publish). Skipped until the FDROID_* secrets are set.
+      # The F-Droid repo on our server (issue #410; the server kit is in the private siansa-dev repo, #634): the APK
+      # goes over SSH to a key that can only publish (siansa-publish there). Skipped until the FDROID_* secrets are set.
       - name: Publish to the F-Droid beta repo
         if: steps.version.outputs.exists != 'true'
         # A server that can't be reached mustn't stop the release notes and history below.

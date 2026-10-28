@@ -1,7 +1,0 @@
-Setting up your servers: $beta_repo_url
-Found a problem? Then please report it directly from within the app. Settings -> Logs -> Report a problem. 
-Please replicate the problem with logs toggled on before clicking the "Report a problem" button.
-Have an idea? Report it here: $issues_url
-(Don't post passwords or your server's address in the repo, it is public)
-
-Thank you for testing Siansa.

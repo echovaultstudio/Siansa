@@ -1,2 +1,0 @@
-# HTTPS straight from Let's Encrypt (TLS_MODE=auto, issue #410): nothing to set, Caddy gets and renews the
-# certificates itself. For DNS that points straight at this server, not through a proxy.

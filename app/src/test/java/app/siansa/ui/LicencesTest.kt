@@ -14,7 +14,7 @@ class LicencesTest {
     private fun file(vararg paths: String): File = paths.map(::File).firstOrNull { it.isFile } ?: run { fail("None of ${paths.toList()} found from ${File(".").absolutePath}"); error("") }
 
     private val gradle get() = file("build.gradle.kts", "app/build.gradle.kts").readText()
-    private val page get() = file("../deploy/site/licenses.html", "deploy/site/licenses.html").readText()
+    private val page get() = file("../docs/licenses.html", "docs/licenses.html").readText()
 
     /** What the page calls each library group, to find it there. */
     private val names = mapOf(
@@ -41,7 +41,7 @@ class LicencesTest {
         // A group or one under it: androidx.compose covers androidx.compose.ui, androidx.compose.material3…
         fun nameOf(group: String) = names.entries.firstOrNull { (key, _) -> group == key || group.startsWith("$key.") }?.value
         val unknown = groups.filter { nameOf(it) == null }
-        assertTrue("Add these to deploy/site/licenses.html and to this test: $unknown", unknown.isEmpty())
+        assertTrue("Add these to docs/licenses.html (and the website's copy in siansa-dev) and to this test: $unknown", unknown.isEmpty())
         val missing = groups.filter { nameOf(it)!! !in page }
         assertTrue("The licences page doesn't list: $missing", missing.isEmpty())
     }
