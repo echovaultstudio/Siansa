@@ -46,6 +46,13 @@ data class TrackProfile(
 
     /** How long before the end the song is last at [db] (relative) or louder, or null if it never is. */
     fun quietForLastMs(db: Int): Long? = endRamp.firstOrNull { it.db >= db }?.ms
+
+    /**
+     * How long before the end the song is last at exactly the measured level [db], or null when the ramp doesn't
+     * have that level: unlike [quietForLastMs], never a louder level standing in, which would make a quiet tail look
+     * like silence (issue #628).
+     */
+    fun lastAtExactlyMs(db: Int): Long? = endRamp.firstOrNull { it.db == db }?.ms
 }
 
 /** The Siansa plugin's ramp blobs: up to 15 entries of (int8 dB, little-endian uint16 index of 100 ms chunks). */

@@ -128,7 +128,9 @@ internal class Crossfader(
         }
         val position = main.currentPosition
         val maxMs = s.crossfadeSeconds * 1000L
-        if (duration - position > maxMs + PREPARE_MS) {
+        // The end a smart fade leaves out (silence, a long fade-out; issue #628) comes off the time left.
+        val cut = if (s.crossfade == CrossfadeMode.SMART) Crossfade.endCut(profiles.cached(item.mediaId), duration, maxMs).first else 0L
+        if (duration - cut - position > maxMs + PREPARE_MS) {
             if (phase == Phase.READY) disarm()
             return LOOK_MS
         }
@@ -153,7 +155,7 @@ internal class Crossfader(
                 skipped = item.mediaId
                 return LOOK_MS
             }
-            val at = duration - planned.overlapMs
+            val at = duration - planned.cutMs - planned.overlapMs
             if (at - position < MIN_PREPARE_MS) {
                 AppLog.d("Crossfade", "Too close to the end of ${current.id} to get a fade ready")
                 skipped = item.mediaId
