@@ -37,6 +37,10 @@ Siansa and install it.
 
 F-Droid needs no invite. For Google Play, [ask for a place in the beta](https://siansa.app/#join).
 
+**Had Siansa from the earlier private F-Droid address?** Remove that repository, add the open one above, then
+uninstall Siansa once and install it again: the app has a new signing key since the project went public, and
+F-Droid can't update across a key change. You'll need to enter your servers again afterwards.
+
 ## Connect your servers
 
 Open Siansa, go to **Settings**, enter these, use **Test** next to each, then **Save**:

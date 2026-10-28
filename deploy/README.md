@@ -106,8 +106,9 @@ Navidrome or Emby server reachable from the phone, 14 days for Play, feedback, p
 - A link opens a page with a button; nothing happens until you press it (so mail scanners can't approve anyone).
   Links are signed and work for 14 days, once.
 - **F-Droid is open to everybody** (issue #608): `https://DOMAIN/fdroid/repo`, no sign-up. After deploying this, run
-  `sudo sh scripts/repo-link public` once: it writes that address into the F-Droid index and rebuilds it. Testers
-  who added the private address below add the open one instead (they must anyway after a key change). The sign-up
+  `sudo sh scripts/repo-link public` once: it writes that address into the F-Droid index, rebuilds it, and emails
+  everyone approved for F-Droid (`emails/open_repo.txt`): add the open address instead of the private one, and
+  uninstall and reinstall Siansa once, because the signing key changed with the move to a public repository. The sign-up
   form on the home page is for the Google Play beta only. What follows is the earlier private address, which keeps
   working until you rotate it.
 - **Approve**, F-Droid (earlier sign-ups): the tester gets an email with the beta's one private address,

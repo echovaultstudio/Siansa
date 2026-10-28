@@ -1,0 +1,11 @@
+Subject: Siansa is now open on F-Droid: please reinstall once
+
+Hello,
+
+Siansa's F-Droid repository is now open to everyone, at a new address. In the F-Droid app, remove the old Siansa beta repository (Settings > Repositories) and add this one:
+
+   $repo_url
+
+Siansa is also signed with a new key now. F-Droid can't update across a key change, so please uninstall Siansa once and install it again from the new repository. You'll need to enter your servers again afterwards.
+
+$tail

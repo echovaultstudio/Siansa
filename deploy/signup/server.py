@@ -713,6 +713,20 @@ def new_link_text():
             "Please don't share the new one.\n\n" + welcome_tail())
 
 
+def open_repo_mail(email=""):
+    values = dict(repo_url=PUBLIC_URL + "/fdroid/repo", beta_repo_url=BETA_REPO_URL, issues_url=ISSUES_URL, email=email)
+    return template("open_repo", "Siansa is now open on F-Droid: please reinstall once", open_repo_text(), **values)
+
+
+def open_repo_text():
+    # Sent once by `repo-link public` (issue #608): the open address, and the one-time reinstall for the new signing key.
+    return ("Hello,\n\nSiansa's F-Droid repository is now open to everyone, at a new address. In the F-Droid app, remove "
+            "the old Siansa beta repository (Settings > Repositories) and add this one:\n\n   " + PUBLIC_URL +
+            "/fdroid/repo\n\nSiansa is also signed with a new key now. F-Droid can't update across a key change, so "
+            "please uninstall Siansa once and install it again from the new repository. You'll need to enter your "
+            "servers again afterwards.\n\n" + welcome_tail())
+
+
 DENY_TEXT = ("Hello,\n\nThank you for asking to join the Siansa beta. We can't offer you a place right now. "
              "We'll write if that changes.\n\nSiansa\n")
 
@@ -941,7 +955,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def cli(argv):
     """Owner tools, run in the container: server.py revoke EMAIL, resend (the approval emails again), approve EMAIL,
-    link EMAIL, accept EMAIL (approve and email them), deny EMAIL, notify-new-link, stats (today's summary),
+    link EMAIL, accept EMAIL (approve and email them), deny EMAIL, notify-new-link, notify-open-repo, stats (today's summary),
     digest (send today's summary now)."""
     if len(argv) == 2 and argv[1] == "stats":
         print(digest_text(utc_day()), end="")
@@ -959,6 +973,10 @@ def cli(argv):
     if len(argv) == 2 and argv[1] == "notify-new-link":
         for email in approved_fdroid_emails():
             print(("sent   " if send_mail(email, *new_link_mail(email)) else "FAILED ") + email)
+        return True
+    if len(argv) == 2 and argv[1] == "notify-open-repo":
+        for email in approved_fdroid_emails():
+            print(("sent   " if send_mail(email, *open_repo_mail(email)) else "FAILED ") + email)
         return True
     if len(argv) == 3 and argv[1] in ("approve", "link"):
         # For when email isn't working: approve (or just show the link for someone already approved) from the server.
