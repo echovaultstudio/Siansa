@@ -29,7 +29,7 @@ import app.siansa.log.AppLog
 
 /** Where About's links go (#576). */
 internal object AboutLinks {
-    /** The libraries in the app and their licences, on the website (deploy/site/licenses.html). */
+    /** The libraries in the app and their licences, on the website (docs/licenses.html here; the site's copy is in the private siansa-dev repo). */
     const val LICENCES = "https://siansa.app/licenses"
     /** The user docs. They're in the public Siansa repository until docs.siansa.app is up. */
     const val DOCS = "https://github.com/echovaultstudio/Siansa/tree/main/docs"
