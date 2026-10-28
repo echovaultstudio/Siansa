@@ -194,6 +194,14 @@ jobs:
           mv app/build/outputs/apk/release/app-release.apk siansa-$VERSION.apk
           mv app/build/outputs/bundle/release/app-release.aab siansa-$VERSION.aab
 
+      # Which key signed the release APK, in the run's summary: public information, and it proves a key change took.
+      - name: Signing certificate
+        continue-on-error: true
+        run: |
+          APKSIGNER=$(ls "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/nonexistent}}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
+          out=$("$APKSIGNER" verify --print-certs "siansa-${{ steps.version.outputs.version }}.apk" 2>&1 | grep -m1 "SHA-256" || true)
+          echo "::notice::Release APK signing certificate: ${out:-not signed (no signing secrets), or apksigner not found}"
+
       - uses: actions/upload-artifact@v7
         with:
           name: apk
