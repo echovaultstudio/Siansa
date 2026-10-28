@@ -3,6 +3,14 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.38.5beta — 2026-10-28
+
+### Fixed
+- **Moving a section to the top in Arrange Home made it vanish.** It now stays in view at the top while you drag it.
+
+### Changed
+- **The F-Droid repository is now called Siansa and shows the Siansa icon** on the Repositories page of the F-Droid app, instead of "Siansa beta" with a QR code. Siansa's page in F-Droid now shows its open-source licence (GPL 3) and links to the source code, issues and changelog on GitHub.
+
 ## 0.38.4beta — 2026-10-28
 
 ### Fixed
