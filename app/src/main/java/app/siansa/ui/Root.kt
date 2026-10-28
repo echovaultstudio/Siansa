@@ -233,16 +233,14 @@ fun SiansaRoot() {
                             )
                         )
                     ) {
-                        // The mini player of whichever played last, music or a book (beta #44: a paused song's kept
-                        // showing over a book that was playing).
+                        // One mini player: the player started last (beta #45). Pausing keeps it; stopping it leaves
+                        // none, so the other never shows from behind. The choice is the app's, not this screen's.
                         val bookState by graph.bookPlayer.state.collectAsStateWithLifecycle()
-                        var lastPlayed by rememberSaveable { mutableStateOf(MiniFor.MUSIC) }
-                        LaunchedEffect(player.isPlaying) { if (player.isPlaying) lastPlayed = MiniFor.MUSIC }
-                        LaunchedEffect(bookState.playing, bookState.book?.id) { if (bookState.playing) lastPlayed = MiniFor.BOOK }
-                        when (miniPlayerFor(player.hasMedia, player.isPlaying, bookState.book != null, bookState.playing, lastPlayed)) {
-                            MiniFor.MUSIC -> MiniPlayer(player) { sheet.open() }
-                            MiniFor.BOOK -> BookMiniPlayer(bookState) { bookSheet.open() }
-                            MiniFor.NONE -> Unit
+                        val active by graph.activePlayer.state.collectAsStateWithLifecycle()
+                        when (app.siansa.playback.miniShown(active, player.hasMedia, bookState.book != null)) {
+                            app.siansa.playback.MiniFor.MUSIC -> MiniPlayer(player) { sheet.open() }
+                            app.siansa.playback.MiniFor.BOOK -> BookMiniPlayer(bookState) { bookSheet.open() }
+                            app.siansa.playback.MiniFor.NONE -> Unit
                         }
                         NavigationBar(containerColor = Color.Transparent, tonalElevation = 0.dp) {
                             tabs.forEach { tab ->
@@ -401,22 +399,6 @@ fun SiansaRoot() {
         }
       }
     }
-}
-
-/** Which mini player shows above the tabs. */
-enum class MiniFor { MUSIC, BOOK, NONE }
-
-/**
- * The mini player to show (beta #44): what's playing; when nothing is, what played last; else whatever is loaded.
- * A song paused by a book starting no longer hides the book's mini player.
- */
-internal fun miniPlayerFor(musicLoaded: Boolean, musicPlaying: Boolean, bookLoaded: Boolean, bookPlaying: Boolean, last: MiniFor): MiniFor = when {
-    bookLoaded && bookPlaying -> MiniFor.BOOK
-    musicLoaded && musicPlaying -> MiniFor.MUSIC
-    last == MiniFor.BOOK && bookLoaded -> MiniFor.BOOK
-    musicLoaded -> MiniFor.MUSIC
-    bookLoaded -> MiniFor.BOOK
-    else -> MiniFor.NONE
 }
 
 /** Opens another tab where it was left, keeping each tab's own history. */
