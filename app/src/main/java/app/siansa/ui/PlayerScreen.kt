@@ -118,6 +118,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -231,23 +232,16 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
 
     // Dragging down (at the top of the page) moves the whole player with the finger; let go far or fast
     // enough and it closes. Swiping up scrolls down to the cards under the player.
-    var dismissY by remember { mutableFloatStateOf(0f) }
-    var heightPx by remember { mutableFloatStateOf(1f) }
-    val cornerMaxPx = with(LocalDensity.current) { 28.dp.toPx() }
-    fun settle(speed: Float) {
-        if (dismissY > heightPx * 0.22f || (dismissY > 40f && speed > 1400f)) {
-            close()
-        } else if (dismissY > 0f) {
-            val from = dismissY
-            scope.launch { animate(from, 0f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { v, _ -> dismissY = v } }
-        }
-    }
+    // Dragging down moves the whole sheet with the finger (#600): the sheet holds where it is and settles it.
+    val dismissSheet = LocalPlayerSheet.current
+    fun dismissedPx(): Float = (1f - dismissSheet.progress.value) * dismissSheet.heightPx
     val dismissOnPull = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (dismissY > 0f && available.y < 0f) {
-                    val used = max(available.y, -dismissY)
-                    dismissY += used
+                val pulled = dismissedPx()
+                if (pulled > 0f && available.y < 0f) {
+                    val used = max(available.y, -pulled)
+                    dismissSheet.dragBy(used)
                     return Offset(0f, used)
                 }
                 return Offset.Zero
@@ -255,15 +249,15 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 if (available.y > 0f && source == NestedScrollSource.UserInput) {
-                    dismissY += available.y
+                    dismissSheet.dragBy(available.y)
                     return Offset(0f, available.y)
                 }
                 return Offset.Zero
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
-                if (dismissY > 0f) {
-                    settle(available.y)
+                if (dismissedPx() > 0f) {
+                    dismissSheet.settle(available.y)
                     return available
                 }
                 return Velocity.Zero
@@ -275,15 +269,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
         Box(
             Modifier
                 .fillMaxSize()
-                .onSizeChanged { heightPx = it.height.toFloat().coerceAtLeast(1f) }
-                // One solid card: everything is clipped to it (the enlarged, blurred cover used to show
-                // through above it), and its top corners round as it is dragged down.
-                .graphicsLayer {
-                    translationY = dismissY
-                    val corner = playerCardCornerPx(dismissY, cornerMaxPx)
-                    shape = RoundedCornerShape(topStart = corner, topEnd = corner)
-                    clip = true
-                }
+                // One solid card: everything is clipped to it (the enlarged, blurred cover used to show through).
+                .clipToBounds()
                 .background(Color.Black)
                 .nestedScroll(dismissOnPull),
         ) {
