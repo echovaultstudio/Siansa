@@ -57,6 +57,13 @@ enum class HomeSection(val id: String, val label: String) {
     }
 }
 
+/**
+ * Whether moving a row from [from] to [to] changes which row is first on screen ([firstVisible]) (#614). A lazy list
+ * keeps the row that was first in place by its key, so moving a row up to the top would leave the moved row above the
+ * screen, out of sight: the list then has to be told to stay where it is, by position.
+ */
+fun movesFirstVisible(from: Int, to: Int, firstVisible: Int): Boolean = from != to && (from == firstVisible || to == firstVisible)
+
 /** [this] with the item at [from] moved to [to]; the same list if either is out of range. */
 fun <T> List<T>.moved(from: Int, to: Int): List<T> {
     if (from == to || from !in indices || to !in indices) return this
