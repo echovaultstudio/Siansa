@@ -3,6 +3,10 @@
 # F-Droid needs the repo's own address to be the one testers add, so it's the same for everybody. The code is
 # kept in $SIGNUPS_DIR/repo_code (the sign-up service checks it) and written into the repo's index (config.yml).
 #   sudo sh scripts/repo-link            show the address (makes it the first time)
+#   sudo sh scripts/repo-link public     the open address, https://DOMAIN/fdroid/repo (issue #608): written into the
+#                                        F-Droid index, which is rebuilt, and everyone approved for F-Droid is emailed
+#                                        the open address and asked to reinstall once (new signing key). The private
+#                                        address keeps working
 #   sudo sh scripts/repo-link rotate     a new address: the old one stops working at once, the F-Droid index is
 #                                        rebuilt, and everyone approved for F-Droid is emailed the new one
 set -eu
@@ -14,8 +18,18 @@ DOMAIN="${DOMAIN:-$(sed -n 's/^DOMAIN=//p' "$HERE/.env" 2>/dev/null | head -n 1)
 : "${DOMAIN:?Set DOMAIN or put it in .env}"
 FDROID_CMD="${FDROID_CMD:-sudo -u siansa-deploy fdroid update --use-date-from-apk}"
 NOTIFY_CMD="${NOTIFY_CMD:-docker compose --project-directory $HERE exec -T signup python -I /app/server.py notify-new-link}"
+NOTIFY_OPEN_CMD="${NOTIFY_OPEN_CMD:-docker compose --project-directory $HERE exec -T signup python -I /app/server.py notify-open-repo}"
 CODE_FILE="$SIGNUPS_DIR/repo_code"
 mode="${1:-show}"
+
+if [ "$mode" = public ]; then
+	sed -i "s#^repo_url:.*#repo_url: https://$DOMAIN/fdroid/repo#" "$FDROID_DIR/config.yml"
+	(cd "$FDROID_DIR" && $FDROID_CMD) >/dev/null 2>&1
+	echo "https://$DOMAIN/fdroid/repo"
+	echo "Emailing everyone approved for F-Droid the open address and the one-time reinstall:"
+	$NOTIFY_OPEN_CMD
+	exit 0
+fi
 
 if [ ! -s "$CODE_FILE" ] || [ "$mode" = rotate ]; then
 	code=$(openssl rand -base64 24 | tr '+/' '-_' | tr -d '=\n')

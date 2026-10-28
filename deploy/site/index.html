@@ -7,7 +7,7 @@
 <link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/style.css?v=8">
+<link rel="stylesheet" href="/style.css?v=9">
 <script src="/count.js" defer></script>
 </head>
 <body>
@@ -35,7 +35,27 @@ of our own pocket. If Siansa makes your day a little better, a <a href="/donate"
 Thank you! 💛</p>
 </div>
 
-<h2 id="join">Join the beta</h2>
+<h2 id="get">Get Siansa</h2>
+<div class="get">
+<section>
+<h3>F-Droid</h3>
+<p>Open to everyone, no sign-up. In the F-Droid app, go to <strong>Settings › Repositories › +</strong>, add this
+address, then search for Siansa:</p>
+<p><code>https://siansa.app/fdroid/repo</code></p>
+<p class="hint">The page at that address shows the repository's fingerprint and a QR code to scan.</p>
+<p class="hint"><strong>Beta tester with the old private address?</strong> Remove that repository, add this one, then
+uninstall Siansa once and install it again: the app has a new signing key, and F-Droid can't update across that.
+You'll need to enter your servers again.</p>
+<p><a class="cta" href="/fdroid/repo">Open the repository</a></p>
+</section>
+<section>
+<h3>Google Play</h3>
+<p>The Google Play beta is a small closed test. Ask for a place below and we'll add your Google account to it.</p>
+<p><a href="#join"><img src="/play-beta.svg" alt="Join the beta on Google Play" width="220" height="66"></a></p>
+</section>
+</div>
+
+<h2 id="join">Join the Google Play beta</h2>
 <div class="why-closed">
 <h3>Why a closed beta?</h3>
 <p>Siansa is still early, so we're keeping the beta small on purpose. That way we can find bugs early, before lots
@@ -43,16 +63,14 @@ of people run into them. We get to know the people testing, and we'd love tester
 the app, not just try it once. And we can hear your honest feedback: what you love, what annoys you, and what's
 missing. Thanks for being part of it!</p>
 </div>
-<p>Tell us a little about your setup and we'll send an invite. We only use your email for the beta
+<p>Tell us a little about your setup and we'll send an invite to the Google Play test. We only use your email for the beta
 (<a href="/privacy">privacy policy</a>).</p>
 <p id="beta-count" class="hint" aria-live="polite"></p>
 <form method="post" action="/signup">
 <p><label>Email<br><input type="email" name="email" required maxlength="254" autocomplete="email"></label>
-<span class="hint">For Google Play this must be the email of your Google account.</span></p>
+<span class="hint">This must be the email of your Google account.</span></p>
 
-<fieldset><legend>How will you install Siansa?</legend>
-<label><input type="radio" name="route" value="play" required> Google Play (still in progress)</label>
-<label><input type="radio" name="route" value="fdroid"> F-Droid (quicker for now)</label></fieldset>
+<input type="hidden" name="route" value="play">
 
 <fieldset><legend>Does your phone run Android 8.0 or newer?</legend>
 <label><input type="radio" name="android" value="yes" required> Yes</label>
@@ -69,7 +87,7 @@ missing. Thanks for being part of it!</p>
 
 <p><label>Phone model (optional)<br><input type="text" name="device" maxlength="80" autocomplete="off"></label></p>
 
-<p><label class="check"><input type="checkbox" name="days" value="yes"> Google Play only: I'll keep Siansa installed
+<p><label class="check"><input type="checkbox" name="days" value="yes" required> I'll keep Siansa installed
 and stay in the test for 14 days in a row.</label></p>
 <p><label class="check"><input type="checkbox" name="feedback" value="yes" required> I'll tell you about problems I find.</label></p>
 <p><label class="check"><input type="checkbox" name="privacy" value="yes" required> You may keep my email for the beta and
@@ -79,11 +97,7 @@ write to me about it.</label></p>
 </form>
 
 <h2>Already invited?</h2>
-<ol>
-<li><strong>Google Play</strong>: open the invite link you were sent, tap "Become a tester", then install Siansa from Play.</li>
-<li><strong>F-Droid</strong>: in the F-Droid app, go to Settings › Repositories › +, and paste the private address in
-your welcome email. Then search for Siansa.</li>
-</ol>
+<p>Open the invite link you were sent, tap "Become a tester", then install Siansa from Google Play.</p>
 
 <p><a href="/privacy">Privacy policy</a></p>
 </main>

@@ -35,7 +35,11 @@ Use the Google account whose email you gave us, and stay in the test for 14 days
 `https://siansa.app/fdroid/repo` (the page also shows a QR code and the repo's fingerprint). Then search for
 Siansa and install it.
 
-Not on the list yet? [Ask for an invite](https://siansa.app).
+F-Droid needs no invite. For Google Play, [ask for a place in the beta](https://siansa.app/#join).
+
+**Had Siansa from the earlier private F-Droid address?** Remove that repository, add the open one above, then
+uninstall Siansa once and install it again: the app has a new signing key since the project went public, and
+F-Droid can't update across a key change. You'll need to enter your servers again afterwards.
 
 ## Connect your servers
 

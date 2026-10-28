@@ -109,7 +109,10 @@ class FlowTest(unittest.TestCase):
         self.assertTrue(server.valid_link(base))
         self.assertFalse(server.valid_link(base.replace("Abc", "Abd") + "/entry.jar"))
         self.assertFalse(server.valid_link(f"/fdroid/t/{CODE}/entry.jar"))
-        self.assertFalse(server.valid_link("/fdroid/repo/entry.jar"))
+        self.assertTrue(server.valid_link("/fdroid/repo/entry.jar"))  # the open address (issue #608)
+        self.assertTrue(server.valid_link("/fdroid/repo"))
+        self.assertFalse(server.valid_link("/fdroid/repository/entry.jar"))
+        self.assertFalse(server.valid_link("/fdroid/other/entry.jar"))
         self.assertFalse(server.valid_link(None))
         os.remove(server.CODE_FILE)
         self.assertFalse(server.valid_link(base + "/entry.jar"))
@@ -205,6 +208,15 @@ class FlowTest(unittest.TestCase):
         self.assertIn("/fdroid/t/Zyxwvutsrqponmlkjihgfedcba987654/repo", self.sent[0][2])
         self.assertFalse(server.valid_link(f"/fdroid/t/{CODE}/repo/entry.jar"))  # the old address is dead
 
+    def test_open_repo_mail_goes_to_approved_fdroid_testers_with_the_open_address(self):
+        a, _ = self.signup(1, "fdroid"); b, _ = self.signup(2, "play")
+        server.decide(a, "approve"); server.decide(b, "approve"); self.sent.clear()
+        self.assertTrue(server.cli(["server.py", "notify-open-repo"]))
+        self.assertEqual([m[0] for m in self.sent], ["p1@example.com"])
+        self.assertIn(server.PUBLIC_URL + "/fdroid/repo", self.sent[0][2])
+        self.assertIn("uninstall Siansa once", self.sent[0][2])
+        self.assertTrue(server.valid_link(f"/fdroid/t/{CODE}/repo/entry.jar"))  # the private address stays
+
     def test_cli_approve_prints_link_and_count_without_email(self):
         import io, contextlib
         rec, _ = self.signup(1)
@@ -299,7 +311,7 @@ class EmailTemplateTest(unittest.TestCase):
 
     def test_the_shipped_templates_are_valid(self):
         server.EMAILS_DIR = os.path.join(os.path.dirname(__file__), "..", "emails")
-        for name in ("welcome_fdroid", "welcome_play", "new_link", "deny"):
+        for name in ("welcome_fdroid", "welcome_play", "new_link", "open_repo", "deny"):
             subject, body = server.template(name, "FALLBACK", "FALLBACK", repo_url="https://r", beta_repo_url="b", issues_url="i", email="e")
             self.assertNotEqual(subject, "FALLBACK", name)
             self.assertNotIn("$", body, name)
@@ -405,6 +417,8 @@ class FdroidStatsTest(unittest.TestCase):
 
     def test_kinds(self):
         self.assertEqual(server.fetch_kind("/fdroid/t/abc/repo/app.siansa_650.apk"), "apk:650")
+        self.assertEqual(server.fetch_kind("/fdroid/repo/entry.jar"), "repo")
+        self.assertEqual(server.fetch_kind("/fdroid/repo/app.siansa_650.apk"), "apk:650")
         self.assertEqual(server.fetch_kind("/fdroid/t/abc/repo/entry.jar?x=1"), "repo")
         self.assertEqual(server.fetch_kind("/fdroid/t/abc/repo/index-v1.jar"), "repo")
         self.assertIsNone(server.fetch_kind("/fdroid/t/abc/repo/icons-640/icon.png"))

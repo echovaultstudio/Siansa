@@ -105,7 +105,13 @@ Navidrome or Emby server reachable from the phone, 14 days for Play, feedback, p
 `/srv/siansa-signups` (no IP addresses). Each new one is emailed to `NOTIFY_TO` with **Approve** and **Deny** links:
 - A link opens a page with a button; nothing happens until you press it (so mail scanners can't approve anyone).
   Links are signed and work for 14 days, once.
-- **Approve**, F-Droid: the tester gets an email with the beta's one private address,
+- **F-Droid is open to everybody** (issue #608): `https://DOMAIN/fdroid/repo`, no sign-up. After deploying this, run
+  `sudo sh scripts/repo-link public` once: it writes that address into the F-Droid index, rebuilds it, and emails
+  everyone approved for F-Droid (`emails/open_repo.txt`): add the open address instead of the private one, and
+  uninstall and reinstall Siansa once, because the signing key changed with the move to a public repository. The sign-up
+  form on the home page is for the Google Play beta only. What follows is the earlier private address, which keeps
+  working until you rotate it.
+- **Approve**, F-Droid (earlier sign-ups): the tester gets an email with the beta's one private address,
   `https://siansa.app/fdroid/t/<code>/repo`, and links to the Siansa GitHub repo (issues) for reports.
   It's one address for everybody because F-Droid only accepts the address the repo's own index names; a different
   address per person makes it treat the address as a mirror and the app list stays empty. Caddy asks the sign-up
@@ -238,7 +244,7 @@ To add the current release by hand: `ssh siansa-deploy@siansa.app < siansa-0.28.
 `sudo -u siansa-deploy siansa-publish < file.apk`.
 
 ### 9. Testers on F-Droid
-In F-Droid (or Droid-ify / Neo Store): **Settings › Repositories › +**, then the address
+Anyone, no sign-up. In F-Droid (or Droid-ify / Neo Store): **Settings › Repositories › +**, then the address
 `https://siansa.app/fdroid/repo`. The page at that address shows its fingerprint and a QR code to scan. Send
 testers the address with the fingerprint, so they can tell the repo is yours.
 

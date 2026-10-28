@@ -54,6 +54,13 @@ button { font: inherit; font-weight: 600; padding: 10px 20px; border: 0; border-
 .open-source h2 { margin: 0 0 8px; }
 .open-source p { margin: 0; }
 
+.get { display: grid; gap: 12px; margin: 16px 0 8px; }
+.get section { padding: 16px; border-radius: 16px; background: rgba(127, 127, 127, 0.08); }
+.get h3 { margin: 0 0 8px; font-size: 1.05rem; color: var(--accent); }
+.get p { margin: 0 0 8px; }
+.get code { word-break: break-all; }
+.get img { display: block; max-width: 100%; height: auto; }
+
 .why-closed { margin: 8px 0 16px; }
 .why-closed h3 { margin: 0 0 4px; font-size: 1.05rem; }
 .why-closed p { margin: 0; color: var(--muted); }

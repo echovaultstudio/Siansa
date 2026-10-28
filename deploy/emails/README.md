@@ -5,7 +5,7 @@ Edit these files, merge the change, and the next email uses the new text (no res
 
 | Placeholder | What it becomes |
 |---|---|
-| `$repo_url` | The private F-Droid beta address (F-Droid emails only) |
+| `$repo_url` | The F-Droid address (F-Droid emails only): the private one, or the open one in `open_repo.txt` |
 | `$beta_repo_url` | The install guide on GitHub (`docs/testing.md`) |
 | `$issues_url` | The page for reporting a problem |
 | `$email` | The tester's email address |
