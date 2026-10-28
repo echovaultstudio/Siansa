@@ -208,6 +208,7 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
         if (sessionId != null) sync("replaced", close = true)
         if (episodeId == null) episode = null
         endedId = null
+        graph.activePlayer.choose(MiniFor.BOOK)
         _state.value = BookPlayerState(book = book, positionSec = fromSec, playing = true, speed = graph.bookSpeeds.speedOf(book.id))
         graph.books.noteProgress(progressAt(book, fromSec))
         // A shortcut at the top of Home, like an album played (#548).
@@ -260,6 +261,7 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
                 // Nothing is loaded, so nothing stays on the screen: a book that never started otherwise kept a
                 // mini player that came back over the music's whenever a song paused (beta #45).
                 sessionId = null
+                graph.activePlayer.failed(MiniFor.BOOK)
                 _state.value = BookPlayerState()
                 graph.player.notice(e.message ?: "Couldn't play the book")
             }
@@ -267,7 +269,7 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
     }
 
     fun togglePlay() = withController { c ->
-        if (c.isPlaying) { c.pause(); sync("paused") } else { graph.player.pause(); c.play() }
+        if (c.isPlaying) { c.pause(); sync("paused") } else { graph.activePlayer.choose(MiniFor.BOOK); graph.player.pause(); c.play() }
     }
     fun pause() = withController { c -> if (c.isPlaying) { c.pause(); sync("paused") } }
 
