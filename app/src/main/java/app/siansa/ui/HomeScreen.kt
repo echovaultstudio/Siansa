@@ -102,6 +102,9 @@ fun HomeScreen(nav: NavController) {
     }
     val customCards by graph.cards.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { graph.cards.all() }
+    // Custom cards pinned to Home (issue #622), each in its own look.
+    val pinnedCards by graph.pinnedCards.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { graph.pinnedCards.all() }
     val selectors by graph.selectors.state.collectAsStateWithLifecycle()
     val status by graph.library.status.collectAsStateWithLifecycle()
     val loaded by graph.library.loaded.collectAsStateWithLifecycle()
@@ -397,6 +400,12 @@ fun HomeScreen(nav: NavController) {
                             }
                         }
                         Shelf("Made for you", tiles, key = { it.first }) { it.second() }
+                    }
+                }
+                HomeSection.CARDS -> {
+                    // Your cards (issue #622), in the order set in Settings › Cards; each is its own row.
+                    pinnedCards.orEmpty().filter { it.shown }.forEach { card ->
+                        item(key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
                     }
                 }
                 HomeSection.REDISCOVER -> {

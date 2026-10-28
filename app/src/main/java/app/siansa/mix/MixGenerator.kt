@@ -714,17 +714,7 @@ class MixGenerator(private val graph: AppGraph) {
         return ids.mapNotNull { local[it] ?: fetched[it] }.distinctBy { it.id }
     }
 
-    /** Keeps the same artist from playing twice in a row where possible. */
-    private fun spreadArtists(songs: List<Song>): List<Song> {
-        val left = songs.toMutableList()
-        val out = ArrayList<Song>(songs.size)
-        while (left.isNotEmpty()) {
-            val last = out.lastOrNull()?.artist
-            val index = left.indexOfFirst { it.artist != last }.takeIf { it >= 0 } ?: 0
-            out += left.removeAt(index)
-        }
-        return out
-    }
+    private fun spreadArtists(songs: List<Song>): List<Song> = app.siansa.mix.spreadArtists(songs)
 
     private companion object {
         const val DAY_MS = 24L * 60 * 60 * 1000
@@ -816,5 +806,17 @@ internal fun serverMatch(hit: ClapHit, results: List<Song>): Song? {
 internal fun matchByName(hits: List<ClapHit>, index: SongIndex): Map<String, String> {
     val out = LinkedHashMap<String, String>()
     for (hit in hits) index.find(hit.artist, hit.title)?.let { out[hit.id] = it }
+    return out
+}
+
+/** Keeps the same artist from playing twice in a row where possible. */
+fun spreadArtists(songs: List<Song>): List<Song> {
+    val left = songs.toMutableList()
+    val out = ArrayList<Song>(songs.size)
+    while (left.isNotEmpty()) {
+        val last = out.lastOrNull()?.artist
+        val index = left.indexOfFirst { it.artist != last }.takeIf { it >= 0 } ?: 0
+        out += left.removeAt(index)
+    }
     return out
 }

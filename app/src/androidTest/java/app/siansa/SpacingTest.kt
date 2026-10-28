@@ -956,6 +956,28 @@ class SpacingTest {
         gaps.forEach { assertEven("Gap between source rows", gaps[0], it, 1.dp) }
     }
 
+    /** Custom cards (issue #622): the banner sits a page margin from both edges of the screen. */
+    @Test fun pinnedBannerHasEvenPageMargins() {
+        val card = app.siansa.mix.PinnedCard.new("Late night").copy(look = app.siansa.mix.CardLook.BANNER, genre = "Jazz")
+        val songs = (1..3).map { app.siansa.data.Song(id = "s$it", title = "Song $it", artist = "Artist") }
+        compose.setContent { SiansaTheme { Column { app.siansa.ui.PinnedBanner(card, songs, open = {}, play = { _, _, _ -> }) } } }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val banner = compose.onNodeWithTag("pinnedBanner").getBoundsInRoot()
+        assertEven("Banner margins", banner.left - screen.left, screen.right - banner.right, 1.dp)
+        assertEven("Banner left margin is the page margin", banner.left - screen.left, Space.Page, 1.dp)
+    }
+
+    /** Custom cards (issue #622): the play button card sits a page margin from both edges of the screen. */
+    @Test fun pinnedPlayButtonHasEvenPageMargins() {
+        val card = app.siansa.mix.PinnedCard.new("Shuffle it").copy(look = app.siansa.mix.CardLook.BUTTON, favourites = true)
+        val songs = (1..3).map { app.siansa.data.Song(id = "s$it", title = "Song $it", artist = "Artist") }
+        compose.setContent { SiansaTheme { Column { app.siansa.ui.PinnedPlayButton(card, songs, open = {}, play = { _, _, _ -> }) } } }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val button = compose.onNodeWithTag("pinnedButton").getBoundsInRoot()
+        assertEven("Play button margins", button.left - screen.left, screen.right - button.right, 1.dp)
+        assertEven("Play button left margin is the page margin", button.left - screen.left, Space.Page, 1.dp)
+    }
+
     @androidx.compose.runtime.Composable
     private fun MusicSourceRows() {
         SiansaTheme { Column { SourceKind.entries.forEach { SourceRow(it) { } } } }

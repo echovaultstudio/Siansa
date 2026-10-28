@@ -12,6 +12,8 @@ enum class HomeSection(val id: String, val label: String) {
     BOOKS("books", "Your books"),
     PODCASTS("podcasts", "Your podcasts"),
     MADE_FOR_YOU("made", "Made for you"),
+    /** Custom cards pinned to Home (issue #622); each shows in its own look, in the order set in Settings › Cards. */
+    CARDS("cards", "Your cards"),
     REDISCOVER("rediscover", "Rediscover"),
     RADIOS("radios", "Radios"),
     PLAYLISTS("playlists", "Your playlists"),

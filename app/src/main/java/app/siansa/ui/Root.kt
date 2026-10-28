@@ -283,6 +283,7 @@ fun SiansaRoot() {
                 composable("vibe/{id}") { VibeScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("settings/cards") { CardsSettingsScreen(nav) }
                 composable("card/{id}") { CardScreen(nav, it.arguments?.getString("id").orEmpty()) }
+                composable("pinned/{id}") { PinnedCardScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("settings") { SettingsHub(nav) }
                 composable(
                     "settings/connections?source={source}&extras={extras}",
