@@ -3,6 +3,18 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.39.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.39.0beta) — 2026-10-28
+
+- [#619](https://github.com/echovaultstudio/Siansa/pull/619) README: F-Droid and Google Play buttons (@Th3K1ngP1n)
+- [#621](https://github.com/echovaultstudio/Siansa/pull/621) Song cache: an Off choice (@Th3K1ngP1n)
+- [#623](https://github.com/echovaultstudio/Siansa/pull/623) Custom cards: cards of your own pinned to Home (@Th3K1ngP1n)
+- [#625](https://github.com/echovaultstudio/Siansa/pull/625) DLNA: let go of the speaker when the phone leaves its Wi-Fi (@Th3K1ngP1n)
+- [#627](https://github.com/echovaultstudio/Siansa/pull/627) Book and podcast pages like album pages; podcast progress follows the episode (@Th3K1ngP1n)
+- [#629](https://github.com/echovaultstudio/Siansa/pull/629) Smart fades leave out silence and the end of long fade-outs (@Th3K1ngP1n)
+- [#631](https://github.com/echovaultstudio/Siansa/pull/631) Podcast episodes: their own description unfolds under them (@Th3K1ngP1n)
+- [#633](https://github.com/echovaultstudio/Siansa/pull/633) Daily summary email: the app version and its F-Droid downloads only (@Th3K1ngP1n)
+- [#635](https://github.com/echovaultstudio/Siansa/pull/635) Server kit and emails move to the private siansa-dev repository (@Th3K1ngP1n)
+
 ## [0.38.5beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.38.5beta) — 2026-10-28
 
 - [#612](https://github.com/echovaultstudio/Siansa/pull/612) F-Droid repo and listing for the public project: name, icon, licence, links (@Th3K1ngP1n)
