@@ -3,6 +3,11 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.38.3beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.38.3beta) — 2026-10-28
+
+- [#599](https://github.com/echovaultstudio/Siansa/pull/599) One mini player: the player started last owns it, kept app-wide (@Th3K1ngP1n)
+- [#601](https://github.com/echovaultstudio/Siansa/pull/601) Now playing and the book player: one finger-driven motion, the mini player fading into them (@Th3K1ngP1n)
+
 ## [0.38.2beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.38.2beta) — 2026-10-27
 
 - [#585](https://github.com/echovaultstudio/Siansa/pull/585) Prepare the repository for public: GPL, the signing key out, no APKs on GitHub (@Th3K1ngP1n)
