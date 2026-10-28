@@ -52,8 +52,9 @@ LOCK_FILE = os.path.join(DATA_DIR, "state.lock")
 SECRET = os.environ.get("SIGNUP_SECRET", "")
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "https://siansa.app").rstrip("/")
 LINK_DAYS = 14
-ISSUES_URL = "https://github.com/echovaultstudio/siansa-beta-testers/issues/new/choose"
-BETA_REPO_URL = "https://github.com/echovaultstudio/siansa-beta-testers"
+# Problem reports and ideas are issues in the Siansa repository itself; the install guide is in its docs.
+ISSUES_URL = "https://github.com/echovaultstudio/Siansa/issues/new/choose"
+BETA_REPO_URL = "https://github.com/echovaultstudio/Siansa/blob/main/docs/testing.md"
 FAILS_PER_HOUR = 30
 LIMIT = int(os.environ.get("BETA_LIMIT", "12") or 12)
 MAX_BODY = 4096
@@ -61,7 +62,7 @@ REPORT_MAX_ZIP = 40 * 1024 * 1024
 REPORTS_MAX_TOTAL = 2 * 1024 * 1024 * 1024
 REPORTS_DIR = os.environ.get("REPORTS_DIR", os.path.join(DATA_DIR, "reports"))
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
-BETA_REPO = os.environ.get("BETA_REPO", "echovaultstudio/siansa-beta-testers")
+BETA_REPO = os.environ.get("ISSUES_REPO") or os.environ.get("BETA_REPO") or "echovaultstudio/Siansa"  # BETA_REPO: the old name
 # A private repository that keeps a copy of each report's log, so it can be read next to its issue (with a token
 # that can write to that repository only). Empty = logs stay on this server only.
 REPORTS_REPO = os.environ.get("REPORTS_REPO", "")

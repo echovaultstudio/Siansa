@@ -106,7 +106,7 @@ Navidrome or Emby server reachable from the phone, 14 days for Play, feedback, p
 - A link opens a page with a button; nothing happens until you press it (so mail scanners can't approve anyone).
   Links are signed and work for 14 days, once.
 - **Approve**, F-Droid: the tester gets an email with the beta's one private address,
-  `https://siansa.app/fdroid/t/<code>/repo`, and links to the beta testers GitHub repo (issues) for reports.
+  `https://siansa.app/fdroid/t/<code>/repo`, and links to the Siansa GitHub repo (issues) for reports.
   It's one address for everybody because F-Droid only accepts the address the repo's own index names; a different
   address per person makes it treat the address as a mirror and the app list stays empty. Caddy asks the sign-up
   service whether the code is valid before serving anything (`forward_auth`); `/fdroid/repo` is closed.
@@ -186,8 +186,9 @@ now. Devices are told apart by address with a key that only lives for the day; o
 
 Settings › Report a problem sends the tester's two answers and the whole log to `POST /report`. The log is kept in
 `/srv/siansa-signups/reports/<id>.zip` (owner-only, 2 GB cap, 5 reports per hour per tester) and a public issue with
-the words and the report id is opened in `siansa-beta-testers`. To turn issues on, create a fine-grained token at
-GitHub › Settings › Developer settings › Personal access tokens › Fine-grained: only the `siansa-beta-testers`
+the words and the report id is opened in the Siansa repository (`ISSUES_REPO`, default `echovaultstudio/Siansa`;
+the old name `BETA_REPO` still works). To turn issues on, create a fine-grained token at
+GitHub › Settings › Developer settings › Personal access tokens › Fine-grained: only the `Siansa`
 repo, permission **Issues: Read and write**, nothing else. Put it in `.env` as `GITHUB_TOKEN=` and run
 `docker compose up -d`. Without it the log is still kept. To also keep a copy of each log in a private repository (so it can be read next to its issue),
 create a private repo such as `siansa-logs` with a README (it needs a `main` branch), make a second fine-grained token

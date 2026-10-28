@@ -1,0 +1,67 @@
+name: Bug report
+description: Something in Siansa doesn't work as it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Siansa. **This page is public.** Don't post passwords, keys or your server's address.
+  - type: input
+    id: version
+    attributes:
+      label: Siansa version
+      description: Settings › About
+      placeholder: "0.29.0beta"
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: How did you install it?
+      options: ["Google Play", "F-Droid", "Direct download"]
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Phone and Android version
+      placeholder: "Pixel 8, Android 15"
+    validations:
+      required: true
+  - type: dropdown
+    id: server
+    attributes:
+      label: Your server
+      options: ["Navidrome", "Emby", "Other (OpenSubsonic)"]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you see instead? A screenshot helps.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can we see it ourselves?
+      placeholder: |
+        1. Open ...
+        2. Tap ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log (optional)
+      description: Settings › Share logs. Paste the part around the problem and replace your server's address with `my-server`.
+      render: shell
+  - type: checkboxes
+    id: safe
+    attributes:
+      label: Before you send
+      options:
+        - label: I removed passwords, keys and my server's address from this report.
+          required: true

@@ -4,7 +4,7 @@
 
 A music player for your own **Navidrome**, **OpenSubsonic** or **Emby** server, with daily mixes built on the phone from **AudioMuse-AI** text search and, optionally, titles and searches written by an **OpenRouter** model. Audiobooks and podcasts from **Audiobookshelf** play alongside.
 
-Siansa is **open source** under the GNU GPL, version 3 or later ([LICENSE](LICENSE)): the code is here to read, build and improve. Website: [siansa.app](https://siansa.app). Docs: [docs.siansa.app](https://docs.siansa.app) (the [beta testers repository](https://github.com/echovaultstudio/siansa-beta-testers) until then).
+Siansa is **open source** under the GNU GPL, version 3 or later ([LICENSE](LICENSE)): the code is here to read, build and improve. Website: [siansa.app](https://siansa.app). Docs: [docs.siansa.app](https://docs.siansa.app) (the [docs folder](docs/README.md) until then).
 
 <p align="center"><img src="docs/screenshots/hero.png" alt="Siansa: Your year, Home and Flow" width="900"></p>
 
@@ -92,7 +92,7 @@ To build locally: `gradle :app:assembleRelease` with Gradle 8.14+, JDK 17 and th
 
 ## Contributing and reporting
 
-Bug reports and feature requests go to the [beta testers repository](https://github.com/echovaultstudio/siansa-beta-testers/issues), or **Settings › Help › Report a problem** in the app, which sends the log along. Pull requests are welcome here: one issue per pull request, with a note in `changelog.d/` and tests for what changes (see `CLAUDE.md` for the conventions CI checks).
+Bug reports and feature requests go in this repository's [issues](issues), or **Settings › Help › Report a problem** in the app, which sends the log along. Pull requests are welcome here: one issue per pull request, with a note in `changelog.d/` and tests for what changes (see `CLAUDE.md` for the conventions CI checks).
 
 ## Licence
 

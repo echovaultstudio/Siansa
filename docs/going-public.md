@@ -54,5 +54,6 @@ repository variable `PLAY_TRACK` = `beta` (or `beta,internal`) so releases go th
 
 - `deploy/` holds the server kit (Caddy, the signup service, the F-Droid repo). It has no secrets (they're in
   `.env`, which is ignored), but it describes the server; keep it or move it to a private repository as you prefer.
-- The beta testers' logs stay in the private `siansa-logs` repository; nothing links there from the public code
+- Problem reports are issues in this repository (the separate beta testers repository is closed down, #606). The
+  reports' logs stay in the private `siansa-logs` repository; nothing links there from the public code
   except the report id in an issue.

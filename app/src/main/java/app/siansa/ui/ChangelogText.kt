@@ -102,10 +102,9 @@ fun changelogSpans(text: String): List<ChangelogSpan> {
 }
 
 /**
- * Every version's changes, in the beta testers repository (issue #435): public, unlike the app's own repository,
- * and kept up to date by each release.
+ * Every version's changes: the changelog in the Siansa repository (issue #435), which each release keeps up to date.
  */
-const val FULL_CHANGELOG_URL = "https://github.com/echovaultstudio/siansa-beta-testers/blob/main/CHANGELOG.md"
+const val FULL_CHANGELOG_URL = "https://github.com/echovaultstudio/Siansa/blob/main/CHANGELOG.md"
 
 /** What's new shows only the newest version (issue #435): its heading and what follows, up to the next version. */
 fun latestOnly(blocks: List<ChangelogBlock>): List<ChangelogBlock> {

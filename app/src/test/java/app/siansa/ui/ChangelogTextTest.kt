@@ -103,6 +103,6 @@ class ChangelogTextTest {
         assertEquals(1, latest.count { it is ChangelogBlock.Version })
         assertEquals(true, latest.any { it is ChangelogBlock.Bullet && it.text == "A" })
         assertEquals(false, latest.any { it is ChangelogBlock.Bullet && it.text == "B" })
-        assertEquals(true, FULL_CHANGELOG_URL.contains("siansa-beta-testers"))
+        assertEquals(true, FULL_CHANGELOG_URL.contains("echovaultstudio/Siansa"))
     }
 }

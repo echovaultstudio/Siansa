@@ -56,7 +56,7 @@ fun WhatsNewScreen(nav: NavController) {
     LaunchedEffect(Unit) {
         val read = withContext(Dispatchers.IO) {
             try {
-                // Only the newest version; every version is in the beta testers repo (issue #435).
+                // Only the newest version; every version is in CHANGELOG.md in the Siansa repository (issue #435).
                 latestOnly(parseChangelog(context.assets.open("CHANGELOG.md").bufferedReader().use { it.readText() }))
             } catch (e: CancellationException) {
                 throw e

@@ -44,7 +44,7 @@ class ReportTest {
     }
 
     @Test fun parseReadsIdAndIssue() {
-        val r = Report.parse("""{"id":"ab12","issue":7,"url":"https://github.com/echovaultstudio/siansa-beta-testers/issues/7"}""")!!
+        val r = Report.parse("""{"id":"ab12","issue":7,"url":"https://github.com/echovaultstudio/Siansa/issues/7"}""")!!
         assertEquals("ab12", r.id)
         assertEquals(7, r.issue)
         assertNull(Report.parse("""{"id":"ab12","url":"https://evil.example/x"}""")!!.url)

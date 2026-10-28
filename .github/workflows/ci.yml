@@ -18,6 +18,8 @@ permissions:
   contents: write
   # The release history (scripts/release_prs.py) looks up which pull request each commit came from.
   pull-requests: read
+  # Release comments on the issues a release fixes (scripts/notify_fixed.py).
+  issues: write
 
 concurrency:
   # The nightly run has a group of its own: GitHub often starts it hours late, and in the shared group it
@@ -461,21 +463,10 @@ jobs:
             for i in 1 2 3; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 5; done
           fi
 
-      # Every version's changes for testers, in the beta testers repo; the app shows only the newest (issue #435).
-      - name: Changelog to the beta testers repo
-        if: steps.version.outputs.exists != 'true'
-        continue-on-error: true
-        env:
-          BETA_REPO_TOKEN: ${{ secrets.BETA_REPO_TOKEN }}
-        run: |
-          git pull -q --rebase origin main || true
-          python3 scripts/beta_changelog.py
-
-      # Beta testers issues fixed in this release get a comment with the version, and are closed (issue #433).
-      - name: Tell beta testers what's fixed
+      # Issues fixed in this release get a comment with the version, and are closed (issues #433, #606).
+      - name: Tell reporters what's fixed
         if: steps.version.outputs.exists != 'true'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-          BETA_REPO_TOKEN: ${{ secrets.BETA_REPO_TOKEN }}
-        run: python3 scripts/beta_notify.py "v${{ steps.version.outputs.version }}"
+        run: python3 scripts/notify_fixed.py "v${{ steps.version.outputs.version }}"
