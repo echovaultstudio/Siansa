@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import app.siansa.data.HomeSection
 import app.siansa.data.moved
+import app.siansa.data.movesFirstVisible
 
 /**
  * Home settings, behind Home's top-right buttons: Sources (whose music shows, see [SourcesPanel]) and Arrange.
@@ -92,6 +93,11 @@ fun ArrangeHomeSheet(
         val current = visible.firstOrNull { it.key == section.id } ?: return
         val middle = current.offset + offset + current.size / 2f
         val target = visible.firstOrNull { it.key != section.id && middle >= it.offset && middle <= it.offset + it.size } ?: return
+        // Moving to or from the top row: stay at the same position, not with the row that was first, or the moved
+        // row ends up above the screen and seems to vanish (#614).
+        if (movesFirstVisible(current.index, target.index, list.firstVisibleItemIndex)) {
+            list.requestScrollToItem(list.firstVisibleItemIndex, list.firstVisibleItemScrollOffset)
+        }
         items = items.moved(current.index, target.index)
         // The row is laid out at its new place next frame; keep it under the finger meanwhile.
         offset += current.offset - target.offset
@@ -119,6 +125,7 @@ fun ArrangeHomeSheet(
                 if (!sources) TextButton(
                     onClick = {
                         if (items != HomeSection.default) {
+                            list.requestScrollToItem(0)  // the reset order shows from its top (#614)
                             items = HomeSection.default
                             onChange(items)
                         }
