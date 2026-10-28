@@ -1,9 +1,11 @@
 Categories:
   - Multimedia
-License: Proprietary
+License: GPL-3.0-or-later
 AuthorName: Siansa
 WebSite: https://DOMAIN
-SourceCode: https://DOMAIN
+SourceCode: https://github.com/echovaultstudio/Siansa
+IssueTracker: https://github.com/echovaultstudio/Siansa/issues
+Changelog: https://github.com/echovaultstudio/Siansa/blob/main/CHANGELOG.md
 Name: Siansa
 Summary: Music player for your own Navidrome or Emby server
 Description: |-
@@ -14,7 +16,8 @@ Description: |-
   * Cast and DLNA, crossfade and levelling, sleep timer
   * No ads, no tracking: everything goes to servers you set up
 
-  This is a beta for testers. Please report problems with the log from Settings.
+  Open source under the GNU GPL 3 or later. These are beta builds: report problems from Settings › Help ›
+  Report a problem, with the log.
 AntiFeatures:
   NonFreeDep:
     en-US: Uses Google Cast for casting to TVs and speakers.
