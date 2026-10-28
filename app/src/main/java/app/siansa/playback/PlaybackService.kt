@@ -12,6 +12,7 @@ import androidx.media3.cast.SessionAvailabilityListener
 import app.siansa.playback.dlna.Dlna
 import app.siansa.playback.dlna.DlnaDevice
 import app.siansa.playback.dlna.DlnaPlayer
+import app.siansa.playback.dlna.LanWatch
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -75,6 +76,8 @@ class PlaybackService : MediaSessionService() {
     private lateinit var phone: ServerSeekPlayer
     private var castPlayer: RemoteCastPlayer? = null
     private var dlnaPlayer: DlnaPlayer? = null
+    /** Follows the Wi-Fi while music plays on a DLNA device, to bring it back the moment the phone leaves (issue #624). */
+    private var lanWatch: LanWatch? = null
     // Where the music was on the TV as casting began to end, in case the TV forgets its queue while stopping.
     private var castSaved: CastSpot<MediaItem>? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -198,6 +201,10 @@ class PlaybackService : MediaSessionService() {
         // DLNA (TVs and speakers without Chromecast): follows the device picked in the app.
         scope.launch(Dispatchers.Main) {
             Dlna.selected.collect { device -> onDlnaDevice(device) }
+        }
+        // A TV or speaker given up on: a note on screen, so the change isn't a mystery (issue #624).
+        scope.launch {
+            Dlna.lostDevices.collect { name -> graph.player.notice("Lost the connection to $name. The music is paused on the phone.") }
         }
 
         // A new quality in Settings → Playback applies straight away: the current song is loaded again at it.
@@ -432,7 +439,11 @@ class PlaybackService : MediaSessionService() {
             val player = DlnaPlayer(device, graph.source)
             dlnaPlayer = player
             moveTo(player)
+            lanWatch?.stop()
+            lanWatch = LanWatch(this) { Dlna.lost(device, "the phone left the Wi-Fi") }.also { it.start() }
         } else {
+            lanWatch?.stop()
+            lanWatch = null
             dlnaPlayer = null
             if (old != null && session.player === old) moveTo(phone)
         }
@@ -601,6 +612,8 @@ class PlaybackService : MediaSessionService() {
         events?.finishCurrent()
         castPlayer?.setSessionAvailabilityListener(null)
         castPlayer?.release()
+        lanWatch?.stop()
+        lanWatch = null
         dlnaPlayer?.release()
         dlnaPlayer = null
         crossfader?.release()

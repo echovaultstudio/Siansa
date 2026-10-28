@@ -51,6 +51,19 @@ internal object DlnaQueue {
         return if (durationMs - positionMs <= NEAR_END_MS) NEAR_END_POLL_MS else POLL_MS
     }
 
+    /**
+     * Whether the device is gone: [failures] missed answers in a row, the last answer [sinceAnswerMs] ago. A few
+     * misses happen on busy Wi-Fi; but once it hasn't answered for [LOST_AFTER_MS] (and missed at least
+     * [MIN_FAILURES]), or missed [MAX_FAILURES] in a row, it's gone. Each try can take up to the request timeouts
+     * (4 s to connect, 8 s to answer), so a count alone could take over a minute.
+     */
+    fun gone(failures: Int, sinceAnswerMs: Long): Boolean =
+        failures >= MAX_FAILURES || (failures >= MIN_FAILURES && sinceAnswerMs >= LOST_AFTER_MS)
+
+    const val MIN_FAILURES = 3
+    const val MAX_FAILURES = 8
+    const val LOST_AFTER_MS = 15_000L
+
     const val POLL_MS = 1_000L
     const val NEAR_END_POLL_MS = 250L
     const val NEAR_END_MS = 4_000L

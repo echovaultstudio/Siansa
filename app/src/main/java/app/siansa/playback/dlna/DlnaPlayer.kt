@@ -62,6 +62,8 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
     private var sawPlaying = false
     private var loadedIndex = -1
     private var failures = 0
+    /** When the device last answered, to tell a slow answer from one that's gone. */
+    private var lastAnswerMs = System.currentTimeMillis()
     private var poll: Job? = null
     /** The address of the song the device was given last, to notice when it moves on by itself. */
     private var currentUrl: String? = null
@@ -364,7 +366,7 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
         scope.launch {
             try {
                 commands.withLock { block() }
-                failures = 0
+                answered()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 AppLog.w("DLNA", "$what on ${device.name} failed: ${e.message}")
@@ -393,7 +395,7 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
                     val e = result.exceptionOrNull()
                     failed(e?.message ?: e?.javaClass?.simpleName ?: "no answer")
                 } else {
-                    failures = 0
+                    answered()
                     val (transportState, position) = answer
                     onStatus(
                         transportState,
@@ -531,10 +533,15 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
         }
     }
 
+    private fun answered() {
+        failures = 0
+        lastAnswerMs = System.currentTimeMillis()
+    }
+
     private fun failed(why: String) {
         failures++
-        // A few missed answers happen on busy Wi-Fi; many in a row means the device is gone.
-        if (failures >= MAX_FAILURES) {
+        // A few missed answers happen on busy Wi-Fi; no answer for a while means the device is gone (issue #624).
+        if (DlnaQueue.gone(failures, System.currentTimeMillis() - lastAnswerMs)) {
             poll?.cancel()
             main.post { Dlna.lost(device, why) }
         }
@@ -551,6 +558,5 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
     private companion object {
         const val COVER_PX = 800
         const val VOLUME_STEP = 5
-        const val MAX_FAILURES = 8
     }
 }
