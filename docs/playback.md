@@ -14,10 +14,12 @@ Siansa always plays the quality you chose; it never switches by itself. Changes 
 ## Song cache and loading ahead
 
 - **Song cache** (**Settings › Storage**, 2 GB by default): songs are kept on the phone as they play, so replays
-  and skips start at once and survive a bad connection. Only original-quality streams are cached.
+  and skips start at once and survive a bad connection. Only original-quality streams are cached. **Off** keeps
+  no song once it has played (the songs already cached are removed); it applies from the next song.
 - **Load songs ahead** (**Settings › Playback**): while a song plays, Siansa loads the next ones, one at a time, so
   they start at once and keep playing if the connection drops. 2 on Wi-Fi and 1 on mobile data by default, up to
-  5. Only original files are loaded ahead.
+  5. Only original files are loaded ahead. This works with the song cache off too, for up to 3 songs: each is held
+  only until it has played.
 - **Image cache** (500 MB by default): covers and artist photos, so they show at once and offline. **Download all
   covers** fetches every cover in the background (Wi-Fi only by default).
 

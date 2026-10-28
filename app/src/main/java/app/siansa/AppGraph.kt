@@ -302,7 +302,8 @@ class AppGraph(val app: Application) {
      * and survive a bad connection. The oldest are removed when the chosen size is reached.
      */
     val songCache: SimpleCache by lazy {
-        val megabytes = settings.current.songCacheMb.coerceAtLeast(100)
+        // Off (0) still needs room for the songs loaded ahead, which are removed once played.
+        val megabytes = settings.current.songCacheMb.let { if (it <= 0) 1024 else it.coerceAtLeast(100) }
         SimpleCache(
             File(app.cacheDir, "song_cache"),
             LeastRecentlyUsedCacheEvictor(megabytes * 1024L * 1024L),

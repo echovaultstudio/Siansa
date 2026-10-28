@@ -249,8 +249,10 @@ fun PlaybackSettingsScreen(nav: NavController) {
             HorizontalDivider()
             Heading("Load songs ahead")
             Hint("While a song plays, Siansa loads the next ones, one at a time, so they start at once and keep playing if the connection drops. Fewer means less data. Only original files are loaded ahead.")
-            PreloadRow("On Wi-Fi", settings.preloadWifi, "preload-wifi") { graph.settings.save(graph.settings.current.copy(preloadWifi = it)) }
-            PreloadRow("On mobile data", settings.preloadMobile, "preload-mobile") { graph.settings.save(graph.settings.current.copy(preloadMobile = it)) }
+            val preloadChoices = Preload.choices(settings)
+            if (settings.songCacheMb <= 0) Hint("The song cache is off (Settings › Storage), so up to 3 songs are loaded ahead, and each is removed once it has played.")
+            PreloadRow("On Wi-Fi", settings.preloadWifi.coerceIn(preloadChoices), "preload-wifi", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadWifi = it)) }
+            PreloadRow("On mobile data", settings.preloadMobile.coerceIn(preloadChoices), "preload-mobile", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadMobile = it)) }
             // Only with an Audiobookshelf server (issue #521): how far the book player's skip buttons jump.
             if (settings.booksReady) {
                 HorizontalDivider()
@@ -331,10 +333,10 @@ internal fun WindDownChips(selected: Int, onPick: (Int) -> Unit) {
 
 /** None to five songs loaded ahead (issue #254). */
 @Composable
-internal fun PreloadRow(label: String, value: Int, tag: String, onPick: (Int) -> Unit) {
+internal fun PreloadRow(label: String, value: Int, tag: String, choices: IntRange = Preload.CHOICES, onPick: (Int) -> Unit) {
     Text(label, style = MaterialTheme.typography.bodyLarge)
     Row(Modifier.horizontalScroll(rememberScrollState()).testTag(tag), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-        Preload.CHOICES.forEach { n ->
+        choices.forEach { n ->
             FilterChip(
                 selected = value == n,
                 onClick = { onPick(n) },
@@ -364,7 +366,8 @@ private fun QualityRow(label: String, value: Int, onPick: (Int) -> Unit) {
 }
 
 private val cacheSizes = listOf(100, 250, 500, 1024, 2048, 5120, 0)
-private val songCacheSizes = listOf(512, 1024, 2048, 5120, 10240, 20480)
+// 0 is Off: songs stream without being kept on the phone.
+private val songCacheSizes = listOf(0, 512, 1024, 2048, 5120, 10240, 20480)
 
 private data class StorageUsage(val images: Long, val songs: Long, val downloads: Long, val library: Long, val logs: Long)
 
@@ -403,17 +406,32 @@ fun StorageScreen(nav: NavController) {
 
             HorizontalDivider()
             Heading("Song cache")
-            Hint("Songs are kept on the phone as they play, and the next song in the queue is fetched ahead, so replays and skips start at once and survive a bad connection. Only original-quality streams are cached.")
+            Hint("Songs are kept on the phone as they play, and the next song in the queue is fetched ahead, so replays and skips start at once and survive a bad connection. Only original-quality streams are cached. Off keeps nothing once it has played; songs loaded ahead (Settings › Playback) are held only until they play.")
             usage.valueOrNull()?.let { u ->
-                Text("In use: ${formatBytes(u.songs)} of ${formatMb(settings.songCacheMb)}", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    if (settings.songCacheMb <= 0) "Off: songs aren't kept after they play"
+                    else "In use: ${formatBytes(u.songs)} of ${formatMb(settings.songCacheMb)}",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
             }
             Text("Maximum size", style = MaterialTheme.typography.bodyLarge)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 songCacheSizes.forEach { mb ->
                     FilterChip(
                         selected = settings.songCacheMb == mb,
-                        onClick = { graph.settings.save(graph.settings.current.copy(songCacheMb = mb)) },
-                        label = { Text(formatMb(mb)) },
+                        onClick = {
+                            graph.settings.save(graph.settings.current.copy(songCacheMb = mb))
+                            if (mb <= 0) scope.launch {
+                                // Off means nothing kept: the songs already cached go too.
+                                withContext(Dispatchers.IO) {
+                                    val cache = graph.songCache
+                                    cache.keys.toList().forEach { key -> runCatching { cache.removeResource(key) } }
+                                }
+                                AppLog.i("Storage", "Song cache switched off and cleared")
+                                refresh++
+                            }
+                        },
+                        label = { Text(if (mb <= 0) "Off" else formatMb(mb)) },
                     )
                 }
             }
@@ -465,7 +483,8 @@ fun StorageScreen(nav: NavController) {
             SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
             Hint("When an album folder has an animated cover (cover.gif or cover.webp), it moves on the album page and in now playing; lists show its first frame. Your server may not shrink an animated WebP (Navidrome can't), so it's downloaded once in full and kept on the phone.")  // server-name: ok (an example of a server that can't)
 
-            if (settings.imageCacheMb != imagesAtStart || settings.songCacheMb != songsAtStart) {
+            // Switching the song cache off applies from the next song; a new size needs a restart.
+            if (settings.imageCacheMb != imagesAtStart || (settings.songCacheMb != songsAtStart && settings.songCacheMb > 0)) {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                         Text("New cache sizes apply after the app restarts.", style = MaterialTheme.typography.bodyMedium)
