@@ -515,49 +515,73 @@ def _since(path, day, key="time"):
     return sum(1 for r in read_lines(path) if str(r.get(key, "")).startswith(day))
 
 
-def digest_text(day, now=None):
-    """The owner's summary of [day] (UTC): sign-ups, places, F-Droid downloads and devices, problem reports."""
+FDROID_INDEX_DIR = os.environ.get("FDROID_INDEX_DIR", "/fdroid")
+
+
+def version_names(index_dir=None):
+    """Build number → version name ("650" → "0.38.5beta"), from the F-Droid repo's index (issue #632).
+
+    Read from index-v2.json (fdroidserver 2.x) or index-v1.json; empty when neither can be read, so the summary
+    falls back to build numbers."""
+    index_dir = index_dir or FDROID_INDEX_DIR
+    names = {}
+    try:
+        with open(os.path.join(index_dir, "index-v2.json"), encoding="utf-8") as f:
+            versions = json.load(f).get("packages", {}).get("app.siansa", {}).get("versions", {})
+        for v in versions.values():
+            m = v.get("manifest", {})
+            if m.get("versionCode") is not None and m.get("versionName"):
+                names[str(m["versionCode"])] = m["versionName"]
+    except (OSError, ValueError, AttributeError):
+        pass
+    if names:
+        return names
+    try:
+        with open(os.path.join(index_dir, "index-v1.json"), encoding="utf-8") as f:
+            for p in json.load(f).get("packages", {}).get("app.siansa", []):
+                if p.get("versionCode") is not None and p.get("versionName"):
+                    names[str(p["versionCode"])] = p["versionName"]
+    except (OSError, ValueError, AttributeError):
+        pass
+    return names
+
+
+def digest_text(day, now=None, names=None):
+    """The owner's summary of [day] (UTC): the app's version and its F-Droid downloads (issue #632). F-Droid is open
+    to everyone now, so there are no sign-ups to report."""
     stats = load_stats().get("days", {})
     today = stats.get(day, {})
-    events = [r for r in read_lines(DECISIONS_FILE) if str(r.get("time", "")).startswith(day)]
-    lines = [f"Siansa on {day} (UTC)", "",
-             f"Sign-ups: {_since(DATA_FILE, day)} new, "
-             f"{sum(1 for e in events if e.get('status') == 'approved')} approved, "
-             f"{sum(1 for e in events if e.get('status') == 'denied')} denied, "
-             f"{sum(1 for e in events if e.get('status') == 'waiting')} put on the waiting list.",
-             places_line(), ""]
-    repo = today.get("repo", {"devices": 0, "requests": 0})
-    lines.append(f"F-Droid: {repo['devices']} device(s) checked the beta repo ({repo['requests']} checks).")
-    apks = sorted((k for k in today if k.startswith("apk:")), key=lambda k: int(k[4:]), reverse=True)
+    names = version_names() if names is None else names
+
+    def label(key):
+        build = key[4:]
+        return names.get(build) or f"build {build}"
+
+    def newest_first(keys):
+        return sorted(keys, key=lambda k: int(k[4:]), reverse=True)
+
+    def times(n):
+        return "1 download" if n == 1 else f"{n} downloads"
+
+    newest = max((int(k) for k in names), default=None)
+    lines = [f"Siansa on {day} (UTC)", ""]
+    if newest is not None:
+        lines += [f"Latest version on F-Droid: {names[str(newest)]}", ""]
+    apks = newest_first(k for k in today if k.startswith("apk:"))
+    lines.append("F-Droid downloads today:")
     for k in apks:
-        lines.append(f"  build {k[4:]}: downloaded {today[k]['requests']} time(s) by {today[k]['devices']} device(s)")
+        d = today[k]
+        lines.append(f"  {label(k)}: {times(d['requests'])} by {d['devices']} device{'' if d['devices'] == 1 else 's'}")
     if not apks:
-        lines.append("  No downloads today.")
-    week = sorted(stats)[-7:]
-    if week:
-        lines.append("Devices checking the repo, last 7 days: " +
-                     ", ".join(f"{d[5:]} {stats[d].get('repo', {}).get('devices', 0)}" for d in week))
+        lines.append("  none")
     totals = {}
     for d in stats.values():
         for k, v in d.items():
             if k.startswith("apk:"):
                 totals[k] = totals.get(k, 0) + v["requests"]
     if totals:
-        lines.append("Downloads so far: " + ", ".join(f"build {k[4:]} {n}" for k, n in sorted(totals.items(), key=lambda kv: -int(kv[0][4:]))))
-    reports = 0
-    try:
-        for e in os.scandir(REPORTS_DIR):
-            if e.name.endswith(".json"):
-                try:
-                    with open(e.path, encoding="utf-8") as f:
-                        reports += str(json.load(f).get("time", "")).startswith(day)
-                except (OSError, ValueError):
-                    pass
-    except OSError:
-        pass
-    lines += ["", f"Problem reports from the app: {reports}.", "",
-              "Devices are told apart by their internet address on the day, so phones sharing Wi-Fi count once and a "
-              "phone changing networks can count twice. No addresses are kept."]
+        lines += ["", "F-Droid downloads so far:"]
+        lines += [f"  {label(k)}: {totals[k]}" for k in newest_first(totals)]
     return "\n".join(lines) + "\n"
 
 
