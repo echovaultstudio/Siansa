@@ -1,5 +1,6 @@
 package app.siansa.playback
 
+import android.app.ActivityManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
@@ -147,6 +148,13 @@ class PlaybackService : MediaSessionService() {
                 }
             })
             .build()
+        // Android may refuse to start the service in the foreground; the player waits instead of the app crashing (issue #602).
+        setListener(object : Listener {
+            override fun onForegroundServiceStartNotAllowedException() {
+                AppLog.w("Player", "Android would not start playback in the foreground; paused instead")
+                session?.player?.pause()
+            }
+        })
 
         // The sleep timer: check it while it runs, and put everything back when it's turned off.
         mainScope.launch {
@@ -540,6 +548,20 @@ class PlaybackService : MediaSessionService() {
             return b.session
         }
         return session
+    }
+
+    /**
+     * Media3 builds the notification off the main thread and its foreground start is only guarded on one of two paths,
+     * so a refusal while the song is only buffering in the background crashed the app (issue #602). The service is
+     * already in the foreground then; the notification catches up when the sound is playing again.
+     */
+    override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
+        val info = ActivityManager.RunningAppProcessInfo().also { ActivityManager.getMyMemoryState(it) }
+        if (!mayStartForeground(startInForegroundRequired, session.player.isPlaying, info.importance)) {
+            AppLog.d("Player", "Notification left as it is while waiting for data in the background")
+            return
+        }
+        super.onUpdateNotification(session, startInForegroundRequired)
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
