@@ -108,7 +108,8 @@ fun SettingsHub(nav: NavController) {
             HubRow(Icons.Rounded.GraphicEq, "Scrobbling") { nav.navigate("settings/scrobbling") }
             // The daily mixes' times of day; the tab's own vibes are on that tab (issue #339).
             HubRow(Icons.Rounded.Schedule, "Daily Vibe settings") { nav.navigate("vibes") }
-            HubRow(Icons.Rounded.Dashboard, "Made for you cards") { nav.navigate("settings/cards") }
+            // Made for you cards and custom cards pinned to Home (issue #622).
+            HubRow(Icons.Rounded.Dashboard, "Cards") { nav.navigate("settings/cards") }
             HubRow(Icons.Rounded.DownloadForOffline, "Downloads") { nav.navigate("downloads") }
             HubRow(Icons.Rounded.Storage, "Storage") { nav.navigate("settings/storage") }
             HubRow(Icons.Rounded.Backup, "Backup") { nav.navigate("settings/backup") }

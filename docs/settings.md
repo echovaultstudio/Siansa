@@ -50,9 +50,14 @@ When a song counts, your server, Last.fm, ListenBrainz or Koito, and which users
 Your vibes for each part of the day, and the **Use the moment** panel. See
 [Home and your mixes](home-and-mixes.md#vibes-and-todays-mix).
 
-## Made for you cards
+## Cards
 
-Cards of your own on Home's Made for you. Each gets new songs every day; tap a name to change it.
+**Made for you**: cards of your own on Home's Made for you. Each gets new songs every day; tap a name to change it.
+
+**Custom cards**: cards pinned to Home's **Your cards** section, each with a name, a look (song tiles, album row,
+banner, song list or play button) and its songs: from your library by tags (genre, years, artist, album, title
+words, favourites) or by a sound described to AudioMuse-AI. Tap a card to change its name, look or rules; the switch
+takes it off Home without removing it. See [Your cards](home-and-mixes.md#your-cards).
 
 ## Downloads
 

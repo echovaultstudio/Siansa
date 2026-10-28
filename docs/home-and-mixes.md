@@ -73,8 +73,26 @@ same day; Siansa tells you which one already has them.
   Koito, ListenBrainz or Last.fm when you use them. It opens straight away and checks your server for changes while
   the cog turns, like a playlist. Until there's enough to go on, it isn't shown.
 - **Discover for you**: songs that sound like your taste, from artists you don't play much (only with AudioMuse-AI).
-- **Cards of your own** (**Settings › Made for you cards**): pick what a card shows (for example a genre or a
+- **Cards of your own** (**Settings › Cards › Made for you**): pick what a card shows (for example a genre or a
   period) and name it. Each card gets new songs every day.
+
+## Your cards
+
+Custom cards you make yourself (**Settings › Cards › Custom cards**), shown on Home in its **Your cards** section
+(move it under Arrange Home; the cards' own order is set in Settings). Each card has a name you give it, a **look**
+and **songs**:
+
+- **Looks**: **Song tiles** (a row of covers), **Album row** (the albums the songs come from), **Banner** (one wide
+  card with the first covers and Play and Shuffle), **Song list** (the first five songs, the rest a tap away) and
+  **Play button** (a slim card: one tap plays the songs, shuffled).
+- **Songs from your library**: songs whose tags match the rules you set, in any mix: a genre, years, part of an
+  artist's name, part of an album's name, words in the title, favourites only. At least one rule is needed.
+- **Songs by sound**: describe a sound ("rainy jazz piano") and AudioMuse-AI finds songs that match (only with
+  AudioMuse-AI).
+
+A card from the library gets a new set of songs every day, with a few songs per artist at most; its page has a
+button for a new set right away. Tap a card's title (or the arrow on a play button) for every song, ready to play
+or save as a playlist. A card can be kept but taken off Home with its switch in Settings.
 
 ## Radios
 

@@ -10,6 +10,7 @@ import app.siansa.data.RecentPlays
 import app.siansa.data.FavouriteAlbums
 import app.siansa.data.FavouriteArtists
 import app.siansa.mix.MadeForYouCards
+import app.siansa.mix.PinnedCards
 import app.siansa.playback.ProfileStore
 import app.siansa.playback.BookPlayer
 import app.siansa.data.BookSpeeds
@@ -395,6 +396,8 @@ class AppGraph(val app: Application) {
     val mixResume = MixResume(this, app)
     /** Your own cards on Made for you (issue #274). */
     val cards = MadeForYouCards(this, app)
+    /** Custom cards pinned to Home (issue #622). */
+    val pinnedCards = PinnedCards(this, app)
     val songPath = SongPath(this)
     val sleepTimer = SleepTimer()
     val windDown = WindDown(this)
