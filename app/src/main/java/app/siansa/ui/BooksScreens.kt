@@ -5,6 +5,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material.icons.outlined.ArrowCircleDown
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DownloadForOffline
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,18 +30,14 @@ import androidx.compose.material.icons.rounded.Check
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material.icons.rounded.DownloadDone
-import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -112,37 +115,97 @@ internal fun booksForCarousel(shelved: List<Pair<String, Book>>, progress: Map<S
 // The five that matter (owner, 27 Oct): what you're in, then up next and new; the rest are in Your Library.
 private const val CAROUSEL_MAX = 5
 
-/** The top of a book's page: the cover's colour fading down behind the cover (left) and the words (right). */
+/**
+ * The top of a book's or podcast's page, laid out like an album's (issue #626): the cover's colour fading down
+ * behind it all, the cover centred (a portrait for a book, a square for a podcast), then the title, the author in
+ * bold, the details, Audiobookshelf's description (folded to a few lines until tapped), where you are, and the
+ * album page's row of buttons. The cover doesn't move as the page scrolls.
+ */
 @Composable
-internal fun BookPageHeader(b: Book, color: Color, surface: Color) {
-    Row(
+internal fun BookPageHeader(
+    b: Book,
+    color: Color,
+    surface: Color,
+    details: String,
+    position: BookPosition?,
+    actions: @Composable () -> Unit,
+) {
+    val width = LocalConfiguration.current.screenWidthDp
+    Column(
         Modifier
             .fillMaxWidth()
             .background(Brush.verticalGradient(0f to color, 0.75f to color.copy(alpha = 0.35f), 1f to surface))
             .statusBarsPadding()
-            .padding(top = 56.dp, start = Space.Page, end = Space.Page, bottom = Space.Page),  // spacing: exact (below the top bar)
-        // The cover's top lines up with the title's (it sat low under a long list of narrators, #550).
-        verticalAlignment = Alignment.Top,
+            .padding(top = 56.dp, start = Space.Page, end = Space.Page),  // spacing: exact (below the top bar)
     ) {
-        Cover(b.cover, LARGE_COVER, Modifier.size(width = BOOK_PAGE_COVER_WIDTH, height = BOOK_PAGE_COVER_HEIGHT).shadow(18.dp, RoundedCornerShape(10.dp)).testTag("bookCover"), RoundedCornerShape(10.dp))
-        Spacer(Modifier.width(Space.Page))
-        Column(Modifier.weight(1f).testTag("bookWords")) {
-            Text(b.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            b.subtitle?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            Spacer(Modifier.height(Space.Small))
-            val by = listOfNotNull(
-                b.author.takeIf { it.isNotBlank() }?.let { "by $it" },
-                b.narrator.takeIf { it.isNotBlank() }?.let { "read by $it" },
-                listOfNotNull(b.series?.let { s -> s + (b.sequence?.let { ", book $it" } ?: "") }, b.year?.toString()).joinToString(" · ").takeIf { it.isNotBlank() },
-            )
-            by.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 4, overflow = TextOverflow.Ellipsis) }
+        val coverModifier = if (b.podcast) Modifier.size((width * 0.62f).dp)
+        else Modifier.size(width = (width * 0.48f).dp, height = (width * 0.48f * BOOK_COVER_RATIO).dp)
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Cover(b.cover, LARGE_COVER, coverModifier.shadow(18.dp, RoundedCornerShape(8.dp)).testTag("bookCover"), RoundedCornerShape(8.dp))
         }
+        Spacer(Modifier.height(Space.Page))
+        Column(Modifier.fillMaxWidth().testTag("bookWords")) {
+            Text(b.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            b.subtitle?.takeIf { it.isNotBlank() }?.let {
+                Text(it, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.height(Space.Small))
+            CollectionByline(b.author.takeIf { it.isNotBlank() }, null, null, details)
+        }
+        b.description?.let(::stripHtml)?.takeIf { it.isNotBlank() }?.let { about ->
+            Spacer(Modifier.height(Space.Medium))
+            BookAbout(about)
+        }
+        position?.let { p ->
+            Spacer(Modifier.height(Space.Medium))
+            BookPositionBar(p)
+        }
+        Spacer(Modifier.height(Space.Tight))
+        actions()
     }
 }
 
-/** The cover on a book's page, a portrait like most audiobook covers; the words sit to its right. */
-private val BOOK_PAGE_COVER_WIDTH = 128.dp
-private val BOOK_PAGE_COVER_HEIGHT = 184.dp
+/** Audiobookshelf's description of the book or podcast: a few lines, the rest a tap away. */
+@Composable
+private fun BookAbout(text: String) {
+    var open by remember(text) { mutableStateOf(false) }
+    var longer by remember(text) { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().clickable(enabled = longer || open) { open = !open }.testTag("bookAbout")) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = if (open) Int.MAX_VALUE else BOOK_ABOUT_LINES,
+            overflow = TextOverflow.Ellipsis,
+            onTextLayout = { if (!open) longer = it.hasVisualOverflow },
+        )
+        if (longer || open) Text(if (open) "Less" else "More", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Accent)
+    }
+}
+
+/** Where you are: the episode on a podcast, a slim bar, and how much is heard and left. */
+@Composable
+private fun BookPositionBar(p: BookPosition) {
+    Column(Modifier.fillMaxWidth().testTag("bookPosition")) {
+        p.episodeTitle?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(Space.Tight))
+        }
+        LinearProgressIndicator(
+            progress = { p.fraction },
+            modifier = Modifier.fillMaxWidth().height(4.dp).testTag("bookProgress"),  // spacing: exact (a hairline bar)
+            color = Accent,
+            trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+            gapSize = 0.dp,  // spacing: exact (no gap between the heard and unheard parts)
+            drawStopIndicator = {},
+        )
+        Spacer(Modifier.height(Space.Tight))
+        Text(if (p.finished) "Finished" else p.line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** A book cover's height to its width: most audiobook covers are a little taller than wide. */
+private const val BOOK_COVER_RATIO = 1.44f
 
 /** How solid the title bar is as the page scrolls past its cover: clear until most of it has gone, then solid. */
 internal fun titleBarAlpha(scrolledPx: Float, coverPx: Float): Float = ((scrolledPx - coverPx * 0.8f) / (coverPx * 0.3f)).coerceIn(0f, 1f)
@@ -227,85 +290,27 @@ fun BookScreen(nav: NavController, id: String) {
     val color = rememberCoverColor(book?.cover)
     val surface = MaterialTheme.colorScheme.surface
     val listState = rememberLazyListState()
-    val headerPx = with(LocalDensity.current) { BOOK_PAGE_COVER_HEIGHT.toPx() }
+    // The title bar fills in as the cover scrolls away, as on an album's page.
+    val headerPx = with(LocalDensity.current) { (LocalConfiguration.current.screenWidthDp * 0.62f).dp.toPx() }
     val scrolled by remember {
         derivedStateOf { if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 100_000f }
     }
     val barAlpha = titleBarAlpha(scrolled, headerPx)
     Box(Modifier.fillMaxSize().background(surface)) {
         LoadBox(page, Modifier) { b ->
-            val current = if (playing.book?.id == b.id) playing.positionSec else progress?.currentSec ?: 0.0
-            val chapterNow = b.chapterAt(current)
             // Loaded here: a list's content block isn't composable (issue #521).
             val episodes by loadState("episodes-${b.id}") { if (b.podcast) graph.audiobookshelf.episodes(b.id) else emptyList() }
             val bookmarks by loadState("bookmarks-${b.id}") { runCatching { graph.audiobookshelf.bookmarks(b.id) }.getOrDefault(emptyList()) }
+            val episodeList = episodes.valueOrNull().orEmpty()
+            val position = bookPosition(b, playing, progress, episodeList)
+            val current = position?.currentSec ?: 0.0
+            val chapterNow = if (b.podcast) null else b.chapterAt(current)
+            val finished = !b.podcast && progress?.finished == true
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
-                item { BookPageHeader(b, color, surface) }
                 item {
-                    Row(Modifier.padding(horizontal = Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalAlignment = Alignment.CenterVertically) {
-                        val started = progress?.started == true && progress.finished != true
-                        Button(
-                            onClick = {
-                                graph.bookPlayer.playOrToggle(b, if (started) current else 0.0)
-                                AppLog.i("Books", "${if (started) "Continue" else "Play"} \"${b.title}\" from its page")
-                            },
-                            modifier = Modifier.testTag("bookPlay"),
-                        ) {
-                            val now = playing.book?.id == b.id && playing.playing
-                            Icon(if (now) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null)
-                            Spacer(Modifier.width(Space.Tight))
-                            Text(if (now) "Pause" else if (started) "Continue" + (chapterNow?.let { " · chapter ${it.index + 1}" } ?: "") else "Play")
-                        }
-                        OutlinedButton(
-                            onClick = { graph.bookPlayer.markFinished(b, finished = progress?.finished != true) },
-                            modifier = Modifier.testTag("bookFinished"),
-                        ) {
-                            Icon(Icons.Rounded.Check, null)
-                            Spacer(Modifier.width(Space.Tight))
-                            Text(if (progress?.finished == true) "Finished" else "Mark finished")
-                        }
+                    BookPageHeader(b, color, surface, bookDetails(b, episodeList.size.takeIf { b.podcast && it > 0 }, finished), position) {
+                        BookActions(b, progress, position)
                     }
-                }
-                item {
-                    // The whole book on the phone, or not (issue #521).
-                    val downloads by graph.bookDownloads.state.collectAsStateWithLifecycle()
-                    val scope = rememberCoroutineScope()
-                    val launch = rememberPlayLauncher()
-                    Row(Modifier.padding(horizontal = Space.Page, vertical = Space.Small), horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalAlignment = Alignment.CenterVertically) {
-                        when {
-                            downloads.fetching == b.id -> {
-                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                                Text("Downloading, file ${downloads.fetched} of ${downloads.of}…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            b.id in downloads.done -> OutlinedButton(onClick = { graph.bookDownloads.remove(b.id) }, modifier = Modifier.testTag("bookRemoveDownload")) {
-                                Icon(Icons.Rounded.DownloadDone, null); Spacer(Modifier.width(Space.Tight)); Text("On this phone · remove")
-                            }
-                            else -> OutlinedButton(
-                                onClick = {
-                                    scope.launch {
-                                        try { graph.bookDownloads.download(b) } catch (e: Exception) { launch.notify(e.message ?: "Couldn't download the book") }
-                                    }
-                                },
-                                modifier = Modifier.testTag("bookDownload"),
-                            ) { Icon(Icons.Rounded.Download, null); Spacer(Modifier.width(Space.Tight)); Text("Download") }
-                        }
-                    }
-                }
-                item {
-                    Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium)) {
-                        val fraction = if (b.durationSec > 0) (current / b.durationSec).toFloat().coerceIn(0f, 1f) else 0f
-                        LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth(), color = Accent)
-                        Spacer(Modifier.height(Space.Small))
-                        Text(
-                            if (current > 0) "${bookLength(current)} of ${bookLength(b.durationSec.toDouble())} · ${(fraction * 100).toInt()} % · ${bookLength(b.durationSec - current)} left"
-                            else bookLength(b.durationSec.toDouble()),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                b.description?.takeIf { it.isNotBlank() }?.let { text ->
-                    item { Text(stripHtml(text), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = Space.Page), maxLines = 8, overflow = TextOverflow.Ellipsis) }
                 }
                 if (b.podcast) {
                     // A podcast's episodes, newest first (issue #521); tap one to play it.
@@ -367,6 +372,73 @@ fun BookScreen(nav: NavController, id: String) {
     }
 }
 
+/**
+ * The album page's row of buttons for a book or podcast (issue #626): download and finished on the left as plain
+ * buttons, the big round Play on the right (⏸ while it plays). There's no shuffle: a book plays in order.
+ */
+@Composable
+private fun BookActions(b: Book, progress: BookProgress?, position: BookPosition?) {
+    val graph = LocalGraph.current
+    val playing by graph.bookPlayer.state.collectAsStateWithLifecycle()
+    val downloads by graph.bookDownloads.state.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val launch = rememberPlayLauncher()
+    var removing by remember { mutableStateOf(false) }
+    PlayButtonRow {
+        // The whole book on the phone, or not (issue #521), as an album's download button.
+        IconButton(
+            onClick = {
+                when {
+                    downloads.fetching == b.id -> Unit
+                    b.id in downloads.done -> removing = true
+                    else -> scope.launch {
+                        try { graph.bookDownloads.download(b) } catch (e: Exception) { launch.notify(e.message ?: "Couldn't download the book") }
+                    }
+                }
+            },
+            modifier = Modifier.testTag(if (b.id in downloads.done) "bookRemoveDownload" else "bookDownload"),
+        ) {
+            when {
+                downloads.fetching == b.id -> Box(contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(
+                        progress = { if (downloads.of > 0) downloads.fetched.toFloat() / downloads.of else 0f },
+                        modifier = Modifier.size(26.dp),
+                        color = Accent,
+                        strokeWidth = 2.5.dp,
+                    )
+                    Icon(Icons.Rounded.DownloadForOffline, "Downloading", tint = Accent.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
+                }
+                b.id in downloads.done -> Icon(Icons.Rounded.DownloadForOffline, "On this phone", tint = Accent, modifier = Modifier.size(28.dp))
+                else -> Icon(Icons.Outlined.ArrowCircleDown, "Download", Modifier.size(28.dp))
+            }
+        }
+        // Finished, or not: ✓ marks it finished, ✕ takes that back. On a podcast it's the episode you're on.
+        val episodeId = position?.episodeId
+        val canMark = !b.podcast || episodeId != null
+        val isFinished = if (b.podcast) position?.finished == true else progress?.finished == true
+        if (canMark) {
+            IconButton(
+                onClick = {
+                    if (b.podcast && episodeId != null) graph.bookPlayer.markEpisodeFinished(b, episodeId, position.totalSec, finished = !isFinished)
+                    else graph.bookPlayer.markFinished(b, finished = !isFinished)
+                },
+                modifier = Modifier.testTag("bookFinished"),
+            ) {
+                if (isFinished) Icon(Icons.Rounded.Close, if (b.podcast) "Mark the episode not finished" else "Mark not finished", Modifier.size(28.dp))
+                else Icon(Icons.Rounded.Check, if (b.podcast) "Mark the episode finished" else "Mark finished", Modifier.size(28.dp))
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        val now = playing.book?.id == b.id && playing.playing
+        BigPlayButton(enabled = true, playing = now) {
+            val started = position != null && !position.finished
+            graph.bookPlayer.playOrToggle(b, if (started) position.currentSec else 0.0)
+            AppLog.i("Books", "${if (now) "Pause" else if (started) "Continue" else "Play"} \"${b.title}\" from its page")
+        }
+    }
+    if (removing) RemoveDialog(b.title, onDismiss = { removing = false }) { graph.bookDownloads.remove(b.id) }
+}
+
 private enum class ChapterState { HEARD, NOW, AHEAD }
 
 @Composable
@@ -389,7 +461,8 @@ private fun ChapterRow(c: Chapter, state: ChapterState, onClick: () -> Unit) {
 
 /** "S2 E14 · 12 Oct 2026", as much as the episode has. */
 internal fun episodeLine(e: app.siansa.net.Episode): String = listOfNotNull(
-    listOfNotNull(e.season?.let { "S$it" }, e.number?.let { "E$it" }).joinToString(" ").takeIf { it.isNotBlank() },
+    // Only what the episode has: Audiobookshelf sends empty seasons and numbers, which showed as "S E" (#626).
+    listOfNotNull(e.season?.trim()?.takeIf { it.isNotEmpty() }?.let { "S$it" }, e.number?.trim()?.takeIf { it.isNotEmpty() }?.let { "E$it" }).joinToString(" ").takeIf { it.isNotBlank() },
     e.publishedAt.takeIf { it > 0 }?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate().format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy")) },
 ).joinToString(" · ")
 

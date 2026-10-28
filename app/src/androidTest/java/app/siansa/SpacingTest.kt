@@ -844,25 +844,30 @@ class SpacingTest {
     }
 
     /**
-     * A book's page (#550, styled like an album's): the cover's top lines up with the title's, a page's gap at the
-     * left edge, and the words start a page's gap after the cover.
+     * A book's page, laid out like an album's (#626): the cover centred, the words a page's gap from the left edge,
+     * and the row of buttons ending in the big Play button a page's gap from the right edge.
      */
-    @Test fun bookPageCoverLinesUpWithItsWords() {
+    @Test fun bookPageIsLaidOutLikeAnAlbum() {
         val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
-        val book = app.siansa.data.Book(id = "b1", title = "A long title", authors = listOf("An author"), narrators = (1..8).map { "Reader $it" })
+        val book = app.siansa.data.Book(id = "b1", title = "A long title", authors = listOf("An author"), narrators = listOf("A reader"), description = "About the book.", durationSec = 3600)
         compose.setContent {
             androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalGraph provides graph) {
                 SiansaTheme {
-                    Box(Modifier.width(360.dp).testTag("bookHeader")) { app.siansa.ui.BookPageHeader(book, Color.DarkGray, Color.Black) }
+                    Box(Modifier.width(360.dp).testTag("bookHeader")) {
+                        app.siansa.ui.BookPageHeader(book, Color.DarkGray, Color.Black, "Audiobook · 1 h", null) {
+                            app.siansa.ui.PlayButtonRow { androidx.compose.foundation.layout.Spacer(Modifier.weight(1f)); app.siansa.ui.BigPlayButton(true) {} }
+                        }
+                    }
                 }
             }
         }
         val header = compose.onNodeWithTag("bookHeader").getBoundsInRoot()
         val cover = compose.onNodeWithTag("bookCover", useUnmergedTree = true).getBoundsInRoot()
         val words = compose.onNodeWithTag("bookWords", useUnmergedTree = true).getBoundsInRoot()
-        assertEven("Cover and words start at the same height", cover.top, words.top, 1.dp)
-        assertEven("A page's gap at the left", cover.left - header.left, Space.Page, 1.dp)
-        assertEven("A page's gap between cover and words", words.left - cover.right, Space.Page, 1.dp)
+        val play = compose.onNodeWithTag("bigPlay").getBoundsInRoot()
+        assertEven("The cover is centred", cover.left - header.left, header.right - cover.right, 1.dp)
+        assertEven("A page's gap left of the words", words.left - header.left, Space.Page, 1.dp)
+        assertEven("A page's gap right of Play", header.right - play.right, Space.Page, 1.dp)
     }
 
     /**
