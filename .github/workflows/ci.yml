@@ -186,18 +186,6 @@ jobs:
                           print("::error::" + " | ".join(block)[:3000])
           PY
 
-      # The full build log on the ci-logs branch when the build fails, readable without downloading artifacts.
-      - name: Build log to the ci-logs branch
-        if: failure() && github.event_name != 'pull_request' || failure() && github.event.pull_request.head.repo.full_name == github.repository
-        run: |
-          [ -f gradle-build.txt ] || exit 0
-          mkdir -p ci-logs && cp gradle-build.txt ci-logs/ && cd ci-logs
-          git init -q && git checkout -q -b ci-logs
-          git config user.name "github-actions[bot]"
-          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git add -A && git commit -q -m "Build log for ${GITHUB_SHA::7}"
-          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-logs
-
       - name: APK and bundle names
         id: version
         run: |
@@ -220,6 +208,7 @@ jobs:
         with:
           name: reports
           path: |
+            gradle-build.txt
             app/build/reports/
             app/build/test-results/
 
@@ -303,8 +292,8 @@ jobs:
           PY
           done
 
-      # The app tour's screenshots (TOURSHOT lines in the log) as images on the ci-screens branch.
-      - name: Tour screenshots to the ci-screens branch
+      # The app tour's screenshots (TOURSHOT lines in the log) as images in the device-test-results artifact.
+      - name: Tour screenshots
         if: always()
         run: |
           [ -f logcat.txt ] || exit 0
@@ -326,13 +315,6 @@ jobs:
           PY
           grep -h "System.out" logcat.txt | grep -E "Tour: |song starts" | sed 's/.*System.out: //' > screens/tour.txt || true
           grep -h "TOURLOG " logcat.txt | sed 's/.*TOURLOG //' > screens/tour-log.txt || true
-          [ -n "$(ls screens/*.jpg 2>/dev/null)" ] || exit 0
-          cd screens
-          git init -q && git checkout -q -b ci-screens
-          git config user.name "github-actions[bot]"
-          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git add -A && git commit -q -m "Tour screenshots for ${GITHUB_SHA::7}"
-          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-screens
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -342,6 +324,7 @@ jobs:
             app/build/reports/
             app/build/outputs/androidTest-results/
             logcat.txt
+            screens/
             ${{ runner.temp }}/navidrome-test/*.log
 
   release:
