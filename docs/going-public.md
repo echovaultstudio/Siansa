@@ -2,8 +2,7 @@
 
 The code is ready for a public repository once #584 is merged: the signing key is gone from the tree, releases
 carry no files, the licence is in. What's left is the **git history**, which still holds `app/siansa.keystore` and
-its password in every commit since the rename (#360), and the retired `app/musix.keystore` (password
-`REDACTED`) before it. A scan of all 1,066 commits found no other keys, tokens or passwords: only made-up ones in
+its password in every commit since the rename (#360), and the retired `app/musix.keystore` before it. A scan of all 1,066 commits found no other keys, tokens or passwords: only made-up ones in
 tests, home-network addresses (192.168.x.x, not reachable from outside) and the notify address in an old
 `deploy/.env.example`, which the rewrite replaces too. Making the repository public with that history would give
 everyone the key that signs the app. So the history is rewritten first, once, by the owner, on a machine with a
@@ -20,37 +19,15 @@ fresh clone. Nothing below runs in CI.
 - Run one release build on main with the secrets in place and check the Play upload and F-Droid publish still
   work (the APK is signed with the same key as before, so testers update as usual).
 
-## 2. The rewrite
+## 2. The rewrite (done 2026-10-28)
 
-On a computer with [git-filter-repo](https://github.com/newren/git-filter-repo) installed:
-
-```sh
-git clone --mirror https://github.com/echovaultstudio/Siansa.git siansa-rewrite
-cd siansa-rewrite
-printf 'REDACTED==>REDACTED\nREDACTED==>REDACTED\nhelp@siansa.app==>help@siansa.app\n' > /tmp/replacements.txt
-git filter-repo --invert-paths --path app/siansa.keystore --path app/musix.keystore --replace-text /tmp/replacements.txt
-git push --force --all
-git push --force --tags
-```
-
-Not `git push --mirror`: a mirror clone carries GitHub's own `refs/pull/*`, which GitHub refuses on push. The
-two pushes above send every branch and tag. A practice run first, without pushing, takes seconds: clone with
-`--mirror`, run filter-repo and the checks below, then delete the folder.
-
-If `pip install` refuses (macOS: "externally-managed-environment"), use a small environment of its own:
-`python3 -m venv ~/filter-repo-env && ~/filter-repo-env/bin/pip install git-filter-repo`, then run
-`~/filter-repo-env/bin/git-filter-repo` in place of `git filter-repo`.
-
-`--invert-paths --path` drops both keystores from every commit (the retired Musix key too: a different key, but no
-reason to publish it); `--replace-text` turns its password into `REDACTED`
-wherever it was written (old `build.gradle.kts`). Tags are rewritten with their commits, so releases keep pointing
-at the right code. Check afterwards:
-
-```sh
-git log --all --oneline -- app/siansa.keystore app/musix.keystore   # must print nothing
-git log --all -S REDACTED --oneline                               # must print nothing
-git log --all -S REDACTED --oneline                                # must print nothing
-```
+The history was rewritten once with [git-filter-repo](https://github.com/newren/git-filter-repo) on a fresh
+`--mirror` clone: both keystores (`app/siansa.keystore`, and the retired `app/musix.keystore`) dropped from every
+commit, the two passwords written in old build files and an old example address replaced, then every branch and tag
+force-pushed. Tags were rewritten with their commits, so releases point at the right code. It was checked
+beforehand: the keystore paths and both passwords find nothing in `git log --all`, the tag count was the same as
+before, and the code on main matched the old main except for the replaced words. The passwords are deliberately not
+written here or in the tests.
 
 ## 3. After the rewrite
 
@@ -59,7 +36,7 @@ git log --all -S REDACTED --oneline                                # must print 
   local clone (including Claude's sessions) must clone again; a push from an old clone would bring the key back.
 - **GitHub keeps old commits reachable by hash for a while** (cached views, pull request pages). Ask GitHub
   Support to run garbage collection on the repository, or wait for it; until then don't rely on the old hashes
-  being gone. The key's password is `REDACTED` in the rewritten history either way.
+  being gone.
 - **Make the repository public:** Settings › General › Danger zone › Change visibility. GitHub then warns about
   secrets it scans for; the keystore isn't one it recognises, which is why the rewrite comes first.
 - **Turn on** Settings › Code security › Secret scanning and Push protection, so a key can't be pushed again.
