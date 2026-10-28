@@ -18,7 +18,8 @@ class PublicRepoTest {
     @Test fun theSigningKeyIsOut() {
         assertTrue("The signing key is in the tree", !File(root, "app/siansa.keystore").exists())
         val gradle = File(root, "app/build.gradle.kts").readText()
-        assertTrue("A password is in build.gradle.kts", !gradle.contains("REDACTED"))
+        val literalPassword = Regex("""(store|key)Password\s*=\s*"[^"]+"""")
+        assertTrue("A password is written in build.gradle.kts", !literalPassword.containsMatchIn(gradle))
         assertTrue("The key isn't read from SIANSA_KEYSTORE", gradle.contains("SIANSA_KEYSTORE"))
         assertTrue(".gitignore doesn't keep keys out", File(root, ".gitignore").readText().contains("*.keystore"))
     }
