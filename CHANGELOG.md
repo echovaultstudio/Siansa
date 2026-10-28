@@ -3,6 +3,23 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.39.0beta — 2026-10-28
+
+### Fixed
+- **Music on a DLNA speaker or TV now comes back to the phone, paused, as soon as you leave its Wi-Fi.** Before, Siansa could keep showing the speaker for a minute or more after it was out of reach. A speaker that stops answering is also let go after about 15 seconds, and a short note says so.
+- **A podcast's progress bar now shows the episode you're on and moves as it plays.** It showed full with "0 min", or "47 min of 0 min".
+- **Episodes without a season or number no longer show "S E".**
+- **Smart crossfades no longer play the silence or the long fade-out at the end of a song.** The next song comes in where the song really ends: dead air is left out, and a long fade-out is cut once it's quiet, so the next song blends in while it's still fading. A silence mid-song, a quiet passage or a soft ending that stays at one level is never cut.
+
+### Added
+- **The song cache can be switched off.** Settings › Storage › Song cache › Off: no song is kept on the phone once it has played, and the songs already cached are removed. Loading songs ahead still works, for 1, 2 or 3 songs (Settings › Playback); each is removed once it has played.
+- **Custom cards on Home.** Settings › Cards › Custom cards: make cards of your own and pin them to Home's new Your cards section. Give each a name, pick its look (song tiles, an album row, a banner, a song list or a play button) and where its songs come from: your library, by genre, years, artist, album, words in the title or favourites, or a sound described to AudioMuse-AI. Change a card any time, or take it off Home with its switch.
+- **Podcast episodes show what they're about.** On a podcast's page, the arrow beside an episode unfolds its own description from Audiobookshelf: the guests and a short summary.
+
+### Changed
+- **Settings › Made for you cards is now Settings › Cards**, with Made for you and Custom cards on one page.
+- **Book and podcast pages look like album pages.** The cover sits in the middle with its colours behind the page, the title and author read the same way, Audiobookshelf's description is at the top (tap it for the rest), and the buttons are the album page's: download, a ✓ to mark it finished (✕ to take that back) and the big round Play, which pauses while it plays.
+
 ## 0.38.5beta — 2026-10-28
 
 ### Fixed
