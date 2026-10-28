@@ -31,8 +31,8 @@ import app.siansa.log.AppLog
 internal object AboutLinks {
     /** The libraries in the app and their licences, on the website (deploy/site/licenses.html). */
     const val LICENCES = "https://siansa.app/licenses"
-    /** The user docs. They're in the public beta testers repository until docs.siansa.app is up. */
-    const val DOCS = "https://github.com/echovaultstudio/siansa-beta-testers/tree/main/docs"
+    /** The user docs. They're in the public Siansa repository until docs.siansa.app is up. */
+    const val DOCS = "https://github.com/echovaultstudio/Siansa/tree/main/docs"
     const val PRIVACY = "https://siansa.app/privacy"
 
     /** The links in the order About shows them: what it's called, what it says under it, where it goes. */

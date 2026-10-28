@@ -6,4 +6,4 @@ Fixes #
 
 **Tested:**
 
-**Docs:** <!-- pages updated in echovaultstudio/siansa-beta-testers docs/, or "none: nothing a user notices" -->
+**Docs:** <!-- pages updated in docs/, or "none: nothing a user notices" -->

@@ -12,7 +12,7 @@ import java.util.Base64
 /**
  * A problem report sent from the app (issue #414): what happened and what was expected, plus the whole
  * diagnostics archive. It goes to the Siansa beta server, which keeps the log privately and opens an issue in
- * the beta testers repo with the words and a report id. The app never holds a GitHub key.
+ * the Siansa repository with the words and a report id. The app never holds a GitHub key.
  *
  * The request is the archive (a ZIP) as the body and the words, app and phone details in one header,
  * [header], as base64 JSON: nothing in the URL, and the archive is streamed from disk.

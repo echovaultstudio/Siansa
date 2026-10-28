@@ -19,7 +19,7 @@ class CiChangesTest(unittest.TestCase):
         self.assertFalse(app_needed(["deploy/site/index.html", "deploy/signup/server.py", "deploy/Caddyfile"]))
         self.assertFalse(app_needed(["README.md", "CLAUDE.md", "CHANGELOG.md", "RELEASES.md", "docs/logging.md"]))
         self.assertFalse(app_needed(["changelog.d/issue-1.md", "audiomuse-plugin/siansa_analysis/jobs.py"]))
-        self.assertFalse(app_needed([".github/workflows/site.yml", "scripts/beta_notify.py", ".gitleaks.toml"]))
+        self.assertFalse(app_needed([".github/workflows/site.yml", "scripts/notify_fixed.py", ".gitleaks.toml"]))
         self.assertFalse(app_needed([]))
 
     def test_the_test_server_still_needs_the_build(self):

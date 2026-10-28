@@ -1,0 +1,21 @@
+name: Idea
+description: Something you'd like Siansa to do
+labels: ["idea"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: One idea per issue, in plain words.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would it help you?
+      description: What are you trying to do when you miss it?
+  - type: dropdown
+    id: server
+    attributes:
+      label: Your server
+      options: ["Navidrome", "Emby", "Other (OpenSubsonic)"]
