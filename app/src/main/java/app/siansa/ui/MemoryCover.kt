@@ -43,8 +43,8 @@ object MemoryCover {
     private suspend fun load(context: Context, graph: AppGraph, id: String): Bitmap? {
         val request = ImageRequest.Builder(context)
             .data(graph.source.coverUrl(id, LARGE_COVER))
-            .diskCacheKey("cover:$id:$LARGE_COVER")
-            .memoryCacheKey("cover:$id:$LARGE_COVER:memory")
+            .diskCacheKey("cover:${app.siansa.covers.CoverVersions.cacheId(id)}:$LARGE_COVER")
+            .memoryCacheKey("cover:${app.siansa.covers.CoverVersions.cacheId(id)}:$LARGE_COVER:memory")
             .allowHardware(false)
             .size(SIZE / 2)
             .build()

@@ -276,7 +276,7 @@ fun coverDecodePx(size: Int?): Int? = when {
     else -> size
 }
 
-internal fun coverMemoryKey(id: String, size: Int?) = "cover:$id:${coverServerPx(size) ?: "full"}@${coverDecodePx(size) ?: "full"}"
+internal fun coverMemoryKey(id: String, size: Int?) = "cover:${app.siansa.covers.CoverVersions.cacheId(id)}:${coverServerPx(size) ?: "full"}@${coverDecodePx(size) ?: "full"}"
 
 /**
  * The memory keys of the same cover at the other sizes the app shows it, biggest first: what can stand
@@ -294,7 +294,7 @@ fun coverRequest(context: android.content.Context, graph: app.siansa.AppGraph, i
     val builder = ImageRequest.Builder(context).memoryCacheKey(coverMemoryKey(id, size))
     // A phone playlist's own picture, already on the phone.
     if (id.startsWith(LocalPlaylists.FILE_COVER)) builder.data(java.io.File(id.removePrefix(LocalPlaylists.FILE_COVER)))
-    else builder.data(graph.source.coverUrl(id, px)).diskCacheKey("cover:$id:${px ?: "full"}")
+    else builder.data(graph.source.coverUrl(id, px)).diskCacheKey("cover:${app.siansa.covers.CoverVersions.cacheId(id)}:${px ?: "full"}")
     // A fixed size lets the load start straight away instead of waiting for the layout.
     coverDecodePx(size)?.let { builder.size(it) }
     return builder.build()

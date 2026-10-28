@@ -387,7 +387,7 @@ object CoverDownload {
                 if (kind != null && kind != AnimatedCovers.Kind.Still) break
                 if (CoverStore.has(id)) break
             }
-            val key = "cover:$id:$size"
+            val key = "cover:${CoverVersions.cacheId(id)}:$size"
             if (disk.openSnapshot(key)?.use { true } == true) continue
             when (fetch(graph, disk, id, size, key)) {
                 null -> return Outcome.FAILED

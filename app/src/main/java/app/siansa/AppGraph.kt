@@ -16,6 +16,7 @@ import app.siansa.playback.BookPlayer
 import app.siansa.data.BookSpeeds
 import app.siansa.offline.BookDownloads
 import app.siansa.covers.CoverStore
+import app.siansa.covers.CoverVersions
 import kotlinx.coroutines.runBlocking
 
 import android.app.Application
@@ -288,6 +289,17 @@ class AppGraph(val app: Application) {
         }
     }
     val sync = LibrarySync(source, library, settings, scope)
+
+    init {
+        // Disc covers follow their album's cover version (issue #639): read again after the library loads and after
+        // each sync, so a cover replaced on the server shows everywhere, the mini player included.
+        scope.launch {
+            library.version.collectLatest {
+                runCatching { CoverVersions.update(library.albumCovers()) }
+                    .onFailure { AppLog.w("Cover", "Couldn't read the albums' cover versions: ${it.message}") }
+            }
+        }
+    }
 
     val lastFm = LastFmApi(http)
     val listenBrainz = ListenBrainzApi(http)

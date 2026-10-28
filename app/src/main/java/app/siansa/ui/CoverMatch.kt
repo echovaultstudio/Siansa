@@ -99,7 +99,7 @@ object CoverMatch {
         runCatching {
             // The request lists use (cached, and safe for animated albums), decoded as a plain bitmap.
             val request = coverRequest(context, graph, id, SMALL_COVER).newBuilder()
-                .memoryCacheKey("cover:$id:match")
+                .memoryCacheKey("cover:${app.siansa.covers.CoverVersions.cacheId(id)}:match")
                 .allowHardware(false)
                 .build()
             val result = SingletonImageLoader.get(context).execute(request) as? SuccessResult ?: return@runCatching null

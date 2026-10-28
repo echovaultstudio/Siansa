@@ -384,6 +384,9 @@ class LibraryRepository(context: Context) {
 
     // ---- Writing (used by sync) ----
 
+    /** Album id → its cover id, for [app.siansa.covers.CoverVersions] (issue #639). */
+    suspend fun albumCovers(): Map<String, String?> = withContext(Dispatchers.IO) { dao.albumCovers().associate { it.id to it.coverArt } }
+
     suspend fun albumSignatures(): Map<String, String> = dao.albumSignatures().associate { it.id to it.signature }
     suspend fun meta(key: String): String? = dao.meta(key)
     suspend fun putMeta(key: String, value: String) = dao.putMeta(MetaEntity(key, value))

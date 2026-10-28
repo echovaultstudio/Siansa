@@ -47,7 +47,7 @@ class CoverBitmapLoader(private val context: Context, private val scope: Corouti
                 val builder = ImageRequest.Builder(context).data(uri.toString()).allowHardware(false).size(512)
                 if (id != null) {
                     // The same entries the lists use, so it's usually on the phone already.
-                    val key = "cover:$id:${uri.getQueryParameter("size") ?: SMALL_COVER}"
+                    val key = "cover:${app.siansa.covers.CoverVersions.cacheId(id)}:${uri.getQueryParameter("size") ?: SMALL_COVER}"
                     builder.diskCacheKey(key).memoryCacheKey("$key:notification")
                 }
                 val result = SingletonImageLoader.get(context).execute(builder.build())
