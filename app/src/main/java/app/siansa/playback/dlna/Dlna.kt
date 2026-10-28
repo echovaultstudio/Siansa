@@ -9,7 +9,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -91,13 +94,20 @@ object Dlna {
         _connecting.value = false
     }
 
-    /** Called by the player when the device stops answering, so the music comes back to the phone. */
+    private val _lost = MutableSharedFlow<String>(extraBufferCapacity = 2)
+    /** The name of each TV or speaker given up on, for a note on screen (issue #624). */
+    val lostDevices: SharedFlow<String> = _lost.asSharedFlow()
+
+    /**
+     * Called when the device stops answering, or the phone leaves the Wi-Fi it's on (issue #624): the music comes
+     * back to the phone, paused.
+     */
     internal fun lost(device: DlnaDevice, why: String) {
-        AppLog.w("DLNA", "${device.name} stopped answering ($why); music back on the phone")
-        if (_selected.value?.id == device.id) {
-            _connecting.value = false
-            _selected.value = null
-        }
+        if (_selected.value?.id != device.id) return
+        AppLog.w("DLNA", "Lost ${device.name} ($why); music back on the phone, paused")
+        _connecting.value = false
+        _selected.value = null
+        _lost.tryEmit(device.name)
     }
 
     /**

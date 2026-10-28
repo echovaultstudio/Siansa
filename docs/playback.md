@@ -94,6 +94,11 @@ The device button in now playing shows TVs and speakers on the same Wi-Fi: Chrom
 ones (most smart TVs, Sonos, AV receivers). They play straight from your server, as MP3 320 kbit/s, so every device
 can play them. Stopping the cast brings the music back to the phone, paused.
 
+**Out of reach.** When the phone leaves the Wi-Fi a DLNA TV or speaker is on (you leave the house), the music comes
+back to the phone, paused, within a few seconds. A device that stops answering on the same Wi-Fi is let go after
+about 15 seconds. A short note says which device was lost. The device itself plays from your server, so it may
+finish the song it has (and the next one, if it was handed that ahead) before it falls silent.
+
 **DLNA without gaps.** Siansa hands a DLNA TV or speaker the next song while the current one plays, so devices
 that support it go straight on to the next song. Devices that don't get the next song when the current one ends,
 with a short gap. How well a device does this is up to the device.
