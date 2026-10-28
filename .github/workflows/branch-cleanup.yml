@@ -34,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           # Branches the workflows and the release use, kept whatever their state.
-          keep=" main ci-screens ci-logs gh-pages "
+          keep=" main gh-pages "
           open=$(gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" --paginate --jq '.[].head.ref')
           deleted=0
           {
