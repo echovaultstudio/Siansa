@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.rounded.DownloadForOffline
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.mutableStateOf
@@ -318,20 +321,9 @@ fun BookScreen(nav: NavController, id: String) {
                     if (list.isNotEmpty()) {
                         item { SectionTitle("${list.size} episodes") }
                         items(list.size, key = { "ep-${list[it].id}" }) { i ->
-                            val e = list[i]
-                            Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    graph.bookPlayer.playEpisode(b, e)
-                                    AppLog.i("Books", "Play episode \"${e.title}\" of \"${b.title}\"")
-                                }.padding(horizontal = Space.Page, vertical = Space.Small).testTag("episode-${e.id}"),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(Space.Medium),
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(e.title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                    Text(episodeLine(e), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                Text(formatDuration(e.durationSec.toLong()), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            EpisodeRow(list[i]) {
+                                graph.bookPlayer.playEpisode(b, list[i])
+                                AppLog.i("Books", "Play episode \"${list[i].title}\" of \"${b.title}\"")
                             }
                         }
                     }
@@ -439,6 +431,58 @@ private fun BookActions(b: Book, progress: BookProgress?, position: BookPosition
     if (removing) RemoveDialog(b.title, onDismiss = { removing = false }) { graph.bookDownloads.remove(b.id) }
 }
 
+/**
+ * One episode in a podcast's list: tap it to play. Its own description from Audiobookshelf (the guests, what it's
+ * about; issue #630) unfolds under it from the arrow on the right, so the list stays short until you want it.
+ */
+@Composable
+private fun EpisodeRow(e: app.siansa.net.Episode, onPlay: () -> Unit) {
+    val about = remember(e.id) { episodeAbout(e) }
+    var open by rememberSaveable(e.id) { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().testTag("episode-${e.id}")) {
+        Row(
+            Modifier.fillMaxWidth().clickable(onClick = onPlay).padding(start = Space.Page, end = if (about != null) Space.Tight else Space.Page, top = Space.Small, bottom = Space.Small),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Space.Medium),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(e.title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(
+                    listOf(episodeLine(e), formatDuration(e.durationSec.toLong())).filter { it.isNotBlank() }.joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (about != null) {
+                IconButton(onClick = { open = !open }, modifier = Modifier.testTag("episodeAbout-${e.id}")) {
+                    Icon(
+                        if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                        if (open) "Hide what the episode is about" else "What the episode is about",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        if (open && about != null) {
+            Text(
+                about,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Page, bottom = Space.Medium).testTag("episodeText-${e.id}"),
+            )
+        }
+    }
+}
+
+/** An episode's own description as plain text, its paragraphs kept and blank runs squeezed; null when there's none. */
+internal fun episodeAbout(e: app.siansa.net.Episode): String? =
+    e.description?.let(::stripHtml)
+        ?.lines()?.map { it.trim() }
+        ?.joinToString("\n")
+        ?.replace(Regex("\n{3,}"), "\n\n")
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+
 private enum class ChapterState { HEARD, NOW, AHEAD }
 
 @Composable
@@ -468,4 +512,8 @@ internal fun episodeLine(e: app.siansa.net.Episode): String = listOfNotNull(
 
 /** Audiobookshelf descriptions can carry HTML; the words only. */
 internal fun stripHtml(text: String): String =
-    text.replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n").replace(Regex("<[^>]+>"), "").replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'").replace("&nbsp;", " ").trim()
+    text.replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
+        // Paragraphs and list items keep their breaks: show notes are mostly <p> and <li> (issue #630).
+        .replace(Regex("</p>\\s*", RegexOption.IGNORE_CASE), "\n\n")
+        .replace(Regex("<li[^>]*>", RegexOption.IGNORE_CASE), "\n• ")
+        .replace(Regex("<[^>]+>"), "").replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'").replace("&nbsp;", " ").trim()

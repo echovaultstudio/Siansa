@@ -45,7 +45,8 @@ how far you are, with a bar and how much is left; on a podcast that's the episod
 The row of buttons is the album page's: **download** (tap again to remove it from the phone) and **✓ mark finished**
 (✕ takes it back; on a podcast it's the episode you're on) on the left, the big round **Play** on the right. It
 continues where you were, and pauses while the book plays. Chapters or episodes follow: chapters you've heard muted,
-the current one highlighted; tap any to play from there.
+the current one highlighted; tap any to play from there. On a podcast, the arrow beside an episode unfolds what that
+episode is about (its guests, a short summary), as Audiobookshelf has it.
 
 ## The book player
 
