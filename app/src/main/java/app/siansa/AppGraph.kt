@@ -1,5 +1,7 @@
 package app.siansa
 
+import app.siansa.playback.ActivePlayer
+import app.siansa.playback.MiniFor
 import app.siansa.mix.Dice
 import app.siansa.data.ArtistPhotos
 import app.siansa.data.SavedVibes
@@ -248,7 +250,7 @@ class AppGraph(val app: Application) {
     /** Plays books and podcasts, apart from the music player (issue #521). */
     val bookPlayer: BookPlayer by lazy { BookPlayer(this) }
     /** Which mini player shows: the player started last (beta #45). */
-    val activePlayer: app.siansa.playback.ActivePlayer by lazy { app.siansa.playback.ActivePlayer(scope, player.state, bookPlayer.state) }
+    val activePlayer: ActivePlayer by lazy { ActivePlayer(scope, player.state, bookPlayer.state) }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
     val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
     val openRouter = OpenRouterApi(http) { settings.current }
@@ -337,7 +339,7 @@ class AppGraph(val app: Application) {
         isOffline = { connection.current.offline }
         onlyDownloads = { settings.current.downloadedOnly }
         isDownloaded = { downloads.isDownloaded(it) }
-        onPlayStarted = { activePlayer.choose(app.siansa.playback.MiniFor.MUSIC); bookPlayer.pause() }
+        onPlayStarted = { activePlayer.choose(MiniFor.MUSIC); bookPlayer.pause() }
     }
     init {
         // The playing artist's popular songs, fetched ahead so their page shows them at once (issue #398). After
