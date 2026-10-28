@@ -50,6 +50,8 @@ services:
       - ./signup/server.py:/app/server.py:ro
       - ${SIGNUPS_DIR}:/data
       - ${EMAILS_DIR:-/srv/siansa-emails}:/emails:ro
+      # The F-Droid repo's index, read only, so the daily summary names versions rather than build numbers (#632).
+      - ${FDROID_DIR:-/srv/fdroid}/repo:/fdroid:ro
     read_only: true
     tmpfs:
       - /tmp

@@ -182,9 +182,9 @@ the buttons in your email), `beta-remove EMAIL`, `beta-today`, `beta-new-link` a
 
 ### Daily summary and F-Droid stats
 
-Every evening (`DIGEST_UTC`, 21:55 UTC by default) the sign-up service emails `NOTIFY_TO` a summary of the day: new
-sign-ups and decisions, places taken, how many devices checked the F-Droid beta repo, downloads per build, and
-problem reports from the app. `sudo sh scripts/signups stats` shows it now; `sudo sh scripts/signups digest` sends it
+Every evening (`DIGEST_UTC`, 21:55 UTC by default) the sign-up service emails `NOTIFY_TO` a summary of the day: the
+latest version on F-Droid, and F-Droid downloads per version, today and so far (issue #632; F-Droid is open, so there
+are no sign-ups to report). Versions are named from the repo's index, mounted read only into the service. `sudo sh scripts/signups stats` shows it now; `sudo sh scripts/signups digest` sends it
 now. Devices are told apart by address with a key that only lives for the day; only totals are stored
 (`/srv/siansa-signups/stats.json`).
 

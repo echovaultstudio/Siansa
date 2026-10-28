@@ -439,13 +439,40 @@ class FdroidStatsTest(unittest.TestCase):
         server.record_fetch("/fdroid/t/abc/repo/entry.jar", "1.1.1.1", self.day + 86400)
         self.assertEqual(server.load_stats()["days"][server.utc_day(self.day + 86400)]["repo"]["devices"], 1)
 
-    def test_summary(self):
-        server.record_fetch("/fdroid/t/abc/repo/entry.jar", "1.1.1.1", self.day)
-        server.record_fetch("/fdroid/t/abc/repo/app.siansa_650.apk", "1.1.1.1", self.day)
-        text = server.digest_text(server.utc_day(self.day))
-        self.assertIn("1 device(s) checked the beta repo", text)
-        self.assertIn("build 650: downloaded 1 time(s) by 1 device(s)", text)
-        self.assertIn("Problem reports from the app: 0.", text)
+    def test_summary_is_the_version_and_its_downloads(self):
+        server.record_fetch("/fdroid/repo/entry.jar", "1.1.1.1", self.day)
+        server.record_fetch("/fdroid/repo/app.siansa_650.apk", "1.1.1.1", self.day)
+        server.record_fetch("/fdroid/repo/app.siansa_650.apk", "2.2.2.2", self.day)
+        server.record_fetch("/fdroid/repo/app.siansa_640.apk", "3.3.3.3", self.day - 86400)
+        names = {"650": "0.38.5beta", "640": "0.38.4beta"}
+        text = server.digest_text(server.utc_day(self.day), names=names)
+        self.assertIn("Latest version on F-Droid: 0.38.5beta", text)
+        self.assertIn("  0.38.5beta: 2 downloads by 2 devices", text)
+        self.assertIn("F-Droid downloads so far:\n  0.38.5beta: 2\n  0.38.4beta: 1", text)
+        # Nothing about sign-ups, places, repo checks or reports any more (issue #632).
+        for gone in ("Sign-ups", "places", "checked", "Problem reports"):
+            self.assertNotIn(gone, text)
+
+    def test_summary_without_the_index_names_builds(self):
+        server.record_fetch("/fdroid/repo/app.siansa_650.apk", "1.1.1.1", self.day)
+        text = server.digest_text(server.utc_day(self.day), names={})
+        self.assertIn("  build 650: 1 download by 1 device", text)
+        self.assertNotIn("Latest version", text)
+
+    def test_a_quiet_day_says_none(self):
+        self.assertIn("F-Droid downloads today:\n  none", server.digest_text(server.utc_day(self.day), names={}))
+
+    def test_version_names_come_from_the_index(self):
+        import json as j
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, "index-v2.json"), "w") as f:
+            j.dump({"packages": {"app.siansa": {"versions": {"h": {"manifest": {"versionCode": 650, "versionName": "0.38.5beta"}}}}}}, f)
+        self.assertEqual(server.version_names(d), {"650": "0.38.5beta"})
+        e = tempfile.mkdtemp()
+        with open(os.path.join(e, "index-v1.json"), "w") as f:
+            j.dump({"packages": {"app.siansa": [{"versionCode": 640, "versionName": "0.38.4beta"}]}}, f)
+        self.assertEqual(server.version_names(e), {"640": "0.38.4beta"})
+        self.assertEqual(server.version_names(tempfile.mkdtemp()), {})
 
     def test_due_once_a_day_after_the_time(self):
         t = 1_800_000_000 - 1_800_000_000 % 86400 + 22 * 3600  # 22:00 UTC
