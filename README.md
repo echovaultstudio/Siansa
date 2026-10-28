@@ -8,6 +8,20 @@ Siansa is **open source** under the GNU GPL, version 3 or later ([LICENSE](LICEN
 
 <p align="center"><img src="docs/screenshots/hero.png" alt="Siansa: Your year, Home and Flow" width="900"></p>
 
+## Get Siansa
+
+<p align="center">
+<a href="https://siansa.app/fdroid/repo"><img src="docs/brand/get-fdroid.svg" alt="Get it on F-Droid" width="220" height="66"></a>
+&nbsp;
+<a href="https://siansa.app/#join"><img src="docs/brand/play-beta.svg" alt="Join the beta on Google Play" width="220" height="66"></a>
+</p>
+
+- **F-Droid**, open to everyone, no sign-up: in the F-Droid app, go to **Settings › Repositories › +** and add
+  `https://siansa.app/fdroid/repo`, then search for Siansa.
+- **Google Play**: a small closed beta. [Ask for a place](https://siansa.app/#join) and we'll add your Google account.
+
+More in the [install guide](docs/testing.md).
+
 ## What it does
 
 - **Library**: albums (A–Z, recently added, most played, random), artists, album and artist pages, search.
