@@ -9,7 +9,14 @@ import androidx.compose.material.icons.rounded.FavoriteBorder
 import app.siansa.data.NavTab
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.graphicsLayer
@@ -23,14 +30,6 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -41,7 +40,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.height
@@ -145,24 +143,10 @@ fun Modifier.aboveKeyboard(): Modifier = padding(bottom = WindowInsets.ime.asPad
 @Composable
 fun keyboardOpen(): Boolean = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
 
-/**
- * Now playing is a sheet over the current page rather than a page of its own, so it slides up and down
- * (and follows the finger when dragged down) with the page underneath still there.
- */
-class PlayerSheet {
-    var isOpen by mutableStateOf(false)
-        private set
-    fun open() { isOpen = true }
-    fun close() { isOpen = false }
-}
-
 val LocalPlayerSheet = staticCompositionLocalOf { PlayerSheet() }
 
 /** The book player's sheet (issue #542), opened from the book mini player and the book pages. */
 val LocalBookSheet = staticCompositionLocalOf { PlayerSheet() }
-
-private val SheetEnter = tween<IntOffset>(250, easing = FastOutSlowInEasing)
-private val SheetExit = tween<IntOffset>(190, easing = FastOutLinearInEasing)
 
 @Composable
 fun SiansaRoot() {
@@ -171,8 +155,9 @@ fun SiansaRoot() {
     val snack = remember { SnackbarHostState() }
     // Messages from the player, e.g. a song that can't play while offline.
     LaunchedEffect(Unit) { graph.player.notices.collect { snack.showSnackbar(it) } }
-    val sheet = remember { PlayerSheet() }
-    val bookSheet = remember { PlayerSheet() }
+    val sheetScope = rememberCoroutineScope()
+    val sheet = remember { PlayerSheet(sheetScope) }
+    val bookSheet = remember { PlayerSheet(sheetScope) }
     val player by graph.player.state.collectAsStateWithLifecycle()
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
@@ -217,7 +202,8 @@ fun SiansaRoot() {
     AskForNotifications()
 
     CompositionLocalProvider(LocalNav provides nav, LocalSnack provides snack, LocalPlayerSheet provides sheet, LocalBookSheet provides bookSheet) {
-      Box(Modifier.fillMaxSize()) {
+      // The sheets need the screen's height before they're drawn, for a drag on the mini player (#600).
+      Box(Modifier.fillMaxSize().onSizeChanged { val h = it.height.toFloat().coerceAtLeast(1f); sheet.heightPx = h; bookSheet.heightPx = h }) {
         Scaffold(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             snackbarHost = { SnackbarHost(snack) },
@@ -237,10 +223,21 @@ fun SiansaRoot() {
                         // none, so the other never shows from behind. The choice is the app's, not this screen's.
                         val bookState by graph.bookPlayer.state.collectAsStateWithLifecycle()
                         val active by graph.activePlayer.state.collectAsStateWithLifecycle()
-                        when (app.siansa.playback.miniShown(active, player.hasMedia, bookState.book != null)) {
-                            app.siansa.playback.MiniFor.MUSIC -> MiniPlayer(player) { sheet.open() }
-                            app.siansa.playback.MiniFor.BOOK -> BookMiniPlayer(bookState) { bookSheet.open() }
-                            app.siansa.playback.MiniFor.NONE -> Unit
+                        Box(
+                            Modifier.graphicsLayer {
+                                // Fades and recedes as a sheet comes up over it (#600), so the two become one.
+                                val p = maxOf(sheet.progress.value, bookSheet.progress.value)
+                                alpha = miniAlpha(p)
+                                val s = miniScale(p)
+                                scaleX = s; scaleY = s
+                                transformOrigin = TransformOrigin(0.5f, 1f)
+                            },
+                        ) {
+                            when (app.siansa.playback.miniShown(active, player.hasMedia, bookState.book != null)) {
+                                app.siansa.playback.MiniFor.MUSIC -> Box(Modifier.sheetDragUp(sheet)) { MiniPlayer(player) { sheet.open() } }
+                                app.siansa.playback.MiniFor.BOOK -> Box(Modifier.sheetDragUp(bookSheet)) { BookMiniPlayer(bookState) { bookSheet.open() } }
+                                app.siansa.playback.MiniFor.NONE -> Unit
+                            }
                         }
                         NavigationBar(containerColor = Color.Transparent, tonalElevation = 0.dp) {
                             tabs.forEach { tab ->
@@ -379,25 +376,63 @@ fun SiansaRoot() {
         val bookLoaded by graph.bookPlayer.state.collectAsStateWithLifecycle()
         LaunchedEffect(bookLoaded.book) { if (bookLoaded.book == null) bookSheet.close() }
         BackHandler(enabled = bookSheet.isOpen) { bookSheet.close() }
-        AnimatedVisibility(
-            visible = bookSheet.isOpen,
-            enter = slideInVertically(SheetEnter) { it },
-            exit = slideOutVertically(SheetExit) { it },
-        ) {
-            CompositionLocalProvider(LocalContentColor provides Color.White) {
-                BookPlayerScreen(nav, onClose = { bookSheet.close() })
+        // Each sheet is one card moved by its progress (#600): below the screen at 0, filling it at 1, its top
+        // corners rounding as it leaves the top and its content fading in over the first part of the way.
+        val cornerMaxPx = with(LocalDensity.current) { 28.dp.toPx() }
+        if (bookSheet.isVisible) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        val p = bookSheet.progress.value
+                        translationY = (1f - p) * size.height
+                        alpha = sheetAlpha(p)
+                        val corner = sheetCornerPx(p, size.height, cornerMaxPx)
+                        shape = RoundedCornerShape(topStart = corner, topEnd = corner)
+                        clip = true
+                    },
+            ) {
+                CompositionLocalProvider(LocalContentColor provides Color.White) {
+                    BookPlayerScreen(nav, onClose = { bookSheet.close() })
+                }
             }
         }
-        AnimatedVisibility(
-            visible = sheet.isOpen,
-            enter = slideInVertically(SheetEnter) { it },
-            exit = slideOutVertically(SheetExit) { it },
-        ) {
-            CompositionLocalProvider(LocalContentColor provides Color.White) {
-                PlayerScreen(nav, onClose = { sheet.close() })
+        if (sheet.isVisible) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        val p = sheet.progress.value
+                        translationY = (1f - p) * size.height
+                        alpha = sheetAlpha(p)
+                        val corner = sheetCornerPx(p, size.height, cornerMaxPx)
+                        shape = RoundedCornerShape(topStart = corner, topEnd = corner)
+                        clip = true
+                    },
+            ) {
+                CompositionLocalProvider(LocalContentColor provides Color.White) {
+                    PlayerScreen(nav, onClose = { sheet.close() })
+                }
             }
         }
       }
+    }
+}
+
+/**
+ * Dragging up on a mini player pulls its sheet up with the finger (#600); let go and it opens or springs back,
+ * taking the finger's speed. Sideways swipes (next and previous) are left to the mini player itself.
+ */
+private fun Modifier.sheetDragUp(sheet: PlayerSheet): Modifier = pointerInput(sheet) {
+    val tracker = VelocityTracker()
+    detectVerticalDragGestures(
+        onDragStart = { tracker.resetTracking() },
+        onDragEnd = { sheet.settle(tracker.calculateVelocity().y) },
+        onDragCancel = { sheet.settle(0f) },
+    ) { change, dy ->
+        change.consume()
+        tracker.addPosition(change.uptimeMillis, change.position)
+        sheet.dragBy(dy)
     }
 }
 
