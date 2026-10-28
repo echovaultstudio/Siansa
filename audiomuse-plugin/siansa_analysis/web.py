@@ -23,7 +23,7 @@ from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url,
 from . import generations, jobs, similarity, status, store
 
 PLUGIN_ID = "siansa_analysis"
-VERSION = "0.2.3"
+VERSION = "0.2.4"
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 

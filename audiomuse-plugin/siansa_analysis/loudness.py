@@ -11,6 +11,9 @@ only when a file is read.
 """
 
 import math
+import shutil
+import subprocess
+import tempfile
 import time
 
 import numpy as np
@@ -119,6 +122,8 @@ class Measurement:
     def __init__(self, chunk_energy, duration_ms):
         self.chunk_energy = list(chunk_energy)
         self.skipped_packets = 0
+        # Which decoder read it: PyAV, or the ffmpeg tool when PyAV couldn't (issue #642).
+        self.decoder = "pyav"
         self.duration_ms = duration_ms
         self.lufs = integrated(self.chunk_energy)
 
@@ -165,7 +170,32 @@ def measure_array(samples, rate):
 
 
 def measure_file(path, deadline_seconds=120.0):
-    """Decodes ``path`` with PyAV and measures it. Raises ``TimeoutError`` after ``deadline_seconds``."""
+    """Decodes ``path`` and measures it. Raises ``TimeoutError`` after ``deadline_seconds``.
+
+    PyAV first (it ships with AudioMuse-AI). Its own copy of FFmpeg can lack something a song needs ("Not yet
+    implemented in FFmpeg, patches welcome", issue #642), while AudioMuse-AI analysed the same file with the
+    ``ffmpeg`` tool, so then the ``ffmpeg`` tool decodes it instead, when it's installed."""
+    started = time.monotonic()
+    try:
+        return _measure_pyav(path, deadline_seconds)
+    except TimeoutError:
+        raise
+    except Exception as first:
+        tool = shutil.which("ffmpeg")
+        left = deadline_seconds - (time.monotonic() - started)
+        if not tool or left <= 1:
+            raise
+        try:
+            result = _measure_ffmpeg(tool, path, left)
+        except TimeoutError:
+            raise
+        except Exception as second:
+            raise ValueError(f"{first} (the ffmpeg tool couldn't read it either: {second})") from first
+        result.decoder = "ffmpeg"
+        return result
+
+
+def _measure_pyav(path, deadline_seconds):
     import av  # AudioMuse-AI ships PyAV; imported here so the maths can be tested without it
 
     started = time.monotonic()
@@ -185,17 +215,20 @@ def measure_file(path, deadline_seconds=120.0):
                     meter.add(out.to_ndarray().reshape(channels, -1))
 
         # Packet by packet, so one damaged packet (common in ripped or edited files) is skipped, as players
-        # do, instead of failing the song. Only a file that is mostly unreadable fails.
-        bad_error = getattr(getattr(av, "error", None), "InvalidDataError", ValueError)
+        # do, instead of failing the song. Only a file that is mostly unreadable fails. A packet using something
+        # this FFmpeg can't decode ("patches welcome") counts the same way (issue #642).
+        errors = getattr(av, "error", None)
+        bad_errors = tuple(e for e in (getattr(errors, "InvalidDataError", None), getattr(errors, "PatchWelcomeError", None)) if e) or (ValueError,)
         packets = bad = 0
         for packet in container.demux(stream):
             packets += 1
             try:
                 frames = packet.decode()
-            except bad_error:
+            except bad_errors as e:
                 bad += 1
                 if bad > MAX_BAD_PACKETS and bad > packets * MAX_BAD_SHARE:
-                    raise ValueError(f"too much of the file can't be read ({bad} of {packets} packets so far)")
+                    codec = getattr(context, "name", None) or "?"
+                    raise ValueError(f"too much of the file can't be read ({bad} of {packets} packets so far, codec {codec}): {e}") from e
                 continue
             for frame in frames:
                 feed(resampler.resample(frame))
@@ -205,4 +238,54 @@ def measure_file(path, deadline_seconds=120.0):
         if meter.frames == 0:
             raise ValueError("no audio could be read from the file")
         meter.skipped_packets = bad
+    return meter.finish()
+
+
+def _channels_by_ffprobe(path):
+    """1 or 2: the first audio stream's channels as ``ffprobe`` sees them; 2 when it can't tell."""
+    probe = shutil.which("ffprobe")
+    if not probe:
+        return 2
+    try:
+        out = subprocess.run([probe, "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=channels",
+                              "-of", "csv=p=0", path], capture_output=True, text=True, timeout=20).stdout.strip()
+        return 1 if out.splitlines() and out.splitlines()[0].strip() == "1" else 2
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return 2
+
+
+def _measure_ffmpeg(tool, path, deadline_seconds):
+    """Decodes ``path`` with the ``ffmpeg`` tool to 48 kHz float samples on a pipe and measures them."""
+    started = time.monotonic()
+    channels = _channels_by_ffprobe(path)
+    command = [tool, "-nostdin", "-v", "error", "-i", path, "-map", "0:a:0", "-vn",
+               "-f", "f32le", "-acodec", "pcm_f32le", "-ac", str(channels), "-ar", str(RATE), "pipe:1"]
+    meter = Meter(RATE, channels)
+    block = RATE * channels * 4  # one second
+    with tempfile.TemporaryFile() as errors:
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=errors, stdin=subprocess.DEVNULL)
+        try:
+            rest = b""
+            while True:
+                data = process.stdout.read(block)
+                if not data:
+                    break
+                data = rest + data
+                usable = len(data) - len(data) % (4 * channels)
+                rest = data[usable:]
+                if usable:
+                    samples = np.frombuffer(data[:usable], dtype="<f4").reshape(-1, channels).T
+                    meter.add(samples)
+                if time.monotonic() - started > deadline_seconds:
+                    raise TimeoutError(f"measuring took longer than {deadline_seconds:.0f} s")
+            code = process.wait(timeout=30)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+            process.stdout.close()
+        if code != 0 or meter.frames == 0:
+            errors.seek(0)
+            said = errors.read().decode("utf-8", "replace").strip().splitlines()
+            raise ValueError(said[-1] if said else f"ffmpeg ended with code {code} and no audio")
     return meter.finish()

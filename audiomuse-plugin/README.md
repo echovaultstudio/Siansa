@@ -50,7 +50,8 @@ https://raw.githubusercontent.com/echovaultstudio/siansa-audiomuse-plugin/main/m
 
 then install Siansa Analysis from the Catalog tab and apply the restart. AudioMuse-AI checks the catalog for
 new versions by itself. Only built-in libraries are used (numpy, scipy, PyAV), so it also works on the
-standalone builds. It needs AudioMuse-AI 3.6.4 or later.
+standalone builds. It needs AudioMuse-AI 3.6.4 or later. A song PyAV can't decode (its copy of FFmpeg lacks
+something the file needs) is read with the `ffmpeg` tool instead, when AudioMuse-AI's install has it.
 
 Fetching songs for older ones works with Navidrome, Jellyfin, Emby and Lyrion; Plex songs are measured
 when AudioMuse-AI analyses them.
