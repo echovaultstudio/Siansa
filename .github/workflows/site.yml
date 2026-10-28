@@ -23,7 +23,7 @@ jobs:
   deploy:
     name: Update the website and emails
     # Your own runner when the RUNS_ON variable names it (e.g. ["self-hosted", "siansa"]), else GitHub's.
-    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ubuntu-latest  # not the home runner: there it would wait behind a whole CI run (one job at a time)
     steps:
       - uses: actions/checkout@v7
       - name: Send to the server
