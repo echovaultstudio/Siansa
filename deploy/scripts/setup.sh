@@ -47,6 +47,9 @@ sed "s#DOMAIN#$DOMAIN#g" "$HERE/fdroid/metadata/app.siansa.yml" > "$FDROID_DIR/m
 # The app's icon for F-Droid (the APK's own icon is a drawn one that fdroidserver can't turn into a picture).
 mkdir -p "$FDROID_DIR/metadata/app.siansa/en-US"
 cp "$HERE/site/icon.png" "$FDROID_DIR/metadata/app.siansa/en-US/icon.png"
+# The repo's own icon, shown on the Repositories page of the F-Droid app (config.yml: repo_icon).
+mkdir -p "$FDROID_DIR/repo/icons"
+cp "$HERE/site/icon.png" "$FDROID_DIR/repo/icons/icon.png"
 chown -R siansa-deploy:siansa-deploy "$FDROID_DIR"
 chmod 750 "$FDROID_DIR"
 chmod 600 "$FDROID_DIR/config.yml" "$FDROID_DIR/keystore.p12"

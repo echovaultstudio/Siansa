@@ -248,6 +248,16 @@ Anyone, no sign-up. In F-Droid (or Droid-ify / Neo Store): **Settings › Reposi
 `https://siansa.app/fdroid/repo`. The page at that address shows its fingerprint and a QR code to scan. Send
 testers the address with the fingerprint, so they can tell the repo is yours.
 
+A server set up before the repo had a name and icon of its own (`repo_name: Siansa`, `repo_icon`): run these once,
+then the F-Droid app shows the Siansa icon instead of a QR code on its Repositories page:
+```sh
+sed -i 's/^repo_name:.*/repo_name: Siansa/' /srv/fdroid/config.yml
+grep -q '^repo_icon:' /srv/fdroid/config.yml || echo 'repo_icon: icon.png' >> /srv/fdroid/config.yml
+mkdir -p /srv/fdroid/repo/icons && cp site/icon.png /srv/fdroid/repo/icons/icon.png
+chown -R siansa-deploy:siansa-deploy /srv/fdroid/repo/icons
+cd /srv/fdroid && sudo -u siansa-deploy fdroid update --use-date-from-apk
+```
+
 ## Keeping it running
 - `docker compose pull && docker compose up -d` once a month (Caddy, Navidrome). Pin a newer Navidrome
   version in `docker-compose.yml` when you update it.
