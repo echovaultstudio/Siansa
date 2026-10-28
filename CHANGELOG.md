@@ -3,6 +3,14 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.38.4beta — 2026-10-28
+
+### Fixed
+- **Music no longer ends with a crash when the connection gets slow in the background.** The song now waits for data and carries on when the network is back.
+
+### Changed
+- **Problems you report from the app now open on Siansa's GitHub page.** The docs and the full list of changes are there too, and the links in About and What's new go there.
+
 ## 0.38.3beta — 2026-10-28
 
 ### Fixed
