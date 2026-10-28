@@ -38,7 +38,7 @@
 	import security
 	header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 
-	# Only approved testers get in, each with a private link: https://DOMAIN/fdroid/t/<code>/repo
+	# The beta's earlier private link, https://DOMAIN/fdroid/t/<code>/repo, still works for the testers who added it.
 	# Caddy asks the sign-up service (/auth) whether the code is valid, then serves the repo without the prefix.
 	handle /fdroid/t/* {
 		route {
@@ -53,7 +53,21 @@
 			file_server
 		}
 	}
-	# The old open address is closed.
+	# The repository is open to everybody: https://DOMAIN/fdroid/repo. It still passes /auth, which counts downloads
+	# and devices (never addresses) and lets this path through.
+	handle /fdroid/repo* {
+		route {
+			forward_auth signup:8080 {
+				uri /auth
+			}
+			uri path_regexp ^/fdroid/repo/? /
+			root * /srv/fdroid/repo
+			header /index-v* Cache-Control "no-cache"
+			header /entry.* Cache-Control "no-cache"
+			header *.apk Cache-Control "private, max-age=3600"
+			file_server
+		}
+	}
 	handle /fdroid* {
 		respond "Not found" 404
 	}

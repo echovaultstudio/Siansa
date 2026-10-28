@@ -35,7 +35,7 @@ Use the Google account whose email you gave us, and stay in the test for 14 days
 `https://siansa.app/fdroid/repo` (the page also shows a QR code and the repo's fingerprint). Then search for
 Siansa and install it.
 
-Not on the list yet? [Ask for an invite](https://siansa.app).
+F-Droid needs no invite. For Google Play, [ask for a place in the beta](https://siansa.app/#join).
 
 ## Connect your servers
 

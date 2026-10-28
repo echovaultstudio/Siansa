@@ -437,7 +437,12 @@ def repo_url(code=None):
 LINK_PATH = re.compile(r"^/fdroid/t/([A-Za-z0-9_-]{20,})/repo(?:/|$)")
 
 
+PUBLIC_PATH = re.compile(r"^/fdroid/repo(?:/|$)")  # the open address (issue #608): every request passes, and is counted
+
+
 def valid_link(uri):
+    if PUBLIC_PATH.match((uri or "").split("?", 1)[0]):
+        return True
     m = LINK_PATH.match((uri or "").split("?", 1)[0])
     code = current_code()
     return bool(m and code) and hmac.compare_digest(m.group(1), code)

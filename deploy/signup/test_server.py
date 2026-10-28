@@ -109,7 +109,10 @@ class FlowTest(unittest.TestCase):
         self.assertTrue(server.valid_link(base))
         self.assertFalse(server.valid_link(base.replace("Abc", "Abd") + "/entry.jar"))
         self.assertFalse(server.valid_link(f"/fdroid/t/{CODE}/entry.jar"))
-        self.assertFalse(server.valid_link("/fdroid/repo/entry.jar"))
+        self.assertTrue(server.valid_link("/fdroid/repo/entry.jar"))  # the open address (issue #608)
+        self.assertTrue(server.valid_link("/fdroid/repo"))
+        self.assertFalse(server.valid_link("/fdroid/repository/entry.jar"))
+        self.assertFalse(server.valid_link("/fdroid/other/entry.jar"))
         self.assertFalse(server.valid_link(None))
         os.remove(server.CODE_FILE)
         self.assertFalse(server.valid_link(base + "/entry.jar"))
@@ -405,6 +408,8 @@ class FdroidStatsTest(unittest.TestCase):
 
     def test_kinds(self):
         self.assertEqual(server.fetch_kind("/fdroid/t/abc/repo/app.siansa_650.apk"), "apk:650")
+        self.assertEqual(server.fetch_kind("/fdroid/repo/entry.jar"), "repo")
+        self.assertEqual(server.fetch_kind("/fdroid/repo/app.siansa_650.apk"), "apk:650")
         self.assertEqual(server.fetch_kind("/fdroid/t/abc/repo/entry.jar?x=1"), "repo")
         self.assertEqual(server.fetch_kind("/fdroid/t/abc/repo/index-v1.jar"), "repo")
         self.assertIsNone(server.fetch_kind("/fdroid/t/abc/repo/icons-640/icon.png"))
