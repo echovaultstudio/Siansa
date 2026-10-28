@@ -7,6 +7,7 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.CacheDataSource
+import app.siansa.data.AppSettings
 
 /**
  * Cache keys leave out the per-session login token in stream URLs, so a song cached yesterday is
@@ -19,14 +20,25 @@ fun songCacheKey(uri: Uri): String {
     return "song:$id:$format:$rate"
 }
 
+/** Whether songs are kept on the phone as they play: Settings › Storage › Song cache, where 0 means Off. */
+fun songCacheOn(settings: AppSettings): Boolean = settings.songCacheMb > 0
+
 /**
- * Original files go through the song cache. Opus conversions stream directly: their length is only
+ * Whether a stream in [format] goes through the song cache: only originals (no format, or raw), and only while the
+ * cache is on ([cacheOn]). With it off, every song streams straight from the server and nothing is kept.
+ */
+fun goesThroughCache(format: String?, cacheOn: Boolean): Boolean = cacheOn && (format == null || format == "raw")
+
+/**
+ * Original files go through the song cache, unless it's switched off ([useCache], checked as each song opens, so
+ * switching it off applies from the next song). Opus conversions stream directly: their length is only
  * an estimate, which doesn't mix well with caching byte ranges.
  */
 @OptIn(UnstableApi::class)
 class CachingSwitchDataSource(
     private val cached: CacheDataSource,
     private val direct: DataSource,
+    private val useCache: () -> Boolean = { true },
 ) : DataSource {
     private var active: DataSource? = null
 
@@ -36,8 +48,7 @@ class CachingSwitchDataSource(
     }
 
     override fun open(dataSpec: DataSpec): Long {
-        val format = dataSpec.uri.getQueryParameter("format")
-        val source = if (format == null || format == "raw") cached else direct
+        val source = if (goesThroughCache(dataSpec.uri.getQueryParameter("format"), useCache())) cached else direct
         active = source
         return source.open(dataSpec)
     }
@@ -61,8 +72,9 @@ class CachingSwitchDataSource(
     class Factory(
         private val cached: CacheDataSource.Factory,
         private val direct: DataSource.Factory,
+        private val useCache: () -> Boolean = { true },
     ) : DataSource.Factory {
         override fun createDataSource(): DataSource =
-            CachingSwitchDataSource(cached.createDataSource(), direct.createDataSource())
+            CachingSwitchDataSource(cached.createDataSource(), direct.createDataSource(), useCache)
     }
 }

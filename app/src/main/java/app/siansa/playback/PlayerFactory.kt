@@ -38,7 +38,9 @@ object PlayerFactory {
             .setCacheKeyFactory { spec -> songCacheKey(spec.uri) }
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
             .setEventListener(PlaybackDiagnostics.cacheListener)
-        val switching = CachingSwitchDataSource.Factory(cacheFactory, http)
+        // With the song cache off (Settings › Storage), every song streams straight from the server.
+        val switching = CachingSwitchDataSource.Factory(cacheFactory, http) { songCacheOn(graph.settings.current) }
+        if (!songCacheOn(graph.settings.current)) AppLog.i("Cache", "Song cache is off: songs stream without being kept")
         // Each stream is pointed at the original file or an Opus conversion when it opens.
         val resolving = ResolvingDataSource.Factory(switching) { spec ->
             val uri = spec.uri.toString().let { if (Streaming.RELOAD_PARAM in it) android.net.Uri.parse(Streaming.withoutReload(it)) else spec.uri }

@@ -62,7 +62,8 @@ Your downloads, and their settings: Wi-Fi only, quality, storage limit. See [Pla
 
 How much space downloads, the song cache, the image cache, the library database and the logs use, with their
 limits and **Clear** buttons. **Animated covers**: when an album folder has an animated cover (cover.gif or
-cover.webp), it moves on the album page and in now playing. New cache sizes apply after a restart.
+cover.webp), it moves on the album page and in now playing. New cache sizes apply after a restart. The song cache
+can also be switched **Off**, so no songs are kept on the phone; that applies from the next song.
 
 ## Backup
 

@@ -13,8 +13,9 @@ object Preload {
     const val DEFAULT_WIFI = 2
     const val DEFAULT_MOBILE = 1
 
+    /** None while the song cache is off: songs loaded ahead are kept in it, so there'd be nowhere to put them. */
     fun count(s: AppSettings, unmetered: Boolean): Int =
-        (if (unmetered) s.preloadWifi else s.preloadMobile).coerceIn(CHOICES)
+        if (!songCacheOn(s)) 0 else (if (unmetered) s.preloadWifi else s.preloadMobile).coerceIn(CHOICES)
 
     /**
      * Songs ahead to fetch loudness and fade shapes for: one more than are loaded, so each is ready before
