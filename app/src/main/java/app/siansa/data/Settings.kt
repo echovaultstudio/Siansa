@@ -36,8 +36,12 @@ data class AppSettings(
      * it has in AudioMuse; empty for AudioMuse's default server.
      */
     val audioMuseServer: String = "",
-    val openRouterKey: String = "",
-    val openRouterModel: String = DEFAULT_MODEL,
+    /** The AI service that writes mix titles and sound searches, its key and model (issue #665: was OpenRouter only). */
+    val aiProvider: AiProvider = AiProvider.OPENROUTER,
+    val aiKey: String = "",
+    val aiModel: String = DEFAULT_MODEL,
+    /** The address of an AI service on your network or another one ([AiProvider.ownAddress]). */
+    val aiAddress: String = "",
     /** The Audiobookshelf server (issue #521): one login for the whole app, like AudioMuse. Empty: no books. */
     val audiobookshelfUrl: String = "",
     val audiobookshelfToken: String = "",
@@ -145,10 +149,11 @@ data class AppSettings(
     val audioMuseReady: Boolean
         get() = audioMuseUrl.isNotBlank()
     val aiReady: Boolean
-        get() = aiTitles && openRouterKey.isNotBlank() && openRouterModel.isNotBlank()
+        get() = aiTitles && aiModel.isNotBlank() && (aiKey.isNotBlank() || !aiProvider.needsKey) &&
+            aiCompletionsUrl(aiProvider, aiAddress) != null
     /**
      * These settings with the Connections page's fields taken from [page]: the music server, its proxy login,
-     * AudioMuse, OpenRouter and Audiobookshelf. Everything else keeps its value here.
+     * AudioMuse, the AI service and Audiobookshelf. Everything else keeps its value here.
      */
     fun withConnectionsFrom(page: AppSettings, kind: SourceKind = sourceKind): AppSettings = copy(
         sourceKind = kind,
@@ -156,7 +161,7 @@ data class AppSettings(
         proxyUser = page.proxyUser, proxyPassword = page.proxyPassword,
         audioMuseUrl = page.audioMuseUrl, audioMuseToken = page.audioMuseToken,
         audioMuseUser = page.audioMuseUser, audioMusePassword = page.audioMusePassword, audioMuseServer = page.audioMuseServer,
-        openRouterKey = page.openRouterKey, openRouterModel = page.openRouterModel, aiTitles = page.aiTitles,
+        aiProvider = page.aiProvider, aiKey = page.aiKey, aiModel = page.aiModel, aiAddress = page.aiAddress, aiTitles = page.aiTitles,
         audiobookshelfUrl = page.audiobookshelfUrl, audiobookshelfToken = page.audiobookshelfToken,
         audiobookshelfUser = page.audiobookshelfUser, audiobookshelfPassword = page.audiobookshelfPassword,
     )
@@ -225,7 +230,7 @@ fun parseAddress(raw: String): ServerAddress {
 
 private fun decode(value: String): String = runCatching { URLDecoder.decode(value, "UTF-8") }.getOrDefault(value)
 
-/** The store for AudioMuse and OpenRouter, shared by every user and server (issue #416). */
+/** The store for AudioMuse, the AI service and Audiobookshelf, shared by every user and server (issue #416). */
 private const val CONNECTIONS = "connections"
 private const val SEEDED = "seeded"
 private val CONNECTION_STRINGS = listOf("am_url", "am_token", "am_user", "am_pass", "am_server", "or_key", "or_model", "abs_url", "abs_token", "abs_user", "abs_pass")
@@ -235,7 +240,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     private val prefs = context.getSharedPreferences(UserFiles.scoped("settings", user), Context.MODE_PRIVATE)
 
     /**
-     * AudioMuse and OpenRouter are the same for every user and every music server (issue #416): they live in one
+     * AudioMuse and the AI service are the same for every user and every music server (issue #416): they live in one
      * store, whatever Navidrome or Emby account is in use. The first time, they're taken from this user's own settings.
      */
     private val shared = context.getSharedPreferences(CONNECTIONS, Context.MODE_PRIVATE).also { store ->
@@ -265,8 +270,10 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         // Which of AudioMuse's servers is this user's (beta report 810dc85c): per user, as a Navidrome user and an
         // Emby user are different servers there. The shared value from before is the fallback.
         audioMuseServer = prefs.getString("am_server", null) ?: shared.getString("am_server", "") ?: "",
-        openRouterKey = SecretBox.decrypt(shared.getString("or_key", "") ?: ""),
-        openRouterModel = shared.getString("or_model", AppSettings.DEFAULT_MODEL) ?: AppSettings.DEFAULT_MODEL,
+        aiKey = SecretBox.decrypt(shared.getString("or_key", "") ?: ""),
+        aiModel = shared.getString("or_model", AppSettings.DEFAULT_MODEL) ?: AppSettings.DEFAULT_MODEL,
+        aiProvider = AiProvider.parse(shared.getString("ai_provider", null)),
+        aiAddress = shared.getString("ai_address", "") ?: "",
         audiobookshelfUrl = shared.getString("abs_url", "") ?: "",
         audiobookshelfToken = SecretBox.decrypt(shared.getString("abs_token", "") ?: ""),
         audiobookshelfUser = shared.getString("abs_user", "") ?: "",
@@ -353,8 +360,9 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             audioMuseUser = am.user ?: input.audioMuseUser.trim(),
             audioMusePassword = am.password ?: input.audioMusePassword,
             audioMuseServer = input.audioMuseServer.trim(),
-            openRouterKey = input.openRouterKey.trim(),
-            openRouterModel = input.openRouterModel.trim(),
+            aiKey = input.aiKey.trim(),
+            aiModel = input.aiModel.trim(),
+            aiAddress = input.aiAddress.trim(),
             audiobookshelfUrl = parseAddress(input.audiobookshelfUrl).url,
             audiobookshelfToken = input.audiobookshelfToken.trim(),
             audiobookshelfUser = input.audiobookshelfUser.trim(),
@@ -407,8 +415,10 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putString("am_token", SecretBox.encrypt(s.audioMuseToken))
             .putString("am_user", s.audioMuseUser)
             .putString("am_pass", SecretBox.encrypt(s.audioMusePassword))
-            .putString("or_key", SecretBox.encrypt(s.openRouterKey))
-            .putString("or_model", s.openRouterModel)
+            .putString("or_key", SecretBox.encrypt(s.aiKey))
+            .putString("or_model", s.aiModel)
+            .putString("ai_provider", s.aiProvider.name)
+            .putString("ai_address", s.aiAddress)
             .putString("abs_url", s.audiobookshelfUrl)
             .putString("abs_token", SecretBox.encrypt(s.audiobookshelfToken))
             .putString("abs_user", s.audiobookshelfUser)

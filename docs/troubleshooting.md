@@ -23,8 +23,8 @@ The album, artist or song isn't on the server Siansa asked. Common reasons:
 Song radio, similar songs or similar albums say "AudioMuse doesn't know this song".
 
 1. **Has AudioMuse-AI analysed it?** New songs need its analysis first. Check in AudioMuse-AI, or run an analysis.
-2. **Several music servers in AudioMuse-AI?** Each server's name must be set in **Settings › Connections ›
-   AudioMuse-AI**, exactly as AudioMuse-AI shows it. See
+2. **Several music servers in AudioMuse-AI?** Each server's name must be set in **Settings › Connections**, in the
+   card of that music server (Server name in AudioMuse), exactly as AudioMuse-AI shows it. See
    [Several music servers](audiomuse.md#several-music-servers-in-one-audiomuse-ai).
 3. **Does AudioMuse-AI know the song on that server?** It links a second server's songs by analysis or by
    **Align** in its setup. To check, ask AudioMuse-AI directly, replacing `TOKEN`, `NAME` and `ID`:

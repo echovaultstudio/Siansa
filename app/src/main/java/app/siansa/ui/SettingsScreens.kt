@@ -51,7 +51,6 @@ import app.siansa.mix.audioMuseCheck
 import app.siansa.net.ApiException
 import app.siansa.net.AudioMuseApi
 import app.siansa.net.AudiobookshelfApi
-import app.siansa.net.OpenRouterApi
 import app.siansa.net.SubsonicApi
 import app.siansa.net.EmbyApi
 import kotlinx.coroutines.CancellationException
@@ -75,7 +74,6 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
     var problem by remember { mutableStateOf<String?>(null) }
     var navidromeTest by remember { mutableStateOf<String?>(null) }
     var audioMuseTest by remember { mutableStateOf<String?>(null) }
-    var openRouterTest by remember { mutableStateOf<String?>(null) }
 
     // Tests use what's typed, before it's saved.
     fun runTest(set: (String) -> Unit, block: suspend (AppSettings) -> String) {
@@ -132,7 +130,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
             if (firstRun) {
                 Text(
                     if (fromPicker) "Enter your server's address and login. Test checks them before you save."
-                    else "Welcome! Connect your server to get started. AudioMuse and OpenRouter can be added now or later.",
+                    else "Welcome! Connect your server to get started. AudioMuse and an AI service can be added now or later.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 // A user being added: a way back to the users already set up.
@@ -176,35 +174,11 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                     if (kind == SourceKind.EMBY) "AudioMuse reads your Emby library for everything smart. If AudioMuse has more than one music server, enter this Emby server's name as it is in AudioMuse. Each user keeps their own."
                     else "Only if AudioMuse has more than one music server: this server's name as it is in AudioMuse. Leave empty for its main one. Each user keeps their own."
                 )
-                TestRow(audioMuseTest) {
-                    runTest({ audioMuseTest = it }) { s ->
-                        val hits = AudioMuseApi(graph.http) { s }.textSearch("calm piano", 10)
-                        // Is AudioMuse's music this server's? Only known once this server's library is synced.
-                        val now = graph.settings.current
-                        val otherServer = s.sourceKind != now.sourceKind || s.navidromeUrl != now.navidromeUrl ||
-                            s.navidromeUser != now.navidromeUser
-                        val match = graph.generator.libraryMatch(hits)
-                        AppLog.i("Settings", "AudioMuse test: $match, other server=$otherServer")
-                        val (ok, words) = audioMuseCheck(match, otherServer)
-                        if (!ok) throw ApiException(words)
-                        words
-                    }
-                }
+                TestRow(audioMuseTest) { runTest({ audioMuseTest = it }) { s -> testAudioMuse(graph, s) } }
 
                 HorizontalDivider()
-                Heading("OpenRouter (optional)")
-                Hint("Writes the mix titles and sound searches. Only the vibe's guidance, the time and your last 20 plays are sent.")
-                SecretField("API key", draft.openRouterKey) { draft = draft.copy(openRouterKey = it) }
-                Field("Model", draft.openRouterModel, AppSettings.DEFAULT_MODEL, keyboard = KeyboardType.Text) {
-                    draft = draft.copy(openRouterModel = it)
-                }
-                SwitchRow("AI titles and sound searches", draft.aiTitles) { draft = draft.copy(aiTitles = it) }
-                TestRow(openRouterTest) {
-                    runTest({ openRouterTest = it }) { s ->
-                        val answer = OpenRouterApi(graph.http) { s }.complete("Reply with one word.", "Say hello.")
-                        "Model answered: ${answer.trim().take(40)}"
-                    }
-                }
+                Heading("AI (optional)")
+                AiFields(graph, draft) { draft = it }
             }
 
             problem?.let { ErrorText(it, Modifier) }

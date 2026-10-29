@@ -151,4 +151,15 @@ class StructuredLogTest {
         assertEquals("true", files.single { it["name"]!!.jsonPrimitive.content == "big.log" }["truncated"]!!.jsonPrimitive.content)
         assertEquals("0.15.3beta", manifest["about"]!!.jsonObject["app_version"]!!.jsonPrimitive.content)
     }
+
+    /** Issue #665: every AI service's key is hidden in free text too, keeping its first letters to tell them apart. */
+    @Test fun aiServiceKeysAreHidden() {
+        val keys = listOf("sk-or-v1-0123456789abcdef", "sk-proj-0123456789abcdefXYZ", "sk-ant-api03-0123456789abcdef", "gsk_0123456789abcdefABCDEF", "AIzaSyA0123456789abcdefghijKLMNOP")
+        for (key in keys) {
+            val shown = Redactor.text("Test failed with key $key in it")
+            assertFalse("$key is still in: $shown", shown.contains(key))
+            assertTrue(shown.contains("•••"))
+        }
+        assertEquals("a task-list item", Redactor.text("a task-list item"))  // words with "sk-" in them stay
+    }
 }

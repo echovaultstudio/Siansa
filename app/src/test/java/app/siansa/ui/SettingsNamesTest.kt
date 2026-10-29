@@ -15,17 +15,23 @@ class SettingsNamesTest {
     }
 
     @Test fun noArrowsOnSettingsPages() {
-        for (name in listOf("SettingsHub.kt", "StyleScreens.kt", "UsersScreen.kt", "CarouselEditor.kt", "DownloadsScreens.kt")) {
+        for (name in listOf("SettingsHub.kt", "StyleScreens.kt", "ConnectionsHub.kt", "CarouselEditor.kt", "DownloadsScreens.kt")) {
             assertFalse("$name still draws an arrow beside a setting", File(ui, name).readText().contains("KeyboardArrowRight"))
         }
     }
 
-    /** The entry for users is called what its page is called (#565): "Users", not "Users and library sync". */
-    @Test fun theUsersEntryIsCalledUsers() {
+    /**
+     * Servers and services are one entry, Connections, called what its page is called (#565, #665): no separate
+     * Users entry, and the page has Servers and Services.
+     */
+    @Test fun serversAndServicesAreOneConnectionsEntry() {
         val hub = File(ui, "SettingsHub.kt").readText()
-        assertTrue("Settings has no \"Users\" entry", hub.contains("HubRow(Icons.Rounded.People, \"Users\")"))
-        assertFalse("The old name is still there", hub.contains("Users and library sync"))
-        assertTrue("The page isn't called Users", File(ui, "UsersScreen.kt").readText().contains("Screen(title = \"Users\""))
+        assertTrue("Settings has no \"Connections\" entry", hub.contains("HubRow(Icons.Rounded.Dns, \"Connections\")"))
+        assertFalse("Users is still its own entry", hub.contains("\"Users\")"))
+        val page = File(ui, "ConnectionsHub.kt").readText()
+        assertTrue("The page isn't called Connections", page.contains("title = \"Connections\""))
+        assertTrue("No Servers section", page.contains("SectionHeading(\"Servers\")"))
+        assertTrue("No Services section", page.contains("SectionHeading(\"Services\")"))
     }
 
     /** #567: Report a problem and Logs are one entry, Help, with the bug icon, at the foot of Settings. */

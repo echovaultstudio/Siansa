@@ -24,12 +24,14 @@ how it starts and ends, and similar albums and artists.
 
 ## Set up AudioMuse-AI in Siansa
 
-**Settings › Connections › AudioMuse-AI**:
+**Settings › Connections › Services › AudioMuse-AI**:
 
 1. **Server address**, for example `http://192.168.1.10:8000`.
 2. If AudioMuse-AI has a login: either an **API token**, or its **user name and password**.
-3. **Server name in AudioMuse**: only if AudioMuse-AI serves more than one music server (see below).
-4. **Test** runs a text search ("calm piano") to check it all works, then **Save**.
+3. **Test** runs a text search ("calm piano") to check it all works, then **Save**.
+
+Only if AudioMuse-AI serves more than one music server: **Server name in AudioMuse**, in the card of your music
+server under **Servers** (see below).
 
 The AudioMuse-AI connection is the same for every user. The server name is kept per user (see below).
 
@@ -73,7 +75,7 @@ AudioMuse-AI 3 can serve several music servers (for example Navidrome and Emby).
 name** in AudioMuse-AI (Setup › Music Servers). Siansa must name the right server in every request, or AudioMuse
 answers with the other server's songs or says it doesn't know the song.
 
-In **Settings › Connections › AudioMuse-AI**, **Server name in AudioMuse** is the name of this user's server,
+In **Settings › Connections**, in the card of your music server, **Server name in AudioMuse** is its name,
 as AudioMuse-AI shows it (capitals don't matter). Leave it empty for AudioMuse-AI's default server. Each user keeps
 their own: switch to your Emby user and enter the Emby server's name there, and to your Navidrome user for
 Navidrome's. Users shown together are always on one server, so one name covers them.

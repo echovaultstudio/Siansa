@@ -114,7 +114,9 @@ object Redactor {
         Regex("(\\bToken=\")[^\"]*", RegexOption.IGNORE_CASE),
         Regex("(X-(?:Emby|MediaBrowser)-Token:\\s*)[^\\s·]+", RegexOption.IGNORE_CASE),
         Regex("(audiomuse_jwt=)[^;\\s]+"),
-        Regex("(sk-or-[A-Za-z0-9-]{4})[A-Za-z0-9-]+"),
+        // AI services' keys (issue #665): OpenRouter, OpenAI and Anthropic (sk-…), Groq (gsk_…), Google (AIza…).
+        Regex("(\\b(?:sk|gsk)[-_][A-Za-z0-9]{2,4})[A-Za-z0-9_-]{8,}"),
+        Regex("(\\bAIza)[0-9A-Za-z_-]{20,}"),
         Regex("(://)[^/@\\s]+:[^/@\\s]+@"),
         Regex("(\"(?:password|token|apiKey|api_key|secret|jwt)\"\\s*:\\s*\")[^\"]*", RegexOption.IGNORE_CASE),
         Regex("(\\b(?:token|password|passwd|apiKey|api_key|secret)=)[^&\\s\"]+", RegexOption.IGNORE_CASE),

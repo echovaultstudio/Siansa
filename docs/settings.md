@@ -2,19 +2,28 @@
 
 The Settings tab, page by page.
 
-## Users
-
-Every login on this phone, and each one's library sync. See
-[Servers, users and libraries](servers-and-users.md). Also the **Audiobookshelf** login and **Scan for new books**;
-see [Audiobooks and podcasts](books.md).
-
 ## Connections
 
-- **Your server**: address, user name, password, and an optional proxy login. **Test** checks the connection.
-- **AudioMuse-AI**: address, API token or user name and password, and this user's server name in AudioMuse. See [AudioMuse-AI](audiomuse.md).
-- **OpenRouter (optional)**: API key, model, and **AI titles and sound searches**. See [AI features](ai.md).
+Everything Siansa connects to, on one page, in two parts. Each server and service is a card: tap it, or its arrow,
+to fold it open; they start folded. **Save** (at the top, or in any open card) keeps every change on the page, and
+**Test** in each card uses what's typed, before you save.
 
-Tests use what's typed, before you save.
+**Servers**
+
+- **Each music server login** (a "user": its own library, history and settings). The one in use has its address,
+  user name, password, an optional proxy login, its **Name shown in Siansa**, its **Server name in AudioMuse** and
+  its **Library sync**. Another one has **Switch to it** (Siansa restarts) and **Remove**. See
+  [Servers, users and libraries](servers-and-users.md).
+- **Audiobookshelf**: address, API token or user name and password, and **Scan for new books**. See
+  [Audiobooks and podcasts](books.md).
+- **Add a music server**: another login on a server, or another server.
+
+**Services**
+
+- **AudioMuse-AI**: address, and an API token or user name and password. See [AudioMuse-AI](audiomuse.md).
+- **AI** (optional): which service writes mix titles and sound searches (OpenRouter, OpenAI, Anthropic, Google
+  Gemini, Mistral, Groq, Ollama or another), its key, its model, and **AI titles and sound searches**. See
+  [AI features](ai.md).
 
 ## Playback
 

@@ -6,7 +6,7 @@ Your listening.
 
 ## Setting it up
 
-**Settings › Users › Audiobookshelf**: the server's web address (for example `192.168.1.10:13378`) and
+**Settings › Connections › Servers › Audiobookshelf**: the server's web address (for example `192.168.1.10:13378`) and
 either an **API token** (in Audiobookshelf, under your user) or your username and password. **Test** checks the
 login and says how many book and podcast libraries the user can see.
 

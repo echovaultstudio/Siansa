@@ -1,13 +1,27 @@
 # AI features
 
 All AI in Siansa is **optional**. The "smart" features (mixes, radios, search by sound) come from AudioMuse-AI on
-your own server, which isn't a chatbot: it analyses how your music sounds. The only outside AI is OpenRouter, and
-only if you add a key.
+your own server, which isn't a chatbot: it analyses how your music sounds. The only outside AI is the AI service you
+pick for mix titles and sound searches, and only if you set one up.
 
-## OpenRouter: mix titles and sound searches
+## Mix titles and sound searches
 
-**Settings › Connections › OpenRouter**: an API key from [openrouter.ai](https://openrouter.ai) and a model
-(`google/gemini-2.5-flash` by default). **AI titles and sound searches** turns it on or off.
+**Settings › Connections › AI**: pick the service, then its key and a model. Picking a service fills in its usual
+model; any model it offers works. **AI titles and sound searches** turns it on or off, and **Test** asks it to say
+hello.
+
+| Service | What it needs |
+|---|---|
+| **OpenRouter** (the default) | An API key from [openrouter.ai](https://openrouter.ai): many models from one account. Usual model `google/gemini-2.5-flash`. |
+| **OpenAI** | An API key from platform.openai.com. Usual model `gpt-4.1-mini`. |
+| **Anthropic** | An API key from console.anthropic.com. Usual model `claude-haiku-4-5`. |
+| **Google Gemini** | An API key from Google AI Studio. Usual model `gemini-2.5-flash`. |
+| **Mistral** | An API key from console.mistral.ai. Usual model `mistral-small-latest`. |
+| **Groq** | An API key from console.groq.com. Usual model `llama-3.3-70b-versatile`. |
+| **Ollama** | Ollama on your own network: its address (like `192.168.1.10:11434`) and a model you've pulled. No key, and nothing leaves your network. |
+| **Other** | Any other service with an OpenAI-style API (LM Studio, LocalAI, vLLM…): its address, a key if it asks for one, and a model. |
+
+A small model is plenty: the answers are a title and a line or two.
 
 With it on, for each vibe or Flow description the AI writes:
 

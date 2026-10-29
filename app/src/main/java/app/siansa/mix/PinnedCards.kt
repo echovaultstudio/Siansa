@@ -256,7 +256,7 @@ class PinnedCards(private val graph: AppGraph, context: Context) {
                 val found = graph.generator.soundSearch(card.sound.trim(), card.size.coerceAtMost(PinnedCard.SIZE))
                 found to if (card.look == CardLook.ALBUMS) albumIdsOf(found).take(ALBUMS).mapNotNull { graph.library.album(it) } else emptyList()
             }
-            !graph.library.isSynced -> throw IllegalStateException("Sync your library first (Settings › Users)")
+            !graph.library.isSynced -> throw IllegalStateException("Sync your library first (Settings › Connections, under your server)")
             card.contents == CardContents.ALBUMS -> {
                 val needsFavourites = card.allRules.any { it.field == RuleField.FAVOURITE }
                 val favourites = if (needsFavourites) graph.library.starredSongs().mapNotNullTo(HashSet()) { it.albumId } else emptySet()

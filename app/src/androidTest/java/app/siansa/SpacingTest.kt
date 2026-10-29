@@ -26,6 +26,7 @@ import app.siansa.mix.VibeTuning
 import androidx.compose.material3.Text
 import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.rounded.Settings
 import app.siansa.ui.MoreChipsHint
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
@@ -1040,6 +1041,24 @@ class SpacingTest {
         val chip = compose.onNodeWithTag("op-CONTAINS").getBoundsInRoot()
         val value = compose.onNodeWithTag("ruleValue").getBoundsInRoot()
         assertEven("Rule chips", chip.top - name.bottom, value.top - chip.bottom, 12.dp)
+    }
+
+    /** Settings › Connections (issue #665): folded cards are one height, evenly spaced, the page margin from the edges. */
+    @Test fun connectionCardsAreEven() {
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.padding(app.siansa.ui.Space.Page), verticalArrangement = Arrangement.spacedBy(app.siansa.ui.Space.Small)) {
+                    listOf("a" to "Navidrome", "b" to "Audiobookshelf", "c" to "AudioMuse-AI").forEach { (key, title) ->
+                        app.siansa.ui.FoldCard(androidx.compose.material.icons.Icons.Rounded.Settings, title, "Set up", expanded = false, onToggle = {}, tag = "fold-$key") { }
+                    }
+                }
+            }
+        }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val cards = listOf("a", "b", "c").map { compose.onNodeWithTag("fold-$it").getBoundsInRoot() }
+        cards.forEach { assertEven("Card height", cards[0].bottom - cards[0].top, it.bottom - it.top, 1.dp) }
+        assertEven("Gap between cards", cards[1].top - cards[0].bottom, cards[2].top - cards[1].bottom, 1.dp)
+        assertEven("Card margins", cards[0].left - screen.left, screen.right - cards[0].right, 1.dp)
     }
 
     @androidx.compose.runtime.Composable

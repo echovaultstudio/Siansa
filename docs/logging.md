@@ -67,7 +67,7 @@ INFO and above are always written while logging is on.
 - Fields whose name says they hold a secret (password, token, salt, key, api key, cookie, authorization, jwt…,
   any case, with or without `-`/`_`) are replaced with `•••` at any depth of the fields.
 - Every string (messages, fields, error messages and stacks) also goes through patterns for addresses with
-  tokens (`t=`, `s=`, `p=`…), login headers, `token=…`, JSON `"password":"…"`, OpenRouter keys and
+  tokens (`t=`, `s=`, `p=`…), login headers, `token=…`, JSON `"password":"…"`, AI services' keys (OpenRouter, OpenAI, Anthropic, Groq, Google) and
   `user:password@` in addresses.
 - Server addresses and IP addresses stay (issue #180: the log is a tool for tracing problems), and so do the
   words of sound searches (issue #229).
