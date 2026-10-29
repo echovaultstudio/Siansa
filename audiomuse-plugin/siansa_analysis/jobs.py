@@ -25,6 +25,16 @@ from . import beats, generations, loudness, ramps, similarity, status, store
 
 HOOK_BUDGET_SECONDS = 60
 DEFAULT_BATCH = 40
+# Songs measured again for their beat grids per 15-minute round (Siansa issue #646); 0 only when asked.
+DEFAULT_BEATS_BATCH = 20
+
+# The two measuring parts: volume and fade profiles for songs without one, and beat grids for songs measured
+# before the beat tracker. They share the decoding and the lock (one song is read at a time), but each has its
+# own batch, its own "measure all" switch and its own job state, so the page shows and steers them apart.
+PARTS = {
+    "profiles": {"job": "profiles_job", "all": "measure_all", "batch": "batch_size", "default": DEFAULT_BATCH, "beats": False},
+    "beats": {"job": "beats_job", "all": "beats_all", "batch": "beats_batch_size", "default": DEFAULT_BEATS_BATCH, "beats": True},
+}
 
 
 def now_iso():
@@ -92,35 +102,61 @@ def _download(item_id, title, folder):
     return download_track(folder, item)
 
 
-def measure_all_on(db):
-    return bool((store.get_state("measure_all", {}, db) or {}).get("on"))
+def measure_all_on(db, part="profiles"):
+    return bool((store.get_state(PARTS[part]["all"], {}, db) or {}).get("on"))
+
+
+def batch_size(part, batch=None):
+    """Songs per normal round of ``part``: 1–500 for profiles; 0–500 for beats, where 0 means only when asked."""
+    spec = PARTS[part]
+    value = batch if batch is not None else get_setting(spec["batch"], spec["default"])
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        value = spec["default"]
+    return max(0 if spec["beats"] else 1, min(value, 500))
 
 
 def measure_missing(budget_seconds=None, batch=None):
-    """Measures songs without a profile, a round at a time.
+    """Measures songs without a volume and fade profile, a round at a time (see :func:`measure_part`)."""
+    return measure_part("profiles", budget_seconds, batch)
 
-    A normal round measures one batch (the "Songs per run" setting) within :data:`status.NORMAL_ROUND_SECONDS`.
-    With "Measure all songs" on, a round goes on until :data:`status.ALL_ROUND_SECONDS`, and the scheduled tick
-    keeps starting rounds until every song is measured or it is stopped. The rounds end with a few minutes
-    free, because AudioMuse-AI doesn't start its own jobs (such as analysis) while a plugin job runs.
+
+def measure_beats(budget_seconds=None, batch=None):
+    """Measures songs again for their beat grids, a round at a time (see :func:`measure_part`)."""
+    return measure_part("beats", budget_seconds, batch)
+
+
+def measure_part(part, budget_seconds=None, batch=None):
+    """Measures the songs ``part`` still needs ("profiles" or "beats"), a round at a time.
+
+    A normal round measures one batch (that part's "Songs per run" setting) within
+    :data:`status.NORMAL_ROUND_SECONDS`. With that part's "Measure all" on, a round goes on until
+    :data:`status.ALL_ROUND_SECONDS`, and the scheduled tick keeps starting rounds until every song is measured or
+    it is stopped. The rounds end with a few minutes free, because AudioMuse-AI doesn't start its own jobs (such as
+    analysis) while a plugin job runs. Both parts measure a song in full, so a song measured for its beats gets
+    its loudness and ramps again too (the same values).
     """
+    spec = PARTS[part]
     db = get_db()
     if not store.try_lock(db, "profiles"):
         return {"status": "busy"}
     started = time.monotonic()
     measured = failed = skipped = 0
-    all_on = measure_all_on(db)
+    all_on = measure_all_on(db, part)
     budget = budget_seconds or status.round_seconds(all_on)
     folder = tempfile.mkdtemp(prefix="siansa_analysis_")
     rate = store.get_state("profiles_rate", {}, db) or {}
     try:
-        limit = 10_000 if all_on else max(1, min(int(batch or get_setting("batch_size", DEFAULT_BATCH) or DEFAULT_BATCH), 500))
-        store.set_state("profiles_job", {"status": "running", "started_at": now_iso(), "all": all_on, "measured": 0,
-                                         "error": None}, db)
+        limit = 10_000 if all_on else batch_size(part, batch)
+        if limit <= 0:
+            return {"status": "idle", "measured": 0, "note": "only when asked"}
+        store.set_state(spec["job"], {"status": "running", "started_at": now_iso(), "all": all_on, "measured": 0,
+                                      "error": None}, db)
         tried = set()
         stopped = False
         while len(tried) < limit and not stopped:
-            rows = [r for r in store.songs_to_measure(db, min(25, limit - len(tried)) + len(tried))
+            rows = [r for r in store.songs_to_measure(db, min(25, limit - len(tried)) + len(tried), beats=spec["beats"])
                     if r[0] not in tried]
             if not rows:
                 break
@@ -129,7 +165,7 @@ def measure_missing(budget_seconds=None, batch=None):
                 if left <= 5:
                     stopped = True
                     break
-                if all_on and not measure_all_on(db):  # "Stop" on the settings page
+                if all_on and not measure_all_on(db, part):  # "Stop" on the settings page
                     all_on, stopped = False, True
                     break
                 tried.add(item_id)
@@ -142,32 +178,38 @@ def measure_missing(budget_seconds=None, batch=None):
                     measured += 1
                 except NotOnServer:
                     skipped += 1
-                    store.save_elsewhere(db, item_id)
+                    if spec["beats"]:
+                        store.save_beats_failure(db, item_id, "not on this music server")
+                    else:
+                        store.save_elsewhere(db, item_id)
                 except Exception as e:
                     db.rollback()
                     failed += 1
-                    logger.info("siansa_analysis couldn't measure %s: %s", item_id, e)
-                    store.save_failure(db, item_id, e)
+                    logger.info("siansa_analysis couldn't measure %s%s: %s", item_id, " for its beats" if spec["beats"] else "", e)
+                    if spec["beats"]:
+                        store.save_beats_failure(db, item_id, e)  # its loudness stays as it was
+                    else:
+                        store.save_failure(db, item_id, e)
                 finally:
                     if path and os.path.exists(path):
                         os.remove(path)
                 if measured and measured % 10 == 0:
-                    store.set_state("profiles_job", {"status": "running", "started_at": now_iso(), "all": all_on,
-                                                     "measured": measured, "error": None}, db)
+                    store.set_state(spec["job"], {"status": "running", "started_at": now_iso(), "all": all_on,
+                                                  "measured": measured, "error": None}, db)
         seconds = round(time.monotonic() - started, 1)
         store.set_state("profiles_rate", status.next_rate(rate, measured + failed, seconds), db)
-        if all_on and not store.songs_to_measure(db, 1):
-            store.set_state("measure_all", {"on": False, "finished_at": now_iso()}, db)
-            logger.info("siansa_analysis: every song is measured")
+        if all_on and not store.songs_to_measure(db, 1, beats=spec["beats"]):
+            store.set_state(spec["all"], {"on": False, "finished_at": now_iso()}, db)
+            logger.info("siansa_analysis: every song is measured%s", " for its beats" if spec["beats"] else "")
         result = {"status": "idle", "finished_at": now_iso(), "measured": measured, "failed": failed,
                   "other_server": skipped, "seconds": seconds, "error": None}
-        store.set_state("profiles_job", result, db)
-        logger.info("siansa_analysis profiles: %s measured, %s failed in %.0f s", measured, failed, seconds)
+        store.set_state(spec["job"], result, db)
+        logger.info("siansa_analysis %s: %s measured, %s failed in %.0f s", part, measured, failed, seconds)
         return result
     except Exception as e:
         db.rollback()
-        store.set_state("profiles_job", {"status": "failed", "finished_at": now_iso(), "error": str(e)[:300]}, db)
-        logger.exception("siansa_analysis profile run failed")
+        store.set_state(spec["job"], {"status": "failed", "finished_at": now_iso(), "error": str(e)[:300]}, db)
+        logger.exception("siansa_analysis %s run failed", part)
         return {"status": "failed", "error": str(e)}
     finally:
         shutil.rmtree(folder, ignore_errors=True)
@@ -258,19 +300,41 @@ def build_similar(force=False):
 # ---- the tick ------------------------------------------------------------------------------------------------
 
 def tick():
-    """The scheduled task: keeps both parts current, each on its own."""
+    """The scheduled task: keeps every part current, each on its own. The beat grids get the time the profiles
+    round left over (or a whole round while "Measure all" is on for them), so one tick never runs past its slot."""
     result = {}
+    started = time.monotonic()
     for name, job in (("similar", build_similar), ("profiles", measure_missing)):
         try:
             result[name] = job()
         except Exception as e:  # one part failing must not stop the other
             logger.exception("siansa_analysis %s failed", name)
             result[name] = {"status": "failed", "error": str(e)}
+    try:
+        db = get_db()
+        beats_all, profiles_all = measure_all_on(db, "beats"), measure_all_on(db, "profiles")
+        spent = time.monotonic() - started
+        left = (status.ALL_ROUND_SECONDS if beats_all and not profiles_all else status.round_seconds(profiles_all)) - spent
+        if left >= MIN_BEATS_ROUND_SECONDS:
+            result["beats"] = measure_beats(budget_seconds=left)
+        else:
+            result["beats"] = {"status": "idle", "note": "no time left this round"}
+    except Exception as e:
+        logger.exception("siansa_analysis beats failed")
+        result["beats"] = {"status": "failed", "error": str(e)}
     return result
+
+
+# The beat grids start no round with less than this left of the tick's slot.
+MIN_BEATS_ROUND_SECONDS = 30
 
 
 def prepare_now():
     return measure_missing()
+
+
+def beats_now():
+    return measure_beats()
 
 
 def rebuild_now():

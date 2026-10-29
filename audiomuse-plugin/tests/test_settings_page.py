@@ -98,5 +98,126 @@ class MeasureAllPageTest(unittest.TestCase):
         self.assertIn(web.MESSAGES["busy"], web.render_settings(self.state(), 40, web.MESSAGES["busy"]))
 
 
+class BeatGridsTest(unittest.TestCase):
+    """Beat grids have their own part on the page (Siansa #646): counts, a batch setting, measure now and all."""
+
+    def state(self, beats_all=False, running=False, waiting=30, failures=()):
+        inputs = Inputs("L", 3, 10, "A", 5, 8)
+        counts = status.profile_counts(100, 100, 0)
+        beat_counts = status.beats_counts(60, 45, 10, waiting)
+        job = {"status": "running"} if running else {}
+        return {
+            "inputs": inputs, "counts": counts, "built": {}, "profiles_job": {}, "similar_job": {},
+            "profiles": status.profiles(counts, {}), "similar": status.similar(inputs, {}, {}, 1),
+            "beat_counts": beat_counts, "beats_job": job, "beats": status.beats(beat_counts, job),
+            "beats_all": beats_all, "beats_failures": list(failures), "rate": {"songs": 10, "seconds": 50},
+        }
+
+    def test_counts_and_labels(self):
+        c = status.beats_counts(60, 45, 10, 30)
+        self.assertEqual(c, {"songs": 100, "done": 60, "with_beat": 45, "failed": 10, "to_measure": 30})
+        self.assertEqual(status.beats(c, {}).label, "Not complete")
+        self.assertEqual(status.beats(c, {}).percent, 70)
+        self.assertEqual(status.beats(c, {"status": "running"}).label, "Measuring")
+        self.assertEqual(status.beats(status.beats_counts(90, 70, 10, 0), {}).label, "Ready")
+        self.assertEqual(status.beats(status.beats_counts(0, 0, 0, 0), {}).label, "Waiting for profiles")
+        self.assertIn("45 with a beat at either end", status.beats(c, {}).detail)
+        self.assertIn("10 couldn't be read again", status.beats(c, {}).detail)
+
+    def test_its_own_section_with_settings_and_buttons(self):
+        page = web.render_settings(self.state(), 40, "", 20)
+        self.assertIn("3. Beat grids", page)
+        self.assertIn("4. Similar albums", page)
+        self.assertIn("30 still to measure", page)
+        self.assertIn('name="beats_batch_size" value="20"', page)
+        self.assertIn('value="measure_beats"', page)
+        self.assertIn("Measure all 30 songs for their beats", page)
+        self.assertIn("every song has its beat grid in about", page)
+        self.assertIn("Their loudness and fades stay in use meanwhile", page)
+
+    def test_measuring_all_shows_stop_and_nothing_left_hides_the_offer(self):
+        page = web.render_settings(self.state(beats_all=True, running=True), 40, "", 20)
+        self.assertIn('value="stop_beats_all"', page)
+        self.assertNotIn('value="beats_all"', page)
+        self.assertIn('value="measure_beats" disabled', page)
+        self.assertIn('value="measure" disabled', page)  # one song at a time across both parts
+        done = web.render_settings(self.state(waiting=0), 40, "", 20)
+        self.assertNotIn("for their beats</button>", done)
+        self.assertIn('value="measure_beats" disabled', done)
+
+    def test_zero_per_run_means_only_when_asked(self):
+        page = web.render_settings(self.state(), 40, "", 0)
+        self.assertIn("only when you press a button here", page)
+        self.assertNotIn("every song has its beat grid in", page)
+
+    def test_failures_are_listed(self):
+        page = web.render_settings(self.state(failures=[("x", "Song", "Artist", "unreadable")]), 40, "", 20)
+        self.assertIn("couldn't be read for their beats", page)
+        self.assertIn("Song – Artist: unreadable", page)
+
+    def test_batch_size_allows_zero_for_beats_only(self):
+        from siansa_analysis import jobs
+        self.assertEqual(jobs.batch_size("beats", 0), 0)
+        self.assertEqual(jobs.batch_size("profiles", 0), 1)
+        self.assertEqual(jobs.batch_size("beats", 900), 500)
+        self.assertEqual(jobs.batch_size("beats", "x"), jobs.DEFAULT_BEATS_BATCH)
+
+
+class BeatButtonsTest(SettingsPostTest):
+    def test_measure_save_all_and_stop(self):
+        queued = []
+        web.enqueue = lambda func, **k: queued.append(func.__name__)
+        answer = self.post_beats("measure_beats", "7")
+        self.assertTrue(answer.headers["Location"].endswith("note=beats_measuring"))
+        self.assertEqual(queued, ["beats_now"])
+        self.assertEqual(api.settings["beats_batch_size"], 7)
+        self.assertTrue(self.post_beats("save_beats", "0").headers["Location"].endswith("note=saved"))
+        self.assertEqual(api.settings["beats_batch_size"], 0)
+        self.assertTrue(self.post_beats("beats_all").headers["Location"].endswith("note=beats_all"))
+        self.assertTrue(self.states["beats_all"]["on"])
+        self.assertNotIn("measure_all", self.states)  # the other part's switch is left alone
+        self.post_beats("stop_beats_all")
+        self.assertFalse(self.states["beats_all"]["on"])
+
+    def post_beats(self, action, size="20"):
+        return self.client.post("/plugins/siansa_analysis/settings", data={"action": action, "beats_batch_size": size})
+
+
+class TickTest(unittest.TestCase):
+    def test_beats_get_the_time_the_profiles_round_left(self):
+        from siansa_analysis import jobs
+        calls = {}
+        saved = {n: getattr(jobs, n) for n in ("build_similar", "measure_missing", "measure_beats", "measure_all_on")}
+        clock = [1000.0]
+        jobs.build_similar = lambda: {"status": "up to date"}
+
+        def profiles():
+            clock[0] += 100  # the profiles round took 100 s
+            return {"status": "idle"}
+
+        jobs.measure_missing = profiles
+        jobs.measure_beats = lambda budget_seconds=None: calls.setdefault("budget", budget_seconds) and {"status": "idle"}
+        jobs.measure_all_on = lambda db, part="profiles": part == "beats" and calls.get("all", False)
+        real = jobs.time.monotonic
+        jobs.time.monotonic = lambda: clock[0]
+        try:
+            jobs.tick()
+            self.assertAlmostEqual(calls["budget"], status.NORMAL_ROUND_SECONDS - 100)
+            calls.clear()
+            calls["all"] = True
+            clock[0] = 1000.0
+            jobs.tick()
+            self.assertAlmostEqual(calls["budget"], status.ALL_ROUND_SECONDS - 100)
+            calls.clear()
+            clock[0] = 1000.0
+            jobs.measure_missing = lambda: clock.__setitem__(0, clock[0] + status.NORMAL_ROUND_SECONDS) or {}
+            self.assertEqual(jobs.tick()["beats"]["note"], "no time left this round")
+            self.assertNotIn("budget", calls)
+        finally:
+            jobs.time.monotonic = real
+            for n, f in saved.items():
+                setattr(jobs, n, f)
+
+
 if __name__ == "__main__":
     unittest.main()

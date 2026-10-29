@@ -53,9 +53,12 @@ new versions by itself. Only built-in libraries are used (numpy, scipy, PyAV), s
 standalone builds. It needs AudioMuse-AI 3.6.4 or later. A song PyAV can't decode (its copy of FFmpeg lacks
 something the file needs) is read with the `ffmpeg` tool instead, when AudioMuse-AI's install has it.
 
-Songs measured by a version before 0.3.0 keep their loudness and fades and are measured again, in the
-background, for their beat grids (the plugin's page says how many are waiting). That reads every file once
-more, so a big library takes a while; Siansa blends a song the plain way until its grid is there.
+Songs measured by a version before 0.3.0 keep their loudness and fades and are measured again for their beat
+grids. The settings page has a **Beat grids** section for that, apart from the profiles: how many songs have their
+grids and how many are waiting, its own **Songs per run** (0 measures them only when you ask), **Measure a batch
+now**, and **Measure all** with **Stop**. Each 15-minute round measures the profiles first and the beat grids in
+the time left over; songs the app is about to play come first. That reads every file once more, so a big library
+takes a while; Siansa blends a song the plain way until its grid is there.
 
 Fetching songs for older ones works with Navidrome, Jellyfin, Emby and Lyrion; Plex songs are measured
 when AudioMuse-AI analyses them.
