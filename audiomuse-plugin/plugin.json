@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.2.4",
+      "min_core_version": "3.6.4",
+      "changelog": "Songs that couldn't be measured with \"Not yet implemented in FFmpeg, patches welcome\" are now read with the ffmpeg tool instead (the one AudioMuse-AI analyses them with), so they get loudness levelling and SmoothFade too. A packet this FFmpeg can't decode counts like a damaged one, and the error names the codec.",
+      "imageUrl": ""
+    },
+    {
       "version": "0.2.3",
       "min_core_version": "3.6.4",
       "changelog": "Similar albums and artists now work for every music server in AudioMuse (for example Emby next to Navidrome): the server the app names is looked up the way AudioMuse does it, and only albums and artists on that server are listed.",
