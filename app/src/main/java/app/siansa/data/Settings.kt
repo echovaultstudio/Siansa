@@ -98,6 +98,8 @@ data class AppSettings(
     /** On: now playing's lyrics, device and queue buttons (issue #294). Off: the earlier look, lyrics card peeking in. */
     val nowPlayingLyricsButton: Boolean = true,
     val homeHidden: Set<HomeSection> = emptySet(),
+    /** Home's rows in another look than their own (issue #655); a row not in it looks as it is. */
+    val homeLooks: Map<HomeSection, HomeLook> = emptyMap(),
     /** The gap between Home's sections (#554), as a step of the spacing scale: 0 tight … 4 airy. 2 is the default. */
     val homeGap: Int = HOME_GAP_DEFAULT,
     /** Show only music on the phone, across the whole app (issue #141). */
@@ -313,6 +315,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         navTabs = NavTab.parse(prefs.getString("nav_tabs", null)),
         nowPlayingLyricsButton = prefs.getBoolean("now_playing_lyrics_button", true),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
+        homeLooks = HomeLook.parse(prefs.getString("home_looks", null)),
         homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
         timeMachineMissing = prefs.getBoolean("time_machine_missing", true),
@@ -512,6 +515,19 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setHomeHidden(hidden: Set<HomeSection>) {
         prefs.edit().putString("home_hidden", HomeSection.formatHidden(hidden)).apply()
         _state.value = _state.value.copy(homeHidden = hidden)
+    }
+
+    /** The look of one of Home's rows (issue #655); [HomeLook.AS_IS] puts it back. */
+    fun setHomeLook(section: HomeSection, look: HomeLook) {
+        val looks = (_state.value.homeLooks - section) + (if (look != HomeLook.AS_IS && section.lookable) mapOf(section to look) else emptyMap())
+        prefs.edit().putString("home_looks", HomeLook.format(looks)).apply()
+        _state.value = _state.value.copy(homeLooks = looks)
+    }
+
+    /** Every row back in its own look. */
+    fun resetHomeLooks() {
+        prefs.edit().remove("home_looks").apply()
+        _state.value = _state.value.copy(homeLooks = emptyMap())
     }
 
     fun setSyncFolders(ids: Set<String>) {

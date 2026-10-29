@@ -1000,6 +1000,38 @@ class SpacingTest {
         assertEven("Play button left margin is the page margin", button.left - screen.left, Space.Page, 1.dp)
     }
 
+    /** Home's rows in another look (issue #655): the banner and the play button card sit a page margin from both edges. */
+    @Test fun homeLookCardsHaveEvenPageMargins() {
+        val items = (1..6).map { app.siansa.ui.HomeItem("a$it", "Album $it", "Artist", open = {}) }
+        compose.setContent {
+            SiansaTheme {
+                Column {
+                    app.siansa.ui.HomeLookRow(app.siansa.data.HomeLook.BANNER, "recent", "Recently played", items, openAll = {})
+                    app.siansa.ui.HomeLookRow(app.siansa.data.HomeLook.BUTTON, "added", "Recently added", items, openAll = {})
+                }
+            }
+        }
+        val screen = compose.onRoot().getBoundsInRoot()
+        for ((label, tag) in listOf("Banner" to "homeLookBanner", "Play button" to "homeLookButton")) {
+            val card = compose.onNodeWithTag(tag).getBoundsInRoot()
+            assertEven("$label margins", card.left - screen.left, screen.right - card.right, 1.dp)
+            assertEven("$label left margin is the page margin", card.left - screen.left, Space.Page, 1.dp)
+        }
+    }
+
+    /** Home's rows as a list (issue #655): five rows of one height, evenly spaced. */
+    @Test fun homeLookListRowsAreEven() {
+        val items = (1..8).map { app.siansa.ui.HomeItem("a$it", "Album $it", "Artist", open = {}) }
+        compose.setContent { SiansaTheme { Column { app.siansa.ui.HomeLookRow(app.siansa.data.HomeLook.LIST, "added", "Recently added", items, openAll = {}) } } }
+        val rows = compose.onAllNodesWithTag("homeLookListRow").fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(5, rows.size)
+        val density = compose.onRoot().fetchSemanticsNode().layoutInfo.density.density
+        val heights = rows.map { ((it.bottom - it.top) / density).dp }
+        heights.forEach { assertEven("List row height", heights[0], it, 1.dp) }
+        val gaps = rows.zipWithNext { a, b -> ((b.top - a.bottom) / density).dp }
+        gaps.forEach { assertEven("Gap between list rows", gaps[0], it, 1.dp) }
+    }
+
     @androidx.compose.runtime.Composable
     private fun MusicSourceRows() {
         SiansaTheme { Column { SourceKind.entries.forEach { SourceRow(it) { } } } }

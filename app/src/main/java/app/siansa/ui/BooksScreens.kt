@@ -74,7 +74,7 @@ import app.siansa.log.AppLog
  * Up next (a series' next) or New. Only with a server set up; nothing while it can't be reached.
  */
 @Composable
-fun BooksCarousel(nav: NavController, podcasts: Boolean) {
+fun BooksCarousel(nav: NavController, podcasts: Boolean, look: app.siansa.data.HomeLook = app.siansa.data.HomeLook.AS_IS) {
     val graph = LocalGraph.current
     val progress by graph.books.progress.collectAsStateWithLifecycle()
     // The shelves as last read, so scrolling back to the carousel shows it at once, at its height (#569: it was
@@ -83,6 +83,13 @@ fun BooksCarousel(nav: NavController, podcasts: Boolean) {
     LaunchedEffect(podcasts) { graph.books.refreshShelves(podcasts) }
     val cards = booksForCarousel(shelvesAll[podcasts].orEmpty().flatMap { shelf -> shelf.books.map { shelf.id to it } }, progress)
     if (cards.isEmpty()) return
+    if (look != app.siansa.data.HomeLook.AS_IS) {
+        // Another look, picked under Arrange Home (issue #655).
+        HomeLookRow(look, if (podcasts) "podcasts" else "books", if (podcasts) "Your podcasts" else "Your books", cards.map { (label, book) ->
+            HomeItem(book.id, book.title, label, book.cover, open = { nav.navigate("book/${book.id}") })
+        })
+        return
+    }
     val pager = rememberPagerState { cards.size }
     Column(Modifier.fillMaxWidth().testTag(if (podcasts) "homePodcasts" else "homeBooks")) {
         SectionTitle(if (podcasts) "Your podcasts" else "Your books")
