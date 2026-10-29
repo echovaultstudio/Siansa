@@ -64,7 +64,8 @@ are waiting, its own **Songs per run** (any number, since a round stops when its
 only when you ask), **Measure a batch now**, and **Measure all** with **Stop**. Each round measures the volume and
 fade profiles first and the beat grids in the time left; songs Siansa is about to play come first. A song that
 can't be read is tried again later (after an hour, 6 hours, a day, then 3 days); the page says why songs failed and
-has **Try them all again now** (0.3.2). Songs only on another music server in AudioMuse are counted apart.
+has **Try them all again now** (0.3.2). Songs on none of AudioMuse's music servers (removed, or not matched yet)
+are counted apart.
 
 ## Several music servers in one AudioMuse-AI
 
@@ -81,3 +82,7 @@ Navidrome's. Users shown together are always on one server, so one name covers t
 analysing that server too, or by **Align** in its setup, which matches songs by path and tags. Songs it couldn't
 match can't be used for radios and similar music. If Siansa says "AudioMuse doesn't know this song", see
 [Troubleshooting](troubleshooting.md#audiomuse-doesnt-know-this-song).
+
+The Siansa plugin measures songs on every server: it fetches each song from whichever server has it (0.3.3).
+AudioMuse-AI runs the plugin's 15-minute task once per server; the first run does the work and the others stop
+straight away, so more servers don't make it take longer.

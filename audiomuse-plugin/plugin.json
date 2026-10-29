@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.3.3",
+      "min_core_version": "3.6.4",
+      "changelog": "Several music servers in AudioMuse: a song is now fetched from whichever server has it, so songs only on a second or third server get their beat grids (and profiles) too. 0.3.2 put them off for a week and the run for their own server skipped them. The 15-minute task does its work once, not once per music server, so it no longer takes three times as long with three servers.",
+      "imageUrl": ""
+    },
+    {
       "version": "0.3.2",
       "min_core_version": "3.6.4",
       "changelog": "Beat grids: a song that couldn't be measured is tried again later (after an hour, 6 hours, a day, 3 days) instead of never; 0.3.1's are tried again now. Songs only on another music server are counted apart and looked at weekly. The page says why songs failed, with how many each, and has Try them all again now. Songs per run for beat grids can be any number: a round still stops when its time is up.",

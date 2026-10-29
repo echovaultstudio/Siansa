@@ -162,10 +162,10 @@ class BeatGridsTest(unittest.TestCase):
         self.assertIn('value="retry_beats"', page)
         self.assertNotIn('value="retry_beats"', web.render_settings(self.state(failed=0), 40, "", 20))
 
-    def test_songs_on_another_server_are_said_apart(self):
+    def test_songs_on_no_server_are_said_apart(self):
         page = web.render_settings(self.state(elsewhere=41027), 40, "", 20)
-        self.assertIn("41,027 songs are only on another music server", page)
-        self.assertNotIn("only on another music server", web.render_settings(self.state(), 40, "", 20))
+        self.assertIn("41,027 songs aren&#x27;t on any of AudioMuse", page.replace("'", "&#x27;"))
+        self.assertNotIn("on any of AudioMuse", web.render_settings(self.state(), 40, "", 20))
 
     def test_any_number_of_songs_per_run(self):
         page = web.render_settings(self.state(), 40, "", 50000)
