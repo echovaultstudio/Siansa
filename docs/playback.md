@@ -48,8 +48,9 @@ size, so they stay gapless too.
   apart. **Off** plays songs as they are.
 - **Where loudness comes from**: song tags (ReplayGain), or the **Siansa plugin**, which measures the audio itself
   (useful when your files have no ReplayGain tags). Songs the plugin hasn't measured yet use their tags.
-- **Target**: −18 LUFS matches ReplayGain and leaves room for loud songs. −14 is louder, like Spotify, but quiet
-  songs can't be raised to it.
+- **Target**: how loud songs are brought to, by the plugin's measurement or by ReplayGain tags alone. −18 LUFS is
+  ReplayGain's own level and leaves room for loud songs. −14 is louder, like Spotify: tagged songs play 4 dB louder
+  than their tags say, but never louder than the file itself or past their peak, so quiet songs can't be raised to it.
 
 Details: [How it works › Levelling](how-it-works.md#levelling).
 

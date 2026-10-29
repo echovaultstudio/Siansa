@@ -149,6 +149,27 @@ class ReplayGainTest {
         assertEquals(0.355f, replayGainVolume(song, AppSettings(replayGain = ReplayGainMode.ALBUM)), 0.005f)
     }
 
+    /** Issue #667: the loudness target applies to ReplayGain tags too: −18 is their own level, −14 is 4 dB more. */
+    @Test fun replayGainFollowsTheLoudnessTarget() {
+        val loud = app.siansa.data.Song(id = "l", title = "Loud", trackGain = -9f, trackPeak = 0.5f)
+        val rg = AppSettings(replayGain = ReplayGainMode.TRACK)
+        assertEquals(0.355f, replayGainVolume(loud, rg.copy(loudnessTarget = -18)), 0.005f)  // -9 dB
+        assertEquals(0.562f, replayGainVolume(loud, rg.copy(loudnessTarget = -14)), 0.005f)  // -5 dB
+        // Never louder than the file, nor past the peak (0.5 here: at most 2× would be allowed, but 1 is the cap).
+        val quiet = app.siansa.data.Song(id = "q", title = "Quiet", trackGain = -2f, trackPeak = 0.9f)
+        assertEquals(1f, replayGainVolume(quiet, rg.copy(loudnessTarget = -14)), 0.001f)
+        val hot = app.siansa.data.Song(id = "h", title = "Hot", trackGain = -3f, trackPeak = 1.0f)
+        assertEquals(1f, replayGainVolume(hot, rg.copy(loudnessTarget = -14)), 0.001f)
+        // A song without tags is left as it is, whatever the target.
+        assertEquals(1f, replayGainVolume(app.siansa.data.Song(id = "n", title = "None"), rg.copy(loudnessTarget = -14)), 0.001f)
+        assertEquals(4f, app.siansa.playback.replayGainShiftDb(-14), 0.001f)
+        assertEquals(0f, app.siansa.playback.replayGainShiftDb(-18), 0.001f)
+        // The levelling decision says where it brought the song.
+        val d = app.siansa.playback.Levelling.decide(loud, rg.copy(loudnessTarget = -14), null)
+        assertTrue(d.why, d.why.endsWith("brought to -14 LUFS"))
+
+    }
+
     @Test fun offIsFullVolume() {
         assertEquals(1f, replayGainVolume(song, AppSettings(replayGain = ReplayGainMode.OFF)), 0f)
     }

@@ -102,9 +102,10 @@ fun CrossfadeScreen(nav: NavController) {
             Heading("Levelling")
             ReplayGainRow(settings.replayGain) { graph.settings.save(graph.settings.current.copy(replayGain = it)) }
             Hint("Evens out loudness. Track: every song at the same level. Album: an album's loud and quiet songs keep their difference. Off: songs play as they are.")
-            if (settings.loudnessSource == LoudnessSource.PLUGIN) {
+            // The target applies to ReplayGain tags too (issue #667), so it's there whenever levelling is on.
+            if (settings.replayGain != ReplayGainMode.OFF) {
                 LoudnessTargetRow(settings.loudnessTarget) { graph.settings.setLoudness(target = it) }
-                Hint("How loud songs are brought to. −18 matches ReplayGain and leaves room for loud songs. −14 is louder, like Spotify, but quiet songs can't be raised to it.")
+                Hint("How loud songs are brought to, by the plugin's measurement or by ReplayGain tags. −18 is ReplayGain's own level and leaves room for loud songs. −14 is louder, like Spotify, but quiet songs can't be raised to it.")
             }
             Hint(levellingHint(settings))
             HorizontalDivider()
