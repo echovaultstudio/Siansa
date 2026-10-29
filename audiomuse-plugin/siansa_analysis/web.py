@@ -25,7 +25,7 @@ from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url,
 from . import generations, jobs, similarity, status, store
 
 PLUGIN_ID = "siansa_analysis"
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
@@ -299,10 +299,21 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
                                  " Their loudness and fades stay in use meanwhile.")
     beats_error = beats_job.get("error")
     beats_failures = ""
-    if state.get("beats_failures"):
-        items = "".join(f"<li>{escape(str(t or i))} – {escape(str(a or ''))}: {escape(str(e or ''))}</li>"
-                        for i, t, a, e in state["beats_failures"])
-        beats_failures = f"<details><summary>Songs that couldn't be read for their beats</summary><ul>{items}</ul></details>"
+    if beat_counts["failed"]:
+        # Why, the most common first, then the last few songs (issue #657), and a way to try them all again now.
+        reasons = "".join(f"<li>{n:,} songs: {escape(str(r or 'unknown'))}</li>" for r, n in state.get("beats_reasons") or [])
+        songs = "".join(f"<li>{escape(str(t or i))} – {escape(str(a or ''))}: {escape(str(e or ''))}</li>"
+                        for i, t, a, e in state.get("beats_failures") or [])
+        beats_failures = f"""<details><summary>Why {beat_counts['failed']:,} songs couldn't be read yet</summary>
+    {f"<ul>{reasons}</ul>" if reasons else ""}{f"<p class='mx-help'>The last ones:</p><ul>{songs}</ul>" if songs else ""}
+    <p class="mx-help">Each is tried again by itself, after an hour, then 6 hours, a day, and 3 days.</p>
+    <form method="post" class="mx-actions"><button type="submit" name="action" value="retry_beats"{busy}>Try them all again now</button></form>
+  </details>"""
+    elsewhere_line = ""
+    if beat_counts.get("elsewhere"):
+        elsewhere_line = (f'<p class="mx-help">{beat_counts["elsewhere"]:,} songs are only on another music server in '
+                          'AudioMuse, not the one this plugin reads from; they\'re looked at again once a week and '
+                          "don't count here.</p>")
     similar_error = state["similar_job"].get("error")
     return f"""{_STYLE}{refresh}{note}
 <section class="mx-section" aria-label="Library">
@@ -334,11 +345,13 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
   <div class="mx-head"><h3>3. Beat grids</h3>{_badge(b)}</div>
   {_meter(b, "Songs measured for their beats")}
   <p><strong>{escape(b.detail)}.</strong> {beat_counts['to_measure']:,} still to measure.</p>
+  {elsewhere_line}
   <p class="mx-help">The tempo, beats and bars at each end of a song, for beat-matched blends in Siansa's DJ
     radio (experimental). New songs get theirs with their volume and fade profile. Songs measured before plugin
     0.3.0 are measured again for them, a batch at a time after the profiles each 15 minutes, songs the app is
     about to play first. Their loudness and fades stay in use meanwhile; a song without its grid blends the
-    plain way. Songs per run 0 measures them only when you ask.</p>
+    plain way. Songs per run can be any number: a round stops when its time is up (4 minutes, 12 while measuring
+    all), so a big number means "as many as fit". 0 measures them only when you ask.</p>
   {f'<p class="mx-help mx-attention">Last run: {escape(beats_error)}</p>' if beats_error else ''}
   {beats_failures}
   {beats_left_line}
@@ -377,6 +390,8 @@ MESSAGES = {
     "all_waiting": "Measuring every song starts with the next round, within 15 minutes: another AudioMuse job is running.",
     "stopped": "Stopped. The songs measured so far are kept; the rest are measured a batch at a time again.",
     "beats_measuring": "Measuring a batch for their beats. This page updates by itself.",
+    "beats_retry": "{n} songs are tried again for their beats, starting now. This page updates by itself.",
+    "beats_retry_waiting": "{n} songs are tried again for their beats with the next round, within 15 minutes: another AudioMuse job is running.",
     "beats_all": "Measuring every song for its beats. It goes on in rounds until all are done; you can stop it here.",
     "beats_all_waiting": "Measuring every song for its beats starts with the next round, within 15 minutes: another AudioMuse job is running.",
     "building": "Build started. This page updates by itself.",
@@ -407,7 +422,7 @@ def settings():
                 pass
         if action in ("save_beats", "measure_beats"):
             try:
-                set_setting("beats_batch_size", max(0, min(int(request.form.get("beats_batch_size", jobs.DEFAULT_BEATS_BATCH)), 500)))
+                set_setting("beats_batch_size", max(0, min(int(request.form.get("beats_batch_size", jobs.DEFAULT_BEATS_BATCH)), jobs.MAX_BEATS_BATCH)))
             except ValueError:
                 pass
         db = get_db()
@@ -424,6 +439,11 @@ def settings():
         elif action == "beats_all":
             store.set_state("beats_all", {"on": True, "started_at": jobs.now_iso()}, db)
             note = "beats_all" if _start(jobs.beats_now) else "beats_all_waiting"
+        elif action == "retry_beats":
+            n = store.retry_beats(db)
+            logger.info("siansa_analysis: %s songs to be measured again for their beats", n)
+            note = "beats_retry" if _start(jobs.beats_now) else "beats_retry_waiting"
+            return redirect(url_for(f"{PLUGIN_ID}.settings", note=note, n=n))
         elif action == "stop_beats_all":
             store.set_state("beats_all", {"on": False, "stopped_at": jobs.now_iso()}, db)
             note = "stopped"
@@ -445,6 +465,7 @@ def settings():
     state["measure_all"] = bool((store.get_state("measure_all", {}, db) or {}).get("on"))
     state["beats_all"] = bool((store.get_state("beats_all", {}, db) or {}).get("on"))
     state["beats_failures"] = store.recent_beats_failures(db)
+    state["beats_reasons"] = store.beats_failure_reasons(db)
     state["rate"] = store.get_state("profiles_rate", {}, db) or {}
     note = MESSAGES.get(request.args.get("note", ""), "").replace("{n}", f"{request.args.get('n', 0, type=int):,}")
     body = render_settings(state, get_setting("batch_size", jobs.DEFAULT_BATCH), note, jobs.batch_size("beats"))
