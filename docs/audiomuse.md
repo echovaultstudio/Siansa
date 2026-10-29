@@ -60,9 +60,11 @@ Plugin 0.3.0 also measures the beat grid at each end of a song (tempo, where the
 beat-driven and how steady the end is), for [beat-matched blends](playback.md#beat-matched-blends-experimental).
 Songs measured by an older version keep their loudness and fades and are measured again for their beats. The
 plugin's settings page (0.3.1) has a **Beat grids** section for that: how many songs have their grids and how many
-are waiting, its own **Songs per run** (0 to measure them only when you ask), **Measure a batch now**, and
-**Measure all** with **Stop**. Each round measures the volume and fade profiles first and the beat grids in the
-time left; songs Siansa is about to play come first.
+are waiting, its own **Songs per run** (any number, since a round stops when its time is up; 0 to measure them
+only when you ask), **Measure a batch now**, and **Measure all** with **Stop**. Each round measures the volume and
+fade profiles first and the beat grids in the time left; songs Siansa is about to play come first. A song that
+can't be read is tried again later (after an hour, 6 hours, a day, then 3 days); the page says why songs failed and
+has **Try them all again now** (0.3.2). Songs only on another music server in AudioMuse are counted apart.
 
 ## Several music servers in one AudioMuse-AI
 

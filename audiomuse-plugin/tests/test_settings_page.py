@@ -101,37 +101,41 @@ class MeasureAllPageTest(unittest.TestCase):
 class BeatGridsTest(unittest.TestCase):
     """Beat grids have their own part on the page (Siansa #646): counts, a batch setting, measure now and all."""
 
-    def state(self, beats_all=False, running=False, waiting=30, failures=()):
+    def state(self, beats_all=False, running=False, waiting=30, failures=(), failed=10, elsewhere=0, reasons=()):
         inputs = Inputs("L", 3, 10, "A", 5, 8)
         counts = status.profile_counts(100, 100, 0)
-        beat_counts = status.beats_counts(60, 45, 10, waiting)
+        beat_counts = status.beats_counts(60, 45, failed, waiting, elsewhere)
         job = {"status": "running"} if running else {}
         return {
             "inputs": inputs, "counts": counts, "built": {}, "profiles_job": {}, "similar_job": {},
             "profiles": status.profiles(counts, {}), "similar": status.similar(inputs, {}, {}, 1),
             "beat_counts": beat_counts, "beats_job": job, "beats": status.beats(beat_counts, job),
-            "beats_all": beats_all, "beats_failures": list(failures), "rate": {"songs": 10, "seconds": 50},
+            "beats_all": beats_all, "beats_failures": list(failures), "beats_reasons": list(reasons),
+            "rate": {"songs": 10, "seconds": 50},
         }
 
     def test_counts_and_labels(self):
-        c = status.beats_counts(60, 45, 10, 30)
-        self.assertEqual(c, {"songs": 100, "done": 60, "with_beat": 45, "failed": 10, "to_measure": 30})
+        c = status.beats_counts(60, 45, 10, 30, 5)
+        self.assertEqual(c, {"songs": 100, "done": 60, "with_beat": 45, "failed": 10, "waiting": 30, "to_measure": 40, "elsewhere": 5})
         self.assertEqual(status.beats(c, {}).label, "Not complete")
-        self.assertEqual(status.beats(c, {}).percent, 70)
+        self.assertEqual(status.beats(c, {}).percent, 60)
         self.assertEqual(status.beats(c, {"status": "running"}).label, "Measuring")
-        self.assertEqual(status.beats(status.beats_counts(90, 70, 10, 0), {}).label, "Ready")
+        # Issue #657: songs that failed are still to measure, so it isn't Ready, and with only those left it needs attention.
+        self.assertEqual(status.beats(status.beats_counts(90, 70, 10, 0), {}).label, "Needs attention")
+        self.assertEqual(status.beats_counts(90, 70, 10, 0)["to_measure"], 10)
+        self.assertEqual(status.beats(status.beats_counts(100, 70, 0, 0, 40000), {}).label, "Ready")  # other servers don't count
         self.assertEqual(status.beats(status.beats_counts(0, 0, 0, 0), {}).label, "Waiting for profiles")
         self.assertIn("45 with a beat at either end", status.beats(c, {}).detail)
-        self.assertIn("10 couldn't be read again", status.beats(c, {}).detail)
+        self.assertIn("10 couldn't be read yet", status.beats(c, {}).detail)
 
     def test_its_own_section_with_settings_and_buttons(self):
         page = web.render_settings(self.state(), 40, "", 20)
         self.assertIn("3. Beat grids", page)
         self.assertIn("4. Similar albums", page)
-        self.assertIn("30 still to measure", page)
+        self.assertIn("40 still to measure", page)
         self.assertIn('name="beats_batch_size" value="20"', page)
         self.assertIn('value="measure_beats"', page)
-        self.assertIn("Measure all 30 songs for their beats", page)
+        self.assertIn("Measure all 40 songs for their beats", page)
         self.assertIn("every song has its beat grid in about", page)
         self.assertIn("Their loudness and fades stay in use meanwhile", page)
 
@@ -141,7 +145,7 @@ class BeatGridsTest(unittest.TestCase):
         self.assertNotIn('value="beats_all"', page)
         self.assertIn('value="measure_beats" disabled', page)
         self.assertIn('value="measure" disabled', page)  # one song at a time across both parts
-        done = web.render_settings(self.state(waiting=0), 40, "", 20)
+        done = web.render_settings(self.state(waiting=0, failed=0), 40, "", 20)
         self.assertNotIn("for their beats</button>", done)
         self.assertIn('value="measure_beats" disabled', done)
 
@@ -150,16 +154,31 @@ class BeatGridsTest(unittest.TestCase):
         self.assertIn("only when you press a button here", page)
         self.assertNotIn("every song has its beat grid in", page)
 
-    def test_failures_are_listed(self):
-        page = web.render_settings(self.state(failures=[("x", "Song", "Artist", "unreadable")]), 40, "", 20)
-        self.assertIn("couldn't be read for their beats", page)
+    def test_failures_are_listed_with_their_reasons_and_a_retry(self):
+        page = web.render_settings(self.state(failures=[("x", "Song", "Artist", "unreadable")], reasons=[("unreadable", 9), ("timeout", 1)]), 40, "", 20)
+        self.assertIn("Why 10 songs couldn&#x27;t be read yet", page.replace("'", "&#x27;"))
+        self.assertIn("9 songs: unreadable", page)
         self.assertIn("Song – Artist: unreadable", page)
+        self.assertIn('value="retry_beats"', page)
+        self.assertNotIn('value="retry_beats"', web.render_settings(self.state(failed=0), 40, "", 20))
+
+    def test_songs_on_another_server_are_said_apart(self):
+        page = web.render_settings(self.state(elsewhere=41027), 40, "", 20)
+        self.assertIn("41,027 songs are only on another music server", page)
+        self.assertNotIn("only on another music server", web.render_settings(self.state(), 40, "", 20))
+
+    def test_any_number_of_songs_per_run(self):
+        page = web.render_settings(self.state(), 40, "", 50000)
+        self.assertIn('name="beats_batch_size" value="50000"', page)
+        self.assertIn("as many as fit", page)
 
     def test_batch_size_allows_zero_for_beats_only(self):
         from siansa_analysis import jobs
         self.assertEqual(jobs.batch_size("beats", 0), 0)
         self.assertEqual(jobs.batch_size("profiles", 0), 1)
-        self.assertEqual(jobs.batch_size("beats", 900), 500)
+        self.assertEqual(jobs.batch_size("beats", 900), 900)
+        self.assertEqual(jobs.batch_size("beats", 10 ** 9), jobs.MAX_BEATS_BATCH)
+        self.assertEqual(jobs.batch_size("profiles", 900), 500)
         self.assertEqual(jobs.batch_size("beats", "x"), jobs.DEFAULT_BEATS_BATCH)
 
 
@@ -178,9 +197,24 @@ class BeatButtonsTest(SettingsPostTest):
         self.assertNotIn("measure_all", self.states)  # the other part's switch is left alone
         self.post_beats("stop_beats_all")
         self.assertFalse(self.states["beats_all"]["on"])
+        self.post_beats("save_beats", "1000000000")
+        self.assertEqual(api.settings["beats_batch_size"], jobs_module().MAX_BEATS_BATCH)
+        saved = web.store.retry_beats
+        web.store.retry_beats = lambda db: 41027
+        try:
+            answer = self.post_beats("retry_beats")
+            self.assertIn("note=beats_retry", answer.headers["Location"])
+            self.assertIn("n=41027", answer.headers["Location"])
+        finally:
+            web.store.retry_beats = saved
 
     def post_beats(self, action, size="20"):
         return self.client.post("/plugins/siansa_analysis/settings", data={"action": action, "beats_batch_size": size})
+
+
+def jobs_module():
+    from siansa_analysis import jobs
+    return jobs
 
 
 class TickTest(unittest.TestCase):

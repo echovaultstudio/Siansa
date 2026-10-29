@@ -55,8 +55,9 @@ something the file needs) is read with the `ffmpeg` tool instead, when AudioMuse
 
 Songs measured by a version before 0.3.0 keep their loudness and fades and are measured again for their beat
 grids. The settings page has a **Beat grids** section for that, apart from the profiles: how many songs have their
-grids and how many are waiting, its own **Songs per run** (0 measures them only when you ask), **Measure a batch
-now**, and **Measure all** with **Stop**. Each 15-minute round measures the profiles first and the beat grids in
+grids and how many are waiting, its own **Songs per run** (any number, as a round stops when its time is up; 0
+measures them only when you ask), **Measure a batch now**, and **Measure all** with **Stop**. A song that can't be
+read is tried again later, and the page lists why songs failed, with **Try them all again now**. Each 15-minute round measures the profiles first and the beat grids in
 the time left over; songs the app is about to play come first. That reads every file once more, so a big library
 takes a while; Siansa blends a song the plain way until its grid is there.
 

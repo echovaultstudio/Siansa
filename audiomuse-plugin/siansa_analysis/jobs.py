@@ -106,15 +106,20 @@ def measure_all_on(db, part="profiles"):
     return bool((store.get_state(PARTS[part]["all"], {}, db) or {}).get("on"))
 
 
+# Songs per round of beat grids at most: as many as a round's time allows (issue #657), in practice no limit.
+MAX_BEATS_BATCH = 100_000
+
+
 def batch_size(part, batch=None):
-    """Songs per normal round of ``part``: 1–500 for profiles; 0–500 for beats, where 0 means only when asked."""
+    """Songs per normal round of ``part``: 1–500 for profiles; 0 up to :data:`MAX_BEATS_BATCH` for beats, where 0
+    means only when asked. A round stops when its time is up whatever the number."""
     spec = PARTS[part]
     value = batch if batch is not None else get_setting(spec["batch"], spec["default"])
     try:
         value = int(value)
     except (TypeError, ValueError):
         value = spec["default"]
-    return max(0 if spec["beats"] else 1, min(value, 500))
+    return max(0 if spec["beats"] else 1, min(value, MAX_BEATS_BATCH if spec["beats"] else 500))
 
 
 def measure_missing(budget_seconds=None, batch=None):
@@ -148,7 +153,7 @@ def measure_part(part, budget_seconds=None, batch=None):
     folder = tempfile.mkdtemp(prefix="siansa_analysis_")
     rate = store.get_state("profiles_rate", {}, db) or {}
     try:
-        limit = 10_000 if all_on else batch_size(part, batch)
+        limit = 10_000_000 if all_on else batch_size(part, batch)
         if limit <= 0:
             return {"status": "idle", "measured": 0, "note": "only when asked"}
         store.set_state(spec["job"], {"status": "running", "started_at": now_iso(), "all": all_on, "measured": 0,
@@ -179,7 +184,7 @@ def measure_part(part, budget_seconds=None, batch=None):
                 except NotOnServer:
                     skipped += 1
                     if spec["beats"]:
-                        store.save_beats_failure(db, item_id, "not on this music server")
+                        store.save_beats_failure(db, item_id, store.ELSEWHERE, elsewhere=True)
                     else:
                         store.save_elsewhere(db, item_id)
                 except Exception as e:
