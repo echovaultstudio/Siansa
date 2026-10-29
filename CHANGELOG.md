@@ -3,6 +3,12 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.39.1beta — 2026-10-29
+
+### Fixed
+- **A cover replaced on your server now shows in the mini player, now playing, the lock screen and the notification too**, after the next sync. Before, those kept the old picture while the album page showed the new one.
+- Play buttons on album, playlist, artist, custom card, Time Machine, report and fingerprint pages now turn into Pause while their songs play, and pause them instead of starting over.
+
 ## 0.39.0beta — 2026-10-28
 
 ### Fixed
