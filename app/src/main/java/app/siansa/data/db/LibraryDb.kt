@@ -123,6 +123,7 @@ data class SourceEntity(@PrimaryKey val id: String, val source: Int)
 data class MetaEntity(@PrimaryKey val key: String, val value: String)
 
 data class AlbumSignature(val id: String, val signature: String)
+data class AlbumCoverRow(val id: String, val coverArt: String?)
 data class AlbumGroupRow(val id: String, val groupKey: String, val songCount: Int, val visible: Boolean = true)
 data class AlbumTypeRow(val releaseTypes: String, val isCompilation: Boolean)
 data class GenreRow(val name: String, val songCount: Int)
@@ -254,6 +255,10 @@ interface LibraryDao {
 
     @Query("SELECT releaseTypes, isCompilation FROM albums WHERE isPrimary = 1")
     suspend fun albumTypes(): List<AlbumTypeRow>
+
+    /** Every album's cover id, for caching song and disc covers per album cover version (issue #639). */
+    @Query("SELECT id, coverArt FROM albums")
+    suspend fun albumCovers(): List<AlbumCoverRow>
 
     /** Own albums only: other users' albums are kept up to date on their own. */
     @Query("SELECT id, signature FROM albums WHERE id NOT IN (SELECT id FROM sources)")
