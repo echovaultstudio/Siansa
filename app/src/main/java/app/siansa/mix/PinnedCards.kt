@@ -37,7 +37,12 @@ enum class CardSource(val label: String, val hint: String) {
     SOUND("By sound", "Describe a sound, like \"rainy jazz piano\", and AudioMuse finds songs that match"),
 }
 
-/** One custom card: its name, look and contents. Empty text fields and null years mean "no rule". */
+/**
+ * One custom card: its name, look and contents. Its songs or albums ([contents]) come from a sound or from [rules]
+ * on the library (issue #663). The single fields from genre to favourites are the rules of cards made before
+ * that, read as rules ([allRules]) and turned into them when the card is changed ([migrated]); empty text fields
+ * and null years mean "no rule".
+ */
 @Serializable
 data class PinnedCard(
     val id: String,
@@ -59,12 +64,42 @@ data class PinnedCard(
     val favourites: Boolean = false,
     /** Shown on Home; a card can be kept but taken off Home. */
     val shown: Boolean = true,
+    /** Songs, or whole albums (issue #663). Albums come from the library only. */
+    val contents: CardContents = CardContents.SONGS,
+    /** What the songs or albums must be, or mustn't be (issue #663). */
+    val rules: List<CardRule> = emptyList(),
+    /** Keep what matches every rule; off, what matches any of them. */
+    val matchAll: Boolean = true,
+    /** The order they come in. */
+    val sort: CardSort = CardSort.RANDOM,
+    /** At most this many songs or albums. */
+    val size: Int = SIZE,
 ) {
-    /** The rules as one line: "Rock · 1990–1999 · favourites", or "Sound: rainy jazz piano". */
+    /** Every rule: [rules], and the single fields of a card made before rules, as rules. */
+    val allRules: List<CardRule>
+        get() = rules + buildList {
+            if (genre.isNotBlank()) add(CardRule(RuleField.GENRE, RuleOp.CONTAINS, genre.trim()))
+            when {
+                fromYear != null && toYear != null -> add(CardRule(RuleField.YEAR, RuleOp.BETWEEN, "$fromYear", "$toYear"))
+                fromYear != null -> add(CardRule(RuleField.YEAR, RuleOp.AT_LEAST, "$fromYear"))
+                toYear != null -> add(CardRule(RuleField.YEAR, RuleOp.AT_MOST, "$toYear"))
+            }
+            if (artist.isNotBlank()) add(CardRule(RuleField.ARTIST, RuleOp.CONTAINS, artist.trim()))
+            if (album.isNotBlank()) add(CardRule(RuleField.ALBUM, RuleOp.CONTAINS, album.trim()))
+            words.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }.forEach { add(CardRule(RuleField.TITLE, RuleOp.CONTAINS, it)) }
+            if (favourites) add(CardRule(RuleField.FAVOURITE, RuleOp.YES))
+        }
+
+    /** The card with its single fields turned into [rules], as the editor keeps it. */
+    fun migrated(): PinnedCard = copy(rules = allRules, genre = "", fromYear = null, toYear = null, artist = "", album = "", words = "", favourites = false)
+
+    /** The rules as one line: "Rock · 1990–1999 · favourites", "Albums · Record label contains Ninja Tune", or "Sound: rainy jazz piano". */
     val detail: String
-        get() = when (source) {
-            CardSource.SOUND -> "Sound: ${sound.trim()}"
-            CardSource.LIBRARY -> buildList {
+        get() = when {
+            source == CardSource.SOUND -> "Sound: ${sound.trim()}"
+            rules.isNotEmpty() -> (if (contents == CardContents.ALBUMS) "Albums · " else "") +
+                allRules.take(3).joinToString(if (matchAll) " · " else " or ") { it.text } + (if (allRules.size > 3) " …" else "")
+            else -> (if (contents == CardContents.ALBUMS) "Albums · " else "") + buildList {
                 if (genre.isNotBlank()) add(genre.trim())
                 if (fromYear != null || toYear != null) add("${fromYear ?: "…"}–${toYear ?: "…"}")
                 if (artist.isNotBlank()) add("artist \"${artist.trim()}\"")
@@ -76,7 +111,7 @@ data class PinnedCard(
 
     /** Whether any library rule is set; a card from the library needs at least one. */
     val hasRule: Boolean
-        get() = genre.isNotBlank() || fromYear != null || toYear != null || artist.isNotBlank() || album.isNotBlank() || words.isNotBlank() || favourites
+        get() = allRules.isNotEmpty()
 
     companion object {
         fun new(title: String = "") = PinnedCard(id = "pin-" + UUID.randomUUID().toString().take(8), title = title)
@@ -89,48 +124,76 @@ data class PinnedCard(
 /** What a card needs before it can be saved, or null when it's fine. */
 fun pinnedCardProblem(card: PinnedCard, audioMuseReady: Boolean, thisYear: Int = LocalDate.now().year): String? = when {
     card.title.isBlank() -> "Give the card a name."
+    card.contents == CardContents.ALBUMS && card.source == CardSource.SOUND -> "Albums come from your library: pick From your library."
     card.source == CardSource.SOUND && !audioMuseReady -> "Set up AudioMuse-AI in Settings › Connections to make a card by sound."
     card.source == CardSource.SOUND && card.sound.isBlank() -> "Describe the sound."
     card.source == CardSource.LIBRARY && !card.hasRule -> "Set at least one rule, so the card isn't your whole library."
     card.fromYear != null && card.fromYear !in 1900..thisYear -> "Years run from 1900 to $thisYear."
     card.toYear != null && card.toYear !in 1900..thisYear -> "Years run from 1900 to $thisYear."
     card.fromYear != null && card.toYear != null && card.fromYear > card.toYear -> "The first year comes before the second."
+    card.source == CardSource.LIBRARY -> card.allRules.firstNotNullOfOrNull { rule ->
+        rule.problem ?: if (card.contents == CardContents.ALBUMS && !rule.field.albums) "${rule.field.label} is for songs, not albums." else null
+    } ?: if (card.size !in 1..MAX_SIZE) "A card holds 1 to $MAX_SIZE." else null
     else -> null
 }
 
-/** Whether [song]'s tags match every rule of a library [card]. A rule that isn't set matches everything. */
-fun matchesRules(song: Song, card: PinnedCard): Boolean {
-    if (card.favourites && !song.starred) return false
-    if (card.genre.isNotBlank() && !(song.genre ?: "").contains(card.genre.trim(), ignoreCase = true)) return false
-    if (card.fromYear != null && (song.year == null || song.year < card.fromYear)) return false
-    if (card.toYear != null && (song.year == null || song.year > card.toYear)) return false
-    if (card.artist.isNotBlank()) {
-        val wanted = card.artist.trim()
-        val names = listOf(song.artist) + song.artists.map { it.name }
-        if (names.none { it.contains(wanted, ignoreCase = true) }) return false
-    }
-    if (card.album.isNotBlank() && !song.album.contains(card.album.trim(), ignoreCase = true)) return false
-    if (card.words.isNotBlank()) {
-        val words = card.words.trim().split(Regex("\\s+"))
-        if (words.any { !song.title.contains(it, ignoreCase = true) }) return false
-    }
-    return true
-}
+/** At most this many songs or albums on a card. */
+const val MAX_SIZE = 500
+
+/** Whether [song] matches a library [card]'s rules ([album]: the album it's on, for its label and the like). */
+fun matchesRules(song: Song, card: PinnedCard, album: Album? = null): Boolean =
+    matchesAll(card.allRules, card.matchAll, SongSubject(song, album))
 
 /**
- * The songs of a library card: those matching its rules, in a random order that limits each artist to a few
- * and avoids the same artist twice in a row, at most [size]. The same [random] seed gives the same list, so a
- * card looks the same all day.
+ * The songs of a library card: those matching its rules, at most [size]. In random order (the default) each artist
+ * is limited to a few and the same artist twice in a row is avoided; the same [random] seed gives the same list, so
+ * a card looks the same all day. [albums] by id gives each song its album's details.
  */
-fun pickRuleSongs(all: List<Song>, card: PinnedCard, random: Random, size: Int = PinnedCard.SIZE, perArtist: Int = 5): List<Song> {
-    val matching = all.filter { matchesRules(it, card) }.distinctBy { it.id }.shuffled(random)
+fun pickRuleSongs(
+    all: List<Song>,
+    card: PinnedCard,
+    random: Random,
+    size: Int = card.size,
+    perArtist: Int = 5,
+    albums: Map<String, Album> = emptyMap(),
+): List<Song> {
+    val matching = all.filter { matchesRules(it, card, it.albumId?.let(albums::get)) }.distinctBy { it.id }
+    if (card.sort != CardSort.RANDOM) return sortSongs(matching, card.sort, albums).take(size)
     val counts = HashMap<String, Int>()
-    val picked = matching.filter { s ->
+    val picked = matching.shuffled(random).filter { s ->
         val n = counts.getOrDefault(s.artist, 0)
         if (n >= perArtist) false else { counts[s.artist] = n + 1; true }
     }.take(size)
     return spreadArtists(picked)
 }
+
+private fun sortSongs(songs: List<Song>, sort: CardSort, albums: Map<String, Album>): List<Song> = when (sort) {
+    CardSort.RANDOM -> songs
+    CardSort.NEWEST -> songs.sortedByDescending { it.year ?: Int.MIN_VALUE }
+    CardSort.OLDEST -> songs.sortedBy { it.year ?: Int.MAX_VALUE }
+    CardSort.ADDED -> songs.sortedByDescending { it.albumId?.let(albums::get)?.created.orEmpty() }
+    CardSort.PLAYED -> songs.sortedByDescending { it.albumId?.let(albums::get)?.playCount ?: 0 }
+    CardSort.NAME -> songs.sortedBy { it.title.lowercase() }
+}
+
+/**
+ * The albums of a library card (issue #663): those matching its rules, at most [size], in its order (random: the
+ * same all day for one [random] seed). [favourites]: albums with a favourite song.
+ */
+fun pickRuleAlbums(all: List<Album>, card: PinnedCard, random: Random, size: Int = card.size, favourites: Set<String> = emptySet()): List<Album> {
+    val matching = all.filter { a -> matchesAll(card.allRules, card.matchAll, AlbumSubject(a, a.id in favourites)) }.distinctBy { it.id }
+    return when (card.sort) {
+        CardSort.RANDOM -> matching.shuffled(random)
+        CardSort.NEWEST -> matching.sortedByDescending { it.year ?: Int.MIN_VALUE }
+        CardSort.OLDEST -> matching.sortedBy { it.year ?: Int.MAX_VALUE }
+        CardSort.ADDED -> matching.sortedByDescending { it.created.orEmpty() }
+        CardSort.PLAYED -> matching.sortedByDescending { it.playCount }
+        CardSort.NAME -> matching.sortedBy { it.name.lowercase() }
+    }.take(size)
+}
+
+/** Fields whose rules need each song's album (its label, release type, when it was added…). */
+private val ALBUM_FIELDS = setOf(RuleField.LABEL, RuleField.RELEASE_TYPE, RuleField.COMPILATION, RuleField.ADDED, RuleField.PLAYS)
 
 /** The albums the songs come from, in the order they first appear. */
 fun albumIdsOf(songs: List<Song>): List<String> = songs.mapNotNull { it.albumId }.distinct()
@@ -187,24 +250,43 @@ class PinnedCards(private val graph: AppGraph, context: Context) {
         val key = "$day-${card.id}-${card.hashCode()}-$round"
         made[key]?.let { return it }
         val started = System.currentTimeMillis()
-        val songs = when (card.source) {
-            CardSource.SOUND -> graph.generator.soundSearch(card.sound.trim(), PinnedCard.SIZE)
-            CardSource.LIBRARY -> {
-                if (!graph.library.isSynced) throw IllegalStateException("Sync your library first (Settings › Users)")
-                pickRuleSongs(graph.library.allSongs(), card, Random(daySeed(card.id, day, round)))
+        val random = Random(daySeed(card.id, day, round))
+        val (songs, albums) = when {
+            card.source == CardSource.SOUND -> {
+                val found = graph.generator.soundSearch(card.sound.trim(), card.size.coerceAtMost(PinnedCard.SIZE))
+                found to if (card.look == CardLook.ALBUMS) albumIdsOf(found).take(ALBUMS).mapNotNull { graph.library.album(it) } else emptyList()
+            }
+            !graph.library.isSynced -> throw IllegalStateException("Sync your library first (Settings › Users)")
+            card.contents == CardContents.ALBUMS -> {
+                val needsFavourites = card.allRules.any { it.field == RuleField.FAVOURITE }
+                val favourites = if (needsFavourites) graph.library.starredSongs().mapNotNullTo(HashSet()) { it.albumId } else emptySet()
+                val picked = pickRuleAlbums(graph.library.albums("name"), card, random, favourites = favourites)
+                // Playing the card plays its first albums in turn.
+                picked.take(PLAY_ALBUMS).flatMap { graph.library.songsOf(it) } to picked
+            }
+            else -> {
+                val needsAlbums = card.allRules.any { it.field in ALBUM_FIELDS } || card.sort in setOf(CardSort.ADDED, CardSort.PLAYED)
+                val albumsById = if (needsAlbums) graph.library.albumsById() else emptyMap()
+                val picked = pickRuleSongs(graph.library.allSongs(), card, random, albums = albumsById)
+                picked to if (card.look == CardLook.ALBUMS) albumIdsOf(picked).take(ALBUMS).mapNotNull { graph.library.album(it) } else emptyList()
             }
         }
-        val albums = if (card.look == CardLook.ALBUMS) albumIdsOf(songs).take(ALBUMS).mapNotNull { graph.library.album(it) } else emptyList()
-        AppLog.i("Cards", "Custom card \"${card.title}\": ${songs.size} songs in ${System.currentTimeMillis() - started}ms")
+        AppLog.i("Cards", "Custom card \"${card.title}\": ${songs.size} songs, ${albums.size} albums in ${System.currentTimeMillis() - started}ms" +
+            (if (card.source == CardSource.LIBRARY) " · ${card.contents.label.lowercase()} where ${if (card.matchAll) "all" else "any"} of: ${card.allRules.joinToString("; ") { it.text }}" else ""))
         made.keys.removeAll { !it.startsWith(day.toString()) }
         val content = CardContent(songs, albums)
         made[key] = content
         return content
     }
 
-    private fun PinnedCard.trimmed() = copy(title = title.trim(), sound = sound.trim(), genre = genre.trim(), artist = artist.trim(), album = album.trim(), words = words.trim())
+    private fun PinnedCard.trimmed() = copy(
+        title = title.trim(), sound = sound.trim(), genre = genre.trim(), artist = artist.trim(), album = album.trim(), words = words.trim(),
+        rules = rules.map { it.copy(value = it.value.trim(), value2 = it.value2.trim()) },
+    )
 
     private companion object {
         const val ALBUMS = 20
+        /** An album card plays this many of its albums, in turn. */
+        const val PLAY_ALBUMS = 10
     }
 }

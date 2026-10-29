@@ -282,6 +282,7 @@ fun SiansaRoot() {
                 composable("dscvr") { DscvrScreen(nav) }
                 composable("vibe/{id}") { VibeScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("settings/cards") { CardsSettingsScreen(nav) }
+                composable("settings/cards/edit/{id}") { CardEditorScreen(nav, it.arguments?.getString("id") ?: "new") }
                 composable("card/{id}") { CardScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("pinned/{id}") { PinnedCardScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("settings") { SettingsHub(nav) }

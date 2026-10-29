@@ -1032,6 +1032,16 @@ class SpacingTest {
         gaps.forEach { assertEven("Gap between list rows", gaps[0], it, 1.dp) }
     }
 
+    /** A custom card's rule (issue #663): its ways of comparing sit evenly between its name and its value. */
+    @Test fun cardRuleChipsAreEvenlySpaced() {
+        val rule = app.siansa.mix.CardRule(app.siansa.mix.RuleField.LABEL, app.siansa.mix.RuleOp.CONTAINS, "Ninja Tune")
+        compose.setContent { SiansaTheme { Column { app.siansa.ui.RuleCard(rule, emptyList(), onChange = {}, onRemove = {}) } } }
+        val name = compose.onNodeWithText("Record label", useUnmergedTree = true).getBoundsInRoot()
+        val chip = compose.onNodeWithTag("op-CONTAINS").getBoundsInRoot()
+        val value = compose.onNodeWithTag("ruleValue").getBoundsInRoot()
+        assertEven("Rule chips", chip.top - name.bottom, value.top - chip.bottom, 12.dp)
+    }
+
     @androidx.compose.runtime.Composable
     private fun MusicSourceRows() {
         SiansaTheme { Column { SourceKind.entries.forEach { SourceRow(it) { } } } }

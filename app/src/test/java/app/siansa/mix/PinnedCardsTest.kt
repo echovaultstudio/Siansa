@@ -105,4 +105,106 @@ class PinnedCardsTest {
         val order = HomeSection.parse("quick,today,made,rediscover")  // saved before the section existed
         assertEquals(HomeSection.MADE_FOR_YOU, order[order.indexOf(HomeSection.CARDS) - 1])
     }
+
+    // ---- Issue #663: rules to include or leave out, and album cards ----
+
+    private val labelAlbum = app.siansa.data.Album(id = "al", name = "Selected Works", artist = "Bonobo", year = 2024, genre = "Electronic",
+        labels = listOf("Ninja Tune"), releaseTypes = listOf("album"), created = "2026-10-20T10:00:00Z", playCount = 12, songCount = 11, durationSec = 3000)
+    private val otherAlbum = labelAlbum.copy(id = "o", name = "Live at Home", year = 2023, labels = listOf("Warp"), releaseTypes = listOf("album", "live"), created = "2024-01-01T00:00:00Z")
+
+    private fun rule(field: RuleField, op: RuleOp, value: String = "", value2: String = "") = CardRule(field, op, value, value2)
+
+    @Test fun anAlbumCardOnALabelAndAYear() {
+        val c = card.copy(contents = CardContents.ALBUMS, rules = listOf(rule(RuleField.LABEL, RuleOp.CONTAINS, "ninja tune"), rule(RuleField.YEAR, RuleOp.IS, "2024")))
+        assertEquals(listOf("al"), pickRuleAlbums(listOf(labelAlbum, otherAlbum), c, Random(1)).map { it.id })
+        assertNull(pinnedCardProblem(c, audioMuseReady = false))
+        assertEquals("Albums · Record label contains ninja tune · Year is 2024", c.detail)
+    }
+
+    @Test fun leavingOutIsAsEasyAsKeeping() {
+        val notLive = card.copy(contents = CardContents.ALBUMS, rules = listOf(rule(RuleField.RELEASE_TYPE, RuleOp.NOT_CONTAINS, "live, remix")))
+        assertEquals(listOf("al"), pickRuleAlbums(listOf(labelAlbum, otherAlbum), notLive, Random(1)).map { it.id })
+        val notWarp = card.copy(contents = CardContents.ALBUMS, rules = listOf(rule(RuleField.LABEL, RuleOp.IS_NOT, "Warp")))
+        assertEquals(listOf("al"), pickRuleAlbums(listOf(labelAlbum, otherAlbum), notWarp, Random(1)).map { it.id })
+    }
+
+    @Test fun everyRuleOrAnyRule() {
+        val rules = listOf(rule(RuleField.LABEL, RuleOp.IS, "Warp"), rule(RuleField.YEAR, RuleOp.IS, "2024"))
+        val all = card.copy(contents = CardContents.ALBUMS, rules = rules)
+        assertTrue(pickRuleAlbums(listOf(labelAlbum, otherAlbum), all, Random(1)).isEmpty())
+        val any = all.copy(matchAll = false)
+        assertEquals(setOf("al", "o"), pickRuleAlbums(listOf(labelAlbum, otherAlbum), any, Random(1)).map { it.id }.toSet())
+        assertEquals("Albums · Record label is Warp or Year is 2024", any.detail)
+    }
+
+    @Test fun numbersAgesAndFlags() {
+        val today = LocalDate.of(2026, 10, 29)
+        val s = AlbumSubject(labelAlbum, favourite = true, today = today)
+        assertTrue(rule(RuleField.YEAR, RuleOp.BETWEEN, "2020", "2029").matches(s))
+        assertTrue(rule(RuleField.YEAR, RuleOp.BETWEEN, "2029", "2020").matches(s))  // either way round
+        assertTrue(rule(RuleField.SONG_COUNT, RuleOp.AT_LEAST, "10").matches(s))
+        assertFalse(rule(RuleField.LENGTH, RuleOp.AT_MOST, "45").matches(s))  // 50 minutes
+        assertTrue(rule(RuleField.ADDED, RuleOp.WITHIN, "30").matches(s))  // 9 days ago
+        assertFalse(rule(RuleField.ADDED, RuleOp.NOT_WITHIN, "30").matches(s))
+        assertTrue(rule(RuleField.FAVOURITE, RuleOp.YES).matches(s))
+        assertFalse(rule(RuleField.COMPILATION, RuleOp.YES).matches(s))
+        // A missing value passes only a rule that leaves out.
+        val noYear = AlbumSubject(labelAlbum.copy(year = null))
+        assertFalse(rule(RuleField.YEAR, RuleOp.AT_LEAST, "1990").matches(noYear))
+        assertTrue(rule(RuleField.YEAR, RuleOp.IS_NOT, "1990").matches(noYear))
+    }
+
+    @Test fun aSongTakesItsAlbumsDetails() {
+        val s = song.copy(albumId = "al")
+        val c = card.copy(rules = listOf(rule(RuleField.LABEL, RuleOp.CONTAINS, "Ninja")))
+        assertTrue(matchesRules(s, c, labelAlbum))
+        assertFalse(matchesRules(s, c, otherAlbum))
+        assertFalse(matchesRules(s, c))  // album unknown: no label
+        assertEquals(listOf("1"), pickRuleSongs(listOf(s), c, Random(1), albums = mapOf("al" to labelAlbum)).map { it.id })
+    }
+
+    @Test fun anOldCardsFieldsBecomeRules() {
+        val old = card.copy(genre = "Rock", fromYear = 1990, toYear = 1999, artist = "Nirvana", words = "smells teen", favourites = true)
+        val m = old.migrated()
+        assertEquals(listOf(
+            rule(RuleField.GENRE, RuleOp.CONTAINS, "Rock"), rule(RuleField.YEAR, RuleOp.BETWEEN, "1990", "1999"),
+            rule(RuleField.ARTIST, RuleOp.CONTAINS, "Nirvana"), rule(RuleField.TITLE, RuleOp.CONTAINS, "smells"),
+            rule(RuleField.TITLE, RuleOp.CONTAINS, "teen"), rule(RuleField.FAVOURITE, RuleOp.YES),
+        ), m.rules)
+        assertEquals("", m.genre)
+        assertNull(m.fromYear)
+        assertFalse(m.favourites)
+        val nirvana = song.copy(title = "Smells Like Teen Spirit", artist = "Nirvana", genre = "Rock", year = 1991, starred = true)
+        assertEquals(matchesRules(nirvana, old), matchesRules(nirvana, m))
+        assertTrue(matchesRules(nirvana, m))
+        assertEquals(listOf(rule(RuleField.YEAR, RuleOp.AT_LEAST, "1980")), card.copy(fromYear = 1980).allRules)
+    }
+
+    @Test fun whatARuleNeeds() {
+        assertEquals("Give record label a value.", pinnedCardProblem(card.copy(rules = listOf(rule(RuleField.LABEL, RuleOp.CONTAINS))), true))
+        assertEquals("Year takes a number.", pinnedCardProblem(card.copy(rules = listOf(rule(RuleField.YEAR, RuleOp.IS, "nineties"))), true))
+        assertEquals("Give year the second number too.", pinnedCardProblem(card.copy(rules = listOf(rule(RuleField.YEAR, RuleOp.BETWEEN, "1990"))), true))
+        assertEquals("Song title is for songs, not albums.", pinnedCardProblem(card.copy(contents = CardContents.ALBUMS, rules = listOf(rule(RuleField.TITLE, RuleOp.CONTAINS, "x"))), true))
+        assertEquals("Albums come from your library: pick From your library.", pinnedCardProblem(card.copy(contents = CardContents.ALBUMS, source = CardSource.SOUND, sound = "x"), true))
+        assertNull(pinnedCardProblem(card.copy(rules = listOf(rule(RuleField.FAVOURITE, RuleOp.NO))), true))
+        assertTrue(RuleField.forContents(CardContents.ALBUMS).none { it == RuleField.TITLE })
+        assertTrue(RuleOp.forKind(RuleKind.TEXT).containsAll(listOf(RuleOp.CONTAINS, RuleOp.NOT_CONTAINS, RuleOp.IS, RuleOp.IS_NOT)))
+    }
+
+    @Test fun ordersAndHowMany() {
+        val albums = listOf(labelAlbum, otherAlbum, labelAlbum.copy(id = "z", name = "Another", year = 2010, created = "2025-01-01T00:00:00Z", playCount = 99))
+        fun ids(sort: CardSort, size: Int = 10) = pickRuleAlbums(albums, card.copy(contents = CardContents.ALBUMS, sort = sort, size = size), Random(1)).map { it.id }
+        assertEquals(listOf("al", "o", "z"), ids(CardSort.NEWEST))
+        assertEquals(listOf("z", "o", "al"), ids(CardSort.OLDEST))
+        assertEquals(listOf("al", "z", "o"), ids(CardSort.ADDED))
+        assertEquals(listOf("z", "al", "o"), ids(CardSort.PLAYED))
+        assertEquals(listOf("z", "o", "al"), ids(CardSort.NAME))
+        assertEquals(2, ids(CardSort.NAME, size = 2).size)
+    }
+
+    @Test fun rulesSaveAndLoad() {
+        val c = card.copy(contents = CardContents.ALBUMS, matchAll = false, sort = CardSort.ADDED, size = 30,
+            rules = listOf(rule(RuleField.LABEL, RuleOp.IS, "Ninja Tune"), rule(RuleField.YEAR, RuleOp.BETWEEN, "2020", "2024")))
+        assertEquals(c, Json.decodeFromString(PinnedCard.serializer(), Json.encodeToString(PinnedCard.serializer(), c)))
+    }
 }

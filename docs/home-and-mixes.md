@@ -94,20 +94,38 @@ same day; Siansa tells you which one already has them.
 ## Your cards
 
 Custom cards you make yourself (**Settings › Cards › Custom cards**), shown on Home in its **Your cards** section
-(move it under Arrange Home; the cards' own order is set in Settings). Each card has a name you give it, a **look**
-and **songs**:
+(move it under Arrange Home; the cards' own order is set in Settings). **Add a custom card** or tap one to change it,
+on a page of its own:
 
-- **Looks**: **Song tiles** (a row of covers), **Album row** (the albums the songs come from), **Banner** (one wide
-  card with the first covers and Play and Shuffle), **Song list** (the first five songs, the rest a tap away) and
-  **Play button** (a slim card: one tap plays the songs, shuffled).
-- **Songs from your library**: songs whose tags match the rules you set, in any mix: a genre, years, part of an
-  artist's name, part of an album's name, words in the title, favourites only. At least one rule is needed.
-- **Songs by sound**: describe a sound ("rainy jazz piano") and AudioMuse-AI finds songs that match (only with
-  AudioMuse-AI).
+- **Shows**: **Songs**, or whole **Albums**. Playing an album card plays its first albums in turn; its page lists
+  every album.
+- **Comes from** (songs only): **From your library**, by rules, or **By sound**: describe a sound ("rainy jazz
+  piano") and AudioMuse-AI finds songs that match (only with AudioMuse-AI).
+- **Rules**: each says what to keep or leave out, and the card keeps what matches **every rule** or **any rule**.
+  Add one with **Add a rule**, then pick how it compares and the value:
 
-A card from the library gets a new set of songs every day, with a few songs per artist at most; its page has a
-button for a new set right away. Tap a card's title (or the arrow on a play button) for every song, ready to play
-or save as a playlist. A card can be kept but taken off Home with its switch in Settings.
+  | Rule | Compares |
+  |---|---|
+  | Song title, Album, Artist, Genre, Record label, Release type | contains, doesn't contain, is, isn't |
+  | Year, Length (minutes), Songs on it, Plays | is, isn't, at least, at most, between |
+  | Added (days) | in the last, not in the last |
+  | Favourite, Compilation | yes, no |
+
+  Text takes several values separated by commas: "Genre contains House, Techno" keeps either, "Release type doesn't
+  contain Live, Remix" leaves both out. The genres, record labels and release types in your library are there to
+  tap. A song's record label, release type, plays and date added are its album's. Song title is for song cards
+  only; Songs on it and Plays for album cards. For example, an album card with **Record label contains Ninja Tune**
+  and **Year is 2024** shows every 2024 album on that label.
+- **Order**: random (a new set every day, with a few songs per artist at most), newest or oldest first, recently
+  added, most played, or A to Z; and **How many, at most** (up to 500).
+- **Look on Home**: **Song tiles** (a row of covers; for an album card, **Album tiles**), **Album row** (the albums
+  the songs come from), **Banner** (one wide card with the first covers and Play and Shuffle), **Song list** (the
+  first five; for an album card, **Album list**) and **Play button** (a slim card: one tap plays it).
+
+A card made before rules keeps working: its genre, years, artist, album, words and favourites become rules the
+first time you change it. A random card's page has a button for a new set right away. Tap a card's title (or the
+arrow on a play button) for everything on it, ready to play or save as a playlist. A card can be kept but taken off
+Home with its switch in Settings.
 
 ## Radios
 
