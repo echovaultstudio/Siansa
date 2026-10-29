@@ -3,7 +3,9 @@
 API (JSON, for any logged-in user or API token):
 
 * ``GET api/health``: the plugin is there and working;
-* ``GET api/profiles?ids=a,b,…``: loudness and fade profiles of up to 500 songs (the layout Siansa reads);
+* ``GET api/profiles?ids=a,b,…``: loudness and fade profiles of up to 500 songs (the layout Siansa reads), with
+  the beat grid at each end (``intro_bpm``, ``intro_beat_ms``, ``intro_bar_ms``, ``intro_rhythm``,
+  ``intro_steady`` and the same for ``outro``) once a song has been measured for them;
 * ``GET api/status``: how far each part is;
 * ``GET api/similar/albums?track_id=…``: albums that sound like the album of that song;
 * ``GET api/similar/artists?track_id=…`` or ``?artist=…``: artists that sound like that one.
@@ -23,7 +25,7 @@ from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url,
 from . import generations, jobs, similarity, status, store
 
 PLUGIN_ID = "siansa_analysis"
-VERSION = "0.2.4"
+VERSION = "0.3.0"
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
@@ -40,6 +42,9 @@ def collect(db):
     profiles_job = store.get_state("profiles_job", {}, db) or {}
     similar_job = store.get_state("similar_job", {}, db) or {}
     built = store.get_state("similar_built", {}, db) or {}
+    with_beats, beats_waiting = store.beats_counts(db)
+    counts["beats"] = with_beats
+    counts["beats_waiting"] = beats_waiting
     return {
         "inputs": inputs,
         "counts": counts,
@@ -283,6 +288,8 @@ def render_settings(state, batch_size, message=""):
     start and end (SmoothFade). New songs are measured right after AudioMuse analyses them; older ones a
     batch at a time every 15 minutes. This runs on its own: it doesn't wait for the similar lists, and
     they don't wait for it.</p>
+  <p class="mx-help">Beat grids, for beat-matched blends in Siansa's DJ radio: {counts.get('beats', 0):,} songs have
+    theirs{f"; {counts['beats_waiting']:,} measured before the beat tracker are measured again in the background, their loudness kept meanwhile" if counts.get('beats_waiting') else ""}.</p>
   {f'<p class="mx-help mx-attention">Last run: {escape(profiles_error)}</p>' if profiles_error else ''}
   {failures}
   {left_line}

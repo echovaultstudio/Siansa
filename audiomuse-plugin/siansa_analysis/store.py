@@ -2,7 +2,7 @@
 
 Tables (each named ``plugin_siansa_analysis__<name>`` by AudioMuse-AI):
 
-* ``profiles``: one row per song, its loudness and ramps, or why it couldn't be measured;
+* ``profiles``: one row per song, its loudness, ramps and beat grids, or why it couldn't be measured;
 * ``wanted``: songs the app asked for that have no profile yet, measured first;
 * ``state``: small JSON values: the input generations, each job's state and the last finished build;
 * ``similar_albums`` / ``similar_artists``: the published similar lists.
@@ -15,6 +15,10 @@ import json
 from plugin.api import get_db, logger, table
 
 ANALYZER_VERSION = 1
+# The beat grids (Siansa issue #646) have a version of their own: a profile measured before them keeps its
+# loudness and ramps (so levelling and SmoothFade go on working) and is measured again, in the background, for
+# its beats. Raise this to measure every song's beats again.
+BEATS_VERSION = 1
 RETRY_HOURS = (1, 6, 24, 72)  # wait after the 1st, 2nd, 3rd, later failure
 
 
@@ -36,6 +40,9 @@ def migrate(db):
         )""")
     # Where a profile came from ('measured' here).
     cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'measured'")
+    # The beat grid at each end (JSON: intro_bpm, intro_beat_ms, …) and which version of the beat tracker made it.
+    cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS beats JSONB")
+    cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS beats_version INTEGER NOT NULL DEFAULT 0")
     cur.execute(f"CREATE INDEX IF NOT EXISTS {table('profiles_status')} ON {table('profiles')} (status, analyzer_version)")
     cur.execute(f"""
         CREATE TABLE IF NOT EXISTS {table('wanted')} (
@@ -214,16 +221,16 @@ def save_profile(db, item_id, profile):
     cur = db.cursor()
     cur.execute(f"""
         INSERT INTO {table('profiles')}
-            (item_id, status, ref_lufs, start_ramp, end_ramp, duration_ms, analyzer_version, attempts,
-             retry_after, error, updated_at)
-        VALUES (%s, 'ready', %s, %s, %s, %s, %s, 0, NULL, NULL, now())
+            (item_id, status, ref_lufs, start_ramp, end_ramp, duration_ms, analyzer_version, beats, beats_version,
+             attempts, retry_after, error, updated_at)
+        VALUES (%s, 'ready', %s, %s, %s, %s, %s, %s, %s, 0, NULL, NULL, now())
         ON CONFLICT (item_id) DO UPDATE SET
             status='ready', ref_lufs=EXCLUDED.ref_lufs, start_ramp=EXCLUDED.start_ramp,
             end_ramp=EXCLUDED.end_ramp, duration_ms=EXCLUDED.duration_ms,
-            analyzer_version=EXCLUDED.analyzer_version, attempts=0, retry_after=NULL, error=NULL,
-            source='measured', updated_at=now()""",
+            analyzer_version=EXCLUDED.analyzer_version, beats=EXCLUDED.beats, beats_version=EXCLUDED.beats_version,
+            attempts=0, retry_after=NULL, error=NULL, source='measured', updated_at=now()""",
         (item_id, profile["ref_lufs"], profile["start_ramp"], profile["end_ramp"], profile["duration_ms"],
-         ANALYZER_VERSION))
+         ANALYZER_VERSION, json.dumps(profile.get("beats") or {}), BEATS_VERSION))
     cur.execute(f"DELETE FROM {table('wanted')} WHERE item_id=%s", (item_id,))
     cur.close()
     db.commit()
@@ -268,13 +275,15 @@ def profiles_for(db, item_ids):
         return {}
     cur = db.cursor()
     cur.execute(f"""
-        SELECT item_id, ref_lufs, start_ramp, end_ramp, duration_ms FROM {table('profiles')}
+        SELECT item_id, ref_lufs, start_ramp, end_ramp, duration_ms, beats FROM {table('profiles')}
          WHERE item_id = ANY(%s) AND status='ready' AND analyzer_version=%s""",
         (list(item_ids), ANALYZER_VERSION))
-    out = {
-        row[0]: {"ref_lufs": row[1], "start_ramp": row[2] or "", "end_ramp": row[3] or "", "duration_ms": row[4] or 0}
-        for row in cur.fetchall()
-    }
+    out = {}
+    for row in cur.fetchall():
+        profile = {"ref_lufs": row[1], "start_ramp": row[2] or "", "end_ramp": row[3] or "", "duration_ms": row[4] or 0}
+        grids = row[5] if isinstance(row[5], dict) else (json.loads(row[5]) if row[5] else {})
+        profile.update(grids or {})  # intro_bpm, intro_beat_ms, … when the beats have been measured
+        out[row[0]] = profile
     cur.close()
     return out
 
@@ -306,8 +315,24 @@ def profile_counts(db):
     return int(songs or 0), int(ready or 0), int(failed or 0), int(wanted or 0)
 
 
+def beats_counts(db):
+    """``(with_beats, waiting)``: ready songs whose beat grids are current, and those still to be measured for
+    them (songs measured before the beat tracker, or by an older one)."""
+    cur = db.cursor()
+    cur.execute(f"""
+        SELECT count(*) FILTER (WHERE p.beats_version=%s),
+               count(*) FILTER (WHERE p.beats_version<>%s)
+          FROM {table('profiles')} p JOIN score s USING (item_id)
+         WHERE p.status='ready' AND p.analyzer_version=%s""", (BEATS_VERSION, BEATS_VERSION, ANALYZER_VERSION))
+    done, waiting = cur.fetchone()
+    cur.close()
+    return int(done or 0), int(waiting or 0)
+
+
 def songs_to_measure(db, limit):
-    """Up to ``limit`` songs without a current profile: asked-for songs first, then the newest.
+    """Up to ``limit`` songs without a current profile: asked-for songs first, then songs with no profile at
+    all (newest first), then songs measured before the beat tracker, whose loudness works but whose beats are
+    still missing (Siansa issue #646).
     """
     cur = db.cursor()
     cur.execute(f"""
@@ -316,10 +341,12 @@ def songs_to_measure(db, limit):
           LEFT JOIN {table('profiles')} p USING (item_id)
           LEFT JOIN {table('wanted')} w USING (item_id)
          WHERE (p.item_id IS NULL
-                OR (p.status='ready' AND p.analyzer_version <> %s)
+                OR (p.status='ready' AND (p.analyzer_version <> %s OR p.beats_version <> %s))
                 OR (p.status IN ('failed', 'elsewhere') AND (p.retry_after IS NULL OR p.retry_after <= now())))
-         ORDER BY w.asked_at DESC NULLS LAST, s.created_at DESC
-         LIMIT %s""", (ANALYZER_VERSION, int(limit)))
+         ORDER BY w.asked_at DESC NULLS LAST,
+                  (p.status='ready' AND p.analyzer_version = %s) ASC,
+                  s.created_at DESC
+         LIMIT %s""", (ANALYZER_VERSION, BEATS_VERSION, ANALYZER_VERSION, int(limit)))
     rows = cur.fetchall()
     cur.close()
     return rows

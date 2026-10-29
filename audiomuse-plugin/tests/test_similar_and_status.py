@@ -134,7 +134,7 @@ class StatusTest(unittest.TestCase):
         def get_state(name, default=None, db=None):
             return state.get(name, default)
 
-        for name, fake in (("get_state", get_state), ("profile_counts", lambda db: (10, 4, 0, 0))):
+        for name, fake in (("get_state", get_state), ("profile_counts", lambda db: (10, 4, 0, 0)), ("beats_counts", lambda db: (4, 0))):
             saved[name] = getattr(web.store, name)
             setattr(web.store, name, fake)
         try:
