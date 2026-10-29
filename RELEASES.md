@@ -3,6 +3,13 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.39.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.39.1beta) — 2026-10-29
+
+- [#637](https://github.com/echovaultstudio/Siansa/pull/637) Going-public runbook removed (now in siansa-dev) (@Th3K1ngP1n)
+- [#641](https://github.com/echovaultstudio/Siansa/pull/641) Disc covers follow their album's cover version: a replaced cover shows in the mini player too (@Th3K1ngP1n)
+- [#643](https://github.com/echovaultstudio/Siansa/pull/643) Plugin 0.2.4: songs PyAV can't decode are measured with the ffmpeg tool (@Th3K1ngP1n)
+- [#645](https://github.com/echovaultstudio/Siansa/pull/645) Play buttons turn into Pause while their songs play (@Th3K1ngP1n)
+
 ## [0.39.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.39.0beta) — 2026-10-28
 
 - [#619](https://github.com/echovaultstudio/Siansa/pull/619) README: F-Droid and Google Play buttons (@Th3K1ngP1n)
