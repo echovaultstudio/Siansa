@@ -325,6 +325,8 @@ private fun DiscHeading(label: String, cover: Color) {
 private fun ActionRow(songs: List<Song>, offline: OfflineItem?, onSimilar: (() -> Unit)?, onPlayed: () -> Unit = {}, saveAs: String? = null) {
     val graph = LocalGraph.current
     var saving by remember { mutableStateOf(false) }
+    // ⏸ while this page's songs play; it pauses them rather than starting over (issue #644).
+    val playback = rememberListPlayback(songs)
     if (saving && saveAs != null) SaveAsPlaylistDialog(saveAs, songs) { saving = false }
     ActionButtons(
         enabled = songs.isNotEmpty(),
@@ -333,7 +335,8 @@ private fun ActionRow(songs: List<Song>, offline: OfflineItem?, onSimilar: (() -
         download = { if (offline != null) DownloadButton(offline, songs) },
         onSimilar = onSimilar,
         onShuffle = { graph.player.play(songs, shuffle = true); onPlayed() },
-        onPlay = { graph.player.play(songs); onPlayed() },
+        onPlay = { playback.press { graph.player.play(songs); onPlayed() } },
+        playing = playback.playing,
     )
 }
 
@@ -347,6 +350,7 @@ internal fun ActionButtons(
     onShuffle: () -> Unit,
     onPlay: () -> Unit,
     onSave: (() -> Unit)? = null,
+    playing: Boolean = false,
 ) {
     PlayButtonRow {
         IconButton(onClick = onQueue, enabled = enabled, modifier = Modifier.testTag("queueAll")) {
@@ -370,7 +374,7 @@ internal fun ActionButtons(
             Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
         }
         Spacer(Modifier.width(Space.Small))
-        BigPlayButton(enabled, onPlay = onPlay)
+        BigPlayButton(enabled, playing = playing, onPlay = onPlay)
     }
 }
 

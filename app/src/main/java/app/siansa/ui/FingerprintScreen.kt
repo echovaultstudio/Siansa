@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.CircularProgressIndicator
@@ -91,12 +92,19 @@ private fun FingerprintPage(nav: NavController) {
                             IconButton(onClick = { round++ }) { Icon(Icons.Rounded.Refresh, "Make it again", tint = Color.White) }
                         }
                         Spacer(Modifier.weight(1f))
+                        val playback = rememberListPlayback(list)
                         FilledIconButton(
-                            onClick = { scope.launch { graph.player.play(list.shuffled()) } },
+                            onClick = { playback.press { scope.launch { graph.player.play(list.shuffled()) } } },
                             enabled = list.isNotEmpty(),
                             modifier = Modifier.size(52.dp),
                             colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = OnAccent),
-                        ) { Icon(Icons.Rounded.PlayArrow, "Play your fingerprint", Modifier.size(30.dp)) }
+                        ) {
+                            Icon(
+                                if (playback.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                if (playback.playing) "Pause your fingerprint" else "Play your fingerprint",
+                                Modifier.size(30.dp),
+                            )
+                        }
                     }
                 }
             }

@@ -259,13 +259,12 @@ private fun TimeMachineSongs(tm: TimeMachine, showMissing: Boolean, onShowMissin
             Modifier.fillMaxWidth().padding(horizontal = Space.Page).padding(bottom = TIME_MACHINE_GAP).testTag("memoryButtons"),
             horizontalArrangement = Arrangement.spacedBy(TIME_MACHINE_GAP),
         ) {
+            val playback = rememberListPlayback(tm.songs)
             Button(
-                onClick = { graph.player.play(tm.songs) },
+                onClick = { playback.press { graph.player.play(tm.songs) } },
                 colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = OnAccent),
             ) {
-                Icon(Icons.Rounded.PlayArrow, null)
-                Spacer(Modifier.width(Space.Tight))
-                Text("Play")
+                PlayPauseLabel(playback.playing)
             }
             OutlinedButton(onClick = onCreate) {
                 Icon(Icons.Rounded.AutoAwesome, null)
