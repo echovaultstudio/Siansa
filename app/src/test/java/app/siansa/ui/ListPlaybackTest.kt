@@ -25,4 +25,11 @@ class ListPlaybackTest {
         assertFalse(listLoaded(songs("a"), emptyList()))
         assertFalse(listLoaded(emptyList(), songs("a")))
     }
+
+    @Test fun idleStartsTheList() {
+        var started = false
+        ListPlayback.IDLE.press { started = true }
+        assertTrue(started)
+        assertFalse(ListPlayback.IDLE.playing)
+    }
 }

@@ -27,6 +27,11 @@ internal fun listLoaded(queue: List<Song>, songs: List<Song>): Boolean {
 /** What a Play button for a list shows and does: [playing] shows ⏸; [press] pauses or resumes it when loaded, else [start]s it. */
 class ListPlayback(val loaded: Boolean, val playing: Boolean, private val toggle: () -> Unit) {
     fun press(start: () -> Unit) = if (loaded) toggle() else start()
+
+    companion object {
+        /** Nothing of the list is playing: a tap starts it. */
+        val IDLE = ListPlayback(loaded = false, playing = false) {}
+    }
 }
 
 /** [ListPlayback] for [songs], following the player as it plays and pauses. */

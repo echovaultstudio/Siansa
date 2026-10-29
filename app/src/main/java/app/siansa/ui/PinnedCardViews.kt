@@ -103,7 +103,7 @@ private fun PinnedCardLook(card: PinnedCard, content: CardContent, open: () -> U
         CardLook.ALBUMS -> Shelf(card.title, content.albums, key = { it.id }, onOpenAll = open) { album ->
             AlbumTile(album.name, album.artist, album.coverArt, onClick = { nav.navigate("album/${album.id}") }, modifier = Modifier.width(140.dp))
         }
-        CardLook.BANNER -> PinnedBanner(card, songs, open, play)
+        CardLook.BANNER -> PinnedBanner(card, songs, open, play, rememberListPlayback(songs))
         CardLook.LIST -> Column {
             Row(
                 Modifier.fillMaxWidth().clickable(onClickLabel = "Show all", onClick = open)
@@ -116,13 +116,20 @@ private fun PinnedCardLook(card: PinnedCard, content: CardContent, open: () -> U
                 SongRow(song, onClick = { play(songs, i, false) })
             }
         }
-        CardLook.BUTTON -> PinnedPlayButton(card, songs, open, play)
+        CardLook.BUTTON -> PinnedPlayButton(card, songs, open, play, rememberListPlayback(songs))
     }
 }
 
 /** One wide card: the title, a few covers fanned at the right, and Play and Shuffle. Tapping it opens the page. */
 @Composable
-internal fun PinnedBanner(card: PinnedCard, songs: List<Song>, open: () -> Unit, play: (List<Song>, Int, Boolean) -> Unit) {
+internal fun PinnedBanner(
+    card: PinnedCard,
+    songs: List<Song>,
+    open: () -> Unit,
+    play: (List<Song>, Int, Boolean) -> Unit,
+    // Whether the card's songs are playing (issue #644); passed in, so the card draws without the player too.
+    playback: ListPlayback = ListPlayback.IDLE,
+) {
     val colors = tileColors(card.id)
     Column(Modifier.padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current)) {
         Box(
@@ -146,7 +153,6 @@ internal fun PinnedBanner(card: PinnedCard, songs: List<Song>, open: () -> Unit,
                 Text("${songs.size} songs · ${card.detail}", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(Space.Page))
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalAlignment = Alignment.CenterVertically) {
-                    val playback = rememberListPlayback(songs)
                     FilledTonalButton(onClick = { playback.press { play(songs, 0, false) } }, modifier = Modifier.testTag("pinnedPlay")) {
                         Icon(if (playback.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null)
                         Text(if (playback.playing) "Pause" else "Play", Modifier.padding(start = Space.Tight))
@@ -160,10 +166,14 @@ internal fun PinnedBanner(card: PinnedCard, songs: List<Song>, open: () -> Unit,
 
 /** A slim card: a play badge, the title and the song count. One tap plays the songs; the arrow opens the page. */
 @Composable
-internal fun PinnedPlayButton(card: PinnedCard, songs: List<Song>, open: () -> Unit, play: (List<Song>, Int, Boolean) -> Unit) {
-    // ⏸ while this card's songs play: a tap pauses them (issue #644).
-    val playback = rememberListPlayback(songs)
-    val colors = tileColors(card.id)
+internal fun PinnedPlayButton(
+    card: PinnedCard,
+    songs: List<Song>,
+    open: () -> Unit,
+    play: (List<Song>, Int, Boolean) -> Unit,
+    // ⏸ while this card's songs play: a tap pauses them (issue #644). Passed in, so the card draws without the player.
+    playback: ListPlayback = ListPlayback.IDLE,
+) {    val colors = tileColors(card.id)
     Row(
         Modifier
             .padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current)
