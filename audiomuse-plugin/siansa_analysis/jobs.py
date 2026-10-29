@@ -21,7 +21,7 @@ import numpy as np
 
 from plugin.api import active_server_id, get_db, get_setting, logger
 
-from . import generations, loudness, ramps, similarity, status, store
+from . import beats, generations, loudness, ramps, similarity, status, store
 
 HOOK_BUDGET_SECONDS = 60
 DEFAULT_BATCH = 40
@@ -32,14 +32,22 @@ def now_iso():
 
 
 def profile_of(measurement):
-    """A song's stored profile from its :class:`loudness.Measurement`."""
+    """A song's stored profile from its :class:`loudness.Measurement`: loudness, ramps, and the beat grid at
+    each end (``intro_*`` / ``outro_*``, Siansa issue #646; left out for an end without a beat)."""
     relative = measurement.relative_levels()
-    return {
+    profile = {
         "ref_lufs": None if measurement.lufs is None else round(measurement.lufs, 2),
         "start_ramp": ramps.encode(ramps.start_ramp(relative)),
         "end_ramp": ramps.encode(ramps.end_ramp(relative)),
         "duration_ms": measurement.duration_ms,
     }
+    try:
+        intro, outro = measurement.beat_grids()
+        profile["beats"] = beats.fields(intro, outro)
+    except Exception as e:  # the loudness still counts; a song without a grid gets plain fades
+        logger.warning("siansa_analysis couldn't find the beats: %s", e)
+        profile["beats"] = {}
+    return profile
 
 
 # ---- profiles ------------------------------------------------------------------------------------------------

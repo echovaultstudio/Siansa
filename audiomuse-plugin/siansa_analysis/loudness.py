@@ -4,7 +4,9 @@ The audio is K-weighted and cut into 100 ms chunks. From the chunks come:
 
 * the integrated loudness in LUFS, gated as BS.1770-4 says (400 ms blocks, 75 % overlap, an absolute gate at
   -70 LUFS and a relative gate 10 LU below), which levels the volume;
-* each chunk's own loudness relative to that, which the ramps in :mod:`ramps` turn into fade shapes.
+* each chunk's own loudness relative to that, which the ramps in :mod:`ramps` turn into fade shapes;
+* the first and last :data:`KEEP_SECONDS` of the sound itself, in mono, which :mod:`beats` reads for the beat
+  grid at each end (Siansa issue #646).
 
 Only numpy and scipy are needed for the maths; decoding uses PyAV (built into AudioMuse-AI) and is imported
 only when a file is read.
@@ -27,6 +29,7 @@ RELATIVE_GATE = -10.0
 MAX_BAD_PACKETS = 20  # damaged packets a song may have before it counts as unreadable…
 MAX_BAD_SHARE = 0.02  # …and at most this share of all packets
 BLOCK_CHUNKS = 4  # a 400 ms gating block is four 100 ms chunks, stepped by one (75 % overlap)
+KEEP_SECONDS = 40  # of mono audio kept from each end of the song for the beat grid (beats.SECONDS plus dead air)
 
 
 def k_weighting(rate):
@@ -79,6 +82,25 @@ class Meter:
         self.filled = 0
         self.frames = 0
         self.skipped_packets = 0
+        # The song's first and last KEEP_SECONDS in mono (float32: 7.7 MB each at most), for the beat grid.
+        self.keep = int(KEEP_SECONDS * rate)
+        self.head = []
+        self.head_frames = 0
+        self.tail = []
+        self.tail_frames = 0
+        self.tail_offset = 0  # where in the song (frames) the kept tail starts
+
+    def _keep(self, block):
+        mono = block.mean(axis=0).astype(np.float32)
+        if self.head_frames < self.keep:
+            self.head.append(mono[:self.keep - self.head_frames])
+            self.head_frames += self.head[-1].size
+        self.tail.append(mono)
+        self.tail_frames += mono.size
+        while self.tail and self.tail_frames - self.tail[0].size >= self.keep:
+            dropped = self.tail.pop(0)
+            self.tail_frames -= dropped.size
+            self.tail_offset += dropped.size
 
     def add(self, block):
         block = np.asarray(block, dtype=np.float64)
@@ -93,6 +115,7 @@ class Meter:
                 signal, self.state[c][i] = lfilter(b, a, signal, zi=self.state[c][i])
             weighted[c] = signal
         squares = np.sum(weighted * weighted, axis=0)  # channels summed, per frame
+        self._keep(block)
         self.frames += squares.size
         offset = 0
         while offset < squares.size:
@@ -113,6 +136,10 @@ class Meter:
             self.filled = 0
         result = Measurement(self.energy, int(round(self.frames * 1000 / self.rate)))
         result.skipped_packets = self.skipped_packets
+        result.rate = self.rate
+        result.head = np.concatenate(self.head) if self.head else np.zeros(0, dtype=np.float32)
+        result.tail = np.concatenate(self.tail) if self.tail else np.zeros(0, dtype=np.float32)
+        result.tail_offset = self.tail_offset
         return result
 
 
@@ -126,6 +153,17 @@ class Measurement:
         self.decoder = "pyav"
         self.duration_ms = duration_ms
         self.lufs = integrated(self.chunk_energy)
+        # The first and last stretch of the sound, mono, for the beat grid (:func:`beat_grids`).
+        self.rate = RATE
+        self.head = np.zeros(0, dtype=np.float32)
+        self.tail = np.zeros(0, dtype=np.float32)
+        self.tail_offset = 0
+
+    def beat_grids(self):
+        """``(intro, outro)`` :class:`beats.Grid` of the song's start and end, either ``None`` without a beat."""
+        from . import beats
+
+        return beats.ends(self.head, self.tail, self.tail_offset, self.relative_levels(), self.rate)
 
     def relative_levels(self):
         """Each 100 ms chunk's loudness minus the song's, in dB (``-inf`` for digital silence)."""
