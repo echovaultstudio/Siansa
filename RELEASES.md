@@ -3,6 +3,11 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.40.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.40.0beta) — 2026-10-29
+
+- [#647](https://github.com/echovaultstudio/Siansa/pull/647) Plugin 0.3.0: the beat grid at each end of a song, for beat-matched blends (@Th3K1ngP1n)
+- [#648](https://github.com/echovaultstudio/Siansa/pull/648) Beat-matched blends in DJ radio (experimental) (@Th3K1ngP1n)
+
 ## [0.39.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.39.1beta) — 2026-10-29
 
 - [#637](https://github.com/echovaultstudio/Siansa/pull/637) Going-public runbook removed (now in siansa-dev) (@Th3K1ngP1n)
