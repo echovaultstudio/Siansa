@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.3.1",
+      "min_core_version": "3.6.4",
+      "changelog": "Beat grids have their own section on the settings page: how many songs have them and how many are still to measure, their own songs per run (0 measures them only when you ask), Measure a batch now, and Measure all with Stop. They run after the volume and fade profiles each round, in the time left over, and songs the app is about to play come first. A song that can't be read again for its beats keeps its loudness and isn't tried again every round.",
+      "imageUrl": ""
+    },
+    {
       "version": "0.3.0",
       "min_core_version": "3.6.4",
       "changelog": "Measures the beat grid at each end of every song (tempo to a fraction of a BPM, where the beats and bars fall, how beat-driven and how steady the end is), for beat-matched blends in Siansa's DJ radio. Songs measured before keep their loudness and fades and are measured again for their beats in the background.",

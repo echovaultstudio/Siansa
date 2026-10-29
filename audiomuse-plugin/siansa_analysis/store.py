@@ -43,6 +43,8 @@ def migrate(db):
     # The beat grid at each end (JSON: intro_bpm, intro_beat_ms, …) and which version of the beat tracker made it.
     cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS beats JSONB")
     cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS beats_version INTEGER NOT NULL DEFAULT 0")
+    # Why a song measured before the beat tracker couldn't be measured again for its beats (it keeps its loudness).
+    cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS beats_error TEXT")
     cur.execute(f"CREATE INDEX IF NOT EXISTS {table('profiles_status')} ON {table('profiles')} (status, analyzer_version)")
     cur.execute(f"""
         CREATE TABLE IF NOT EXISTS {table('wanted')} (
@@ -228,7 +230,7 @@ def save_profile(db, item_id, profile):
             status='ready', ref_lufs=EXCLUDED.ref_lufs, start_ramp=EXCLUDED.start_ramp,
             end_ramp=EXCLUDED.end_ramp, duration_ms=EXCLUDED.duration_ms,
             analyzer_version=EXCLUDED.analyzer_version, beats=EXCLUDED.beats, beats_version=EXCLUDED.beats_version,
-            attempts=0, retry_after=NULL, error=NULL, source='measured', updated_at=now()""",
+            beats_error=NULL, attempts=0, retry_after=NULL, error=NULL, source='measured', updated_at=now()""",
         (item_id, profile["ref_lufs"], profile["start_ramp"], profile["end_ramp"], profile["duration_ms"],
          ANALYZER_VERSION, json.dumps(profile.get("beats") or {}), BEATS_VERSION))
     cur.execute(f"DELETE FROM {table('wanted')} WHERE item_id=%s", (item_id,))
@@ -251,6 +253,18 @@ def save_failure(db, item_id, error):
             error=EXCLUDED.error, updated_at=now()
           WHERE {table('profiles')}.status <> 'ready'""",
         (item_id, attempts, hours, str(error)[:500]))
+    cur.close()
+    db.commit()
+
+
+def save_beats_failure(db, item_id, error):
+    """Notes that a song measured before the beat tracker couldn't be read again for its beats. Its loudness and
+    ramps stay; it isn't tried again for this beat tracker, so one bad file doesn't come back every round."""
+    cur = db.cursor()
+    cur.execute(f"""
+        UPDATE {table('profiles')} SET beats='{{}}'::jsonb, beats_version=%s, beats_error=%s, updated_at=now()
+         WHERE item_id=%s AND status='ready'""", (BEATS_VERSION, str(error)[:500], item_id))
+    cur.execute(f"DELETE FROM {table('wanted')} WHERE item_id=%s", (item_id,))
     cur.close()
     db.commit()
 
@@ -289,7 +303,8 @@ def profiles_for(db, item_ids):
 
 
 def mark_wanted(db, item_ids):
-    """Remembers songs the app asked for that have no profile yet, so the next run measures them first."""
+    """Remembers songs the app asked for that have no profile yet (or no beat grids yet), so the next run
+    measures them first."""
     if not item_ids:
         return
     cur = db.cursor()
@@ -316,37 +331,62 @@ def profile_counts(db):
 
 
 def beats_counts(db):
-    """``(with_beats, waiting)``: ready songs whose beat grids are current, and those still to be measured for
-    them (songs measured before the beat tracker, or by an older one)."""
+    """``(done, with_beat, failed, waiting)`` over the songs with a volume and fade profile: measured by the
+    current beat tracker, of those how many have a beat at either end, how many couldn't be read again, and how
+    many are still to be measured for their beats (measured before the beat tracker, or by an older one)."""
     cur = db.cursor()
     cur.execute(f"""
-        SELECT count(*) FILTER (WHERE p.beats_version=%s),
+        SELECT count(*) FILTER (WHERE p.beats_version=%s AND p.beats_error IS NULL),
+               count(*) FILTER (WHERE p.beats_version=%s AND p.beats_error IS NULL
+                                  AND (p.beats ? 'intro_bpm' OR p.beats ? 'outro_bpm')),
+               count(*) FILTER (WHERE p.beats_version=%s AND p.beats_error IS NOT NULL),
                count(*) FILTER (WHERE p.beats_version<>%s)
           FROM {table('profiles')} p JOIN score s USING (item_id)
-         WHERE p.status='ready' AND p.analyzer_version=%s""", (BEATS_VERSION, BEATS_VERSION, ANALYZER_VERSION))
-    done, waiting = cur.fetchone()
+         WHERE p.status='ready' AND p.analyzer_version=%s""",
+        (BEATS_VERSION, BEATS_VERSION, BEATS_VERSION, BEATS_VERSION, ANALYZER_VERSION))
+    done, with_beat, failed, waiting = cur.fetchone()
     cur.close()
-    return int(done or 0), int(waiting or 0)
+    return int(done or 0), int(with_beat or 0), int(failed or 0), int(waiting or 0)
 
 
-def songs_to_measure(db, limit):
-    """Up to ``limit`` songs without a current profile: asked-for songs first, then songs with no profile at
-    all (newest first), then songs measured before the beat tracker, whose loudness works but whose beats are
-    still missing (Siansa issue #646).
+def songs_to_measure(db, limit, beats=False):
+    """Up to ``limit`` songs to measure, newest first.
+
+    Without ``beats``, songs without a current volume and fade profile (none yet, an older analyser, or due to be
+    tried again), asked-for songs first. With ``beats``, songs whose profile is current but whose beat grids are
+    missing: measured before the beat tracker, or by an older one (Siansa issue #646); asked-for songs first too,
+    since the app is about to play them. The two never overlap, so each part keeps its own pace.
     """
     cur = db.cursor()
+    if beats:
+        where = "p.status='ready' AND p.analyzer_version = %s AND p.beats_version <> %s"
+        params = (ANALYZER_VERSION, BEATS_VERSION)
+    else:
+        where = """(p.item_id IS NULL
+                OR (p.status='ready' AND p.analyzer_version <> %s)
+                OR (p.status IN ('failed', 'elsewhere') AND (p.retry_after IS NULL OR p.retry_after <= now())))"""
+        params = (ANALYZER_VERSION,)
     cur.execute(f"""
         SELECT s.item_id, s.title
           FROM score s
           LEFT JOIN {table('profiles')} p USING (item_id)
           LEFT JOIN {table('wanted')} w USING (item_id)
-         WHERE (p.item_id IS NULL
-                OR (p.status='ready' AND (p.analyzer_version <> %s OR p.beats_version <> %s))
-                OR (p.status IN ('failed', 'elsewhere') AND (p.retry_after IS NULL OR p.retry_after <= now())))
-         ORDER BY w.asked_at DESC NULLS LAST,
-                  (p.status='ready' AND p.analyzer_version = %s) ASC,
-                  s.created_at DESC
-         LIMIT %s""", (ANALYZER_VERSION, BEATS_VERSION, ANALYZER_VERSION, int(limit)))
+         WHERE {where}
+         ORDER BY w.asked_at DESC NULLS LAST, s.created_at DESC
+         LIMIT %s""", (*params, int(limit)))
+    rows = cur.fetchall()
+    cur.close()
+    return rows
+
+
+def recent_beats_failures(db, limit=5):
+    """The last songs that couldn't be read again for their beats: ``(item_id, title, artist, error)``."""
+    cur = db.cursor()
+    cur.execute(f"""
+        SELECT p.item_id, s.title, s.author, p.beats_error
+          FROM {table('profiles')} p LEFT JOIN score s USING (item_id)
+         WHERE p.beats_error IS NOT NULL AND p.beats_version=%s
+         ORDER BY p.updated_at DESC LIMIT %s""", (BEATS_VERSION, int(limit)))
     rows = cur.fetchall()
     cur.close()
     return rows

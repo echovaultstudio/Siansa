@@ -106,6 +106,30 @@ def profiles(counts, job):
     return Status("Not complete", WORKING, share, detail)
 
 
+def beats_counts(done, with_beat, failed, waiting):
+    """Counts for the beat grids, over the songs that have a volume and fade profile."""
+    done, with_beat, failed, waiting = (max(int(v), 0) for v in (done, with_beat, failed, waiting))
+    return {"songs": done + failed + waiting, "done": done, "with_beat": min(with_beat, done), "failed": failed,
+            "to_measure": waiting}
+
+
+def beats(counts, job):
+    """The beat grids: ``counts`` from :func:`beats_counts`, ``job`` their own job state."""
+    songs, done, failed = counts["songs"], counts["done"], counts["failed"]
+    running = (job or {}).get("status") == "running"
+    share = percent(done + failed, songs)
+    detail = f"{done:,} of {songs:,} songs measured for their beats, {counts['with_beat']:,} with a beat at either end"
+    if failed:
+        detail += f", {failed:,} couldn't be read again"
+    if songs == 0:
+        return Status("Waiting for profiles", WORKING, 0, "Songs get their beat grids with their volume and fade profile")
+    if counts["to_measure"] == 0:
+        return Status("Ready", READY, 100, detail)
+    if running:
+        return Status("Measuring", WORKING, share, detail)
+    return Status("Not complete", WORKING, share, detail)
+
+
 def similar(inputs, built, job, algorithm_version):
     """The similar albums and artists: their inputs, the last finished build, and their own job."""
     job = job or {}

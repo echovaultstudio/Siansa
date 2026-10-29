@@ -88,7 +88,8 @@ so their beats clash only for a moment. A beatless ending or start keeps the sma
 It's experimental: downbeats are the hardest thing to hear in a recording, so when either song's bars aren't clear
 the songs are laid beat on beat instead, and a mix can land a beat off. The log says how each blend was planned and
 how far the next song was out of step. Songs measured before plugin 0.3.0 keep their loudness and fades and get
-their beats when the plugin measures them again, in the background.
+their beats when the plugin measures them again: see the **Beat grids** section on the plugin's settings page
+([AudioMuse-AI](audiomuse.md)).
 
 Crossfades only happen on this phone: on a TV or speaker, songs play back to back. They're not used with Repeat
 one, or while the sleep timer lets a song finish.

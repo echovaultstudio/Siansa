@@ -58,8 +58,11 @@ Until a song is measured, Siansa uses its ReplayGain tags, and crossfades use th
 
 Plugin 0.3.0 also measures the beat grid at each end of a song (tempo, where the beats and bars fall, how
 beat-driven and how steady the end is), for [beat-matched blends](playback.md#beat-matched-blends-experimental).
-Songs measured by an older version keep their loudness and fades and are measured again for their beats in the
-background; the plugin's page says how many are waiting.
+Songs measured by an older version keep their loudness and fades and are measured again for their beats. The
+plugin's settings page (0.3.1) has a **Beat grids** section for that: how many songs have their grids and how many
+are waiting, its own **Songs per run** (0 to measure them only when you ask), **Measure a batch now**, and
+**Measure all** with **Stop**. Each round measures the volume and fade profiles first and the beat grids in the
+time left; songs Siansa is about to play come first.
 
 ## Several music servers in one AudioMuse-AI
 

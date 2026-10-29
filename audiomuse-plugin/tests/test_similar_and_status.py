@@ -134,7 +134,7 @@ class StatusTest(unittest.TestCase):
         def get_state(name, default=None, db=None):
             return state.get(name, default)
 
-        for name, fake in (("get_state", get_state), ("profile_counts", lambda db: (10, 4, 0, 0)), ("beats_counts", lambda db: (4, 0))):
+        for name, fake in (("get_state", get_state), ("profile_counts", lambda db: (10, 4, 0, 0)), ("beats_counts", lambda db: (4, 3, 0, 0))):
             saved[name] = getattr(web.store, name)
             setattr(web.store, name, fake)
         try:
@@ -172,7 +172,8 @@ class PageTest(unittest.TestCase):
         page = web.render_settings(self.state(), 40)
         self.assertIn("1. Library", page)
         self.assertIn("2. Volume &amp; fade profiles", page)
-        self.assertIn("3. Similar albums &amp; artists", page)
+        self.assertIn("4. Similar albums &amp; artists", page)
+        self.assertIn("3. Beat grids", page)
         self.assertIn("4 of 10 songs measured", page)
         self.assertIn("Update pending", page)
         self.assertIn("library generation 2 of\n      3", page)
