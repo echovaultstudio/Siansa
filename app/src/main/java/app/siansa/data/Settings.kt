@@ -4,6 +4,7 @@ import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import app.siansa.playback.BeatMatchMode
 import app.siansa.playback.CrossfadeMode
 import app.siansa.playback.LoudnessSource
 import app.siansa.mix.ContinuousMode
@@ -124,6 +125,8 @@ data class AppSettings(
     val windDownSongs: Int = DEFAULT_WIND_DOWN_SONGS,
     /** The crossfade length; in smart mode, the longest a fade may be. */
     val crossfadeSeconds: Int = DEFAULT_CROSSFADE_SECONDS,
+    /** Where smart crossfades are beat-matched like a DJ's (issue #646, experimental): off, DJ radio, everywhere. */
+    val beatMatch: BeatMatchMode = BeatMatchMode.DJ_RADIO,
 ) {
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
@@ -326,6 +329,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         windDownSongs = prefs.getInt("wind_down_songs", AppSettings.DEFAULT_WIND_DOWN_SONGS)
             .takeIf { it in AppSettings.WIND_DOWN_CHOICES } ?: AppSettings.DEFAULT_WIND_DOWN_SONGS,
         crossfadeSeconds = prefs.getInt("crossfade_s", AppSettings.DEFAULT_CROSSFADE_SECONDS).coerceIn(AppSettings.CROSSFADE_SECONDS),
+        beatMatch = BeatMatchMode.parse(prefs.getString("beat_match", null)),
     )
 
     /**
@@ -545,5 +549,10 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         val length = seconds.coerceIn(AppSettings.CROSSFADE_SECONDS)
         prefs.edit().putString("crossfade", mode.name).putInt("crossfade_s", length).apply()
         _state.value = _state.value.copy(crossfade = mode, crossfadeSeconds = length)
+    }
+
+    fun setBeatMatch(mode: BeatMatchMode) {
+        prefs.edit().putString("beat_match", mode.name).apply()
+        _state.value = _state.value.copy(beatMatch = mode)
     }
 }

@@ -211,6 +211,23 @@ class SpacingTest {
         assertEven("Crossfade chips", mode.top - hint.bottom, hint2.top - mode.bottom)
     }
 
+    /** Beat-matched blends (issue #646): the Off / DJ radio / Everywhere chips sit evenly between their heading and hint. */
+    @Test fun beatMatchChipsAreEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                Column(verticalArrangement = Arrangement.spacedBy(app.siansa.ui.CROSSFADE_GAP)) {
+                    Box(Modifier.fillMaxWidth().height(24.dp).testTag("heading"))
+                    app.siansa.ui.BeatMatchRow(app.siansa.playback.BeatMatchMode.DJ_RADIO) { }
+                    Box(Modifier.fillMaxWidth().height(16.dp).testTag("hint"))
+                }
+            }
+        }
+        val heading = compose.onNodeWithTag("heading").getBoundsInRoot()
+        val chips = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("DJ radio")), useUnmergedTree = true).getBoundsInRoot()
+        val hint = compose.onNodeWithTag("hint").getBoundsInRoot()
+        assertEven("Beat-match chips", chips.top - heading.bottom, hint.top - chips.bottom)
+    }
+
     /** Time machine: the year and the month chips are one even gap apart (issue #186). */
     @Test fun timeMachinePickerIsEvenlySpaced() {
         compose.setContent {

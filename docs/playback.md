@@ -66,6 +66,30 @@ Same page. **Off**, a **fixed** length (1–12 seconds, 6 by default), or **Smar
 - Songs that run straight on within one album aren't faded, so they stay gapless.
 - Without the plugin's measurements, Smart uses the fixed length.
 
+### Beat-matched blends (experimental)
+
+**Settings › Playback › Crossfade and levelling › Beat-matched blends**, shown with Smart crossfades and the Siansa
+plugin. Two songs that both keep a beat can clash at the changeover when their beats land at different moments,
+like a bad DJ set. With the plugin 0.3.0, which measures the beat grid at each end of every song, Siansa can blend
+them the way a DJ mixes:
+
+- **DJ radio** (the default): in DJ radio and DJ keep-playing, a song that keeps a beat blends into the next one bar
+  for bar. The blend starts on a bar of the song going out, the next song starts on its first downbeat, and it
+  plays a touch faster or slower (up to 8 %, pitch kept) so its beats keep time with the old song's. Afterwards it
+  eases back to its own speed over about 25 seconds, too slowly to hear. The blend is as many whole bars as fit the
+  crossfade length.
+- **Everywhere**: the same in every smart crossfade.
+- **Off**: fades don't follow the beat.
+
+Whatever the setting, two songs that both keep a beat but can't be matched (tempos more than 8 % apart, counting
+double and half time as the same; a beat that isn't steady; a stream that can't jump to a point) get a short blend,
+so their beats clash only for a moment. A beatless ending or start keeps the smart blend as before.
+
+It's experimental: downbeats are the hardest thing to hear in a recording, so when either song's bars aren't clear
+the songs are laid beat on beat instead, and a mix can land a beat off. The log says how each blend was planned and
+how far the next song was out of step. Songs measured before plugin 0.3.0 keep their loudness and fades and get
+their beats when the plugin measures them again, in the background.
+
 Crossfades only happen on this phone: on a TV or speaker, songs play back to back. They're not used with Repeat
 one, or while the sleep timer lets a song finish.
 

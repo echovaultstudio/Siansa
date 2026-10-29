@@ -25,8 +25,9 @@ enum class CrossfadeMode(val label: String) {
  * How one change of song is blended: the next song starts [overlapMs] before the current one ends. The
  * current song fades out over the whole overlap; the next fades in over its first [fadeInMs]. In smart mode the
  * current song can end early: its last [cutMs] (silence, or the end of a long fade-out) isn't played (issue #628).
+ * A [beat]-matched blend (issue #646) also says where the next song starts and how fast it plays.
  */
-data class FadePlan(val overlapMs: Long, val fadeInMs: Long, val why: String, val cutMs: Long = 0L)
+data class FadePlan(val overlapMs: Long, val fadeInMs: Long, val why: String, val cutMs: Long = 0L, val beat: BeatMatch.Plan? = null)
 
 /**
  * Plans each blend. Smart mode uses the songs' ramps (the MixRamp idea): the current song's quiet tail plus
@@ -102,6 +103,7 @@ object Crossfade {
         nextDurationMs: Long,
         currentProfile: TrackProfile? = null,
         nextProfile: TrackProfile? = null,
+        beatMatch: Boolean = false,
     ): FadePlan? {
         if (mode == CrossfadeMode.OFF || maxMs <= 0) return null
         if (mode == CrossfadeMode.SMART && runsStraightOn(current, next)) return null
@@ -109,11 +111,24 @@ object Crossfade {
         // Smart: the dead air and the long fade-out at the end are left out first (issue #628); the blend is planned
         // from the song's new end.
         val (cut, cutWhy) = if (mode == CrossfadeMode.SMART) endCut(currentProfile, currentDurationMs, maxMs) else 0L to null
-        var plan = if (mode == CrossfadeMode.SMART && currentProfile != null && nextProfile != null) {
+        val outro = currentProfile?.outro
+        val intro = nextProfile?.intro
+        val rhythmic = mode == CrossfadeMode.SMART && BeatMatch.bothRhythmic(outro, intro)
+        // Beat-matched (issue #646): a DJ blend over whole bars, beat on beat, when both ends have a steady beat.
+        val matched = if (rhythmic && beatMatch && currentDurationMs > 0) BeatMatch.plan(outro!!, intro!!, currentDurationMs - cut, maxMs) else null
+        var plan = if (matched != null) {
+            FadePlan(matched.overlapMs, matched.overlapMs, matched.why, cut, matched)
+        } else if (mode == CrossfadeMode.SMART && currentProfile != null && nextProfile != null) {
             val tail = ((currentProfile.quietForLastMs(QUIET_DB) ?: 0L) - cut).coerceAtLeast(0L)
             val head = nextProfile.reachesAfterMs(QUIET_DB) ?: 0L
-            val overlap = (tail + head).coerceAtMost(maxMs)
-            FadePlan(overlap, head.coerceIn(MIN_FADE_IN_MS, overlap.coerceAtLeast(MIN_FADE_IN_MS)), "smart: ${tail} ms tail + ${head} ms intro", cut)
+            var overlap = (tail + head).coerceAtMost(maxMs)
+            var why = "smart: ${tail} ms tail + ${head} ms intro"
+            if (rhythmic && overlap > BeatMatch.CLASH_MS) {
+                // Both ends keep a beat that can't be laid on the other's: a long blend would clash, so a short one.
+                overlap = BeatMatch.CLASH_MS
+                why += " · beats would clash, so a short blend"
+            }
+            FadePlan(overlap, head.coerceIn(MIN_FADE_IN_MS, overlap.coerceAtLeast(MIN_FADE_IN_MS)), why, cut)
         } else {
             FadePlan(maxMs, maxMs, if (mode == CrossfadeMode.SMART) "smart without profiles: fixed ${maxMs} ms" else "fixed ${maxMs} ms", cut)
         }
@@ -121,11 +136,12 @@ object Crossfade {
         if (cut > 0 && plan.overlapMs < MIN_OVERLAP_MS) plan = plan.copy(overlapMs = MIN_OVERLAP_MS, fadeInMs = MIN_FADE_IN_MS)
         if (cutWhy != null) plan = plan.copy(why = "${plan.why} · $cutWhy")
 
-        // Never more than a third of either song, so short songs still get heard.
+        // Never more than a third of either song, so short songs still get heard (a beat-matched blend that long
+        // is dropped: its start must stay on the bar).
         val shortest = listOf(currentDurationMs - plan.cutMs, nextDurationMs).filter { it > 0 }.minOrNull()
         if (shortest != null && plan.overlapMs > shortest / 3) {
             val overlap = shortest / 3
-            plan = plan.copy(overlapMs = overlap, fadeInMs = min(plan.fadeInMs, overlap).coerceAtLeast(MIN_FADE_IN_MS))
+            plan = plan.copy(overlapMs = overlap, fadeInMs = min(plan.fadeInMs, overlap).coerceAtLeast(MIN_FADE_IN_MS), beat = null)
         }
         return if (plan.overlapMs < MIN_OVERLAP_MS) null else plan
     }
@@ -161,6 +177,7 @@ object Crossfade {
         next: Song,
         currentProfile: TrackProfile?,
         nextProfile: TrackProfile?,
+        beatMatch: Boolean = false,
     ): String? = when {
         mode == CrossfadeMode.OFF || maxMs <= 0 -> "crossfade is off"
         mode == CrossfadeMode.SMART && runsStraightOn(current, next) -> "they run straight on in one album"
@@ -168,7 +185,14 @@ object Crossfade {
             val tail = currentProfile.quietForLastMs(QUIET_DB) ?: 0L
             val silence = currentProfile.lastAtExactlyMs(SILENT_DB) ?: 0L
             val head = nextProfile.reachesAfterMs(QUIET_DB) ?: 0L
-            if (tail + head < MIN_OVERLAP_MS && silence < MIN_SILENCE_MS) "a hard ending into a quick start (${tail} ms quiet tail + ${head} ms intro), played back to back" else null
+            val outro = currentProfile.outro
+            val intro = nextProfile.intro
+            val unmatched = when {
+                !beatMatch || !BeatMatch.bothRhythmic(outro, intro) -> null
+                BeatMatch.speed(outro!!, intro!!) == null -> "; no beat-matching: %.1f and %.1f BPM are too far apart".format(java.util.Locale.ROOT, outro.bpm, intro.bpm)
+                else -> "; no beat-matching: not even one bar fits the crossfade length"
+            }
+            if (tail + head < MIN_OVERLAP_MS && silence < MIN_SILENCE_MS) "a hard ending into a quick start (${tail} ms quiet tail + ${head} ms intro), played back to back${unmatched ?: ""}" else null
         }
         else -> null
     }
