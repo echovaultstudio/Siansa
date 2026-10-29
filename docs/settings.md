@@ -33,7 +33,7 @@ to fold it open; they start folded. **Save** (at the top, or in any open card) k
 | **Crossfade and levelling** | Levelling (Track, Album, Off), where loudness comes from (tags or the Siansa plugin), the target (−18 or −14 LUFS), the crossfade (Off, fixed or Smart, 1–12 s), and beat-matched blends (experimental: Off, DJ radio or Everywhere; with Smart and the plugin). |
 | **Streaming quality** | Original or Opus 96–320 kbit/s, on Wi-Fi and on mobile data. |
 | **Song radio** | How far a radio may wander: Stay close, A little, Wander. |
-| **Keep playing** | Off, Steady or DJ, when the queue is about to end. |
+| **Keep playing** | Off, Steady or DJ, when the queue is about to end. A DJ mix's shape and surprises are set in the queue while a DJ radio plays (see [Discovery](discovery.md#shape-the-mix)). |
 | **Wind down** | How many calm songs Wind down plays without a sleep timer: 10, 20 or 30. |
 | **Load songs ahead** | How many songs to load ahead, on Wi-Fi and on mobile data (0–5). |
 | **Books** | Only with Audiobookshelf: how far the book player's ↺ and ↻ skip, 10–90 s each. |

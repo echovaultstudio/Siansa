@@ -41,6 +41,36 @@ fun continuousTopUpDue(
 ): Boolean = mode != ContinuousMode.OFF && hasMedia && left <= ContinuousPlay.WHEN_LEFT && repeatOff &&
     !radioOn && !windingDown && !sleepFinishing
 
+/**
+ * The shape of a DJ mix (issue #649): what the energy does over the next songs. Shown in the queue while a DJ
+ * radio plays; changing it reorders the songs not yet played.
+ */
+enum class MixShape(val label: String, val hint: String) {
+    STEADY("Steady vibes", "Stays where it is: songs as close as can be to the last one."),
+    BUILD("Steady build", "The energy climbs song by song, from where it is now to the top."),
+    EUPHORIC("Euphoric", "Climbs to a high in a few songs and stays there, the brightest songs first."),
+    WIND_DOWN("Wind down", "The energy falls song by song, towards the calmest.");
+
+    /**
+     * The energy (0..1) the song picked [index]th of [count] should have, from [from] (the energy where the mix
+     * is now); null when the shape has no say (Steady) or [from] is unknown and the shape needs it.
+     */
+    fun target(from: Double?, index: Int, count: Int): Double? {
+        val start = from ?: 0.5
+        val progress = (index + 1).toDouble() / count.coerceAtLeast(1)
+        return when (this) {
+            STEADY -> null
+            BUILD -> start + (1 - start) * progress
+            EUPHORIC -> start + (1 - start) * (progress * 3).coerceAtMost(1.0)
+            WIND_DOWN -> start * (1 - progress)
+        }
+    }
+
+    companion object {
+        fun parse(name: String?): MixShape = entries.firstOrNull { it.name == name } ?: STEADY
+    }
+}
+
 /** A song DJ mode may pick, with what it knows of its sound (null when AudioMuse hasn't analysed it). */
 data class DjTrack(
     val id: String,
@@ -50,6 +80,10 @@ data class DjTrack(
     val tempo: Double? = null,
     val key: String? = null,
     val scale: String? = null,
+    /** How energetic, 0..1 against the other songs on offer (AudioMuse's energy by rank); null when unknown. */
+    val energy: Double? = null,
+    /** How bright: AudioMuse's happy and party moods, 0..1; null when unknown. */
+    val lift: Double? = null,
 )
 
 /**
@@ -103,30 +137,56 @@ fun tempoMatch(a: Double?, b: Double?): Double {
 
 private const val TEMPO_SPREAD = 0.08
 
-/** How good a change from [from] to [to] is: how alike [to] is to the seed, then tempo and key; a new artist is better. */
-fun transition(from: DjTrack, to: DjTrack): Double {
+/**
+ * How good a change from [from] to [to] is: how alike [to] is to the seed, then tempo and key; a new artist is
+ * better. With [surprise] (0..1, issue #649) likeness and tempo count for less, so the next song may stray
+ * further, and [wild] (0..1, the song's draw) can lift any song; the key still counts in full, so a surprise
+ * still mixes in. [target] (an energy, 0..1) pulls towards that energy; [bright] favours happy, party songs.
+ */
+fun transition(from: DjTrack, to: DjTrack, surprise: Double = 0.0, wild: Double = 0.0, target: Double? = null, bright: Boolean = false): Double {
     val sameArtist = from.artist.isNotBlank() && from.artist.equals(to.artist, ignoreCase = true)
-    return 0.45 * to.likeness +
-        0.35 * tempoMatch(from.tempo, to.tempo) +
+    val s = surprise.coerceIn(0.0, 1.0)
+    var score = 0.45 * (1 - 0.6 * s) * to.likeness +
+        0.35 * (1 - 0.5 * s) * tempoMatch(from.tempo, to.tempo) +
         0.20 * keyMatch(camelot(from.key, from.scale), camelot(to.key, to.scale)) -
-        (if (sameArtist) 0.15 else 0.0)
+        (if (sameArtist) 0.15 else 0.0) +
+        0.4 * s * wild.coerceIn(0.0, 1.0)
+    if (target != null) score += ENERGY_WEIGHT * (to.energy?.let { 1 - abs(it - target) } ?: 0.5)
+    if (bright) score += LIFT_WEIGHT * (to.lift ?: 0.3)
+    return score
 }
+
+/** How much a shape's energy target counts next to likeness, tempo and key. */
+const val ENERGY_WEIGHT = 0.45
+/** How much a song's brightness counts in a euphoric mix. */
+const val LIFT_WEIGHT = 0.2
 
 /**
  * DJ mode's order (issue #337): from [seed], each next song is the best change from the one before it, so the
- * set moves smoothly instead of jumping in tempo or key. At most [count] of [pool].
+ * set moves smoothly instead of jumping in tempo or key. At most [count] of [pool]. [shape] bends the energy
+ * over the picks and [surprise] (0..1) lets them stray, with [random] drawing each song's wild card (issue #649).
  */
-fun djOrder(seed: DjTrack, pool: List<DjTrack>, count: Int): List<DjTrack> {
+fun djOrder(seed: DjTrack, pool: List<DjTrack>, count: Int, shape: MixShape = MixShape.STEADY, surprise: Double = 0.0, random: kotlin.random.Random = kotlin.random.Random.Default): List<DjTrack> {
     val left = pool.filter { it.id != seed.id }.distinctBy { it.id }.toMutableList()
+    val wild = if (surprise > 0) left.associate { it.id to random.nextDouble() } else emptyMap()
     val picked = ArrayList<DjTrack>(count)
     var tail = seed
     while (picked.size < count && left.isNotEmpty()) {
-        val next = left.maxBy { transition(tail, it) }
+        val target = shape.target(seed.energy, picked.size, count)
+        val next = left.maxBy { transition(tail, it, surprise, wild[it.id] ?: 0.0, target, bright = shape == MixShape.EUPHORIC) }
         picked += next
         left -= next
         tail = next
     }
     return picked
+}
+
+/** Each song's energy as its rank among [values] (0 the calmest, 1 the most energetic); null stays null. */
+fun energyByRank(values: Map<String, Double?>): Map<String, Double?> {
+    val known = values.filterValues { it != null }.entries.sortedBy { it.value }
+    val n = known.size
+    val ranked = known.mapIndexed { i, e -> e.key to (if (n <= 1) 0.5 else i.toDouble() / (n - 1)) }.toMap()
+    return values.mapValues { (id, _) -> ranked[id] }
 }
 
 /** 1 for the most alike of [size] songs in AudioMuse's order down to near 0 for the last: its scores differ by route. */
@@ -243,16 +303,22 @@ class ContinuousPlay(private val graph: AppGraph) {
             ?.associateBy { it.id }
             ?: return null
         val seedFeatures = features[last.id]
-        val seed = DjTrack(last.id, last.artist, 1.0, seedFeatures?.tempo, seedFeatures?.key, seedFeatures?.scale)
+        val energy = energyByRank((listOf(last.id) + hits.map { it.id }).associateWith { features[it]?.energy })
+        fun lift(f: app.siansa.net.TrackFeatures?): Double? = f?.moods?.let { m -> listOfNotNull(m["happy"], m["party"]).takeIf { it.isNotEmpty() }?.average()?.coerceIn(0.0, 1.0) }
+        val seed = DjTrack(last.id, last.artist, 1.0, seedFeatures?.tempo, seedFeatures?.key, seedFeatures?.scale, energy[last.id], lift(seedFeatures))
         val pool = hits.mapIndexed { i, hit ->
             val f = features[hit.id]
-            DjTrack(hit.id, hit.artist, likenessByRank(i, hits.size), f?.tempo, f?.key, f?.scale)
+            DjTrack(hit.id, hit.artist, likenessByRank(i, hits.size), f?.tempo, f?.key, f?.scale, energy[hit.id], lift(f))
         }
-        val order = djOrder(seed, pool, count)
+        val settings = graph.settings.current
+        val shape = settings.mixShape
+        val surprise = settings.mixSurprise / 100.0
+        val order = djOrder(seed, pool, count, shape, surprise)
         AppLog.d(
             "KeepPlaying",
-            "DJ from ${seed.tempo?.let { "%.0f BPM".format(it) } ?: "unknown tempo"} ${seed.key.orEmpty()} ${seed.scale.orEmpty()}: " +
-                order.joinToString { t -> "${t.tempo?.let { "%.0f".format(it) } ?: "?"} ${t.key.orEmpty()}" },
+            "DJ (${shape.label.lowercase()}, surprise ${settings.mixSurprise} %) from ${seed.tempo?.let { "%.0f BPM".format(it) } ?: "unknown tempo"} ${seed.key.orEmpty()} ${seed.scale.orEmpty()}" +
+                "${seed.energy?.let { " energy %.2f".format(it) } ?: ""}: " +
+                order.joinToString { t -> "${t.tempo?.let { "%.0f".format(it) } ?: "?"} ${t.key.orEmpty()}${t.energy?.let { " e%.2f".format(it) } ?: ""}" },
         )
         return order.map { it.id }
     }

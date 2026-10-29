@@ -16,6 +16,25 @@ Playing anything else ends the radio.
 
 When you start a radio you can also pick **Steady** or **DJ** order (see Keep playing below).
 
+### Shape the mix
+
+While a DJ radio plays, the queue (pull up from now playing) has **Shape the mix**: what the energy does over the
+songs not yet played, and how far the mix may stray. Each change puts those songs in a new order, starting with
+the next one; the song playing and anything you queued yourself stay where they are.
+
+| Shape | What happens |
+|---|---|
+| **Steady vibes** (default) | Stays where it is: songs as close as can be to the last one. |
+| **Steady build** | The energy climbs song by song, from where it is now to the top. |
+| **Euphoric** | Climbs to a high in a few songs and stays there, with the brightest (happy, party) songs first. |
+| **Wind down** | The energy falls song by song, towards the calmest. |
+
+**Surprises** (None, A few, Some, Lots): at None every song is a close neighbour of the last in tempo and how
+alike it is; the further right, the further a song may stray, though its key still has to go with the last
+song's, so a surprise still mixes in. The shape and surprises also apply to Keep playing in DJ mode, and are kept
+in Settings. Energy and brightness come from AudioMuse-AI's analysis; a song it hasn't analysed counts as
+middling.
+
 Without AudioMuse-AI, song radio uses Navidrome's similar songs, or Emby's Instant Mix.
 
 ## Keep playing
@@ -26,7 +45,7 @@ Without AudioMuse-AI, song radio uses Navidrome's similar songs, or Emby's Insta
 |---|---|
 | **Off** | The music stops when the queue ends. |
 | **Steady** | Adds songs like the last one in the queue, so the music carries on in the same style. |
-| **DJ** | Adds songs like the last one and orders them for smooth changes: close tempo and keys that go together. Needs AudioMuse-AI. |
+| **DJ** | Adds songs like the last one and orders them for smooth changes: close tempo and keys that go together, shaped as the mix is (see above). Needs AudioMuse-AI. |
 
 Songs already in the queue or played lately aren't added again. Songs Siansa added by itself are marked in the
 queue.
