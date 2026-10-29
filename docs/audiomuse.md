@@ -20,7 +20,7 @@ how it starts and ends, and similar albums and artists.
 | Song path | AudioMuse-AI, or the AudioMuse-AI Navidrome plugin |
 | Your sound, sonic fingerprint | AudioMuse-AI |
 | Similar albums, similar artists ("Fans also like") | Siansa Analysis plugin |
-| Levelling from measured loudness, smart crossfades | Siansa Analysis plugin (otherwise ReplayGain tags and fixed crossfades) |
+| Levelling from measured loudness, smart crossfades, beat-matched blends | Siansa Analysis plugin (otherwise ReplayGain tags and fixed crossfades) |
 
 ## Set up AudioMuse-AI in Siansa
 
@@ -55,6 +55,11 @@ It needs AudioMuse-AI 3.6.4 or later and works on the standalone builds too.
   or the analysis changes.
 
 Until a song is measured, Siansa uses its ReplayGain tags, and crossfades use the fixed length.
+
+Plugin 0.3.0 also measures the beat grid at each end of a song (tempo, where the beats and bars fall, how
+beat-driven and how steady the end is), for [beat-matched blends](playback.md#beat-matched-blends-experimental).
+Songs measured by an older version keep their loudness and fades and are measured again for their beats in the
+background; the plugin's page says how many are waiting.
 
 ## Several music servers in one AudioMuse-AI
 

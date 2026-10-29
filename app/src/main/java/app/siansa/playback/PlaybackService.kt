@@ -40,6 +40,7 @@ import app.siansa.SiansaApp
 import app.siansa.data.PlayEvent
 import app.siansa.data.Song
 import app.siansa.log.AppLog
+import app.siansa.mix.ContinuousMode
 import app.siansa.log.Level
 import app.siansa.log.Trace
 import com.google.android.gms.cast.framework.CastSession
@@ -119,6 +120,10 @@ class PlaybackService : MediaSessionService() {
             sleepLevel = { sleepLevel },
             allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true },
             onLevel = { if (session?.player === phone) applyVolume(phone) },
+            inDjRadio = {
+                (graph.songRadio.seed.value != null && graph.songRadio.mode == ContinuousMode.DJ) ||
+                    graph.settings.current.continuousPlay == ContinuousMode.DJ
+            },
         ).also { it.start() }
         exo.addAnalyticsListener(PlaybackDiagnostics(exo, this))
         exo.addAnalyticsListener(object : AnalyticsListener {

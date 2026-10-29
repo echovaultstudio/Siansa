@@ -41,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.data.AppSettings
 import app.siansa.data.ReplayGainMode
+import app.siansa.playback.BeatMatchMode
 import app.siansa.playback.CrossfadeMode
 import app.siansa.playback.Levelling
 import app.siansa.playback.LoudnessSource
@@ -116,6 +117,12 @@ fun CrossfadeScreen(nav: NavController) {
                 }
                 Hint("Only on this phone: on a TV or speaker, songs play back to back. Not used with Repeat one, or while the sleep timer lets a song finish.")
             }
+            if (settings.crossfade == CrossfadeMode.SMART && settings.loudnessSource == LoudnessSource.PLUGIN) {
+                HorizontalDivider()
+                Heading("Beat-matched blends (experimental)")
+                BeatMatchRow(settings.beatMatch) { graph.settings.setBeatMatch(it) }
+                Hint(beatMatchHint(settings.beatMatch))
+            }
         }
     }
 }
@@ -136,6 +143,22 @@ private fun crossfadeHint(s: AppSettings): String = when (s.crossfade) {
         "Other fades start where a song goes quiet and last as long as the two songs need, up to the length below."
     } else {
         "Other fades use the length below; with the Siansa plugin they follow how each song ends and starts."
+    }
+}
+
+private fun beatMatchHint(mode: BeatMatchMode): String = when (mode) {
+    BeatMatchMode.OFF -> "Fades don't follow the beat. Two songs that both keep a beat get a short fade, so their beats don't clash for long."
+    BeatMatchMode.DJ_RADIO -> "In DJ radio, a song that keeps a beat blends into the next one bar for bar, like a DJ mix: the next song starts on its first downbeat, a touch faster or slower to match, then eases back to its own speed. Needs the Siansa plugin 0.3.0, which measures each song's beats."
+    BeatMatchMode.EVERYWHERE -> "Every smart crossfade blends bar for bar when both songs keep a beat, with the next song a touch faster or slower to match (up to 8 %). Needs the Siansa plugin 0.3.0, which measures each song's beats."
+}
+
+/** Off, DJ radio or Everywhere: where blends are beat-matched (issue #646). */
+@Composable
+internal fun BeatMatchRow(selected: BeatMatchMode, onPick: (BeatMatchMode) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        BeatMatchMode.entries.forEach { mode ->
+            FilterChip(selected = selected == mode, onClick = { onPick(mode) }, label = { Text(mode.label) })
+        }
     }
 }
 

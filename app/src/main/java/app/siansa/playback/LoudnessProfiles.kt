@@ -27,6 +27,19 @@ enum class LoudnessSource(val label: String, val detail: String) {
 data class RampPoint(val db: Int, val ms: Long)
 
 /**
+ * The beat grid at one end of a song, measured by the Siansa plugin from its first or last half minute (issue
+ * #646): [bpm] to a fraction, [beatMs] a beat near that end and [barMs] a downbeat (both in ms from the start of
+ * the song; the downbeat only when the bars are clear), [rhythm] how beat-driven the end is (0 to 1: a drum
+ * outro near 1, a pad or a spoken intro near 0) and [steady] how well the beats keep to one tempo (0 to 1).
+ */
+data class BeatEnd(val bpm: Double, val beatMs: Double, val barMs: Double?, val rhythm: Float, val steady: Float) {
+    val beatLengthMs: Double get() = 60_000.0 / bpm
+
+    /** A beat-driven, steady end: one a blend can be laid on, beat for beat. */
+    val matchable: Boolean get() = bpm > 0 && rhythm >= BeatMatch.MIN_RHYTHM && steady >= BeatMatch.MIN_STEADY
+}
+
+/**
  * A song's measured loudness and how it starts and ends (the MixRamp idea, from the MPD player):
  * - [refLufs]: overall loudness in LUFS, measured from the audio, so it works without ReplayGain tags;
  * - [startRamp]: for each level (dB relative to [refLufs], −90 up to +6), how long after the start the song
@@ -40,6 +53,10 @@ data class TrackProfile(
     val startRamp: List<RampPoint>,
     val endRamp: List<RampPoint>,
     val durationMs: Long = 0,
+    /** The beat grid at the start, once the plugin has measured it (issue #646); null without a beat. */
+    val intro: BeatEnd? = null,
+    /** The beat grid at the end. */
+    val outro: BeatEnd? = null,
 ) {
     /** How long after the start the song first gets up to [db] (relative), or null if it never does. */
     fun reachesAfterMs(db: Int): Long? = startRamp.firstOrNull { it.db >= db }?.ms
@@ -122,6 +139,21 @@ object PluginProfiles {
             startRamp = RampCodec.decode(p.str("start_ramp")),
             endRamp = RampCodec.decode(p.str("end_ramp")),
             durationMs = p.int("duration_ms")?.toLong() ?: 0,
+            intro = beatEnd(p, "intro"),
+            outro = beatEnd(p, "outro"),
+        )
+    }
+
+    /** The `<prefix>_bpm`, `_beat_ms`, `_bar_ms`, `_rhythm` and `_steady` fields of one end, or null without them. */
+    private fun beatEnd(p: JsonObject, prefix: String): BeatEnd? {
+        val bpm = p.dbl("${prefix}_bpm")?.takeIf { it.isFinite() && it > 0 } ?: return null
+        val beat = p.dbl("${prefix}_beat_ms")?.takeIf { it.isFinite() } ?: return null
+        return BeatEnd(
+            bpm = bpm,
+            beatMs = beat,
+            barMs = p.dbl("${prefix}_bar_ms")?.takeIf { it.isFinite() },
+            rhythm = (p.dbl("${prefix}_rhythm") ?: 0.0).toFloat().coerceIn(0f, 1f),
+            steady = (p.dbl("${prefix}_steady") ?: 0.0).toFloat().coerceIn(0f, 1f),
         )
     }
 

@@ -32,6 +32,11 @@ import kotlin.math.min
  * seek, when another app takes the sound, or when the music moves to another device. Fades are skipped with
  * repeat-one, at the end of the queue, while the sleep timer finishes a song, and when the song couldn't be
  * made ready in time (for example a stream converted by Navidrome that can't jump to a point).
+ *
+ * A beat-matched blend (issue #646, [BeatMatch]) starts on a bar of the old song and the new song on its first
+ * downbeat, at the speed that matches the old tempo. Through the blend the new song is kept in step: a jump
+ * when it landed well off (the seek takes a moment), tiny speed nudges otherwise. Afterwards it eases back to
+ * its own speed over [BeatMatch.EASE_MS], too slowly to hear; a skip or a seek ends that at once.
  */
 @OptIn(UnstableApi::class)
 internal class Crossfader(
@@ -45,6 +50,8 @@ internal class Crossfader(
     private val sleepLevel: () -> Float,
     /** False while casting or while the sleep timer lets the song end. */
     private val allowed: () -> Boolean,
+    /** A DJ radio or DJ keep-playing is on: where beat-matched blends apply in their default setting. */
+    private val inDjRadio: () -> Boolean = { false },
     /** The main player's [level] changed: apply its volume again. */
     private val onLevel: () -> Unit,
 ) : Player.Listener {
@@ -72,6 +79,14 @@ internal class Crossfader(
     private var lastCoarseAlign = 0L
     /** A song whose fade was given up or isn't wanted, until the queue moves on or changes. */
     private var skipped: String? = null
+    /** The main player's own speed before a beat-matched blend changed it. */
+    private var baseSpeed = 1f
+    /** During a beat-matched blend: how often the next song was jumped into step (at most [MAX_JUMPS]). */
+    private var jumps = 0
+    private var switchedAt = 0L
+    /** After a beat-matched blend: the matched speed being eased back from, and since when. */
+    private var easingFrom = 0f
+    private var easingSince = 0L
 
     fun start() {
         main.addListener(this)
@@ -81,6 +96,7 @@ internal class Crossfader(
     fun release() {
         handler.removeCallbacks(watch)
         handler.removeCallbacks(fadeTick)
+        stopEasing()
         main.removeListener(this)
         releaseTail()
         phase = Phase.IDLE
@@ -128,6 +144,7 @@ internal class Crossfader(
         }
         val position = main.currentPosition
         val maxMs = s.crossfadeSeconds * 1000L
+        val beatMatch = s.crossfade == CrossfadeMode.SMART && s.beatMatch.appliesTo(inDjRadio())
         // The end a smart fade leaves out (silence, a long fade-out; issue #628) comes off the time left.
         val cut = if (s.crossfade == CrossfadeMode.SMART) Crossfade.endCut(profiles.cached(item.mediaId), duration, maxMs).first else 0L
         if (duration - cut - position > maxMs + PREPARE_MS) {
@@ -147,9 +164,10 @@ internal class Crossfader(
                 nextDurationMs = next.durationSec * 1000L,
                 currentProfile = profiles.cached(current.id),
                 nextProfile = profiles.cached(next.id),
+                beatMatch = beatMatch,
             )
             if (planned == null) {
-                val why = Crossfade.whyNoFade(s.crossfade, maxMs, current, next, profiles.cached(current.id), profiles.cached(next.id))
+                val why = Crossfade.whyNoFade(s.crossfade, maxMs, current, next, profiles.cached(current.id), profiles.cached(next.id), beatMatch)
                     ?: "one of them is too short to share a fade"
                 AppLog.d("Crossfade", "No fade from ${current.id} into ${next.id}: $why")
                 skipped = item.mediaId
@@ -164,6 +182,7 @@ internal class Crossfader(
             arm(item, planned, at, primeFrom(position, at))
         }
         val speed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
+        // A beat-matched blend lands the new song on the bar: its tail must be in step, so it's primed early.
         if (!primed && position >= primeAt - ON_TIME_MS) prime()
         if (primed) align(speed)
         val until = ((startAt - position) / speed).toLong()
@@ -268,6 +287,9 @@ internal class Crossfader(
         incomingIndex = nextIndex
         startedAt = SystemClock.elapsedRealtime()
         switched = false
+        jumps = 0
+        stopEasing()
+        baseSpeed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
         phase = Phase.FADING
         val wasPrimed = primed && t.isPlaying
         val drift = t.currentPosition - main.currentPosition
@@ -302,10 +324,19 @@ internal class Crossfader(
                 onLevel()
                 if (elapsed >= HANDOVER_MS && t.isPlaying) {
                     switched = true
+                    switchedAt = SystemClock.elapsedRealtime()
                     level = 0f
                     onLevel()
                     expectSeek = true
-                    main.seekTo(incomingIndex, 0)
+                    val beat = planned.beat
+                    if (beat != null) {
+                        // The new song comes in at the matched speed, where it should be right now against the old
+                        // song's beats (the old song's position is the tail's).
+                        main.setPlaybackSpeed(baseSpeed * beat.speed)
+                        main.seekTo(incomingIndex, beat.incomingAt(t.currentPosition))
+                    } else {
+                        main.seekTo(incomingIndex, 0)
+                    }
                 } else if (elapsed > HANDOVER_MS + 1_000) {
                     AppLog.w("Crossfade", "The fade-out didn't start playing; carrying on without a crossfade")
                     skipped = outgoing
@@ -316,10 +347,12 @@ internal class Crossfader(
                 val out = ((t.currentPosition - startAt).toFloat() / planned.overlapMs).coerceIn(0f, 1f)
                 val tailDone = out >= 1f || t.playbackState == Player.STATE_ENDED || t.playbackState == Player.STATE_IDLE
                 t.volume = if (tailDone) 0f else tailBase * sleep * Crossfade.fadeOut(out)
-                val heard = if (main.currentMediaItemIndex == incomingIndex) main.currentPosition else 0L
+                val beat = planned.beat
+                val heard = if (main.currentMediaItemIndex == incomingIndex) (main.currentPosition - (beat?.incomingStartMs ?: 0L)).coerceAtLeast(0L) else 0L
                 val fadedIn = (heard.toFloat() / planned.fadeInMs).coerceIn(0f, 1f)
                 level = Crossfade.fadeIn(fadedIn)
                 onLevel()
+                if (beat != null && !tailDone) keepInStep(beat, t)
                 // Done when both are; or anyway a while after the old song ended, if the new one is stuck loading.
                 if (tailDone && (fadedIn >= 1f || elapsed > planned.overlapMs + GIVE_UP_MS)) {
                     finish()
@@ -330,8 +363,70 @@ internal class Crossfader(
         }
     }
 
+    /**
+     * Keeps the new song's beats on the old song's through a beat-matched blend: well off (the seek landed late,
+     * or the stream couldn't jump), it jumps to where it should be, a few times at most; otherwise its speed is
+     * nudged a little, which can't be heard.
+     */
+    private fun keepInStep(beat: BeatMatch.Plan, t: ExoPlayer) {
+        if (main.currentMediaItemIndex != incomingIndex || !main.isPlaying) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - switchedAt < SETTLE_MS) return  // the seek is still landing; its position isn't real yet
+        val error = beat.error(t.currentPosition, main.currentPosition)
+        if (abs(error) > BeatMatch.JUMP_MS) {
+            if (jumps < MAX_JUMPS && main.isCurrentMediaItemSeekable) {
+                jumps++
+                switchedAt = now
+                val target = beat.incomingAt(t.currentPosition) + JUMP_LEAD_MS
+                AppLog.d("Crossfade", "Beat-matching: the next song is ${if (error > 0) "+" else ""}$error ms out of step; jumping to $target ms (jump $jumps)")
+                main.seekTo(incomingIndex, target)
+            } else if (jumps < MAX_JUMPS + 1) {
+                jumps = MAX_JUMPS + 1
+                AppLog.w("Crossfade", "Beat-matching: the next song stays ${if (error > 0) "+" else ""}$error ms out of step (${if (main.isCurrentMediaItemSeekable) "after $MAX_JUMPS jumps" else "it can't jump to a point"})")
+            }
+            return
+        }
+        main.setPlaybackSpeed(baseSpeed * beat.speed * BeatMatch.nudge(error))
+    }
+
+    /** After a beat-matched blend, the new song eases back to its own speed. */
+    private val easeTick = object : Runnable {
+        override fun run() {
+            if (easingFrom == 0f) return
+            val elapsed = SystemClock.elapsedRealtime() - easingSince
+            val speed = BeatMatch.eased(easingFrom, elapsed)
+            main.setPlaybackSpeed(baseSpeed * speed)
+            if (elapsed >= BeatMatch.EASE_MS) {
+                easingFrom = 0f
+                AppLog.d("Crossfade", "Beat-matching: back at the song's own speed")
+            } else {
+                handler.postDelayed(this, EASE_TICK_MS)
+            }
+        }
+    }
+
+    private fun startEasing(beat: BeatMatch.Plan) {
+        easingFrom = beat.speed
+        easingSince = SystemClock.elapsedRealtime()
+        AppLog.i("Crossfade", "Beat-matched blend done (${beat.shiftPercent} %); easing back to the song's own speed over ${BeatMatch.EASE_MS / 1000} s")
+        handler.post(easeTick)
+    }
+
+    /** Ends any easing at once, back at the song's own speed (a skip, a seek, a new fade). */
+    private fun stopEasing() {
+        handler.removeCallbacks(easeTick)
+        if (easingFrom != 0f) {
+            easingFrom = 0f
+            main.setPlaybackSpeed(baseSpeed)
+        }
+    }
+
     private fun finish() {
         handler.removeCallbacks(fadeTick)
+        val beat = plan?.beat
+        if (beat != null && phase == Phase.FADING && switched) {
+            if (main.currentMediaItemIndex == incomingIndex) startEasing(beat) else main.setPlaybackSpeed(baseSpeed)
+        }
         phase = Phase.IDLE
         primed = false
         releaseTail()
@@ -358,6 +453,7 @@ internal class Crossfader(
             Phase.READY -> disarm()
             Phase.IDLE -> Unit
         }
+        stopEasing()
         poke()
     }
 
@@ -375,6 +471,7 @@ internal class Crossfader(
 
     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
         if (phase == Phase.FADING) return
+        stopEasing()
         skipped = null
         if (phase == Phase.READY && mediaItem?.mediaId != outgoing) disarm()
         poke()
@@ -422,5 +519,13 @@ internal class Crossfader(
         const val TICK_MS = 20L
         /** How long after the old song has faded out to wait for the new one to start fading in. */
         const val GIVE_UP_MS = 10_000L
+        /** After a seek in a beat-matched blend, how long before the new song's position is trusted. */
+        const val SETTLE_MS = 250L
+        /** How often the new song may be jumped into step in one blend. */
+        const val MAX_JUMPS = 2
+        /** A jump lands this much ahead, as the seek takes a moment. */
+        const val JUMP_LEAD_MS = 60L
+        /** How often the speed moves while easing back after a beat-matched blend. */
+        const val EASE_TICK_MS = 200L
     }
 }
