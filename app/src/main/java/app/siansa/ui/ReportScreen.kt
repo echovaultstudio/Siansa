@@ -193,13 +193,12 @@ internal fun ReportBody(r: ListeningReport, nav: NavController, songs: (@Composa
             SectionTitle("Top songs", Modifier.weight(1f))
             val playable = r.topTracks.mapNotNull { it.song }
             if (playable.isNotEmpty()) {
+                val playback = rememberListPlayback(playable)
                 Button(
-                    onClick = { graph.player.play(playable) },
+                    onClick = { playback.press { graph.player.play(playable) } },
                     colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = OnAccent),
                 ) {
-                    Icon(Icons.Rounded.PlayArrow, null)
-                    Spacer(Modifier.width(Space.Tight))
-                    Text("Play")
+                    PlayPauseLabel(playback.playing)
                 }
             }
         }

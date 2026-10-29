@@ -235,7 +235,8 @@ fun ArtistScreen(nav: NavController, id: String) {
                                 Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
                             }
                             Spacer(Modifier.width(Space.Small))
-                            BigPlayButton(enabled = true) { graph.player.play(p.songs) }
+                            val playback = rememberListPlayback(p.songs)
+                            BigPlayButton(enabled = true, playing = playback.playing) { playback.press { graph.player.play(p.songs) } }
                         }
                     }
                 }

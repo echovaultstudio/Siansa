@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Shuffle
@@ -145,9 +146,10 @@ internal fun PinnedBanner(card: PinnedCard, songs: List<Song>, open: () -> Unit,
                 Text("${songs.size} songs · ${card.detail}", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(Space.Page))
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalAlignment = Alignment.CenterVertically) {
-                    FilledTonalButton(onClick = { play(songs, 0, false) }, modifier = Modifier.testTag("pinnedPlay")) {
-                        Icon(Icons.Rounded.PlayArrow, null)
-                        Text("Play", Modifier.padding(start = Space.Tight))
+                    val playback = rememberListPlayback(songs)
+                    FilledTonalButton(onClick = { playback.press { play(songs, 0, false) } }, modifier = Modifier.testTag("pinnedPlay")) {
+                        Icon(if (playback.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null)
+                        Text(if (playback.playing) "Pause" else "Play", Modifier.padding(start = Space.Tight))
                     }
                     IconButton(onClick = { play(songs, 0, true) }) { Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Color.White) }
                 }
@@ -159,6 +161,8 @@ internal fun PinnedBanner(card: PinnedCard, songs: List<Song>, open: () -> Unit,
 /** A slim card: a play badge, the title and the song count. One tap plays the songs; the arrow opens the page. */
 @Composable
 internal fun PinnedPlayButton(card: PinnedCard, songs: List<Song>, open: () -> Unit, play: (List<Song>, Int, Boolean) -> Unit) {
+    // ⏸ while this card's songs play: a tap pauses them (issue #644).
+    val playback = rememberListPlayback(songs)
     val colors = tileColors(card.id)
     Row(
         Modifier
@@ -167,17 +171,17 @@ internal fun PinnedPlayButton(card: PinnedCard, songs: List<Song>, open: () -> U
             .height(64.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .clickable { play(songs, 0, true) }
+            .clickable { playback.press { play(songs, 0, true) } }
             .testTag("pinnedButton"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier.size(64.dp).background(Brush.linearGradient(listOf(colors.first, colors.second))),
             contentAlignment = Alignment.Center,
-        ) { Icon(Icons.Rounded.PlayArrow, null, tint = Color.White, modifier = Modifier.size(32.dp)) }
+        ) { Icon(if (playback.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, tint = Color.White, modifier = Modifier.size(32.dp)) }
         Column(Modifier.weight(1f).padding(horizontal = Space.Medium)) {
             Text(card.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("Tap to play · ${songs.size} songs", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(if (playback.playing) "Playing · tap to pause" else "Tap to play · ${songs.size} songs", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         IconButton(onClick = open) { Icon(Icons.Rounded.ChevronRight, "Open ${card.title}") }
     }
