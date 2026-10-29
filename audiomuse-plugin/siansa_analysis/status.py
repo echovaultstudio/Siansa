@@ -108,8 +108,8 @@ def profiles(counts, job):
 
 def beats_counts(done, with_beat, failed, waiting, elsewhere=0):
     """Counts for the beat grids, over the songs that have a volume and fade profile. Songs that failed are tried
-    again later, so they count as still to measure, like the profiles' (issue #657); songs only on another music
-    server are counted apart and don't keep the part from being ready."""
+    again later, so they count as still to measure, like the profiles' (issue #657); songs on none of the music
+    servers are counted apart and don't keep the part from being ready."""
     done, with_beat, failed, waiting, elsewhere = (max(int(v), 0) for v in (done, with_beat, failed, waiting, elsewhere))
     return {"songs": done + failed + waiting, "done": done, "with_beat": min(with_beat, done), "failed": failed,
             "waiting": waiting, "to_measure": waiting + failed, "elsewhere": elsewhere}

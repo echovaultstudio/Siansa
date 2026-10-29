@@ -19,6 +19,8 @@ if "plugin.api" not in sys.modules:
     api.set_setting = lambda key, value: api.settings.__setitem__(key, value)
     api.enqueue = lambda func, *a, **k: api.queued.append(func.__name__)
     api.active_server_id = lambda: None
+    api.list_servers = lambda: []
+    api.use_server = lambda server_id: __import__("contextlib").nullcontext()
     api.manage_plugins_url = lambda: "/plugins/manage"
     api.render_page = lambda body, title=None: f"<title>{title}</title>{body}"
     package = types.ModuleType("plugin")

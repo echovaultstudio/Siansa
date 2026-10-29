@@ -48,6 +48,12 @@ def migrate(db):
     cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS beats_error TEXT")
     cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS beats_attempts INTEGER NOT NULL DEFAULT 0")
     cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS beats_retry_after TIMESTAMPTZ")
+    # 0.3.2 put songs on another music server off for a week, and the run for that server then skipped them (issue
+    # #659); 0.3.3 fetches a song from whichever server has it, so they're measured now. The same for profiles.
+    cur.execute(f"""
+        UPDATE {table('profiles')} SET beats_retry_after=NULL
+         WHERE beats_error='not on this music server' AND beats_version<>%s""", (BEATS_VERSION,))
+    cur.execute(f"UPDATE {table('profiles')} SET retry_after=NULL WHERE status='elsewhere'")
     # 0.3.1 marked such songs done for good: they wait to be measured again, now.
     cur.execute(f"""
         UPDATE {table('profiles')} SET beats_version=0, beats_retry_after=NULL, beats_attempts=GREATEST(beats_attempts, 1)
@@ -265,14 +271,15 @@ def save_failure(db, item_id, error):
     db.commit()
 
 
-ELSEWHERE_DAYS = 7  # a song not on this run's music server is looked at again a week later
+ELSEWHERE_DAYS = 7  # a song on none of the music servers is looked at again a week later
 
 
 def save_beats_failure(db, item_id, error, elsewhere=False):
     """Notes that a song measured before the beat tracker couldn't be measured again for its beats. Its loudness
     and ramps stay, and it's tried again later, waiting longer each time (as profiles do), so one bad file doesn't
     come back every round and a passing problem doesn't last. A song that isn't on this run's music server (one
-    only on another server) waits :data:`ELSEWHERE_DAYS` and doesn't count as a failure."""
+    on any of AudioMuse-AI's servers (removed, or not mapped yet) waits :data:`ELSEWHERE_DAYS` and doesn't count
+    as a failure."""
     cur = db.cursor()
     cur.execute(f"SELECT beats_attempts FROM {table('profiles')} WHERE item_id=%s", (item_id,))
     row = cur.fetchone()
@@ -288,7 +295,7 @@ def save_beats_failure(db, item_id, error, elsewhere=False):
     db.commit()
 
 
-ELSEWHERE = "not on this music server"
+ELSEWHERE = "not on any music server"
 
 
 def retry_beats(db):
@@ -310,19 +317,20 @@ def beats_failure_reasons(db, limit=5):
     cur.execute(f"""
         SELECT beats_error, count(*) FROM {table('profiles')} p JOIN score s USING (item_id)
          WHERE p.status='ready' AND p.beats_version<>%s AND p.beats_error IS NOT NULL
-         GROUP BY beats_error ORDER BY count(*) DESC LIMIT %s""", (BEATS_VERSION, int(limit)))
+           AND p.beats_error NOT IN (%s, 'not on this music server')
+         GROUP BY beats_error ORDER BY count(*) DESC LIMIT %s""", (BEATS_VERSION, ELSEWHERE, int(limit)))
     rows = [(r[0], int(r[1])) for r in cur.fetchall()]
     cur.close()
     return rows
 
 
 def save_elsewhere(db, item_id):
-    """Notes a song that isn't on the music server of this run (a song only on another server, or one AudioMuse
+    """Notes a song that isn't on any of AudioMuse-AI's music servers (removed, or one AudioMuse
     hasn't mapped yet). It is looked at again a day later, without counting as a failure."""
     cur = db.cursor()
     cur.execute(f"""
         INSERT INTO {table('profiles')} (item_id, status, retry_after, error, updated_at)
-        VALUES (%s, 'elsewhere', now() + interval '1 day', 'not on this music server', now())
+        VALUES (%s, 'elsewhere', now() + interval '1 day', 'not on any music server', now())
         ON CONFLICT (item_id) DO UPDATE SET status='elsewhere', retry_after=EXCLUDED.retry_after,
             error=EXCLUDED.error, updated_at=now()
           WHERE {table('profiles')}.status <> 'ready'""", (item_id,))
@@ -385,8 +393,8 @@ def beats_counts(db):
     cur.execute(f"""
         SELECT count(*) FILTER (WHERE p.beats_version=%s),
                count(*) FILTER (WHERE p.beats_version=%s AND (p.beats ? 'intro_bpm' OR p.beats ? 'outro_bpm')),
-               count(*) FILTER (WHERE p.beats_version<>%s AND p.beats_error IS NOT NULL AND p.beats_error<>%s),
-               count(*) FILTER (WHERE p.beats_version<>%s AND p.beats_error IS NULL),
+               count(*) FILTER (WHERE p.beats_version<>%s AND p.beats_error IS NOT NULL AND p.beats_error NOT IN (%s, 'not on this music server')),
+               count(*) FILTER (WHERE p.beats_version<>%s AND (p.beats_error IS NULL OR p.beats_error='not on this music server')),
                count(*) FILTER (WHERE p.beats_version<>%s AND p.beats_error=%s)
           FROM {table('profiles')} p JOIN score s USING (item_id)
          WHERE p.status='ready' AND p.analyzer_version=%s""",

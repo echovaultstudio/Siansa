@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 import numpy as np
 
-from plugin.api import active_server_id, get_db, get_setting, logger
+from plugin.api import active_server_id, get_db, get_setting, list_servers, logger, use_server
 
 from . import beats, generations, loudness, ramps, similarity, status, store
 
@@ -86,20 +86,45 @@ def on_song_analyzed(song):
 
 
 class NotOnServer(Exception):
-    """The song is on another music server; that server's run measures it."""
+    """The song isn't on any music server AudioMuse-AI knows (it was removed, or isn't mapped yet)."""
 
 
 def _download(item_id, title, folder):
-    """Fetches one song's audio from the music server of this run; returns the file path or ``None``."""
+    """Fetches one song's audio; returns the file path or ``None``.
+
+    From the music server of this run when it has the song, else from another of AudioMuse-AI's servers that does
+    (Siansa issue #659): with several servers, a song only on one of them was only ever looked for on the server
+    the run was for, and a run for another server put it off, so it was never measured."""
     from tasks.mediaserver import download_track
     from tasks.mediaserver.registry import translate_ids
 
-    provider_id = translate_ids([item_id], active_server_id()).get(item_id)
-    if not provider_id:
-        raise NotOnServer(item_id)
+    active = active_server_id()
+    provider_id = translate_ids([item_id], active).get(item_id)
+    if provider_id:
+        return download_track(folder, _item(provider_id, item_id, title))
+    for server in _servers():
+        server_id = server.get("server_id")
+        if not server_id or server_id == active:
+            continue
+        provider_id = translate_ids([item_id], server_id).get(item_id)
+        if provider_id:
+            with use_server(server_id):  # the download talks to that server
+                return download_track(folder, _item(provider_id, item_id, title))
+    raise NotOnServer(item_id)
+
+
+def _item(provider_id, item_id, title):
     # The keys each server's download reads: Navidrome 'id', Jellyfin/Emby 'Id', names for the log.
-    item = {"id": provider_id, "Id": provider_id, "title": title or item_id, "Name": title or item_id}
-    return download_track(folder, item)
+    return {"id": provider_id, "Id": provider_id, "title": title or item_id, "Name": title or item_id}
+
+
+def _servers():
+    """AudioMuse-AI's music servers, as dicts with ``server_id``; none when it can't say."""
+    try:
+        return [s for s in (list_servers() or []) if isinstance(s, dict)]
+    except Exception as e:
+        logger.warning("siansa_analysis couldn't list the music servers: %s", e)
+        return []
 
 
 def measure_all_on(db, part="profiles"):
@@ -304,9 +329,30 @@ def build_similar(force=False):
 
 # ---- the tick ------------------------------------------------------------------------------------------------
 
+def _same_task_again():
+    """True when this task already ran the tick: AudioMuse-AI runs a plugin's scheduled task once per music
+    server, one after another, and the plugin reads songs from any server (:func:`_download`), so the first run
+    does the work and the others would only make the tick three times as long (Siansa issue #659)."""
+    try:
+        import taskqueue
+
+        task_id = taskqueue.current_task_id()
+    except Exception:
+        return False
+    if not task_id:
+        return False
+    db = get_db()
+    if (store.get_state("tick_task", {}, db) or {}).get("id") == task_id:
+        return True
+    store.set_state("tick_task", {"id": task_id, "at": now_iso()}, db)
+    return False
+
+
 def tick():
     """The scheduled task: keeps every part current, each on its own. The beat grids get the time the profiles
     round left over (or a whole round while "Measure all" is on for them), so one tick never runs past its slot."""
+    if _same_task_again():
+        return {"status": "done", "note": "already ran for another music server in this task"}
     result = {}
     started = time.monotonic()
     for name, job in (("similar", build_similar), ("profiles", measure_missing)):

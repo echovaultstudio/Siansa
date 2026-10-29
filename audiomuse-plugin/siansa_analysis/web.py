@@ -25,7 +25,7 @@ from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url,
 from . import generations, jobs, similarity, status, store
 
 PLUGIN_ID = "siansa_analysis"
-VERSION = "0.3.2"
+VERSION = "0.3.3"
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
@@ -311,9 +311,9 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
   </details>"""
     elsewhere_line = ""
     if beat_counts.get("elsewhere"):
-        elsewhere_line = (f'<p class="mx-help">{beat_counts["elsewhere"]:,} songs are only on another music server in '
-                          'AudioMuse, not the one this plugin reads from; they\'re looked at again once a week and '
-                          "don't count here.</p>")
+        elsewhere_line = (f'<p class="mx-help">{beat_counts["elsewhere"]:,} songs aren\'t on any of AudioMuse\'s music '
+                          "servers now (removed, or not matched yet); they're looked at again once a week and don't "
+                          "count here.</p>")
     similar_error = state["similar_job"].get("error")
     return f"""{_STYLE}{refresh}{note}
 <section class="mx-section" aria-label="Library">
