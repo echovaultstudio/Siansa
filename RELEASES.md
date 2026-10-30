@@ -3,6 +3,20 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.43.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.43.0beta) — 2026-10-30
+
+- [#650](https://github.com/echovaultstudio/Siansa/pull/650) Shape the mix: steady, build, euphoric, wind down and surprises in DJ radio (@Th3K1ngP1n)
+- [#652](https://github.com/echovaultstudio/Siansa/pull/652) Pinned card views draw without the player again (emulator tests) (@Th3K1ngP1n)
+- [#654](https://github.com/echovaultstudio/Siansa/pull/654) Plugin 0.3.1: beat grids get their own section on the settings page (@Th3K1ngP1n)
+- [#656](https://github.com/echovaultstudio/Siansa/pull/656) Change the look of any Home section from Arrange Home (@Th3K1ngP1n)
+- [#658](https://github.com/echovaultstudio/Siansa/pull/658) Plugin 0.3.2: beat grids that failed are tried again, any songs per run (@Th3K1ngP1n)
+- [#660](https://github.com/echovaultstudio/Siansa/pull/660) Plugin 0.3.3: songs on every music server get measured (@Th3K1ngP1n)
+- [#662](https://github.com/echovaultstudio/Siansa/pull/662) Time Machine finds other versions of a song; search finds names typed without an apostrophe (@Th3K1ngP1n)
+- [#664](https://github.com/echovaultstudio/Siansa/pull/664) Custom cards: rules to include and exclude, album cards, order and size (@Th3K1ngP1n)
+- [#666](https://github.com/echovaultstudio/Siansa/pull/666) One Connections page: servers and services, folded; more AI services (@Th3K1ngP1n)
+- [#668](https://github.com/echovaultstudio/Siansa/pull/668) The loudness target applies to ReplayGain tags too (@Th3K1ngP1n)
+- [#670](https://github.com/echovaultstudio/Siansa/pull/670) Next release is 0.43.0beta (@Th3K1ngP1n)
+
 ## [0.40.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.40.0beta) — 2026-10-29
 
 - [#647](https://github.com/echovaultstudio/Siansa/pull/647) Plugin 0.3.0: the beat grid at each end of a song, for beat-matched blends (@Th3K1ngP1n)
