@@ -156,4 +156,16 @@ class JellyfinApiTest {
         val server = FakeJellyfin { seen -> if (seen.path == "/System/Info/Public") 200 to """{"ProductName":"Jellyfin Server","Version":"12.0.1"}""" else 200 to "" }
         assertEquals("Jellyfin Server 12.0.1", api(server).ping())
     }
+
+    @Test fun behindAProxyLoginTheProxyKeepsTheAuthorizationHeader() = runBlocking {
+        val server = FakeJellyfin { 200 to """{"Items":[]}""" }
+        val proxied = settings.copy(proxyUser = "gate", proxyPassword = "pw")
+        EmbyApi(server.client, { proxied }, jellyfin = true).starredSongs()
+        val list = server.seen.last()
+        // Left free for the proxy's Basic login (added by the app's HTTP client); the token goes as ApiKey instead.
+        assertNull(list.auth)
+        assertTrue(list.embyHeaders)
+        assertEquals("jt1", list.query["ApiKey"])
+        assertEquals("u1", list.query["userId"])
+    }
 }

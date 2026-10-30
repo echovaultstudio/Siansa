@@ -16,7 +16,8 @@
 
 - The address can include the port (`http://192.168.1.10:4533`) and a path if your server lives under one.
 - **Server behind a login page?** If a reverse proxy asks for its own login before your server, tap **Add a proxy
-  login** and enter that user name and password too.
+  login** and enter that user name and password too. With Jellyfin this works up to Jellyfin 10.11: Jellyfin 12
+  only takes its login in the same place the proxy's goes.
 - Passwords are stored encrypted with Android's keystore, and never written to the log or to backups.
 
 ## Several users

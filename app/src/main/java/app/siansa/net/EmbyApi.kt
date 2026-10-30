@@ -132,12 +132,19 @@ class EmbyApi(
     /** One HTTP exchange, as text. Throws [Refused] for HTTP 401 with a token. */
     private suspend fun send(method: String, path: String, body: String?, token: String?): String =
         withContext(Dispatchers.IO) {
-            val builder = Request.Builder().url(base() + path)
-            // Jellyfin takes the login in the standard header only (its 12.0 dropped Emby's); Emby in its own two.
-            if (jellyfin) builder.header("Authorization", authHeader(token))
-            else {
-                builder.header("X-Emby-Authorization", authHeader(token))
-                if (token != null) builder.header("X-Emby-Token", token)
+            // Jellyfin takes the login in the standard header (its 12.0 dropped Emby's); Emby in its own two. Behind a
+            // proxy login that header is the proxy's, so Jellyfin then gets Emby's header and the token as ApiKey,
+            // which Jellyfin 10.9 to 10.11 still read.
+            val behindProxy = jellyfin && settings().proxyUser.isNotBlank()
+            val url = if (behindProxy && token != null) base() + path + (if ('?' in path) "&" else "?") + "ApiKey=" + enc(token) else base() + path
+            val builder = Request.Builder().url(url)
+            when {
+                behindProxy -> builder.header("X-Emby-Authorization", authHeader(token))
+                jellyfin -> builder.header("Authorization", authHeader(token))
+                else -> {
+                    builder.header("X-Emby-Authorization", authHeader(token))
+                    if (token != null) builder.header("X-Emby-Token", token)
+                }
             }
             val json = "application/json".toMediaType()
             when (method) {
