@@ -894,7 +894,8 @@ internal fun MixShapeControls(shape: app.siansa.mix.MixShape, surprise: Int, onC
         Text(shape.hint, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
         var value by remember(surprise) { mutableFloatStateOf(surprise.toFloat()) }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Surprises", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(SURPRISE_LABEL_WIDTH))
+            // On one line whatever the font size (issue #677): the slider takes what's left.
+            Text("Surprises", style = MaterialTheme.typography.bodyMedium, maxLines = 1, softWrap = false, modifier = Modifier.padding(end = Space.Small).testTag("mixSurpriseLabel"))
             Slider(
                 value = value,
                 onValueChange = { value = it },
@@ -902,7 +903,7 @@ internal fun MixShapeControls(shape: app.siansa.mix.MixShape, surprise: Int, onC
                 valueRange = 0f..100f,
                 modifier = Modifier.weight(1f).testTag("mixSurprise"),
             )
-            Text(surpriseLabel(value.roundToInt()), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.End, modifier = Modifier.width(SURPRISE_LABEL_WIDTH))
+            Text(surpriseLabel(value.roundToInt()), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.End, maxLines = 1, softWrap = false, modifier = Modifier.padding(start = Space.Small).width(SURPRISE_LABEL_WIDTH))
         }
     }
 }
