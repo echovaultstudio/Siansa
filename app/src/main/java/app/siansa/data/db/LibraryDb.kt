@@ -174,7 +174,8 @@ interface LibraryDao {
     @Query("SELECT * FROM songs WHERE 1 = 1" + VISIBLE_SONG + " ORDER BY RANDOM() LIMIT :limit")
     suspend fun randomSongs(limit: Int): List<SongEntity>
 
-    @Query("SELECT * FROM songs WHERE searchKey LIKE '%' || :term || '%'" + VISIBLE_SONG + " LIMIT :limit")
+    // Spaces left out, so "im" finds "I'm" (stored as "i m") and "dont" finds "Don't" (issue #661).
+    @Query("SELECT * FROM songs WHERE REPLACE(searchKey, ' ', '') LIKE '%' || :term || '%'" + VISIBLE_SONG + " LIMIT :limit")
     suspend fun searchSongs(term: String, limit: Int): List<SongEntity>
 
     @Query("SELECT * FROM songs WHERE starred = 1" + VISIBLE_SONG)
@@ -239,7 +240,7 @@ interface LibraryDao {
     @Query("SELECT * FROM albums WHERE isPrimary = 1 AND (artistId = :artistId OR artistKey = :artistKey) ORDER BY year DESC")
     suspend fun albumsOfArtist(artistId: String, artistKey: String): List<AlbumEntity>
 
-    @Query("SELECT * FROM albums WHERE isPrimary = 1 AND (sortKey LIKE '%' || :term || '%' OR artistKey LIKE '%' || :term || '%') ORDER BY sortKey LIMIT :limit")
+    @Query("SELECT * FROM albums WHERE isPrimary = 1 AND (REPLACE(sortKey, ' ', '') LIKE '%' || :term || '%' OR REPLACE(artistKey, ' ', '') LIKE '%' || :term || '%') ORDER BY sortKey LIMIT :limit")
     suspend fun searchAlbums(term: String, limit: Int): List<AlbumEntity>
 
     /** Albums tagged with [genre] (#558): the album's own genre, or any of its songs'; newest first. */
@@ -308,7 +309,7 @@ interface LibraryDao {
     @Query("SELECT * FROM artists WHERE sortKey = :key LIMIT 1")
     suspend fun artistByKey(key: String): ArtistEntity?
 
-    @Query("SELECT * FROM artists WHERE sortKey LIKE '%' || :term || '%' AND " + VISIBLE_ARTIST + " ORDER BY sortKey LIMIT :limit")
+    @Query("SELECT * FROM artists WHERE REPLACE(sortKey, ' ', '') LIKE '%' || :term || '%' AND " + VISIBLE_ARTIST + " ORDER BY sortKey LIMIT :limit")
     suspend fun searchArtists(term: String, limit: Int): List<ArtistEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

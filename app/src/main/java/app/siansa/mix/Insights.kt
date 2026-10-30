@@ -390,7 +390,8 @@ class Insights(private val graph: AppGraph) {
         val version = graph.library.version.value
         cachedIndex?.takeIf { it.first == version }?.second ?: run {
             val started = System.currentTimeMillis()
-            val index = SongIndex(graph.library.songTitles().map { SongIndex.Entry(it.id, it.title, it.artist) })
+            // Any version of a played song in the library counts here (issue #661).
+            val index = SongIndex(graph.library.songTitles().map { SongIndex.Entry(it.id, it.title, it.artist) }, versions = true)
             AppLog.d("TimeMachine", "Song index: ${index.size} songs in ${System.currentTimeMillis() - started}ms")
             cachedIndex = version to index
             index

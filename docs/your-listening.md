@@ -13,8 +13,9 @@ Any month or year you played music, laid out like Your month: minutes, plays, ar
 top artists with their plays, your top songs, top albums, your listening clock and how your taste moved against
 the month or year before. The songs come from Koito and Last.fm (whichever you set up), otherwise Siansa's own
 history; the rest comes from Koito or Siansa's own history, so with only Last.fm an older month may show just its
-songs. Songs not in your library are listed too, marked "Not in your library"
-(you can hide them). **Create memory** saves the list as a playlist, named like "Time Machine - March 2019".
+songs. A song counts as in your library when its title and artist match, on any album: a remastered, mono, single
+or "feat." version, a title with or without its apostrophe ("I'm", "Im"), and "The Beatles" for "Beatles" all
+count. Songs not in your library are listed too, marked "Not in your library" (you can hide them). **Create memory** saves the list as a playlist, named like "Time Machine - March 2019".
 
 When you scrobble to both Koito and Last.fm, the same listen usually reached both, so a song's count is the
 higher of the two, never the sum. Months and years that are over are kept on the phone, so they open at once;

@@ -26,6 +26,16 @@ import java.util.Locale
 private val MARKS = Regex("\\p{M}+")
 private val NON_WORD = Regex("[^\\p{L}\\p{N}]+")
 
+/**
+ * Whether every one of [terms] (from [normalizeKey]) is in [key], as it is or with its spaces left out: a name's
+ * punctuation turns into spaces ("I'm" into "i m"), so "im" or "dont" typed without the apostrophe still match
+ * (issue #661).
+ */
+fun searchMatches(key: String, terms: List<String>): Boolean {
+    val compact by lazy(LazyThreadSafetyMode.NONE) { key.replace(" ", "") }
+    return terms.all { key.contains(it) || compact.contains(it) }
+}
+
 fun normalizeKey(value: String): String =
     Normalizer.normalize(value, Normalizer.Form.NFKD)
         .replace(MARKS, "")
@@ -356,12 +366,15 @@ class LibraryRepository(context: Context) {
         }
     }
 
-    /** Every word must appear in the name (accents and case ignored). */
+    /**
+     * Every word must appear in the name (accents and case ignored), with or without the spaces punctuation leaves:
+     * "Im looking" finds "I'm Looking Through You" (issue #661), see [searchMatches].
+     */
     suspend fun search(query: String): SearchResults = withContext(Dispatchers.IO) {
         val terms = normalizeKey(query).split(' ').filter { it.isNotEmpty() }
         if (terms.isEmpty()) return@withContext SearchResults(emptyList(), emptyList(), emptyList())
         val first = terms.maxBy { it.length }
-        fun all(key: String) = terms.all { key.contains(it) }
+        fun all(key: String) = searchMatches(key, terms)
         val only = onlyDownloaded()
         val albumArtists = dao.searchArtists(first, 200).filter { all(it.sortKey) }.map { it.toArtist() }
             .let { CombinedArtists.withoutCombined(it, combinedArtists()) }
