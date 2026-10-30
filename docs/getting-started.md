@@ -8,7 +8,7 @@
 | **Music server** | Navidrome (or another OpenSubsonic server: Gonic, Airsonic, Ampache…) or Emby, that your phone can reach. At home on Wi-Fi is fine. Away from home, use a VPN such as WireGuard or Tailscale, or your own secure address. Jellyfin and files on the phone are listed as "coming soon". |
 | **AudioMuse-AI** (recommended) | [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) 3.6.4 or newer, connected to your music server, with text search (CLAP) on. It powers the mixes, radios, search by sound and more. See [AudioMuse-AI](audiomuse.md). |
 | **Siansa Analysis plugin** (recommended) | Installed in AudioMuse-AI. Needed for loudness levelling from measured audio, smart crossfades, and similar albums and artists. |
-| **OpenRouter key** (optional) | For mix titles and sound searches written by an AI model. See [AI features](ai.md). |
+| **An AI service** (optional) | For mix titles and sound searches written by an AI model: OpenRouter, OpenAI, Anthropic, Google Gemini, Mistral, Groq, or Ollama on your own network. See [AI features](ai.md). |
 
 Siansa works as a plain player with only a music server. Everything "smart" needs AudioMuse-AI.
 

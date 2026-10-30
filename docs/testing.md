@@ -22,7 +22,8 @@ What changed in each version: [CHANGELOG.md](../CHANGELOG.md)
   text search (CLAP) turned on. It makes the mixes and the "search by sound".
 - The **Siansa Analysis plugin** installed in AudioMuse-AI (steps below). It's needed for volume levelling,
   smooth crossfades and "similar albums and artists". Without it those features don't work.
-- Optional: an [OpenRouter](https://openrouter.ai) API key for mix titles written by an AI model.
+- Optional: an AI service for mix titles written by an AI model: an [OpenRouter](https://openrouter.ai) key, another
+  service's key, or Ollama on your network.
 
 ## Install Siansa
 
@@ -48,7 +49,7 @@ Open Siansa, go to **Settings**, enter these, use **Test** next to each, then **
 1. **Your music server**: Navidrome or Emby. Address (for example `http://192.168.1.10:4533`), user name, password.
 2. **AudioMuse-AI**: its address (for example `http://192.168.1.10:8000`) and its API token if you use one.
    If your AudioMuse-AI serves several music servers, also fill in **Server name in AudioMuse**.
-3. Optional: **OpenRouter** key and model.
+3. Optional: **AI**: the service, its key and model.
 
 ## Install the plugin in AudioMuse-AI
 

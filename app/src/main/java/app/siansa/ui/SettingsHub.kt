@@ -99,8 +99,7 @@ import kotlin.math.roundToInt
 fun SettingsHub(nav: NavController) {
     Screen(title = "Settings", nav = nav) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
-            // Library sync lives under Users now (issue #273): each user's library is their own.
-            HubRow(Icons.Rounded.People, "Users") { nav.navigate("settings/users") }
+            // Servers (each login with its own library and sync) and services, on one page (issue #665).
             HubRow(Icons.Rounded.Dns, "Connections") { nav.navigate("settings/connections") }
             HubRow(Icons.Rounded.Equalizer, "Playback") { nav.navigate("settings/playback") }
             // Themes moved into Style, with the now playing, mini player and nav bar looks (issue #346).

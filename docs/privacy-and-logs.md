@@ -4,7 +4,8 @@
 
 Siansa has no account with us, no ads, no analytics and no tracking. We don't run a server that receives your
 data. Everything Siansa sends goes to services **you** set up or switch on: your music server, AudioMuse-AI, and
-optionally Audiobookshelf, OpenRouter, Last.fm, ListenBrainz or Koito, Open-Meteo (weather) and Deezer (artist photos). What each
+optionally Audiobookshelf, the AI service you pick (OpenRouter, OpenAI, Anthropic, Google Gemini, Mistral, Groq, or Ollama
+or another on your own network), Last.fm, ListenBrainz or Koito, Open-Meteo (weather) and Deezer (artist photos). What each
 one gets is in [API › Other services](api.md#other-services).
 
 Your settings, passwords (encrypted with Android's keystore), history, downloads and caches stay on your phone.

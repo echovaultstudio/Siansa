@@ -10,7 +10,8 @@
 
 ## Connecting
 
-**Settings › Connections**: the server's address, user name and password, with **Test** and **Save**.
+**Settings › Connections**, under **Servers**: open the server in use for its address, user name and password, with
+**Test** and **Save**. The first time, Siansa asks for them when it starts.
 
 - The address can include the port (`http://192.168.1.10:4533`) and a path if your server lives under one.
 - **Server behind a login page?** If a reverse proxy asks for its own login before your server, tap **Add a proxy
@@ -19,11 +20,12 @@
 
 ## Several users
 
-**Settings › Users** holds every login on this phone. Each user has their own library, play
-history and settings. A user can be on the same server or a different one, of either type.
+**Settings › Connections › Servers** holds every login on this phone, one card each. Each user has their own
+library, play history and settings. A user can be on the same server or a different one, of either type.
 
-- Tap a user to switch to them (Siansa restarts).
-- **Add another user** for another login (on the same server or a different one).
+- Open another user's card and tap **Switch to it** (Siansa restarts), or **Remove** to take it off the phone.
+- **Add a music server** for another login (on the same server or a different one).
+- **Name shown in Siansa**, in the card of the server in use, shows a name like "Home" instead of its address.
 - **Remove** a user to take their library, history and settings off the phone. Nothing changes on the server.
 - **Name a server** with the pencil next to a user, for example "Home" or "Kids". That user then shows the name
   instead of the address ("max on Home"), here and in the source filter. The name is each user's own, so two
@@ -37,7 +39,7 @@ The **filter button at the top of Home** opens the source filter. There you can:
 - **Show other users' music next to yours**, for users on the **same server** as you (for example two logins on
   one Navidrome). Their albums, artists, songs and playlists appear in your library, and everything about their
   music (streaming, covers, lyrics, scrobbles) uses *their* login. Users on another server (another address, or
-  Emby next to Navidrome) can't be shown together: switch to them in **Settings › Users** instead.
+  Emby next to Navidrome) can't be shown together: switch to them in **Settings › Connections** instead.
   Siansa recognises your server by its songs, so a user who reaches it at another address (a domain instead
   of an IP) still counts as the same server; while it checks, that user shows "Checking whether it's your server…".
 - **Hide your own music**, to see only another user's.
@@ -61,8 +63,8 @@ rewrites every hour) show as soon as the answer comes. No library sync is needed
 
 ## Library sync
 
-Siansa keeps a copy of each user's library list on the phone (**Settings › Users › Library
-sync**):
+Siansa keeps a copy of each user's library list on the phone (**Settings › Connections**, in the card of the server
+in use: **Library sync**):
 
 - It checks for changes when the app starts. If your server hasn't scanned since the last sync, nothing is
   fetched again.

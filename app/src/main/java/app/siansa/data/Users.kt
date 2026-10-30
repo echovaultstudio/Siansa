@@ -56,7 +56,7 @@ object UserFiles {
 
     /**
      * A user's row, second line in smaller type (#571): the kind of server, then the name the user gave it (the pencil
-     * in Settings › Users), if any: "OpenSubsonic", "Emby · Living room". "Not connected yet" before set-up.
+     * in Settings › Connections), if any: "OpenSubsonic", "Emby · Living room". "Not connected yet" before set-up.
      */
     fun serverLine(kind: SourceKind, serverName: String?, connected: Boolean): String =
         if (!connected) "Not connected yet"

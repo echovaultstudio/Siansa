@@ -292,10 +292,16 @@ fun SiansaRoot() {
                         androidx.navigation.navArgument("source") { type = androidx.navigation.NavType.StringType; nullable = true; defaultValue = null },
                         androidx.navigation.navArgument("extras") { defaultValue = "true" },
                     ),
-                ) { ConnectionsScreen(nav, it.arguments?.getString("source"), it.arguments?.getString("extras") != "false") }
+                ) {
+                    val source = it.arguments?.getString("source")
+                    // Setting up a server (the first run, or a user being added) is its own form; after that, one page
+                    // for every server and service (issue #665).
+                    if (source == null && LocalGraph.current.settings.current.navidromeReady) ConnectionsHub(nav)
+                    else ConnectionsScreen(nav, source, it.arguments?.getString("extras") != "false")
+                }
                 composable("welcome") { SourcePickerScreen(nav) }
                 composable("welcome/extras/{source}") { SmartExtrasScreen(nav, it.arguments?.getString("source").orEmpty()) }
-                composable("settings/users") { UsersScreen(nav) }
+                composable("settings/users") { ConnectionsHub(nav, open = "server") }
                 composable("settings/playback") { PlaybackSettingsScreen(nav) }
                 composable("settings/themes") { ThemesScreen(nav) }
                 composable("settings/style") { StyleScreen(nav) }
@@ -309,7 +315,7 @@ fun SiansaRoot() {
                 composable("downloads/add") { DownloadPickerScreen(nav) }
                 composable("downloads/songs") { DownloadedSongsScreen(nav) }
                 composable("settings/help") { HelpScreen(nav) }
-                composable("settings/audiobookshelf") { AudiobookshelfScreen(nav) }
+                composable("settings/audiobookshelf") { ConnectionsHub(nav, open = "books") }
                 composable("settings/logs") { LogsScreen(nav) }
                 composable("settings/report") { ProblemReportScreen(nav) }
                 composable("settings/backup") { BackupScreen(nav) }

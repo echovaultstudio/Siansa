@@ -73,7 +73,7 @@ its own server.
 | Service | When | What's sent |
 |---|---|---|
 | Audiobookshelf (your own server) | Set up in Connections | Your login; which book you play and where you are in it (progress, bookmarks) |
-| OpenRouter (`openrouter.ai`) | AI on, for each vibe | See [AI features](ai.md) |
+| The AI service you pick: OpenRouter (`openrouter.ai`), OpenAI (`api.openai.com`), Anthropic (`api.anthropic.com`), Google Gemini (`generativelanguage.googleapis.com`), Mistral (`api.mistral.ai`), Groq (`api.groq.com`), or Ollama or another at the address you enter | AI on, for each vibe | See [AI features](ai.md) |
 | Last.fm | Connected | Plays, now playing, loved tracks; top artists and songs for your taste |
 | ListenBrainz / Koito | Connected | Plays, now playing; top artists and songs |
 | Open-Meteo | Weather in Use the moment on | Your location rounded to about 10 km |

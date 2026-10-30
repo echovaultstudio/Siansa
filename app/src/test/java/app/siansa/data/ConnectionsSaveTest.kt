@@ -11,7 +11,7 @@ class ConnectionsSaveTest {
         navidromeUrl = "http://music", navidromeUser = "max", navidromePassword = "pw",
         proxyUser = "p", proxyPassword = "pp",
         audioMuseUrl = "http://am", audioMuseToken = "t", audioMuseUser = "u", audioMusePassword = "ap", audioMuseServer = "Emby",
-        openRouterKey = "k", openRouterModel = "m", aiTitles = false,
+        aiKey = "k", aiModel = "m", aiTitles = false,
         audiobookshelfUrl = "http://abs:13378", audiobookshelfToken = "abs-token",
         audiobookshelfUser = "reader", audiobookshelfPassword = "abs-pw",
     )

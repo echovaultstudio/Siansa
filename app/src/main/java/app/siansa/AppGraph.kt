@@ -63,7 +63,7 @@ import app.siansa.net.HistoryApi
 import app.siansa.net.LastFmApi
 import app.siansa.net.ListenBrainzApi
 import app.siansa.net.NavidromeNativeApi
-import app.siansa.net.OpenRouterApi
+import app.siansa.net.ChatApi
 import app.siansa.net.Connection
 import app.siansa.net.SubsonicApi
 import app.siansa.net.MusicSource
@@ -255,7 +255,8 @@ class AppGraph(val app: Application) {
     val activePlayer: ActivePlayer by lazy { ActivePlayer(scope, player.state, bookPlayer.state) }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
     val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
-    val openRouter = OpenRouterApi(http) { settings.current }
+    /** The AI service that writes mix titles and sound searches (issue #665). */
+    val ai = ChatApi(http) { settings.current }
     val deezer = DeezerApi(http)
 
     val selectors = SelectorStore(app)

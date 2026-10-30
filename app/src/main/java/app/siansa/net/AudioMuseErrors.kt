@@ -10,7 +10,7 @@ object AudioMuseErrors {
      * than this user's (an Emby user, beta report 810dc85c): its name in AudioMuse goes in Settings › Connections.
      */
     const val NOT_KNOWN = "AudioMuse doesn't know this song. Has it been analysed? If AudioMuse reads more than one " +
-        "music server, enter this one's name in Settings › Connections › Server name in AudioMuse."
+        "music server, enter this one's name in Settings › Connections, under your server: Server name in AudioMuse."
 
     fun message(code: Int?, http: Int, reason: String): String = when (code) {
         1003 -> "AudioMuse didn't understand the request: $reason"

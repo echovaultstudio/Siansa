@@ -44,7 +44,7 @@ fun mayFetchUnsynced(syncedFolders: String?): Boolean = syncedFolders == null ||
 
 /**
  * Builds a daily mix for a selector on the phone:
- * 1. optionally asks OpenRouter for a title and a sound description (small prompt, never the library),
+ * 1. optionally asks the AI service for a title and a sound description (small prompt, never the library),
  * 2. runs that description through AudioMuse's text-to-audio search,
  * 3. picks a varied set, skipping recent repeats, and resolves the songs in Navidrome.
  * Without AudioMuse, or when its songs aren't in the music shown, the mix comes from the library by genre (beta #25).
@@ -325,7 +325,7 @@ class MixGenerator(private val graph: AppGraph) {
     }
 
     private suspend fun askPlan(user: String): kotlinx.serialization.json.JsonObject {
-        val raw = graph.openRouter.complete(SYSTEM_PROMPT, user)
+        val raw = graph.ai.complete(SYSTEM_PROMPT, user)
         val start = raw.indexOf('{')
         val end = raw.lastIndexOf('}')
         if (start < 0 || end <= start) throw MixException("The AI didn't answer with JSON")
@@ -600,7 +600,7 @@ class MixGenerator(private val graph: AppGraph) {
             if (recent.isNotEmpty()) appendLine("Recently played: ${recent.joinToString("; ")}")
             if (concepts.isNotEmpty()) appendLine("Sound concepts the search understands well: ${concepts.joinToString(", ")}")
         }
-        val raw = graph.openRouter.complete(SYSTEM_PROMPT, user)
+        val raw = graph.ai.complete(SYSTEM_PROMPT, user)
         val start = raw.indexOf('{')
         val end = raw.lastIndexOf('}')
         if (start < 0 || end <= start) throw MixException("The AI didn't answer with JSON")
