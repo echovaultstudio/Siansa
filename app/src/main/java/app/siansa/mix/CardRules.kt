@@ -1,12 +1,14 @@
 package app.siansa.mix
 
 import app.siansa.data.Album
+import app.siansa.data.PlayEvent
 import app.siansa.data.Song
 import app.siansa.data.normalizeKey
 import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 
@@ -39,7 +41,11 @@ enum class RuleField(val label: String, val kind: RuleKind, val songs: Boolean, 
     YEAR("Year", RuleKind.NUMBER, songs = true, albums = true),
     LENGTH("Length", RuleKind.NUMBER, songs = true, albums = true, unit = "minutes"),
     SONG_COUNT("Songs on it", RuleKind.NUMBER, songs = false, albums = true),
-    PLAYS("Plays", RuleKind.NUMBER, songs = false, albums = true),
+    /** A song's own plays (issue #678), an album's as the server counts them. */
+    PLAYS("Play count", RuleKind.NUMBER, songs = true, albums = true),
+    /** How often this phone saw the song skipped, over its history (about two months). */
+    SKIPS("Times skipped", RuleKind.NUMBER, songs = true, albums = false),
+    PLAYED("Played", RuleKind.AGE, songs = true, albums = true, unit = "days"),
     ADDED("Added", RuleKind.AGE, songs = true, albums = true, unit = "days"),
     FAVOURITE("Favourite", RuleKind.FLAG, songs = true, albums = true),
     COMPILATION("Compilation", RuleKind.FLAG, songs = true, albums = true);
@@ -110,12 +116,49 @@ interface RuleSubject {
     fun texts(field: RuleField): List<String>
     fun number(field: RuleField): Double?
     fun flag(field: RuleField): Boolean
-    /** Days since it was added, or null when that isn't known. */
-    fun ageDays(): Long?
+    /** Days since it was added or last played ([field]), or null when that isn't known (never played). */
+    fun ageDays(field: RuleField): Long?
 }
 
-/** [song] for the rules, with the [album] it's on (when known) for the album's details. */
-class SongSubject(private val song: Song, private val album: Album?, private val today: LocalDate = LocalDate.now()) : RuleSubject {
+/**
+ * What's known of a song's plays (issue #678): [plays] from the server's count or this phone's history, whichever is
+ * higher; [skips] on this phone; [lastPlayed] as an epoch day.
+ */
+data class PlayStats(val plays: Long = 0, val skips: Int = 0, val lastPlayed: Long? = null)
+
+/**
+ * Each song's [PlayStats], from this phone's [history] and the server's counts as Siansa last saw them ([server], song
+ * id → the day the count changed and the count).
+ */
+fun playStats(history: List<PlayEvent>, server: Map<String, CountPoint>, zone: ZoneId = ZoneId.systemDefault()): Map<String, PlayStats> {
+    val out = HashMap<String, PlayStats>()
+    history.groupBy { it.id }.forEach { (id, events) ->
+        val heard = events.filter { !it.skipped }
+        out[id] = PlayStats(
+            plays = heard.size.toLong(),
+            skips = events.size - heard.size,
+            lastPlayed = heard.maxOfOrNull { it.at }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().toEpochDay() },
+        )
+    }
+    server.forEach { (id, point) ->
+        val have = out[id] ?: PlayStats()
+        out[id] = have.copy(plays = maxOf(have.plays, point.count), lastPlayed = listOfNotNull(have.lastPlayed, point.day).maxOrNull())
+    }
+    return out
+}
+
+/** An album's [PlayStats] from its songs' ([songs]: song id → album id): their plays added up, the latest play. */
+fun albumPlayStats(songStats: Map<String, PlayStats>, songs: Map<String, String>): Map<String, PlayStats> =
+    songStats.entries.mapNotNull { (id, s) -> songs[id]?.let { it to s } }.groupBy({ it.first }, { it.second })
+        .mapValues { (_, list) -> PlayStats(list.sumOf { it.plays }, list.sumOf { it.skips }, list.mapNotNull { it.lastPlayed }.maxOrNull()) }
+
+/** [song] for the rules, with the [album] it's on (when known) for the album's details, and its [stats]. */
+class SongSubject(
+    private val song: Song,
+    private val album: Album?,
+    private val stats: PlayStats? = null,
+    private val today: LocalDate = LocalDate.now(),
+) : RuleSubject {
     override fun texts(field: RuleField): List<String> = when (field) {
         RuleField.TITLE -> listOf(song.title)
         RuleField.ALBUM -> listOf(song.album)
@@ -129,7 +172,8 @@ class SongSubject(private val song: Song, private val album: Album?, private val
     override fun number(field: RuleField): Double? = when (field) {
         RuleField.YEAR -> song.year?.toDouble()
         RuleField.LENGTH -> song.durationSec / 60.0
-        RuleField.PLAYS -> album?.playCount?.toDouble()
+        RuleField.PLAYS -> (stats?.plays ?: 0).toDouble()
+        RuleField.SKIPS -> (stats?.skips ?: 0).toDouble()
         else -> null
     }
 
@@ -139,11 +183,19 @@ class SongSubject(private val song: Song, private val album: Album?, private val
         else -> false
     }
 
-    override fun ageDays(): Long? = album?.created?.let { addedDaysAgo(it, today) }
+    override fun ageDays(field: RuleField): Long? = when (field) {
+        RuleField.PLAYED -> stats?.lastPlayed?.let { (today.toEpochDay() - it).coerceAtLeast(0) }
+        else -> album?.created?.let { addedDaysAgo(it, today) }
+    }
 }
 
-/** [album] for the rules; [favourite] when any of its songs is a favourite. */
-class AlbumSubject(private val album: Album, private val favourite: Boolean = false, private val today: LocalDate = LocalDate.now()) : RuleSubject {
+/** [album] for the rules; [favourite] when any of its songs is a favourite; [stats] from its songs' plays. */
+class AlbumSubject(
+    private val album: Album,
+    private val favourite: Boolean = false,
+    private val stats: PlayStats? = null,
+    private val today: LocalDate = LocalDate.now(),
+) : RuleSubject {
     override fun texts(field: RuleField): List<String> = when (field) {
         RuleField.ALBUM -> listOf(album.name)
         RuleField.ARTIST -> listOf(album.artist).filter { it.isNotBlank() }
@@ -157,7 +209,7 @@ class AlbumSubject(private val album: Album, private val favourite: Boolean = fa
         RuleField.YEAR -> album.year?.toDouble()
         RuleField.LENGTH -> album.durationSec / 60.0
         RuleField.SONG_COUNT -> album.songCount.toDouble()
-        RuleField.PLAYS -> album.playCount.toDouble()
+        RuleField.PLAYS -> maxOf(album.playCount, stats?.plays ?: 0).toDouble()
         else -> null
     }
 
@@ -167,7 +219,11 @@ class AlbumSubject(private val album: Album, private val favourite: Boolean = fa
         else -> false
     }
 
-    override fun ageDays(): Long? = album.created?.let { addedDaysAgo(it, today) }
+    override fun ageDays(field: RuleField): Long? = when (field) {
+        RuleField.PLAYED -> listOfNotNull(stats?.lastPlayed, album.played?.let { addedDaysAgo(it, today) }?.let { today.toEpochDay() - it })
+            .maxOrNull()?.let { (today.toEpochDay() - it).coerceAtLeast(0) }
+        else -> album.created?.let { addedDaysAgo(it, today) }
+    }
 }
 
 /** An album's release types as words people use: "Album", "EP", "Single", "Compilation"… */
@@ -210,7 +266,7 @@ fun CardRule.matches(subject: RuleSubject): Boolean = when (field.kind) {
     }
     RuleKind.FLAG -> if (op == RuleOp.NO) !subject.flag(field) else subject.flag(field)
     RuleKind.AGE -> {
-        val days = subject.ageDays()
+        val days = subject.ageDays(field)
         val limit = value.trim().toDoubleOrNull()
         if (days == null || limit == null) op.negative else (days <= limit) != (op == RuleOp.NOT_WITHIN)
     }

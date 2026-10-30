@@ -323,7 +323,8 @@ private fun RuleFieldDialog(contents: CardContents, onDismiss: () -> Unit, onPic
 }
 
 /** A song's own details; the rest come from its album. */
-private val SONG_OWN = setOf(RuleField.TITLE, RuleField.ARTIST, RuleField.GENRE, RuleField.YEAR, RuleField.LENGTH, RuleField.FAVOURITE, RuleField.ALBUM)
+private val SONG_OWN = setOf(RuleField.TITLE, RuleField.ARTIST, RuleField.GENRE, RuleField.YEAR, RuleField.LENGTH, RuleField.FAVOURITE, RuleField.ALBUM,
+    RuleField.PLAYS, RuleField.SKIPS, RuleField.PLAYED)
 
 /** Release types as the servers tag them, to tap. */
 private val RELEASE_TYPES = listOf("Album", "EP", "Single", "Compilation", "Live", "Soundtrack", "Remix", "DJ-mix")

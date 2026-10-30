@@ -207,4 +207,58 @@ class PinnedCardsTest {
             rules = listOf(rule(RuleField.LABEL, RuleOp.IS, "Ninja Tune"), rule(RuleField.YEAR, RuleOp.BETWEEN, "2020", "2024")))
         assertEquals(c, Json.decodeFromString(PinnedCard.serializer(), Json.encodeToString(PinnedCard.serializer(), c)))
     }
+
+    // ---- Issue #678: play count, last played and skips ----
+
+    private val zone = java.time.ZoneOffset.UTC
+    private val today = LocalDate.of(2026, 10, 30)
+    private fun at(day: LocalDate) = day.atStartOfDay(zone).toInstant().toEpochMilli() + 3_600_000
+
+    private fun event(id: String, day: LocalDate, skipped: Boolean = false) =
+        app.siansa.data.PlayEvent(id = id, title = "", artist = "", at = at(day), skipped = skipped)
+
+    @Test fun playStatsTakeTheHigherCountAndTheLatestPlay() {
+        val history = listOf(
+            event("1", today.minusDays(2)), event("1", today.minusDays(5)), event("1", today.minusDays(1), skipped = true),
+            event("2", today.minusDays(3), skipped = true),
+        )
+        val server = mapOf("1" to CountPoint(today.minusDays(10).toEpochDay(), 7), "3" to CountPoint(today.minusDays(40).toEpochDay(), 2))
+        val stats = playStats(history, server, zone)
+        assertEquals(PlayStats(plays = 7, skips = 1, lastPlayed = today.minusDays(2).toEpochDay()), stats["1"])
+        assertEquals(PlayStats(plays = 0, skips = 1, lastPlayed = null), stats["2"])  // only skipped: never really played
+        assertEquals(PlayStats(plays = 2, skips = 0, lastPlayed = today.minusDays(40).toEpochDay()), stats["3"])
+        val albums = albumPlayStats(stats, mapOf("1" to "al", "3" to "al", "2" to "o"))
+        assertEquals(PlayStats(plays = 9, skips = 1, lastPlayed = today.minusDays(2).toEpochDay()), albums["al"])
+    }
+
+    @Test fun songsHaveTheirOwnPlayCountLastPlayedAndSkips() {
+        val played = SongSubject(song, labelAlbum, PlayStats(plays = 3, skips = 4, lastPlayed = today.minusDays(100).toEpochDay()), today)
+        assertTrue(rule(RuleField.PLAYS, RuleOp.AT_LEAST, "3").matches(played))
+        assertFalse(rule(RuleField.PLAYS, RuleOp.AT_LEAST, "12").matches(played))  // the album's 12 plays aren't the song's
+        assertTrue(rule(RuleField.SKIPS, RuleOp.AT_LEAST, "3").matches(played))
+        assertTrue(rule(RuleField.PLAYED, RuleOp.NOT_WITHIN, "90").matches(played))
+        assertFalse(rule(RuleField.PLAYED, RuleOp.WITHIN, "90").matches(played))
+        assertTrue(rule(RuleField.ADDED, RuleOp.WITHIN, "30").matches(played))  // added still comes from the album
+        // Never played: no plays, and "not played lately" keeps it.
+        val never = SongSubject(song, labelAlbum, null, today)
+        assertTrue(rule(RuleField.PLAYS, RuleOp.AT_MOST, "0").matches(never))
+        assertTrue(rule(RuleField.PLAYED, RuleOp.NOT_WITHIN, "30").matches(never))
+        assertFalse(rule(RuleField.PLAYED, RuleOp.WITHIN, "30").matches(never))
+        assertTrue(RuleField.PLAYS in RuleField.forContents(CardContents.SONGS))
+        assertTrue(RuleField.PLAYS in RuleField.forContents(CardContents.ALBUMS))
+        assertFalse(RuleField.SKIPS in RuleField.forContents(CardContents.ALBUMS))
+        assertEquals("Play count at least 3", rule(RuleField.PLAYS, RuleOp.AT_LEAST, "3").text)
+        assertEquals("Played not in the last 90 days", rule(RuleField.PLAYED, RuleOp.NOT_WITHIN, "90").text)
+    }
+
+    @Test fun albumsLastPlayedFromTheirSongsAndMostPlayedSongsFirst() {
+        val s = AlbumSubject(labelAlbum, stats = PlayStats(plays = 20, lastPlayed = today.minusDays(3).toEpochDay()), today = today)
+        assertTrue(rule(RuleField.PLAYS, RuleOp.AT_LEAST, "20").matches(s))  // the higher of the server's 12 and its songs' 20
+        assertTrue(rule(RuleField.PLAYED, RuleOp.WITHIN, "7").matches(s))
+        assertTrue(rule(RuleField.PLAYED, RuleOp.NOT_WITHIN, "7").matches(AlbumSubject(labelAlbum, today = today)))
+        val songs = listOf(song.copy(id = "a"), song.copy(id = "b"), song.copy(id = "c"))
+        val c = card.copy(sort = CardSort.PLAYED, rules = listOf(rule(RuleField.PLAYS, RuleOp.AT_LEAST, "1")))
+        val stats = mapOf("a" to PlayStats(plays = 2), "b" to PlayStats(plays = 9))
+        assertEquals(listOf("b", "a"), pickRuleSongs(songs, c, Random(1), stats = stats).map { it.id })
+    }
 }
