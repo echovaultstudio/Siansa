@@ -112,6 +112,12 @@ class Guests(
 
     private val apis = ConcurrentHashMap<Int, MusicSource>()
 
+    /** Reads [user]'s settings again after their login was changed on the Connections page (issue #687). */
+    fun reloadSettings(user: Int) {
+        settings.remove(user)
+        apis.remove(user)
+    }
+
     /**
      * [user]'s server with their login, of the kind they set up (issue #427): Emby or OpenSubsonic. Kept per user,
      * so an Emby login is made once; made again if they changed kind.
