@@ -127,10 +127,25 @@ interface RuleSubject {
 data class PlayStats(val plays: Long = 0, val skips: Int = 0, val lastPlayed: Long? = null)
 
 /**
- * Each song's [PlayStats], from this phone's [history] and the server's counts as Siansa last saw them ([server], song
- * id → the day the count changed and the count).
+ * A song's play count on the server as Siansa last saw it, and the day it was played when that's known (issue #678):
+ * only a day the count went up says so. The first count Siansa notes is just when it first saw the song, which may be
+ * years after it was last played.
  */
-fun playStats(history: List<PlayEvent>, server: Map<String, CountPoint>, zone: ZoneId = ZoneId.systemDefault()): Map<String, PlayStats> {
+data class ServerPlays(val count: Long, val playedDay: Long?) {
+    companion object {
+        /** From a song's noted counts ([PlayCountLog]), oldest first; null when there are none. */
+        fun of(points: List<CountPoint>): ServerPlays? {
+            val last = points.lastOrNull() ?: return null
+            val before = points.getOrNull(points.size - 2)
+            return ServerPlays(last.count, last.day.takeIf { before != null && last.count > before.count })
+        }
+    }
+}
+
+/**
+ * Each song's [PlayStats], from this phone's [history] and the server's counts as Siansa last saw them ([server]).
+ */
+fun playStats(history: List<PlayEvent>, server: Map<String, ServerPlays>, zone: ZoneId = ZoneId.systemDefault()): Map<String, PlayStats> {
     val out = HashMap<String, PlayStats>()
     history.groupBy { it.id }.forEach { (id, events) ->
         val heard = events.filter { !it.skipped }
@@ -140,9 +155,9 @@ fun playStats(history: List<PlayEvent>, server: Map<String, CountPoint>, zone: Z
             lastPlayed = heard.maxOfOrNull { it.at }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().toEpochDay() },
         )
     }
-    server.forEach { (id, point) ->
+    server.forEach { (id, plays) ->
         val have = out[id] ?: PlayStats()
-        out[id] = have.copy(plays = maxOf(have.plays, point.count), lastPlayed = listOfNotNull(have.lastPlayed, point.day).maxOrNull())
+        out[id] = have.copy(plays = maxOf(have.plays, plays.count), lastPlayed = listOfNotNull(have.lastPlayed, plays.playedDay).maxOrNull())
     }
     return out
 }

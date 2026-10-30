@@ -222,13 +222,26 @@ class PinnedCardsTest {
             event("1", today.minusDays(2)), event("1", today.minusDays(5)), event("1", today.minusDays(1), skipped = true),
             event("2", today.minusDays(3), skipped = true),
         )
-        val server = mapOf("1" to CountPoint(today.minusDays(10).toEpochDay(), 7), "3" to CountPoint(today.minusDays(40).toEpochDay(), 2))
+        val server = mapOf("1" to ServerPlays(7, today.minusDays(10).toEpochDay()), "3" to ServerPlays(2, today.minusDays(40).toEpochDay()))
         val stats = playStats(history, server, zone)
         assertEquals(PlayStats(plays = 7, skips = 1, lastPlayed = today.minusDays(2).toEpochDay()), stats["1"])
         assertEquals(PlayStats(plays = 0, skips = 1, lastPlayed = null), stats["2"])  // only skipped: never really played
         assertEquals(PlayStats(plays = 2, skips = 0, lastPlayed = today.minusDays(40).toEpochDay()), stats["3"])
         val albums = albumPlayStats(stats, mapOf("1" to "al", "3" to "al", "2" to "o"))
         assertEquals(PlayStats(plays = 9, skips = 1, lastPlayed = today.minusDays(2).toEpochDay()), albums["al"])
+    }
+
+    @Test fun theDaySiansaFirstSawASongIsntWhenItWasPlayed() {
+        val day = today.toEpochDay()
+        // Seen once: its count, but not when it was played (it may have been years ago).
+        assertEquals(ServerPlays(12, null), ServerPlays.of(listOf(CountPoint(day, 12))))
+        // The count went up on a later day: played then.
+        assertEquals(ServerPlays(13, day), ServerPlays.of(listOf(CountPoint(day - 5, 12), CountPoint(day, 13))))
+        assertEquals(null, ServerPlays.of(emptyList()))
+        // A song first seen today with plays long ago stays "not played lately".
+        val stats = playStats(emptyList(), mapOf("x" to ServerPlays.of(listOf(CountPoint(day, 30)))!!), zone)
+        assertTrue(rule(RuleField.PLAYED, RuleOp.NOT_WITHIN, "90").matches(SongSubject(song, null, stats["x"], today)))
+        assertTrue(rule(RuleField.PLAYS, RuleOp.AT_LEAST, "30").matches(SongSubject(song, null, stats["x"], today)))
     }
 
     @Test fun songsHaveTheirOwnPlayCountLastPlayedAndSkips() {

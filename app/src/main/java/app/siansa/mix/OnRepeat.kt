@@ -98,8 +98,8 @@ class PlayCountLog(context: Context) {
     }
 
     /** Each song's latest count and the day it changed to it (custom cards' play rules, issue #678). */
-    suspend fun latest(): Map<String, CountPoint> =
-        json.read().mapNotNull { (id, points) -> points.lastOrNull()?.let { id to it } }.toMap()
+    suspend fun latest(): Map<String, ServerPlays> =
+        json.read().mapNotNull { (id, points) -> ServerPlays.of(points)?.let { id to it } }.toMap()
 
     /** Each song's count on [day] (an epoch day), for the songs Siansa had seen by then. */
     suspend fun countsOn(day: Long): Map<String, Long> =
