@@ -1,6 +1,6 @@
 import unittest
 
-from play_upload import already_uploaded, code_of_uploaded, track_has, draft_only, plain_notes, track_body, tracks_of
+from play_upload import play_reason, step_of, already_uploaded, code_of_uploaded, track_has, draft_only, plain_notes, track_body, tracks_of
 
 
 class PlayUploadTest(unittest.TestCase):
@@ -33,6 +33,22 @@ class PlayUploadTest(unittest.TestCase):
         self.assertFalse(already_uploaded("HTTP 401: invalid credentials"))
         self.assertTrue(draft_only("HTTP 400: Only releases with status draft may be created on draft app."))
         self.assertFalse(draft_only("HTTP 400: Track not found"))
+
+    def test_plays_reason_is_one_readable_line(self):
+        body = '{\n  "error": {\n    "code": 403,\n    "message": "The Android App Bundle was signed with the wrong key.",\n    "status": "PERMISSION_DENIED"\n  }\n}\n'
+        reason = play_reason(403, body)
+        self.assertEqual("HTTP 403 PERMISSION_DENIED The Android App Bundle was signed with the wrong key.", reason)
+        self.assertNotIn("\n", reason)
+        self.assertTrue(already_uploaded(play_reason(403, '{"error": {"message": "APK specifies a version code that has already been used."}}')))
+        self.assertEqual("HTTP 502 <html> bad gateway </html>", play_reason(502, "<html>\n bad gateway\n</html>"))
+
+    def test_the_step_play_refused_is_named(self):
+        api = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/app.siansa"
+        up = "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/app.siansa"
+        self.assertEqual("Starting an edit", step_of("POST", f"{api}/edits"))
+        self.assertEqual("Uploading the bundle", step_of("POST", f"{up}/edits/123/bundles?uploadType=media"))
+        self.assertEqual("Setting the alpha track", step_of("PUT", f"{api}/edits/123/tracks/alpha"))
+        self.assertEqual("Committing the edit", step_of("POST", f"{api}/edits/123:commit"))
 
     def test_both_tracks_unless_set(self):
         self.assertEqual(["alpha", "internal"], tracks_of(""))
