@@ -70,7 +70,8 @@ Each song gets one volume, from **one** source, never two at once:
 - With **Track** levelling, the song's loudness is brought towards the target: −18 LUFS (close to what ReplayGain
   aims for) or −14 LUFS.
 - The loudness is the Siansa plugin's measurement of the audio (EBU R128, in LUFS) when that's the chosen source
-  and the song is measured; otherwise the song's ReplayGain tags.
+  and the song is measured; otherwise the song's ReplayGain tags. The tags bring a song to −18 LUFS, so with the −14
+  target their gain is raised by 4 dB.
 - **Album** levelling keeps the album's tags when the song has them, since the plugin measures songs one by one.
 - Like ReplayGain, levelling works through the player's volume, so it can only **turn songs down**. That's why −14
   can't raise quiet songs to it.

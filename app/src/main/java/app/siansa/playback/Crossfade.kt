@@ -255,7 +255,7 @@ object Levelling {
             else -> "the Siansa plugin hasn't measured this song yet, so its ReplayGain tags"
         }
         if (!hasTags) return Decision(Source.NONE, 1f, "$why: the song has none")
-        return Decision(Source.REPLAYGAIN, replayGainVolume(song, settings), why)
+        return Decision(Source.REPLAYGAIN, replayGainVolume(song, settings), "$why, brought to ${settings.loudnessTarget} LUFS")
     }
 
     /** The player volume for [song]: from [decide], so the Siansa plugin and ReplayGain never both apply. */

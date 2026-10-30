@@ -79,10 +79,19 @@ fun replayGainVolume(song: Song?, settings: AppSettings): Float {
     val album = settings.replayGain == ReplayGainMode.ALBUM
     val gain = if (album) song.albumGain ?: song.trackGain else song.trackGain ?: song.albumGain
     val peak = if (album) song.albumPeak ?: song.trackPeak else song.trackPeak ?: song.albumPeak
-    var volume = 10f.pow((gain ?: 0f) / 20f)
+    // ReplayGain tags bring a song to their reference, −18 LUFS; the loudness target moves that (issue #667): at
+    // −14 every tagged song gets 4 dB more. Still never louder than the file, nor past its peak.
+    val shift = if (gain != null) replayGainShiftDb(settings.loudnessTarget) else 0f
+    var volume = 10f.pow(((gain ?: 0f) + shift) / 20f)
     if (peak != null && peak > 0f) volume = min(volume, 1f / peak)
     return volume.coerceIn(0f, 1f)
 }
+
+/** The loudness ReplayGain tags level songs to: ReplayGain 2.0's reference (−18 LUFS). */
+const val REPLAYGAIN_REFERENCE_LUFS = -18
+
+/** How much a ReplayGain gain moves for the loudness [targetLufs] (issue #667): 0 at −18, +4 dB at −14. */
+fun replayGainShiftDb(targetLufs: Int): Float = (targetLufs - REPLAYGAIN_REFERENCE_LUFS).toFloat()
 
 /** Whether this queue item was added by keep playing or a song radio rather than chosen (issue #337). */
 fun MediaItem.isAuto(): Boolean = mediaMetadata.extras?.getBoolean(AUTO_EXTRA, false) == true
