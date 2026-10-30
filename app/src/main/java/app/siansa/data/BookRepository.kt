@@ -24,6 +24,39 @@ class BookRepository(private val api: AudiobookshelfApi, private val settings: (
 
     val ready: Boolean get() = settings().booksReady
 
+    private val _sync = MutableStateFlow(BookSync())
+    /** The last sync from Home's Source filter (issue #693): running, what it found, or why it failed. */
+    val sync: StateFlow<BookSync> = _sync.asStateFlow()
+
+    /**
+     * Reads everything from Audiobookshelf again (issue #693): its libraries, how many books and podcasts each has,
+     * Home's shelves and the progress. Nothing is kept on the phone, so this is what a sync is for books.
+     */
+    suspend fun syncAll() {
+        if (_sync.value.running || !ready) return
+        _sync.value = BookSync(running = true)
+        try {
+            forget()
+            val libs = libraries()
+            var books = 0
+            var podcasts = 0
+            for (lib in libs) {
+                val n = api.itemCount(lib.id)
+                if (lib.podcasts) podcasts += n else books += n
+            }
+            refreshShelves(podcasts = false, force = true)
+            refreshShelves(podcasts = true, force = true)
+            _sync.value = BookSync(libraries = libs.size, books = books, podcasts = podcasts, done = true)
+            AppLog.i("Books", "Synced: ${libs.size} libraries, $books books, $podcasts podcasts")
+        } catch (e: CancellationException) {
+            _sync.value = BookSync()
+            throw e
+        } catch (e: Exception) {
+            AppLog.w("Books", "Sync failed: ${e.message}")
+            _sync.value = BookSync(error = e.message ?: "Couldn't reach Audiobookshelf")
+        }
+    }
+
     suspend fun libraries(): List<AbsLibrary> = libraries ?: api.libraries().also { libraries = it }
 
     /** After a scan or a new login (#582): the next read asks the server for everything again. */
@@ -149,3 +182,13 @@ enum class BookSort(val label: String, val field: String, val desc: Boolean) {
     SERIES("Series", "media.metadata.seriesName", false),
     ADDED("Recently added", "addedAt", true),
 }
+
+/** A sync of the books and podcasts (issue #693). */
+data class BookSync(
+    val running: Boolean = false,
+    val libraries: Int = 0,
+    val books: Int = 0,
+    val podcasts: Int = 0,
+    val error: String? = null,
+    val done: Boolean = false,
+)

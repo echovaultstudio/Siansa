@@ -45,6 +45,11 @@ The **filter button at the top of Home** opens the source filter. There you can:
 - **Hide your own music**, to see only another user's.
 - **Pick which libraries to show** (Navidrome's music folders, Emby's libraries).
 - **Only downloaded music**: hides everything that isn't on the phone. Handy on a flight.
+- **Sync** one server, or **Sync all** to sync every music library that's shown and Audiobookshelf at once. Each
+  server shows how its sync is going on one small line under its name, with a tick once it's done.
+
+Every server set up in **Settings › Connections** is listed, Audiobookshelf too (with how many books and podcasts it
+has after a sync). Audiobookshelf's books aren't hidden from here: Home's **Arrange** hides their rows.
 
 Song radios, mixes, the dice and recently played only use what the filter shows.
 

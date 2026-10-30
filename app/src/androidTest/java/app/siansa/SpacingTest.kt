@@ -150,6 +150,19 @@ class SpacingTest {
         assertEven("Source card libraries", chipBox.top - name.bottom, card.bottom - chipBox.bottom)
     }
 
+    /** Source filter (issue #693): the sync line starts under the source's name, and its libraries keep their gap below it. */
+    @Test fun sourceSyncLineSitsUnderTheName() {
+        compose.setContent { SiansaTheme { app.siansa.ui.SourceCardForTest(syncLine = "Synced · 12 books") } }
+        val name = compose.onNodeWithText("anna on music.example.com").getBoundsInRoot()
+        val line = compose.onNodeWithText("Synced · 12 books").getBoundsInRoot()
+        val chip = compose.onNodeWithText("albums").getBoundsInRoot()
+        val strip = compose.onNodeWithTag("source-sync-progress").getBoundsInRoot()
+        val tick = compose.onNodeWithTag("source-sync-done", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Sync line starts under the name", tick.left - name.left, 0.dp)
+        assertTrue("The line sits above the libraries", line.bottom <= chip.top)
+        assertEven("Libraries below the sync line", chip.top - strip.bottom, app.siansa.ui.SOURCE_CARD_GAP)
+    }
+
     /** Home: the one settings button sits centred on the greeting's line (issue #152). */
     @Test fun homeButtonSitsOnTheGreetingLine() {
         compose.setContent {
