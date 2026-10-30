@@ -116,6 +116,22 @@ class Guests(
     fun reloadSettings(user: Int) {
         settings.remove(user)
         apis.remove(user)
+        // Whether they're on the user in use's server is asked again: the address may have changed.
+        _sameServer.update { it - user }
+        if (user !in _shown.value) return
+        scope.launch {
+            checkSameServers(listOf(user))
+            when (sameServerNow(user)) {
+                // Still the same server (a new password, a proxy login): their music is loaded with the new login.
+                true -> sync(user, force = true)
+                // Now another server: their music can't show with the user in use's any more.
+                false -> {
+                    AppLog.i("Sources", "User ${user + 1} is now on another server; their music is hidden")
+                    setShown(user, false)
+                }
+                null -> Unit
+            }
+        }
     }
 
     /**
