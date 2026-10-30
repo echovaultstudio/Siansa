@@ -124,6 +124,16 @@ private val allTabRoutes = NavTab.entries.map { it.route }.toSet()
 /** Height of the see-through bottom bar (mini player + tabs), so scrolling pages can end above it. */
 val LocalBottomBarPadding = compositionLocalOf { 0.dp }
 
+/**
+ * The bottom bar's fade (issue #699): clear at the top, where the page shows through, to nearly solid [surface] behind
+ * the tabs. [surface] is the theme's, so the tabs' own colours stand out on it in light and dark.
+ */
+fun bottomBarStops(surface: Color): Array<Pair<Float, Color>> = arrayOf(
+    0f to Color.Transparent,
+    0.3f to surface.copy(alpha = 0.78f),
+    1f to surface.copy(alpha = 0.96f),
+)
+
 /** Bottom padding for a scrolling page: clear of the bottom bar, plus [extra]. */
 @Composable
 fun bottomBarPadding(extra: Dp = Space.Section): Dp = LocalBottomBarPadding.current + extra
@@ -209,16 +219,9 @@ fun SiansaRoot() {
             snackbarHost = { SnackbarHost(snack) },
             bottomBar = {
                 run {
-                    // See-through: the page shows through the top of the bar and fades out behind the tabs.
-                    Column(
-                        Modifier.background(
-                            Brush.verticalGradient(
-                                0f to Color.Transparent,
-                                0.3f to DarkColours.surface.copy(alpha = 0.78f),
-                                1f to DarkColours.surface.copy(alpha = 0.96f),
-                            )
-                        )
-                    ) {
+                    // See-through: the page shows through the top of the bar and fades out behind the tabs, in the
+                    // theme's own colour, so the tabs stand out in light mode too (issue #699).
+                    Column(Modifier.background(Brush.verticalGradient(*bottomBarStops(MaterialTheme.colorScheme.surface)))) {
                         // One mini player: the player started last (beta #45). Pausing keeps it; stopping it leaves
                         // none, so the other never shows from behind. The choice is the app's, not this screen's.
                         val bookState by graph.bookPlayer.state.collectAsStateWithLifecycle()
