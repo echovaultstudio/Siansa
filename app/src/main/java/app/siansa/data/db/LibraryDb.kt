@@ -383,6 +383,9 @@ interface LibraryDao {
     @Query("SELECT * FROM albums WHERE isPrimary = 1")
     suspend fun primaryAlbums(): List<AlbumEntity>
 
+    @Query("SELECT * FROM albums")
+    suspend fun allAlbums(): List<AlbumEntity>
+
     // Meta
     @Query("SELECT value FROM meta WHERE `key` = :key")
     suspend fun meta(key: String): String?

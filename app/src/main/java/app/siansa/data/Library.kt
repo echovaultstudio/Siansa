@@ -217,6 +217,15 @@ class LibraryRepository(context: Context) {
         else -> dao.albumsByName()
     }.map { it.toAlbum() }.onlyDownloadedAlbums()
 
+    /** Every album, copies in other libraries too, by id: for a song's album details in custom cards (issue #663). */
+    suspend fun albumsById(): Map<String, Album> = withContext(Dispatchers.IO) { dao.allAlbums().associate { it.id to it.toAlbum() } }
+
+    /** Every record label on an album, the most used first, for picking one in a card's rules (issue #663). */
+    suspend fun labels(limit: Int = 60): List<String> = withContext(Dispatchers.IO) {
+        dao.primaryAlbums().flatMap { a -> unmarkLabels(a.labels) }
+            .groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.take(limit).map { it.key }
+    }
+
     /** Every album tagged with [genre] (#558), newest first; what's shown only, as the other album lists. */
     suspend fun albumsWithGenre(genre: String): List<Album> = dao.albumsWithGenre(genre.trim()).map { it.toAlbum() }.onlyDownloadedAlbums()
 

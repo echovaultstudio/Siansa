@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -45,6 +46,7 @@ import androidx.navigation.NavController
 import app.siansa.data.Song
 import app.siansa.data.cover
 import app.siansa.mix.CardContent
+import app.siansa.mix.CardContents
 import app.siansa.mix.CardLook
 import app.siansa.mix.CardSource
 import app.siansa.mix.PinnedCard
@@ -80,7 +82,7 @@ fun PinnedCardSection(nav: NavController, card: PinnedCard, aiDown: String?) {
                 modifier = Modifier.padding(horizontal = Space.Page).testTag("pinnedProblem"),
             )
         }
-        is Load.Ok -> if (load.value.songs.isNotEmpty()) PinnedCardLook(card, load.value, open, ::play, nav)
+        is Load.Ok -> if (load.value.songs.isNotEmpty() || load.value.albums.isNotEmpty()) PinnedCardLook(card, load.value, open, ::play, nav)
         else {
             SectionTitle(card.title)
             Text(
@@ -96,6 +98,37 @@ fun PinnedCardSection(nav: NavController, card: PinnedCard, aiDown: String?) {
 @Composable
 private fun PinnedCardLook(card: PinnedCard, content: CardContent, open: () -> Unit, play: (List<Song>, Int, Boolean) -> Unit, nav: NavController) {
     val songs = content.songs
+    // An album card (issue #663): its tiles and list are its albums; its banner and button play them in turn.
+    if (card.contents == CardContents.ALBUMS && card.look in setOf(CardLook.TILES, CardLook.ALBUMS, CardLook.LIST)) {
+        if (card.look == CardLook.LIST) {
+            Column {
+                Row(
+                    Modifier.fillMaxWidth().clickable(onClickLabel = "Show all", onClick = open)
+                        .padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current, bottom = Space.Small),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(card.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                }
+                content.albums.take(LIST).forEach { album ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { nav.navigate("album/${album.id}") }.padding(horizontal = Space.Page, vertical = Space.Small).testTag("pinnedAlbumRow"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Cover(album.coverArt, 150, Modifier.size(48.dp))
+                        Column(Modifier.weight(1f).padding(start = Space.Medium)) {
+                            Text(album.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(listOfNotNull(album.artist.ifBlank { null }, album.year?.toString()).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+        } else {
+            Shelf(card.title, content.albums.take(TILES), key = { it.id }, onOpenAll = open) { album ->
+                AlbumTile(album.name, album.artist, album.coverArt, onClick = { nav.navigate("album/${album.id}") }, modifier = Modifier.width(140.dp))
+            }
+        }
+        return
+    }
     when (card.look) {
         CardLook.TILES -> Shelf(card.title, songs.take(TILES), key = { it.id }, onOpenAll = open) { song ->
             AlbumTile(song.title, song.artist, song.cover, onClick = { play(songs, songs.indexOf(song), false) }, modifier = Modifier.width(140.dp))
@@ -150,7 +183,7 @@ internal fun PinnedBanner(
             Column(Modifier.padding(Space.Page).fillMaxWidth(0.55f)) {
                 Text(card.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(Space.Tight))
-                Text("${songs.size} songs · ${card.detail}", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(listOfNotNull(countText(card, songs), card.detail).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(Space.Page))
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalAlignment = Alignment.CenterVertically) {
                     FilledTonalButton(onClick = { playback.press { play(songs, 0, false) } }, modifier = Modifier.testTag("pinnedPlay")) {
@@ -191,11 +224,14 @@ internal fun PinnedPlayButton(
         ) { Icon(if (playback.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, tint = Color.White, modifier = Modifier.size(32.dp)) }
         Column(Modifier.weight(1f).padding(horizontal = Space.Medium)) {
             Text(card.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(if (playback.playing) "Playing · tap to pause" else "Tap to play · ${songs.size} songs", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(if (playback.playing) "Playing · tap to pause" else "Tap to play" + (countText(card, songs)?.let { " · $it" } ?: ""), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         IconButton(onClick = open) { Icon(Icons.Rounded.ChevronRight, "Open ${card.title}") }
     }
 }
+
+/** "24 songs"; nothing for an album card, whose details already say Albums. */
+private fun countText(card: PinnedCard, songs: List<Song>): String? = if (card.contents == CardContents.ALBUMS) null else "${songs.size} songs"
 
 /** A custom card's page (issue #622): every song, ready to play or save as a playlist, with a button for a new set. */
 @Composable
@@ -207,6 +243,24 @@ fun PinnedCardScreen(nav: NavController, id: String) {
     val content by loadStateFresh("pinned-songs-$id-$round-${c?.hashCode()}") { c?.let { graph.pinnedCards.content(it, round) } }
     val title = c?.title ?: "Your card"
     val colors = tileColors(id)
+    // An album card's page is its albums, like a label's (issue #663).
+    if (c?.contents == CardContents.ALBUMS) {
+        Screen(title = title, nav = nav, actions = {
+            if (c.sort == app.siansa.mix.CardSort.RANDOM) IconButton(onClick = { round++ }) { Icon(Icons.Rounded.Refresh, "New albums") }
+        }) { padding ->
+            LoadBox(content, Modifier.padding(top = padding.calculateTopPadding())) { found ->
+                val albums = found?.albums.orEmpty()
+                if (albums.isEmpty()) {
+                    Text("No albums match yet. Change the card in Settings › Cards.", style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(Space.Page).testTag("pinnedProblem"))
+                } else {
+                    AlbumsGridOrList(albums, page = "pinned-albums", onOpen = { nav.navigate("album/${it.id}") }, modifier = Modifier.fillMaxSize(),
+                        title = "${c.detail} · ${albums.size} ${if (albums.size == 1) "album" else "albums"}")
+                }
+            }
+        }
+        return
+    }
     CollectionPage(
         nav = nav,
         title = title,

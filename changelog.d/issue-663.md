@@ -1,0 +1,3 @@
+### Added
+
+- Custom cards can now be built from rules that keep or leave things out: each rule compares a song title, album, artist, genre, record label, release type, year, length, plays, date added, favourite or compilation ("contains", "doesn't contain", "is", "isn't", "at least", "between"…), and a card keeps what matches every rule or any of them. Cards can now list whole albums too, for example every 2024 album on one record label, and be sorted (random each day, newest, recently added, most played, A to Z) with a limit on how many. Cards are made and changed on a page of their own in Settings › Cards; cards made before keep their rules.
