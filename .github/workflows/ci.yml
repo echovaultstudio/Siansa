@@ -71,7 +71,7 @@ jobs:
           fi
           git diff --name-only "$BEFORE" "$GITHUB_SHA" | python3 scripts/ci_changes.py | grep '^emulator=' | tee -a "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       # The AudioMuse-AI plugin in audiomuse-plugin/ (issue #188), with the libraries AudioMuse-AI ships.
@@ -400,7 +400,7 @@ jobs:
 
       # Google Play's open testing (issue #557, #584): the .aab with the version's notes, through a service account that
       # can only release to testing tracks. Skipped until PLAY_SERVICE_ACCOUNT_JSON is set.
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         if: steps.version.outputs.exists != 'true'
         with:
           python-version: "3.12"
