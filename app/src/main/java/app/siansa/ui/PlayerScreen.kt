@@ -75,6 +75,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -138,6 +139,7 @@ import app.siansa.playback.AudioOutput
 import app.siansa.playback.Cast
 import app.siansa.playback.PlayerState
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /** Now playing's colours: white on the cover's colours, with the theme's accent for buttons. */
 @Composable
@@ -838,6 +840,15 @@ private fun QueueView(state: PlayerState) {
                 Icon(Icons.Rounded.AddCircle, "Save queue as playlist", tint = Color.White)
             }
         }
+        // Shape the mix (issue #649): only while a DJ song radio fills the queue.
+        val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
+        if (radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ) {
+            val settings by graph.settings.state.collectAsStateWithLifecycle()
+            MixShapeControls(settings.mixShape, settings.mixSurprise) { shape, surprise ->
+                graph.settings.setMixShape(shape, surprise)
+                graph.songRadio.reshape()
+            }
+        }
         Spacer(Modifier.height(Space.Tight))
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             itemsIndexed(state.queue, key = { i, s -> "$i-${s.id}" }) { index, song ->
@@ -859,6 +870,52 @@ private fun QueueView(state: PlayerState) {
     }
 }
 
+
+/**
+ * The shape of a DJ mix (issue #649), in the queue: a chip for what the energy does over the next songs, and a
+ * slider for how far the mix may stray. Each change puts the songs not yet played in a new order.
+ */
+@Composable
+internal fun MixShapeControls(shape: app.siansa.mix.MixShape, surprise: Int, onChange: (app.siansa.mix.MixShape, Int) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = Space.Page).testTag("mixShape")) {
+        Text("Shape the mix", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.8f))
+        Spacer(Modifier.height(Space.Small))
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            app.siansa.mix.MixShape.entries.forEach { s ->
+                androidx.compose.material3.FilterChip(
+                    selected = shape == s,
+                    onClick = { if (s != shape) onChange(s, surprise) },
+                    label = { Text(s.label) },
+                    modifier = Modifier.testTag("mixShape-${s.name}"),
+                )
+            }
+        }
+        Spacer(Modifier.height(Space.Small))
+        Text(shape.hint, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
+        var value by remember(surprise) { mutableFloatStateOf(surprise.toFloat()) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Surprises", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(SURPRISE_LABEL_WIDTH))
+            Slider(
+                value = value,
+                onValueChange = { value = it },
+                onValueChangeFinished = { if (value.roundToInt() != surprise) onChange(shape, value.roundToInt()) },
+                valueRange = 0f..100f,
+                modifier = Modifier.weight(1f).testTag("mixSurprise"),
+            )
+            Text(surpriseLabel(value.roundToInt()), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.End, modifier = Modifier.width(SURPRISE_LABEL_WIDTH))
+        }
+    }
+}
+
+/** What a surprise setting means, in a word. */
+internal fun surpriseLabel(surprise: Int): String = when {
+    surprise < 15 -> "None"
+    surprise < 40 -> "A few"
+    surprise < 70 -> "Some"
+    else -> "Lots"
+}
+
+private val SURPRISE_LABEL_WIDTH = 64.dp
 
 /** In the classic now playing style, how much of the lyrics card shows under the player before scrolling (issue #346). */
 private val PLAYER_PEEK = 44.dp

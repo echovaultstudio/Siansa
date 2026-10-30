@@ -270,6 +270,19 @@ class SpacingTest {
         assertEven("Path mood chips", chip.top - label.bottom, lyrics.top - chip.bottom)
     }
 
+    /** Shape the mix (issue #649): the shape chips sit evenly between their title and the hint under them. */
+    @Test fun mixShapeChipsAreEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.MixShapeControls(app.siansa.mix.MixShape.STEADY, 20) { _, _ -> }
+            }
+        }
+        val title = compose.onNodeWithText("Shape the mix").getBoundsInRoot()
+        val chips = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Euphoric")), useUnmergedTree = true).getBoundsInRoot()
+        val hint = compose.onNodeWithText(app.siansa.mix.MixShape.STEADY.hint).getBoundsInRoot()
+        assertEven("Mix shape chips", chips.top - title.bottom, hint.top - chips.bottom)
+    }
+
     /** Crossfade and levelling: the Off / Track / Album chips sit evenly between their heading and hint (issue #214). */
     @Test fun levellingChipsAreEvenlySpaced() {
         compose.setContent {

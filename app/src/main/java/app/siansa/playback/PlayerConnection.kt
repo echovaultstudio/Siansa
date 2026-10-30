@@ -227,6 +227,16 @@ class PlayerConnection(
         }
     }
 
+    /** Swaps everything after the current song for [chosen] (yours) followed by [auto] (a radio's, marked so). */
+    fun replaceUpcoming(chosen: List<Song>, auto: List<Song>) {
+        SongRegistry.register(chosen + auto)
+        withController { c ->
+            val keep = c.currentMediaItemIndex + 1
+            if (c.mediaItemCount > keep) c.removeMediaItems(keep, c.mediaItemCount)
+            c.addMediaItems(chosen.map { it.toMediaItem(api) } + auto.map { it.toMediaItem(api, auto = true) })
+        }
+    }
+
     /** [auto]: the songs were picked by a song radio, not chosen, and the queue marks them (issue #337). */
     fun addAll(songs: List<Song>, auto: Boolean = false) {
         if (songs.isEmpty()) return

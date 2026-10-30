@@ -113,6 +113,34 @@ class SongRadio(private val graph: AppGraph) {
         }
     }
 
+    /**
+     * The mix's shape or surprise changed (issue #649): the radio's songs not yet played are put in DJ order again
+     * from the one playing, so the new shape starts with the next song. Only in DJ mode, and only the songs the
+     * radio added; anything you queued yourself stays where it is, first.
+     */
+    fun reshape() {
+        if (_seed.value == null || mode != ContinuousMode.DJ) return
+        val state = graph.player.state.value
+        val current = state.current ?: return
+        val upcoming = state.queue.withIndex().filter { it.index > state.index }
+        val mine = upcoming.filter { it.index in state.auto }.map { it.value }
+        val yours = upcoming.filter { it.index !in state.auto }.map { it.value }
+        if (mine.size < 2) return
+        graph.scope.launch {
+            val started = System.currentTimeMillis()
+            val arranged = runCatching { arrange(mode, yours.lastOrNull() ?: current, mine) }
+                .onFailure { AppLog.w("SongRadio", "Couldn't reshape the mix: ${it.message}") }
+                .getOrNull() ?: return@launch
+            val s = graph.settings.current
+            AppLog.i("SongRadio", "Reshaped ${arranged.size} songs (${s.mixShape.label.lowercase()}, surprise ${s.mixSurprise} %) in ${System.currentTimeMillis() - started}ms")
+            withContext(Dispatchers.Main) {
+                // Still the same radio and song: otherwise the queue has moved on and the order would be stale.
+                val now = graph.player.state.value
+                if (_seed.value != null && now.current?.id == current.id) graph.player.replaceUpcoming(yours, arranged)
+            }
+        }
+    }
+
     fun stop() {
         if (_seed.value != null) AppLog.i("SongRadio", "Stopped")
         watcher?.cancel()

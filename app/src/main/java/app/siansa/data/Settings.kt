@@ -8,6 +8,7 @@ import app.siansa.playback.BeatMatchMode
 import app.siansa.playback.CrossfadeMode
 import app.siansa.playback.LoudnessSource
 import app.siansa.mix.ContinuousMode
+import app.siansa.mix.MixShape
 import app.siansa.mix.RadioDrift
 import app.siansa.situation.SituationOptions
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -133,6 +134,10 @@ data class AppSettings(
     val crossfadeSeconds: Int = DEFAULT_CROSSFADE_SECONDS,
     /** Where smart crossfades are beat-matched like a DJ's (issue #646, experimental): off, DJ radio, everywhere. */
     val beatMatch: BeatMatchMode = BeatMatchMode.DJ_RADIO,
+    /** The shape of a DJ mix (issue #649): what the energy does over the next songs. */
+    val mixShape: MixShape = MixShape.STEADY,
+    /** How far a DJ mix may stray from the last song, 0 (close neighbours only) to 100 (adventurous). */
+    val mixSurprise: Int = DEFAULT_MIX_SURPRISE,
 ) {
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
@@ -180,6 +185,8 @@ data class AppSettings(
         /** Close to what ReplayGain tags aim for, so switching where loudness comes from doesn't change the overall level. */
         const val DEFAULT_LOUDNESS_TARGET = -18
         const val DEFAULT_CROSSFADE_SECONDS = 6
+        /** A DJ mix strays a little by default (issue #649). */
+        const val DEFAULT_MIX_SURPRISE = 20
         val CROSSFADE_SECONDS = 1..12
         const val DEFAULT_WIND_DOWN_SONGS = 20
         val WIND_DOWN_CHOICES = listOf(10, 20, 30)
@@ -340,6 +347,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .takeIf { it in AppSettings.WIND_DOWN_CHOICES } ?: AppSettings.DEFAULT_WIND_DOWN_SONGS,
         crossfadeSeconds = prefs.getInt("crossfade_s", AppSettings.DEFAULT_CROSSFADE_SECONDS).coerceIn(AppSettings.CROSSFADE_SECONDS),
         beatMatch = BeatMatchMode.parse(prefs.getString("beat_match", null)),
+        mixShape = MixShape.parse(prefs.getString("mix_shape", null)),
+        mixSurprise = prefs.getInt("mix_surprise", AppSettings.DEFAULT_MIX_SURPRISE).coerceIn(0, 100),
     )
 
     /**
@@ -580,5 +589,12 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setBeatMatch(mode: BeatMatchMode) {
         prefs.edit().putString("beat_match", mode.name).apply()
         _state.value = _state.value.copy(beatMatch = mode)
+    }
+
+    /** The shape and surprise of a DJ mix (issue #649). */
+    fun setMixShape(shape: MixShape = _state.value.mixShape, surprise: Int = _state.value.mixSurprise) {
+        val s = surprise.coerceIn(0, 100)
+        prefs.edit().putString("mix_shape", shape.name).putInt("mix_surprise", s).apply()
+        _state.value = _state.value.copy(mixShape = shape, mixSurprise = s)
     }
 }
