@@ -126,15 +126,24 @@ fun CollectionPage(
     val scrolled by remember {
         derivedStateOf { if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 100_000f }
     }
-    // How far the list can scroll at most, once its end is in view; a short album can't scroll a whole cover's
-    // height, so the fade is stretched to reach its end there (issue #682).
+    // How far the list can scroll at most: a short album can't scroll a whole cover's height, so the fade is stretched
+    // to reach its end there (issue #682). Rows not laid out yet count as the average of those shown, so the fade
+    // doesn't jump when the end comes into view.
     val maxScroll by remember {
         derivedStateOf {
             val info = listState.layoutInfo
-            val last = info.visibleItemsInfo.lastOrNull()
-            if (listState.firstVisibleItemIndex != 0 || last == null || last.index != info.totalItemsCount - 1) null
-            else listState.firstVisibleItemScrollOffset +
-                (last.offset + last.size + info.afterContentPadding - info.viewportEndOffset).coerceAtLeast(0).toFloat()
+            val visible = info.visibleItemsInfo
+            val last = visible.lastOrNull()
+            val rows = visible.filter { it.index > 0 }
+            if (listState.firstVisibleItemIndex != 0 || last == null || rows.isEmpty()) null
+            else estimatedMaxScroll(
+                scrolledPx = listState.firstVisibleItemScrollOffset.toFloat(),
+                lastBottomPx = (last.offset + last.size).toFloat(),
+                viewportEndPx = info.viewportEndOffset.toFloat(),
+                afterPaddingPx = info.afterContentPadding.toFloat(),
+                unseenItems = info.totalItemsCount - 1 - last.index,
+                averageItemPx = rows.sumOf { it.size }.toFloat() / rows.size,
+            )
         }
     }
     val faded = fadeScroll(scrolled, coverPx, maxScroll)
@@ -259,6 +268,19 @@ fun CollectionPage(
         FadingTitleBar(nav, title, color, barAlpha, actions)
     }
 }
+
+/**
+ * How far a list can scroll at most (issue #682): what's below the screen now, the rows not laid out yet at
+ * [averageItemPx] each, and the end padding.
+ */
+internal fun estimatedMaxScroll(
+    scrolledPx: Float,
+    lastBottomPx: Float,
+    viewportEndPx: Float,
+    afterPaddingPx: Float,
+    unseenItems: Int,
+    averageItemPx: Float,
+): Float = scrolledPx + (lastBottomPx + unseenItems.coerceAtLeast(0) * averageItemPx + afterPaddingPx - viewportEndPx).coerceAtLeast(0f)
 
 /** How far the cover fades out entirely: the title bar is solid once the page has scrolled this far. */
 internal const val FULL_FADE = 1.1f
