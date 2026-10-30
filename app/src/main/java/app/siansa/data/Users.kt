@@ -239,7 +239,7 @@ object Users {
         val kind = SourceKind.parse(settings.getString("source_kind", null))
         return UserEntry(
             id, UserFiles.label(user, address, name), connected = user.isNotBlank() && address.isNotBlank(),
-            emby = kind == SourceKind.EMBY,
+            emby = kind.embyLike,
             server = server, serverName = name, user = user, kind = kind,
         )
     }

@@ -7,6 +7,7 @@
 | **Navidrome** (OpenSubsonic) | Everything. Navidrome is what Siansa is tested on most. If your Navidrome has the AudioMuse-AI Navidrome plugin, "similar songs" and Song path can use Navidrome's own sonic similarity. |
 | **Other OpenSubsonic servers** (Gonic, Airsonic, Ampache…) | Browsing, playback, playlists, favourites, scrobbling. Some extras depend on what the server supports (lyrics with timings, sonic similarity). |
 | **Emby** | Browsing, playback, playlists, favourites, play history and "now playing" on Emby. The smart features go through AudioMuse-AI directly. Without AudioMuse, similar songs use Emby's Instant Mix. |
+| **Jellyfin** (10.9 or later) | The same as Emby: browsing, playback, playlists, favourites, play history, "now playing" and lyrics (timed when Jellyfin has them). The smart features go through AudioMuse-AI directly; without it, similar songs use Jellyfin's Instant Mix. |
 
 ## Connecting
 

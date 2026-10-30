@@ -10,7 +10,7 @@ the hood, and what to do when something goes wrong.
 
 - [Getting started](getting-started.md): what you need, installing, first setup.
 - [Install and report a problem](testing.md): Google Play and F-Droid, the AudioMuse-AI plugin, how to report a bug.
-- [Servers, users and libraries](servers-and-users.md): Navidrome and Emby, several users, the source filter.
+- [Servers, users and libraries](servers-and-users.md): Navidrome, Jellyfin and Emby, several users, the source filter.
 - [AudioMuse-AI and the Siansa plugin](audiomuse.md): the smart parts and how to connect them.
 
 ## Using Siansa

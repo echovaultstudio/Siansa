@@ -50,6 +50,11 @@ import java.time.Instant
  * - Lyrics come from the song's lyrics streams (Emby 4.8+). Emby has no sound-alike search and no song paths: those come back empty, so the
  *   app hides them like it does for a Navidrome server without them. Similar songs and artist radio use Emby's
  *   Instant Mix.
+ *
+ * With [jellyfin], the same for Jellyfin 10.9 and later (issue #703), which forked from Emby and kept most of its API.
+ * The differences: it logs in with `Authorization: MediaBrowser …` and takes `ApiKey` in addresses (Jellyfin 12.0
+ * dropped Emby's headers and `api_key`); its per-user calls are `/Items?userId=…`, `/UserViews`, `/UserFavoriteItems`
+ * and `/UserPlayedItems`; lyrics come from `/Audio/{id}/Lyrics`; a playlist is renamed through `/Playlists/{id}`.
  */
 class EmbyApi(
     private val http: OkHttpClient,
@@ -60,8 +65,14 @@ class EmbyApi(
     private val recall: () -> Login? = { null },
     /** Keeps a new login for the next run. */
     private val remember: (Login) -> Unit = {},
+    /** Talks to Jellyfin instead of Emby (issue #703). */
+    private val jellyfin: Boolean = false,
 ) : MusicSource {
-    override val kind: SourceKind = SourceKind.EMBY
+    override val kind: SourceKind = if (jellyfin) SourceKind.JELLYFIN else SourceKind.EMBY
+
+    /** The server's name in messages and the log. */
+    private val server = if (jellyfin) "Jellyfin" else "Emby"
+    private val aServer = if (jellyfin) "a Jellyfin" else "an Emby"
 
     /** The login for the current address + user: the user's id and access token. */
     data class Login(val key: String, val userId: String, val token: String)
@@ -80,22 +91,23 @@ class EmbyApi(
     private fun loginKey(s: AppSettings) = base(s) + "|" + s.navidromeUser
 
     private fun authHeader(token: String?): String = buildString {
-        append("Emby Client=\"Siansa\", Device=\"Android\", DeviceId=\"").append(deviceId()).append("\", Version=\"1\"")
+        append(if (jellyfin) "MediaBrowser" else "Emby")
+        append(" Client=\"Siansa\", Device=\"Android\", DeviceId=\"").append(deviceId()).append("\", Version=\"1\"")
         if (token != null) append(", Token=\"").append(token).append('"')
     }
 
     /** Logs in when there's no login yet for the current settings (or [again] after a refusal). */
     private suspend fun session(again: Boolean = false): Login {
         val s = settings()
-        if (base(s).isBlank()) throw ApiException("Emby isn't set up yet")
+        if (base(s).isBlank()) throw ApiException("$server isn't set up yet")
         val key = loginKey(s)
         if (!again) current()?.let { return it }
         val body = buildJsonObject { put("Username", s.navidromeUser); put("Pw", s.navidromePassword) }.toString()
         val root = exchange("POST", "/Users/AuthenticateByName", body, token = null)
-            ?: throw ApiException("Emby didn't answer the login")
-        val token = root.str("AccessToken") ?: throw ApiException("Emby refused the login")
-        val userId = root.obj("User")?.str("Id") ?: throw ApiException("Emby refused the login")
-        AppLog.i("Server", "Logged in to Emby as ${s.navidromeUser}")
+            ?: throw ApiException("$server didn't answer the login")
+        val token = root.str("AccessToken") ?: throw ApiException("$server refused the login")
+        val userId = root.obj("User")?.str("Id") ?: throw ApiException("$server refused the login")
+        AppLog.i("Server", "Logged in to $server as ${s.navidromeUser}")
         return Login(key, userId, token).also { login = it; remember(it) }
     }
 
@@ -108,7 +120,7 @@ class EmbyApi(
         val element = try {
             AppJson.parseToJsonElement(text)
         } catch (e: Exception) {
-            throw ApiException("That address doesn't look like an Emby server")
+            throw ApiException("That address doesn't look like $aServer server")
         }
         return when (element) {
             is JsonObject -> element
@@ -120,8 +132,13 @@ class EmbyApi(
     /** One HTTP exchange, as text. Throws [Refused] for HTTP 401 with a token. */
     private suspend fun send(method: String, path: String, body: String?, token: String?): String =
         withContext(Dispatchers.IO) {
-            val builder = Request.Builder().url(base() + path).header("X-Emby-Authorization", authHeader(token))
-            if (token != null) builder.header("X-Emby-Token", token)
+            val builder = Request.Builder().url(base() + path)
+            // Jellyfin takes the login in the standard header only (its 12.0 dropped Emby's); Emby in its own two.
+            if (jellyfin) builder.header("Authorization", authHeader(token))
+            else {
+                builder.header("X-Emby-Authorization", authHeader(token))
+                if (token != null) builder.header("X-Emby-Token", token)
+            }
             val json = "application/json".toMediaType()
             when (method) {
                 "POST" -> builder.post((body ?: "").toRequestBody(json))
@@ -132,14 +149,14 @@ class EmbyApi(
                 val text = response.body?.string().orEmpty()
                 if (response.code == 401) {
                     if (token != null) throw Refused()
-                    throw ApiException("Emby refused the user name or password")
+                    throw ApiException("$server refused the user name or password")
                 }
                 if (response.code == 407) throw ApiException("The server asked for a login (HTTP 407). Fill in the proxy login in Settings.")
                 if (!response.isSuccessful) {
-                    // Emby says why in a short text (e.g. a missing field): kept in the log to trace it.
+                    // The server says why in a short text (e.g. a missing field): kept in the log to trace it.
                     val why = AppLog.redact(text.trim().take(200)).takeIf { it.isNotEmpty() }?.let { ": $it" }.orEmpty()
-                    AppLog.w("Server", "Emby $method ${path.substringBefore('?')} answered HTTP ${response.code}$why")
-                    throw ApiException("Emby answered HTTP ${response.code}")
+                    AppLog.w("Server", "$server $method ${path.substringBefore('?')} answered HTTP ${response.code}$why")
+                    throw ApiException("$server answered HTTP ${response.code}")
                 }
                 text
             }
@@ -152,12 +169,12 @@ class EmbyApi(
         return try {
             block(at(s), s.token)
         } catch (e: Refused) {
-            AppLog.w("Server", "Emby refused the saved login; logging in again")
+            AppLog.w("Server", "$server refused the saved login; logging in again")
             s = session(again = true)
             try {
                 block(at(s), s.token)
             } catch (e: Refused) {
-                throw ApiException("Emby refused the login")
+                throw ApiException("$server refused the login")
             }
         }
     }
@@ -174,34 +191,58 @@ class EmbyApi(
 
     /** Music items of the user, with the fields Siansa reads. */
     private suspend fun items(vararg params: Pair<String, Any?>): List<JsonObject> =
-        call("/Users/{user}/Items?" + q(*params, "Recursive" to "true", "Fields" to FIELDS)).arr("Items")
+        call(itemsPath() + q(*params, "Recursive" to "true", "Fields" to FIELDS)).arr("Items")
+
+    // ---- Where the per-user calls are: Emby's under /Users/{user}, Jellyfin 10.9's with ?userId= ----
+
+    /** A list of the user's items, ready for its parameters. */
+    private fun itemsPath() = if (jellyfin) "/Items?userId={user}&" else "/Users/{user}/Items?"
+
+    /** One item as the user sees it, with [query] (already encoded) when given. */
+    private fun itemPath(id: String, query: String? = null) =
+        if (jellyfin) "/Items/" + enc(id) + "?userId={user}" + (query?.let { "&$it" } ?: "")
+        else "/Users/{user}/Items/" + enc(id) + (query?.let { "?$it" } ?: "")
+
+    private fun viewsPath() = if (jellyfin) "/UserViews?userId={user}" else "/Users/{user}/Views"
+
+    private fun favouritePath(id: String) = if (jellyfin) "/UserFavoriteItems/" + enc(id) + "?userId={user}" else "/Users/{user}/FavoriteItems/" + enc(id)
+
+    /** Marks [id] played, at [at] (epoch ms) when given. */
+    private fun playedPath(id: String, at: Long?): String = when {
+        jellyfin -> "/UserPlayedItems/" + enc(id) + "?userId={user}" + (at?.let { "&" + q("datePlayed" to Instant.ofEpochMilli(it).toString()) } ?: "")
+        // Emby reads DatePlayed as yyyyMMddHHmmss (UTC); an ISO date made it answer HTTP 500 (beta #15).
+        else -> "/Users/{user}/PlayedItems/" + enc(id) + (at?.let { "?" + q("DatePlayed" to embyDate(it)) } ?: "")
+    }
 
     // ---- Addresses ----
 
     private fun mediaToken(): String = current()?.token.orEmpty()
 
     override fun streamUrl(id: String): String =
-        base() + "/Audio/" + enc(id) + "/stream?" + q("Static" to "true", "api_key" to mediaToken())
+        base() + "/Audio/" + enc(id) + "/stream?" + q("Static" to "true", tokenParam to mediaToken())
 
     /** A cover: Siansa keeps covers as item ids; Navidrome-style "al-" ids from older data are read too. */
     override fun coverUrl(id: String, size: Int?): String {
         val item = id.removePrefix("al-").removePrefix("ar-").removePrefix("pl-")
         return base() + "/Items/" + enc(item) + "/Images/Primary?" +
-            q("maxWidth" to size, "maxHeight" to size, "quality" to "90", "api_key" to mediaToken())
+            q("maxWidth" to size, "maxHeight" to size, "quality" to "90", tokenParam to mediaToken())
     }
+
+    /** The token in song and cover addresses, which players and the image cache fetch without headers. */
+    private val tokenParam = if (jellyfin) "ApiKey" else "api_key"
 
     // ---- Server ----
 
     override suspend fun ping(): String {
         val info = exchange("GET", "/System/Info/Public", null, token = null)
-            ?: throw ApiException("That address doesn't look like an Emby server")
+            ?: throw ApiException("That address doesn't look like $aServer server")
         session(again = true)
-        val name = info.str("ProductName")?.takeIf { it.isNotBlank() } ?: "Emby Server"
+        val name = info.str("ProductName")?.takeIf { it.isNotBlank() } ?: "$server Server"
         return "$name ${info.str("Version").orEmpty()}".trim()
     }
 
     override suspend fun musicFolders(): List<MusicFolder> =
-        call("/Users/{user}/Views").arr("Items")
+        call(viewsPath()).arr("Items")
             .filter { it.str("CollectionType") == "music" }
             .mapNotNull { v -> MusicFolder(v.str("Id") ?: return@mapNotNull null, v.str("Name") ?: "Music") }
 
@@ -224,7 +265,7 @@ class EmbyApi(
     }
 
     override suspend fun album(id: String): AlbumDetail {
-        val album = call("/Users/{user}/Items/" + enc(id))
+        val album = call(itemPath(id))
         if (album.str("Id") == null) throw ApiException("Album not found")
         // Emby can't sort by disc and track number (not among its sort fields), so they're put in order here.
         val songs = items("ParentId" to id, "IncludeItemTypes" to "Audio", "SortBy" to "SortName")
@@ -238,7 +279,7 @@ class EmbyApi(
             .arr("Items").map(::parseArtist)
 
     override suspend fun artist(id: String): ArtistDetail {
-        val artist = call("/Users/{user}/Items/" + enc(id))
+        val artist = call(itemPath(id))
         if (artist.str("Id") == null) throw ApiException("Artist not found")
         // Emby filters albums by any artist on them (ArtistIds); the artist's own albums are those with them as
         // album artist, with the rest (appearances) only when there are none of those.
@@ -248,7 +289,7 @@ class EmbyApi(
     }
 
     override suspend fun artistInfo(id: String, includeNotPresent: Boolean): ArtistInfo {
-        val artist = call("/Users/{user}/Items/" + enc(id))
+        val artist = call(itemPath(id))
         val similar = runCatching {
             call("/Items/" + enc(id) + "/Similar?" + q("UserId" to "{user}", "Limit" to "20")).arr("Items")
         }.getOrDefault(emptyList()).mapNotNull { a ->
@@ -273,13 +314,13 @@ class EmbyApi(
     }
 
     override suspend fun song(id: String): Song {
-        val o = call("/Users/{user}/Items/" + enc(id))
+        val o = call(itemPath(id))
         if (o.str("Id") == null) throw ApiException("Song not found")
         return parseSong(o)
     }
 
     override suspend fun songDetails(id: String): SongDetails {
-        val o = call("/Users/{user}/Items/" + enc(id) + "?" + q("Fields" to "$FIELDS,MediaSources,Path,People,Studios"))
+        val o = call(itemPath(id, q("Fields" to "$FIELDS,MediaSources,Path,People,Studios")))
         val source = o.arr("MediaSources").firstOrNull()
         val audio = source?.arr("MediaStreams")?.firstOrNull { it.str("Type") == "Audio" }
         return SongDetails(
@@ -340,7 +381,8 @@ class EmbyApi(
      * subtitle streams of the song, read through its subtitle address. Several (languages): the most detailed.
      */
     override suspend fun lyrics(song: Song): Lyrics? {
-        val item = call("/Users/{user}/Items/" + enc(song.id) + "?" + q("Fields" to "MediaSources,MediaStreams"))
+        if (jellyfin) return jellyfinLyrics(song)
+        val item = call(itemPath(song.id, q("Fields" to "MediaSources,MediaStreams")))
         val source = item.arr("MediaSources").firstOrNull()
         val sourceId = source?.str("Id") ?: song.id
         val streams = (source?.arr("MediaStreams").orEmpty().ifEmpty { item.arr("MediaStreams") })
@@ -354,6 +396,20 @@ class EmbyApi(
             readLyrics(raw)?.let { stream.str("Language") to it }
         }
         return LyricsFormats.best(options)
+    }
+
+    /**
+     * Jellyfin's lyrics (10.9 and later): one call, the lines with their start in ticks when they're timed. A song
+     * without lyrics is answered with HTTP 404.
+     */
+    private suspend fun jellyfinLyrics(song: Song): Lyrics? {
+        val answer = try {
+            call("/Audio/" + enc(song.id) + "/Lyrics")
+        } catch (e: ApiException) {
+            if (e.message?.contains("404") != true) AppLog.w("Lyrics", "Jellyfin lyrics ${song.id} not read: ${e.message}")
+            return null
+        }
+        return readJellyfinLyrics(answer)
     }
 
     // ---- Similar ----
@@ -380,14 +436,23 @@ class EmbyApi(
         call("/Playlists/" + enc(playlistId) + "/Items?" + q("UserId" to "{user}", "Fields" to FIELDS)).arr("Items")
 
     override suspend fun playlist(id: String): PlaylistDetail {
-        val playlist = call("/Users/{user}/Items/" + enc(id))
+        val playlist = call(itemPath(id))
         if (playlist.str("Id") == null) throw ApiException("Playlist not found")
         val songs = entries(id).map(::parseSong)
         return PlaylistDetail(parsePlaylist(playlist).copy(songCount = songs.size, durationSec = songs.sumOf { it.durationSec }), songs)
     }
 
     override suspend fun createPlaylist(name: String, songIds: List<String>): Playlist? {
-        val made = call(
+        val made = if (jellyfin) {
+            // Jellyfin takes the new playlist in the body (its query form is going away).
+            val body = buildJsonObject {
+                put("Name", name)
+                put("Ids", JsonArray(songIds.map { JsonPrimitive(it) }))
+                put("UserId", session().userId)
+                put("MediaType", "Audio")
+            }
+            call("/Playlists", method = "POST", body = body.toString())
+        } else call(
             "/Playlists?" + q("Name" to name, "Ids" to songIds.joinToString(",").ifEmpty { null }, "MediaType" to "Audio"),
             method = "POST",
         )
@@ -396,8 +461,13 @@ class EmbyApi(
     }
 
     override suspend fun renamePlaylist(playlistId: String, name: String) {
+        // Jellyfin lets a playlist's owner rename it here; editing the item itself is for admins.
+        if (jellyfin) {
+            call("/Playlists/" + enc(playlistId), method = "POST", body = buildJsonObject { put("Name", name) }.toString())
+            return
+        }
         // Emby updates an item from the whole item, so it's read first and sent back with the new name.
-        val item = call("/Users/{user}/Items/" + enc(playlistId))
+        val item = call(itemPath(playlistId))
         val changed = JsonObject(item + ("Name" to JsonPrimitive(name)))
         call("/Items/" + enc(playlistId), method = "POST", body = changed.toString())
     }
@@ -420,7 +490,7 @@ class EmbyApi(
     // ---- Favourites ----
 
     private suspend fun favourite(id: String, on: Boolean) {
-        call("/Users/{user}/FavoriteItems/" + enc(id), method = if (on) "POST" else "DELETE")
+        call(favouritePath(id), method = if (on) "POST" else "DELETE")
     }
 
     override suspend fun star(id: String) = favourite(id, true)
@@ -443,14 +513,13 @@ class EmbyApi(
 
     override suspend fun scrobble(id: String, submission: Boolean, timeMs: Long?) {
         if (submission) {
-            // Emby reads DatePlayed as yyyyMMddHHmmss (UTC); an ISO date made it answer HTTP 500 (beta #15).
-            val at = embyDate(timeMs ?: System.currentTimeMillis())
+            val at = timeMs ?: System.currentTimeMillis()
             try {
-                call("/Users/{user}/PlayedItems/" + enc(id) + "?" + q("DatePlayed" to at), method = "POST")
+                call(playedPath(id, at), method = "POST")
             } catch (e: ApiException) {
                 // A server that won't take the date still counts the play, as of now.
-                AppLog.w("Server", "Emby refused the play's date ($at); marking it played without it")
-                call("/Users/{user}/PlayedItems/" + enc(id), method = "POST")
+                AppLog.w("Server", "$server refused the play's date; marking it played without it")
+                call(playedPath(id, null), method = "POST")
             }
         } else {
             call("/Sessions/Playing", method = "POST", body = timeline(id, 0, paused = false, event = null))
@@ -469,7 +538,8 @@ class EmbyApi(
     internal fun timeline(id: String, positionMs: Long, paused: Boolean, event: String?): String = buildJsonObject {
         put("ItemId", id)
         // Emby files each play under its media source and a play session; without them it may answer HTTP 400.
-        put("MediaSourceId", "mediasource_$id")
+        // Jellyfin's media source is the song itself.
+        put("MediaSourceId", if (jellyfin) id else "mediasource_$id")
         put("PlaySessionId", playSession(id))
         put("PositionTicks", positionMs.coerceAtLeast(0) * TICKS_PER_MS)
         put("IsPaused", paused)
@@ -581,6 +651,17 @@ class EmbyApi(
             "subrip" -> "srt"
             "webvtt" -> "vtt"
             else -> "txt"
+        }
+
+        /**
+         * Lyrics from Jellyfin's answer (issue #703): `Lyrics` lines with `Text` and, when timed, `Start` in ticks.
+         * Null when there are none.
+         */
+        fun readJellyfinLyrics(o: JsonObject): Lyrics? {
+            val lines = o.arr("Lyrics").map { line -> line.long("Start")?.let { it / TICKS_PER_MS } to line.str("Text").orEmpty().trimEnd() }
+            if (lines.none { it.second.isNotBlank() }) return null
+            val timed = lines.any { it.first != null }
+            return Lyrics(timed, lines.map { (at, text) -> LyricLine(if (timed) at ?: 0L else null, text) })
         }
 
         /** Lyrics from Emby's text: timed when it is LRC or subtitles, else plain lines; null when empty. */

@@ -308,7 +308,7 @@ private fun ServerFields(graph: AppGraph, draft: AppSettings, onChange: (AppSett
     var showProxy by remember { mutableStateOf(draft.proxyUser.isNotBlank()) }
     val kind = draft.sourceKind
     Hint(kind.detail)
-    Field("Server address", draft.navidromeUrl, if (kind == SourceKind.EMBY) "192.168.1.10:8096" else "192.168.1.10:4533") { onChange(draft.copy(navidromeUrl = it)) }
+    Field("Server address", draft.navidromeUrl, if (kind.embyLike) "192.168.1.10:8096" else "192.168.1.10:4533") { onChange(draft.copy(navidromeUrl = it)) }
     Field("Username", draft.navidromeUser, keyboard = KeyboardType.Text) { onChange(draft.copy(navidromeUser = it)) }
     SecretField("Password", draft.navidromePassword) { onChange(draft.copy(navidromePassword = it)) }
     if (showProxy) {
@@ -320,7 +320,7 @@ private fun ServerFields(graph: AppGraph, draft: AppSettings, onChange: (AppSett
     }
     TestRow(result) {
         test(graph, draft, scope, { result = it }) { s ->
-            val server = if (kind == SourceKind.EMBY) EmbyApi(graph.http, { s }) else SubsonicApi(graph.http) { s }
+            val server = if (kind.embyLike) EmbyApi(graph.http, { s }, jellyfin = kind == SourceKind.JELLYFIN) else SubsonicApi(graph.http) { s }
             "Connected to " + server.ping()
         }
     }
@@ -328,7 +328,7 @@ private fun ServerFields(graph: AppGraph, draft: AppSettings, onChange: (AppSett
     Hint("Shown instead of the address, so two logins can be told apart. Leave empty to show the address.")
     Field("Server name in AudioMuse", draft.audioMuseServer, keyboard = KeyboardType.Text) { onChange(draft.copy(audioMuseServer = it)) }
     Hint(
-        if (kind == SourceKind.EMBY) "AudioMuse reads your Emby library for everything smart. If AudioMuse has more than one music server, enter this Emby server's name as it is in AudioMuse."
+        if (kind.embyLike) "AudioMuse reads your ${ServerWords.name(kind)} library for everything smart. If AudioMuse has more than one music server, enter this ${ServerWords.name(kind)} server's name as it is in AudioMuse."
         else "Only if AudioMuse has more than one music server: this server's name as it is in AudioMuse. Leave empty for its main one.",
     )
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
