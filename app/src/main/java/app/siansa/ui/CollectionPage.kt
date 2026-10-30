@@ -126,8 +126,20 @@ fun CollectionPage(
     val scrolled by remember {
         derivedStateOf { if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 100_000f }
     }
-    val progress = (scrolled / coverPx).coerceIn(0f, 1f)
-    val barAlpha = ((scrolled - coverPx * 0.8f) / (coverPx * 0.3f)).coerceIn(0f, 1f)
+    // How far the list can scroll at most, once its end is in view; a short album can't scroll a whole cover's
+    // height, so the fade is stretched to reach its end there (issue #682).
+    val maxScroll by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()
+            if (listState.firstVisibleItemIndex != 0 || last == null || last.index != info.totalItemsCount - 1) null
+            else listState.firstVisibleItemScrollOffset +
+                (last.offset + last.size + info.afterContentPadding - info.viewportEndOffset).coerceAtLeast(0).toFloat()
+        }
+    }
+    val faded = fadeScroll(scrolled, coverPx, maxScroll)
+    val progress = (faded / coverPx).coerceIn(0f, 1f)
+    val barAlpha = ((faded - coverPx * 0.8f) / (coverPx * 0.3f)).coerceIn(0f, 1f)
     val surface = MaterialTheme.colorScheme.surface
     // Albums with several discs get a heading above each disc (its title, or "Disc 2").
     val discs = remember(songs, numbered, discTitles) { if (numbered && songs != null) discHeaders(songs, discTitles) else emptyMap() }
@@ -246,6 +258,21 @@ fun CollectionPage(
 
         FadingTitleBar(nav, title, color, barAlpha, actions)
     }
+}
+
+/** How far the cover fades out entirely: the title bar is solid once the page has scrolled this far. */
+internal const val FULL_FADE = 1.1f
+
+/**
+ * How far along the cover's fade the page is, as a scroll distance: [scrolled] itself, or on a page too short to
+ * scroll [FULL_FADE] covers ([maxScroll], known once its end is in view) stretched so the fade ends with the page
+ * (issue #682). A page that can't scroll at all doesn't fade.
+ */
+internal fun fadeScroll(scrolled: Float, coverPx: Float, maxScroll: Float?): Float {
+    val full = coverPx * FULL_FADE
+    if (maxScroll == null || maxScroll >= full) return scrolled
+    if (maxScroll <= 0f) return 0f
+    return (scrolled * full / maxScroll).coerceAtMost(full)
 }
 
 /**
