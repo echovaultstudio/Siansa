@@ -67,6 +67,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.AppGraph
 import app.siansa.data.Album
+import app.siansa.data.HomeLook
 import app.siansa.data.HomeSection
 import app.siansa.data.Artist
 import app.siansa.data.Mix
@@ -250,6 +251,12 @@ fun HomeScreen(nav: NavController) {
         listState.animateScrollToItem(0)
     }
 
+    // Plays a row of albums (issue #655): the first at once, the next few added as they load.
+    fun playAlbums(label: String, albums: List<Album>) = launch.progressive(
+        label,
+        { graph.source.album(albums.first().id).songs },
+    ) { albums.drop(1).take(PLAY_ALBUMS - 1).flatMap { a -> runCatching { graph.source.album(a.id).songs }.getOrDefault(emptyList()) } }
+
     // The gap between sections, from Arrange Home's spacing slider (#554).
     CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap)) {
     LazyColumn(
@@ -271,8 +278,9 @@ fun HomeScreen(nav: NavController) {
             item(key = "sync") { Card(Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Small)) { SyncPrompt(nav) } }
         }
 
-        // The rest in the order chosen under Arrange Home, without the hidden ones.
+        // The rest in the order chosen under Arrange Home, without the hidden ones, each in its look (issue #655).
         for (section in HomeSection.visible(homeOrder, homeHidden)) {
+            val look = homeSettings.homeLooks[section] ?: HomeLook.AS_IS
             when (section) {
                 HomeSection.QUICK -> {
                     // Quick access, like the top grid in Spotify (issue #271): Liked songs always first, then what
@@ -290,7 +298,12 @@ fun HomeScreen(nav: NavController) {
                             add(Triple("Liked songs", null) { nav.navigate("liked") })
                             quickShortcuts(played, fill, QUICK_COUNT - 1).forEach { r -> add(Triple(r.title, r.cover) { nav.navigate(r.route) }) }
                         }
-                        if (quick.isNotEmpty()) {
+                        if (look != HomeLook.AS_IS) {
+                            HomeLookRow(look, "quick", "Shortcuts", quick.mapIndexed { i, (title, cover, open) ->
+                                val liked = title == "Liked songs" && cover == null
+                                HomeItem("quick-$i", title, coverArt = cover, colors = if (liked) Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(title), open = open)
+                            })
+                        } else if (quick.isNotEmpty()) {
                             Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                                 quick.chunked(2).forEach { row ->
                                     Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
@@ -313,6 +326,15 @@ fun HomeScreen(nav: NavController) {
                     item(key = "today") {
                         val mix = current
                         when {
+                            mix != null && look != HomeLook.AS_IS -> HomeLookRow(
+                                look, "today", "Today's mix",
+                                listOf(HomeItem(mix.id, mix.title, "${mix.songs.size} tracks", mix.songs.firstOrNull()?.coverArt, open = { nav.navigate("mix/${mix.id}") })),
+                                play = {
+                                    graph.mixResume.play(mix)
+                                    graph.scope.launch { graph.recentPlays.note("mix/${mix.id}", mix.title, mix.songs.firstOrNull()?.cover) }
+                                },
+                                songs = mix.songs,
+                            )
                             mix != null -> HeroMix(
                                 mix = mix,
                                 busy = busySelector == "current",
@@ -345,14 +367,30 @@ fun HomeScreen(nav: NavController) {
                 HomeSection.CAROUSEL -> {
                     // Your own mixes for this part of the day, set in Vibes (issue #253): AI mixes, so only with
                     // AudioMuse (issue #486).
-                    if (homeSettings.navidromeReady && aiMixes) item(key = "carousel") { HomeCarousel(nav, aiDown) }
+                    if (homeSettings.navidromeReady && aiMixes) item(key = "carousel") { HomeCarousel(nav, aiDown, look) }
                 }
                 // Audiobookshelf's books and podcasts (issue #521): only with a server set up.
-                HomeSection.BOOKS -> if (homeSettings.booksReady) item(key = "books") { BooksCarousel(nav, podcasts = false) }
-                HomeSection.PODCASTS -> if (homeSettings.booksReady) item(key = "podcasts") { BooksCarousel(nav, podcasts = true) }
+                HomeSection.BOOKS -> if (homeSettings.booksReady) item(key = "books") { BooksCarousel(nav, podcasts = false, look = look) }
+                HomeSection.PODCASTS -> if (homeSettings.booksReady) item(key = "podcasts") { BooksCarousel(nav, podcasts = true, look = look) }
                 HomeSection.MADE_FOR_YOU -> {
                     // Made for you: the vibe for this hour, then mixes from your own listening.
                     item(key = "made") {
+                        // The same tiles as plain items, for the other looks (issue #655).
+                        val made: List<HomeItem> = buildList {
+                            applicable.filter { aiMixes }.forEach { selector ->
+                                val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
+                                add(HomeItem(selector.id, mix?.title ?: "${selector.name} mix", madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make today's mix"),
+                                    mix?.songs?.firstOrNull()?.coverArt, open = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) }))
+                            }
+                            MixGenerator.Personal.entries.filter { kind ->
+                                MixRules.showsPersonalTile(kind, homeSettings.audioMuseReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough)
+                            }.forEach { kind ->
+                                val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
+                                add(HomeItem(kind.id, kind.title, madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make it"),
+                                    mix?.songs?.firstOrNull()?.coverArt, open = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) }))
+                            }
+                            customCards.orEmpty().forEach { card -> add(HomeItem(card.id, card.title, open = { nav.navigate("card/${card.id}") })) }
+                        }
                         val tiles: List<Pair<String, @Composable () -> Unit>> = buildList {
                             // The vibe's mix is an AI mix: only with AudioMuse (issue #486).
                             applicable.filter { aiMixes }.forEach { selector ->
@@ -399,7 +437,8 @@ fun HomeScreen(nav: NavController) {
                                 })
                             }
                         }
-                        Shelf("Made for you", tiles, key = { it.first }) { it.second() }
+                        if (look != HomeLook.AS_IS) HomeLookRow(look, "made", "Made for you", made)
+                        else Shelf("Made for you", tiles, key = { it.first }) { it.second() }
                     }
                 }
                 HomeSection.CARDS -> {
@@ -411,7 +450,11 @@ fun HomeScreen(nav: NavController) {
                 HomeSection.REDISCOVER -> {
                     // Albums you loved a while ago but haven't played since.
                     item(key = "rediscover") {
-                        Shelf("Rediscover", lovedBefore.valueOrNull().orEmpty(), key = { it.album.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Rediscover)) { r ->
+                        val albums = lovedBefore.valueOrNull().orEmpty()
+                        if (look != HomeLook.AS_IS) {
+                            HomeLookRow(look, "rediscover", "Rediscover", albums.map { r -> albumItem(r.album, rediscoverSubtitle(r)) { nav.navigate("album/${r.album.id}") } },
+                                openAll = nav.openAll(app.siansa.ui.HomeSection.Rediscover), play = albums.takeIf { it.isNotEmpty() }?.let { { playAlbums("Rediscover", it.map { r -> r.album }) } })
+                        } else Shelf("Rediscover", lovedBefore.valueOrNull().orEmpty(), key = { it.album.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Rediscover)) { r ->
                             AlbumTile(
                                 name = r.album.name,
                                 subtitle = rediscoverSubtitle(r),
@@ -424,7 +467,11 @@ fun HomeScreen(nav: NavController) {
                 }
                 HomeSection.RADIOS -> {
                     item(key = "radios") {
-                        Shelf("Radios", moodRadios, key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Radios)) { radio ->
+                        if (look != HomeLook.AS_IS) {
+                            HomeLookRow(look, "radios", "Radios", moodRadios.map { radio ->
+                                HomeItem(radio.id, radio.name, colors = Color(radio.colors.first) to Color(radio.colors.second), open = { nav.openMoodRadio(radio.id) })
+                            }, openAll = nav.openAll(app.siansa.ui.HomeSection.Radios))
+                        } else Shelf("Radios", moodRadios, key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Radios)) { radio ->
                             GradientTile(
                                 title = radio.name,
                                 colors = Color(radio.colors.first) to Color(radio.colors.second),
@@ -437,21 +484,35 @@ fun HomeScreen(nav: NavController) {
                 }
                 HomeSection.PLAYLISTS -> {
                     item(key = "playlists") {
-                        Shelf("Your playlists", playlists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Playlists)) { playlist ->
+                        if (look != HomeLook.AS_IS) {
+                            HomeLookRow(look, "playlists", "Your playlists", playlists.valueOrNull().orEmpty().map { p ->
+                                HomeItem(p.id, p.name, if (p.songCount > 0) "${p.songCount} songs" else "", p.coverArt, open = { nav.navigate("playlist/${p.id}") })
+                            }, openAll = nav.openAll(app.siansa.ui.HomeSection.Playlists))
+                        } else Shelf("Your playlists", playlists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Playlists)) { playlist ->
                             PlaylistTile(playlist) { nav.navigate("playlist/${playlist.id}") }
                         }
                     }
                 }
                 HomeSection.RECENT -> {
                     item(key = "recent") {
-                        Shelf("Recently played", recentAlbums.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.RecentlyPlayed)) { album ->
+                        val albums = recentAlbums.valueOrNull().orEmpty()
+                        if (look != HomeLook.AS_IS) {
+                            HomeLookRow(look, "recent", "Recently played", albums.map { a -> albumItem(a, a.artist) { nav.navigate("album/${a.id}") } },
+                                openAll = nav.openAll(app.siansa.ui.HomeSection.RecentlyPlayed), play = albums.takeIf { it.isNotEmpty() }?.let { { playAlbums("Recently played", it) } })
+                        } else Shelf("Recently played", recentAlbums.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.RecentlyPlayed)) { album ->
                             AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
                         }
                     }
                 }
                 HomeSection.ARTIST_RADIOS -> {
                     item(key = "artist_radios") {
-                        Shelf("Artist radios", recentArtists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.ArtistRadios)) { artist ->
+                        if (look != HomeLook.AS_IS) {
+                            HomeLookRow(look, "artist_radios", "Artist radios", recentArtists.valueOrNull().orEmpty().map { artist ->
+                                HomeItem(artist.id, "${artist.name} radio", "With similar artists", freshCovers[artist.id] ?: artist.coverArt, round = true, open = {
+                                    launch.progressive("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
+                                })
+                            }, openAll = nav.openAll(app.siansa.ui.HomeSection.ArtistRadios))
+                        } else Shelf("Artist radios", recentArtists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.ArtistRadios)) { artist ->
                             AlbumTile(
                                 name = "${artist.name} radio",
                                 subtitle = "With similar artists",
@@ -467,14 +528,22 @@ fun HomeScreen(nav: NavController) {
                 }
                 HomeSection.ADDED -> {
                     item(key = "added") {
-                        Shelf("Recently added", newest.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.RecentlyAdded)) { album ->
+                        val albums = newest.valueOrNull().orEmpty()
+                        if (look != HomeLook.AS_IS) {
+                            HomeLookRow(look, "added", "Recently added", albums.map { a -> albumItem(a, a.artist) { nav.navigate("album/${a.id}") } },
+                                openAll = nav.openAll(app.siansa.ui.HomeSection.RecentlyAdded), play = albums.takeIf { it.isNotEmpty() }?.let { { playAlbums("Recently added", it) } })
+                        } else Shelf("Recently added", newest.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.RecentlyAdded)) { album ->
                             AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
                         }
                     }
                 }
                 HomeSection.GENRES -> {
                     item(key = "genres") {
-                        Shelf("Your genres", genres.valueOrNull().orEmpty(), key = { it.name }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Genres)) { genre ->
+                        if (look != HomeLook.AS_IS) {
+                            HomeLookRow(look, "genres", "Your genres", genres.valueOrNull().orEmpty().map { genre ->
+                                HomeItem(genre.name, genre.name, open = { nav.openGenreRadio(genre.name) })
+                            }, openAll = nav.openAll(app.siansa.ui.HomeSection.Genres))
+                        } else Shelf("Your genres", genres.valueOrNull().orEmpty(), key = { it.name }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Genres)) { genre ->
                             GradientTile(
                                 title = genre.name,
                                 colors = tileColors(genre.name),
@@ -487,7 +556,11 @@ fun HomeScreen(nav: NavController) {
                 }
                 HomeSection.RANDOM -> {
                     item(key = "random") {
-                        Shelf("Random picks", rediscover.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.RandomPicks)) { album ->
+                        val albums = rediscover.valueOrNull().orEmpty()
+                        if (look != HomeLook.AS_IS) {
+                            HomeLookRow(look, "random", "Random picks", albums.map { a -> albumItem(a, a.artist) { nav.navigate("album/${a.id}") } },
+                                openAll = nav.openAll(app.siansa.ui.HomeSection.RandomPicks), play = albums.takeIf { it.isNotEmpty() }?.let { { playAlbums("Random picks", it) } })
+                        } else Shelf("Random picks", rediscover.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.RandomPicks)) { album ->
                             AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
                         }
                     }
@@ -506,7 +579,21 @@ fun HomeScreen(nav: NavController) {
         }, onHiddenChange = {
             AppLog.i("Home", "Hidden: ${HomeSection.formatHidden(it).ifEmpty { "none" }}")
             graph.settings.setHomeHidden(it)
-        }, onDismiss = { arranging = false }, startOnSources = true)
+        }, onDismiss = { arranging = false }, startOnSources = true,
+            looks = homeSettings.homeLooks,
+            onLookChange = { section, look ->
+                AppLog.i("Home", "${section.label} looks: ${look.label}")
+                graph.settings.setHomeLook(section, look)
+            },
+            onResetLooks = {
+                AppLog.i("Home", "Every row back in its own look")
+                graph.settings.resetHomeLooks()
+            },
+            onOpenCards = {
+                arranging = false
+                nav.navigate("settings/cards")
+            },
+        )
     }
 }
 
@@ -566,6 +653,12 @@ internal suspend fun artistRadioArtists(graph: AppGraph, count: Int = ArtistRadi
 
 /** Opens a Home row's full list; navigation stays on the main thread (it's called from a tap). */
 private fun NavController.openAll(section: app.siansa.ui.HomeSection): () -> Unit = { navigate(section.route) }
+
+/** An album as an item of a row in another look (issue #655). */
+private fun albumItem(album: Album, subtitle: String, open: () -> Unit) = HomeItem(album.id, album.name, subtitle, album.coverArt, open = open)
+
+/** A row of albums played as one plays this many of them, in order. */
+private const val PLAY_ALBUMS = 10
 
 private fun greeting(): String {
     val hour = LocalTime.now().hour

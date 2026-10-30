@@ -67,7 +67,7 @@ private object CarouselBuilding {
  * another the first time Home shows them each day, each leaving out the songs of the ones before.
  */
 @Composable
-fun HomeCarousel(nav: NavController, aiDown: String?) {
+fun HomeCarousel(nav: NavController, aiDown: String?, look: app.siansa.data.HomeLook = app.siansa.data.HomeLook.AS_IS) {
     val graph = LocalGraph.current
     val launch = rememberPlayLauncher()
     val carousels by graph.carousels.state.collectAsStateWithLifecycle()
@@ -144,6 +144,26 @@ fun HomeCarousel(nav: NavController, aiDown: String?) {
     }
 
     val mixCount = carousel.usable.size
+    if (look != app.siansa.data.HomeLook.AS_IS) {
+        // Another look, picked under Arrange Home (issue #655): the mixes, then the pinned vibes, as items.
+        val items = carousel.usable.indices.map { i ->
+            val mix = made[i]
+            val selector = carousel.selectorFor(i)
+            HomeItem(
+                selector.id, carousel.usable[i].name,
+                when {
+                    mix != null -> "${mix.songs.size} tracks"
+                    selector.id in building -> "Making it…"
+                    else -> carousel.usable[i].sound
+                },
+                mix?.songs?.firstOrNull()?.coverArt, tileColors(selector.id.substringBeforeLast("-v") + i),
+                open = { if (mix != null) nav.navigate("mix/${mix.id}") else make(i, open = true) },
+            )
+        } + pinned.map { vibe -> HomeItem(vibe.id, vibe.shownTitle, "${vibe.songs.size} tracks", vibe.songs.firstOrNull()?.coverArt, open = { nav.navigate("vibe/${vibe.id}") }) }
+        val first = made.firstOrNull()
+        HomeLookRow(look, "carousel", carousel.title, items, play = first?.let { { graph.mixResume.play(it) } }, songs = first?.songs.orEmpty())
+        return
+    }
     val pager = rememberPagerState { mixCount + pinned.size }
     // Nothing under the dots: the next section's gap is the room below, as under every other row on Home (#560).
     Column(Modifier.fillMaxWidth().testTag("homeCarousel")) {

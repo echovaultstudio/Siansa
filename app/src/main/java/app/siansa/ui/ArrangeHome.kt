@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Column
@@ -17,9 +18,12 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DragIndicator
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -49,6 +53,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import app.siansa.data.HomeLook
 import app.siansa.data.HomeSection
 import app.siansa.data.moved
 import app.siansa.data.movesFirstVisible
@@ -71,7 +76,16 @@ fun ArrangeHomeSheet(
     // The gap between Home's sections, a step of the spacing scale (#554).
     gap: Int = AppSettings.HOME_GAP_DEFAULT,
     onGapChange: (Int) -> Unit = {},
+    // Each row's look (issue #655), changed with its cog; Your cards' cog opens Settings › Cards.
+    looks: Map<HomeSection, HomeLook> = emptyMap(),
+    onLookChange: (HomeSection, HomeLook) -> Unit = { _, _ -> },
+    onResetLooks: () -> Unit = {},
+    onOpenCards: () -> Unit = {},
 ) {
+    var picking by remember { mutableStateOf<HomeSection?>(null) }
+    picking?.let { section ->
+        HomeLookDialog(section, looks[section] ?: HomeLook.AS_IS, onPick = { onLookChange(section, it); picking = null }, onDismiss = { picking = null })
+    }
     var sources by remember { mutableStateOf(startOnSources) }
     var items by remember { mutableStateOf(order) }
     var hiddenItems by remember { mutableStateOf(hidden) }
@@ -117,7 +131,7 @@ fun ArrangeHomeSheet(
                 Column(Modifier.weight(1f)) {
                     Text(if (sources) "Source filter" else "Arrange Home", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
-                        if (sources) "Whose music shows, everywhere in the app" else "Hold a row and drag it. Tap the eye to hide it.",
+                        if (sources) "Whose music shows, everywhere in the app" else "Hold a row and drag it. Tap the eye to hide it, the cog to change its look.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -134,8 +148,9 @@ fun ArrangeHomeSheet(
                             onHiddenChange(hiddenItems)
                         }
                         if (gap != AppSettings.HOME_GAP_DEFAULT) onGapChange(AppSettings.HOME_GAP_DEFAULT)
+                        if (looks.isNotEmpty()) onResetLooks()
                     },
-                    enabled = items != HomeSection.default || hiddenItems.isNotEmpty() || gap != AppSettings.HOME_GAP_DEFAULT,
+                    enabled = items != HomeSection.default || hiddenItems.isNotEmpty() || gap != AppSettings.HOME_GAP_DEFAULT || looks.isNotEmpty(),
                 ) { Text("Reset") }
             }
             SheetTabs(sources) { sources = it }
@@ -173,12 +188,27 @@ fun ArrangeHomeSheet(
                     ) {
                         Row(Modifier.height(52.dp).padding(start = Space.Page), verticalAlignment = Alignment.CenterVertically) {
                             // Hidden rows stay in the list, dimmed, so they keep their place and can come back.
-                            Text(
-                                section.label,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f).alpha(if (isHidden) 0.6f else 1f),
-                            )
+                            Column(Modifier.weight(1f).alpha(if (isHidden) 0.6f else 1f)) {
+                                Text(
+                                    section.label,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                                )
+                                // A row in another look says which (issue #655).
+                                looks[section]?.let { look ->
+                                    Text(look.label, style = MaterialTheme.typography.bodySmall, color = Accent, modifier = Modifier.testTag("homeLookLabel"))
+                                }
+                            }
+                            IconButton(
+                                onClick = { if (section.lookable) picking = section else onOpenCards() },
+                                modifier = Modifier.testTag("homeLookCog"),
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Settings,
+                                    contentDescription = if (section.lookable) "Look of ${section.label}" else "Your cards in Settings",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                             IconButton(onClick = {
                                 hiddenItems = if (isHidden) hiddenItems - section else hiddenItems + section
                                 onHiddenChange(hiddenItems)
@@ -212,6 +242,33 @@ fun ArrangeHomeSheet(
             }
         }
     }
+}
+
+/** The looks one of Home's rows can take (issue #655): its own, or one of the custom cards' looks. */
+@Composable
+private fun HomeLookDialog(section: HomeSection, current: HomeLook, onPick: (HomeLook) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(section.label) },
+        text = {
+            Column(Modifier.testTag("homeLookDialog")) {
+                HomeLook.entries.forEach { look ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onPick(look) }.padding(vertical = Space.Small).testTag("homeLook-${look.id}"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = look == current, onClick = { onPick(look) })
+                        Spacer(Modifier.width(Space.Small))
+                        Column(Modifier.weight(1f)) {
+                            Text(look.label, style = MaterialTheme.typography.bodyLarge)
+                            Text(look.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
 }
 
 /**

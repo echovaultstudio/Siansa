@@ -23,6 +23,9 @@ enum class HomeSection(val id: String, val label: String) {
     GENRES("genres", "Your genres"),
     RANDOM("random", "Random picks");
 
+    /** Its look can be changed under Arrange Home (issue #655); Your cards each have their own, in Settings › Cards. */
+    val lookable: Boolean get() = this != CARDS
+
     companion object {
         val default: List<HomeSection> = entries.toList()
 
@@ -56,6 +59,35 @@ enum class HomeSection(val id: String, val label: String) {
 
         /** The sections Home shows: [order] without the [hidden] ones. */
         fun visible(order: List<HomeSection>, hidden: Set<HomeSection>): List<HomeSection> = order.filter { it !in hidden }
+    }
+}
+
+/**
+ * How one of Home's rows looks (issue #655), picked with the cog under Arrange Home: Home's own look, or one of the
+ * custom cards' looks (issue #622). Song tiles and Album row are both a row of covers for Home's rows (their items
+ * are albums, mixes, radios…), so they're one choice here: Tiles.
+ */
+enum class HomeLook(val id: String, val label: String, val hint: String) {
+    AS_IS("as_is", "As it is", "Home's own look for this row"),
+    TILES("tiles", "Tiles", "A row of covers to swipe through"),
+    BANNER("banner", "Banner", "One wide card with the first covers and a button"),
+    LIST("list", "List", "The first five listed, the rest a tap away"),
+    BUTTON("button", "Play button", "A slim card: one tap plays it, or opens it");
+
+    companion object {
+        /** Reads the saved looks ("recent:list,added:banner"); unknown sections and looks are dropped. */
+        fun parse(saved: String?): Map<HomeSection, HomeLook> {
+            if (saved.isNullOrBlank()) return emptyMap()
+            return saved.split(',').mapNotNull { pair ->
+                val (section, look) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                val s = HomeSection.entries.firstOrNull { it.id == section.trim() } ?: return@mapNotNull null
+                val l = entries.firstOrNull { it.id == look.trim() } ?: return@mapNotNull null
+                if (s.lookable && l != AS_IS) s to l else null
+            }.toMap()
+        }
+
+        fun format(looks: Map<HomeSection, HomeLook>): String =
+            HomeSection.entries.mapNotNull { s -> looks[s]?.takeIf { it != AS_IS }?.let { "${s.id}:${it.id}" } }.joinToString(",")
     }
 }
 

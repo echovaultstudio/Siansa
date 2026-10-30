@@ -2,7 +2,22 @@
 
 Home is built from sections you can reorder and hide (**Arrange Home**, from the filter button at the top of Home).
 Its **Spacing** slider sets the gap between every section at once, from Tight to Airy; **Reset** puts the order,
-the hidden sections and the spacing back.
+the hidden sections, the spacing and the looks back.
+
+The **cog** on a section changes its look, to any of the custom cards' looks:
+
+| Look | What it shows |
+|---|---|
+| **As it is** | The section's own look (the default). |
+| **Tiles** | A row of covers to swipe through. |
+| **Banner** | One wide card with the first covers and a button. |
+| **List** | The first five, listed; the title opens the rest. |
+| **Play button** | A slim card: a tap plays the section, or opens it when it can't be played as one. |
+
+A section in another look says which under its name. **Play** in a banner or the play button plays the section:
+today's mix or the carousel's first mix where they left off, or the albums of Rediscover, Recently played, Recently
+added and Random picks in order. Sections of radios, playlists, genres, books and Made for you open instead. **Your
+cards** keep their own looks: their cog opens **Settings › Cards**.
 
 | Section | What it shows |
 |---|---|
