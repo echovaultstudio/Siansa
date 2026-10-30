@@ -3,6 +3,22 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.43.0beta — 2026-10-30
+
+### Fixed
+- Time Machine finds more of your songs in your library: a remastered, mono, single or "feat." version of a song, a title with or without its apostrophe, and "Beatles" for "The Beatles" now count as the same song, on any album, instead of "Not in your library".
+- Search finds names with an apostrophe when you type them without one: "Im looking" finds "I'm Looking Through You", "dont" finds "Don't".
+
+### Added
+- Shape the mix: while a DJ song radio plays, the queue has a choice of Steady vibes, Steady build, Euphoric or Wind down for what the energy does over the next songs, and a Surprises slider for how far the mix may stray. Each change reorders the songs not yet played. The same shape applies to Keep playing in DJ mode.
+- Change the look of any section on Home: in Arrange Home, the cog on a section offers the custom cards' looks (Tiles, Banner, List or Play button) as well as its own. A banner or play button plays the section where it can, such as today's mix or a row of albums. Your cards keep their own looks; their cog opens Settings › Cards.
+- Custom cards can now be built from rules that keep or leave things out: each rule compares a song title, album, artist, genre, record label, release type, year, length, plays, date added, favourite or compilation ("contains", "doesn't contain", "is", "isn't", "at least", "between"…), and a card keeps what matches every rule or any of them. Cards can now list whole albums too, for example every 2024 album on one record label, and be sorted (random each day, newest, recently added, most played, A to Z) with a limit on how many. Cards are made and changed on a page of their own in Settings › Cards; cards made before keep their rules.
+- Mix titles and sound searches can now be written by OpenAI, Anthropic, Google Gemini, Mistral, Groq, Ollama on your own network, or another service with an OpenAI-style API, as well as OpenRouter. Pick one in Settings › Connections › AI.
+
+### Changed
+- Settings › Users and Settings › Connections are now one page, Settings › Connections. Under Servers, each music server login has its own card with its address, login, the name shown in Siansa, its name in AudioMuse-AI and its library sync, followed by Audiobookshelf and Add a music server. Under Services are AudioMuse-AI and AI. Each card folds open with its arrow and starts folded.
+- The loudness target (−18 or −14 LUFS) now also applies when songs are levelled by their ReplayGain tags alone, not only with the Siansa plugin. At −14, tagged songs play 4 dB louder than their tags say, but never louder than the file itself or past their peak. The choice now shows whenever levelling is on.
+
 ## 0.40.0beta — 2026-10-29
 
 ### Added
