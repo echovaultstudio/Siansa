@@ -5,7 +5,7 @@ Source: `app/src/main/java/app/siansa/`. Unit tests: `app/src/test/`. Emulator t
 
 ## Every change
 
-- Build and test before opening a pull request: `gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease :app:bundleRelease`.
+- Build and test before opening a pull request: `gradle :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:assembleRelease :app:bundleRelease`.
   Lint errors fail the build.
 - Add or update unit tests in `app/src/test/` for any logic you change.
 - Add a note file in `changelog.d/` (e.g. `changelog.d/issue-42.md`, see its README) with `### Fixed` /
@@ -48,7 +48,7 @@ implements them and opens a pull request. Labels show where each one is: `claude
   has the fix (`scripts/notify_fixed.py`, issue #433).
 - Describe before and after, and how it was tested.
 - Don't merge: the owner reviews, and CI (`.github/workflows/ci.yml`) must pass. Pull requests run the build,
-  Lint, unit tests and secret scan; emulator tests run after merging to main.
+  Lint, unit tests and secret scan, and compile the emulator tests; emulator tests run after merging to main.
 
 ## Don'ts
 

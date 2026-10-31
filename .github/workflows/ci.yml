@@ -110,7 +110,8 @@ jobs:
 
       # Compiling catches syntax and type errors; unit tests check the app's own logic; Android Lint
       # finds likely crashes, wrong API use and security issues. The release is built twice from the same code:
-      # the APK for GitHub and F-Droid, and the app bundle (.aab) Google Play takes (issue #515).
+      # the APK for GitHub and F-Droid, and the app bundle (.aab) Google Play takes (issue #515). The emulator tests
+      # are compiled too, so a pull request can't break them unseen: they only run after merging (issue #712).
       # The release key from the repository's secrets (public repo since #584): SIGNING_KEYSTORE_BASE64 is the
       # keystore file, base64; the passwords are secrets too. Without them (a fork's pull request) the build is
       # unsigned, which still checks everything but can't be published.
@@ -136,7 +137,7 @@ jobs:
           # Pull requests also compare the screenshot tests' pictures with the approved ones (issue #710). Only there:
           # they're recorded on GitHub's runners (screenshots.yml), and another machine may draw a pixel differently.
           VERIFY=""; [ "$EVENT" = "pull_request" ] && VERIFY="-Proborazzi.test.verify=true"
-          gradle :app:testDebugUnitTest $VERIFY :app:lintDebug :app:assembleRelease :app:bundleRelease --continue --stacktrace 2>&1 | tee gradle-build.txt
+          gradle :app:testDebugUnitTest $VERIFY :app:compileDebugAndroidTestKotlin :app:lintDebug :app:assembleRelease :app:bundleRelease --continue --stacktrace 2>&1 | tee gradle-build.txt
 
       - name: Test and lint results
         if: always()
