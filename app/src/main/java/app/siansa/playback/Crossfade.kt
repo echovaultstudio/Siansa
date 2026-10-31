@@ -196,6 +196,21 @@ object Crossfade {
     /** How long the fade may wait for the tail to get that close (a beat, in a beat-matched blend), before going
      *  ahead anyway. */
     const val HANDOVER_WAIT_MS = 600L
+    /** How long the fade may wait for a tail that is still loading (it just jumped to catch up), before playing on
+     *  without the fade (issue #767). */
+    const val LOADING_WAIT_MS = 1_500L
+
+    /**
+     * Whether the fade, due [untilMs] from now (negative: overdue), waits a moment for the tail (issue #759, #767):
+     * a primed tail that is still loading waits up to [LOADING_WAIT_MS]; one that plays but is [stepMs] apart from
+     * the main player waits up to [waitMs] to get within [HANDOVER_STEP_MS]. Otherwise the fade begins now.
+     */
+    fun waitForTail(primed: Boolean, loading: Boolean, playing: Boolean, untilMs: Long, stepMs: Long, waitMs: Long): Boolean = when {
+        !primed -> false
+        loading -> untilMs > -LOADING_WAIT_MS
+        playing -> untilMs > -waitMs && abs(stepMs) > HANDOVER_STEP_MS
+        else -> false
+    }
 
     /**
      * Why there's no fade between two songs, for the log (issue #355: "No fade" alone didn't say). Null when

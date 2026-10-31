@@ -2,6 +2,7 @@ package app.siansa.playback
 
 import app.siansa.data.Song
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,6 +15,19 @@ class CrossfadeHandoverTest {
 
     private fun profile(id: String, introMs: Int, tailMs: Int) =
         TrackProfile(id, -10.0, listOf(RampPoint(-18, introMs.toLong())), listOf(RampPoint(-18, tailMs.toLong())))
+
+    @Test fun aTailStillLoadingGetsAMomentBeforeTheBlendIsCalledOff() {
+        // Issue #767: the tail jumped to catch up 0.6 s before the blend and was still loading at its start.
+        assertTrue(Crossfade.waitForTail(primed = true, loading = true, playing = false, untilMs = 0, stepMs = 0, waitMs = 428))
+        assertTrue(Crossfade.waitForTail(true, true, false, -1_400, 0, 428))
+        assertFalse(Crossfade.waitForTail(true, true, false, -Crossfade.LOADING_WAIT_MS, 0, 428))  // then on without
+        // Playing but out of step: waits up to a beat, as before (issue #759).
+        assertTrue(Crossfade.waitForTail(true, false, true, -100, 35, 428))
+        assertFalse(Crossfade.waitForTail(true, false, true, -500, 35, 428))
+        assertFalse(Crossfade.waitForTail(true, false, true, 0, 15, 428))  // in step: go
+        // Not primed (a stream that can't play ahead): no wait.
+        assertFalse(Crossfade.waitForTail(false, true, false, 0, 0, 428))
+    }
 
     @Test fun inStepPlaysAtNormalSpeed() {
         assertEquals(1f, Crossfade.tailSpeed(0), 0f)
