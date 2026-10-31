@@ -38,6 +38,8 @@ object BeatMatch {
     const val BEATS_PER_BAR = 4
     /** A blend is this many bars, the longest that fits the crossfade length setting. */
     val BAR_CHOICES = listOf(8, 4, 2, 1)
+    /** The most whole phrases a blend lasts (two 8-bar phrases at 128 BPM is 30 s). */
+    const val MAX_PHRASES = 2
     /** Closer than this, the two songs count as in step. */
     const val IN_STEP_MS = 12L
     /** Further apart than this, the next song jumps into step rather than catching up by speed. */
@@ -72,6 +74,10 @@ object BeatMatch {
         val onBars: Boolean,
         val outgoing: BeatEnd,
         val incoming: BeatEnd,
+        /** Phrase on phrase (issue #757): how many bars a phrase is; null when laid bar on bar or beat on beat. */
+        val phraseBars: Int? = null,
+        /** The end of the song going out that's left out, so it's let go at the end of a phrase (its last part-phrase). */
+        val cutMs: Long = 0L,
     ) {
         /** Where the next song should be (its own ms) when the song going out is at [outgoingMs]. */
         fun incomingAt(outgoingMs: Long): Long = incomingStartMs + ((outgoingMs - startMs) * speed.toDouble()).roundToLong()
@@ -84,8 +90,14 @@ object BeatMatch {
 
         /** For the log: "beat-matched 128.0 → 126.4 BPM (+1.3 %), 7 bars (13.8 s), bar on bar". */
         val why: String
-            get() = "beat-matched %.1f → %.1f BPM (%s %%), %d bar%s (%.1f s), %s".format(
-                java.util.Locale.ROOT, incoming.bpm, outgoing.bpm, shiftPercent, bars, if (bars == 1) "" else "s", overlapMs / 1000.0, if (onBars) "bar on bar" else "beat on beat",
+            get() = "beat-matched %.1f → %.1f BPM (%s %%), %d bar%s (%.1f s), %s%s".format(
+                java.util.Locale.ROOT, incoming.bpm, outgoing.bpm, shiftPercent, bars, if (bars == 1) "" else "s", overlapMs / 1000.0,
+                when {
+                    phraseBars != null -> "phrase on phrase ($phraseBars-bar phrases)"
+                    onBars -> "bar on bar"
+                    else -> "beat on beat"
+                },
+                if (cutMs > 0) ", let go at the end of its last phrase (%.1f s left out)".format(java.util.Locale.ROOT, cutMs / 1000.0) else "",
             )
     }
 
@@ -100,6 +112,7 @@ object BeatMatch {
         if (!outgoing.matchable || !incoming.matchable || endMs <= 0) return null
         val speed = speed(outgoing, incoming) ?: return null
         val bar = outgoing.beatLengthMs * BEATS_PER_BAR
+        phrased(outgoing, incoming, endMs, maxMs, speed, bar)?.let { return it }
         val bars = BAR_CHOICES.firstOrNull { it * bar <= maxMs } ?: return null
         val onBars = outgoing.barMs != null && incoming.barMs != null
         val step = if (onBars) bar else outgoing.beatLengthMs
@@ -113,6 +126,44 @@ object BeatMatch {
         val incomingStart = (if (onBars) incoming.barMs!! else incoming.beatMs).coerceAtLeast(0.0)
         val overlap = endMs - start
         return Plan(start.roundToLong(), overlap.roundToLong(), incomingStart.roundToLong(), speed, floor(overlap / bar).toInt(), onBars, outgoing, incoming)
+    }
+
+    /**
+     * Phrase on phrase (issue #757), as a DJ mixes, when the plugin found the phrases at both ends: the next song's
+     * first phrase starts on a phrase boundary of the song going out, the blend lasts whole phrases (up to
+     * [MAX_PHRASES], as many as [maxMs] allows, or half a phrase of 8 bars when a whole one doesn't fit), and the
+     * song going out is let go at the end of a phrase: a last part-phrase shorter than half a phrase is left out
+     * ([Plan.cutMs]); a longer one plays to the song's end, still on the grid. Null when there are no phrases, or
+     * nothing fits: then bar on bar.
+     */
+    internal fun phrased(outgoing: BeatEnd, incoming: BeatEnd, endMs: Long, maxMs: Long, speed: Float, bar: Double): Plan? {
+        val outPhrase = outgoing.phraseMs ?: return null
+        val inPhrase = incoming.phraseMs ?: return null
+        val inBars = incoming.phraseBars ?: return null
+        // The longer phrase of the two is the unit, so both songs' phrases end together (8-bar ones are two 4-bar).
+        val phraseBars = maxOf(outgoing.phraseBars ?: return null, inBars)
+        if (outPhrase < 0) return null
+        val phrase = phraseBars * bar
+        val slack = outgoing.beatLengthMs  // a blend may run a beat over the setting, as the bar plan does
+        // The last phrase boundary of the song going out, and what's after it.
+        val last = outPhrase + floor((endMs - outPhrase) / phrase) * phrase
+        if (last <= 0) return null
+        val rest = endMs - last
+        val cut = if (rest < phrase / 2) rest else 0.0
+        val blendEnd = endMs - cut
+        // Whole phrases before [last], plus the rest when it's kept; the most that fit.
+        val lengths = ArrayList<Pair<Double, Double>>()  // start, overlap
+        for (k in MAX_PHRASES downTo (if (cut > 0) 1 else 0)) {
+            val overlap = k * phrase + (blendEnd - last)
+            if (overlap <= maxMs + slack && overlap >= bar) lengths += (last - k * phrase) to overlap
+        }
+        // Half a phrase of 8 bars, when not even one fits (a short crossfade setting).
+        if (lengths.isEmpty() && cut > 0 && phraseBars == 8 && 4 * bar <= maxMs + slack) lengths += (last - 4 * bar) to 4 * bar
+        val (start, overlap) = lengths.firstOrNull { it.first > 0 } ?: return null
+        return Plan(
+            start.roundToLong(), overlap.roundToLong(), inPhrase.coerceAtLeast(0.0).roundToLong(), speed,
+            floor(overlap / bar).toInt(), onBars = true, outgoing, incoming, phraseBars = phraseBars, cutMs = cut.roundToLong(),
+        )
     }
 
     /**

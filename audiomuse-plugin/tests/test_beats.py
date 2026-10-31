@@ -14,8 +14,10 @@ def kick(freq=55.0, seconds=0.12):
     return np.sin(2 * np.pi * freq * np.arange(n) / RATE) * np.exp(-np.arange(n) / (0.03 * RATE))
 
 
-def drums(bpm, seconds=30.0, first=0.3, accent=True, noise=0.0, drift=0.0, seed=1):
-    """A kick on every beat (louder on the first of four with ``accent``), a hat on every other one."""
+def drums(bpm, seconds=30.0, first=0.3, accent=True, noise=0.0, drift=0.0, seed=1, phrase=0, phrase_from=0):
+    """A kick on every beat (louder on the first of four with ``accent``), a hat on every other one. With
+    ``phrase`` (bars), every other phrase from bar ``phrase_from`` adds a sustained chord, as a song's parts come
+    and go: the phrases start where the chord comes in or drops out."""
     rng = np.random.default_rng(seed)
     x = rng.normal(0, noise, int(seconds * RATE)) if noise else np.zeros(int(seconds * RATE))
     t, k = first, 0
@@ -27,6 +29,12 @@ def drums(bpm, seconds=30.0, first=0.3, accent=True, noise=0.0, drift=0.0, seed=
         if k % 2 == 1:
             hat = rng.normal(0, 0.1, 2000) * np.exp(-np.arange(2000) / 400)
             x[s:s + 2000] += hat[:x.size - s]
+        bar = k // 4
+        if phrase and k % 4 == 0 and bar >= phrase_from and ((bar - phrase_from) // phrase) % 2 == 1:
+            n = int(period * 4 * RATE)  # the chord held over the whole bar
+            tt = np.arange(n) / RATE
+            chord = 0.15 * (np.sin(2 * np.pi * 330 * tt) + np.sin(2 * np.pi * 415 * tt) + np.sin(2 * np.pi * 494 * tt))
+            x[s:s + n] += chord[:x.size - s]
         t += period
         k += 1
     return x.astype(np.float32)
@@ -48,6 +56,48 @@ class GridTest(unittest.TestCase):
         self.assertIsNotNone(g.bar_ms)
         off = (g.bar_ms - 300) % 1875  # bars are 4 × 468.75 ms from 300 ms
         self.assertAlmostEqual(min(off, 1875 - off), 0, delta=15)
+
+    def test_the_phrase_is_where_the_parts_come_and_go(self):
+        # 8-bar phrases from bar 2 (a 2-bar pickup): at 128 BPM a bar is 1875 ms, a phrase 15 s.
+        g = beats.grid(drums(128.0, 60.0, first=0.3, phrase=8, phrase_from=2), 0, from_end=True)
+        self.assertEqual(g.phrase_bars, 8)
+        off = (g.phrase_ms - 300 - 2 * 1875) % 15_000
+        self.assertAlmostEqual(min(off, 15_000 - off), 0, delta=20)
+        self.assertGreater(g.phrase_ms, 60_000 - 15_000 - 100)  # the last phrase start
+        # From the start: the first phrase starts at the first bar unless the music says a later one (within a phrase).
+        g = beats.grid(drums(128.0, 40.0, first=0.3, phrase=8, phrase_from=2), 0)
+        self.assertEqual(g.phrase_bars, 8)
+        self.assertAlmostEqual(g.phrase_ms, 300 + 2 * 1875, delta=20)
+        # Without any change from bar to bar there's no phrase to report, only the bars.
+        g = beats.grid(drums(128.0, 60.0), 0, from_end=True)
+        self.assertIsNotNone(g.bar_ms)
+        self.assertIsNone(g.phrase_ms)
+
+    def test_drums_that_vary_hit_to_hit_have_bars_but_no_phrase(self):
+        # Every hit a little louder or softer, as a drummer plays: the bars are still clear, and nothing from bar to
+        # bar says "phrase", so none is reported (a false phrase would cut a song's ending).
+        rng = np.random.default_rng(5)
+        for bpm in (90.0, 128.0):
+            x = np.zeros(60 * RATE)
+            t, k = 0.3, 0
+            while t < 60:
+                s = int(t * RATE)
+                hit = kick() * (1.0 if k % 4 == 0 else 0.6) * rng.uniform(0.8, 1.2)
+                x[s:s + hit.size] += hit[:x.size - s]
+                t += 60 / bpm
+                k += 1
+            g = beats.grid(x.astype(np.float32), 0, from_end=True)
+            self.assertIsNotNone(g.bar_ms, bpm)
+            self.assertIsNone(g.phrase_ms, bpm)
+        # A kick on every beat with no accent: no bar to find either.
+        self.assertIsNone(beats.grid(drums(128.0, accent=False), 0).bar_ms)
+
+    def test_an_intros_phrase_starts_at_the_first_bar_or_a_short_pickup(self):
+        # The parts change from bar 6 on: too far in for a pickup, so the first phrase is the first downbeat the
+        # grid has (the very first kick, at 300 ms, comes before the tracker locks on: bar 1 at 2175 ms).
+        g = beats.grid(drums(128.0, 40.0, first=0.3, phrase=8, phrase_from=6), 0)
+        self.assertEqual(g.phrase_bars, 8)
+        self.assertAlmostEqual(g.phrase_ms, 300 + 1875, delta=20)
 
     def test_an_offset_and_the_end_of_a_stretch(self):
         g = beats.grid(drums(128.0), 5000, from_end=True)
@@ -82,8 +132,8 @@ class EndsTest(unittest.TestCase):
         song[42 * RATE:67 * RATE] = drums(100.0, 25.0, first=0.0, seed=2)
         m = loudness.measure_array(np.vstack([song, song]), RATE)
         self.assertEqual(m.head.size, 40 * RATE)
-        self.assertEqual(m.tail.size, 40 * RATE)
-        self.assertEqual(m.tail_offset, 30 * RATE)
+        self.assertEqual(m.tail.size, 70 * RATE)
+        self.assertEqual(m.tail_offset, 0)
         intro, outro = m.beat_grids()
         self.assertAlmostEqual(intro.bpm, 120.0, delta=0.1)
         off = (intro.beat_ms - 1200) % 500
@@ -95,6 +145,20 @@ class EndsTest(unittest.TestCase):
         fields = jobs.profile_of(m)["beats"]
         self.assertEqual(fields["intro_bpm"], round(intro.bpm, 2))
         self.assertIn("outro_beat_ms", fields)
+
+    def test_the_outros_phrase_comes_from_the_last_minute_when_its_the_same_grid(self):
+        # 8-bar phrases at 128 over the last 65 s (4 phrases), after 20 s at another tempo: the 30 s grid gives the
+        # tempo, the minute the phrase; the part at 100 BPM doesn't get in the way.
+        song = np.concatenate([drums(100.0, 20.0, seed=3), drums(128.0, 65.0, first=0.0, phrase=8, seed=4)])
+        m = loudness.measure_array(np.vstack([song, song]), RATE)
+        intro, outro = m.beat_grids()
+        self.assertAlmostEqual(outro.bpm, 128.0, delta=0.1)
+        self.assertEqual(outro.phrase_bars, 8)
+        off = (outro.phrase_ms - 20_000) % 15_000
+        self.assertAlmostEqual(min(off, 15_000 - off), 0, delta=25)
+        fields = jobs.profile_of(m)["beats"]
+        self.assertEqual(fields["outro_phrase_bars"], 8)
+        self.assertNotIn("intro_phrase_ms", fields)  # the 100 BPM start has no phrase structure
 
     def test_a_song_without_a_beat_has_no_grid_fields(self):
         t = np.arange(40 * RATE) / RATE

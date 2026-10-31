@@ -59,7 +59,12 @@ It needs AudioMuse-AI 3.6.4 or later and works on the standalone builds too.
 Until a song is measured, Siansa uses its ReplayGain tags, and crossfades use the fixed length.
 
 Plugin 0.3.0 also measures the beat grid at each end of a song (tempo, where the beats and bars fall, how
-beat-driven and how steady the end is), for [beat-matched blends](playback.md#beat-matched-blends-experimental).
+beat-driven and how steady the end is), for [beat-matched blends](playback.md#beat-matched-blends-experimental);
+0.4.0 finds the phrases too (which bar of every 4 or 8 starts one, from where the parts of the song come in or
+drop out, read over the song's last minute and its first 40 s), so blends go phrase on phrase. A song whose bars
+don't change from one to the next gets no phrase, and blends bar on bar; so does one whose last minute changes
+tempo. The downbeat is found more surely too: by the kick and by what changes over a whole bar. Updating to 0.4.0 measures every
+song's beat grid again in the background; until a song's turn comes, its blends go bar on bar as before.
 Songs measured by an older version keep their loudness and fades and are measured again for their beats. The
 plugin's settings page (0.3.1) has a **Beat grids** section for that: how many songs have their grids and how many
 are waiting, its own **Songs per run** (any number, since a round stops when its time is up; 0 to measure them

@@ -18,7 +18,7 @@ ANALYZER_VERSION = 1
 # The beat grids (Siansa issue #646) have a version of their own: a profile measured before them keeps its
 # loudness and ramps (so levelling and SmoothFade go on working) and is measured again, in the background, for
 # its beats. Raise this to measure every song's beats again.
-BEATS_VERSION = 1
+BEATS_VERSION = 2  # 2: the phrases (Siansa issue #757)
 RETRY_HOURS = (1, 6, 24, 72)  # wait after the 1st, 2nd, 3rd, later failure
 
 

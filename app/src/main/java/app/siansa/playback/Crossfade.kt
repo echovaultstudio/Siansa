@@ -125,7 +125,8 @@ object Crossfade {
         // Beat-matched (issue #646): a DJ blend over whole bars, beat on beat, when both ends have a steady beat.
         val matched = if (rhythmic && beatMatch && currentDurationMs > 0) BeatMatch.plan(outro!!, intro!!, currentDurationMs - cut, maxMs) else null
         var plan = if (matched != null) {
-            FadePlan(matched.overlapMs, matched.overlapMs, matched.why, cut, matched)
+            // A phrase-on-phrase blend may let the song go at the end of its last phrase (issue #757).
+            FadePlan(matched.overlapMs, matched.overlapMs, matched.why, cut + matched.cutMs, matched)
         } else if (mode == CrossfadeMode.SMART && currentProfile != null && nextProfile != null) {
             val tail = ((currentProfile.quietForLastMs(QUIET_DB) ?: 0L) - cut).coerceAtLeast(0L)
             val head = nextProfile.reachesAfterMs(QUIET_DB) ?: 0L
@@ -156,6 +157,9 @@ object Crossfade {
             val dropped = plan.beat != null
             plan = plan.copy(
                 overlapMs = overlap, fadeInMs = min(plan.fadeInMs, overlap).coerceAtLeast(MIN_FADE_IN_MS), beat = null,
+                // A phrase plan's cut (its last part-phrase) goes with it: without the plan it would only lose the ending.
+                cutMs = if (dropped) cut else plan.cutMs,
+                why = if (dropped) "smart: a third of the shorter song" + (cutWhy?.let { " · $it" } ?: "") else plan.why,
                 beatNote = if (dropped) "${plan.beatNote} · not beat-matched: the blend would be over a third of a song" else plan.beatNote,
             )
         }

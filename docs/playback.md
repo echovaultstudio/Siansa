@@ -74,11 +74,16 @@ plugin. Two songs that both keep a beat can clash at the changeover when their b
 like a bad DJ set. With the plugin 0.3.0, which measures the beat grid at each end of every song, Siansa can blend
 them the way a DJ mixes:
 
-- **DJ radio** (the default): in DJ radio and DJ keep-playing, a song that keeps a beat blends into the next one bar
-  for bar. The blend starts on a bar of the song going out, the next song starts on its first downbeat, and it
-  plays a touch faster or slower (up to 8 %, pitch kept) so its beats keep time with the old song's. Afterwards it
-  eases back to its own speed over about 25 seconds, too slowly to hear. The blend is as many whole bars as fit the
-  crossfade length.
+- **DJ radio** (the default): in DJ radio and DJ keep-playing, a song that keeps a beat blends into the next one the
+  way a DJ mixes. With plugin 0.4.0, which also finds the phrases (the 4 or 8 bars a song is built from), the
+  blend goes **phrase on phrase**: it starts where a phrase of the song going out starts, the next song comes in on
+  its first phrase, it lasts whole phrases (one or two, as the crossfade length allows: an 8-bar phrase at 128 BPM
+  is 15 s, so 16 s or more gives a whole one; shorter settings get half a phrase), and the song going out is let go
+  at the end of a phrase: a short last part-phrase (less than half a phrase) isn't played, so both songs' phrases
+  end together. Without phrases, the blend starts on a bar of the song going out, the next song starts on its first
+  downbeat, and the blend is as many whole bars as fit. Either way the next song plays a touch faster or slower (up
+  to 8 %, pitch kept) so its beats keep time with the old song's, then eases back to its own speed over about 25
+  seconds, too slowly to hear.
 - **Everywhere**: the same in every smart crossfade.
 - **Off**: fades don't follow the beat.
 
