@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -165,6 +166,7 @@ private fun HomeList(title: String, items: List<HomeItem>, open: () -> Unit) {
 private fun HomeButton(id: String, title: String, items: List<HomeItem>, open: () -> Unit, play: (() -> Unit)?, songs: List<Song>) {
     val colors = tileColors(id)
     val playback = if (play != null && songs.isNotEmpty()) rememberListPlayback(songs) else ListPlayback.IDLE
+    // The card opens the section; only the play badge plays (or pauses) it, and there's no arrow (issue #730).
     Row(
         Modifier
             .padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current)
@@ -172,32 +174,51 @@ private fun HomeButton(id: String, title: String, items: List<HomeItem>, open: (
             .height(64.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .clickable { if (play != null) playback.press(play) else open() }
+            .clickable(onClickLabel = "Open $title", onClick = open)
             .testTag("homeLookButton"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(64.dp).background(Brush.linearGradient(listOf(colors.first, colors.second))), contentAlignment = Alignment.Center) {
-            Icon(
-                when {
-                    play == null -> Icons.Rounded.ChevronRight
-                    playback.playing -> Icons.Rounded.Pause
-                    else -> Icons.Rounded.PlayArrow
-                },
-                null, tint = Color.White, modifier = Modifier.size(32.dp),
-            )
-        }
+        PlayBadge(colors, playing = playback.playing, title = title, onPlay = play?.let { p -> { playback.press(p) } }, tag = "homeLookButtonPlay")
         Column(Modifier.weight(1f).padding(horizontal = Space.Medium)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(homeButtonCaption(play != null, playback.playing, items.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (play != null) IconButton(onClick = open) { Icon(Icons.Rounded.ChevronRight, "Open $title") }
     }
 }
 
-/** What the slim card says under its title. */
+/**
+ * The coloured square at the start of a play button card (issue #730): ▶ (⏸ while its songs play) that plays or pauses
+ * them when tapped. Without [onPlay] it's only an arrow, and a tap goes to the card, which opens.
+ */
+@Composable
+internal fun PlayBadge(colors: Pair<Color, Color>, playing: Boolean, title: String, onPlay: (() -> Unit)?, tag: String) {
+    Box(
+        Modifier
+            .size(64.dp)
+            .background(Brush.linearGradient(listOf(colors.first, colors.second)))
+            .then(if (onPlay != null) Modifier.clickable(onClickLabel = if (playing) "Pause $title" else "Play $title", role = Role.Button, onClick = onPlay).testTag(tag) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            when {
+                onPlay == null -> Icons.Rounded.ChevronRight
+                playing -> Icons.Rounded.Pause
+                else -> Icons.Rounded.PlayArrow
+            },
+            when {
+                onPlay == null -> null
+                playing -> "Pause $title"
+                else -> "Play $title"
+            },
+            tint = Color.White, modifier = Modifier.size(32.dp),
+        )
+    }
+}
+
+/** What the slim card says under its title: the card opens, the ▶ plays. */
 internal fun homeButtonCaption(plays: Boolean, playing: Boolean, count: Int): String = when {
-    playing -> "Playing · tap to pause"
-    plays -> "Tap to play"
+    playing -> "Playing"
+    plays -> "Press play, or tap to open"
     else -> "Tap to open · $count"
 }
 

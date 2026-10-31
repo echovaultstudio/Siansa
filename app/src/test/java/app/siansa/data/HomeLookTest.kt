@@ -33,8 +33,15 @@ class HomeLookTest {
     }
 
     @Test fun theSlimCardSaysWhatATapDoes() {
-        assertEquals("Tap to play", homeButtonCaption(plays = true, playing = false, count = 12))
-        assertEquals("Playing · tap to pause", homeButtonCaption(plays = true, playing = true, count = 12))
+        // The card opens; only its ▶ plays (issue #730).
+        assertEquals("Press play, or tap to open", homeButtonCaption(plays = true, playing = false, count = 12))
+        assertEquals("Playing", homeButtonCaption(plays = true, playing = true, count = 12))
         assertEquals("Tap to open · 12", homeButtonCaption(plays = false, playing = false, count = 12))
+    }
+
+    @Test fun aCustomPlayButtonCardSaysItsSongs() {
+        assertEquals("24 songs", app.siansa.ui.pinnedButtonCaption(playing = false, count = "24 songs"))
+        assertEquals("Playing · 24 songs", app.siansa.ui.pinnedButtonCaption(playing = true, count = "24 songs"))
+        assertEquals("Tap to open", app.siansa.ui.pinnedButtonCaption(playing = false, count = null))
     }
 }

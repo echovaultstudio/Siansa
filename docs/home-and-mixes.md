@@ -12,9 +12,9 @@ The **cog** on a section changes its look, to any of the custom cards' looks:
 | **Tiles** | A row of covers to swipe through. |
 | **Banner** | One wide card with the first covers and a button. |
 | **List** | The first five, listed; the title opens the rest. |
-| **Play button** | A slim card: a tap plays the section, or opens it when it can't be played as one. |
+| **Play button** | A slim card: its ▶ plays the section; a tap anywhere else on the card opens it. |
 
-A section in another look says which under its name. **Play** in a banner or the play button plays the section:
+A section in another look says which under its name. **Play** in a banner or the ▶ of a play button card plays the section:
 today's mix or the carousel's first mix where they left off, or the albums of Rediscover, Recently played, Recently
 added and Random picks in order. Sections of radios, playlists, genres, books and Made for you open instead. **Your
 cards** keep their own looks: their cog opens **Settings › Cards**.
@@ -126,11 +126,11 @@ on a page of its own:
   added, most played (a song's own plays first), or A to Z; and **How many, at most** (up to 500).
 - **Look on Home**: **Song tiles** (a row of covers; for an album card, **Album tiles**), **Album row** (the albums
   the songs come from), **Banner** (one wide card with the first covers and Play and Shuffle), **Song list** (the
-  first five; for an album card, **Album list**) and **Play button** (a slim card: one tap plays it).
+  first five; for an album card, **Album list**) and **Play button** (a slim card: its ▶ plays it, the rest opens it).
 
 A card made before rules keeps working: its genre, years, artist, album, words and favourites become rules the
-first time you change it. A random card's page has a button for a new set right away. Tap a card's title (or the
-arrow on a play button) for everything on it, ready to play or save as a playlist. A card can be kept but taken off
+first time you change it. A random card's page has a button for a new set right away. Tap a card's title (or a play button card
+anywhere but its ▶) for everything on it, ready to play or save as a playlist. A card can be kept but taken off
 Home with its switch in Settings.
 
 ## Radios
