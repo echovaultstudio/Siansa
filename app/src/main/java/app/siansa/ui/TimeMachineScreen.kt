@@ -137,7 +137,7 @@ private fun TimeMachinePage(nav: NavController) {
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Brand.Plum)) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item {
                 ListeningHeader(nav, "Time machine", "How you listened, any month or year.") {

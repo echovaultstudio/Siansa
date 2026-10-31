@@ -16,6 +16,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -202,6 +203,23 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             },
             // Settings › Style (issue #681).
             Scene("style_top_bar") { TopBarChoice(TopBarStyle.BLACK) {} },
+            // Themes › Pages and cards (issue #761): grey, warm, blue grey and the theme's own, with long labels.
+            Scene("themes_pages_and_cards") {
+                val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+                Box(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.SurfaceSwatches(app.siansa.ui.SurfaceColour.GREY, themeOwn = app.siansa.ui.themeScheme(app.siansa.ui.ThemeColours.SIANSA, dark, surfaces = app.siansa.ui.SurfaceColour.THEME), dark = dark, onPick = {})
+                }
+            },
+            // Grey cards on a grey page (issue #761): what Home's tiles and a menu sheet sit on now.
+            Scene("grey_cards") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    listOf(MaterialTheme.colorScheme.surfaceContainerLow, MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.surfaceContainerHighest).forEach { c ->
+                        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c).padding(Space.Page)) {
+                            Text("Unbelievably long playlistname", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+            },
             // Arrange Home's spacing ("Compact", issue #694).
             Scene("arrange_spacing") { SpacingRow(gap = 1) {} },
             // A list to rearrange (Nav Bar, Mini Player; issue #701).

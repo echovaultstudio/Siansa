@@ -213,7 +213,7 @@ private fun DiscoveryPage(nav: NavController) {
         suggestions to counts
     }
     var open by remember { mutableStateOf<SuggestedArtist?>(null) }
-    Box(Modifier.fillMaxSize().background(Brand.Plum)) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item { ListeningHeader(nav, "Other artists you might like", "Like the artists you play most. New ones each day.") }
             item {

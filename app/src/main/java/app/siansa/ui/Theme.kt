@@ -83,6 +83,46 @@ enum class SelectionColour(val label: String, val argb: Long? = null) {
     }
 }
 
+/**
+ * The colour of pages, cards, sheets and menus (issue #761): neutral grey by default, like Spotify, instead of the
+ * theme's tinted backgrounds (Siansa's were plum). [hue] and [saturation] tint the greys a touch; [THEME] keeps the
+ * theme's own.
+ */
+enum class SurfaceColour(val label: String, val hue: Float = 0f, val saturation: Float = 0f) {
+    GREY("Grey"),
+    WARM("Warm grey", hue = 30f, saturation = 0.09f),
+    COOL("Blue grey", hue = 215f, saturation = 0.12f),
+    THEME("Match theme");
+
+    companion object {
+        fun parse(value: String?): SurfaceColour = entries.firstOrNull { it.name == value } ?: GREY
+    }
+}
+
+/**
+ * [this] with its pages and cards in [surfaces] greys (issue #761): the background, the containers from lowest to
+ * highest, the variant and outlines, and the text on them. [SurfaceColour.THEME] leaves it as it is.
+ */
+internal fun ColorScheme.withSurfaces(surfaces: SurfaceColour, dark: Boolean): ColorScheme {
+    if (surfaces == SurfaceColour.THEME) return this
+    fun tone(lightness: Float) = Color.hsl(surfaces.hue, surfaces.saturation, lightness)
+    return if (dark) copy(
+        background = tone(0.07f), surface = tone(0.07f), surfaceDim = tone(0.07f),
+        surfaceContainerLowest = tone(0.04f), surfaceContainerLow = tone(0.095f), surfaceContainer = tone(0.12f),
+        surfaceContainerHigh = tone(0.155f), surfaceContainerHighest = tone(0.2f), surfaceBright = tone(0.2f),
+        surfaceVariant = tone(0.155f), onBackground = tone(0.95f), onSurface = tone(0.95f), onSurfaceVariant = tone(0.7f),
+        outline = tone(0.45f), outlineVariant = tone(0.24f), inverseSurface = tone(0.92f), inverseOnSurface = tone(0.12f),
+        surfaceTint = Color.Transparent,
+    ) else copy(
+        background = tone(0.99f), surface = tone(0.99f), surfaceBright = tone(0.99f),
+        surfaceContainerLowest = Color.White, surfaceContainerLow = tone(0.965f), surfaceContainer = tone(0.945f),
+        surfaceContainerHigh = tone(0.925f), surfaceContainerHighest = tone(0.895f), surfaceDim = tone(0.88f),
+        surfaceVariant = tone(0.925f), onBackground = tone(0.1f), onSurface = tone(0.1f), onSurfaceVariant = tone(0.36f),
+        outline = tone(0.55f), outlineVariant = tone(0.82f), inverseSurface = tone(0.18f), inverseOnSurface = tone(0.94f),
+        surfaceTint = Color.Transparent,
+    )
+}
+
 /** Whether [c] is (nearly) grey: its channels hardly differ. */
 internal fun isGreyish(c: Color): Boolean = maxOf(c.red, c.green, c.blue) - minOf(c.red, c.green, c.blue) < 0.12f
 
@@ -148,6 +188,8 @@ data class ThemeChoice(
     val seed: Int = app.siansa.data.DEFAULT_THEME_SEED,
     /** The accent colour (issues #313, #404). */
     val selection: SelectionColour = SelectionColour.DEFAULT,
+    /** Pages, cards, sheets and menus (issue #761). */
+    val surfaces: SurfaceColour = SurfaceColour.GREY,
 )
 
 /** Filled selected items (chips, the current tab): the accent colour exactly as picked in Themes (issue #404). */
@@ -257,7 +299,13 @@ private fun ThemeTones.Roles.toScheme(dark: Boolean): ColorScheme {
 
 /** The colours for [colours] in light or [dark]; pure black only applies to dark. [seed] is used for "Your colour". */
 @Composable
-fun themeScheme(colours: ThemeColours, dark: Boolean, pureBlack: Boolean = false, seed: Int = LocalChoice.current.seed): ColorScheme {
+fun themeScheme(
+    colours: ThemeColours,
+    dark: Boolean,
+    pureBlack: Boolean = false,
+    seed: Int = LocalChoice.current.seed,
+    surfaces: SurfaceColour = LocalChoice.current.surfaces,
+): ColorScheme {
     val context = LocalContext.current
     val base = when {
         colours == ThemeColours.YOURS -> remember(seed, dark) { ThemeTones.scheme(seed, dark, mono = ThemeTones.isGrey(seed)).toScheme(dark) }
@@ -269,7 +317,8 @@ fun themeScheme(colours: ThemeColours, dark: Boolean, pureBlack: Boolean = false
         }
         else -> if (dark) SiansaDark else SiansaLight
     }
-    return if (dark && pureBlack) base.onBlack() else base
+    val toned = base.withSurfaces(surfaces, dark)
+    return if (dark && pureBlack) toned.onBlack() else toned
 }
 
 /** The accent of [colours]: Siansa keeps its bright amber in light and dark, the others use their main colour. */
@@ -289,11 +338,11 @@ fun isDark(choice: ThemeChoice): Boolean = when (choice.mode) {
 @Composable
 fun SiansaTheme(choice: ThemeChoice = ThemeChoice(), content: @Composable () -> Unit) {
     val dark = isDark(choice)
-    val plain = themeScheme(choice.colours, dark, choice.pureBlack, choice.seed)
+    val plain = themeScheme(choice.colours, dark, choice.pureBlack, choice.seed, choice.surfaces)
     val fill = selectionColourOf(choice.selection, accentOf(choice.colours, plain), dark)
     val scheme = plain.withSelection(fill)
     val accent = accentFor(fill, plain.surface)
-    val darkPlain = if (dark) plain else themeScheme(choice.colours, true, choice.pureBlack, choice.seed)
+    val darkPlain = if (dark) plain else themeScheme(choice.colours, true, choice.pureBlack, choice.seed, choice.surfaces)
     val darkScheme = darkPlain.withSelection(selectionColourOf(choice.selection, accentOf(choice.colours, darkPlain), true))
     CompositionLocalProvider(
         LocalChoice provides choice,
@@ -310,7 +359,7 @@ fun SiansaTheme(choice: ThemeChoice = ThemeChoice(), content: @Composable () -> 
 @Composable
 fun SiansaDarkTheme(content: @Composable () -> Unit) {
     val choice = LocalChoice.current
-    val plain = themeScheme(choice.colours, true, seed = choice.seed)
+    val plain = themeScheme(choice.colours, true, seed = choice.seed, surfaces = choice.surfaces)
     val fill = selectionColourOf(choice.selection, accentOf(choice.colours, plain), true)
     val scheme = plain.withSelection(fill)
     val accent = accentFor(fill, plain.surface)
@@ -339,4 +388,5 @@ fun themeChoiceOf(settings: app.siansa.data.AppSettings): ThemeChoice = ThemeCho
     pureBlack = settings.pureBlack,
     seed = settings.themeSeed,
     selection = SelectionColour.parse(settings.themeSelection),
+    surfaces = SurfaceColour.parse(settings.surfaceColour),
 )

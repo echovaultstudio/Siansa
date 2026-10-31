@@ -338,7 +338,7 @@ internal data class DiscBand(val start: Color, val text: Color)
  */
 internal fun discBand(cover: Color, dark: Boolean): DiscBand {
     val start = if (dark) lerp(cover, Color.Black, 0.6f) else lerp(cover, Color.White, 0.75f)
-    val text = if (start.luminance() > 0.3f) Color(0xFF1A1426) else Color.White
+    val text = if (start.luminance() > 0.3f) Color(0xFF1A1A1A) else Color.White
     return DiscBand(start.copy(alpha = 1f), text)
 }
 
