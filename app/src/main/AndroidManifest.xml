@@ -6,6 +6,8 @@
     <!-- Finding DLNA TVs and speakers on the Wi-Fi (their answers arrive by multicast). -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- The echo at the end of a beat-matched blend: a reverb on the phone's output mix (issue #759). -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Swipe to queue vibrates. -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

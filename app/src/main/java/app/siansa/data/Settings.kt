@@ -156,6 +156,10 @@ data class AppSettings(
     val crossfadeSeconds: Int = DEFAULT_CROSSFADE_SECONDS,
     /** Where smart crossfades are beat-matched like a DJ's (issue #646, experimental): off, DJ radio, everywhere. */
     val beatMatch: BeatMatchMode = BeatMatchMode.DJ_RADIO,
+    /** The old song rings out in a hall over the last bar of a beat-matched blend (issue #759). */
+    val echoTail: Boolean = true,
+    /** How many bars a beat-matched blend aims at, apart from the crossfade length (issue #759). */
+    val blendBars: Int = DEFAULT_BLEND_BARS,
     /** The shape of a DJ mix (issue #649): what the energy does over the next songs. */
     val mixShape: MixShape = MixShape.STEADY,
     /** How far a DJ mix may stray from the last song, 0 (close neighbours only) to 100 (adventurous). */
@@ -222,7 +226,11 @@ data class AppSettings(
         const val DEFAULT_CROSSFADE_SECONDS = 6
         /** A DJ mix strays a little by default (issue #649). */
         const val DEFAULT_MIX_SURPRISE = 20
-        val CROSSFADE_SECONDS = 1..12
+        /** Up to 30 s for long, slow fades (issue #759; it was 12). Beat-matched blends have their own length in bars. */
+        val CROSSFADE_SECONDS = 1..30
+        /** A beat-matched blend's length: 8 bars is about 15 s at 128 BPM (issue #759). */
+        const val DEFAULT_BLEND_BARS = 8
+        val BLEND_BAR_CHOICES = listOf(4, 8, 16)
         const val DEFAULT_WIND_DOWN_SONGS = 20
         val WIND_DOWN_CHOICES = listOf(10, 20, 30)
     }
@@ -383,6 +391,9 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .takeIf { it in AppSettings.WIND_DOWN_CHOICES } ?: AppSettings.DEFAULT_WIND_DOWN_SONGS,
         crossfadeSeconds = prefs.getInt("crossfade_s", AppSettings.DEFAULT_CROSSFADE_SECONDS).coerceIn(AppSettings.CROSSFADE_SECONDS),
         beatMatch = BeatMatchMode.parse(prefs.getString("beat_match", null)),
+        echoTail = prefs.getBoolean("echo_tail", true),
+        blendBars = prefs.getInt("blend_bars", AppSettings.DEFAULT_BLEND_BARS)
+            .takeIf { it in AppSettings.BLEND_BAR_CHOICES } ?: AppSettings.DEFAULT_BLEND_BARS,
         mixShape = MixShape.parse(prefs.getString("mix_shape", null)),
         mixSurprise = prefs.getInt("mix_surprise", AppSettings.DEFAULT_MIX_SURPRISE).coerceIn(0, 100),
     )
@@ -630,6 +641,17 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setBeatMatch(mode: BeatMatchMode) {
         prefs.edit().putString("beat_match", mode.name).apply()
         _state.value = _state.value.copy(beatMatch = mode)
+    }
+
+    fun setBlendBars(bars: Int) {
+        val length = bars.takeIf { it in AppSettings.BLEND_BAR_CHOICES } ?: AppSettings.DEFAULT_BLEND_BARS
+        prefs.edit().putInt("blend_bars", length).apply()
+        _state.value = _state.value.copy(blendBars = length)
+    }
+
+    fun setEchoTail(on: Boolean) {
+        prefs.edit().putBoolean("echo_tail", on).apply()
+        _state.value = _state.value.copy(echoTail = on)
     }
 
     /** The shape and surprise of a DJ mix (issue #649). */

@@ -123,6 +123,21 @@ class SpacingSettingsTest : SpacingCheck() {
         assertEven("Beat-match chips", chips.top - heading.bottom, hint.top - chips.bottom)
     }
 
+    /** Beat-matched blends (issue #759): the 4 / 8 / 16 bars chips sit evenly between "Blend length" and their hint. */
+    @Test fun blendLengthChipsAreEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                Column(verticalArrangement = Arrangement.spacedBy(app.siansa.ui.CROSSFADE_GAP)) {
+                    app.siansa.ui.BeatMatchSection(app.siansa.playback.BeatMatchMode.DJ_RADIO, 8, true, { }, { }, { })
+                }
+            }
+        }
+        val label = compose.onNodeWithText("Blend length").getBoundsInRoot()
+        val chips = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("8 bars")), useUnmergedTree = true).getBoundsInRoot()
+        val hint = compose.onNode(hasText("Apart from the crossfade length", substring = true)).getBoundsInRoot()
+        assertEven("Blend length chips", chips.top - label.bottom, hint.top - chips.bottom)
+    }
+
     /** Style › Phone's top bar (issue #681): its chips sit evenly between the heading and the hint. */
     @Test fun topBarChipsAreEvenlySpaced() {
         compose.setContent {

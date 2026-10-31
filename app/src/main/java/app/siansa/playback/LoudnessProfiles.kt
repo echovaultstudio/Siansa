@@ -51,6 +51,12 @@ data class BeatEnd(
     /** A beat-driven, steady end: one a blend can be laid on, beat for beat. */
     val matchable: Boolean get() = bpm > 0 && rhythm >= BeatMatch.MIN_RHYTHM && steady >= BeatMatch.MIN_STEADY
 
+    /**
+     * As the start of the next song (issue #759): a quiet build-up that keeps a steady beat with clear bars can be
+     * laid on the old song's beats too, so when its drums come in they're in step; it needn't be beat-driven yet.
+     */
+    val matchableAsIntro: Boolean get() = matchable || (bpm > 0 && steady >= BeatMatch.MIN_STEADY && barMs != null)
+
     /** For the log (issue #744): "128.0 BPM, beat 0.82, steady 0.91, bars found". */
     fun describe(): String = "%.1f BPM, beat %.2f, steady %.2f, %s".format(
         java.util.Locale.ROOT, bpm, rhythm, steady,

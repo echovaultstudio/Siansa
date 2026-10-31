@@ -40,6 +40,9 @@ import app.siansa.ui.HomeItem
 import app.siansa.ui.HomeLookRow
 import app.siansa.ui.MixShapeControls
 import app.siansa.ui.ProgressCard
+import app.siansa.playback.BeatMatchMode
+import app.siansa.ui.BeatMatchSection
+import app.siansa.ui.CROSSFADE_GAP
 import app.siansa.ui.RuleCard
 import app.siansa.ui.SiansaTheme
 import app.siansa.ui.SourceCardForTest
@@ -236,6 +239,10 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         DlnaDevice("uuid:jbl", "JBL BAR 800MK2", null, "http://speaker/transport", null, formats = setOf("audio/mpeg", "audio/flac", "audio/wav")),
                     )
                 }
+            },
+            // Beat-matched blends with the echo switch (issue #759).
+            Scene("crossfade_beat_match") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP)) { BeatMatchSection(BeatMatchMode.DJ_RADIO, bars = 8, echo = true, onMode = {}, onBars = {}, onEcho = {}) }
             },
             // Custom card editor: a rule (issue #663).
             Scene("card_rule") {

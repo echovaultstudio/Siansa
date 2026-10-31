@@ -112,6 +112,7 @@ object Crossfade {
         currentProfile: TrackProfile? = null,
         nextProfile: TrackProfile? = null,
         beatMatch: Boolean = false,
+        blendBars: Int = BeatMatch.BAR_CHOICES[1],
     ): FadePlan? {
         if (mode == CrossfadeMode.OFF || maxMs <= 0) return null
         if (mode == CrossfadeMode.SMART && runsStraightOn(current, next)) return null
@@ -122,8 +123,10 @@ object Crossfade {
         val outro = currentProfile?.outro
         val intro = nextProfile?.intro
         val rhythmic = mode == CrossfadeMode.SMART && BeatMatch.bothRhythmic(outro, intro)
-        // Beat-matched (issue #646): a DJ blend over whole bars, beat on beat, when both ends have a steady beat.
-        val matched = if (rhythmic && beatMatch && currentDurationMs > 0) BeatMatch.plan(outro!!, intro!!, currentDurationMs - cut, maxMs) else null
+        // Beat-matched (issue #646): a DJ blend over whole bars, beat on beat, when both ends have a steady beat;
+        // a quiet, steady intro with clear bars is laid on the beat too (issue #759), but doesn't count as a clash.
+        val matchable = mode == CrossfadeMode.SMART && outro?.matchable == true && intro?.matchableAsIntro == true
+        val matched = if (matchable && beatMatch && currentDurationMs > 0) BeatMatch.plan(outro!!, intro!!, currentDurationMs - cut, BeatMatch.maxMsFor(outro, blendBars)) else null
         var plan = if (matched != null) {
             // A phrase-on-phrase blend may let the song go at the end of its last phrase (issue #757).
             FadePlan(matched.overlapMs, matched.overlapMs, matched.why, cut + matched.cutMs, matched)
@@ -143,7 +146,7 @@ object Crossfade {
         }
         if (mode == CrossfadeMode.SMART && (outro != null || intro != null)) {
             val note = BeatMatch.note(outro, intro, beatMatch)
-            plan = plan.copy(beatNote = if (matched == null && rhythmic && beatMatch && !note.contains("not beat-matched")) "$note · not beat-matched: not even one bar fits the crossfade length" else note)
+            plan = plan.copy(beatNote = if (matched == null && matchable && beatMatch && !note.contains("not beat-matched")) "$note · not beat-matched: not even one bar fits before the song's end" else note)
         }
         // Leaving out the end always needs a blend, however short, or the song would stop dead.
         if (cut > 0 && plan.overlapMs < MIN_OVERLAP_MS) plan = plan.copy(overlapMs = MIN_OVERLAP_MS, fadeInMs = MIN_FADE_IN_MS)
@@ -187,6 +190,12 @@ object Crossfade {
 
     /** Closer than this, the tail and the main player count as in step. */
     const val IN_STEP_MS = 10L
+    /** The tail may take the song over when it's this close to the main player: further apart, the two copies
+     *  played together for the handover would sound like one through a comb (issue #759). */
+    const val HANDOVER_STEP_MS = 20L
+    /** How long the fade may wait for the tail to get that close (a beat, in a beat-matched blend), before going
+     *  ahead anyway. */
+    const val HANDOVER_WAIT_MS = 600L
 
     /**
      * Why there's no fade between two songs, for the log (issue #355: "No fade" alone didn't say). Null when
@@ -212,7 +221,7 @@ object Crossfade {
             val unmatched = when {
                 !beatMatch || !BeatMatch.bothRhythmic(outro, intro) -> null
                 BeatMatch.speed(outro!!, intro!!) == null -> "; no beat-matching: %.1f and %.1f BPM are too far apart".format(java.util.Locale.ROOT, outro.bpm, intro.bpm)
-                else -> "; no beat-matching: not even one bar fits the crossfade length"
+                else -> "; no beat-matching: not even one bar fits before the song's end"
             }
             if (tail + head < MIN_OVERLAP_MS && silence < MIN_SILENCE_MS) "a hard ending into a quick start (${tail} ms quiet tail + ${head} ms intro), played back to back${unmatched ?: ""}" else null
         }

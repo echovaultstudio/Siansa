@@ -35,20 +35,22 @@ class BeatMatchTest {
     }
 
     @Test fun theBlendStartsOnABarAndCoversWholeBars() {
-        // The song ends at 310 s; 8 bars (15 s) fit a 16 s setting: the blend starts on the first downbeat at or
-        // after 310 - 15 = 295 s on the bar grid from 300 s (bars are 1.875 s): 296.25 s, 7 whole bars of blend.
+        // The song ends at 310 s; 8 bars (15 s) fit a 16 s setting: the blend starts on the last downbeat at or
+        // before 310 - 15 = 295 s on the bar grid from 300 s (bars are 1.875 s): 294.375 s, 8 whole bars and a
+        // part-bar, since 15.6 s still fits (issue #759; it used to start a bar later and lose one).
         val plan = BeatMatch.plan(outro, intro, endMs = 310_000, maxMs = 16_000)!!
-        assertEquals(296_250L, plan.startMs)
-        assertEquals(13_750L, plan.overlapMs)
-        assertEquals(7, plan.bars)
+        assertEquals(294_375L, plan.startMs)
+        assertEquals(15_625L, plan.overlapMs)
+        assertEquals(8, plan.bars)
         assertTrue(plan.onBars)
         assertEquals(1_000L, plan.incomingStartMs)  // the next song comes in on its first downbeat
         assertEquals(128.0 / 126.0, plan.speed.toDouble(), 1e-5)
-        assertEquals("beat-matched 126.0 → 128.0 BPM (+1.6 %), 7 bars (13.8 s), bar on bar", plan.why)
+        assertEquals("beat-matched 126.0 → 128.0 BPM (+1.6 %), 8 bars (15.6 s), bar on bar", plan.why)
     }
 
     @Test fun aShorterSettingTakesFewerBarsAndBeatsStandInForUnclearBars() {
-        // Aimed at 4, 2 and 1 bars; the start moves to the next downbeat, so up to one bar less is blended.
+        // Aimed at 4, 2 and 1 bars; when the downbeat before doesn't fit the setting, the start moves to the next
+        // one, so up to one bar less is blended.
         assertTrue(BeatMatch.plan(outro, intro, 310_000, 8_000)!!.overlapMs in 7_500 - 1_875..7_500L)
         assertTrue(BeatMatch.plan(outro, intro, 310_000, 4_000)!!.overlapMs in 3_750 - 1_875..3_750L)
         assertTrue(BeatMatch.plan(outro, intro, 310_000, 2_000)!!.overlapMs in 469..1_875L)
@@ -57,7 +59,7 @@ class BeatMatchTest {
         assertFalse(beats.onBars)
         val onGrid = (beats.startMs - 300_000) / 468.75
         assertEquals(onGrid, Math.rint(onGrid), 0.01)  // on the beat grid, within a ms
-        assertTrue(beats.overlapMs in 15_000 - 469..15_000)
+        assertTrue(beats.overlapMs in 15_000..15_000 + 469)
         assertEquals(1_000L, beats.incomingStartMs)
         assertTrue(beats.why.endsWith("beat on beat"))
     }
@@ -73,8 +75,11 @@ class BeatMatchTest {
 
     @Test fun nudgesAreTinyAndEasingIsAStraightLineBack() {
         assertEquals(1f, BeatMatch.nudge(5))
-        assertEquals(0.98f, BeatMatch.nudge(40), 1e-4f)  // ahead: slower
-        assertEquals(1.02f, BeatMatch.nudge(-40), 1e-4f)
+        assertEquals(0.98f, BeatMatch.nudge(20), 1e-4f)  // ahead: slower
+        assertEquals(1.02f, BeatMatch.nudge(-20), 1e-4f)
+        // Never more than 3 %: 90 ms out of step is made up in about 3 s, which can't be heard (issue #759).
+        assertEquals(0.97f, BeatMatch.nudge(90), 1e-4f)
+        assertEquals(1.03f, BeatMatch.nudge(-200), 1e-4f)
         assertEquals(1.016f, BeatMatch.eased(1.016f, 0), 1e-5f)
         assertEquals(1.008f, BeatMatch.eased(1.016f, BeatMatch.EASE_MS / 2), 1e-5f)
         assertEquals(1f, BeatMatch.eased(1.016f, BeatMatch.EASE_MS + 1), 1e-5f)
@@ -104,6 +109,24 @@ class BeatMatchTest {
         assertTrue(plan.why, plan.why.startsWith("beat-matched"))
         // A hard ending into a quick start, which smart mode alone plays back to back, still gets the DJ blend.
         assertNull(Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 310_000, 300_000, profile("a", outro, null), profile("b", null, intro)))
+    }
+
+    @Test fun aBlendHasItsOwnLengthInBarsApartFromTheCrossfadeLength() {
+        val next = song.copy(id = "b", albumId = "al2")
+        val bar = outro.beatLengthMs * BeatMatch.BEATS_PER_BAR
+        // A 6 s crossfade length doesn't shorten an 8-bar blend (issue #759), and 4 or 16 bars give those.
+        for (bars in listOf(4, 8, 16)) {
+            val plan = Crossfade.plan(CrossfadeMode.SMART, 6_000, song, next, 310_000, 300_000,
+                profile("a", outro, null), profile("b", null, intro), beatMatch = true, blendBars = bars)!!
+            assertEquals("$bars bars", bars, plan.beat!!.bars)
+            assertTrue(plan.why, plan.overlapMs in (bars * bar).toLong()..(bars * bar + bar).toLong())
+        }
+        assertTrue(BeatMatch.maxMsFor(outro, 8) in (8 * bar + bar - outro.beatLengthMs).toLong()..(9 * bar).toLong())
+        // An ordinary fade still keeps to the crossfade length.
+        val plain = Crossfade.plan(CrossfadeMode.SMART, 6_000, song, next, 310_000, 300_000,
+            profile("a", null, null, quietTailMs = 6_000), profile("b", null, null, headMs = 8_000), beatMatch = true, blendBars = 16)!!
+        assertNull(plain.beat)
+        assertTrue(plain.why, plain.overlapMs <= 6_000L)
     }
 
     @Test fun twoBeatsThatCantBeMatchedGetAShortBlendNotALongClash() {
@@ -151,7 +174,8 @@ class BeatMatchTest {
         assertEquals("out: 128.0 BPM, beat 0.90, steady 0.90, bars found, no phrases · in: 126.0 BPM, beat 0.90, steady 0.90, bars found, no phrases", matched)
         assertTrue(BeatMatch.note(null, intro, true).endsWith("not beat-matched: the plugin hasn't measured the beat at the end of the song going out"))
         assertTrue(BeatMatch.note(outro, null, true).endsWith("not beat-matched: the plugin hasn't measured the beat at the start of the next song"))
-        assertTrue(BeatMatch.note(outro, pad, true).endsWith("not beat-matched: the start of the next song isn't beat-driven and steady enough"))
+        // The pad is steady but has no bars: steady alone isn't enough for a quiet intro to be laid on the beat.
+        assertTrue(BeatMatch.note(outro, pad, true).endsWith("not beat-matched: the start of the next song isn't beat-driven and steady enough (steady, but its bars aren't clear)"))
         assertTrue(BeatMatch.note(pad, intro, true).endsWith("not beat-matched: the end of the song going out isn't beat-driven and steady enough"))
         assertTrue(BeatMatch.note(outro, intro.copy(bpm = 110.0), true).endsWith("not beat-matched: 128.0 and 110.0 BPM are too far apart"))
         assertTrue(BeatMatch.note(outro, intro, applies = false).endsWith("not beat-matched: beat-matching is set for DJ radio only"))
@@ -169,6 +193,37 @@ class BeatMatchTest {
         assertTrue(elsewhere.beatNote!!, elsewhere.beatNote!!.endsWith("beat-matching is set for DJ radio only"))
         // Fixed crossfades don't look at beats at all.
         assertNull(Crossfade.plan(CrossfadeMode.FIXED, 16_000, song, next, 310_000, 300_000, a, b)!!.beatNote)
+    }
+
+    @Test fun oneReadingOffDoesntMoveTheSong() {
+        // The position arrives in pieces: one reading 90 ms off, the next back in step. The middle of the last
+        // five decides, so a lone reading can't start a jump (issue #759).
+        val s = BeatMatch.SmoothedError()
+        assertNull(s.add(4)); assertNull(s.add(-6)); assertNull(s.add(91)); assertNull(s.add(2))
+        assertEquals(2L, s.add(-3))
+        assertEquals(2L, s.add(95))
+        assertEquals(91L, s.add(93))   // three of the last five say it really is off
+    }
+
+    @Test fun wholeBarsForgiveATenthOfABeat() {
+        assertEquals(4, BeatMatch.wholeBars(7_679.0, 1_920.0))  // 125 BPM: 4 bars, not 3.99
+        assertEquals(3, BeatMatch.wholeBars(7_600.0, 1_920.0))
+    }
+
+    @Test fun aQuietSteadyIntroWithClearBarsCanBeLaidOnTheBeat() {
+        val quiet = intro.copy(rhythm = 0.1f, steady = 0.8f)
+        assertTrue(quiet.matchableAsIntro)
+        assertFalse(quiet.copy(barMs = null).matchableAsIntro)
+        assertFalse(quiet.copy(steady = 0.3f).matchableAsIntro)
+        assertNotNull(BeatMatch.plan(outro, quiet, 310_000, 16_000))
+        // Not a clash, though: without beat-matching, a drum outro into a quiet build-up keeps the long smart blend.
+        assertFalse(BeatMatch.bothRhythmic(outro, quiet))
+        val next = song.copy(id = "b", albumId = "al2")
+        val plain = Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 310_000, 300_000, profile("a", outro, null, quietTailMs = 6_000), profile("b", null, quiet, headMs = 8_000), beatMatch = false)!!
+        assertEquals(14_000L, plain.overlapMs)
+        assertNotNull(Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 310_000, 300_000, profile("a", outro, null, quietTailMs = 6_000), profile("b", null, quiet, headMs = 8_000), beatMatch = true)!!.beat)
+        assertTrue(BeatMatch.note(outro, quiet.copy(barMs = null), true).endsWith("(steady, but its bars aren't clear)"))
+        assertTrue(BeatMatch.note(outro, quiet.copy(steady = 0.3f), true).endsWith("isn't beat-driven and steady enough"))
     }
 
     @Test fun keepingInStepIsMeasured() {
@@ -221,7 +276,7 @@ class BeatMatchTest {
     @Test fun withoutPhrasesAtBothEndsItsBarOnBar() {
         assertNull(BeatMatch.plan(phrasedOutro, intro, 310_000, 16_000)!!.phraseBars)
         assertNull(BeatMatch.plan(outro, phrasedIntro, 310_000, 16_000)!!.phraseBars)
-        assertEquals(296_250L, BeatMatch.plan(outro, phrasedIntro, 310_000, 16_000)!!.startMs)
+        assertEquals(294_375L, BeatMatch.plan(outro, phrasedIntro, 310_000, 16_000)!!.startMs)  // the bar plan: 8 whole bars and a part-bar
     }
 
     @Test fun aSmartPlanLetsTheSongGoAtTheEndOfItsLastPhrase() {
