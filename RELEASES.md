@@ -3,6 +3,13 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.45.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.45.0beta) — 2026-10-31
+
+- [#754](https://github.com/echovaultstudio/Siansa/pull/754) Showcase: audiobooks and podcasts, four years of listening, and the website's animations (@Th3K1ngP1n)
+- [#758](https://github.com/echovaultstudio/Siansa/pull/758) DJ radio: blends phrase on phrase, like a DJ (plugin 0.4.0) (@Th3K1ngP1n)
+- [#760](https://github.com/echovaultstudio/Siansa/pull/760) DJ blends: no jumps once heard, the handover in step, an echo at the end, crossfades up to 30 s (@Th3K1ngP1n)
+- [#766](https://github.com/echovaultstudio/Siansa/pull/766) Plugin 0.4.1: the settings page says where the rounds are and keeps itself current (@Th3K1ngP1n)
+
 ## [0.44.2beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.44.2beta) — 2026-10-31
 
 - [#743](https://github.com/echovaultstudio/Siansa/pull/743) Showcase screenshots: the app on the emulator with a made-up library (@Th3K1ngP1n)
