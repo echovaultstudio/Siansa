@@ -73,6 +73,32 @@ class GridTest(unittest.TestCase):
         self.assertIsNotNone(g.bar_ms)
         self.assertIsNone(g.phrase_ms)
 
+    def test_drums_that_vary_hit_to_hit_have_bars_but_no_phrase(self):
+        # Every hit a little louder or softer, as a drummer plays: the bars are still clear, and nothing from bar to
+        # bar says "phrase", so none is reported (a false phrase would cut a song's ending).
+        rng = np.random.default_rng(5)
+        for bpm in (90.0, 128.0):
+            x = np.zeros(60 * RATE)
+            t, k = 0.3, 0
+            while t < 60:
+                s = int(t * RATE)
+                hit = kick() * (1.0 if k % 4 == 0 else 0.6) * rng.uniform(0.8, 1.2)
+                x[s:s + hit.size] += hit[:x.size - s]
+                t += 60 / bpm
+                k += 1
+            g = beats.grid(x.astype(np.float32), 0, from_end=True)
+            self.assertIsNotNone(g.bar_ms, bpm)
+            self.assertIsNone(g.phrase_ms, bpm)
+        # A kick on every beat with no accent: no bar to find either.
+        self.assertIsNone(beats.grid(drums(128.0, accent=False), 0).bar_ms)
+
+    def test_an_intros_phrase_starts_at_the_first_bar_or_a_short_pickup(self):
+        # The parts change from bar 6 on: too far in for a pickup, so the first phrase is the first downbeat the
+        # grid has (the very first kick, at 300 ms, comes before the tracker locks on: bar 1 at 2175 ms).
+        g = beats.grid(drums(128.0, 40.0, first=0.3, phrase=8, phrase_from=6), 0)
+        self.assertEqual(g.phrase_bars, 8)
+        self.assertAlmostEqual(g.phrase_ms, 300 + 1875, delta=20)
+
     def test_an_offset_and_the_end_of_a_stretch(self):
         g = beats.grid(drums(128.0), 5000, from_end=True)
         self.assertAlmostEqual(g.bpm, 128.0, delta=0.05)

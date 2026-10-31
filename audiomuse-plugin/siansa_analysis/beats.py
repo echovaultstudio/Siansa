@@ -30,8 +30,9 @@ import math
 
 import numpy as np
 
-SECONDS = 30.0  # of the start of the song
-OUTRO_SECONDS = 60.0  # of its end: a few phrases, so the phrase can be found (8 bars at 90 BPM is 21 s)
+SECONDS = 30.0  # of each end of the song, for the beat grid
+INTRO_SECONDS = 40.0  # of its start, for the phrase (all that's kept: loudness.KEEP_SECONDS)
+OUTRO_SECONDS = 60.0  # of its end, for the phrase: a few phrases, so the pattern shows (8 bars at 90 BPM is 21 s)
 RATE = 48_000  # the samples are at this rate (loudness.RATE)
 FRAME = 1024
 HOP = 480  # 10 ms at 48 kHz: 100 frames a second
@@ -44,8 +45,12 @@ SILENT_DB = -48.0  # below this (relative to the song) the end is dead air, trim
 BEATS_PER_BAR = 4
 ONSET_FLOOR = 0.5  # the onset strength beats must have, on average, to count as a rhythm at all
 BAR_CONFIDENCE = 0.5  # below this the bars aren't clear and only the beats are reported
+CHANGE_WEIGHT = 3.0  # a change of the spectrum over a bar, against the sound's level, next to a kick's weight of 1
 PHRASE_BARS = (8, 4)  # the phrase lengths tried, the usual one first
-PHRASE_CONFIDENCE = 0.35  # below this the phrases aren't clear and only the bars are reported
+PHRASE_CONFIDENCE = 0.45  # below this the phrases aren't clear and only the bars are reported
+PHRASE_SAMPLES = 3  # phrases a stretch must hold for a length to be tried: two is a coin toss on most music
+INTRO_PHRASE_SAMPLES = 2  # the start is shorter, and only its first phrase start matters, not the length
+PICKUP_BARS = 2  # an intro's first phrase may start this many bars in (a pickup), else at the first downbeat
 DEBUG = False
 
 
@@ -203,6 +208,21 @@ def fit_line(times_ms):
     return float(period), float(first), float(np.sqrt(np.mean(residual ** 2)))
 
 
+def spectral_change(bands, frames, window, overall=False):
+    """How much the sound changes at each of ``frames``: the mean spectrum of the ``window`` frames after it against
+    the ``window`` before (``overall``: only how much sound there is). A frame whose windows run past the stretch's
+    ends gets the others' median, so a short window at the edge (against nothing) can't stand out."""
+    change = np.full(frames.size, np.nan)
+    for i, f in enumerate(frames):
+        if f - window < 0 or f + window > bands.shape[0]:
+            continue
+        before, after = bands[f - window:f], bands[f:f + window]
+        change[i] = abs(after.mean() - before.mean()) if overall else np.abs(after.mean(axis=0) - before.mean(axis=0)).mean()
+    whole = change[~np.isnan(change)]
+    fill = float(np.median(whole)) if whole.size else 0.0
+    return np.where(np.isnan(change), fill, change)
+
+
 def at_frames(values, frames, reach=2):
     """``values`` at each of ``frames``, the most within ``reach`` frames either side: a beat falls between two 10 ms
     frames, and reading one frame caught more or less of a kick's rise from beat to beat."""
@@ -218,15 +238,14 @@ def downbeat(beats, low, bands, per_bar=BEATS_PER_BAR):
     if beats.size < per_bar * 2:
         return 0, 0.0
     frames = np.clip(np.round(beats).astype(int), 0, bands.shape[0] - 1)
-    change = np.zeros(frames.size)
-    for i, f in enumerate(frames):
-        before = bands[max(0, f - 20):f]
-        after = bands[f:f + 20]
-        if before.size and after.size:
-            change[i] = np.abs(after.mean(axis=0) - before.mean(axis=0)).mean()
+    # What changes over a bar: the sound of the bar after this beat against the bar before it. A bar's worth, not
+    # a few frames: a hat or a snare on some beats makes every other beat "change" too, and that's not a downbeat.
+    bar_frames = max(1, int(round(np.median(np.diff(frames)) * per_bar))) if frames.size > 1 else 1
+    change = spectral_change(bands, frames, bar_frames)
     lowness = at_frames(low, frames)
-    # The kick counts double: it's what makes a downbeat in most music; the spectrum changing says the rest.
-    score = 2 * lowness / (lowness.mean() + 1e-9) + change / (change.mean() + 1e-9)
+    # The change against the sound's own level, not against its mean: when nothing changes from bar to bar the
+    # term is near zero everywhere (not noise blown up to 1), and the kicks decide.
+    score = lowness / (lowness.mean() + 1e-9) + CHANGE_WEIGHT * change / (bands.mean() + 1e-9)
     totals = np.array([score[p::per_bar].mean() for p in range(per_bar)])
     order = np.argsort(totals)[::-1]
     best, second = totals[order[0]], totals[order[1]]
@@ -235,27 +254,24 @@ def downbeat(beats, low, bands, per_bar=BEATS_PER_BAR):
     return int(order[0]), confidence
 
 
-def phrase(beats, phase, low, bands, onset, per_bar=BEATS_PER_BAR, choices=PHRASE_BARS):
+def phrase(beats, phase, low, bands, onset, per_bar=BEATS_PER_BAR, choices=PHRASE_BARS, samples=PHRASE_SAMPLES):
     """``(bars, offset, confidence)``: how many bars a phrase is and which bar (counted from the first downbeat
     ``phase``) starts one, from the bar starts on which the sound changes most: what comes in or drops out over the
-    bar, the low end, and how much is going on. ``bars`` is ``None`` when the phrases aren't clear."""
+    bar, the low end, and how much is going on. A length is only tried when the stretch holds ``samples`` phrases
+    of it. ``bars`` is ``None`` when the phrases aren't clear."""
     starts = np.arange(phase, beats.size, per_bar)
-    if starts.size < 2 * min(choices):
+    if starts.size < samples * min(choices):
         return None, 0, 0.0
     frames = np.clip(np.round(beats[starts]).astype(int), 0, bands.shape[0] - 1)
     bar_frames = int(round(np.median(np.diff(frames)))) if frames.size > 1 else 1
-    score = np.zeros(frames.size)
-    for i, f in enumerate(frames):
-        before = bands[max(0, f - bar_frames):f]
-        after = bands[f:f + bar_frames]
-        if before.size and after.size:
-            # A change in what plays (the spectrum over the whole bar), and more or less sound overall.
-            score[i] = np.abs(after.mean(axis=0) - before.mean(axis=0)).mean() + abs(after.mean() - before.mean())
+    # A change in what plays (the spectrum over the whole bar), and more or less sound overall.
+    change = spectral_change(bands, frames, bar_frames) + spectral_change(bands, frames, bar_frames, overall=True)
+    score = CHANGE_WEIGHT * change / (bands.mean() + 1e-9)
     lowness, hits = at_frames(low, frames), at_frames(onset, frames)
     score += lowness / (lowness.mean() + 1e-9) * 0.5 + hits / (hits.mean() + 1e-9) * 0.5
     best = (None, 0, 0.0)
     for bars in choices:
-        if starts.size < 2 * bars:
+        if starts.size < samples * bars:
             continue
         totals = np.array([score[p::bars].mean() for p in range(bars)])
         order = np.argsort(totals)[::-1]
@@ -302,15 +318,16 @@ def grid(samples, offset_ms, rate=RATE, from_end=False):
         # The downbeat nearest the reference beat, on the bar grid from ``phase``.
         k_bar = phase + BEATS_PER_BAR * round((k_ref - phase) / BEATS_PER_BAR)
         bar_ms = offset_ms + first + period * k_bar
-        bars, offset, sure = phrase(exact, phase, low, bands, onset)
+        bars, offset, sure = phrase(exact, phase, low, bands, onset, samples=PHRASE_SAMPLES if from_end else INTRO_PHRASE_SAMPLES)
         if bars is not None and sure >= PHRASE_CONFIDENCE:
-            # An intro's first phrase start (the first bar is one unless the music says otherwise), an outro's last.
+            # An outro's last phrase start; an intro's first: the first downbeat, or a bar start up to PICKUP_BARS in
+            # when the music starts in earnest there (a pickup), never a phrase deep into the song.
             per_phrase = BEATS_PER_BAR * bars
             k_first = phase + BEATS_PER_BAR * offset
             if from_end:
                 k_phrase = k_first + per_phrase * math.floor((k_ref - k_first) / per_phrase)
             else:
-                k_phrase = k_first if k_first - phase < per_phrase else phase
+                k_phrase = k_first if offset <= PICKUP_BARS else phase
             phrase_ms = offset_ms + first + period * k_phrase
             phrase_bars = bars
     return Grid(bpm, beat_ms, bar_ms, rhythm, steady, phrase_ms, phrase_bars)
@@ -337,6 +354,12 @@ def ends(head, tail, tail_offset_frames, relative_levels, rate=RATE, seconds=SEC
         start_ms = int(loud[0]) * chunk_ms if loud.size else 0
         start = min(int(start_ms * rate / 1000), max(0, head.size - rate * 8))
         intro = grid(head[start:start + n], start * 1000.0 / rate, rate)
+        # The phrase from all that's kept of the start, when it's the same grid.
+        if intro is not None and intro.bar_ms is not None:
+            longer = grid(head[start:start + int(INTRO_SECONDS * rate)], start * 1000.0 / rate, rate)
+            intro.phrase_ms = intro.phrase_bars = None
+            if longer is not None and longer.phrase_ms is not None and same_grid(intro, longer):
+                intro.phrase_ms, intro.phrase_bars = longer.phrase_ms, longer.phrase_bars
     if tail is not None and tail.size:
         end_ms = (int(loud[-1]) + 1) * chunk_ms if loud.size else None
         end = tail.size if end_ms is None else int(np.clip(end_ms * rate / 1000 - tail_offset_frames, rate * 8, tail.size))
@@ -345,8 +368,10 @@ def ends(head, tail, tail_offset_frames, relative_levels, rate=RATE, seconds=SEC
         # The phrase from a longer stretch, when its beat grid is the same one: a minute holds a few phrases, but
         # may also reach back into a part at another tempo, whose grid would say nothing about the end.
         m = int(outro_seconds * rate)
-        if outro is not None and outro.bar_ms is not None and end > n:
+        if outro is not None and outro.bar_ms is not None:
             longer = grid(tail[max(0, end - m):end], (tail_offset_frames + max(0, end - m)) * 1000.0 / rate, rate, from_end=True)
+            # Half a minute holds too few phrases to trust: only the minute's phrase counts.
+            outro.phrase_ms = outro.phrase_bars = None
             if longer is not None and longer.phrase_ms is not None and same_grid(outro, longer):
                 outro.phrase_ms, outro.phrase_bars = longer.phrase_ms, longer.phrase_bars
     return intro, outro

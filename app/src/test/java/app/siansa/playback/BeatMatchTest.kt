@@ -232,6 +232,21 @@ class BeatMatchTest {
         assertEquals(5_000L, plan.cutMs)
         assertEquals(15_000L, plan.overlapMs)
         assertTrue(plan.why, plan.why.contains("phrase on phrase"))
+        // Into a short song the blend is held to a third of it and isn't beat-matched: the part-phrase isn't left
+        // out then, as it would only lose the ending.
+        val short = Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 305_000, 40_000, a, b, beatMatch = true)!!
+        assertNull(short.beat)
+        assertEquals(0L, short.cutMs)
+        assertEquals(13_333L, short.overlapMs)
+        assertFalse(short.why, short.why.contains("phrase"))
+    }
+
+    @Test fun mixedPhraseLengthsUseTheLongerOne() {
+        // 4-bar phrases going out, 8-bar coming in: the blend is a whole 8-bar unit, so both end together.
+        val fours = outro.copy(phraseMs = 300_000.0, phraseBars = 4)
+        val plan = BeatMatch.plan(fours, phrasedIntro, 305_000, 16_000)!!
+        assertEquals(8, plan.phraseBars)
+        assertEquals(285_000L, plan.startMs)
     }
 
     @Test fun aJumpAllowsForHowLongJumpingTakesOnThisPhone() {

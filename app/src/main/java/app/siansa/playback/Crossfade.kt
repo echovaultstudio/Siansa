@@ -157,6 +157,9 @@ object Crossfade {
             val dropped = plan.beat != null
             plan = plan.copy(
                 overlapMs = overlap, fadeInMs = min(plan.fadeInMs, overlap).coerceAtLeast(MIN_FADE_IN_MS), beat = null,
+                // A phrase plan's cut (its last part-phrase) goes with it: without the plan it would only lose the ending.
+                cutMs = if (dropped) cut else plan.cutMs,
+                why = if (dropped) "smart: a third of the shorter song" + (cutWhy?.let { " · $it" } ?: "") else plan.why,
                 beatNote = if (dropped) "${plan.beatNote} · not beat-matched: the blend would be over a third of a song" else plan.beatNote,
             )
         }

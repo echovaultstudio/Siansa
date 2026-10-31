@@ -139,12 +139,15 @@ object BeatMatch {
     internal fun phrased(outgoing: BeatEnd, incoming: BeatEnd, endMs: Long, maxMs: Long, speed: Float, bar: Double): Plan? {
         val outPhrase = outgoing.phraseMs ?: return null
         val inPhrase = incoming.phraseMs ?: return null
-        val phraseBars = outgoing.phraseBars ?: return null
-        if (incoming.phraseBars == null || outPhrase < 0 || endMs <= outPhrase) return null
+        val inBars = incoming.phraseBars ?: return null
+        // The longer phrase of the two is the unit, so both songs' phrases end together (8-bar ones are two 4-bar).
+        val phraseBars = maxOf(outgoing.phraseBars ?: return null, inBars)
+        if (outPhrase < 0) return null
         val phrase = phraseBars * bar
         val slack = outgoing.beatLengthMs  // a blend may run a beat over the setting, as the bar plan does
         // The last phrase boundary of the song going out, and what's after it.
         val last = outPhrase + floor((endMs - outPhrase) / phrase) * phrase
+        if (last <= 0) return null
         val rest = endMs - last
         val cut = if (rest < phrase / 2) rest else 0.0
         val blendEnd = endMs - cut
