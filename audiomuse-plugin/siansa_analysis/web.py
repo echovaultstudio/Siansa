@@ -346,12 +346,14 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
   {_meter(b, "Songs measured for their beats")}
   <p><strong>{escape(b.detail)}.</strong> {beat_counts['to_measure']:,} still to measure.</p>
   {elsewhere_line}
-  <p class="mx-help">The tempo, beats and bars at each end of a song, for beat-matched blends in Siansa's DJ
-    radio (experimental). New songs get theirs with their volume and fade profile. Songs measured before plugin
-    0.3.0 are measured again for them, a batch at a time after the profiles each 15 minutes, songs the app is
-    about to play first. Their loudness and fades stay in use meanwhile; a song without its grid blends the
-    plain way. Songs per run can be any number: a round stops when its time is up (4 minutes, 12 while measuring
-    all), so a big number means "as many as fit". 0 measures them only when you ask.</p>
+  <p class="mx-help">The tempo, beats, bars and phrases at each end of a song, for beat-matched blends in
+    Siansa's DJ radio (experimental): with the phrases (plugin 0.4.0: the 4 or 8 bars a song is built from, read
+    over its last minute) the blends go phrase on phrase, as a DJ mixes. New songs get theirs with their volume
+    and fade profile. Songs measured before plugin 0.4.0 are read again for them (the sound isn't kept, only what
+    was measured), a batch at a time after the profiles each 15 minutes, songs the app is about to play first.
+    Their loudness, fades and earlier beat grids stay in use meanwhile; a song without its phrases blends bar on
+    bar, one without its grid the plain way. Songs per run can be any number: a round stops when its time is up (4
+    minutes, 12 while measuring all), so a big number means "as many as fit". 0 measures them only when you ask.</p>
   {f'<p class="mx-help mx-attention">Last run: {escape(beats_error)}</p>' if beats_error else ''}
   {beats_failures}
   {beats_left_line}
