@@ -108,6 +108,9 @@ Both follow your finger, and let go wherever you like: a hard swipe finishes qui
 a short pull springs back. The mini player fades away as the player rises and comes back as it goes. The book
 player opens and closes the same way.
 
+Swipe the mini player left for the next song or right for the one before; the phone gives a short buzz as the song
+changes (if touch vibration is on in your phone's settings).
+
 Scroll down in now playing for **About the artist** and **About this song**. The whole page scrolls as one, in the
 colours of the cover, and the cards take a deep shade of the cover's colour too (a dark grey for a black-and-white
 cover). Scroll back up for the controls.
