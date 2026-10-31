@@ -183,8 +183,10 @@ class BeatMatchTest {
         assertEquals(167L, BeatMatch.learnedLag(BeatMatch.DEFAULT_SEEK_LAG_MS, leadMs = 0, errorMs = -185))
         // Sent 167 ms ahead and landed 10 ms ahead: it took 157 ms.
         assertEquals(162L, BeatMatch.learnedLag(167, leadMs = 167, errorMs = 10))
-        // A stall isn't learned as the phone's usual delay.
-        assertEquals(BeatMatch.MAX_SEEK_LAG_MS, BeatMatch.learnedLag(BeatMatch.MAX_SEEK_LAG_MS, leadMs = 0, errorMs = -5_000))
+        // A stall (the song buffering for seconds) isn't learned as the phone's usual delay: what was known stays.
+        assertEquals(167L, BeatMatch.learnedLag(167, leadMs = 150, errorMs = -2_000))
+        assertEquals(167L, BeatMatch.learnedLag(167, leadMs = 0, errorMs = -(BeatMatch.MAX_SEEK_LAG_MS + 1)))
+        // A jump that landed early can't make the delay negative.
         assertEquals(0L, BeatMatch.learnedLag(0, leadMs = 0, errorMs = 300))
     }
 }

@@ -89,6 +89,8 @@ internal class Crossfader(
      */
     private var seekLag = BeatMatch.DEFAULT_SEEK_LAG_MS
     private var seekLead: Long? = null
+    /** Where the last jump was sent; the player reports that spot until the jump lands, so it isn't a position yet. */
+    private var seekTarget = -1L
     /** How far apart the two songs' beats were through this blend (issue #744). */
     private var stepStats = BeatMatch.StepStats()
     private var switchedAt = 0L
@@ -300,6 +302,7 @@ internal class Crossfader(
         jumps = 0
         stepStats = BeatMatch.StepStats()
         seekLead = null
+        seekTarget = -1L
         stopEasing()
         baseSpeed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
         phase = Phase.FADING
@@ -348,7 +351,8 @@ internal class Crossfader(
                         // Sent ahead by what getting there takes on this phone, so it lands on the beat (issue #747).
                         val lead = seekLag
                         seekLead = lead
-                        main.seekTo(incomingIndex, beat.incomingAt(t.currentPosition) + lead)
+                        seekTarget = beat.incomingAt(t.currentPosition) + lead
+                        main.seekTo(incomingIndex, seekTarget)
                     } else {
                         main.seekTo(incomingIndex, 0)
                     }
@@ -387,10 +391,13 @@ internal class Crossfader(
         if (main.currentMediaItemIndex != incomingIndex || !main.isPlaying) return
         val now = SystemClock.elapsedRealtime()
         if (now - switchedAt < SETTLE_MS) return  // the seek is still landing; its position isn't real yet
-        val error = beat.error(t.currentPosition, main.currentPosition)
+        val position = main.currentPosition
+        // Until the jump lands the player says it's at the spot it was sent to, which isn't a position yet.
+        if (position == seekTarget || main.playbackState != Player.STATE_READY) return
+        val error = beat.error(t.currentPosition, position)
         stepStats.add(error)
         seekLead?.let { lead ->
-            // The first settled position after a seek says how long getting there took on this phone (issue #747).
+            // The first real position after a jump says how long getting there took on this phone (issue #747).
             seekLag = BeatMatch.learnedLag(seekLag, lead, error)
             seekLead = null
         }
@@ -403,6 +410,7 @@ internal class Crossfader(
                 // Our own jump, not the listener moving in the song: the blend carries on (issue #747).
                 expectSeek = true
                 val target = beat.incomingAt(t.currentPosition) + lead
+                seekTarget = target
                 AppLog.d("Crossfade", "Beat-matching: the next song is ${if (error > 0) "+" else ""}$error ms out of step; jumping to $target ms (jump $jumps)")
                 main.seekTo(incomingIndex, target)
             } else if (jumps < MAX_JUMPS + 1) {

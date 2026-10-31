@@ -158,10 +158,15 @@ object BeatMatch {
     /**
      * What a jump costs on this phone, learned from the last one (issue #747): the next song was sent [leadMs] ahead
      * of where it should be and, once settled, was [errorMs] out of step (behind is negative), so the jump took
-     * [leadMs] − [errorMs]. Averaged with [previous], so one slow jump doesn't throw the next one off.
+     * [leadMs] − [errorMs]. Averaged with [previous], so one slow jump doesn't throw the next one off. A jump that
+     * took longer than any jump does ([MAX_SEEK_LAG_MS]) was a stall (the song buffering), not the phone's usual
+     * delay: [previous] stays.
      */
-    fun learnedLag(previous: Long, leadMs: Long, errorMs: Long): Long =
-        ((previous + (leadMs - errorMs)) / 2).coerceIn(0L, MAX_SEEK_LAG_MS)
+    fun learnedLag(previous: Long, leadMs: Long, errorMs: Long): Long {
+        val took = leadMs - errorMs
+        if (took > MAX_SEEK_LAG_MS) return previous
+        return ((previous + took) / 2).coerceIn(0L, MAX_SEEK_LAG_MS)
+    }
 
     /** The speed nudge that brings the next song back in step over about a second: ahead, a touch slower. */
     fun nudge(errorMs: Long): Float = if (abs(errorMs) <= IN_STEP_MS) 1f else (1f - errorMs / 1000f).coerceIn(0.98f, 1.02f)
