@@ -122,7 +122,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.navigation:navigation-compose:2.8.5")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
-    implementation("androidx.palette:palette-ktx:1.0.0")
+    implementation("androidx.palette:palette-ktx:1.1.0")
 
     // Media3 stays on the version the FFmpeg decoder below is built for (Jellyfin's build); update both together.
     implementation("androidx.media3:media3-exoplayer:1.9.0")
