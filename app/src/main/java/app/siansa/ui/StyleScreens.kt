@@ -83,13 +83,41 @@ import androidx.compose.foundation.gestures.detectDragGestures
  */
 @Composable
 fun StyleScreen(nav: NavController) {
+    val graph = LocalGraph.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
     Screen(title = "Style", nav = nav) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
             HubRow(Icons.Rounded.Palette, "Theme") { nav.navigate("settings/themes") }
             HubRow(Icons.Rounded.PhoneAndroid, "Now Playing Style") { nav.navigate("settings/style/now-playing") }
             HubRow(Icons.Rounded.PlayCircle, "Mini Player") { nav.navigate("settings/style/mini-player") }
             HubRow(Icons.Rounded.Dashboard, "Nav Bar") { nav.navigate("settings/style/nav-bar") }
+            Spacer(Modifier.height(Space.Section))
+            TopBarChoice(settings.topBar) {
+                AppLog.i("Style", "Phone's top bar: ${it.name.lowercase()}")
+                graph.settings.setTopBar(it)
+            }
         }
+    }
+}
+
+/** The phone's top bar (issue #681): see-through, black, or hidden for full screen. */
+@Composable
+internal fun TopBarChoice(selected: app.siansa.data.TopBarStyle, onPick: (app.siansa.data.TopBarStyle) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = Space.Page).testTag("topBarChoice")) {
+        Text("Phone's top bar", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(Space.Small))
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            app.siansa.data.TopBarStyle.entries.forEach { style ->
+                androidx.compose.material3.FilterChip(
+                    selected = selected == style,
+                    onClick = { if (style != selected) onPick(style) },
+                    label = { Text(style.label) },
+                    modifier = Modifier.testTag("topBar-${style.name}"),
+                )
+            }
+        }
+        Spacer(Modifier.height(Space.Small))
+        Text(selected.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
