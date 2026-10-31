@@ -187,6 +187,11 @@ object Crossfade {
 
     /** Closer than this, the tail and the main player count as in step. */
     const val IN_STEP_MS = 10L
+    /** The tail may take the song over when it's this close to the main player: further apart, the two copies
+     *  played together for the handover would sound like one through a comb (issue #759). */
+    const val HANDOVER_STEP_MS = 20L
+    /** How long the fade may wait for the tail to get that close, before going ahead anyway. */
+    const val HANDOVER_WAIT_MS = 1_500L
 
     /**
      * Why there's no fade between two songs, for the log (issue #355: "No fade" alone didn't say). Null when

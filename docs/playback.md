@@ -56,7 +56,7 @@ Details: [How it works › Levelling](how-it-works.md#levelling).
 
 ## Crossfade
 
-Same page. **Off**, a **fixed** length (1–12 seconds, 6 by default), or **Smart**:
+Same page. **Off**, a **fixed** length (1–30 seconds, 6 by default), or **Smart**:
 
 - Smart crossfades follow how songs end and start, measured by the Siansa plugin. A long fade-out starts blending
   early, a hard ending doesn't blend at all. A slow intro fades in slowly, a hard hit comes in at once.
@@ -90,6 +90,13 @@ them the way a DJ mixes:
 Whatever the setting, two songs that both keep a beat but can't be matched (tempos more than 8 % apart, counting
 double and half time as the same; a beat that isn't steady; a stream that can't jump to a point) get a short blend,
 so their beats clash only for a moment. A beatless ending or start keeps the smart blend as before.
+
+**Echo at the end** (on by default): over the last bar of a blend the old song rings out in a hall, as a DJ
+echoes a track out, so the join is softer. A phone whose reverb can't be opened plays the blend plain.
+
+For DJ blends a crossfade of 16 s or more works best: an 8-bar phrase at 128 BPM is 15 s. A quiet build-up that
+keeps a steady beat with clear bars is laid on the old song's beats too, so when its drums come in they're in
+step.
 
 It's experimental: downbeats are the hardest thing to hear in a recording, so when either song's bars aren't clear
 the songs are laid beat on beat instead, and a mix can land a beat off. The log says how each blend was planned and

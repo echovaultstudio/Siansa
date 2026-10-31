@@ -3,6 +3,8 @@ package app.siansa.playback
 import android.os.Handler
 import android.os.SystemClock
 import androidx.annotation.OptIn
+import android.media.audiofx.PresetReverb
+import androidx.media3.common.AuxEffectInfo
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -93,10 +95,20 @@ internal class Crossfader(
     private var seekTarget = -1L
     /** How far apart the two songs' beats were through this blend (issue #744). */
     private var stepStats = BeatMatch.StepStats()
+    /** The step error smoothed over the last few readings, which decides jumps and nudges (issue #759). */
+    private var smoothed = BeatMatch.SmoothedError()
     private var switchedAt = 0L
     /** After a beat-matched blend: the matched speed being eased back from, and since when. */
     private var easingFrom = 0f
     private var easingSince = 0L
+    /**
+     * The echo at the end of a beat-matched blend (issue #759): a hall reverb on the phone's output mix that the
+     * tail is sent to, more and more over its last bar, as a DJ echoes a track out; then the tail is paused and the
+     * hall rings until [echoUntil].
+     */
+    private var reverb: PresetReverb? = null
+    private var echoSend = -1f
+    private var echoUntil = 0L
 
     fun start() {
         main.addListener(this)
@@ -197,6 +209,10 @@ internal class Crossfader(
         if (primed) align(speed)
         val until = ((startAt - position) / speed).toLong()
         if (until <= ON_TIME_MS) {
+            // A primed tail takes over only once it's in step, or a while later anyway (issue #759).
+            val t = tail
+            if (primed && t != null && t.isPlaying && until > -Crossfade.HANDOVER_WAIT_MS &&
+                abs(main.currentPosition - t.currentPosition) > Crossfade.HANDOVER_STEP_MS) return ALIGN_MS
             begin()
             return 0
         }
@@ -262,6 +278,7 @@ internal class Crossfader(
     }
 
     private fun releaseTail() {
+        closeEcho()
         tail?.let { t ->
             runCatching { t.stop() }
             t.release()
@@ -301,11 +318,13 @@ internal class Crossfader(
         switched = false
         jumps = 0
         stepStats = BeatMatch.StepStats()
+        smoothed = BeatMatch.SmoothedError()
         seekLead = null
         seekTarget = -1L
         stopEasing()
         baseSpeed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
         phase = Phase.FADING
+        if (planned.beat != null && settings().echoTail) openEcho(t)
         val wasPrimed = primed && t.isPlaying
         val drift = t.currentPosition - main.currentPosition
         t.setPlaybackSpeed(main.playbackParameters.speed.takeIf { it > 0f } ?: 1f)
@@ -367,13 +386,16 @@ internal class Crossfader(
                 val tailDone = out >= 1f || t.playbackState == Player.STATE_ENDED || t.playbackState == Player.STATE_IDLE
                 t.volume = if (tailDone) 0f else tailBase * sleep * Crossfade.fadeOut(out)
                 val beat = planned.beat
+                if (beat != null && reverb != null) echo(t, planned, beat, tailDone)
                 val heard = if (main.currentMediaItemIndex == incomingIndex) (main.currentPosition - (beat?.incomingStartMs ?: 0L)).coerceAtLeast(0L) else 0L
                 val fadedIn = (heard.toFloat() / planned.fadeInMs).coerceIn(0f, 1f)
                 level = Crossfade.fadeIn(fadedIn)
                 onLevel()
                 if (beat != null && !tailDone) keepInStep(beat, t)
-                // Done when both are; or anyway a while after the old song ended, if the new one is stuck loading.
-                if (tailDone && (fadedIn >= 1f || elapsed > planned.overlapMs + GIVE_UP_MS)) {
+                // Done when both are (and the echo has rung out); or anyway a while after the old song ended, if the
+                // new one is stuck loading.
+                val rung = reverb == null || SystemClock.elapsedRealtime() >= echoUntil
+                if (tailDone && rung && (fadedIn >= 1f || elapsed > planned.overlapMs + GIVE_UP_MS)) {
                     finish()
                     return
                 }
@@ -394,32 +416,80 @@ internal class Crossfader(
         val position = main.currentPosition
         // Until the jump lands the player says it's at the spot it was sent to, which isn't a position yet.
         if (position == seekTarget || main.playbackState != Player.STATE_READY) return
-        val error = beat.error(t.currentPosition, position)
-        stepStats.add(error)
+        val reading = beat.error(t.currentPosition, position)
+        stepStats.add(reading)
         seekLead?.let { lead ->
             // The first real position after a jump says how long getting there took on this phone (issue #747).
-            seekLag = BeatMatch.learnedLag(seekLag, lead, error)
+            seekLag = BeatMatch.learnedLag(seekLag, lead, reading)
             seekLead = null
         }
-        if (abs(error) > BeatMatch.JUMP_MS) {
-            if (jumps < MAX_JUMPS && main.isCurrentMediaItemSeekable) {
-                jumps++
-                switchedAt = now
-                val lead = seekLag
-                seekLead = lead
-                // Our own jump, not the listener moving in the song: the blend carries on (issue #747).
-                expectSeek = true
-                val target = beat.incomingAt(t.currentPosition) + lead
-                seekTarget = target
-                AppLog.d("Crossfade", "Beat-matching: the next song is ${if (error > 0) "+" else ""}$error ms out of step; jumping to $target ms (jump $jumps)")
-                main.seekTo(incomingIndex, target)
-            } else if (jumps < MAX_JUMPS + 1) {
-                jumps = MAX_JUMPS + 1
-                AppLog.w("Crossfade", "Beat-matching: the next song stays ${if (error > 0) "+" else ""}$error ms out of step (${if (main.isCurrentMediaItemSeekable) "after $MAX_JUMPS jumps" else "it can't jump to a point"})")
-            }
+        // One reading can be 90 ms off and back the next moment: the middle of the last few decides (issue #759).
+        val error = smoothed.add(reading) ?: return
+        // A jump is a cut in the sound: only while the new song is still quiet, early in the blend. After that
+        // the speed brings it in step, which can't be heard.
+        val early = now - switchedAt < JUMP_WINDOW_MS && jumps < MAX_JUMPS
+        if (abs(error) > BeatMatch.JUMP_MS && early && main.isCurrentMediaItemSeekable) {
+            jumps++
+            switchedAt = now
+            smoothed = BeatMatch.SmoothedError()
+            val lead = seekLag
+            seekLead = lead
+            // Our own jump, not the listener moving in the song: the blend carries on (issue #747).
+            expectSeek = true
+            val target = beat.incomingAt(t.currentPosition) + lead
+            seekTarget = target
+            AppLog.d("Crossfade", "Beat-matching: the next song is ${if (error > 0) "+" else ""}$error ms out of step; jumping to $target ms (jump $jumps)")
+            main.seekTo(incomingIndex, target)
             return
         }
         main.setPlaybackSpeed(baseSpeed * beat.speed * BeatMatch.nudge(error))
+    }
+
+    /** The hall for the echo, on the output mix, with the tail sent to it at nothing yet (issue #759). */
+    private fun openEcho(t: ExoPlayer) {
+        closeEcho()
+        reverb = runCatching {
+            PresetReverb(0, 0).apply {
+                preset = PresetReverb.PRESET_LARGEHALL
+                enabled = true
+            }
+        }.onFailure { AppLog.w("Crossfade", "No echo at the end: the phone's reverb couldn't be opened (${it.message})") }.getOrNull()
+        reverb?.let { t.setAuxEffectInfo(AuxEffectInfo(it.id, 0f)) }
+        echoSend = 0f
+        echoUntil = 0L
+    }
+
+    /**
+     * Sends more of the tail to the hall through its last bar; once the tail is done, pauses it and lets the hall
+     * ring for [ECHO_RING_MS] before the fade ends.
+     */
+    private fun echo(t: ExoPlayer, planned: FadePlan, beat: BeatMatch.Plan, tailDone: Boolean) {
+        val id = reverb?.id ?: return
+        if (tailDone) {
+            if (echoUntil == 0L) {
+                echoUntil = SystemClock.elapsedRealtime() + ECHO_RING_MS
+                if (t.isPlaying) t.pause()
+            }
+            return
+        }
+        val bar = beat.outgoing.beatLengthMs * BeatMatch.BEATS_PER_BAR
+        val left = planned.overlapMs - (t.currentPosition - startAt)
+        val send = (((bar - left) / bar).toFloat().coerceIn(0f, 1f) * ECHO_SEND)
+        if (abs(send - echoSend) >= 0.02f) {
+            echoSend = send
+            t.setAuxEffectInfo(AuxEffectInfo(id, send))
+        }
+    }
+
+    private fun closeEcho() {
+        reverb?.let { r ->
+            runCatching { tail?.setAuxEffectInfo(AuxEffectInfo(0, 0f)) }
+            runCatching { r.enabled = false }
+            r.release()
+        }
+        reverb = null
+        echoSend = -1f
+        echoUntil = 0L
     }
 
     /** After a beat-matched blend, the new song eases back to its own speed. */
@@ -546,8 +616,9 @@ internal class Crossfader(
         const val MIN_PREPARE_MS = 1_500L
         /** Starting this close to the planned moment is on time. */
         const val ON_TIME_MS = 15L
-        /** The blend as the tail takes the song over from the main player. */
-        const val HANDOVER_MS = 120L
+        /** The blend as the tail takes the song over from the main player: short, as two copies a few ms apart
+         *  sound like one through a comb while both play (issue #759). */
+        const val HANDOVER_MS = 60L
         /** The tail starts playing, silent, this long before the fade, to be sounding and in step by then. */
         const val PREROLL_MS = 3_000L
         /** While the tail plays silently, how often its step is checked. */
@@ -562,9 +633,14 @@ internal class Crossfader(
         const val GIVE_UP_MS = 10_000L
         /** After a seek in a beat-matched blend, how long before the new song's position is trusted. */
         const val SETTLE_MS = 250L
-        /** How often the new song may be jumped into step in one blend. */
+        /** How often the new song may be jumped into step in one blend, and only this soon after it came in. */
         const val MAX_JUMPS = 2
+        const val JUMP_WINDOW_MS = 1_500L
         /** How often the speed moves while easing back after a beat-matched blend. */
         const val EASE_TICK_MS = 200L
+        /** The echo at the end (issue #759): how much of the tail goes to the hall by the end of its last bar, and
+         *  how long the hall rings after it. */
+        const val ECHO_SEND = 0.75f
+        const val ECHO_RING_MS = 1_800L
     }
 }

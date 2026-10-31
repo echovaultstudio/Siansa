@@ -156,6 +156,8 @@ data class AppSettings(
     val crossfadeSeconds: Int = DEFAULT_CROSSFADE_SECONDS,
     /** Where smart crossfades are beat-matched like a DJ's (issue #646, experimental): off, DJ radio, everywhere. */
     val beatMatch: BeatMatchMode = BeatMatchMode.DJ_RADIO,
+    /** The old song rings out in a hall over the last bar of a beat-matched blend (issue #759). */
+    val echoTail: Boolean = true,
     /** The shape of a DJ mix (issue #649): what the energy does over the next songs. */
     val mixShape: MixShape = MixShape.STEADY,
     /** How far a DJ mix may stray from the last song, 0 (close neighbours only) to 100 (adventurous). */
@@ -222,7 +224,8 @@ data class AppSettings(
         const val DEFAULT_CROSSFADE_SECONDS = 6
         /** A DJ mix strays a little by default (issue #649). */
         const val DEFAULT_MIX_SURPRISE = 20
-        val CROSSFADE_SECONDS = 1..12
+        /** Up to 30 s: two 8-bar phrases at 128 BPM (issue #759; it was 12). */
+        val CROSSFADE_SECONDS = 1..30
         const val DEFAULT_WIND_DOWN_SONGS = 20
         val WIND_DOWN_CHOICES = listOf(10, 20, 30)
     }
@@ -383,6 +386,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .takeIf { it in AppSettings.WIND_DOWN_CHOICES } ?: AppSettings.DEFAULT_WIND_DOWN_SONGS,
         crossfadeSeconds = prefs.getInt("crossfade_s", AppSettings.DEFAULT_CROSSFADE_SECONDS).coerceIn(AppSettings.CROSSFADE_SECONDS),
         beatMatch = BeatMatchMode.parse(prefs.getString("beat_match", null)),
+        echoTail = prefs.getBoolean("echo_tail", true),
         mixShape = MixShape.parse(prefs.getString("mix_shape", null)),
         mixSurprise = prefs.getInt("mix_surprise", AppSettings.DEFAULT_MIX_SURPRISE).coerceIn(0, 100),
     )
@@ -630,6 +634,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setBeatMatch(mode: BeatMatchMode) {
         prefs.edit().putString("beat_match", mode.name).apply()
         _state.value = _state.value.copy(beatMatch = mode)
+    }
+
+    fun setEchoTail(on: Boolean) {
+        prefs.edit().putBoolean("echo_tail", on).apply()
+        _state.value = _state.value.copy(echoTail = on)
     }
 
     /** The shape and surprise of a DJ mix (issue #649). */

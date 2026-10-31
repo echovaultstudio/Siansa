@@ -44,6 +44,8 @@ object BeatMatch {
     const val IN_STEP_MS = 12L
     /** Further apart than this, the next song jumps into step rather than catching up by speed. */
     const val JUMP_MS = 90L
+    /** How many step readings go into the smoothed error (at 20 ms ticks, a tenth of a second). */
+    const val STEP_READINGS = 5
     /** After the blend, the next song eases back to its own speed over this long. */
     const val EASE_MS = 25_000L
 
@@ -58,7 +60,7 @@ object BeatMatch {
     }
 
     /** Both ends are beat-driven and steady: a blend between them either keeps the beats in step or clashes. */
-    fun bothRhythmic(outgoing: BeatEnd?, incoming: BeatEnd?): Boolean = outgoing?.matchable == true && incoming?.matchable == true
+    fun bothRhythmic(outgoing: BeatEnd?, incoming: BeatEnd?): Boolean = outgoing?.matchable == true && incoming?.matchableAsIntro == true
 
     /**
      * One beat-matched blend: it starts at [startMs] of the song going out and lasts [overlapMs] ([bars] whole
@@ -108,8 +110,11 @@ object BeatMatch {
      * the bars of either song aren't clear) of the old song at or after that point, so it stays within the
      * setting; the next song starts on its first downbeat (or beat).
      */
+    /** Whole bars in [overlapMs], to within a tenth of a beat (7.68 s at 125 BPM is 4 bars, not 3.99). */
+    fun wholeBars(overlapMs: Double, barMs: Double): Int = floor((overlapMs + barMs / BEATS_PER_BAR / 10) / barMs).toInt()
+
     fun plan(outgoing: BeatEnd, incoming: BeatEnd, endMs: Long, maxMs: Long): Plan? {
-        if (!outgoing.matchable || !incoming.matchable || endMs <= 0) return null
+        if (!outgoing.matchable || !incoming.matchableAsIntro || endMs <= 0) return null
         val speed = speed(outgoing, incoming) ?: return null
         val bar = outgoing.beatLengthMs * BEATS_PER_BAR
         phrased(outgoing, incoming, endMs, maxMs, speed, bar)?.let { return it }
@@ -125,7 +130,7 @@ object BeatMatch {
         if (start <= 0 || endMs - start < outgoing.beatLengthMs) return null
         val incomingStart = (if (onBars) incoming.barMs!! else incoming.beatMs).coerceAtLeast(0.0)
         val overlap = endMs - start
-        return Plan(start.roundToLong(), overlap.roundToLong(), incomingStart.roundToLong(), speed, floor(overlap / bar).toInt(), onBars, outgoing, incoming)
+        return Plan(start.roundToLong(), overlap.roundToLong(), incomingStart.roundToLong(), speed, wholeBars(overlap, bar), onBars, outgoing, incoming)
     }
 
     /**
@@ -177,7 +182,8 @@ object BeatMatch {
             outgoing == null -> "the plugin hasn't measured the beat at the end of the song going out"
             incoming == null -> "the plugin hasn't measured the beat at the start of the next song"
             !outgoing.matchable -> "the end of the song going out isn't beat-driven and steady enough"
-            !incoming.matchable -> "the start of the next song isn't beat-driven and steady enough"
+            !incoming.matchableAsIntro -> "the start of the next song isn't beat-driven and steady enough" +
+                (if (incoming.steady >= MIN_STEADY && incoming.barMs == null) " (steady, but its bars aren't clear)" else "")
             speed(outgoing, incoming) == null -> "%.1f and %.1f BPM are too far apart".format(java.util.Locale.ROOT, outgoing.bpm, incoming.bpm)
             !applies -> "beat-matching is set for DJ radio only"
             else -> null
@@ -220,7 +226,23 @@ object BeatMatch {
     }
 
     /** The speed nudge that brings the next song back in step over about a second: ahead, a touch slower. */
-    fun nudge(errorMs: Long): Float = if (abs(errorMs) <= IN_STEP_MS) 1f else (1f - errorMs / 1000f).coerceIn(0.98f, 1.02f)
+    fun nudge(errorMs: Long): Float = if (abs(errorMs) <= IN_STEP_MS) 1f else (1f - errorMs / 1000f).coerceIn(0.97f, 1.03f)
+
+    /**
+     * The step error that decides a jump or a nudge (issue #759): the middle of the last few readings, as one
+     * reading can be 90 ms off and back the next moment (the position arrives in pieces). Null until there are
+     * [STEP_READINGS] of them.
+     */
+    class SmoothedError {
+        private val recent = ArrayDeque<Long>()
+
+        fun add(errorMs: Long): Long? {
+            recent.addLast(errorMs)
+            if (recent.size > STEP_READINGS) recent.removeFirst()
+            if (recent.size < STEP_READINGS) return null
+            return recent.sorted()[recent.size / 2]
+        }
+    }
 
     /** The speed [elapsedMs] after the blend ended: from [matched] back to 1, a straight line over [EASE_MS]. */
     fun eased(matched: Float, elapsedMs: Long): Float {

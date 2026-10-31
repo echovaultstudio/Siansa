@@ -121,8 +121,7 @@ fun CrossfadeScreen(nav: NavController) {
             if (settings.crossfade == CrossfadeMode.SMART && settings.loudnessSource == LoudnessSource.PLUGIN) {
                 HorizontalDivider()
                 Heading("Beat-matched blends (experimental)")
-                BeatMatchRow(settings.beatMatch) { graph.settings.setBeatMatch(it) }
-                Hint(beatMatchHint(settings.beatMatch))
+                BeatMatchSection(settings.beatMatch, settings.echoTail, graph.settings::setBeatMatch, graph.settings::setEchoTail)
             }
         }
     }
@@ -144,6 +143,17 @@ private fun crossfadeHint(s: AppSettings): String = when (s.crossfade) {
         "Other fades start where a song goes quiet and last as long as the two songs need, up to the length below."
     } else {
         "Other fades use the length below; with the Siansa plugin they follow how each song ends and starts."
+    }
+}
+
+/** The beat-matched blends' choice, its hint, and the echo at the end (issue #759), for the page and its screenshot. */
+@Composable
+internal fun BeatMatchSection(mode: BeatMatchMode, echo: Boolean, onMode: (BeatMatchMode) -> Unit, onEcho: (Boolean) -> Unit) {
+    BeatMatchRow(mode, onMode)
+    Hint(beatMatchHint(mode))
+    if (mode != BeatMatchMode.OFF) {
+        SwitchRow("Echo at the end", echo, onEcho)
+        Hint("Over the last bar of a blend the old song rings out in a hall, as a DJ echoes a track out, so the join is softer. Phones without the effect play the blend plain.")
     }
 }
 
