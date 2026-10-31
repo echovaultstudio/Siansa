@@ -276,7 +276,7 @@ class BeatMatchTest {
     @Test fun withoutPhrasesAtBothEndsItsBarOnBar() {
         assertNull(BeatMatch.plan(phrasedOutro, intro, 310_000, 16_000)!!.phraseBars)
         assertNull(BeatMatch.plan(outro, phrasedIntro, 310_000, 16_000)!!.phraseBars)
-        assertEquals(296_250L, BeatMatch.plan(outro, phrasedIntro, 310_000, 16_000)!!.startMs)
+        assertEquals(294_375L, BeatMatch.plan(outro, phrasedIntro, 310_000, 16_000)!!.startMs)  // the bar plan: 8 whole bars and a part-bar
     }
 
     @Test fun aSmartPlanLetsTheSongGoAtTheEndOfItsLastPhrase() {
