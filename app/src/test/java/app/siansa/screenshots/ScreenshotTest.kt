@@ -50,6 +50,7 @@ import app.siansa.ui.ThemeMode
 import app.siansa.ui.TopBarChoice
 import app.siansa.ui.bottomBarStops
 import app.siansa.ui.icon
+import app.siansa.ui.playerColors
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
 import org.junit.Test
@@ -107,7 +108,15 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
 
         private val song = Song(id = "1", title = "So Nearly", artist = "Lonely The Brave", album = "The Day's War")
 
-        private fun items(vararg titles: String) = titles.mapIndexed { i, t -> HomeItem(key = "item-$i", title = t, subtitle = "40 tracks", open = {}) }
+        /** Now playing's own colours, white on the cover's dark colours in light mode too, as PlayerScreen draws them. */
+        @Composable
+        private fun OnPlayer(content: @Composable () -> Unit) {
+            MaterialTheme(colorScheme = playerColors(), typography = MaterialTheme.typography) {
+                Box(Modifier.fillMaxWidth().background(Color(0xFF221C2E))) { content() }
+            }
+        }
+
+        private fun items(vararg titles: String) =titles.mapIndexed { i, t -> HomeItem(key = "item-$i", title = t, subtitle = "40 tracks", open = {}) }
 
         val SCENES = listOf(
             // Home's Radios: long words must stay whole ("Melancholy", issue #697).
@@ -141,13 +150,11 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             },
             // Now playing: the small header when scrolled down (issue #683).
             Scene("player_mini_header") {
-                PlayerMiniHeader(song, isPlaying = true, progress = 0.4f, liked = false, onHeart = {}, onPlayPause = {}, onTop = {})
+                OnPlayer { PlayerMiniHeader(song, isPlaying = true, progress = 0.4f, liked = false, onHeart = {}, onPlayPause = {}, onTop = {}) }
             },
-            // The queue's mix controls, on now playing's dark background ("Surprises", issue #677).
+            // The queue's mix controls ("Surprises", issue #677).
             Scene("queue_mix_shape") {
-                Box(Modifier.background(Color(0xFF221C2E)).padding(vertical = Space.Medium)) {
-                    MixShapeControls(MixShape.STEADY, 50) { _, _ -> }
-                }
+                OnPlayer { Box(Modifier.padding(vertical = Space.Medium)) { MixShapeControls(MixShape.STEADY, 50) { _, _ -> } } }
             },
             // Settings › Style (issue #681).
             Scene("style_top_bar") { TopBarChoice(TopBarStyle.BLACK) {} },
@@ -171,7 +178,9 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 Column(Modifier.padding(Space.Page)) { SourceCardForTest(syncLine = "Synced · 312 books · 4 podcasts") }
             },
             Scene("source_sync_running") {
-                SyncStrip("compilations (2 of 4) · 2,099 albums", running = true, fraction = 0.4f, done = false, failed = false)
+                Column(Modifier.padding(Space.Page)) {
+                    SyncStrip("compilations (2 of 4) · 2,099 albums", running = true, fraction = 0.4f, done = false, failed = false)
+                }
             },
             // The Library sync card, finished (one tick, issue #693).
             Scene("sync_card_done") {

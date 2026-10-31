@@ -143,7 +143,7 @@ import kotlin.math.roundToInt
 
 /** Now playing's colours: white on the cover's colours, with the theme's accent for buttons. */
 @Composable
-private fun playerColors() = darkColorScheme(
+internal fun playerColors() = darkColorScheme(
     primary = Accent,
     onPrimary = OnAccent,
     surface = Color.Transparent,
