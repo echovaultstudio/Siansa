@@ -5,8 +5,11 @@ import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Base64
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -22,6 +25,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.text.AnnotatedString
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -100,8 +104,24 @@ class ShowcaseTest {
             }
         }
 
+        // A phone of today: gesture navigation, so no button bar sits under the pages and sheets, and the system in
+        // dark mode like the app, so a sheet's system bars are dark too.
+        println("Showcase: gestures: " + shell("cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.gestural").trim().ifEmpty { "on" })
+        shell("cmd uimode night yes")
+        SystemClock.sleep(3000)
+
+        val album = songs.filter { it.album == "Low Tide" }.sortedBy { it.track ?: 0 }
+        val start = album.indexOfFirst { it.title == "Harbour Lights" }.coerceAtLeast(0)
+        fun playHarbourLights(atMs: Long) {
+            instrumentation.runOnMainSync { graph.player.play(album, start, startMs = atMs) }
+            val until = SystemClock.elapsedRealtime() + 20_000
+            while (SystemClock.elapsedRealtime() < until && !graph.player.state.value.isPlaying) SystemClock.sleep(200)
+        }
+
         scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
+            // A song playing all along, as in use: the mini player on every page.
+            runCatching { playHarbourLights(20_000) }.onFailure { println("Showcase: playing: $it") }
             step("home") {
                 tab("Home")
                 waitText("Today's mix", 90_000)
@@ -136,11 +156,7 @@ class ShowcaseTest {
                 shot("album")
             }
             step("now playing") {
-                val album = songs.filter { it.album == "Low Tide" }.sortedBy { it.track ?: 0 }
-                val start = album.indexOfFirst { it.title == "Harbour Lights" }.coerceAtLeast(0)
-                instrumentation.runOnMainSync { graph.player.play(album, start, startMs = 72_000) }
-                val until = SystemClock.elapsedRealtime() + 20_000
-                while (SystemClock.elapsedRealtime() < until && !graph.player.state.value.isPlaying) SystemClock.sleep(200)
+                playHarbourLights(72_000)
                 idle(1500)
                 compose.onAllNodesWithTag("miniPlayer").onFirst().performClick()
                 idle(3000)
@@ -163,17 +179,31 @@ class ShowcaseTest {
                 idle(3000)
                 shot("flow")
             }
+            step("vibe") {
+                tab("Flow")
+                compose.onAllNodes(hasSetTextAction()).onFirst()
+                    .performSemanticsAction(SemanticsActions.SetText) { it(AnnotatedString("rainy jazz piano")) }
+                compose.onAllNodesWithTag("shapeToggle").onFirst().performClick()
+                idle(1000)
+                slider("sliderEnergy", -2f)
+                slider("sliderTempo", -1f)
+                idle(1500)
+                shot("flow-shape")
+                compose.onAllNodesWithTag("vibeGenerate").onFirst().performScrollTo().performClick()
+                waitText("Wet Streets, Warm Keys", 45_000)
+                idle(3000)
+                shot("vibe")
+                back()
+            }
             step("your listening") {
                 libraryAll()
                 chip("Your listening")
                 click("Your ${LocalDate.now().year}")
                 idle(4000)
                 shot("listening")
-                swipe()
-                idle(2000)
+                bringUp("Top songs")
                 shot("listening-more")
-                swipe()
-                idle(2000)
+                bringUp("Your listening clock")
                 shot("listening-clock")
                 back()
             }
@@ -306,10 +336,35 @@ class ShowcaseTest {
     /** Scrolls the page's list until [text] is drawn. */
     private fun scrollTo(text: String) {
         if (exists(text)) return
-        compose.onAllNodes(androidx.compose.ui.test.hasScrollToNodeAction()).onFirst()
+        compose.onAllNodes(hasScrollToNodeAction()).onFirst()
             .performScrollToNode(onPage(text))
         idle(500)
     }
+
+    /**
+     * Scrolls the page until [text] is near the top of the screen ([at] of the way down), where a picture starts: by
+     * the exact distance, without a swipe that could land on the mini player.
+     */
+    private fun bringUp(text: String, at: Float = 0.1f) {
+        scrollTo(text)
+        val top = node(text).fetchSemanticsNode().boundsInRoot.top
+        val height = compose.onRoot().fetchSemanticsNode().boundsInRoot.height
+        compose.onAllNodes(hasScrollToNodeAction()).onFirst()
+            .performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, top - height * at) }
+        idle(1500)
+    }
+
+    /** Sets the slider inside the part tagged [tag] to [value]. */
+    private fun slider(tag: String, value: Float) {
+        compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress) and hasAnyAncestor(hasTestTag(tag))).onFirst()
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(value) }
+        idle(300)
+    }
+
+    /** Runs [command] in the emulator's shell and gives back what it printed. */
+    private fun shell(command: String): String =
+        android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command))
+            .bufferedReader().use { it.readText() }
 
     private fun idle(ms: Long = 300) {
         compose.waitForIdle()
@@ -355,7 +410,8 @@ class ShowcaseTest {
         }
     }
 
-    private fun swipe() = compose.onRoot().performTouchInput { swipeUp(startY = bottom * 0.78f, endY = top + bottom * 0.22f) }
+    /** Half a page further down, from above the mini player (a swipe that starts on it opens now playing). */
+    private fun swipe() = compose.onRoot().performTouchInput { swipeUp(startY = bottom * 0.66f, endY = top + bottom * 0.12f) }
 
     private fun back() {
         scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }

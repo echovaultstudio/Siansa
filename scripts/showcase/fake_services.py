@@ -108,7 +108,7 @@ def genres_for(text):
 
 def ranked(text, n, seed=""):
     """Songs for [text]: the genres its words bring up first, then the rest, shuffled the same way each time."""
-    wanted = genres_for(text)
+    wanted = next((v["genres"] for v in VIBES.values() if v["query"] == text), None) or genres_for(text)
     songs = library()
     def score(s):
         g = s.get("genre", "")
@@ -143,12 +143,28 @@ def features(s):
     }
 
 
+# What a real AI makes of the description ShowcaseTest types in Flow: a name, a sentence and sound concepts to steer
+# by. Anything else gets its own words back as the name.
+VIBES = {
+    "rainy jazz piano": {
+        "title": "Wet Streets, Warm Keys",
+        "description": "Soft jazz piano and brushed drums for a rainy evening in.",
+        "query": "soft jazz piano, brushed drums, slow and warm, rain on the window",
+        "steer": [{"term": "piano", "direction": "more"}, {"term": "jazz", "direction": "more"}],
+        # What the sound search finds for that query, best first.
+        "genres": ["Jazz", "Modern Classical", "Neo-Soul", "Lo-Fi", "Soul", "Ambient"],
+    },
+}
+
+
 def ai_answer(messages):
     """A mix plan in the shape Siansa asks for: {title, query, description, steer}."""
     user = next((m.get("content", "") for m in reversed(messages) if m.get("role") == "user"), "")
     wish = re.search(r'describes their mood or wish: "([^"]+)"', user)
     if wish:
         words = wish.group(1).strip()
+        if words.lower() in VIBES:
+            return {k: v for k, v in VIBES[words.lower()].items() if k != "genres"}
         title = words[:1].upper() + words[1:]
         return {"title": title[:40], "query": words, "description": f"Songs that sound like {words.lower()}.", "steer": []}
     slot = re.search(r"Time slot: (\w+)", user)
