@@ -86,13 +86,19 @@ object AnimatedCovers {
     }
     private val locks = ConcurrentHashMap<String, Mutex>()
     @Volatile private var loaded = false
+    private const val RECHECKED = "rechecked-736"
 
     private fun prefs(graph: AppGraph) = graph.app.getSharedPreferences("animated_covers", Context.MODE_PRIVATE)
 
     private fun loadSaved(graph: AppGraph) {
         if (loaded) return
         loaded = true
-        prefs(graph).all.forEach { (id, value) ->
+        val saved = prefs(graph)
+        // Stills saved before issue #736 may only have been a slow first answer from the server: ask once more.
+        if (!saved.getBoolean(RECHECKED, false)) {
+            saved.edit().apply { saved.all.filterValues { it == "small" }.keys.forEach { remove(it) } }.putBoolean(RECHECKED, true).apply()
+        }
+        saved.all.forEach { (id, value) ->
             val text = value as? String ?: return@forEach
             known[id] = when {
                 text == "still" -> Kind.Still
@@ -105,8 +111,10 @@ object AnimatedCovers {
         }
     }
 
-    private fun remember(graph: AppGraph, id: String, kind: Kind) {
+    /** Keeps [kind] for this cover; [lasting] also saves it for later starts. */
+    private fun remember(graph: AppGraph, id: String, kind: Kind, lasting: Boolean = true) {
         known[id] = kind
+        if (!lasting) return
         val text = when (kind) {
             Kind.Still -> "still"
             Kind.StillOnlySmall -> "small"
@@ -125,7 +133,7 @@ object AnimatedCovers {
         val lock = locks.getOrPut(key) { Mutex() }
         return lock.withLock {
             known[key]?.let { return@withLock it }
-            decide(graph, albumCoverId)?.also { remember(graph, key, it) }
+            decide(graph, albumCoverId)?.let { (kind, lasting) -> kind.also { remember(graph, key, it, lasting) } }
         }
     }
 
@@ -175,9 +183,10 @@ object AnimatedCovers {
         prefs(graph).edit().clear().apply()
     }
 
-    private suspend fun decide(graph: AppGraph, id: String): Kind? {
+    /** The cover's kind, and whether that holds for later starts too (see [bigAnimationChoice]). */
+    private suspend fun decide(graph: AppGraph, id: String): Pair<Kind, Boolean>? {
         val original = peek(graph, id, null) ?: return null
-        if (!original.animated) return Kind.Still
+        if (!original.animated) return Kind.Still to true
         if (original.kind == "animated WebP" || original.bytes in 1..MAX_ORIGINAL_BYTES) {
             AppLog.i(
                 "Cover",
@@ -185,31 +194,44 @@ object AnimatedCovers {
                     if (original.kind == "animated WebP") "Navidrome sends it full size for every request, so it's kept once on the phone"
                     else "Small enough to keep the original",
             )
-            return Kind.Local
+            return Kind.Local to true
         }
         val small = peek(graph, id, SMALL_COVER)
-        return when {
+        // No answer in time, or an error page (a proxy's 504 while Navidrome is still making it): not a real answer.
+        val answered = small != null && !small.kind.startsWith("HTTP ")
+        val choice = bigAnimationChoice(answered, animated = small?.animated == true, shrunk = small?.shrunk == true)
+        when {
             small != null && small.animated && small.shrunk -> {
                 AppLog.i(
                     "Cover",
                     "Animated cover for $id: original is ${mb(original.bytes)} (${original.kind}), too big for streaming; " +
                         "using Navidrome's $SMALL_COVER px version (${small.kind}, ${mb(small.bytes)}, ready in ${small.ms} ms)",
                 )
-                Kind.Animated(SMALL_COVER)
             }
-            small != null && small.animated -> {
+            small != null && small.animated ->
                 AppLog.i("Cover", "Animated cover for $id: Navidrome doesn't shrink it (${original.kind}, ${mb(original.bytes)}); kept once on the phone")
-                Kind.Local
-            }
-            else -> {
+            else ->
                 AppLog.w(
                     "Cover",
                     "Animated cover for $id is ${mb(original.bytes)} (${original.kind}) and Navidrome couldn't send a small animated " +
-                        "version (${small?.kind ?: "no answer"}). Showing it still, at $SMALL_COVER px.",
+                        "version (${small?.kind ?: "no answer"}). Showing it still, at $SMALL_COVER px" +
+                        if (choice.second) "." else " until Siansa starts again, then it asks again.",
                 )
-                Kind.StillOnlySmall
-            }
         }
+        return choice
+    }
+
+    /**
+     * What a big animated GIF becomes, from Navidrome's answer for its small version (issue #736), and whether that holds
+     * for later starts: its small animation when Navidrome shrinks it, the original kept on the phone when it doesn't, a
+     * still when the small one doesn't move. When Navidrome didn't answer in time (it makes the small version slowly the
+     * first time), the still is only for this start: the next one asks again, by when Navidrome has it ready.
+     */
+    internal fun bigAnimationChoice(answered: Boolean, animated: Boolean, shrunk: Boolean): Pair<Kind, Boolean> = when {
+        answered && animated && shrunk -> Kind.Animated(SMALL_COVER) to true
+        answered && animated -> Kind.Local to true
+        answered -> Kind.StillOnlySmall to true
+        else -> Kind.StillOnlySmall to false
     }
 
     private class Peek(val animated: Boolean, val kind: String, val bytes: Long, val ms: Long, val size: String = "", val shrunk: Boolean = false)
