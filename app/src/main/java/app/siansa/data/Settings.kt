@@ -31,6 +31,16 @@ enum class TopBarStyle(val label: String, val hint: String) {
 /** "Your colour" starts as a teal until someone picks their own (issue #148). */
 const val DEFAULT_THEME_SEED: Int = 0xFF0E9AA7.toInt()
 
+/** A fresh install's theme (issue #728): Mono colours with the Amber accent, to match the black icon (#726). */
+const val DEFAULT_THEME_COLOURS = "MONO"
+const val DEFAULT_THEME_SELECTION = "AMBER"
+
+/**
+ * The accent when none was saved (issue #728): Amber on a fresh install, where no colours were saved either. Someone who
+ * already picked their colours ([savedColours]) keeps "Match theme", the accent they've had until now.
+ */
+internal fun defaultSelectionFor(savedColours: String?): String = if (savedColours == null) DEFAULT_THEME_SELECTION else "THEME"
+
 data class AppSettings(
     /** Where the music comes from (issue #113); the server fields below are its address and login. */
     val sourceKind: SourceKind = SourceKind.OPENSUBSONIC,
@@ -123,14 +133,14 @@ data class AppSettings(
     val downloadedOnly: Boolean = false,
     /** The time machine lists songs that aren't in your library, marked (issue #234). */
     val timeMachineMissing: Boolean = true,
-    /** Theme (issue #148): "AUTO", "LIGHT" or "DARK"; colours by name ("SIANSA", "OCEAN"…); pure black when dark. */
+    /** Theme (issue #148): "AUTO", "LIGHT" or "DARK"; colours by name ("MONO", "OCEAN"…); pure black when dark. */
     val themeMode: String = "AUTO",
-    val themeColours: String = "SIANSA",
+    val themeColours: String = DEFAULT_THEME_COLOURS,
     val pureBlack: Boolean = false,
     /** The seed for "Your colour" (issue #148, step 2), as ARGB. */
     val themeSeed: Int = DEFAULT_THEME_SEED,
-    /** The colour of selected items, by name ("THEME", "AMBER"…), issue #313. */
-    val themeSelection: String = "THEME",
+    /** The accent colour, by name ("AMBER", "THEME"…), issues #313, #728. */
+    val themeSelection: String = DEFAULT_THEME_SELECTION,
     /** Where song loudness and fade shapes come from (issue #60): ReplayGain tags, or the Siansa plugin. */
     val loudnessSource: LoudnessSource = LoudnessSource.TAGS,
     /** The loudness, in LUFS, that measured levelling brings songs towards. */
@@ -360,10 +370,10 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
         timeMachineMissing = prefs.getBoolean("time_machine_missing", true),
         themeMode = prefs.getString("theme_mode", "AUTO") ?: "AUTO",
-        themeColours = prefs.getString("theme_colours", "SIANSA") ?: "SIANSA",
+        themeColours = prefs.getString("theme_colours", null) ?: DEFAULT_THEME_COLOURS,
         pureBlack = prefs.getBoolean("pure_black", false),
         themeSeed = prefs.getInt("theme_seed", DEFAULT_THEME_SEED),
-        themeSelection = prefs.getString("theme_selection", "THEME") ?: "THEME",
+        themeSelection = prefs.getString("theme_selection", null) ?: defaultSelectionFor(prefs.getString("theme_colours", null)),
         loudnessSource = LoudnessSource.parse(prefs.getString("loudness_source", null)),
         loudnessTarget = prefs.getInt("loudness_target", AppSettings.DEFAULT_LOUDNESS_TARGET),
         crossfade = CrossfadeMode.parse(prefs.getString("crossfade", null)),

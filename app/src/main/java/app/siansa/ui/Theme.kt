@@ -48,7 +48,10 @@ enum class ThemeColours(val label: String, val seed: Long? = null) {
     YOURS("Your colour");
 
     companion object {
-        fun parse(value: String?): ThemeColours = entries.firstOrNull { it.name == value } ?: SIANSA
+        /** A fresh install's colours (issue #728). */
+        val DEFAULT: ThemeColours get() = parse(app.siansa.data.DEFAULT_THEME_COLOURS)
+
+        fun parse(value: String?): ThemeColours = entries.firstOrNull { it.name == value } ?: MONO
 
         /** Wallpaper colours exist from Android 12 on. */
         val wallpaperAvailable: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -73,6 +76,9 @@ enum class SelectionColour(val label: String, val argb: Long? = null) {
     RED("Red", 0xFFE5534B);
 
     companion object {
+        /** A fresh install's accent (issue #728). */
+        val DEFAULT: SelectionColour get() = parse(app.siansa.data.DEFAULT_THEME_SELECTION)
+
         fun parse(value: String?): SelectionColour = entries.firstOrNull { it.name == value } ?: THEME
     }
 }
@@ -133,15 +139,15 @@ internal fun onSelectionColourOf(selected: Color): Color =
 private fun ColorScheme.withSelection(selected: Color): ColorScheme =
     copy(secondaryContainer = selected, onSecondaryContainer = onSelectionColourOf(selected))
 
-/** The chosen theme. */
+/** The chosen theme; a fresh install's is Mono with the Amber accent (issue #728). */
 data class ThemeChoice(
     val mode: ThemeMode = ThemeMode.AUTO,
-    val colours: ThemeColours = ThemeColours.SIANSA,
+    val colours: ThemeColours = ThemeColours.DEFAULT,
     val pureBlack: Boolean = false,
     /** The seed for [ThemeColours.YOURS], as ARGB. */
     val seed: Int = app.siansa.data.DEFAULT_THEME_SEED,
     /** The accent colour (issues #313, #404). */
-    val selection: SelectionColour = SelectionColour.THEME,
+    val selection: SelectionColour = SelectionColour.DEFAULT,
 )
 
 /** Filled selected items (chips, the current tab): the accent colour exactly as picked in Themes (issue #404). */
@@ -329,7 +335,7 @@ val BrandGradient: List<Color>
 /** The theme saved in [settings]. */
 fun themeChoiceOf(settings: app.siansa.data.AppSettings): ThemeChoice = ThemeChoice(
     mode = ThemeMode.entries.firstOrNull { it.name == settings.themeMode } ?: ThemeMode.AUTO,
-    colours = ThemeColours.parse(settings.themeColours).let { if (it == ThemeColours.WALLPAPER && !ThemeColours.wallpaperAvailable) ThemeColours.SIANSA else it },
+    colours = ThemeColours.parse(settings.themeColours).let { if (it == ThemeColours.WALLPAPER && !ThemeColours.wallpaperAvailable) ThemeColours.DEFAULT else it },
     pureBlack = settings.pureBlack,
     seed = settings.themeSeed,
     selection = SelectionColour.parse(settings.themeSelection),

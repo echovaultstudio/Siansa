@@ -44,8 +44,9 @@ See [Playback](playback.md) and [Discovery](discovery.md).
 
 - **Themes**: Auto (follows your phone, including its dark-mode schedule), Light or Dark; **Pure black** when dark
   (saves battery on OLED screens); a colour scheme, or **Your colour** (pick one colour and Siansa makes the rest,
-  in light and dark), or colours from your wallpaper; and the colour of selected items. Album, artist and now
-  playing pages keep their colours from the cover.
+  in light and dark), or colours from your wallpaper; and the accent colour for selected items and buttons. Siansa
+  starts on **Mono** colours with the **Amber** accent. Album, artist and now playing pages keep their colours from
+  the cover.
 - **Now playing**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in.
 - **Mini player** and **bottom bar**: hold a row and drag it to reorder; tap the eye to show or hide it.
 - **Phone's top bar** (the clock and battery): **See-through** (the app shows behind it), **Black**, or **Hidden** for
