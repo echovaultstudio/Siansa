@@ -14,9 +14,10 @@ on:
 permissions:
   contents: write
 
-# A new run replaces the one before; adding another label to the pull request runs nothing and cancels nothing.
+# A new run replaces the one before for the same pull request; another pull request's push, or another label added,
+# runs nothing and cancels nothing (a push to another pull request cancelled a run here).
 concurrency:
-  group: showcase${{ github.event.action == 'labeled' && github.event.label.name != 'showcase' && format('-{0}', github.run_id) || '' }}
+  group: showcase-${{ github.event.pull_request.number || github.ref }}${{ (github.event.action == 'labeled' && github.event.label.name != 'showcase' || github.event.pull_request && !contains(github.event.pull_request.labels.*.name, 'showcase')) && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 jobs:
