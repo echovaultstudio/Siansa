@@ -10,8 +10,20 @@ from siansa_analysis.generations import Inputs
 
 class TimingTest(unittest.TestCase):
     def test_rounds_leave_room_for_audiomuse_jobs(self):
-        self.assertLess(status.round_seconds(True), status.TICK_SECONDS)
-        self.assertLess(status.round_seconds(False), status.round_seconds(True))
+        for minutes in (12, 10, 5):
+            self.assertLess(status.round_seconds(True, minutes), status.TICK_SECONDS)
+        self.assertLess(status.round_seconds(False), status.round_seconds(True, 12))
+
+    def test_measure_all_goes_on_without_a_break_by_default(self):
+        # Siansa issue #765: measuring all just carries on until every song is measured, unless rounds are set.
+        self.assertIsNone(status.round_seconds(True))
+        self.assertEqual(status.round_seconds(True, 10), 600)
+        self.assertEqual(status.round_seconds(False, 0), status.NORMAL_ROUND_SECONDS)
+        self.assertEqual(status.all_round_minutes("7"), 0)  # not a choice: the default
+        self.assertEqual(status.all_round_minutes(None), 0)
+        self.assertEqual(status.all_round_minutes("5"), 5)
+        self.assertIn("without a break", status.all_round_text(0))
+        self.assertIn("rounds of 10 minutes every 15", status.all_round_text(10))
 
     def test_rate_keeps_the_recent_pace(self):
         rate = status.next_rate({}, 10, 50)
@@ -24,7 +36,9 @@ class TimingTest(unittest.TestCase):
         self.assertIsNone(status.time_left(100, {}, False, 40))
         self.assertIsNone(status.time_left(0, {"songs": 1, "seconds": 5}, True, 40))
         # 5 s a song, 1,000 songs, 12 of every 15 minutes: 5000 s * 15/12 = about 104 minutes -> 2 hours.
-        self.assertEqual(status.time_left(1000, {"songs": 10, "seconds": 50}, True, 40), "about 2 hours")
+        self.assertEqual(status.time_left(1000, {"songs": 10, "seconds": 50}, True, 40, 12), "about 2 hours")
+        # Without a break: 5000 s, about 83 minutes.
+        self.assertEqual(status.time_left(1000, {"songs": 10, "seconds": 50}, True, 40), "about 83 minutes")
         # Normally 40 songs per 15-minute tick: 1,000 songs = 25 ticks = about 6 hours.
         self.assertEqual(status.time_left(1000, {"songs": 10, "seconds": 50}, False, 40), "about 6 hours")
         self.assertEqual(status.duration_text(30), "about 1 minute")
@@ -234,6 +248,7 @@ class TickTest(unittest.TestCase):
         jobs.measure_all_on = lambda db, part="profiles": part == "beats" and calls.get("all", False)
         real = jobs.time.monotonic
         jobs.time.monotonic = lambda: clock[0]
+        api.settings["all_round_minutes"] = 12  # rounds, as before Siansa issue #765
         try:
             jobs.tick()
             self.assertAlmostEqual(calls["budget"], status.NORMAL_ROUND_SECONDS - 100)
@@ -247,7 +262,22 @@ class TickTest(unittest.TestCase):
             jobs.measure_missing = lambda: clock.__setitem__(0, clock[0] + status.NORMAL_ROUND_SECONDS) or {}
             self.assertEqual(jobs.tick()["beats"]["note"], "no time left this round")
             self.assertNotIn("budget", calls)
+            # Without a break (the default since issue #765), the beat grids measured all get no time limit.
+            api.settings.pop("all_round_minutes")
+            calls.clear()
+            calls["all"] = True
+            clock[0] = 1000.0
+            jobs.measure_beats = lambda budget_seconds=None: calls.__setitem__("budget", budget_seconds) or {"status": "idle"}
+            jobs.tick()
+            self.assertIn("budget", calls)
+            self.assertIsNone(calls["budget"])
+            # Stop now during the profiles: the beat grids don't start.
+            calls.clear()
+            jobs.measure_missing = lambda: {"status": "idle", "note": "stopped by hand"}
+            self.assertEqual(jobs.tick()["beats"]["note"], "stopped by hand")
+            self.assertNotIn("budget", calls)
         finally:
+            api.settings.pop("all_round_minutes", None)
             jobs.time.monotonic = real
             for n, f in saved.items():
                 setattr(jobs, n, f)

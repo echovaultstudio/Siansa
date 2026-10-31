@@ -175,6 +175,51 @@ def unlock(db, name):
     db.commit()
 
 
+# ---- AudioMuse-AI's schedule and queue, read only (Siansa issue #765) -----------------------------------------
+
+def _quiet_rollback(db):
+    try:
+        db.rollback()
+    except Exception:
+        pass
+
+
+def scheduled_tick(db):
+    """This plugin's scheduled task as AudioMuse-AI has it: ``{"enabled", "cron_expr", "last_run"}``, or ``None``
+    when it can't be read (another AudioMuse version)."""
+    if db is None:
+        return None
+    try:
+        cur = db.cursor()
+        cur.execute("SELECT enabled, cron_expr, last_run FROM cron WHERE task_type LIKE %s ORDER BY id LIMIT 1",
+                    ("plugin.siansa_analysis%tick",))
+        row = cur.fetchone()
+        cur.close()
+        db.commit()
+    except Exception:
+        _quiet_rollback(db)
+        return None
+    if not row:
+        return None
+    return {"enabled": bool(row[0]), "cron_expr": row[1], "last_run": row[2]}
+
+
+def blocking_task(db):
+    """The job holding AudioMuse-AI's queue now (``{"task_type", "status"}``), or ``None``: while it runs, no
+    scheduled task starts, this plugin's rounds included."""
+    if db is None:
+        return None
+    try:
+        from database import get_queue_blocking_task
+
+        task = get_queue_blocking_task(conn=db)
+        db.commit()
+    except Exception:
+        _quiet_rollback(db)
+        return None
+    return {"task_type": task.get("task_type"), "status": task.get("status")} if task else None
+
+
 # ---- inputs (AudioMuse-AI's own tables, read only) -----------------------------------------------------------
 
 def library_digest(db):
