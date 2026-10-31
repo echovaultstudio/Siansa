@@ -82,11 +82,13 @@ class ShowcaseTest {
     fun showcase() {
         val server = args.getString("navidromeUrl") ?: "http://10.0.2.2:4533"
         val services = args.getString("servicesUrl") ?: "http://10.0.2.2:8000"
+        val books = args.getString("booksUrl") ?: "http://10.0.2.2:13378"
         graph.settings.save(
             graph.settings.current.copy(
                 navidromeUrl = server, navidromeUser = "admin", navidromePassword = "admin",
                 audioMuseUrl = services,
                 aiProvider = AiProvider.OTHER, aiAddress = "$services/v1", aiModel = "showcase", aiKey = "",
+                audiobookshelfUrl = books, audiobookshelfUser = "admin", audiobookshelfPassword = "admin",
                 themeMode = "DARK",
             ),
         )
@@ -117,6 +119,10 @@ class ShowcaseTest {
             instrumentation.runOnMainSync { graph.player.play(album, start, startMs = atMs) }
             val until = SystemClock.elapsedRealtime() + 20_000
             while (SystemClock.elapsedRealtime() < until && !graph.player.state.value.isPlaying) SystemClock.sleep(200)
+        }
+        // The same song in the mini player on every page: started again when it has run on to the next.
+        fun keepPlaying() {
+            if (graph.player.state.value.current?.title != "Harbour Lights") runCatching { playHarbourLights(40_000) }
         }
 
         scenario = ActivityScenario.launch(MainActivity::class.java)
@@ -162,8 +168,20 @@ class ShowcaseTest {
                 compose.onAllNodesWithTag("miniPlayer").onFirst().performClick()
                 idle(3000)
                 shot("now-playing")
+                // The website's animation: now playing, down to About the artist and the song, back up, then the
+                // lyrics following the song.
+                frame("player", 1400)
+                val down = glide("player", "About the artist", at = 0.1f, steps = 12, frameMs = 70)
+                frame("player", 2200)
+                glideBy("player", -down, steps = 8, frameMs = 60, text = "About the artist")
                 compose.onAllNodesWithContentDescription("Lyrics").onFirst().performClick()
-                idle(2500)
+                playHarbourLights(10_000)
+                idle(800)
+                repeat(18) {
+                    frame("player", 320)
+                    SystemClock.sleep(650)
+                }
+                frame("player", 1800)
                 shot("lyrics")
                 back()
                 idle(800)
@@ -181,6 +199,7 @@ class ShowcaseTest {
                 shot("flow")
             }
             step("vibe") {
+                keepPlaying()
                 tab("Flow")
                 compose.onAllNodes(hasSetTextAction()).onFirst()
                     .performSemanticsAction(SemanticsActions.SetText) { it(AnnotatedString("rainy jazz piano")) }
@@ -197,6 +216,7 @@ class ShowcaseTest {
                 back()
             }
             step("your listening") {
+                keepPlaying()
                 libraryAll()
                 chip("Your listening")
                 click("Your ${LocalDate.now().year}")
@@ -208,7 +228,47 @@ class ShowcaseTest {
                 shot("listening-clock")
                 back()
             }
+            step("time machine") {
+                keepPlaying()
+                libraryAll()
+                chip("Your listening")
+                click("Time machine")
+                waitText("How you listened, any month or year.")
+                compose.onAllNodesWithTag("month-0").onFirst().performClick()
+                idle(1500)
+                // From three years ago to this one, a picture a year.
+                repeat(2) {
+                    compose.onAllNodesWithContentDescription("Year before").onFirst().performClick()
+                    idle(1200)
+                }
+                val year = LocalDate.now().year
+                for (y in year - 3..year) {
+                    waitText("$y")
+                    compose.waitUntil(30_000) { exists("Top artists") }
+                    idle(2500)
+                    shot("timemachine-$y")
+                    if (y < year) {
+                        compose.onAllNodesWithContentDescription("Year after").onFirst().performClick()
+                        idle(800)
+                    }
+                }
+                back()
+            }
+            step("smart search") {
+                keepPlaying()
+                tab("Search")
+                waitText("Radios")
+                compose.onAllNodesWithTag("searchField").onFirst()
+                    .performSemanticsAction(SemanticsActions.SetText) { it(AnnotatedString("warm piano for a lazy evening")) }
+                compose.waitUntil(45_000) { compose.onAllNodes(hasText("Sounds like", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+                idle(5000)
+                shot("smart-search")
+                compose.onAllNodesWithTag("searchField").onFirst()
+                    .performSemanticsAction(SemanticsActions.SetText) { it(AnnotatedString("")) }
+                idle(800)
+            }
             step("library") {
+                keepPlaying()
                 libraryAll()
                 idle(1500)
                 shot("library")
@@ -231,6 +291,32 @@ class ShowcaseTest {
                 idle(1500)
                 shot("settings")
             }
+            step("books") {
+                libraryAll()
+                chip("Books")
+                waitText("The Lighthouse at Merrow Point", 60_000)
+                click("The Lighthouse at Merrow Point")
+                waitText("8 chapters", 30_000)
+                idle(3000)
+                shot("book")
+                compose.onAllNodesWithTag("bigPlay").onFirst().performClick()
+                compose.waitUntil(30_000) { compose.onAllNodesWithTag("bookMiniPlayer").fetchSemanticsNodes().isNotEmpty() }
+                idle(2500)
+                compose.onAllNodesWithTag("bookMiniPlayer").onFirst().performClick()
+                idle(3000)
+                shot("book-player")
+                back()
+                idle(800)
+            }
+            step("podcasts") {
+                libraryAll()
+                chip("Podcasts")
+                waitText("The Long Commute", 60_000)
+                click("The Long Commute")
+                waitText("6 episodes", 30_000)
+                idle(3000)
+                shot("podcast")
+            }
         } finally {
             scenario.close()
         }
@@ -240,27 +326,41 @@ class ShowcaseTest {
     // ---- The made-up listening past -------------------------------------------------------------------------------
 
     /**
-     * Plays over this year, most of them the favourite artists, mostly in the evening: what Your listening, the
+     * A listening past: this year's plays, most of them the favourite artists, mostly in the evening, and three years
+     * before it, each with other favourites and its own time of day, for the time machine. What Your listening, the
      * listening clock and On repeat are made from. Written straight to the history file, and to the store's memory.
      */
     private fun seedHistory(songs: List<Song>) {
         if (songs.isEmpty()) return
         val rnd = Random(741)
-        val favourites = listOf("Glass Harbour", "Neon Parish", "Velvet Coast", "Mara Lux", "Kel Arden", "Iris Okafor", "Sunborn")
-        val weighted = songs.flatMap { s -> List(favourites.indexOf(s.artist).let { if (it < 0) 1 else 12 - it }) { s } }
-        val hours = listOf(7, 8, 8, 9, 12, 13, 17, 18, 18, 19, 19, 20, 20, 20, 21, 21, 21, 21, 22, 22, 22, 23, 23, 0)
         val zone = ZoneId.systemDefault()
         val today = LocalDate.now()
-        val firstDay = LocalDate.of(today.year, 1, 1)
-        val days = (today.toEpochDay() - firstDay.toEpochDay()).toInt().coerceAtLeast(1)
         val now = System.currentTimeMillis()
-        val events = (0 until 2950).map {
-            val s = weighted[rnd.nextInt(weighted.size)]
-            // More plays lately: the month and the year both look busy.
-            val day = (Math.pow(rnd.nextDouble(), 1.4) * days).toInt()
-            val at = today.minusDays(day.toLong()).atTime(hours[rnd.nextInt(hours.size)], rnd.nextInt(60), rnd.nextInt(60)).atZone(zone).toInstant().toEpochMilli()
-            PlayEvent(s.id, s.title, s.artist, s.genre, at.coerceAtMost(now - 60_000), listenedMs = s.durationSec * 1000L)
-        }.sortedByDescending { it.at }
+        fun plays(count: Int, favourites: List<String>, hours: List<Int>, year: Int): List<PlayEvent> {
+            val pool = songs.flatMap { s -> List(favourites.indexOf(s.artist).let { if (it < 0) 1 else 12 - it }) { s } }
+            val first = LocalDate.of(year, 1, 1)
+            val thisYear = year == today.year
+            val days = if (thisYear) (today.toEpochDay() - first.toEpochDay()).toInt().coerceAtLeast(1) else first.lengthOfYear()
+            return (0 until count).map {
+                val s = pool[rnd.nextInt(pool.size)]
+                // This year, more plays lately: the month and the year both look busy.
+                val day = if (thisYear) today.minusDays((Math.pow(rnd.nextDouble(), 1.4) * days).toLong())
+                    else first.plusDays(rnd.nextInt(days).toLong())
+                val at = day.atTime(hours[rnd.nextInt(hours.size)], rnd.nextInt(60), rnd.nextInt(60)).atZone(zone).toInstant().toEpochMilli()
+                PlayEvent(s.id, s.title, s.artist, s.genre, at.coerceAtMost(now - 60_000), listenedMs = s.durationSec * 1000L)
+            }
+        }
+        val evenings = listOf(7, 8, 8, 9, 12, 13, 17, 18, 18, 19, 19, 20, 20, 20, 21, 21, 21, 21, 22, 22, 22, 23, 23, 0)
+        val mornings = listOf(6, 6, 7, 7, 7, 8, 8, 8, 8, 9, 9, 10, 12, 13, 17, 18, 19, 21)
+        val nights = listOf(20, 21, 22, 22, 23, 23, 23, 0, 0, 0, 1, 1, 2, 18, 19, 13)
+        val afternoons = listOf(11, 12, 13, 13, 14, 14, 15, 15, 15, 16, 16, 17, 9, 10, 19, 20)
+        val year = today.year
+        val events = (
+            plays(2950, listOf("Glass Harbour", "Neon Parish", "Velvet Coast", "Mara Lux", "Kel Arden", "Iris Okafor", "Sunborn"), evenings, year) +
+                plays(2400, listOf("Kel Arden", "Loma Drift", "Sunborn", "Pale Signal", "Mara Lux"), afternoons, year - 1) +
+                plays(1900, listOf("Neon Parish", "Midnight Atlas", "Tove Marin", "Static Avenue", "Brass Meridian"), nights, year - 2) +
+                plays(1300, listOf("Hollow Pines", "Ewan Hale", "Velvet Coast", "Rosa Venn", "Iris Okafor"), mornings, year - 3)
+            ).sortedByDescending { it.at }
         val file = File(app.filesDir, Users.scoped("history.json"))
         file.writeText(AppJson.encodeToString(ListSerializer(PlayEvent.serializer()), events))
         // The store keeps what it read in memory: give it the same list.
@@ -268,7 +368,7 @@ class ShowcaseTest {
         val state = json.javaClass.getDeclaredField("_state").apply { isAccessible = true }.get(json)
         @Suppress("UNCHECKED_CAST")
         (state as MutableStateFlow<Any?>).value = events
-        println("Showcase: ${events.size} plays this year")
+        println("Showcase: ${events.size} plays over four years, ${events.count { java.time.Instant.ofEpochMilli(it.at).atZone(zone).year == year }} this year")
     }
 
     /** A few vibes described in Flow, two of them pinned to Home. */
@@ -363,6 +463,39 @@ class ShowcaseTest {
         }
         println("Showcase: $text from ${before.toInt()} to ${top().toInt()} px of ${height.toInt()} ($swipes swipes)")
         idle(800)
+    }
+
+    private val frameCount = HashMap<String, Int>()
+
+    /** One picture of the website's animation [name], half size, shown [holdMs] there: anim-NAME-NN-MS. */
+    private fun frame(name: String, holdMs: Int) {
+        val n = frameCount.getOrDefault(name, 0)
+        frameCount[name] = n + 1
+        shot("anim-$name-${"%02d".format(n)}-$holdMs", half = true)
+    }
+
+    /**
+     * Scrolls the list holding [text] until it's [at] of the way down the screen, in [steps] eased frames of the
+     * animation [name]; gives back how far it went.
+     */
+    private fun glide(name: String, text: String, at: Float, steps: Int, frameMs: Int): Float {
+        val height = compose.onRoot().fetchSemanticsNode().boundsInRoot.height
+        val total = node(text).fetchSemanticsNode().positionInRoot.y - height * at
+        glideBy(name, total, steps, frameMs, text)
+        return total
+    }
+
+    /** Scrolls the list holding [text] by [total] px in [steps] frames that start and end slowly. */
+    private fun glideBy(name: String, total: Float, steps: Int, frameMs: Int, text: String) {
+        val list = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.ScrollBy) and hasAnyDescendant(onPage(text))).onFirst()
+        var done = 0f
+        for (i in 1..steps) {
+            val eased = ((1 - kotlin.math.cos(Math.PI * i / steps)) / 2).toFloat() * total
+            list.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, eased - done) }
+            done = eased
+            compose.waitForIdle()
+            frame(name, frameMs)
+        }
     }
 
     /** Sets the slider inside the part tagged [tag] to [value]. */
@@ -463,7 +596,7 @@ class ShowcaseTest {
     }
 
     /** The whole window at full size, as a JPEG, written to the log in pieces: SHOWCASE name part/parts data. */
-    private fun shot(name: String, popups: Boolean = false) {
+    private fun shot(name: String, popups: Boolean = false, half: Boolean = false) {
         compose.waitForIdle()
         var bitmap: Bitmap? = null
         var outcome = -1
@@ -491,12 +624,13 @@ class ShowcaseTest {
             }
             drawn.await(5, java.util.concurrent.TimeUnit.SECONDS)
         }
-        val bytes = ByteArrayOutputStream().also { full.compress(Bitmap.CompressFormat.JPEG, 94, it) }.toByteArray()
+        val picture = if (half) Bitmap.createScaledBitmap(full, full.width / 2, full.height / 2, true) else full
+        val bytes = ByteArrayOutputStream().also { picture.compress(Bitmap.CompressFormat.JPEG, if (half) 90 else 94, it) }.toByteArray()
         val parts = Base64.encodeToString(bytes, Base64.NO_WRAP).chunked(3000)
         parts.forEachIndexed { i, part ->
             println("SHOWCASE $name ${i + 1}/${parts.size} $part")
             SystemClock.sleep(6)  // the log drops lines that come faster than it's read
         }
-        println("Showcase: shot $name ${full.width}x${full.height}, ${bytes.size / 1024} KB")
+        println("Showcase: shot $name ${picture.width}x${picture.height}, ${bytes.size / 1024} KB")
     }
 }

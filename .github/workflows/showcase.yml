@@ -1,9 +1,11 @@
 name: Showcase screenshots
 
 # The README's and website's screenshots (issue #741): the app on the emulator with a made-up library (invented
-# artists, albums and covers, scripts/showcase) and stand-ins for AudioMuse-AI and an AI service, page by page at full
-# size. On demand, or on a pull request labelled "showcase". The pictures are pushed to the showcase-shots branch
-# (one commit, replaced each time) and kept with the run; docs/screenshots/compose.py makes the README's from them.
+# artists, albums and covers, scripts/showcase), stand-ins for AudioMuse-AI and an AI service, and Audiobookshelf (its
+# own image) with made-up books and podcasts, page by page at full size, plus the frames of the website's animations
+# (anim-NAME-NN-MS.jpg, half size, each shown MS milliseconds). On demand, or on a pull request labelled "showcase".
+# The pictures are pushed to the showcase-shots branch (one commit, replaced each time) and kept with the run;
+# docs/screenshots/compose.py makes the README's from them, siansa-dev's deploy/site-shots.py the website's.
 on:
   workflow_dispatch:
   pull_request:
@@ -51,7 +53,7 @@ jobs:
           sudo apt-get install -y -qq fonts-inter > /dev/null || echo "::warning::No Inter font: the covers' lettering uses DejaVu"
           python3 -m pip install --quiet --break-system-packages pillow numpy
 
-      - name: Start Navidrome with the showcase library, and the stand-ins
+      - name: Start Navidrome with the showcase library, the stand-ins, and Audiobookshelf
         run: scripts/showcase-server.sh
 
       - name: Enable KVM
@@ -69,7 +71,8 @@ jobs:
             -Pandroid.testInstrumentationRunnerArguments.class=app.siansa.ShowcaseTest \
             -Pandroid.testInstrumentationRunnerArguments.showcase=true \
             -Pandroid.testInstrumentationRunnerArguments.navidromeUrl=http://10.0.2.2:4533 \
-            -Pandroid.testInstrumentationRunnerArguments.servicesUrl=http://10.0.2.2:8000 2>&1 | tee gradle.txt
+            -Pandroid.testInstrumentationRunnerArguments.servicesUrl=http://10.0.2.2:8000 \
+            -Pandroid.testInstrumentationRunnerArguments.booksUrl=http://10.0.2.2:13378 2>&1 | tee gradle.txt
 
       - name: The pictures, from the log
         if: always()
