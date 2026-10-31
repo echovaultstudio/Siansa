@@ -83,12 +83,6 @@ internal class Crossfader(
     private var baseSpeed = 1f
     /** During a beat-matched blend: how often the next song was jumped into step (at most [MAX_JUMPS]). */
     private var jumps = 0
-    /**
-     * How long getting the next song to a point takes on this phone (issue #747), learned from each jump in a blend
-     * and kept while the app runs; and the lead of the seek in flight, until its first settled position is measured.
-     */
-    private var seekLag = BeatMatch.DEFAULT_SEEK_LAG_MS
-    private var seekLead: Long? = null
     /** How far apart the two songs' beats were through this blend (issue #744). */
     private var stepStats = BeatMatch.StepStats()
     private var switchedAt = 0L
@@ -299,7 +293,6 @@ internal class Crossfader(
         switched = false
         jumps = 0
         stepStats = BeatMatch.StepStats()
-        seekLead = null
         stopEasing()
         baseSpeed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
         phase = Phase.FADING
@@ -345,10 +338,7 @@ internal class Crossfader(
                         // The new song comes in at the matched speed, where it should be right now against the old
                         // song's beats (the old song's position is the tail's).
                         main.setPlaybackSpeed(baseSpeed * beat.speed)
-                        // Sent ahead by what getting there takes on this phone, so it lands on the beat (issue #747).
-                        val lead = seekLag
-                        seekLead = lead
-                        main.seekTo(incomingIndex, beat.incomingAt(t.currentPosition) + lead)
+                        main.seekTo(incomingIndex, beat.incomingAt(t.currentPosition))
                     } else {
                         main.seekTo(incomingIndex, 0)
                     }
@@ -389,20 +379,11 @@ internal class Crossfader(
         if (now - switchedAt < SETTLE_MS) return  // the seek is still landing; its position isn't real yet
         val error = beat.error(t.currentPosition, main.currentPosition)
         stepStats.add(error)
-        seekLead?.let { lead ->
-            // The first settled position after a seek says how long getting there took on this phone (issue #747).
-            seekLag = BeatMatch.learnedLag(seekLag, lead, error)
-            seekLead = null
-        }
         if (abs(error) > BeatMatch.JUMP_MS) {
             if (jumps < MAX_JUMPS && main.isCurrentMediaItemSeekable) {
                 jumps++
                 switchedAt = now
-                val lead = seekLag
-                seekLead = lead
-                // Our own jump, not the listener moving in the song: the blend carries on (issue #747).
-                expectSeek = true
-                val target = beat.incomingAt(t.currentPosition) + lead
+                val target = beat.incomingAt(t.currentPosition) + JUMP_LEAD_MS
                 AppLog.d("Crossfade", "Beat-matching: the next song is ${if (error > 0) "+" else ""}$error ms out of step; jumping to $target ms (jump $jumps)")
                 main.seekTo(incomingIndex, target)
             } else if (jumps < MAX_JUMPS + 1) {
@@ -435,8 +416,7 @@ internal class Crossfader(
         easingSince = SystemClock.elapsedRealtime()
         AppLog.i(
             "Crossfade",
-            "Beat-matched blend done (${beat.shiftPercent} %): ${stepStats.describe()}, $jumps jump${if (jumps == 1) "" else "s"}, " +
-                "next song sent ${seekLag} ms ahead on this phone; " +
+            "Beat-matched blend done (${beat.shiftPercent} %): ${stepStats.describe()}, $jumps jump${if (jumps == 1) "" else "s"}; " +
                 "easing back to the song's own speed over ${BeatMatch.EASE_MS / 1000} s",
         )
         handler.post(easeTick)
@@ -541,7 +521,7 @@ internal class Crossfader(
         /** The blend as the tail takes the song over from the main player. */
         const val HANDOVER_MS = 120L
         /** The tail starts playing, silent, this long before the fade, to be sounding and in step by then. */
-        const val PREROLL_MS = 3_000L
+        const val PREROLL_MS = 2_000L
         /** While the tail plays silently, how often its step is checked. */
         const val ALIGN_MS = 50L
         /** Further apart than this, the tail jumps to the main player rather than catching up by speed. */
@@ -556,6 +536,8 @@ internal class Crossfader(
         const val SETTLE_MS = 250L
         /** How often the new song may be jumped into step in one blend. */
         const val MAX_JUMPS = 2
+        /** A jump lands this much ahead, as the seek takes a moment. */
+        const val JUMP_LEAD_MS = 60L
         /** How often the speed moves while easing back after a beat-matched blend. */
         const val EASE_TICK_MS = 200L
     }
