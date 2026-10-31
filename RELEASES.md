@@ -3,6 +3,12 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.46.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.46.0beta) — 2026-10-31
+
+- [#762](https://github.com/echovaultstudio/Siansa/pull/762) Grey pages and cards instead of the purple tint, with a choice in Themes (@Th3K1ngP1n)
+- [#764](https://github.com/echovaultstudio/Siansa/pull/764) Mini player: a short buzz when a swipe changes the song (@Th3K1ngP1n)
+- [#768](https://github.com/echovaultstudio/Siansa/pull/768) DJ blends: wait for the old song's copy while it loads, instead of calling the blend off (@Th3K1ngP1n)
+
 ## [0.45.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.45.0beta) — 2026-10-31
 
 - [#754](https://github.com/echovaultstudio/Siansa/pull/754) Showcase: audiobooks and podcasts, four years of listening, and the website's animations (@Th3K1ngP1n)
