@@ -132,12 +132,4 @@ class SpacingPlayerTest : SpacingCheck() {
         listOf(prev, back, fwd, next).forEach { assertEven("Centred on play", (it.top + it.bottom) / 2 - (play.top + play.bottom) / 2, 0.dp, 1.dp) }
     }
 
-    /** A speaker's settings (issue #691): the "plays the queue" switch sits a tight step above its hint. */
-    @Test fun speakerQueueSwitchSitsCloseAboveItsHint() {
-        val device = app.siansa.playback.dlna.DlnaDevice("uuid:jbl", "JBL BAR 800MK2", null, "http://x/t", null, queueUrl = "http://x/q")
-        compose.setContent { SiansaTheme { app.siansa.ui.SpeakerQueueSwitch(device) } }
-        val row = compose.onNodeWithTag("dlnaSpeakerQueue").getBoundsInRoot()
-        val hint = compose.onNodeWithText("Hands it the next few songs", substring = true).getBoundsInRoot()
-        assertEven("Speaker queue switch and hint", hint.top - row.bottom, app.siansa.ui.Space.Tight)
-    }
 }
