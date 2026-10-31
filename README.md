@@ -2,11 +2,11 @@
 
 <p align="center"><img src="docs/brand/siansa-banner.png" alt="Siansa" width="720"></p>
 
-A music player for your own **Navidrome**, **OpenSubsonic** or **Emby** server, with daily mixes built on the phone from **AudioMuse-AI** text search and, optionally, titles and searches written by an **OpenRouter** model. Audiobooks and podcasts from **Audiobookshelf** play alongside.
+A music player for your own music server (**Navidrome** or another **OpenSubsonic** server, **Emby** or **Jellyfin**), with mixes made for the moment from **AudioMuse-AI**'s sound search: for the time of day, the weather or a mood you describe, named by an AI service of your choice if you like. Audiobooks and podcasts from **Audiobookshelf** play alongside.
 
 Siansa is **open source** under the GNU GPL, version 3 or later ([LICENSE](LICENSE)): the code is here to read, build and improve. Website: [siansa.app](https://siansa.app). Docs: [docs.siansa.app](https://docs.siansa.app) (the [docs folder](docs/README.md) until then).
 
-<p align="center"><img src="docs/screenshots/hero.png" alt="Siansa: Your year, Home and Flow" width="900"></p>
+<p align="center"><img src="docs/screenshots/hero.png" alt="Siansa: Your year, Home and now playing" width="900"></p>
 
 ## Get Siansa
 
@@ -40,14 +40,24 @@ More in the [install guide](docs/testing.md).
 
 <table align="center">
 <tr>
-<td align="center" width="33%"><img src="docs/screenshots/home-more.png" alt="Home: your podcasts, Made for you, recently added" width="240"><br><sub><b>Home</b>: podcasts, Made for you, recently added</sub></td>
-<td align="center" width="33%"><img src="docs/screenshots/listening-clock.png" alt="Your listening clock and how your taste moved" width="240"><br><sub><b>Your year</b>: listening clock, how your taste moved</sub></td>
-<td align="center" width="33%"><img src="docs/screenshots/search.png" alt="Search with mood radios" width="240"><br><sub><b>Search</b>: a sound, or a mood radio</sub></td>
+<td align="center" width="33%"><img src="docs/screenshots/home.png" alt="Home in the morning: shortcuts and Today's mix" width="240"><br><sub><b>Home</b>: a mix for each part of the day</sub></td>
+<td align="center" width="33%"><img src="docs/screenshots/flow.png" alt="Flow: rainy jazz piano described, with the energy and tempo dials" width="240"><br><sub><b>Flow</b>: describe a sound, set the dials</sub></td>
+<td align="center" width="33%"><img src="docs/screenshots/vibe.png" alt="The vibe made from it, named by the AI" width="240"><br><sub><b>The vibe</b> it makes, named by AI</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screenshots/books.png" alt="Audiobooks in Your Library" width="240"><br><sub><b>Audiobooks</b> from Audiobookshelf</sub></td>
-<td align="center"><img src="docs/screenshots/podcasts.png" alt="Podcasts in Your Library" width="240"><br><sub><b>Podcasts</b>, with your progress</sub></td>
-<td align="center"><img src="docs/screenshots/settings.png" alt="Settings" width="240"><br><sub><b>Settings</b></sub></td>
+<td align="center"><img src="docs/screenshots/now-playing.png" alt="Now playing" width="240"><br><sub><b>Now playing</b></sub></td>
+<td align="center"><img src="docs/screenshots/lyrics.png" alt="Synced lyrics" width="240"><br><sub><b>Synced lyrics</b>, line by line</sub></td>
+<td align="center"><img src="docs/screenshots/album.png" alt="An album page" width="240"><br><sub><b>An album</b></sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screenshots/listening.png" alt="Your year: minutes, plays and top artists" width="240"><br><sub><b>Your year</b> in numbers</sub></td>
+<td align="center"><img src="docs/screenshots/listening-clock.png" alt="Your listening clock and how your taste moved" width="240"><br><sub><b>Listening clock</b>, how your taste moved</sub></td>
+<td align="center"><img src="docs/screenshots/library.png" alt="Your Library: albums as a grid" width="240"><br><sub><b>Your Library</b></sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screenshots/search.png" alt="Search, with a radio for each mood" width="240"><br><sub><b>Search</b>: a sound, or a mood radio</sub></td>
+<td align="center"><img src="docs/screenshots/arrange.png" alt="Arrange Home: show, hide and style each section" width="240"><br><sub><b>Arrange Home</b> your way</sub></td>
+<td align="center"><img src="docs/screenshots/home-more.png" alt="More of Home: artist radios, recently added, your genres" width="240"><br><sub><b>More of Home</b>: radios, genres</sub></td>
 </tr>
 </table>
 

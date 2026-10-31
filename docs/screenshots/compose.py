@@ -11,19 +11,23 @@ import sys
 
 from PIL import Image, ImageDraw, ImageFilter
 
-# The README's grid, in order: (screenshot, file name).
+# The README's grid, three to a row, in order: (screenshot, file name).
 SINGLES = [
     ("home", "home"),
+    ("flow-shape", "flow"),
+    ("vibe", "vibe"),
     ("now-playing", "now-playing"),
-    ("search", "search"),
-    ("flow", "flow"),
+    ("lyrics", "lyrics"),
+    ("album", "album"),
     ("listening", "listening"),
     ("listening-clock", "listening-clock"),
-    ("album", "album"),
-    ("lyrics", "lyrics"),
     ("library-grid", "library"),
-    ("style", "style"),
+    ("search", "search"),
+    ("arrange", "arrange"),
+    ("home-more-2", "home-more"),
 ]
+# Each in the grid is shown 240 px wide: 540 px stays sharp on high-density screens.
+SINGLE_WIDTH = 540
 HERO = ["listening", "home", "now-playing"]  # left, middle (in front), right
 
 
@@ -95,7 +99,7 @@ def main(src, out):
         print("Missing screenshots:", ", ".join(sorted(set(missing))))
     for name, file in SINGLES:
         if name in shots:
-            phone(shots[name], 640).save(os.path.join(out, f"{file}.png"), optimize=True)
+            phone(shots[name], SINGLE_WIDTH).save(os.path.join(out, f"{file}.png"), optimize=True)
     if all(n in shots for n in HERO):
         hero(shots, out)
     print("Written to", out)
