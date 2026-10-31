@@ -320,6 +320,13 @@ class SpacingTest {
         val fade = compose.onNodeWithTag("playerMiniHeaderFade", useUnmergedTree = true).getBoundsInRoot()
         assertEven("Fade under the header: left edge and bottom", fade.left - header.left, header.bottom - fade.bottom)
         assertEven("Fade under the header: width", fade.right - fade.left, header.right - header.left)
+    /** A speaker's settings (issue #691): the "plays the queue" switch sits a tight step above its hint. */
+    @Test fun speakerQueueSwitchSitsCloseAboveItsHint() {
+        val device = app.siansa.playback.dlna.DlnaDevice("uuid:jbl", "JBL BAR 800MK2", null, "http://x/t", null, queueUrl = "http://x/q")
+        compose.setContent { SiansaTheme { app.siansa.ui.SpeakerQueueSwitch(device) } }
+        val row = compose.onNodeWithTag("dlnaSpeakerQueue").getBoundsInRoot()
+        val hint = compose.onNodeWithText("Hands it the next few songs", substring = true).getBoundsInRoot()
+        assertEven("Speaker queue switch and hint", hint.top - row.bottom, app.siansa.ui.Space.Tight)
     }
 
     /** Crossfade and levelling: the Off / Track / Album chips sit evenly between their heading and hint (issue #214). */

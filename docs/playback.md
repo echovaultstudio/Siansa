@@ -139,6 +139,13 @@ with a short gap. How well a device does this is up to the device.
 asked to load the next song about 20 seconds before the current one ends, so it can go straight on. Songs go as MP3,
 which can leave a very short pause between songs that run into each other.
 
+**Speakers that play the queue themselves (experimental).** Some speakers can't take the next song ahead (for
+example the JBL Bar 800), so songs change with a gap of a few seconds. Speakers built on LinkPlay (JBL Bar, WiiM,
+Arylic, Audio Pro and others) can instead be handed the next few songs as a list of their own and play through it by
+themselves. Tap the cog beside the speaker in **Play on** and turn on **Speaker plays the queue**; it's only offered
+on speakers that have it. Siansa keeps the speaker's list in step as the queue changes. If the speaker refuses,
+songs go one at a time as before.
+
 **Original files on DLNA.** Tap the cog beside a DLNA TV or speaker in **Play on** and turn on **Send the original
 file**. It then gets your music as it is (for example FLAC) instead of MP3 320, whenever it says it plays that
 format; other songs still go as MP3 320. Better sound, and no tiny gap between songs, but it uses more Wi-Fi. The

@@ -52,6 +52,7 @@ object Upnp {
             var transport: String? = null
             var rendering: String? = null
             var connection: String? = null
+            var queue: String? = null
             for (j in 0 until services.length) {
                 val service = services.item(j) as? Element ?: continue
                 // Only the device's own services, not those of devices nested inside it.
@@ -62,6 +63,8 @@ object Upnp {
                     type.startsWith("urn:schemas-upnp-org:service:AVTransport:") -> transport = resolve(base, control)
                     type.startsWith("urn:schemas-upnp-org:service:RenderingControl:") -> rendering = resolve(base, control)
                     type.startsWith("urn:schemas-upnp-org:service:ConnectionManager:") -> connection = resolve(base, control)
+                    // LinkPlay's own queue (JBL Bar, WiiM…), issue #691.
+                    type.startsWith("urn:schemas-wiimu-com:service:PlayQueue:") -> queue = resolve(base, control)
                 }
             }
             if (transport == null) continue
@@ -74,6 +77,7 @@ object Upnp {
                 transportUrl = transport,
                 renderingUrl = rendering,
                 connectionUrl = connection,
+                queueUrl = queue,
             )
         }
         return null
@@ -186,4 +190,6 @@ data class DlnaDevice(
     val connectionUrl: String? = null,
     /** The formats it says it plays (see [Upnp.sinkFormats]); null when it didn't say. */
     val formats: Set<String>? = null,
+    /** Where LinkPlay's queue commands go, on speakers that have it (issue #691); null otherwise. */
+    val queueUrl: String? = null,
 )

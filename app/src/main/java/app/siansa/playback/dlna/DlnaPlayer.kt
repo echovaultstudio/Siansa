@@ -37,6 +37,9 @@ import kotlinx.coroutines.sync.withLock
  *
  * The next song is handed over ahead (SetNextAVTransportURI) so a device that supports it moves on by itself,
  * without a gap (beta testers #23). Devices that refuse it get the next song when the current one stops.
+ *
+ * LinkPlay speakers (JBL Bar, WiiM…) can instead be handed the song and the next few as a list of their own, which
+ * they play through by themselves (issue #691, [LinkPlay]); turned on per speaker, as it's experimental.
  */
 @OptIn(UnstableApi::class)
 class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) : SimpleBasePlayer(Looper.getMainLooper()) {
@@ -72,6 +75,18 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
     /** Whether the device takes the next song ahead: null until it's tried. */
     private var takesNext: Boolean? = null
     private var nextSending = false
+
+    /** The speaker plays a list of songs itself (LinkPlay, issue #691): turned on for it, and it has the service. */
+    private val speakerQueue = device.queueUrl != null && device.id in Dlna.speakerQueue.value
+    /** It refused its list: one song at a time from then on. */
+    private var queueBroken = false
+    private val useQueue: Boolean get() = speakerQueue && !queueBroken
+    /** The songs on the speaker's list, in order; the one playing is at [onSpeakerAt]. */
+    private var onSpeaker: MutableList<LinkPlay.Track> = mutableListOf()
+    private var onSpeakerAt = 0
+    private var syncing = false
+    private var syncAgain = false
+    private var queueLogged = false
 
     private val available = Player.Commands.Builder()
         .addAll(
@@ -187,6 +202,7 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
         state = Player.STATE_IDLE
         loadedIndex = -1
         sentNext = null
+        onSpeaker = mutableListOf()
         poll?.cancel()
         send("Stop") { transport("Stop", "InstanceID" to "0") }
         return Futures.immediateVoidFuture()
@@ -205,6 +221,7 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
 
     override fun handleSetRepeatMode(repeatMode: Int): ListenableFuture<*> {
         repeat = repeatMode
+        syncAhead()
         return Futures.immediateVoidFuture()
     }
 
@@ -219,6 +236,7 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
             this.index += mediaItems.size
             if (loadedIndex >= 0) loadedIndex += mediaItems.size
         }
+        syncAhead()
         return Futures.immediateVoidFuture()
     }
 
@@ -244,6 +262,7 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
                 loadedIndex = index
             }
         }
+        if (!wasCurrent) syncAhead()
         return Futures.immediateVoidFuture()
     }
 
@@ -260,6 +279,7 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
             if (loadedIndex == index) loadedIndex = at
             index = at
         }
+        syncAhead()
         return Futures.immediateVoidFuture()
     }
 
@@ -269,6 +289,7 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
         list.addAll(fromIndex, mediaItems)
         items = list
         index = index.coerceIn(0, (items.size - 1).coerceAtLeast(0))
+        syncAhead()
         return Futures.immediateVoidFuture()
     }
 
@@ -299,6 +320,7 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
         val startAt = positionMs
         loadedIndex = index
         sawPlaying = false
+        stoppedPolls = 0
         durationMs = C.TIME_UNSET
         playingSince = 0
         state = Player.STATE_BUFFERING
@@ -308,13 +330,19 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
         send("Load") {
             val (url, metadata) = streamFor(item)
             currentUrl = url
-            // Some devices refuse a new song while one plays.
-            if (stopFirst) runCatching { transport("Stop", "InstanceID" to "0") }
-            transport("SetAVTransportURI", "InstanceID" to "0", "CurrentURI" to url, "CurrentURIMetaData" to metadata)
+            val listed = useQueue && startSpeakerQueue(loadIndex, LinkPlay.Track(item.mediaId, url, metadata))
+            if (!listed) {
+                onSpeaker = mutableListOf()
+                // Some devices refuse a new song while one plays.
+                if (stopFirst) runCatching { transport("Stop", "InstanceID" to "0") }
+                transport("SetAVTransportURI", "InstanceID" to "0", "CurrentURI" to url, "CurrentURIMetaData" to metadata)
+            }
             if (startAt > 1000) {
                 runCatching { transport("Seek", "InstanceID" to "0", "Unit" to "REL_TIME", "Target" to Upnp.time(startAt)) }
             }
             if (play) transport("Play", "InstanceID" to "0", "Speed" to "1")
+            // The speaker's list starts playing at once; paused, it waits.
+            else if (listed) runCatching { transport("Pause", "InstanceID" to "0") }
             if (loadIndex == index) {
                 state = Player.STATE_READY
                 if (play) playingSince = System.currentTimeMillis()
@@ -346,6 +374,140 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
         val cover = song.cover?.let { api.coverUrl(it, COVER_PX) }
         return url to Upnp.didl(item.mediaId, song.title, song.artist, song.album, url, mime, song.durationSec, cover)
     }
+
+    /**
+     * Hands the speaker [first] and the songs after it as its own list and starts it (LinkPlay, issue #691). False
+     * when the speaker refuses, after which songs go one at a time.
+     */
+    private suspend fun startSpeakerQueue(at: Int, first: LinkPlay.Track): Boolean {
+        val tracks = arrayListOf(first)
+        for (i in LinkPlay.ahead(at, items.size, repeat)) {
+            val item = items.getOrNull(i) ?: continue
+            val (url, metadata) = streamFor(item)
+            tracks += LinkPlay.Track(item.mediaId, url, metadata)
+        }
+        return try {
+            queueCall("CreateQueue", "QueueContext" to LinkPlay.queueContext(tracks))
+            queueCall("PlayQueueWithIndex", "QueueName" to LinkPlay.QUEUE, "Index" to "1")
+            onSpeaker = tracks.toMutableList()
+            onSpeakerAt = 0
+            // The queue may have changed while the list was being made ("Play next" as it starts).
+            syncAgain = false
+            main.post { syncAhead() }
+            if (!queueLogged) AppLog.i("DLNA", "${device.name} plays the queue itself: ${tracks.size} songs handed over")
+            else AppLog.d("DLNA", "${device.name}: new list of ${tracks.size} songs")
+            queueLogged = true
+            true
+        } catch (e: java.io.IOException) {
+            // Refused (the service isn't really there): one song at a time from now on. Anything else (a timeout on
+            // busy Wi-Fi): one song at a time for this song only.
+            if (DlnaQueue.nextRefused(e.message)) {
+                queueBroken = true
+                AppLog.w("DLNA", "${device.name} refused its own list (${e.message}): one song at a time instead")
+            } else {
+                AppLog.w("DLNA", "${device.name}'s list didn't go through (${e.message}): this song on its own")
+            }
+            false
+        }
+    }
+
+    /**
+     * The speaker moved on through its list by itself: Siansa follows. [trackUri] is the address it reports; when it
+     * reports none, [speakerIndex] (its place in the list, from 1) says which song. True when it moved.
+     */
+    private fun followSpeaker(trackUri: String?, speakerIndex: Int?, relMs: Long?, trackMs: Long?): Boolean {
+        if (!useQueue || onSpeaker.isEmpty()) return false
+        val at = when {
+            !trackUri.isNullOrBlank() -> {
+                if (DlnaQueue.sameStream(trackUri, currentUrl)) return false
+                // The next one first, as the same song can be on the list twice.
+                (onSpeakerAt + 1 until onSpeaker.size).firstOrNull { DlnaQueue.sameStream(trackUri, onSpeaker[it].url) }
+                    ?: (0 until onSpeakerAt).firstOrNull { DlnaQueue.sameStream(trackUri, onSpeaker[it].url) }
+                    ?: return false
+            }
+            speakerIndex != null && speakerIndex - 1 != onSpeakerAt && speakerIndex - 1 in onSpeaker.indices -> speakerIndex - 1
+            else -> return false
+        }
+        if (at < onSpeakerAt) {
+            // Back to an earlier song on its list (its own repeat): Siansa's next song starts on a new list instead.
+            AppLog.i("DLNA", "${device.name} went back to an earlier song on its list; starting the next song afresh")
+            next()
+            return true
+        }
+        val track = onSpeaker[at]
+        onSpeakerAt = at
+        currentUrl = track.url
+        val expected = DlnaQueue.nextIndex(index, items.size, repeat)
+        val place = if (items.getOrNull(expected)?.mediaId == track.id) expected else items.indexOfFirst { it.mediaId == track.id }
+        if (place < 0) {
+            // Taken out of the queue before the speaker heard about it: play what's next in the queue instead.
+            AppLog.i("DLNA", "${device.name} moved on to a song no longer in the queue")
+            next()
+            return true
+        }
+        AppLog.i("DLNA", "Song ${track.id} on ${device.name}, played on by the speaker")
+        index = place
+        loadedIndex = place
+        positionMs = relMs ?: 0L
+        durationMs = trackMs?.takeIf { it > 0 } ?: C.TIME_UNSET
+        sawPlaying = true
+        playingSince = System.currentTimeMillis()
+        state = Player.STATE_READY
+        syncAhead()
+        invalidateState()
+        return true
+    }
+
+    /**
+     * Keeps the speaker's coming songs the same as the queue's: tops them up as it plays on, and changes them when
+     * songs are added, taken out, moved or repeat changes.
+     */
+    private fun syncAhead() {
+        if (!useQueue) return
+        if (syncing) { syncAgain = true; return }
+        syncing = true
+        scope.launch {
+            try {
+                // Worked out inside the lock, after any Load before it: the list it changes is the one the speaker
+                // has. A Load still giving the speaker its first list syncs again when it's done.
+                val plan = commands.withLock {
+                    if (onSpeaker.isEmpty() || loadedIndex != index || state == Player.STATE_BUFFERING) return@withLock null
+                    val places = LinkPlay.ahead(index, items.size, repeat)
+                    val wanted = places.map { items[it].mediaId }
+                    val plan = LinkPlay.plan(onSpeaker.drop(onSpeakerAt + 1).map { it.id }, wanted)
+                    if (plan.nothing) return@withLock null
+                    plan.removeFrom?.let { from ->
+                        // Places on the speaker's list count from 1.
+                        val start = onSpeakerAt + 2 + from
+                        if (start - 1 <= onSpeaker.size) {
+                            queueCall("RemoveTracksInQueue", "QueueName" to LinkPlay.QUEUE, "RangStart" to "$start", "RangEnd" to "${onSpeaker.size}")
+                            onSpeaker = onSpeaker.subList(0, start - 1).toMutableList()
+                        }
+                    }
+                    if (plan.append.isNotEmpty()) {
+                        val tracks = places.drop(wanted.size - plan.append.size).mapNotNull { i ->
+                            items.getOrNull(i)?.let { item -> streamFor(item).let { (url, metadata) -> LinkPlay.Track(item.mediaId, url, metadata) } }
+                        }
+                        queueCall("AppendTracksInQueue", "QueueContext" to LinkPlay.queueContext(tracks))
+                        onSpeaker.addAll(tracks)
+                    }
+                    plan
+                }
+                if (plan != null) AppLog.d("DLNA", "${device.name}'s list: " + listOfNotNull(
+                    plan.removeFrom?.let { "took out from ${it + 1} after the song playing" },
+                    plan.append.takeIf { it.isNotEmpty() }?.let { "added ${it.size}" },
+                ).joinToString(", "))
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                AppLog.w("DLNA", "Updating ${device.name}'s list failed: ${e.message}")
+            }
+            syncing = false
+            if (syncAgain) { syncAgain = false; syncAhead() }
+        }
+    }
+
+    private suspend fun queueCall(action: String, vararg args: Pair<String, String>): String =
+        Dlna.soap(device.queueUrl ?: throw java.io.IOException("$action refused: no list service"), LinkPlay.SERVICE, action, *args)
 
     /** Formats already logged, so each shows once. */
     private val loggedOriginal = HashSet<String>()
@@ -387,6 +549,10 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
                     commands.withLock {
                         val info = transport("GetTransportInfo", "InstanceID" to "0")
                         val position = transport("GetPositionInfo", "InstanceID" to "0")
+                        // A speaker playing its own list that doesn't say which address it plays: ask its place in the list.
+                        if (useQueue && onSpeaker.isNotEmpty() && Upnp.value(position, "TrackURI").isNullOrBlank()) {
+                            speakerPlace = runCatching { Upnp.value(queueCall("GetQueueIndex", "QueueName" to LinkPlay.QUEUE), "CurrentIndex")?.toIntOrNull() }.getOrNull()
+                        } else speakerPlace = null
                         Upnp.value(info, "CurrentTransportState") to position
                     }
                 }
@@ -408,12 +574,20 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
         }
     }
 
+    /** Polls in a row the device said it's stopped. */
+    private var stoppedPolls = 0
+
+    /** The speaker's place in its own list, when it was asked (see [followSpeaker]). */
+    private var speakerPlace: Int? = null
+
     private fun onStatus(transportState: String?, relMs: Long?, trackMs: Long?, trackUri: String?) {
         if (loadedIndex != index || state == Player.STATE_BUFFERING) return
+        if (followSpeaker(trackUri, speakerPlace, relMs, trackMs)) return
         if (movedOnByItself(trackUri, relMs, trackMs)) return
         trackMs?.takeIf { it > 0 }?.let { durationMs = it }
         when (transportState) {
             "PLAYING" -> {
+                stoppedPolls = 0
                 sawPlaying = true
                 relMs?.let { positionMs = it }
                 playingSince = System.currentTimeMillis()
@@ -424,7 +598,10 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
                 relMs?.let { positionMs = it }
                 playingSince = 0
             }
-            "STOPPED", "NO_MEDIA_PRESENT" -> if (sawPlaying && playWhenReady) {
+            // A speaker playing its own list may stop for a moment between its songs: only when it stays stopped
+            // (or its list is done) is it the end.
+            "STOPPED", "NO_MEDIA_PRESENT" -> if (sawPlaying && playWhenReady && LinkPlay.ended(useQueue && onSpeaker.isNotEmpty(), onSpeakerAt, onSpeaker.size, ++stoppedPolls)) {
+                stoppedPolls = 0
                 // The song ended on the device and it didn't move on by itself: on to the next one.
                 sawPlaying = false
                 if (sentNext != null) AppLog.i("DLNA", "${device.name} stopped instead of playing the next song it was given")
@@ -484,6 +661,8 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
      * repeat changed which song that is, and an empty one when the queue ends here.
      */
     private fun queueNext() {
+        // A speaker playing its own list already has the next songs.
+        if (useQueue && onSpeaker.isNotEmpty()) return
         if (takesNext == false || nextSending || !playWhenReady) return
         // Repeating one song: the same address twice can't be told apart, so it's sent again at the end instead.
         val nextIndex = if (repeat == Player.REPEAT_MODE_ONE) -1 else DlnaQueue.nextIndex(index, items.size, repeat)
