@@ -31,16 +31,34 @@ data class RampPoint(val db: Int, val ms: Long)
  * #646): [bpm] to a fraction, [beatMs] a beat near that end and [barMs] a downbeat (both in ms from the start of
  * the song; the downbeat only when the bars are clear), [rhythm] how beat-driven the end is (0 to 1: a drum
  * outro near 1, a pad or a spoken intro near 0) and [steady] how well the beats keep to one tempo (0 to 1).
+ * Plugin 0.4.0 adds the phrase (issue #757): [phraseMs] where a phrase starts near that end (an intro's first, an
+ * outro's last) and [phraseBars] how many bars a phrase is (4 or 8), only when the phrases are clear.
  */
-data class BeatEnd(val bpm: Double, val beatMs: Double, val barMs: Double?, val rhythm: Float, val steady: Float) {
+data class BeatEnd(
+    val bpm: Double,
+    val beatMs: Double,
+    val barMs: Double?,
+    val rhythm: Float,
+    val steady: Float,
+    val phraseMs: Double? = null,
+    val phraseBars: Int? = null,
+) {
     val beatLengthMs: Double get() = 60_000.0 / bpm
+
+    /** A phrase's length in ms, when the phrases are clear. */
+    val phraseLengthMs: Double? get() = phraseBars?.let { it * BeatMatch.BEATS_PER_BAR * beatLengthMs }
 
     /** A beat-driven, steady end: one a blend can be laid on, beat for beat. */
     val matchable: Boolean get() = bpm > 0 && rhythm >= BeatMatch.MIN_RHYTHM && steady >= BeatMatch.MIN_STEADY
 
     /** For the log (issue #744): "128.0 BPM, beat 0.82, steady 0.91, bars found". */
     fun describe(): String = "%.1f BPM, beat %.2f, steady %.2f, %s".format(
-        java.util.Locale.ROOT, bpm, rhythm, steady, if (barMs != null) "bars found" else "no bars found",
+        java.util.Locale.ROOT, bpm, rhythm, steady,
+        when {
+            phraseBars != null -> "$phraseBars-bar phrases found"
+            barMs != null -> "bars found, no phrases"
+            else -> "no bars found"
+        },
     )
 }
 
@@ -159,6 +177,8 @@ object PluginProfiles {
             barMs = p.dbl("${prefix}_bar_ms")?.takeIf { it.isFinite() },
             rhythm = (p.dbl("${prefix}_rhythm") ?: 0.0).toFloat().coerceIn(0f, 1f),
             steady = (p.dbl("${prefix}_steady") ?: 0.0).toFloat().coerceIn(0f, 1f),
+            phraseMs = p.dbl("${prefix}_phrase_ms")?.takeIf { it.isFinite() },
+            phraseBars = p.dbl("${prefix}_phrase_bars")?.takeIf { it.isFinite() && it >= 1 }?.toInt(),
         )
     }
 

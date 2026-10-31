@@ -144,10 +144,11 @@ class BeatMatchTest {
 
     @Test fun theLogSaysWhatWasMeasuredAndWhyABlendWasntBeatMatched() {
         // Issue #744: a report sent after a blend that sounded off shows which case it was.
-        assertEquals("128.0 BPM, beat 0.90, steady 0.90, bars found", outro.describe())
+        assertEquals("128.0 BPM, beat 0.90, steady 0.90, bars found, no phrases", outro.describe())
+        assertEquals("128.0 BPM, beat 0.90, steady 0.90, 8-bar phrases found", outro.copy(phraseMs = 300_000.0, phraseBars = 8).describe())
         assertEquals("120.0 BPM, beat 0.10, steady 0.90, no bars found", pad.describe())
         val matched = BeatMatch.note(outro, intro, applies = true)
-        assertEquals("out: 128.0 BPM, beat 0.90, steady 0.90, bars found · in: 126.0 BPM, beat 0.90, steady 0.90, bars found", matched)
+        assertEquals("out: 128.0 BPM, beat 0.90, steady 0.90, bars found, no phrases · in: 126.0 BPM, beat 0.90, steady 0.90, bars found, no phrases", matched)
         assertTrue(BeatMatch.note(null, intro, true).endsWith("not beat-matched: the plugin hasn't measured the beat at the end of the song going out"))
         assertTrue(BeatMatch.note(outro, null, true).endsWith("not beat-matched: the plugin hasn't measured the beat at the start of the next song"))
         assertTrue(BeatMatch.note(outro, pad, true).endsWith("not beat-matched: the start of the next song isn't beat-driven and steady enough"))
@@ -175,6 +176,62 @@ class BeatMatchTest {
         assertEquals("beats not checked", stats.describe())
         listOf(4L, -8L, 12L, -20L).forEach(stats::add)
         assertEquals("beats typically 11 ms apart, at worst 20 ms (4 checks)", stats.describe())
+    }
+
+    // ---- Phrase on phrase (issue #757) ----
+
+    /** The outro's last phrase starts at 300 s (8 bars of 1.875 s: 15 s); the intro's first phrase at 1.875 s. */
+    private val phrasedOutro = outro.copy(phraseMs = 300_000.0, phraseBars = 8)
+    private val phrasedIntro = intro.copy(phraseMs = 1_875.0, phraseBars = 8)
+
+    @Test fun theNextSongsFirstPhraseStartsOnAPhraseOfTheSongGoingOut() {
+        // The song ends 5 s into its last phrase: that part-phrase is left out, and one whole phrase is blended.
+        val plan = BeatMatch.plan(phrasedOutro, phrasedIntro, endMs = 305_000, maxMs = 16_000)!!
+        assertEquals(8, plan.phraseBars)
+        assertEquals(285_000L, plan.startMs)
+        assertEquals(15_000L, plan.overlapMs)
+        assertEquals(5_000L, plan.cutMs)
+        assertEquals(1_875L, plan.incomingStartMs)
+        assertEquals(8, plan.bars)
+        assertEquals("beat-matched 126.0 → 128.0 BPM (+1.6 %), 8 bars (15.0 s), phrase on phrase (8-bar phrases), let go at the end of its last phrase (5.0 s left out)", plan.why)
+    }
+
+    @Test fun aLongerLastPartPhraseIsPlayedToTheEnd() {
+        // 10 s into the last phrase (more than half of it): the blend starts on that phrase and runs to the end.
+        val plan = BeatMatch.plan(phrasedOutro, phrasedIntro, endMs = 310_000, maxMs = 16_000)!!
+        assertEquals(300_000L, plan.startMs)
+        assertEquals(10_000L, plan.overlapMs)
+        assertEquals(0L, plan.cutMs)
+        // A longer setting takes a whole phrase before it too.
+        val longer = BeatMatch.plan(phrasedOutro, phrasedIntro, endMs = 310_000, maxMs = 30_000)!!
+        assertEquals(285_000L, longer.startMs)
+        assertEquals(25_000L, longer.overlapMs)
+    }
+
+    @Test fun aShortSettingBlendsHalfAPhraseAndALongOneTwo() {
+        assertEquals(292_500L, BeatMatch.plan(phrasedOutro, phrasedIntro, 305_000, 8_000)!!.startMs)
+        assertEquals(7_500L, BeatMatch.plan(phrasedOutro, phrasedIntro, 305_000, 8_000)!!.overlapMs)
+        val two = BeatMatch.plan(phrasedOutro, phrasedIntro, 305_000, 32_000)!!
+        assertEquals(270_000L, two.startMs)
+        assertEquals(30_000L, two.overlapMs)
+        // Not even half a phrase: back to bar on bar.
+        assertNull(BeatMatch.plan(phrasedOutro, phrasedIntro, 305_000, 4_000)!!.phraseBars)
+    }
+
+    @Test fun withoutPhrasesAtBothEndsItsBarOnBar() {
+        assertNull(BeatMatch.plan(phrasedOutro, intro, 310_000, 16_000)!!.phraseBars)
+        assertNull(BeatMatch.plan(outro, phrasedIntro, 310_000, 16_000)!!.phraseBars)
+        assertEquals(296_250L, BeatMatch.plan(outro, phrasedIntro, 310_000, 16_000)!!.startMs)
+    }
+
+    @Test fun aSmartPlanLetsTheSongGoAtTheEndOfItsLastPhrase() {
+        val next = song.copy(id = "b", albumId = "al2")
+        val a = profile("a", phrasedOutro, null, quietTailMs = 3_000)
+        val b = profile("b", null, phrasedIntro, headMs = 2_000)
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 305_000, 300_000, a, b, beatMatch = true)!!
+        assertEquals(5_000L, plan.cutMs)
+        assertEquals(15_000L, plan.overlapMs)
+        assertTrue(plan.why, plan.why.contains("phrase on phrase"))
     }
 
     @Test fun aJumpAllowsForHowLongJumpingTakesOnThisPhone() {

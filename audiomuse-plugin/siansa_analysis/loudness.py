@@ -29,7 +29,8 @@ RELATIVE_GATE = -10.0
 MAX_BAD_PACKETS = 20  # damaged packets a song may have before it counts as unreadable…
 MAX_BAD_SHARE = 0.02  # …and at most this share of all packets
 BLOCK_CHUNKS = 4  # a 400 ms gating block is four 100 ms chunks, stepped by one (75 % overlap)
-KEEP_SECONDS = 40  # of mono audio kept from each end of the song for the beat grid (beats.SECONDS plus dead air)
+KEEP_SECONDS = 40  # of mono audio kept from the start of the song for the beat grid (beats.SECONDS plus dead air)
+KEEP_TAIL_SECONDS = 70  # and from its end: the phrase needs a minute (beats.OUTRO_SECONDS plus dead air)
 
 
 def k_weighting(rate):
@@ -82,8 +83,10 @@ class Meter:
         self.filled = 0
         self.frames = 0
         self.skipped_packets = 0
-        # The song's first and last KEEP_SECONDS in mono (float32: 7.7 MB each at most), for the beat grid.
+        # The song's first KEEP_SECONDS and last KEEP_TAIL_SECONDS in mono (float32: 7.7 and 13.4 MB at most), for
+        # the beat grid and the phrases.
         self.keep = int(KEEP_SECONDS * rate)
+        self.keep_tail = int(KEEP_TAIL_SECONDS * rate)
         self.head = []
         self.head_frames = 0
         self.tail = []
@@ -97,7 +100,7 @@ class Meter:
             self.head_frames += self.head[-1].size
         self.tail.append(mono)
         self.tail_frames += mono.size
-        while self.tail and self.tail_frames - self.tail[0].size >= self.keep:
+        while self.tail and self.tail_frames - self.tail[0].size >= self.keep_tail:
             dropped = self.tail.pop(0)
             self.tail_frames -= dropped.size
             self.tail_offset += dropped.size

@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.4.0",
+      "min_core_version": "3.6.4",
+      "changelog": "Finds the phrases at each end of a song (the 4 or 8 bars it's built from: where parts come in or drop out), so Siansa's DJ radio can mix phrase on phrase, as a DJ does. The outro is read over the song's last minute. Beat grids are measured again in the background, as 0.3.0 did; the downbeat is found more surely (the kick counts double, read around the beat).",
+      "imageUrl": ""
+    },
+    {
       "version": "0.3.3",
       "min_core_version": "3.6.4",
       "changelog": "Several music servers in AudioMuse: a song is now fetched from whichever server has it, so songs only on a second or third server get their beat grids (and profiles) too. 0.3.2 put them off for a week and the run for their own server skipped them. The 15-minute task does its work once, not once per music server, so it no longer takes three times as long with three servers.",

@@ -125,7 +125,8 @@ object Crossfade {
         // Beat-matched (issue #646): a DJ blend over whole bars, beat on beat, when both ends have a steady beat.
         val matched = if (rhythmic && beatMatch && currentDurationMs > 0) BeatMatch.plan(outro!!, intro!!, currentDurationMs - cut, maxMs) else null
         var plan = if (matched != null) {
-            FadePlan(matched.overlapMs, matched.overlapMs, matched.why, cut, matched)
+            // A phrase-on-phrase blend may let the song go at the end of its last phrase (issue #757).
+            FadePlan(matched.overlapMs, matched.overlapMs, matched.why, cut + matched.cutMs, matched)
         } else if (mode == CrossfadeMode.SMART && currentProfile != null && nextProfile != null) {
             val tail = ((currentProfile.quietForLastMs(QUIET_DB) ?: 0L) - cut).coerceAtLeast(0L)
             val head = nextProfile.reachesAfterMs(QUIET_DB) ?: 0L

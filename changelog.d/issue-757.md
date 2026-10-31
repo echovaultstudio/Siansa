@@ -1,0 +1,2 @@
+### Added
+- **DJ radio mixes phrase on phrase, like a DJ.** With the Siansa plugin 0.4.0, which finds the phrases a song is built from (its 4 or 8 bars), a beat-matched blend starts where a phrase of the song going out starts, the next song comes in on its first phrase, it lasts whole phrases, and the song going out is let go at the end of a phrase instead of wherever it happens to stop. Songs the plugin hasn't measured again yet blend bar on bar as before.
