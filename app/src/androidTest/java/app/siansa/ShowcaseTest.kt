@@ -150,11 +150,7 @@ class ShowcaseTest {
                 shot("lyrics")
                 back()
                 idle(800)
-                compose.onAllNodesWithContentDescription("Play on a TV or speaker").onFirst().performClick()
-                idle(2500)
-                shot("cast", popups = true)
-                closeSheet()
-                back()
+                settle()
             }
             step("search") {
                 tab("Search")
@@ -269,6 +265,7 @@ class ShowcaseTest {
     // ---- Helpers --------------------------------------------------------------------------------------------------
 
     private fun step(name: String, block: () -> Unit) {
+        runCatching { settle() }
         try {
             block()
             println("Showcase: OK $name")
@@ -279,6 +276,14 @@ class ShowcaseTest {
             runCatching { shot("FAIL-" + name.replace(' ', '-')) }
             repeat(3) { if (popupWindows() > 0) runCatching { closeSheet() } }
             println("Showcase: on screen after $name: " + runCatching { onScreenTexts().take(400) }.getOrDefault("?"))
+        }
+    }
+
+    /** Closes what a step left open: sheets and menus (windows of their own), then now playing. */
+    private fun settle() {
+        repeat(3) { if (popupWindows() > 0) closeSheet() }
+        repeat(2) {
+            if (compose.onAllNodesWithContentDescription("Song options").fetchSemanticsNodes().isNotEmpty()) back()
         }
     }
 
@@ -410,7 +415,10 @@ class ShowcaseTest {
         }
         val bytes = ByteArrayOutputStream().also { full.compress(Bitmap.CompressFormat.JPEG, 94, it) }.toByteArray()
         val parts = Base64.encodeToString(bytes, Base64.NO_WRAP).chunked(3000)
-        parts.forEachIndexed { i, part -> println("SHOWCASE $name ${i + 1}/${parts.size} $part") }
+        parts.forEachIndexed { i, part ->
+            println("SHOWCASE $name ${i + 1}/${parts.size} $part")
+            SystemClock.sleep(6)  // the log drops lines that come faster than it's read
+        }
         println("Showcase: shot $name ${full.width}x${full.height}, ${bytes.size / 1024} KB")
     }
 }
