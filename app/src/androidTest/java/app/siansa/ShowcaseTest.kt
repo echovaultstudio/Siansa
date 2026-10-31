@@ -8,6 +8,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
@@ -336,22 +337,31 @@ class ShowcaseTest {
     /** Scrolls the page's list until [text] is drawn. */
     private fun scrollTo(text: String) {
         if (exists(text)) return
-        compose.onAllNodes(hasScrollToNodeAction()).onFirst()
-            .performScrollToNode(onPage(text))
+        pageList().performScrollToNode(onPage(text))
         idle(500)
     }
 
     /**
      * Scrolls the page until [text] is near the top of the screen ([at] of the way down), where a picture starts: by
-     * the exact distance, without a swipe that could land on the mini player.
+     * the exact distance on the list that holds it, else by half-page swipes clear of the mini player.
      */
     private fun bringUp(text: String, at: Float = 0.1f) {
         scrollTo(text)
-        val top = node(text).fetchSemanticsNode().boundsInRoot.top
         val height = compose.onRoot().fetchSemanticsNode().boundsInRoot.height
-        compose.onAllNodes(hasScrollToNodeAction()).onFirst()
-            .performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, top - height * at) }
-        idle(1500)
+        fun top() = node(text).fetchSemanticsNode().boundsInRoot.top
+        val before = top()
+        runCatching {
+            compose.onAllNodes(hasScrollToNodeAction() and hasAnyDescendant(onPage(text))).onFirst()
+                .performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, before - height * at) }
+        }.onFailure { println("Showcase: scrolling to $text: $it") }
+        idle(1200)
+        var swipes = 0
+        while (top() > height * (at + 0.2f) && swipes++ < 10) {
+            swipe()
+            idle(800)
+        }
+        println("Showcase: $text from ${before.toInt()} to ${top().toInt()} px of ${height.toInt()} ($swipes swipes)")
+        idle(800)
     }
 
     /** Sets the slider inside the part tagged [tag] to [value]. */
@@ -365,6 +375,17 @@ class ShowcaseTest {
     private fun shell(command: String): String =
         android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command))
             .bufferedReader().use { it.readText() }
+
+    /**
+     * The page's own list: of the lists on screen, the one that shows most (a closed sheet's lists are there too, and
+     * the first list found isn't always the page's: a scroll sent to it did nothing in the fourth run).
+     */
+    private fun pageList(): SemanticsNodeInteraction {
+        val screen = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        val lists = compose.onAllNodes(hasScrollToNodeAction())
+        val shown = lists.fetchSemanticsNodes().map { n -> n.boundsInRoot.intersect(screen).let { if (it.isEmpty) 0f else it.width * it.height } }
+        return lists[shown.indices.maxByOrNull { shown[it] } ?: 0]
+    }
 
     private fun idle(ms: Long = 300) {
         compose.waitForIdle()
