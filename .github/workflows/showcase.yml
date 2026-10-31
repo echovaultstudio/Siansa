@@ -97,6 +97,8 @@ jobs:
           print(f"::notice::{len(parts)} screenshots: {', '.join(sorted(parts))}")
           for n in [n for n in notes if "FAILED" not in n][:9]:
               print("::notice::" + n)
+          # All of them, with the pictures: GitHub shows only ten notes of a step.
+          open("shots/notes.txt", "w").write("\n".join(notes) + "\n")
           PY
           tail -3 "${RUNNER_TEMP}/showcase/services.log" 2>/dev/null || true
 

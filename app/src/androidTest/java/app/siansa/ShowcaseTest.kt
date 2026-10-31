@@ -348,7 +348,8 @@ class ShowcaseTest {
     private fun bringUp(text: String, at: Float = 0.1f) {
         scrollTo(text)
         val height = compose.onRoot().fetchSemanticsNode().boundsInRoot.height
-        fun top() = node(text).fetchSemanticsNode().boundsInRoot.top
+        // Where it is, even below the screen (its clipped bounds would be empty there, at 0).
+        fun top() = node(text).fetchSemanticsNode().positionInRoot.y
         val before = top()
         runCatching {
             compose.onAllNodes(hasScrollToNodeAction() and hasAnyDescendant(onPage(text))).onFirst()
