@@ -77,8 +77,11 @@ answers with the other server's songs or says it doesn't know the song.
 
 In **Settings › Connections**, in the card of your music server, **Server name in AudioMuse** is its name,
 as AudioMuse-AI shows it (capitals don't matter). Leave it empty for AudioMuse-AI's default server. Each user keeps
-their own: switch to your Emby user and enter the Emby server's name there, and to your Navidrome user for
-Navidrome's. Users shown together are always on one server, so one name covers them.
+their own: enter the Emby server's name in your Emby user's card, and Navidrome's in your Navidrome user's.
+
+**Users shown together** (for example your kids' login on the same Navidrome, with a library of its own): if
+AudioMuse-AI reads that login as a server of its own, enter that server's name in the kids' card too. Their songs
+then go to AudioMuse-AI under their name, and yours under yours, so radios and "similar" work for both.
 
 **AudioMuse-AI must know each server's songs.** It links songs on a second server to its analysis either by
 analysing that server too, or by **Align** in its setup, which matches songs by path and tags. Songs it couldn't

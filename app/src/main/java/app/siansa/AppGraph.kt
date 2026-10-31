@@ -4,6 +4,8 @@ import app.siansa.playback.ActivePlayer
 import app.siansa.playback.MiniFor
 import app.siansa.mix.Dice
 import app.siansa.data.ArtistPhotos
+import app.siansa.data.audioMuseUserFor
+import app.siansa.data.Users
 import app.siansa.data.SavedVibes
 import app.siansa.mix.MixResume
 import app.siansa.data.RecentPlays
@@ -257,8 +259,15 @@ class AppGraph(val app: Application) {
     )
     /** Only [MusicSource.coverUrl] is ever asked of it: book cover ids are routed here and nowhere else. */
     private val bookCovers: MusicSource by lazy { BookCoverSource(audiobookshelf, subsonic) }
-    // Users shown together are on one server (Guests.onSameServer), so one AudioMuse server name serves them all.
-    val audioMuse = AudioMuseApi(http) { settings.current }
+    // Users shown together share a music server, but AudioMuse reads each login as a server of its own: a shown
+    // user's songs go to AudioMuse with that user's "Server name in AudioMuse" (issue #708).
+    val audioMuse = AudioMuseApi(
+        http,
+        serverFor = { ids ->
+            val user = audioMuseUserFor(ids, { guests.ownerOf(it) }, Users.active, guests.shown.value, library.ownHidden.value)
+            if (user == Users.active) settings.current.audioMuseServer else guests.settingsOf(user).current.audioMuseServer
+        },
+    ) { settings.current }
     /** Audiobooks and podcasts (issue #521): one login for the whole app, like AudioMuse. */
     val audiobookshelf = AudiobookshelfApi(http) { settings.current }
     val books = BookRepository(audiobookshelf) { settings.current }
