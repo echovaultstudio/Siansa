@@ -107,17 +107,23 @@ on a page of its own:
   | Rule | Compares |
   |---|---|
   | Song title, Album, Artist, Genre, Record label, Release type | contains, doesn't contain, is, isn't |
-  | Year, Length (minutes), Songs on it, Plays | is, isn't, at least, at most, between |
-  | Added (days) | in the last, not in the last |
+  | Year, Length (minutes), Songs on it, Play count, Times skipped | is, isn't, at least, at most, between |
+  | Added, Played (days) | in the last, not in the last |
   | Favourite, Compilation | yes, no |
 
   Text takes several values separated by commas: "Genre contains House, Techno" keeps either, "Release type doesn't
   contain Live, Remix" leaves both out. The genres, record labels and release types in your library are there to
-  tap. A song's record label, release type, plays and date added are its album's. Song title is for song cards
-  only; Songs on it and Plays for album cards. For example, an album card with **Record label contains Ninja Tune**
+  tap. A song's record label, release type and date added are its album's. Song title and Times skipped are for
+  song cards only; Songs on it for album cards. For example, an album card with **Record label contains Ninja Tune**
   and **Year is 2024** shows every 2024 album on that label.
+
+  **Play count** and **Played** (when it was last played) for a song come from what Siansa knows: this phone's own
+  history (about the last two months) and your server's count for songs played lately. A song played only long ago
+  on another device may show as never played. **Played not in the last 90 days** also keeps songs never played, so
+  it makes a "not heard in a while" card. **Times skipped** counts the skips on this phone. An album's play count is
+  the server's, or its songs' added up when that's higher.
 - **Order**: random (a new set every day, with a few songs per artist at most), newest or oldest first, recently
-  added, most played, or A to Z; and **How many, at most** (up to 500).
+  added, most played (a song's own plays first), or A to Z; and **How many, at most** (up to 500).
 - **Look on Home**: **Song tiles** (a row of covers; for an album card, **Album tiles**), **Album row** (the albums
   the songs come from), **Banner** (one wide card with the first covers and Play and Shuffle), **Song list** (the
   first five; for an album card, **Album list**) and **Play button** (a slim card: one tap plays it).

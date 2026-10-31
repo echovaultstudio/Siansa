@@ -128,7 +128,7 @@ class AppTourTest {
                     shot("01c-home-two-users")
                     compose.onAllNodesWithContentDescription("Source filter and Arrange Home").onFirst().performClick()
                     idle(1200)
-                    waitText("Users and libraries")
+                    waitText("Servers and libraries")
                     shot("01d-source-filter-two-users", popups = true)
                     click("Only downloaded music")
                     idle(800)

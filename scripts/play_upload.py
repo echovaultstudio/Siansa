@@ -99,7 +99,36 @@ def call(method, url, tok, body=None, data=None, content_type="application/json"
             text = r.read().decode() or "{}"
             return json.loads(text)
     except urllib.error.HTTPError as e:
-        raise PlayError(f"HTTP {e.code}: {e.read().decode(errors='replace')[:800]}") from None
+        raise PlayError(f"{step_of(method, url)}: {play_reason(e.code, e.read().decode(errors='replace'))}") from None
+
+
+def play_reason(code, body):
+    """Play's answer on one line: "HTTP 403 PERMISSION_DENIED: …". Its JSON comes over several lines, and the run's
+    log hides any line that is also a line of the key's JSON (a lone "{"), which left only "***" (issue #675)."""
+    reason = ""
+    try:
+        error = json.loads(body).get("error") or {}
+        reason = " ".join(x for x in (str(error.get("status") or ""), str(error.get("message") or "")) if x).strip()
+    except (ValueError, AttributeError):
+        pass
+    reason = reason or " ".join(body.split())
+    return f"HTTP {code}" + (f" {reason}" if reason else "")[:600]
+
+
+def step_of(method, url):
+    """Which call Play refused, in words: the step tells a missing permission from a wrong upload key."""
+    path = url.split("/applications/", 1)[-1].split("?", 1)[0]
+    if method == "POST" and path.endswith("/edits"):
+        return "Starting an edit"
+    if "/bundles" in path and method == "POST":
+        return "Uploading the bundle"
+    if "/bundles" in path:
+        return "Looking up the bundles"
+    if "/tracks/" in path:
+        return f"{'Reading' if method == 'GET' else 'Setting'} the {path.rsplit('/', 1)[-1]} track"
+    if path.endswith(":commit"):
+        return "Committing the edit"
+    return f"{method} {path}"
 
 
 def tracks_of(setting):

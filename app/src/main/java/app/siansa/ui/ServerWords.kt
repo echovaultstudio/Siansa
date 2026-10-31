@@ -11,6 +11,7 @@ internal object ServerWords {
     /** The server's own name, e.g. for a playlist without an owner: "Playlist · Emby · 12 songs". */
     fun name(kind: SourceKind): String = when (kind) {
         SourceKind.EMBY -> "Emby"
+        SourceKind.JELLYFIN -> "Jellyfin"
         else -> "OpenSubsonic"
     }
 

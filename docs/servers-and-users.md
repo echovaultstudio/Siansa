@@ -7,6 +7,7 @@
 | **Navidrome** (OpenSubsonic) | Everything. Navidrome is what Siansa is tested on most. If your Navidrome has the AudioMuse-AI Navidrome plugin, "similar songs" and Song path can use Navidrome's own sonic similarity. |
 | **Other OpenSubsonic servers** (Gonic, Airsonic, Ampache…) | Browsing, playback, playlists, favourites, scrobbling. Some extras depend on what the server supports (lyrics with timings, sonic similarity). |
 | **Emby** | Browsing, playback, playlists, favourites, play history and "now playing" on Emby. The smart features go through AudioMuse-AI directly. Without AudioMuse, similar songs use Emby's Instant Mix. |
+| **Jellyfin** (10.9 or later) | The same as Emby: browsing, playback, playlists, favourites, play history, "now playing" and lyrics (timed when Jellyfin has them). The smart features go through AudioMuse-AI directly; without it, similar songs use Jellyfin's Instant Mix. |
 
 ## Connecting
 
@@ -15,7 +16,8 @@
 
 - The address can include the port (`http://192.168.1.10:4533`) and a path if your server lives under one.
 - **Server behind a login page?** If a reverse proxy asks for its own login before your server, tap **Add a proxy
-  login** and enter that user name and password too.
+  login** and enter that user name and password too. With Jellyfin this works up to Jellyfin 10.11: Jellyfin 12
+  only takes its login in the same place the proxy's goes.
 - Passwords are stored encrypted with Android's keystore, and never written to the log or to backups.
 
 ## Several users
@@ -23,7 +25,9 @@
 **Settings › Connections › Servers** holds every login on this phone, one card each. Each user has their own
 library, play history and settings. A user can be on the same server or a different one, of either type.
 
-- Open another user's card and tap **Switch to it** (Siansa restarts), or **Remove** to take it off the phone.
+- Open another user's card to change its server address, user name, password, proxy login, name and name in
+  AudioMuse without switching to it; **Save** keeps the changes. **Switch to it** (Siansa restarts) saves them first;
+  **Remove** takes it off the phone.
 - **Add a music server** for another login (on the same server or a different one).
 - **Name shown in Siansa**, in the card of the server in use, shows a name like "Home" instead of its address.
 - **Remove** a user to take their library, history and settings off the phone. Nothing changes on the server.
@@ -45,6 +49,11 @@ The **filter button at the top of Home** opens the source filter. There you can:
 - **Hide your own music**, to see only another user's.
 - **Pick which libraries to show** (Navidrome's music folders, Emby's libraries).
 - **Only downloaded music**: hides everything that isn't on the phone. Handy on a flight.
+- **Sync** one server, or **Sync all** to sync every music library that's shown and Audiobookshelf at once. Each
+  server shows how its sync is going on one small line under its name, with a tick once it's done.
+
+Every server set up in **Settings › Connections** is listed, Audiobookshelf too (with how many books and podcasts it
+has after a sync). Audiobookshelf's books aren't hidden from here: Home's **Arrange** hides their rows.
 
 Song radios, mixes, the dice and recently played only use what the filter shows.
 

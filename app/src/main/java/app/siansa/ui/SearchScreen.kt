@@ -441,7 +441,7 @@ private fun BrowseTile(title: String, colors: Pair<Color, Color>, onClick: () ->
             .clickable(onClick = onClick)
             .padding(Space.Medium),
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 2)
+        WholeWordsText(title, MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 2)
     }
 }
 

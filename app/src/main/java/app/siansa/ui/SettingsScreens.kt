@@ -143,7 +143,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
 
             Heading("${kind.label} server")
             Hint(kind.detail)
-            Field("Server address", draft.navidromeUrl, if (kind == SourceKind.EMBY) "192.168.1.10:8096" else "192.168.1.10:4533") { draft = draft.copy(navidromeUrl = it) }
+            Field("Server address", draft.navidromeUrl, if (kind.embyLike) "192.168.1.10:8096" else "192.168.1.10:4533") { draft = draft.copy(navidromeUrl = it) }
             Field("Username", draft.navidromeUser, keyboard = KeyboardType.Text) { draft = draft.copy(navidromeUser = it) }
             SecretField("Password", draft.navidromePassword) { draft = draft.copy(navidromePassword = it) }
             if (showProxy) {
@@ -155,7 +155,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
             }
             TestRow(navidromeTest) {
                 runTest({ navidromeTest = it }) { s ->
-                    val server = if (kind == SourceKind.EMBY) EmbyApi(graph.http, { s }) else SubsonicApi(graph.http) { s }
+                    val server = if (kind.embyLike) EmbyApi(graph.http, { s }, jellyfin = kind == SourceKind.JELLYFIN) else SubsonicApi(graph.http) { s }
                     "Connected to " + server.ping()
                 }
             }
@@ -171,7 +171,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                 SecretField("Password", draft.audioMusePassword) { draft = draft.copy(audioMusePassword = it) }
                 Field("Server name in AudioMuse", draft.audioMuseServer, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseServer = it) }
                 Hint(
-                    if (kind == SourceKind.EMBY) "AudioMuse reads your Emby library for everything smart. If AudioMuse has more than one music server, enter this Emby server's name as it is in AudioMuse. Each user keeps their own."
+                    if (kind.embyLike) "AudioMuse reads your ${ServerWords.name(kind)} library for everything smart. If AudioMuse has more than one music server, enter this ${ServerWords.name(kind)} server's name as it is in AudioMuse. Each user keeps their own."
                     else "Only if AudioMuse has more than one music server: this server's name as it is in AudioMuse. Leave empty for its main one. Each user keeps their own."
                 )
                 TestRow(audioMuseTest) { runTest({ audioMuseTest = it }) { s -> testAudioMuse(graph, s) } }

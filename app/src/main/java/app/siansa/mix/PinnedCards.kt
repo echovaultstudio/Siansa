@@ -141,13 +141,13 @@ fun pinnedCardProblem(card: PinnedCard, audioMuseReady: Boolean, thisYear: Int =
 const val MAX_SIZE = 500
 
 /** Whether [song] matches a library [card]'s rules ([album]: the album it's on, for its label and the like). */
-fun matchesRules(song: Song, card: PinnedCard, album: Album? = null): Boolean =
-    matchesAll(card.allRules, card.matchAll, SongSubject(song, album))
+fun matchesRules(song: Song, card: PinnedCard, album: Album? = null, stats: PlayStats? = null): Boolean =
+    matchesAll(card.allRules, card.matchAll, SongSubject(song, album, stats))
 
 /**
  * The songs of a library card: those matching its rules, at most [size]. In random order (the default) each artist
  * is limited to a few and the same artist twice in a row is avoided; the same [random] seed gives the same list, so
- * a card looks the same all day. [albums] by id gives each song its album's details.
+ * a card looks the same all day. [albums] by id gives each song its album's details, [stats] its plays.
  */
 fun pickRuleSongs(
     all: List<Song>,
@@ -156,9 +156,10 @@ fun pickRuleSongs(
     size: Int = card.size,
     perArtist: Int = 5,
     albums: Map<String, Album> = emptyMap(),
+    stats: Map<String, PlayStats> = emptyMap(),
 ): List<Song> {
-    val matching = all.filter { matchesRules(it, card, it.albumId?.let(albums::get)) }.distinctBy { it.id }
-    if (card.sort != CardSort.RANDOM) return sortSongs(matching, card.sort, albums).take(size)
+    val matching = all.filter { matchesRules(it, card, it.albumId?.let(albums::get), stats[it.id]) }.distinctBy { it.id }
+    if (card.sort != CardSort.RANDOM) return sortSongs(matching, card.sort, albums, stats).take(size)
     val counts = HashMap<String, Int>()
     val picked = matching.shuffled(random).filter { s ->
         val n = counts.getOrDefault(s.artist, 0)
@@ -167,21 +168,29 @@ fun pickRuleSongs(
     return spreadArtists(picked)
 }
 
-private fun sortSongs(songs: List<Song>, sort: CardSort, albums: Map<String, Album>): List<Song> = when (sort) {
+private fun sortSongs(songs: List<Song>, sort: CardSort, albums: Map<String, Album>, stats: Map<String, PlayStats>): List<Song> = when (sort) {
     CardSort.RANDOM -> songs
     CardSort.NEWEST -> songs.sortedByDescending { it.year ?: Int.MIN_VALUE }
     CardSort.OLDEST -> songs.sortedBy { it.year ?: Int.MAX_VALUE }
     CardSort.ADDED -> songs.sortedByDescending { it.albumId?.let(albums::get)?.created.orEmpty() }
-    CardSort.PLAYED -> songs.sortedByDescending { it.albumId?.let(albums::get)?.playCount ?: 0 }
+    // The song's own plays first (issue #678), its album's for songs played as often.
+    CardSort.PLAYED -> songs.sortedWith(compareByDescending<Song> { stats[it.id]?.plays ?: 0 }.thenByDescending { it.albumId?.let(albums::get)?.playCount ?: 0 })
     CardSort.NAME -> songs.sortedBy { it.title.lowercase() }
 }
 
 /**
  * The albums of a library card (issue #663): those matching its rules, at most [size], in its order (random: the
- * same all day for one [random] seed). [favourites]: albums with a favourite song.
+ * same all day for one [random] seed). [favourites]: albums with a favourite song; [stats]: their songs' plays.
  */
-fun pickRuleAlbums(all: List<Album>, card: PinnedCard, random: Random, size: Int = card.size, favourites: Set<String> = emptySet()): List<Album> {
-    val matching = all.filter { a -> matchesAll(card.allRules, card.matchAll, AlbumSubject(a, a.id in favourites)) }.distinctBy { it.id }
+fun pickRuleAlbums(
+    all: List<Album>,
+    card: PinnedCard,
+    random: Random,
+    size: Int = card.size,
+    favourites: Set<String> = emptySet(),
+    stats: Map<String, PlayStats> = emptyMap(),
+): List<Album> {
+    val matching = all.filter { a -> matchesAll(card.allRules, card.matchAll, AlbumSubject(a, a.id in favourites, stats[a.id])) }.distinctBy { it.id }
     return when (card.sort) {
         CardSort.RANDOM -> matching.shuffled(random)
         CardSort.NEWEST -> matching.sortedByDescending { it.year ?: Int.MIN_VALUE }
@@ -193,7 +202,10 @@ fun pickRuleAlbums(all: List<Album>, card: PinnedCard, random: Random, size: Int
 }
 
 /** Fields whose rules need each song's album (its label, release type, when it was added…). */
-private val ALBUM_FIELDS = setOf(RuleField.LABEL, RuleField.RELEASE_TYPE, RuleField.COMPILATION, RuleField.ADDED, RuleField.PLAYS)
+private val ALBUM_FIELDS = setOf(RuleField.LABEL, RuleField.RELEASE_TYPE, RuleField.COMPILATION, RuleField.ADDED)
+
+/** Fields whose rules need what's known of each song's plays (issue #678). */
+private val PLAY_FIELDS = setOf(RuleField.PLAYS, RuleField.SKIPS, RuleField.PLAYED)
 
 /** The albums the songs come from, in the order they first appear. */
 fun albumIdsOf(songs: List<Song>): List<String> = songs.mapNotNull { it.albumId }.distinct()
@@ -260,14 +272,18 @@ class PinnedCards(private val graph: AppGraph, context: Context) {
             card.contents == CardContents.ALBUMS -> {
                 val needsFavourites = card.allRules.any { it.field == RuleField.FAVOURITE }
                 val favourites = if (needsFavourites) graph.library.starredSongs().mapNotNullTo(HashSet()) { it.albumId } else emptySet()
-                val picked = pickRuleAlbums(graph.library.albums("name"), card, random, favourites = favourites)
+                val stats = if (card.allRules.any { it.field in PLAY_FIELDS }) {
+                    albumPlayStats(playStats(), graph.library.allSongs().mapNotNull { s -> s.albumId?.let { s.id to it } }.toMap())
+                } else emptyMap()
+                val picked = pickRuleAlbums(graph.library.albums("name"), card, random, favourites = favourites, stats = stats)
                 // Playing the card plays its first albums in turn.
                 picked.take(PLAY_ALBUMS).flatMap { graph.library.songsOf(it) } to picked
             }
             else -> {
                 val needsAlbums = card.allRules.any { it.field in ALBUM_FIELDS } || card.sort in setOf(CardSort.ADDED, CardSort.PLAYED)
                 val albumsById = if (needsAlbums) graph.library.albumsById() else emptyMap()
-                val picked = pickRuleSongs(graph.library.allSongs(), card, random, albums = albumsById)
+                val stats = if (card.allRules.any { it.field in PLAY_FIELDS } || card.sort == CardSort.PLAYED) playStats() else emptyMap()
+                val picked = pickRuleSongs(graph.library.allSongs(), card, random, albums = albumsById, stats = stats)
                 picked to if (card.look == CardLook.ALBUMS) albumIdsOf(picked).take(ALBUMS).mapNotNull { graph.library.album(it) } else emptyList()
             }
         }
@@ -278,6 +294,10 @@ class PinnedCards(private val graph: AppGraph, context: Context) {
         made[key] = content
         return content
     }
+
+    /** What this phone and the server's counts say about each song's plays. */
+    private suspend fun playStats(): Map<String, PlayStats> =
+        playStats(graph.history.all(), graph.playCounts.latest())
 
     private fun PinnedCard.trimmed() = copy(
         title = title.trim(), sound = sound.trim(), genre = genre.trim(), artist = artist.trim(), album = album.trim(), words = words.trim(),

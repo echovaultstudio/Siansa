@@ -139,7 +139,7 @@ fun SmartExtrasScreen(nav: NavController, sourceName: String) {
                 "Listens to your music on your server, for mixes made for you, Vibes, Song path and searching by " +
                     "sound. Needs an AudioMuse-AI server. Everything else in Siansa works without it, and you can " +
                     "add it later in Settings." +
-                    if (kind == SourceKind.EMBY) " With Emby, all of these come from AudioMuse: set it up to read your Emby library." else "",
+                    if (kind.embyLike) " With ${ServerWords.name(kind)}, all of these come from AudioMuse: set it up to read your ${ServerWords.name(kind)} library." else "",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Button(

@@ -58,6 +58,7 @@ import androidx.navigation.NavController
 import app.siansa.AppGraph
 import app.siansa.data.AiProvider
 import app.siansa.data.AppSettings
+import app.siansa.data.SettingsRepository
 import app.siansa.data.UserEntry
 import app.siansa.data.UserFiles
 import app.siansa.data.Users
@@ -93,9 +94,35 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
     val inUse = users.firstOrNull { it.id == Users.active }
     var serverName by remember(changes) { mutableStateOf(inUse?.serverName.orEmpty()) }
     var removing by remember { mutableStateOf<UserEntry?>(null) }
+    // The other logins' server settings, to change without switching to them first (issue #687).
+    val othersSaved = remember(changes) { users.filter { it.id != Users.active }.associate { it.id to SettingsRepository(context, it.id).current } }
+    var others by remember(changes) { mutableStateOf(othersSaved) }
+    var otherNames by remember(changes) { mutableStateOf(users.filter { it.id != Users.active }.associate { it.id to it.serverName.orEmpty() }) }
     fun toggle(key: String) { opened = if (key in opened) opened - key else opened + key }
 
+    /** Keeps another login's changed server settings and name; false (with [problem] set) when they can't be. */
+    fun saveOther(user: UserEntry): Boolean {
+        val edited = others[user.id] ?: return true
+        val saved = othersSaved[user.id] ?: return true
+        if (saved.serverDiffers(edited)) {
+            try {
+                val store = SettingsRepository(context, user.id)
+                store.save(store.current.withServerFrom(edited))
+            } catch (e: Exception) {
+                problem = "${user.label}: ${e.message}"
+                return false
+            }
+            graph.guests.reloadSettings(user.id)
+            AppLog.i("Settings", "Server login changed for another user: ${AppLog.redact(edited.navidromeUrl)} as ${edited.navidromeUser}")
+        }
+        val name = otherNames[user.id] ?: return true
+        if (UserFiles.cleanServerName(name) != user.serverName.orEmpty()) Users.setServerName(context, user.id, name)
+        return true
+    }
+
     fun save() {
+        // Other logins first: each save writes the shared AudioMuse and AI settings too, and the page's own come last.
+        for (user in users) if (user.id != Users.active && !saveOther(user)) return
         val before = graph.settings.current
         try {
             graph.settings.save(before.withConnectionsFrom(draft))
@@ -152,9 +179,16 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                         ServerFields(graph, draft, { draft = it; problem = null }, serverName, { serverName = it }, nav)
                         Button(onClick = ::save, modifier = Modifier.fillMaxWidth()) { Text("Save") }
                     } else {
-                        Hint("Another login, with its own library, history and settings. Switch to it to use it or change its login; Siansa restarts.")
+                        Hint("Another login, with its own library, history and settings. Change it here; switch to it to use it (Siansa restarts).")
+                        others[user.id]?.let { other ->
+                            ServerFields(
+                                graph, other, { others = others + (user.id to it); problem = null },
+                                otherNames[user.id].orEmpty(), { otherNames = otherNames + (user.id to it) }, nav, inUse = false,
+                            )
+                        }
+                        Button(onClick = ::save, modifier = Modifier.fillMaxWidth().testTag("saveUser-${user.id}")) { Text("Save") }
                         Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                            Button(onClick = { Users.switchTo(context, user.id) }) { Text("Switch to it") }
+                            Button(onClick = { if (saveOther(user)) Users.switchTo(context, user.id) }) { Text("Switch to it") }
                             OutlinedButton(onClick = { removing = user }) { Text("Remove") }
                         }
                     }
@@ -302,13 +336,22 @@ private fun test(graph: AppGraph, draft: AppSettings, scope: kotlinx.coroutines.
  * AudioMuse-AI, and its library sync.
  */
 @Composable
-private fun ServerFields(graph: AppGraph, draft: AppSettings, onChange: (AppSettings) -> Unit, serverName: String, onServerName: (String) -> Unit, nav: NavController) {
+private fun ServerFields(
+    graph: AppGraph,
+    draft: AppSettings,
+    onChange: (AppSettings) -> Unit,
+    serverName: String,
+    onServerName: (String) -> Unit,
+    nav: NavController,
+    // Another login's server (issue #687): no Library sync row, which is for the login in use.
+    inUse: Boolean = true,
+) {
     val scope = rememberCoroutineScope()
     var result by remember { mutableStateOf<String?>(null) }
     var showProxy by remember { mutableStateOf(draft.proxyUser.isNotBlank()) }
     val kind = draft.sourceKind
     Hint(kind.detail)
-    Field("Server address", draft.navidromeUrl, if (kind == SourceKind.EMBY) "192.168.1.10:8096" else "192.168.1.10:4533") { onChange(draft.copy(navidromeUrl = it)) }
+    Field("Server address", draft.navidromeUrl, if (kind.embyLike) "192.168.1.10:8096" else "192.168.1.10:4533") { onChange(draft.copy(navidromeUrl = it)) }
     Field("Username", draft.navidromeUser, keyboard = KeyboardType.Text) { onChange(draft.copy(navidromeUser = it)) }
     SecretField("Password", draft.navidromePassword) { onChange(draft.copy(navidromePassword = it)) }
     if (showProxy) {
@@ -320,7 +363,7 @@ private fun ServerFields(graph: AppGraph, draft: AppSettings, onChange: (AppSett
     }
     TestRow(result) {
         test(graph, draft, scope, { result = it }) { s ->
-            val server = if (kind == SourceKind.EMBY) EmbyApi(graph.http, { s }) else SubsonicApi(graph.http) { s }
+            val server = if (kind.embyLike) EmbyApi(graph.http, { s }, jellyfin = kind == SourceKind.JELLYFIN) else SubsonicApi(graph.http) { s }
             "Connected to " + server.ping()
         }
     }
@@ -328,9 +371,10 @@ private fun ServerFields(graph: AppGraph, draft: AppSettings, onChange: (AppSett
     Hint("Shown instead of the address, so two logins can be told apart. Leave empty to show the address.")
     Field("Server name in AudioMuse", draft.audioMuseServer, keyboard = KeyboardType.Text) { onChange(draft.copy(audioMuseServer = it)) }
     Hint(
-        if (kind == SourceKind.EMBY) "AudioMuse reads your Emby library for everything smart. If AudioMuse has more than one music server, enter this Emby server's name as it is in AudioMuse."
+        if (kind.embyLike) "AudioMuse reads your ${ServerWords.name(kind)} library for everything smart. If AudioMuse has more than one music server, enter this ${ServerWords.name(kind)} server's name as it is in AudioMuse."
         else "Only if AudioMuse has more than one music server: this server's name as it is in AudioMuse. Leave empty for its main one.",
     )
+    if (!inUse) return
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
     val library by graph.library.status.collectAsStateWithLifecycle()
     Row(

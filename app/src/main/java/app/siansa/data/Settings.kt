@@ -17,6 +17,17 @@ import app.siansa.net.SourceKind
 
 enum class ReplayGainMode(val label: String) { TRACK("Track"), ALBUM("Album"), OFF("Off") }
 
+/** The phone's top bar, with the clock and battery (issue #681, Settings › Style). */
+enum class TopBarStyle(val label: String, val hint: String) {
+    CLEAR("See-through", "The app shows behind the phone's top bar."),
+    BLACK("Black", "A black top bar, so nothing shows behind the clock and icons."),
+    HIDDEN("Hidden", "Full screen: swipe down from the top to see the bar for a moment.");
+
+    companion object {
+        fun parse(value: String?): TopBarStyle = entries.firstOrNull { it.name == value } ?: CLEAR
+    }
+}
+
 /** "Your colour" starts as a teal until someone picks their own (issue #148). */
 const val DEFAULT_THEME_SEED: Int = 0xFF0E9AA7.toInt()
 
@@ -102,6 +113,7 @@ data class AppSettings(
     val navTabs: List<NavTab> = NavTab.default,
     /** On: now playing's lyrics, device and queue buttons (issue #294). Off: the earlier look, lyrics card peeking in. */
     val nowPlayingLyricsButton: Boolean = true,
+    val topBar: TopBarStyle = TopBarStyle.CLEAR,
     val homeHidden: Set<HomeSection> = emptySet(),
     /** Home's rows in another look than their own (issue #655); a row not in it looks as it is. */
     val homeLooks: Map<HomeSection, HomeLook> = emptyMap(),
@@ -170,6 +182,19 @@ data class AppSettings(
         audiobookshelfUrl = page.audiobookshelfUrl, audiobookshelfToken = page.audiobookshelfToken,
         audiobookshelfUser = page.audiobookshelfUser, audiobookshelfPassword = page.audiobookshelfPassword,
     )
+
+    /**
+     * These settings with the music server's fields taken from [page] (another user's card on the Connections page,
+     * issue #687): its address, login, proxy login and name in AudioMuse. Everything else, AudioMuse and AI included,
+     * keeps its value here.
+     */
+    fun withServerFrom(page: AppSettings): AppSettings = copy(
+        navidromeUrl = page.navidromeUrl, navidromeUser = page.navidromeUser, navidromePassword = page.navidromePassword,
+        proxyUser = page.proxyUser, proxyPassword = page.proxyPassword, audioMuseServer = page.audioMuseServer,
+    )
+
+    /** Whether [other] has a different music server or login from these settings. */
+    fun serverDiffers(other: AppSettings): Boolean = withServerFrom(other) != this
 
     /** Books show once an Audiobookshelf server with a login is set (issue #521). */
     val booksReady: Boolean
@@ -328,6 +353,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         miniButtons = MiniButton.parse(prefs.getString("mini_buttons", null)),
         navTabs = NavTab.parse(prefs.getString("nav_tabs", null)),
         nowPlayingLyricsButton = prefs.getBoolean("now_playing_lyrics_button", true),
+        topBar = TopBarStyle.parse(prefs.getString("top_bar", null)),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
         homeLooks = HomeLook.parse(prefs.getString("home_looks", null)),
         homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
@@ -513,6 +539,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         val kept = NavTab.parse(NavTab.format(tabs))
         prefs.edit().putString("nav_tabs", NavTab.format(kept)).apply()
         _state.value = _state.value.copy(navTabs = kept)
+    }
+
+    fun setTopBar(style: TopBarStyle) {
+        prefs.edit().putString("top_bar", style.name).apply()
+        _state.value = _state.value.copy(topBar = style)
     }
 
     fun setNowPlayingLyricsButton(on: Boolean) {
