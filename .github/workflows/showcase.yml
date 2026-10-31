@@ -1,0 +1,125 @@
+name: Showcase screenshots
+
+# The README's and website's screenshots (issue #741): the app on the emulator with a made-up library (invented
+# artists, albums and covers, scripts/showcase) and stand-ins for AudioMuse-AI and an AI service, page by page at full
+# size. On demand, or on a pull request labelled "showcase". The pictures are pushed to the showcase-shots branch
+# (one commit, replaced each time) and kept with the run; docs/screenshots/compose.py makes the README's from them.
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [labeled, synchronize]
+
+permissions:
+  contents: write
+
+# A new run replaces the one before; adding another label to the pull request runs nothing and cancels nothing.
+concurrency:
+  group: showcase${{ github.event.action == 'labeled' && github.event.label.name != 'showcase' && format('-{0}', github.run_id) || '' }}
+  cancel-in-progress: true
+
+jobs:
+  showcase:
+    name: Showcase screenshots
+    # On demand; or a push or the label just added to a pull request labelled "showcase" (not another label).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.pull_request.labels.*.name, 'showcase') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'showcase'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /usr/share/swift /opt/hostedtoolcache/CodeQL /usr/local/lib/node_modules || true
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.14.3"
+
+      - name: Install ffmpeg, Inter and the picture tools
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          sudo apt-get install -y -qq fonts-inter > /dev/null || echo "::warning::No Inter font: the covers' lettering uses DejaVu"
+          python3 -m pip install --quiet --break-system-packages pillow numpy
+
+      - name: Start Navidrome with the showcase library, and the stand-ins
+        run: scripts/showcase-server.sh
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Take the screenshots on a managed emulator
+        run: |
+          set -o pipefail
+          gradle :app:ciPhoneDebugAndroidTest \
+            -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
+            -Pandroid.experimental.testOptions.managedDevices.setupTimeoutMinutes=20 \
+            -Pandroid.testInstrumentationRunnerArguments.class=app.siansa.ShowcaseTest \
+            -Pandroid.testInstrumentationRunnerArguments.showcase=true \
+            -Pandroid.testInstrumentationRunnerArguments.navidromeUrl=http://10.0.2.2:4533 \
+            -Pandroid.testInstrumentationRunnerArguments.servicesUrl=http://10.0.2.2:8000 2>&1 | tee gradle.txt
+
+      - name: The pictures, from the log
+        if: always()
+        run: |
+          find app/build/outputs -iname "logcat*.txt" -exec cat {} + > logcat.txt 2>/dev/null || true
+          mkdir -p shots
+          python3 - <<'PY'
+          import base64, collections, re
+          parts, totals = collections.defaultdict(dict), {}
+          notes = []
+          for line in open("logcat.txt", errors="ignore"):
+              m = re.search(r"SHOWCASE (\S+) (\d+)/(\d+) (\S+)", line)
+              if m:
+                  parts[m[1]][int(m[2])] = m[4]
+                  totals[m[1]] = int(m[3])
+              elif "System.out: Showcase: " in line:
+                  notes.append(line.split("System.out: ", 1)[1].strip())
+          for name, d in sorted(parts.items()):
+              if len(d) == totals[name]:
+                  open(f"shots/{name}.jpg", "wb").write(base64.b64decode("".join(d[i] for i in sorted(d))))
+              else:
+                  print(f"::warning::{name}: only {len(d)} of {totals[name]} parts")
+          for n in [n for n in notes if "FAILED" in n][:9]:
+              print("::error::" + n)
+          print(f"::notice::{len(parts)} screenshots: {', '.join(sorted(parts))}")
+          for n in [n for n in notes if "FAILED" not in n][:9]:
+              print("::notice::" + n)
+          PY
+          tail -3 "${RUNNER_TEMP}/showcase/services.log" 2>/dev/null || true
+
+      - name: Push them to the showcase-shots branch
+        if: always()
+        env:
+          SOURCE: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          [ -n "$(ls shots 2>/dev/null)" ] || { echo "::warning::No screenshots to push"; exit 0; }
+          cd shots
+          git init -q -b showcase-shots
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Showcase screenshots from ${SOURCE}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" showcase-shots
+          echo "::notice::Pushed $(ls | wc -l) screenshots to the showcase-shots branch"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: showcase-screenshots
+          path: |
+            shots/
+            logcat.txt
+            gradle.txt
