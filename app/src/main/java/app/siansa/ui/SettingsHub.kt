@@ -227,41 +227,48 @@ fun PlaybackSettingsScreen(nav: NavController) {
                 }
             }
             HorizontalDivider()
-            Heading("Streaming quality")
-            Hint(ServerWords.streamingHint(settings.sourceKind))
-            QualityRow("On Wi-Fi", settings.transcodeWifiKbps) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
-            QualityRow("On mobile data", settings.transcodeMobileKbps) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
-            Hint("Siansa always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
+            // Each section folds (issue #776): the heading and what's set show; tap to open.
+            FoldSection("Streaming quality", "Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}") {
+                Hint(ServerWords.streamingHint(settings.sourceKind))
+                QualityRow("On Wi-Fi", settings.transcodeWifiKbps) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
+                QualityRow("On mobile data", settings.transcodeMobileKbps) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
+                Hint("Siansa always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
+            }
             HorizontalDivider()
-            Heading("Song radio")
-            Hint("A song radio always starts with its song. How far may it wander from it?")
-            RadioDriftChips(settings.radioDrift) { graph.settings.setRadioDrift(it) }
-            Hint(settings.radioDrift.hint)
+            FoldSection("Song radio", settings.radioDrift.label) {
+                Hint("A song radio always starts with its song. How far may it wander from it?")
+                RadioDriftChips(settings.radioDrift) { graph.settings.setRadioDrift(it) }
+                Hint(settings.radioDrift.hint)
+            }
             HorizontalDivider()
-            Heading("Keep playing")
-            Hint("When the queue is about to end, should Siansa add more songs?")
-            ContinuousChips(settings.continuousPlay) { graph.settings.setContinuousPlay(it) }
-            Hint(continuousHint(settings.continuousPlay, settings.audioMuseReady))
+            FoldSection("Keep playing", settings.continuousPlay.label) {
+                Hint("When the queue is about to end, should Siansa add more songs?")
+                ContinuousChips(settings.continuousPlay) { graph.settings.setContinuousPlay(it) }
+                Hint(continuousHint(settings.continuousPlay, settings.audioMuseReady))
+            }
             HorizontalDivider()
-            Heading("Wind down")
-            Hint("With the sleep timer's Wind down switched on and no time picked, how many calmer songs play before the music ends?")
-            WindDownChips(settings.windDownSongs) { graph.settings.save(graph.settings.current.copy(windDownSongs = it)) }
+            FoldSection("Wind down", "${settings.windDownSongs} songs") {
+                Hint("With the sleep timer's Wind down switched on and no time picked, how many calmer songs play before the music ends?")
+                WindDownChips(settings.windDownSongs) { graph.settings.save(graph.settings.current.copy(windDownSongs = it)) }
+            }
             HorizontalDivider()
-            Heading("Load songs ahead")
-            Hint("While a song plays, Siansa loads the next ones, one at a time, so they start at once and keep playing if the connection drops. Fewer means less data. Only original files are loaded ahead.")
             val preloadChoices = Preload.choices(settings)
-            if (settings.songCacheMb <= 0) Hint("The song cache is off (Settings › Storage), so up to 3 songs are loaded ahead, and each is removed once it has played.")
-            PreloadRow("On Wi-Fi", settings.preloadWifi.coerceIn(preloadChoices), "preload-wifi", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadWifi = it)) }
-            PreloadRow("On mobile data", settings.preloadMobile.coerceIn(preloadChoices), "preload-mobile", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadMobile = it)) }
+            FoldSection("Load songs ahead", "Wi-Fi ${settings.preloadWifi.coerceIn(preloadChoices)} · mobile ${settings.preloadMobile.coerceIn(preloadChoices)}") {
+                Hint("While a song plays, Siansa loads the next ones, one at a time, so they start at once and keep playing if the connection drops. Fewer means less data. Only original files are loaded ahead.")
+                if (settings.songCacheMb <= 0) Hint("The song cache is off (Settings › Storage), so up to 3 songs are loaded ahead, and each is removed once it has played.")
+                PreloadRow("On Wi-Fi", settings.preloadWifi.coerceIn(preloadChoices), "preload-wifi", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadWifi = it)) }
+                PreloadRow("On mobile data", settings.preloadMobile.coerceIn(preloadChoices), "preload-mobile", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadMobile = it)) }
+            }
             // Only with an Audiobookshelf server (issue #521): how far the book player's skip buttons jump.
             if (settings.booksReady) {
                 HorizontalDivider()
-                Heading("Books")
-                Hint("How far the book player's skip buttons jump.")
-                Text("Back", style = MaterialTheme.typography.bodyMedium)
-                SkipChips(settings.bookSkipBackSec, "bookSkipBack") { graph.settings.save(graph.settings.current.copy(bookSkipBackSec = it)) }
-                Text("Forward", style = MaterialTheme.typography.bodyMedium)
-                SkipChips(settings.bookSkipForwardSec, "bookSkipForward") { graph.settings.save(graph.settings.current.copy(bookSkipForwardSec = it)) }
+                FoldSection("Books", "Back ${settings.bookSkipBackSec} s · forward ${settings.bookSkipForwardSec} s") {
+                    Hint("How far the book player's skip buttons jump.")
+                    Text("Back", style = MaterialTheme.typography.bodyMedium)
+                    SkipChips(settings.bookSkipBackSec, "bookSkipBack") { graph.settings.save(graph.settings.current.copy(bookSkipBackSec = it)) }
+                    Text("Forward", style = MaterialTheme.typography.bodyMedium)
+                    SkipChips(settings.bookSkipForwardSec, "bookSkipForward") { graph.settings.save(graph.settings.current.copy(bookSkipForwardSec = it)) }
+                }
             }
         }
     }
@@ -351,6 +358,9 @@ internal fun PreloadRow(label: String, value: Int, tag: String, choices: IntRang
 private val qualities = listOf(0, 96, 128, 160, 192, 256, 320)
 
 
+/** "Original" or "Opus 128", for a folded section's summary. */
+internal fun qualityLabel(kbps: Int): String = if (kbps == 0) "Original" else "Opus $kbps"
+
 @Composable
 private fun QualityRow(label: String, value: Int, onPick: (Int) -> Unit) {
     Text(label, style = MaterialTheme.typography.bodyLarge)
@@ -399,13 +409,17 @@ fun StorageScreen(nav: NavController) {
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
-            Heading("Downloads")
-            Hint("Music you chose to keep on the phone isn't part of the song cache and is never removed by itself.")
-            usage.valueOrNull()?.let { u -> Text("In use: ${formatBytes(u.downloads)}", style = MaterialTheme.typography.bodyLarge) }
-            OutlinedButton(onClick = { nav.navigate("downloads") }) { Text("Manage downloads") }
+            // Each section folds (issue #776): the heading and what it holds show; tap to open.
+            val u = usage.valueOrNull()
+            FoldSection("Downloads", u?.let { "In use: ${formatBytes(it.downloads)}" }) {
+                Hint("Music you chose to keep on the phone isn't part of the song cache and is never removed by itself.")
+                u?.let { Text("In use: ${formatBytes(it.downloads)}", style = MaterialTheme.typography.bodyLarge) }
+                OutlinedButton(onClick = { nav.navigate("downloads") }) { Text("Manage downloads") }
+            }
 
             HorizontalDivider()
-            Heading("Song cache")
+            val songSummary = if (settings.songCacheMb <= 0) "Off" else u?.let { "${formatBytes(it.songs)} of ${formatMb(settings.songCacheMb)}" } ?: formatMb(settings.songCacheMb)
+            FoldSection("Song cache", songSummary) {
             Hint("Songs are kept on the phone as they play, and the next song in the queue is fetched ahead, so replays and skips start at once and survive a bad connection. Only original-quality streams are cached. Off keeps nothing once it has played; songs loaded ahead (Settings › Playback) are held only until they play.")
             usage.valueOrNull()?.let { u ->
                 Text(
@@ -445,9 +459,11 @@ fun StorageScreen(nav: NavController) {
                     refresh++
                 }
             }) { Text("Clear song cache") }
+            }
 
             HorizontalDivider()
-            Heading("Image cache")
+            val imageSummary = u?.let { "${formatBytes(it.images)}" + if (settings.imageCacheMb > 0) " of ${formatMb(settings.imageCacheMb)}" else "" }
+            FoldSection("Image cache", imageSummary) {
             Hint("Covers and artist photos are saved as they load, so they show instantly next time and without a connection. The oldest are removed when the cache is full. With no limit nothing is removed, and Android won't clear them when the phone runs low on space.")
             usage.valueOrNull()?.let { u ->
                 Text(
@@ -479,9 +495,13 @@ fun StorageScreen(nav: NavController) {
                     refresh++
                 }
             }) { Text("Clear image cache") }
+            }
 
+            HorizontalDivider()
+            FoldSection("Animated covers", if (settings.animatedCovers) "On" else "Off") {
             SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
             Hint("When an album folder has an animated cover (cover.gif or cover.webp), it moves on the album page and in now playing; lists show its first frame. Your server may not shrink an animated WebP (Navidrome can't), so it's downloaded once in full and kept on the phone.")  // server-name: ok (an example of a server that can't)
+            }
 
             // Switching the song cache off applies from the next song; a new size needs a restart.
             if (settings.imageCacheMb != imagesAtStart || (settings.songCacheMb != songsAtStart && settings.songCacheMb > 0)) {
@@ -494,10 +514,11 @@ fun StorageScreen(nav: NavController) {
             }
 
             HorizontalDivider()
-            Heading("Other data on this phone")
-            usage.valueOrNull()?.let { u ->
-                Text("Library database: ${formatBytes(u.library)}", style = MaterialTheme.typography.bodyMedium)
-                Text("Logs: ${formatBytes(u.logs)}", style = MaterialTheme.typography.bodyMedium)
+            FoldSection("Other data on this phone", u?.let { "Library ${formatBytes(it.library)} · logs ${formatBytes(it.logs)}" }) {
+                u?.let {
+                    Text("Library database: ${formatBytes(it.library)}", style = MaterialTheme.typography.bodyMedium)
+                    Text("Logs: ${formatBytes(it.logs)}", style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
     }

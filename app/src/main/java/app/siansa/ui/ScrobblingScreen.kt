@@ -87,9 +87,11 @@ fun ScrobblingScreen(nav: NavController) {
                 .padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
-            Heading("When a song counts")
-            ScrobblePercentChips(settings.scrobblePercent) { graph.settings.save(graph.settings.current.copy(scrobblePercent = it)) }
-            Hint("A song is sent once more than ${settings.scrobblePercent}% of it has played, or four minutes, whichever comes first. Songs under 30 seconds never count. Listens made offline are sent later.")
+            // Each section folds (issue #776): the heading and what's set show; tap to open.
+            FoldSection("When a song counts", "After ${settings.scrobblePercent}% or four minutes") {
+                ScrobblePercentChips(settings.scrobblePercent) { graph.settings.save(graph.settings.current.copy(scrobblePercent = it)) }
+                Hint("A song is sent once more than ${settings.scrobblePercent}% of it has played, or four minutes, whichever comes first. Songs under 30 seconds never count. Listens made offline are sent later.")
+            }
 
             HorizontalDivider()
 
@@ -97,7 +99,7 @@ fun ScrobblingScreen(nav: NavController) {
             val context = LocalContext.current
             val users = remember { Users.all(context) }
             if (users.size > 1) {
-                Heading("Users")
+                FoldSection("Users", "${users.count { scrobblesFrom(it.id, settings.scrobbleOffUsers) }} of ${users.size} scrobbled") {
                 users.forEach { user ->
                     val on = scrobblesFrom(user.id, settings.scrobbleOffUsers)
                     SwitchRow(user.label + if (user.id == Users.active) " (you)" else "", on) { scrobble ->
@@ -107,17 +109,25 @@ fun ScrobblingScreen(nav: NavController) {
                     }
                 }
                 Hint("Turn a user off and songs from their library aren't sent to your server, Last.fm or ListenBrainz, while you listen as you.")
+                }
                 HorizontalDivider()
             }
 
-            Heading("Your server")
+            val serverOn = settings.scrobbleNavidrome
+            FoldSection("Your server", if (serverOn) "On" else "Off") {
             SwitchRow("Record plays on your server", settings.scrobbleNavidrome) {
                 graph.settings.save(graph.settings.current.copy(scrobbleNavidrome = it))
             }
             Hint("Keeps play counts and \"recently played\" on your server. If your server itself is linked to Last.fm or ListenBrainz, leave the matching option below off, or plays are counted twice.")
+            }
 
             HorizontalDivider()
-            Heading("Last.fm")
+            val lfmSummary = when {
+                settings.lastFmSession.isNotBlank() && settings.lastFmEnabled -> "On · ${settings.lastFmUser}"
+                settings.lastFmSession.isNotBlank() -> "Off · signed in as ${settings.lastFmUser}"
+                else -> "Off"
+            }
+            FoldSection("Last.fm", lfmSummary) {
             SwitchRow("Scrobble to Last.fm", settings.lastFmEnabled) {
                 graph.settings.save(graph.settings.current.copy(lastFmEnabled = it))
             }
@@ -152,9 +162,11 @@ fun ScrobblingScreen(nav: NavController) {
             }
             val lfmShown = lfmStatus ?: if (settings.lastFmSession.isNotBlank()) "✓ Signed in as ${settings.lastFmUser}" else null
             lfmShown?.let { Status(it) }
+            }
 
             HorizontalDivider()
-            Heading("ListenBrainz / Koito")
+            val lbSummary = if (settings.listenBrainzReady) "On · " + ListenBrainzApi.apiRoot(settings.listenBrainzUrl).removePrefix("https://").removeSuffix("/") else "Off"
+            FoldSection("ListenBrainz / Koito", lbSummary, tag = "listenbrainz") {
             SwitchRow("Send listens", settings.listenBrainzEnabled) {
                 graph.settings.save(graph.settings.current.copy(listenBrainzEnabled = it))
             }
@@ -173,6 +185,7 @@ fun ScrobblingScreen(nav: NavController) {
                 }) { Text("Test and save") }
             }
             lbStatus?.let { Status(it) }
+            }
         }
     }
 }

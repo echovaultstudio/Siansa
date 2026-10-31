@@ -53,8 +53,18 @@ the vibe for the current hour builds **today's mix**. **Settings › Daily Vibe 
 
 How the songs are picked is explained in [How it works](how-it-works.md#todays-mix-and-vibes).
 
-**When mixes are made.** Today's mix is made once a day, when Home or the background first needs it. When the
-hour's vibe moves on, the mix you have stays; tap refresh on it to make one for the vibe of this hour. The
+**Today's mix** has settings of its own at the top of **Settings › Daily Vibe settings**, which apply to it whichever
+vibe makes it:
+
+- **Auto update** (on by default): the mix follows the time of day. A new one is made as the day or the hour's vibe
+  moves on, when Home or the background next needs it, and when a tuning below changes. Off: the mix you last made
+  with refresh stays on Home, whatever the day or the hour, until you press refresh again. Nothing is made for you;
+  before the first, Home offers **Make it**.
+- **Songs**, **Surprise**, **Leave out most played** and **Days before a repeat**: each either **Vibe's own** (what
+  the vibe that makes the mix says) or a value of its own, so one place tunes the mix you see first.
+
+**When mixes are made.** With Auto update on, today's mix is made when Home or the background first needs it, and
+again when the hour's vibe moves on; refresh makes a new one at any time. The
 carousel's mixes are made for each part of the day, the first time Home shows them. Showing or hiding music with
 the source filter doesn't make mixes again; tap refresh to make one for the music shown now.
 

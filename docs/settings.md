@@ -25,6 +25,9 @@ to fold it open; they start folded. **Save** (at the top, or in any open card) k
   Gemini, Mistral, Groq, Ollama or another), its key, its model, and **AI titles and sound searches**. See
   [AI features](ai.md).
 
+Settings pages are in sections that fold: each shows its heading and what's set, and opens with the arrow on the
+right, as Connections does. Tap the heading to open or fold it.
+
 ## Playback
 
 | Setting | What it does |
@@ -61,8 +64,8 @@ When a song counts, your server, Last.fm, ListenBrainz or Koito, and which users
 
 ## Daily Vibe settings
 
-Your vibes for each part of the day, and the **Use the moment** panel. See
-[Home and your mixes](home-and-mixes.md#vibes-and-todays-mix).
+**Today's mix** (Auto update, and its own tuning over the vibe's), your vibes for each part of the day, and the
+**Use the moment** panel. See [Home and your mixes](home-and-mixes.md#vibes-and-todays-mix).
 
 ## Cards
 

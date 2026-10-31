@@ -52,4 +52,20 @@ class MixRulesTest {
         val others = listOf(made("y", "morning", "2026-10-25", 1), made("c", "carousel-day-v0-0", today, 1), made("p", "you-sound", today, 1))
         assertEquals(null, MixRules.todaysMix(others, today, "morning", vibes))
     }
+
+    @Test fun autoUpdateFollowsTheTimeOfDayAndOffKeepsTheLastMade() {
+        // Issue #776. Auto update on: the mix of this hour's vibe, made today; otherwise none, so one is made.
+        val today = "2026-10-31"
+        val vibes = setOf("morning", "daytime", "evening")
+        val morning = made("m", "morning", today, at = 1)
+        assertEquals(morning, MixRules.todaysMixBy(true, listOf(morning), today, "morning", vibes))
+        assertEquals(null, MixRules.todaysMixBy(true, listOf(morning), today, "daytime", vibes))  // the hour moved on: a new one
+        assertEquals(null, MixRules.todaysMixBy(true, listOf(made("y", "daytime", "2026-10-30", 9)), today, "daytime", vibes))  // yesterday's doesn't count
+        // Off: whatever was made last stays, across the hour and the day, until ↻.
+        val yesterday = made("y", "evening", "2026-10-30", at = 9)
+        assertEquals(yesterday, MixRules.todaysMixBy(false, listOf(morning, yesterday), today, "daytime", vibes))
+        assertEquals(morning, MixRules.todaysMixBy(false, listOf(morning), today, "daytime", vibes))
+        // Off, with nothing ever made: null, and Home offers to make one.
+        assertEquals(null, MixRules.todaysMixBy(false, listOf(made("p", "you-sound", today, 1)), today, "morning", vibes))
+    }
 }

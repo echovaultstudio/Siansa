@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -35,6 +36,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -190,6 +193,51 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
 @Composable
 internal fun Heading(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+}
+
+/**
+ * A settings page's section that folds (issue #776): its heading and a line of what's set, with the arrow
+ * Connections uses, turned when open. Folded by default, so a page shows what's on it at a glance; the body is
+ * only built when open. [summary] says the setting's state while folded ("On · Rock", "6 s"). The open state is
+ * kept while the page lives.
+ */
+@Composable
+internal fun FoldSection(
+    title: String,
+    summary: String? = null,
+    tag: String = title.lowercase().replace(Regex("[^a-z0-9]+"), "-"),
+    startOpen: Boolean = false,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    var open by androidx.compose.runtime.saveable.rememberSaveable(tag) { mutableStateOf(startOpen) }
+    val turn by androidx.compose.animation.core.animateFloatAsState(if (open) 180f else 0f, label = "fold")
+    Column(Modifier.fillMaxWidth().testTag("section-$tag")) {
+        Row(
+            Modifier.fillMaxWidth()
+                .clickable(onClickLabel = if (open) "Fold" else "Open") { open = !open }
+                .padding(vertical = Space.Small)
+                .testTag("section-$tag-header"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Heading(title)
+                if (!open && !summary.isNullOrBlank()) Hint(summary)
+            }
+            Icon(
+                androidx.compose.material.icons.Icons.Rounded.ExpandMore,
+                if (open) "Fold $title" else "Open $title",
+                Modifier.rotate(turn),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        androidx.compose.animation.AnimatedVisibility(open) {
+            Column(
+                Modifier.fillMaxWidth().padding(bottom = Space.Small).testTag("section-$tag-body"),
+                verticalArrangement = Arrangement.spacedBy(Space.Medium),
+                content = content,
+            )
+        }
+    }
 }
 
 @Composable

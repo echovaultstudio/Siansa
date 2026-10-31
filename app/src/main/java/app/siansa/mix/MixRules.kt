@@ -37,4 +37,17 @@ object MixRules {
         val made = mixes.filter { it.date == today && it.selectorId in vibeIds }
         return made.firstOrNull { it.selectorId == currentId } ?: made.maxByOrNull { it.createdAt }
     }
+
+    /**
+     * Home's "Today's mix" by the Auto update setting (issue #776):
+     * - **on**: it follows the time of day. The mix of this hour's vibe ([currentId]) when it was made today;
+     *   null otherwise, so one is made as the day or the hour's vibe moves on.
+     * - **off**: the mix made last with ↻ stays, whatever the day or the hour, until ↻ again: the newest vibe mix
+     *   there is. Null only when none was ever made.
+     */
+    fun todaysMixBy(autoUpdate: Boolean, mixes: List<Mix>, today: String, currentId: String?, vibeIds: Set<String>): Mix? {
+        val vibeMixes = mixes.filter { it.selectorId in vibeIds }
+        return if (autoUpdate) vibeMixes.firstOrNull { it.date == today && it.selectorId == currentId }
+        else vibeMixes.maxByOrNull { it.createdAt }
+    }
 }

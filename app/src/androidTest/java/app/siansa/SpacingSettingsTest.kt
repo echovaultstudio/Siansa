@@ -16,6 +16,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -121,6 +123,41 @@ class SpacingSettingsTest : SpacingCheck() {
         val chips = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("DJ radio")), useUnmergedTree = true).getBoundsInRoot()
         val hint = compose.onNodeWithTag("hint").getBoundsInRoot()
         assertEven("Beat-match chips", chips.top - heading.bottom, hint.top - chips.bottom)
+    }
+
+    /** Today's mix tuning (issue #776): a row of chips sits evenly between its label and the next label. */
+    @Test fun todaysMixTuningChipsAreEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    app.siansa.ui.TuningRow("Songs", 40, app.siansa.data.DailyMix.LENGTHS, { "$it" }, "dailyLength") { }
+                    app.siansa.ui.TuningRow("Surprise", null, listOf(0, 15, 30), { "$it %" }, "dailySurprise") { }
+                }
+            }
+        }
+        val songs = compose.onNodeWithText("Songs").getBoundsInRoot()
+        val chips = compose.onNodeWithTag("dailyLength").getBoundsInRoot()
+        val surprise = compose.onNodeWithText("Surprise").getBoundsInRoot()
+        assertEven("Tuning chips", chips.top - songs.bottom, surprise.top - chips.bottom)
+    }
+
+    /** A folded settings section (issue #776): the arrow is centred on the heading, open or folded. */
+    @Test fun foldSectionArrowIsCentredOnItsHeading() {
+        compose.setContent {
+            SiansaTheme {
+                Column {
+                    app.siansa.ui.FoldSection("Song radio", "A little", tag = "radio") { Box(Modifier.fillMaxWidth().height(40.dp).testTag("radio-content")) }
+                }
+            }
+        }
+        val header = compose.onNodeWithTag("section-radio-header").getBoundsInRoot()
+        val arrow = compose.onNode(hasContentDescription("Open Song radio"), useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Fold arrow centred", arrow.top - header.top, header.bottom - arrow.bottom, 2.dp)
+        // Folded by default: the body isn't there; a tap opens it.
+        assertTrue(compose.onAllNodesWithTag("radio-content").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithTag("section-radio-header").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("radio-content").assertExists()
     }
 
     /** Beat-matched blends (issue #759): the 4 / 8 / 16 bars chips sit evenly between "Blend length" and their hint. */
