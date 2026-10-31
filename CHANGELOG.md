@@ -3,6 +3,25 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.47.0beta — 2026-10-31
+
+### Fixed
+- **DJ blends no longer cut or flutter at the start.** The next song is sent ahead by what this phone really needs
+  (about 60 ms, not 150), a near miss is corrected by speed instead of a jump, and the speed is only nudged by up to
+  1 % and only when it matters, so the beats come together without a pitch wobble.
+
+### Added
+- **Today's mix has its own settings**, at the top of Settings › Daily Vibe settings. **Auto update** on keeps it
+  following the time of day; off keeps the mix you last made with ↻ until you press it again. **Songs**, **Surprise**,
+  **Leave out most played** and **Days before a repeat** can be set for Today's mix on their own, or left to the vibe
+  that makes it.
+
+### Changed
+- **Repeat and Add to playlist in now playing give a short buzz** when pressed, like swiping the mini player. It
+  follows your phone's touch vibration setting.
+- **Settings pages are in sections that fold.** Each shows its heading and what's set, and opens with the arrow on the
+  right, as Connections does: Playback, Crossfade and levelling, Scrobbling and Storage.
+
 ## 0.46.0beta — 2026-10-31
 
 ### Fixed
