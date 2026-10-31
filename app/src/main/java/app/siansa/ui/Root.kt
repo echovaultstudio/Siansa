@@ -492,7 +492,11 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
                             onDragEnd = {
                                 val moved = drag.value
                                 scope.launch {
-                                    when (miniSwipe(moved, barWidth)) {
+                                    val swipe = miniSwipe(moved, barWidth)
+                                    // A short buzz as the song changes (issue #763); the phone's touch-feedback setting decides
+                                    // whether it's felt.
+                                    if (swipe != MiniSwipe.NONE) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    when (swipe) {
                                         MiniSwipe.NEXT -> { drag.animateTo(-barWidth.toFloat()); graph.player.next() }
                                         MiniSwipe.PREVIOUS -> { drag.animateTo(barWidth.toFloat()); graph.player.previousTrack() }
                                         MiniSwipe.NONE -> drag.animateTo(0f)
