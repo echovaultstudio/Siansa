@@ -79,6 +79,8 @@ internal class Crossfader(
     private var primeAt = 0L
     /** The tail is playing silently, keeping in step with the main player. */
     private var primed = false
+    /** The fade is waiting for a tail that is still loading (logged once, issue #767). */
+    private var waitingForTail = false
     private var lastCoarseAlign = 0L
     /** A song whose fade was given up or isn't wanted, until the queue moves on or changes. */
     private var skipped: String? = null
@@ -216,8 +218,19 @@ internal class Crossfader(
             // A primed tail takes over only once it's in step, or a while later anyway (issue #759).
             val t = tail
             val wait = min(Crossfade.HANDOVER_WAIT_MS, plan?.beat?.outgoing?.beatLengthMs?.toLong() ?: Crossfade.HANDOVER_WAIT_MS)
-            if (primed && t != null && t.isPlaying && until > -wait &&
-                abs(main.currentPosition - t.currentPosition) > Crossfade.HANDOVER_STEP_MS) return ALIGN_MS
+            // A tail still loading (it just jumped to catch up) gets a moment too, or the blend would be called off
+            // and the next song come in with a cut (issue #767).
+            if (t != null) {
+                val loading = t.playbackState == Player.STATE_BUFFERING
+                if (Crossfade.waitForTail(primed, loading, t.isPlaying, until, main.currentPosition - t.currentPosition, wait)) {
+                    if (loading && !waitingForTail) {
+                        waitingForTail = true
+                        AppLog.d("Crossfade", "Waiting for the tail to load (it jumped to catch up)")
+                    }
+                    return ALIGN_MS
+                }
+            }
+            waitingForTail = false
             begin()
             return 0
         }
@@ -276,6 +289,7 @@ internal class Crossfader(
     private fun disarm() {
         if (phase == Phase.FADING) return
         primed = false
+        waitingForTail = false
         releaseTail()
         outgoing = null
         plan = null
