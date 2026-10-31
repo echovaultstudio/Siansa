@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -108,11 +109,16 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
 
         private val song = Song(id = "1", title = "So Nearly", artist = "Lonely The Brave", album = "The Day's War")
 
-        /** Now playing's own colours, white on the cover's dark colours in light mode too, as PlayerScreen draws them. */
+        /**
+         * Now playing's own colours, white on the cover's dark colours in light mode too: the player's colour scheme
+         * (PlayerScreen) and its white text (Root, around the player's sheet).
+         */
         @Composable
         private fun OnPlayer(content: @Composable () -> Unit) {
             MaterialTheme(colorScheme = playerColors(), typography = MaterialTheme.typography) {
-                Box(Modifier.fillMaxWidth().background(Color(0xFF221C2E))) { content() }
+                CompositionLocalProvider(LocalContentColor provides Color.White) {
+                    Box(Modifier.fillMaxWidth().background(Color(0xFF221C2E))) { content() }
+                }
             }
         }
 
