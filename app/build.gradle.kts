@@ -67,6 +67,8 @@ android {
         unitTests.isReturnDefaultValues = true
         // The screenshot tests (issue #710) draw with the app's real resources on Robolectric.
         unitTests.isIncludeAndroidResources = true
+        // Robolectric fetches Android itself while the tests run: from Google's copy of Maven Central too (issue #749).
+        unitTests.all { it.systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2") }
         managedDevices {
             localDevices {
                 create("ciPhone") {
