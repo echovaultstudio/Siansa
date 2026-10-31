@@ -150,6 +150,19 @@ object BeatMatch {
         fun describe(): String = if (checks == 0) "beats not checked" else "beats typically ${total / checks} ms apart, at worst $worst ms ($checks checks)"
     }
 
+    /** How long getting the next song to a point takes at first, before Siansa has measured it on this phone (issue #747). */
+    const val DEFAULT_SEEK_LAG_MS = 150L
+    /** Longer than this, a measured lag is a stall, not the phone's usual delay. */
+    const val MAX_SEEK_LAG_MS = 600L
+
+    /**
+     * What a jump costs on this phone, learned from the last one (issue #747): the next song was sent [leadMs] ahead
+     * of where it should be and, once settled, was [errorMs] out of step (behind is negative), so the jump took
+     * [leadMs] − [errorMs]. Averaged with [previous], so one slow jump doesn't throw the next one off.
+     */
+    fun learnedLag(previous: Long, leadMs: Long, errorMs: Long): Long =
+        ((previous + (leadMs - errorMs)) / 2).coerceIn(0L, MAX_SEEK_LAG_MS)
+
     /** The speed nudge that brings the next song back in step over about a second: ahead, a touch slower. */
     fun nudge(errorMs: Long): Float = if (abs(errorMs) <= IN_STEP_MS) 1f else (1f - errorMs / 1000f).coerceIn(0.98f, 1.02f)
 

@@ -176,4 +176,15 @@ class BeatMatchTest {
         listOf(4L, -8L, 12L, -20L).forEach(stats::add)
         assertEquals("beats typically 11 ms apart, at worst 20 ms (4 checks)", stats.describe())
     }
+
+    @Test fun aJumpAllowsForHowLongJumpingTakesOnThisPhone() {
+        // Issue #747: sent 0 ms ahead, the next song settled 185 ms behind: getting there took 185 ms. Averaged with
+        // the 150 ms Siansa starts from, the next jump is sent 167 ms ahead.
+        assertEquals(167L, BeatMatch.learnedLag(BeatMatch.DEFAULT_SEEK_LAG_MS, leadMs = 0, errorMs = -185))
+        // Sent 167 ms ahead and landed 10 ms ahead: it took 157 ms.
+        assertEquals(162L, BeatMatch.learnedLag(167, leadMs = 167, errorMs = 10))
+        // A stall isn't learned as the phone's usual delay.
+        assertEquals(BeatMatch.MAX_SEEK_LAG_MS, BeatMatch.learnedLag(BeatMatch.MAX_SEEK_LAG_MS, leadMs = 0, errorMs = -5_000))
+        assertEquals(0L, BeatMatch.learnedLag(0, leadMs = 0, errorMs = 300))
+    }
 }
