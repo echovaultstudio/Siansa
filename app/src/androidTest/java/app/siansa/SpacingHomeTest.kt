@@ -68,7 +68,15 @@ class SpacingHomeTest : SpacingCheck() {
         compose.onNodeWithText("Melancholy", useUnmergedTree = true)
             .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
         val layout = layouts.single()
-        assertTrue("\"Melancholy\" broke over ${layout.lineCount} lines", layout.lineCount == 1 && !layout.hasVisualOverflow)
+        val box = compose.onNodeWithTag("gradientTileTitle", useUnmergedTree = true).getBoundsInRoot()
+        // What was measured, so a failure says why (issue #738).
+        val sizes = "lines=${layout.lineCount}, word ${layout.getLineRight(0)} px wide in ${layout.size.width} px, " +
+            "font ${layout.layoutInput.style.fontSize}, box ${box.right - box.left} wide, ellipsis=${layout.isLineEllipsized(0)}, " +
+            "too tall=${layout.didOverflowHeight}"
+        // One whole line, no "…", and the word's last letter inside the text's width. (hasVisualOverflow also counts a
+        // paragraph a fraction of a pixel wider than its box, with every letter showing: issue #738.)
+        val fits = layout.lineCount == 1 && !layout.isLineEllipsized(0) && layout.getLineRight(0) <= layout.size.width && !layout.didOverflowHeight
+        assertTrue("\"Melancholy\" doesn't fit on one line: $sizes", fits)
     }
 
     /** Home: the one settings button sits centred on the greeting's line (issue #152). */
@@ -189,7 +197,8 @@ class SpacingHomeTest : SpacingCheck() {
     @Test fun cardRuleChipsAreEvenlySpaced() {
         val rule = app.siansa.mix.CardRule(app.siansa.mix.RuleField.LABEL, app.siansa.mix.RuleOp.CONTAINS, "Ninja Tune")
         compose.setContent { SiansaTheme { Column { app.siansa.ui.RuleCard(rule, emptyList(), onChange = {}, onRemove = {}) } } }
-        val name = compose.onNodeWithText("Record label", useUnmergedTree = true).getBoundsInRoot()
+        // The name is also the label of the text field below: find the name by its tag.
+        val name = compose.onNodeWithTag("ruleName").getBoundsInRoot()
         val chip = compose.onNodeWithTag("op-CONTAINS").getBoundsInRoot()
         val value = compose.onNodeWithTag("ruleValue").getBoundsInRoot()
         assertEven("Rule chips", chip.top - name.bottom, value.top - chip.bottom, 12.dp)

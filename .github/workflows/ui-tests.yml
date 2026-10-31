@@ -10,8 +10,10 @@ on:
 permissions:
   contents: read
 
+# A new push cancels the run of the one before. Adding another label (such as "record screenshots") runs nothing,
+# so it gets a group of its own: it used to cancel the emulator tests already running (issue #738).
 concurrency:
-  group: ui-tests-${{ github.event.pull_request.number }}
+  group: ui-tests-${{ github.event.pull_request.number }}${{ github.event.action == 'labeled' && github.event.label.name != 'ui' && '-other-label' || '' }}
   cancel-in-progress: true
 
 jobs:

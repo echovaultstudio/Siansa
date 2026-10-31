@@ -13,8 +13,11 @@ class CollectionFadeTest {
     @Test fun aShortPageGetsRoomToScrollItsCoverAway() {
         // A single: its rows let it scroll 200 px; it needs FULL_FADE covers.
         assertEquals(full - 200f, roomBelow(200f, cover), 0.01f)
-        // Rows that don't fill the screen at all.
+        // Rows that just fill the screen.
         assertEquals(full, roomBelow(0f, cover), 0.01f)
+        // Rows that end 800 px above the screen's end (a single on a tall phone, issue #738): that much more, or it
+        // still can't scroll at all.
+        assertEquals(full + 800f, roomBelow(-800f, cover), 0.01f)
     }
 
     @Test fun aLongPageGetsNoRoom() {
@@ -22,12 +25,17 @@ class CollectionFadeTest {
         assertEquals(0f, roomBelow(5000f, cover), 0.01f)
     }
 
-    @Test fun theLengthIsEstimatedBeforeTheEndShows() {
-        // At the end: nothing unseen, what's left below the screen.
-        assertEquals(300f, app.siansa.ui.estimatedMaxScroll(100f, 1900f, 1800f, 100f, 0, 60f), 0.01f)
-        // Five more rows of 60 px not laid out yet: counted in, so nothing jumps when they appear.
-        assertEquals(600f, app.siansa.ui.estimatedMaxScroll(100f, 1900f, 1800f, 100f, 5, 60f), 0.01f)
-        // Everything fits: it can't scroll beyond where it is.
-        assertEquals(0f, app.siansa.ui.estimatedMaxScroll(0f, 900f, 1800f, 100f, 0, 60f), 0.01f)
+    @Test fun howFarTheRowsReachPastTheScreen() {
+        // Scrolled 100 px, the last row ends 100 px below the screen, and 100 px of padding: 300 px.
+        assertEquals(300f, app.siansa.ui.rowsPastScreen(100f, 1900f, 1800f, 100f), 0.01f)
+        // Rows and padding end 800 px before the screen does: below zero, so the room fills that first.
+        assertEquals(-800f, app.siansa.ui.rowsPastScreen(0f, 900f, 1800f, 100f), 0.01f)
+    }
+
+    @Test fun aSingleOnATallPhoneCanScrollItsCoverAway() {
+        // With the room, the page scrolls exactly FULL_FADE covers, however short its rows.
+        val past = app.siansa.ui.rowsPastScreen(0f, 900f, 1800f, 100f)
+        val room = roomBelow(past, cover)
+        assertEquals(full, past + room, 0.01f)
     }
 }

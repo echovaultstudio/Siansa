@@ -99,6 +99,46 @@ class RealServerTest {
 
     private fun songOf(album: Album): Song = runBlocking { graph.subsonic.album(album.id).songs.first() }
 
+    /** What Navidrome sent for a cover's small version: [ok] when it answered with a page that isn't an error. */
+    private class SmallAnswer(val ok: Boolean, val image: CoverStore.Sniffed?) {
+        val animated get() = image?.animated == true
+        val shrunk get() = image != null && image.width in 1..(SMALL_COVER * 5 / 4) && image.height in 1..(SMALL_COVER * 5 / 4)
+        override fun toString() = if (!ok) "no answer" else "${image?.kind ?: "not a picture"} ${image?.width}x${image?.height} animated=$animated"
+    }
+
+    /**
+     * Has Navidrome make (and keep) a cover's small version, waiting as long as it takes, and says what it sent: what
+     * Siansa then gets too, as Navidrome keeps it. Null when it didn't answer within 3 minutes.
+     */
+    private fun prepareSmallCover(coverId: String): SmallAnswer? {
+        val started = SystemClock.elapsedRealtime()
+        val client = graph.imageHttp.newBuilder().callTimeout(3, java.util.concurrent.TimeUnit.MINUTES).readTimeout(3, java.util.concurrent.TimeUnit.MINUTES).build()
+        return runCatching {
+            client.newCall(okhttp3.Request.Builder().url(graph.source.coverUrl(coverId, SMALL_COVER)).build()).execute().use { response ->
+                val bytes = response.body?.bytes() ?: ByteArray(0)
+                val answer = SmallAnswer(response.isSuccessful, if (response.isSuccessful) CoverStore.sniff(bytes) else null)
+                println("Kinds: Navidrome's $SMALL_COVER px version of $coverId: HTTP ${response.code}, $answer, ${bytes.size} bytes in ${SystemClock.elapsedRealtime() - started} ms")
+                answer
+            }
+        }.onFailure { println("Kinds: Navidrome's $SMALL_COVER px version of $coverId: no answer in ${SystemClock.elapsedRealtime() - started} ms ($it)") }.getOrNull()
+    }
+
+    /**
+     * Siansa's [kind] for an animated GIF is the one that fits what Navidrome [sent] for its small version. A GIF small
+     * enough to [keep] may also be kept whole on the phone, without asking for the small version.
+     */
+    private fun assertChoiceFor(what: String, sent: SmallAnswer?, kind: AnimatedCovers.Kind?, keep: Boolean = false) {
+        if (kind != AnimatedCovers.Kind.Animated(SMALL_COVER)) println("Kinds: $what: Navidrome sent $sent for its small version; Siansa chose $kind")
+        if (keep && kind == AnimatedCovers.Kind.Local) return
+        if (sent == null || !sent.ok) {
+            // No real answer: Siansa's own, later question may still get one, so any of its choices can be right.
+            assertTrue("$what: $kind", kind is AnimatedCovers.Kind.Animated || kind == AnimatedCovers.Kind.Local || kind == AnimatedCovers.Kind.StillOnlySmall)
+            return
+        }
+        val expected = AnimatedCovers.bigAnimationChoice(answered = true, animated = sent.animated, shrunk = sent.shrunk).first
+        assertEquals("$what: Siansa's choice for what Navidrome sent ($sent)", expected, kind)
+    }
+
     @Test
     fun a_coverKinds() = runBlocking {
         // A clean start: the app tour may already have kept covers.
@@ -106,15 +146,21 @@ class RealServerTest {
         AnimatedCovers.forget(graph)
         SingletonImageLoader.get(app).let { it.memoryCache?.clear(); it.diskCache?.clear() }
         val a = albums()
+        // Navidrome makes a 13 MB GIF's 300 px version slowly the first time (over 40 s on a busy CI machine, issue #736).
+        // Ask for it once first, so this checks Siansa's choice for what Navidrome sends, not the server's speed.
+        val sentBig = prepareSmallCover(a.getValue("Big Animated").coverArt!!)
+        val sentSmall = prepareSmallCover(a.getValue("Small Animated").coverArt!!)
         val big = AnimatedCovers.kind(graph, a.getValue("Big Animated").coverArt!!)
         val small = AnimatedCovers.kind(graph, a.getValue("Small Animated").coverArt!!)
         val still = AnimatedCovers.kind(graph, a.getValue("Still Album").coverArt!!)
         val webp = AnimatedCovers.kind(graph, a.getValue("WebP Animated").coverArt!!)
         println("Kinds: big=$big small=$small still=$still webp=$webp")
-        assertEquals("13 MB GIF should use Navidrome's small animated version", AnimatedCovers.Kind.Animated(SMALL_COVER), big)
+        // Navidrome normally sends a small animated GIF, and Siansa uses it. When it sends something else (a still, a
+        // full-size GIF), Siansa must make the matching choice for it instead.
+        assertChoiceFor("13 MB GIF", sentBig, big)
         // Navidrome sends GIF originals without a size (chunked), so a small GIF goes through its 300 px
-        // conversion like a big one; both ways animate.
-        assertTrue("Small GIF should be animated: $small", small is AnimatedCovers.Kind.Animated || small == AnimatedCovers.Kind.Local)
+        // conversion like a big one.
+        assertChoiceFor("Small GIF", sentSmall, small, keep = true)
         assertEquals(AnimatedCovers.Kind.Still, still)
         assertEquals("Animated WebP should be kept and animated from the phone", AnimatedCovers.Kind.Local, webp)
         // Only the first bytes were read to decide: nothing downloaded yet.
@@ -190,6 +236,9 @@ class RealServerTest {
     fun b_animatedCoverMovesOnScreen() {
         val cover = albums().getValue("Big Animated").coverArt!!
         val kind = runBlocking { AnimatedCovers.kind(graph, cover) }!!
+        // Only an animation can move: when this Navidrome sent no small animated version (see a_coverKinds), there's
+        // nothing to watch.
+        org.junit.Assume.assumeTrue("This Navidrome sent no small animated version: $kind", kind is AnimatedCovers.Kind.Animated || kind == AnimatedCovers.Kind.Local)
         compose.setContent {
             CompositionLocalProvider(LocalGraph provides graph) {
                 AnimatedCover(cover, kind, Modifier.size(300.dp), RectangleShape) { }

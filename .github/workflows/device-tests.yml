@@ -68,30 +68,50 @@ jobs:
             -Pandroid.experimental.testOptions.managedDevices.setupTimeoutMinutes=20 \
             -Pandroid.testInstrumentationRunnerArguments.navidromeUrl=http://10.0.2.2:5533 2>&1 | tee gradle.txt
           
-      # Results as annotations, so they can be read without downloading logs.
+      # Results as annotations, so they can be read without downloading logs. GitHub shows only the first 10 errors and
+      # 10 notices of a step, so the ones that explain a failure come first: failed tests, then a crash, then the build.
       - name: Test output
         if: always()
         run: |
-          grep -A8 "What went wrong" gradle.txt 2>/dev/null | head -12 | while IFS= read -r line; do [ -n "$line" ] && echo "::error::$line"; done || true
-          # Kotlin compile errors in the emulator tests, with file and line (they don't show up in the Build job).
-          grep -E "^e: file://" gradle.txt 2>/dev/null | sort -u | head -30 | sed -E 's#^e: file://[^ ]*/app/(src/[^:]+):([0-9]+):([0-9]+) (.*)#::error file=app/\1,line=\2,col=\3::\4#' || true
-          grep -E "Tests? .*(passed|failed)|BUILD (SUCCESSFUL|FAILED)" gradle.txt 2>/dev/null | tail -3 | while IFS= read -r line; do echo "::notice::$line"; done || true
           find app/build/outputs -iname "logcat*.txt" -exec cat {} + > logcat.txt 2>/dev/null || true
-          grep -h "System.out" logcat.txt 2>/dev/null | grep -E "Kinds:|drawable:|setup|Tour: " | sed 's/.*System.out: //' | head -40 | while IFS= read -r line; do echo "::notice::$line"; done || true
-          for f in $(find app/build/outputs/androidTest-results -name "*.xml"); do
-            [ -f "$f" ] || continue
-            python3 - "$f" <<'PY'
-          import sys, xml.etree.ElementTree as ET
-          for case in ET.parse(sys.argv[1]).getroot().iter("testcase"):
-              fail = case.find("failure")
-              name = case.get("name")
-              if fail is not None:
-                  msg = (fail.get("message") or fail.text or "").replace("\n", " ")[:400]
-                  print(f"::error::FAILED {name}: {msg}")
-              else:
-                  print(f"::notice::PASSED {name} ({case.get('time')}s)")
+          python3 - <<'PY'
+          import glob, re, xml.etree.ElementTree as ET
+          errors, notices, passed, total = [], [], 0, 0
+          for f in sorted(glob.glob("app/build/outputs/androidTest-results/**/*.xml", recursive=True)):
+              for case in ET.parse(f).getroot().iter("testcase"):
+                  total += 1
+                  fail = case.find("failure")
+                  if fail is None:
+                      passed += 1
+                  else:
+                      msg = (fail.get("message") or fail.text or "").replace("\n", " ")[:400]
+                      errors.append(f"FAILED {case.get('classname', '').rsplit('.', 1)[-1]}.{case.get('name')}: {msg}")
+          # A crash: the app's process dying ends the run, and its reason is only in the log.
+          try:
+              log = open("logcat.txt", errors="ignore").read().splitlines()
+          except OSError:
+              log = []
+          for i, line in enumerate(log):
+              if "FATAL EXCEPTION" in line or "OutOfMemoryError" in line or ("AndroidRuntime" in line and "Process: app.siansa" in line):
+                  errors.append("crash: " + " | ".join(re.sub(r"^.*?AndroidRuntime: ", "", l).strip() for l in log[i:i + 4])[:400])
+                  break
+          try:
+              gradle = open("gradle.txt", errors="ignore").read()
+          except OSError:
+              gradle = ""
+          if "Process crashed" in gradle:
+              errors.append("The app's process crashed during the run: the tests after it didn't run.")
+          errors += [f"e: {m}" for m in sorted(set(re.findall(r"^e: file://\S*/app/(src/\S+ .*)$", gradle, re.M)))][:5]
+          if not errors:
+              errors += [l.strip() for l in re.findall(r"What went wrong:\n(?:.*\n){1,3}", gradle)][:2]
+          notices.append(f"Emulator tests: {passed} of {total} passed")
+          notices += [re.sub(r".*System.out: ", "", l) for l in log if "System.out" in l and re.search(r"Kinds:|drawable:", l)][:6]
+          notices += [re.sub(r".*System.out: ", "", l) for l in log if "System.out" in l and re.search(r"setup|Tour: ", l)][:3]
+          for e in errors[:10]:
+              print("::error::" + e)
+          for n in notices[:10]:
+              print("::notice::" + n)
           PY
-          done
 
       # The app tour's screenshots (TOURSHOT lines in the log) as images in the device-test-results artifact.
       - name: Tour screenshots
