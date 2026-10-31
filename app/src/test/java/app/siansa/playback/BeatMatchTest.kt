@@ -158,8 +158,9 @@ class BeatMatchTest {
 
     @Test fun aSmartPlanCarriesTheBeatNote() {
         val next = song.copy(id = "b", albumId = "al2")
-        val a = TrackProfile("a", -14.0, emptyList(), emptyList(), outro = outro)
-        val b = TrackProfile("b", -14.0, emptyList(), emptyList(), intro = intro)
+        // A few seconds of quiet tail and intro, so the blend that isn't beat-matched still has a length.
+        val a = profile("a", outro, null, quietTailMs = 3_000)
+        val b = profile("b", null, intro, headMs = 2_000)
         val matched = Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 310_000, 300_000, a, b, beatMatch = true)!!
         assertNotNull(matched.beat)
         assertFalse(matched.beatNote!!, matched.beatNote!!.contains("not beat-matched"))
