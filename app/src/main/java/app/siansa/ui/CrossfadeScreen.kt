@@ -149,8 +149,8 @@ private fun crossfadeHint(s: AppSettings): String = when (s.crossfade) {
 
 private fun beatMatchHint(mode: BeatMatchMode): String = when (mode) {
     BeatMatchMode.OFF -> "Fades don't follow the beat. Two songs that both keep a beat get a short fade, so their beats don't clash for long."
-    BeatMatchMode.DJ_RADIO -> "In DJ radio, a song that keeps a beat blends into the next one bar for bar, like a DJ mix: the next song starts on its first downbeat, a touch faster or slower to match, then eases back to its own speed. Needs the Siansa plugin 0.3.0, which measures each song's beats."
-    BeatMatchMode.EVERYWHERE -> "Every smart crossfade blends bar for bar when both songs keep a beat, with the next song a touch faster or slower to match (up to 8 %). Needs the Siansa plugin 0.3.0, which measures each song's beats."
+    BeatMatchMode.DJ_RADIO -> "In DJ radio, a song that keeps a beat blends into the next one like a DJ mix: phrase on phrase with the Siansa plugin 0.4.0, which finds the phrases a song is built from, else bar for bar. The next song comes in on its first phrase, a touch faster or slower to match, then eases back to its own speed."
+    BeatMatchMode.EVERYWHERE -> "Every smart crossfade blends phrase on phrase (plugin 0.4.0) or bar for bar when both songs keep a beat, with the next song a touch faster or slower to match (up to 8 %)."
 }
 
 /** Off, DJ radio or Everywhere: where blends are beat-matched (issue #646). */
