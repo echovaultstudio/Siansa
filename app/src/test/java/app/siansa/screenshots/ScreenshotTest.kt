@@ -1,5 +1,6 @@
 package app.siansa.screenshots
 
+import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -72,7 +73,8 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(ParameterizedRobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w360dp-h800dp-xxhdpi")
+// A plain Application: the scenes need no server, player or background work, which the app's own start-up sets up.
+@Config(sdk = [35], qualifiers = "w360dp-h800dp-xxhdpi", application = Application::class)
 class ScreenshotTest(private val scene: Scene, private val dark: Boolean, private val fontScale: Float) {
     @get:Rule val compose = createComposeRule()
 
