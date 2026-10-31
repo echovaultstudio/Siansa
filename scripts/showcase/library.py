@@ -4,7 +4,8 @@
 
     python3 scripts/showcase/library.py MUSIC_FOLDER
 
-The songs are quiet chords, a few lengths of them, each tagged as its own song. Needs ffmpeg, Pillow and numpy.
+The songs are quiet chords, a few lengths of them, each tagged as its own song: 320 kbit/s at 44.1 kHz, as a library's
+songs would be (now playing shows it under About this song). Needs ffmpeg, Pillow and numpy.
 """
 import hashlib
 import os
@@ -31,8 +32,8 @@ def base_songs(folder):
             root = [110.0, 123.47, 130.81, 146.83, 164.81, 98.0][i]
             chord = "+".join(f"0.18*sin(2*PI*{root * k}*t)" for k in (1, 1.25, 1.5, 2))
             run("ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
-                f"aevalsrc='({chord})*(0.6+0.4*sin(2*PI*0.25*t))':s=22050:d={length}",
-                "-af", f"afade=t=in:d=3,afade=t=out:st={length - 4}:d=4", "-ac", "1", "-b:a", "32k", path)
+                f"aevalsrc='({chord})*(0.6+0.4*sin(2*PI*0.25*t))':s=44100:d={length}",
+                "-af", f"afade=t=in:d=3,afade=t=out:st={length - 4}:d=4", "-ac", "2", "-b:a", "320k", path)
         paths[length] = path
     return paths
 
