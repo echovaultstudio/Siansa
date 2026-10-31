@@ -71,17 +71,17 @@ Same page. **Off**, a **fixed** length (1–30 seconds, 6 by default), or **Smar
 
 **Settings › Playback › Crossfade and levelling › Beat-matched blends**, shown with Smart crossfades and the Siansa
 plugin. Two songs that both keep a beat can clash at the changeover when their beats land at different moments,
-like a bad DJ set. With the plugin 0.3.0, which measures the beat grid at each end of every song, Siansa can blend
-them the way a DJ mixes:
+like a bad DJ set. The Siansa plugin for AudioMuse measures the beat grid at each end of every song, so Siansa can
+blend them the way a DJ mixes:
 
 - **DJ radio** (the default): in DJ radio and DJ keep-playing, a song that keeps a beat blends into the next one the
   way a DJ mixes. With plugin 0.4.0, which also finds the phrases (the 4 or 8 bars a song is built from), the
   blend goes **phrase on phrase**: it starts where a phrase of the song going out starts, the next song comes in on
-  its first phrase, it lasts whole phrases (one or two, as the crossfade length allows: an 8-bar phrase at 128 BPM
-  is 15 s, so 16 s or more gives a whole one; shorter settings get half a phrase), and the song going out is let go
+  its first phrase, it lasts whole phrases (as many as the **Blend length** below allows: 8 bars gives one 8-bar
+  phrase, 16 bars two, 4 bars half of one), and the song going out is let go
   at the end of a phrase: a short last part-phrase (less than half a phrase) isn't played, so both songs' phrases
   end together. Without phrases, the blend starts on a bar of the song going out, the next song starts on its first
-  downbeat, and the blend is as many whole bars as fit. Either way the next song plays a touch faster or slower (up
+  downbeat, and the blend is the Blend length in whole bars. Either way the next song plays a touch faster or slower (up
   to 8 %, pitch kept) so its beats keep time with the old song's, then eases back to its own speed over about 25
   seconds, too slowly to hear.
 - **Everywhere**: the same in every smart crossfade.
@@ -91,17 +91,22 @@ Whatever the setting, two songs that both keep a beat but can't be matched (temp
 double and half time as the same; a beat that isn't steady; a stream that can't jump to a point) get a short blend,
 so their beats clash only for a moment. A beatless ending or start keeps the smart blend as before.
 
+**Blend length** (4, 8 or 16 bars; 8 by default): how long a beat-matched blend is, counted in bars the way a DJ
+counts it. It's apart from the crossfade length, so ordinary fades can stay short while DJ blends run long: 8 bars
+is about 15 seconds at 128 BPM, 16 bars about 30. A blend starts on a bar, so it runs to the song's end a part-bar
+longer, and it never takes more than a third of a song.
+
 **Echo at the end** (on by default): over the last bar of a blend the old song rings out in a hall, as a DJ
 echoes a track out, so the join is softer. A phone whose reverb can't be opened plays the blend plain.
 
-For DJ blends a crossfade of 16 s or more works best: an 8-bar phrase at 128 BPM is 15 s. A quiet build-up that
+A quiet build-up that
 keeps a steady beat with clear bars is laid on the old song's beats too, so when its drums come in they're in
 step.
 
 It's experimental: downbeats are the hardest thing to hear in a recording, so when either song's bars aren't clear
 the songs are laid beat on beat instead, and a mix can land a beat off. The log says how each blend was planned and
-how far the next song was out of step. Songs measured before plugin 0.3.0 keep their loudness and fades and get
-their beats when the plugin measures them again: see the **Beat grids** section on the plugin's settings page
+how far the next song was out of step. Songs the plugin measured before it measured beats keep their loudness and
+fades and get their beats when the plugin measures them again: see the **Beat grids** section on the plugin's settings page
 ([AudioMuse-AI](audiomuse.md)).
 
 Crossfades only happen on this phone: on a TV or speaker, songs play back to back. They're not used with Repeat

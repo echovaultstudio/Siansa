@@ -16,6 +16,7 @@ import app.siansa.data.Song
 import app.siansa.log.AppLog
 import kotlin.math.abs
 import kotlin.math.min
+import kotlin.math.max
 
 /**
  * Crossfades on the phone (issue #60), keeping the one main player behind the media session, so the queue,
@@ -169,7 +170,9 @@ internal class Crossfader(
         val beatMatch = s.crossfade == CrossfadeMode.SMART && s.beatMatch.appliesTo(inDjRadio())
         // The end a smart fade leaves out (silence, a long fade-out; issue #628) comes off the time left.
         val cut = if (s.crossfade == CrossfadeMode.SMART) Crossfade.endCut(profiles.cached(item.mediaId), duration, maxMs).first else 0L
-        if (duration - cut - position > maxMs + PREPARE_MS) {
+        // A beat-matched blend has its own length in bars (issue #759), often longer than the crossfade length.
+        val lookMs = if (beatMatch) max(maxMs, profiles.cached(item.mediaId)?.outro?.let { BeatMatch.maxMsFor(it, s.blendBars) } ?: 0L) else maxMs
+        if (duration - cut - position > lookMs + PREPARE_MS) {
             if (phase == Phase.READY) disarm()
             return LOOK_MS
         }
@@ -187,6 +190,7 @@ internal class Crossfader(
                 currentProfile = profiles.cached(current.id),
                 nextProfile = profiles.cached(next.id),
                 beatMatch = beatMatch,
+                blendBars = s.blendBars,
             )
             if (planned == null) {
                 val why = Crossfade.whyNoFade(s.crossfade, maxMs, current, next, profiles.cached(current.id), profiles.cached(next.id), beatMatch)

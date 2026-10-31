@@ -35,20 +35,22 @@ class BeatMatchTest {
     }
 
     @Test fun theBlendStartsOnABarAndCoversWholeBars() {
-        // The song ends at 310 s; 8 bars (15 s) fit a 16 s setting: the blend starts on the first downbeat at or
-        // after 310 - 15 = 295 s on the bar grid from 300 s (bars are 1.875 s): 296.25 s, 7 whole bars of blend.
+        // The song ends at 310 s; 8 bars (15 s) fit a 16 s setting: the blend starts on the last downbeat at or
+        // before 310 - 15 = 295 s on the bar grid from 300 s (bars are 1.875 s): 294.375 s, 8 whole bars and a
+        // part-bar, since 15.6 s still fits (issue #759; it used to start a bar later and lose one).
         val plan = BeatMatch.plan(outro, intro, endMs = 310_000, maxMs = 16_000)!!
-        assertEquals(296_250L, plan.startMs)
-        assertEquals(13_750L, plan.overlapMs)
-        assertEquals(7, plan.bars)
+        assertEquals(294_375L, plan.startMs)
+        assertEquals(15_625L, plan.overlapMs)
+        assertEquals(8, plan.bars)
         assertTrue(plan.onBars)
         assertEquals(1_000L, plan.incomingStartMs)  // the next song comes in on its first downbeat
         assertEquals(128.0 / 126.0, plan.speed.toDouble(), 1e-5)
-        assertEquals("beat-matched 126.0 → 128.0 BPM (+1.6 %), 7 bars (13.8 s), bar on bar", plan.why)
+        assertEquals("beat-matched 126.0 → 128.0 BPM (+1.6 %), 8 bars (15.6 s), bar on bar", plan.why)
     }
 
     @Test fun aShorterSettingTakesFewerBarsAndBeatsStandInForUnclearBars() {
-        // Aimed at 4, 2 and 1 bars; the start moves to the next downbeat, so up to one bar less is blended.
+        // Aimed at 4, 2 and 1 bars; when the downbeat before doesn't fit the setting, the start moves to the next
+        // one, so up to one bar less is blended.
         assertTrue(BeatMatch.plan(outro, intro, 310_000, 8_000)!!.overlapMs in 7_500 - 1_875..7_500L)
         assertTrue(BeatMatch.plan(outro, intro, 310_000, 4_000)!!.overlapMs in 3_750 - 1_875..3_750L)
         assertTrue(BeatMatch.plan(outro, intro, 310_000, 2_000)!!.overlapMs in 469..1_875L)
@@ -57,7 +59,7 @@ class BeatMatchTest {
         assertFalse(beats.onBars)
         val onGrid = (beats.startMs - 300_000) / 468.75
         assertEquals(onGrid, Math.rint(onGrid), 0.01)  // on the beat grid, within a ms
-        assertTrue(beats.overlapMs in 15_000 - 469..15_000)
+        assertTrue(beats.overlapMs in 15_000..15_000 + 469)
         assertEquals(1_000L, beats.incomingStartMs)
         assertTrue(beats.why.endsWith("beat on beat"))
     }
@@ -107,6 +109,24 @@ class BeatMatchTest {
         assertTrue(plan.why, plan.why.startsWith("beat-matched"))
         // A hard ending into a quick start, which smart mode alone plays back to back, still gets the DJ blend.
         assertNull(Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 310_000, 300_000, profile("a", outro, null), profile("b", null, intro)))
+    }
+
+    @Test fun aBlendHasItsOwnLengthInBarsApartFromTheCrossfadeLength() {
+        val next = song.copy(id = "b", albumId = "al2")
+        val bar = outro.beatLengthMs * BeatMatch.BEATS_PER_BAR
+        // A 6 s crossfade length doesn't shorten an 8-bar blend (issue #759), and 4 or 16 bars give those.
+        for (bars in listOf(4, 8, 16)) {
+            val plan = Crossfade.plan(CrossfadeMode.SMART, 6_000, song, next, 310_000, 300_000,
+                profile("a", outro, null), profile("b", null, intro), beatMatch = true, blendBars = bars)!!
+            assertEquals("$bars bars", bars, plan.beat!!.bars)
+            assertTrue(plan.why, plan.overlapMs in (bars * bar).toLong()..(bars * bar + bar).toLong())
+        }
+        assertTrue(BeatMatch.maxMsFor(outro, 8) in (8 * bar + bar - outro.beatLengthMs).toLong()..(9 * bar).toLong())
+        // An ordinary fade still keeps to the crossfade length.
+        val plain = Crossfade.plan(CrossfadeMode.SMART, 6_000, song, next, 310_000, 300_000,
+            profile("a", null, null, quietTailMs = 6_000), profile("b", null, null, headMs = 8_000), beatMatch = true, blendBars = 16)!!
+        assertNull(plain.beat)
+        assertTrue(plain.why, plain.overlapMs <= 6_000L)
     }
 
     @Test fun twoBeatsThatCantBeMatchedGetAShortBlendNotALongClash() {

@@ -1,7 +1,6 @@
 package app.siansa.playback
 
 import kotlin.math.abs
-import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.roundToLong
@@ -36,10 +35,17 @@ object BeatMatch {
     /** Two rhythmic ends that can't be matched blend over this, so their beats clash only for a moment. */
     const val CLASH_MS = 1_500L
     const val BEATS_PER_BAR = 4
-    /** A blend is this many bars, the longest that fits the crossfade length setting. */
-    val BAR_CHOICES = listOf(8, 4, 2, 1)
-    /** The most whole phrases a blend lasts (two 8-bar phrases at 128 BPM is 30 s). */
+    /** A blend is this many bars, the longest that fits the blend length setting (and the song). */
+    val BAR_CHOICES = listOf(16, 8, 4, 2, 1)
+    /** The most whole phrases a blend lasts (two 8-bar phrases is the 16-bar blend length). */
     const val MAX_PHRASES = 2
+
+    /**
+     * The longest blend of [bars] whole bars at [outgoing]'s tempo: those bars plus the part-bar a song's end
+     * rarely falls exactly on (all but half a beat of one more bar).
+     */
+    fun maxMsFor(outgoing: BeatEnd, bars: Int): Long =
+        (outgoing.beatLengthMs * ((bars + 1) * BEATS_PER_BAR - 0.5)).toLong()
     /** Closer than this, the two songs count as in step. */
     const val IN_STEP_MS = 12L
     /** Further apart than this, the next song jumps into step rather than catching up by speed. */
@@ -105,7 +111,7 @@ object BeatMatch {
 
     /**
      * Plans the blend from [outgoing]'s end at [endMs] (its length, less any end left out) into [incoming], within
-     * [maxMs] (the crossfade length setting). Null when the two can't be matched, or when not even one bar fits.
+     * [maxMs] (from the blend length setting, [maxMsFor]). Null when the two can't be matched, or when not even one bar fits.
      * The blend aims at the most bars of [BAR_CHOICES] that fit, and starts on the first downbeat (or beat, when
      * the bars of either song aren't clear) of the old song at or after that point, so it stays within the
      * setting; the next song starts on its first downbeat (or beat).
@@ -123,9 +129,11 @@ object BeatMatch {
         val step = if (onBars) bar else outgoing.beatLengthMs
         val grid = if (onBars) outgoing.barMs!! else outgoing.beatMs
         val wanted = endMs - bars * bar
-        // On the grid at or after [wanted], so the blend stays within the setting; a blend that would then be
-        // shorter than a bar takes the grid point before instead, when that still fits. At least a beat.
-        var start = grid + ceil((wanted - grid) / step) * step
+        // On the grid at or before [wanted], so the blend has its whole bars, when that still fits [maxMs]; else the
+        // grid point after it. A blend that would then be shorter than a bar takes the point before when that
+        // nearly fits. At least a beat.
+        var start = grid + floor((wanted - grid) / step) * step
+        if (endMs - start > maxMs) start += step
         if (endMs - start < bar && endMs - (start - step) <= maxMs + outgoing.beatLengthMs) start -= step
         if (start <= 0 || endMs - start < outgoing.beatLengthMs) return null
         val incomingStart = (if (onBars) incoming.barMs!! else incoming.beatMs).coerceAtLeast(0.0)

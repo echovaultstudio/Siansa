@@ -242,7 +242,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             },
             // Beat-matched blends with the echo switch (issue #759).
             Scene("crossfade_beat_match") {
-                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP)) { BeatMatchSection(BeatMatchMode.DJ_RADIO, echo = true, onMode = {}, onEcho = {}) }
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP)) { BeatMatchSection(BeatMatchMode.DJ_RADIO, bars = 8, echo = true, onMode = {}, onBars = {}, onEcho = {}) }
             },
             // Custom card editor: a rule (issue #663).
             Scene("card_rule") {

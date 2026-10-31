@@ -121,7 +121,10 @@ fun CrossfadeScreen(nav: NavController) {
             if (settings.crossfade == CrossfadeMode.SMART && settings.loudnessSource == LoudnessSource.PLUGIN) {
                 HorizontalDivider()
                 Heading("Beat-matched blends (experimental)")
-                BeatMatchSection(settings.beatMatch, settings.echoTail, graph.settings::setBeatMatch, graph.settings::setEchoTail)
+                BeatMatchSection(
+                    settings.beatMatch, settings.blendBars, settings.echoTail,
+                    graph.settings::setBeatMatch, graph.settings::setBlendBars, graph.settings::setEchoTail,
+                )
             }
         }
     }
@@ -148,10 +151,24 @@ private fun crossfadeHint(s: AppSettings): String = when (s.crossfade) {
 
 /** The beat-matched blends' choice, its hint, and the echo at the end (issue #759), for the page and its screenshot. */
 @Composable
-internal fun BeatMatchSection(mode: BeatMatchMode, echo: Boolean, onMode: (BeatMatchMode) -> Unit, onEcho: (Boolean) -> Unit) {
+internal fun BeatMatchSection(
+    mode: BeatMatchMode,
+    bars: Int,
+    echo: Boolean,
+    onMode: (BeatMatchMode) -> Unit,
+    onBars: (Int) -> Unit,
+    onEcho: (Boolean) -> Unit,
+) {
     BeatMatchRow(mode, onMode)
     Hint(beatMatchHint(mode))
     if (mode != BeatMatchMode.OFF) {
+        Text("Blend length", style = MaterialTheme.typography.bodyLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            AppSettings.BLEND_BAR_CHOICES.forEach { n ->
+                FilterChip(selected = bars == n, onClick = { onBars(n) }, label = { Text("$n bars") })
+            }
+        }
+        Hint("Apart from the crossfade length: 8 bars is about 15 seconds at 128 BPM. A blend never takes more than a third of a song.")
         SwitchRow("Echo at the end", echo, onEcho)
         Hint("Over the last bar of a blend the old song rings out in a hall, as a DJ echoes a track out, so the join is softer. Phones without the effect play the blend plain.")
     }
@@ -159,8 +176,8 @@ internal fun BeatMatchSection(mode: BeatMatchMode, echo: Boolean, onMode: (BeatM
 
 private fun beatMatchHint(mode: BeatMatchMode): String = when (mode) {
     BeatMatchMode.OFF -> "Fades don't follow the beat. Two songs that both keep a beat get a short fade, so their beats don't clash for long."
-    BeatMatchMode.DJ_RADIO -> "In DJ radio, a song that keeps a beat blends into the next one like a DJ mix: phrase on phrase with the Siansa plugin 0.4.0, which finds the phrases a song is built from, else bar for bar. The next song comes in on its first phrase, a touch faster or slower to match, then eases back to its own speed."
-    BeatMatchMode.EVERYWHERE -> "Every smart crossfade blends phrase on phrase (plugin 0.4.0) or bar for bar when both songs keep a beat, with the next song a touch faster or slower to match (up to 8 %)."
+    BeatMatchMode.DJ_RADIO -> "In DJ radio, a song that keeps a beat blends into the next one like a DJ mix: phrase on phrase where the Siansa plugin for AudioMuse found the phrases a song is built from, else bar for bar. The next song comes in on its first phrase, a touch faster or slower to match, then eases back to its own speed."
+    BeatMatchMode.EVERYWHERE -> "Every smart crossfade blends phrase on phrase or bar for bar when both songs keep a beat, with the next song a touch faster or slower to match (up to 8 %). Uses the beats and phrases the Siansa plugin for AudioMuse measures."
 }
 
 /** Off, DJ radio or Everywhere: where blends are beat-matched (issue #646). */
