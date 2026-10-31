@@ -3,6 +3,29 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.44.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.44.1beta) — 2026-10-31
+
+- [#671](https://github.com/echovaultstudio/Siansa/pull/671) Bump androidx.palette:palette-ktx from 1.0.0 to 1.1.0 in the androidx group (@dependabot[bot])
+- [#672](https://github.com/echovaultstudio/Siansa/pull/672) Bump actions/setup-python from 6 to 7 in the actions group (@dependabot[bot])
+- [#709](https://github.com/echovaultstudio/Siansa/pull/709) AudioMuse: a shown user's songs are asked on their own AudioMuse server (@Th3K1ngP1n)
+- [#711](https://github.com/echovaultstudio/Siansa/pull/711) Screenshot tests on every pull request (@Th3K1ngP1n)
+- [#715](https://github.com/echovaultstudio/Siansa/pull/715) Emulator tests: SpacingTest split by area of the app (@Th3K1ngP1n)
+- [#716](https://github.com/echovaultstudio/Siansa/pull/716) CI: compile the emulator tests on every pull request (@Th3K1ngP1n)
+- [#718](https://github.com/echovaultstudio/Siansa/pull/718) Now playing: one scrolling page, cards in the cover's colour (@Th3K1ngP1n)
+- [#719](https://github.com/echovaultstudio/Siansa/pull/719) CI: emulator tests on pull requests labelled ui (@Th3K1ngP1n)
+- [#722](https://github.com/echovaultstudio/Siansa/pull/722) Casting: remove "Speaker plays the queue" (@Th3K1ngP1n)
+- [#724](https://github.com/echovaultstudio/Siansa/pull/724) Album pages: a short album scrolls its cover away instead of leaving a gap (@Th3K1ngP1n)
+- [#725](https://github.com/echovaultstudio/Siansa/pull/725) Bottom tabs: "Your Library" fits with a larger font (@Th3K1ngP1n)
+- [#727](https://github.com/echovaultstudio/Siansa/pull/727) New app icon: nordic bars with a reflection between Siansa's half circles (@Th3K1ngP1n)
+- [#729](https://github.com/echovaultstudio/Siansa/pull/729) Default theme: Mono colours with the amber accent (@Th3K1ngP1n)
+- [#731](https://github.com/echovaultstudio/Siansa/pull/731) Play button cards: only the play button plays, no arrow (@Th3K1ngP1n)
+- [#733](https://github.com/echovaultstudio/Siansa/pull/733) Licences page: the website's new look (@Th3K1ngP1n)
+- [#735](https://github.com/echovaultstudio/Siansa/pull/735) Hold releases while a batch of pull requests is merged (@Th3K1ngP1n)
+- [#737](https://github.com/echovaultstudio/Siansa/pull/737) Animated covers: a slow first answer no longer makes a cover still for good (@Th3K1ngP1n)
+- [#739](https://github.com/echovaultstudio/Siansa/pull/739) Emulator tests: no crash, the tour and cover checks pass, and even gaps they found (@Th3K1ngP1n)
+- [#742](https://github.com/echovaultstudio/Siansa/pull/742) Publish the held release (v0.44.1beta) (@Th3K1ngP1n)
+- [#750](https://github.com/echovaultstudio/Siansa/pull/750) Build: Robolectric from Google's copy of Maven Central, so the release build gets its jar (@Th3K1ngP1n)
+
 ## [0.44.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.44.0beta) — 2026-10-31
 
 - [#676](https://github.com/echovaultstudio/Siansa/pull/676) Google Play: say why an upload is refused, on one line, and at which step (@Th3K1ngP1n)
