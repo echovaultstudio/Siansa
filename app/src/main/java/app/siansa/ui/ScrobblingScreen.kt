@@ -113,7 +113,8 @@ fun ScrobblingScreen(nav: NavController) {
                 HorizontalDivider()
             }
 
-            FoldSection("Your server", if (settings.scrobbleNavidrome) "On" else "Off") {
+            val serverOn = settings.scrobbleNavidrome
+            FoldSection("Your server", if (serverOn) "On" else "Off") {
             SwitchRow("Record plays on your server", settings.scrobbleNavidrome) {
                 graph.settings.save(graph.settings.current.copy(scrobbleNavidrome = it))
             }
