@@ -283,6 +283,23 @@ class SpacingTest {
         assertEven("Mix shape chips", chips.top - title.bottom, hint.top - chips.bottom)
     }
 
+    /** Shape the mix: "Surprises" stays on one line beside its slider (issue #677), as tall as one line of text. */
+    @Test fun mixSurpriseLabelIsOneLine() {
+        compose.setContent {
+            SiansaTheme {
+                androidx.compose.foundation.layout.Box(Modifier.width(360.dp)) {
+                    app.siansa.ui.MixShapeControls(app.siansa.mix.MixShape.STEADY, 50) { _, _ -> }
+                }
+            }
+        }
+        val label = compose.onNodeWithTag("mixSurpriseLabel").getBoundsInRoot()
+        val value = compose.onNodeWithText("Some").getBoundsInRoot()
+        val labelHeight = label.bottom - label.top
+        assertTrue("\"Surprises\" wraps: $labelHeight tall", labelHeight < (value.bottom - value.top) * 1.6f)
+        val slider = compose.onNodeWithTag("mixSurprise").getBoundsInRoot()
+        assertEven("Surprise label and slider centres", (label.top + label.bottom) / 2, (slider.top + slider.bottom) / 2)
+    }
+
     /** Crossfade and levelling: the Off / Track / Album chips sit evenly between their heading and hint (issue #214). */
     @Test fun levellingChipsAreEvenlySpaced() {
         compose.setContent {
