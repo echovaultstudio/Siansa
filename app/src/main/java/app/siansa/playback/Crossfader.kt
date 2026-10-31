@@ -83,6 +83,8 @@ internal class Crossfader(
     private var baseSpeed = 1f
     /** During a beat-matched blend: how often the next song was jumped into step (at most [MAX_JUMPS]). */
     private var jumps = 0
+    /** How far apart the two songs' beats were through this blend (issue #744). */
+    private var stepStats = BeatMatch.StepStats()
     private var switchedAt = 0L
     /** After a beat-matched blend: the matched speed being eased back from, and since when. */
     private var easingFrom = 0f
@@ -237,7 +239,9 @@ internal class Crossfader(
         primeAt = from
         primed = false
         phase = Phase.READY
-        AppLog.i("Crossfade", "Getting the fade out of ${item.mediaId} ready (${planned.why})")
+        val length = main.duration.takeIf { it > 0 }
+        val where = length?.let { " · starts at ${clock(at)} of ${clock(it)}" }.orEmpty()
+        AppLog.i("Crossfade", "Getting the fade out of ${item.mediaId} ready (${planned.why})$where" + (planned.beatNote?.let { " · $it" } ?: ""))
     }
 
     private fun disarm() {
@@ -288,6 +292,7 @@ internal class Crossfader(
         startedAt = SystemClock.elapsedRealtime()
         switched = false
         jumps = 0
+        stepStats = BeatMatch.StepStats()
         stopEasing()
         baseSpeed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
         phase = Phase.FADING
@@ -373,6 +378,7 @@ internal class Crossfader(
         val now = SystemClock.elapsedRealtime()
         if (now - switchedAt < SETTLE_MS) return  // the seek is still landing; its position isn't real yet
         val error = beat.error(t.currentPosition, main.currentPosition)
+        stepStats.add(error)
         if (abs(error) > BeatMatch.JUMP_MS) {
             if (jumps < MAX_JUMPS && main.isCurrentMediaItemSeekable) {
                 jumps++
@@ -408,7 +414,11 @@ internal class Crossfader(
     private fun startEasing(beat: BeatMatch.Plan) {
         easingFrom = beat.speed
         easingSince = SystemClock.elapsedRealtime()
-        AppLog.i("Crossfade", "Beat-matched blend done (${beat.shiftPercent} %); easing back to the song's own speed over ${BeatMatch.EASE_MS / 1000} s")
+        AppLog.i(
+            "Crossfade",
+            "Beat-matched blend done (${beat.shiftPercent} %): ${stepStats.describe()}, $jumps jump${if (jumps == 1) "" else "s"}; " +
+                "easing back to the song's own speed over ${BeatMatch.EASE_MS / 1000} s",
+        )
         handler.post(easeTick)
     }
 
@@ -495,6 +505,9 @@ internal class Crossfader(
         disarm()
         poke()
     }
+
+    /** A position for the log: "3:21". */
+    private fun clock(ms: Long): String = "%d:%02d".format(java.util.Locale.ROOT, ms / 60_000, ms / 1000 % 60)
 
     companion object {
         /** How often to look while a song plays. */

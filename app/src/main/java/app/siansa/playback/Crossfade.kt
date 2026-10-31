@@ -27,7 +27,15 @@ enum class CrossfadeMode(val label: String) {
  * current song can end early: its last [cutMs] (silence, or the end of a long fade-out) isn't played (issue #628).
  * A [beat]-matched blend (issue #646) also says where the next song starts and how fast it plays.
  */
-data class FadePlan(val overlapMs: Long, val fadeInMs: Long, val why: String, val cutMs: Long = 0L, val beat: BeatMatch.Plan? = null)
+data class FadePlan(
+    val overlapMs: Long,
+    val fadeInMs: Long,
+    val why: String,
+    val cutMs: Long = 0L,
+    val beat: BeatMatch.Plan? = null,
+    /** In smart mode, what the plugin measured at both ends and why the blend wasn't beat-matched (issue #744). */
+    val beatNote: String? = null,
+)
 
 /**
  * Plans each blend. Smart mode uses the songs' ramps (the MixRamp idea): the current song's quiet tail plus
@@ -132,6 +140,10 @@ object Crossfade {
         } else {
             FadePlan(maxMs, maxMs, if (mode == CrossfadeMode.SMART) "smart without profiles: fixed ${maxMs} ms" else "fixed ${maxMs} ms", cut)
         }
+        if (mode == CrossfadeMode.SMART && (outro != null || intro != null)) {
+            val note = BeatMatch.note(outro, intro, beatMatch)
+            plan = plan.copy(beatNote = if (matched == null && rhythmic && beatMatch && !note.contains("not beat-matched")) "$note · not beat-matched: not even one bar fits the crossfade length" else note)
+        }
         // Leaving out the end always needs a blend, however short, or the song would stop dead.
         if (cut > 0 && plan.overlapMs < MIN_OVERLAP_MS) plan = plan.copy(overlapMs = MIN_OVERLAP_MS, fadeInMs = MIN_FADE_IN_MS)
         if (cutWhy != null) plan = plan.copy(why = "${plan.why} · $cutWhy")
@@ -141,7 +153,11 @@ object Crossfade {
         val shortest = listOf(currentDurationMs - plan.cutMs, nextDurationMs).filter { it > 0 }.minOrNull()
         if (shortest != null && plan.overlapMs > shortest / 3) {
             val overlap = shortest / 3
-            plan = plan.copy(overlapMs = overlap, fadeInMs = min(plan.fadeInMs, overlap).coerceAtLeast(MIN_FADE_IN_MS), beat = null)
+            val dropped = plan.beat != null
+            plan = plan.copy(
+                overlapMs = overlap, fadeInMs = min(plan.fadeInMs, overlap).coerceAtLeast(MIN_FADE_IN_MS), beat = null,
+                beatNote = if (dropped) "${plan.beatNote} · not beat-matched: the blend would be over a third of a song" else plan.beatNote,
+            )
         }
         return if (plan.overlapMs < MIN_OVERLAP_MS) null else plan
     }

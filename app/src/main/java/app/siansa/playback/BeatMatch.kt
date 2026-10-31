@@ -115,6 +115,41 @@ object BeatMatch {
         return Plan(start.roundToLong(), overlap.roundToLong(), incomingStart.roundToLong(), speed, floor(overlap / bar).toInt(), onBars, outgoing, incoming)
     }
 
+    /**
+     * What the Siansa plugin measured at the two ends of a blend, and why it wasn't laid beat on beat when it wasn't,
+     * for the log (issue #744): so a report sent after a blend that sounded off shows which case it was. [applies]:
+     * beat-matching is on for this blend (Settings, and DJ radio when it's set for DJ radio only).
+     */
+    fun note(outgoing: BeatEnd?, incoming: BeatEnd?, applies: Boolean): String {
+        val ends = "out: ${outgoing?.describe() ?: "no beat measured"} · in: ${incoming?.describe() ?: "no beat measured"}"
+        val reason = when {
+            outgoing == null -> "the plugin hasn't measured the beat at the end of the song going out"
+            incoming == null -> "the plugin hasn't measured the beat at the start of the next song"
+            !outgoing.matchable -> "the end of the song going out isn't beat-driven and steady enough"
+            !incoming.matchable -> "the start of the next song isn't beat-driven and steady enough"
+            speed(outgoing, incoming) == null -> "%.1f and %.1f BPM are too far apart".format(java.util.Locale.ROOT, outgoing.bpm, incoming.bpm)
+            !applies -> "beat-matching is set for DJ radio only"
+            else -> null
+        }
+        return if (reason == null) ends else "$ends · not beat-matched: $reason"
+    }
+
+    /** How well a beat-matched blend kept in step (issue #744): how far apart the two songs' beats were, at each check. */
+    class StepStats {
+        private var checks = 0
+        private var total = 0L
+        private var worst = 0L
+
+        fun add(errorMs: Long) {
+            checks++
+            total += abs(errorMs)
+            worst = maxOf(worst, abs(errorMs))
+        }
+
+        /** "beats typically 6 ms apart, at worst 18 ms (412 checks)". */
+        fun describe(): String = if (checks == 0) "beats not checked" else "beats typically ${total / checks} ms apart, at worst $worst ms ($checks checks)"
+    }
+
     /** The speed nudge that brings the next song back in step over about a second: ahead, a touch slower. */
     fun nudge(errorMs: Long): Float = if (abs(errorMs) <= IN_STEP_MS) 1f else (1f - errorMs / 1000f).coerceIn(0.98f, 1.02f)
 
