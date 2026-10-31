@@ -163,7 +163,8 @@ class ShowcaseTest {
                 shot("album")
             }
             step("now playing") {
-                playHarbourLights(72_000)
+                // Early in the song, so the lyrics have lines still to come when they open.
+                playHarbourLights(6_000)
                 idle(1500)
                 compose.onAllNodesWithTag("miniPlayer").onFirst().performClick()
                 idle(3000)
@@ -173,13 +174,17 @@ class ShowcaseTest {
                 frame("player", 1400)
                 val down = glide("player", "About the artist", at = 0.1f, steps = 12, frameMs = 70)
                 frame("player", 2200)
-                glideBy("player", -down, steps = 8, frameMs = 60, text = "About the artist")
+                // Back up by what it really moved, short of a pixel: past the top, the scroll would pull the player
+                // down to close it.
+                glideBy("player", -(down - 1f), steps = 8, frameMs = 60, text = "About the artist")
                 compose.onAllNodesWithContentDescription("Lyrics").onFirst().performClick()
-                playHarbourLights(10_000)
                 idle(800)
+                // The lyrics follow the song's position, read every half second: the test's clock moves on with it.
                 repeat(18) {
-                    frame("player", 320)
                     SystemClock.sleep(650)
+                    compose.mainClock.advanceTimeBy(700)
+                    compose.waitForIdle()
+                    frame("player", 320)
                 }
                 frame("player", 1800)
                 shot("lyrics")
@@ -232,7 +237,8 @@ class ShowcaseTest {
                 keepPlaying()
                 libraryAll()
                 chip("Your listening")
-                click("Time machine")
+                // The entry, by its line under the title: a chip under Your listening is called Time machine too.
+                click("Your listening · Any month or year")
                 waitText("How you listened, any month or year.")
                 compose.onAllNodesWithTag("month-0").onFirst().performClick()
                 idle(1500)
@@ -476,13 +482,15 @@ class ShowcaseTest {
 
     /**
      * Scrolls the list holding [text] until it's [at] of the way down the screen, in [steps] eased frames of the
-     * animation [name]; gives back how far it went.
+     * animation [name]; gives back how far it really went.
      */
     private fun glide(name: String, text: String, at: Float, steps: Int, frameMs: Int): Float {
         val height = compose.onRoot().fetchSemanticsNode().boundsInRoot.height
-        val total = node(text).fetchSemanticsNode().positionInRoot.y - height * at
-        glideBy(name, total, steps, frameMs, text)
-        return total
+        fun y() = node(text).fetchSemanticsNode().positionInRoot.y
+        val before = y()
+        glideBy(name, before - height * at, steps, frameMs, text)
+        // What it really moved: the list may end before the text gets that far up.
+        return before - y()
     }
 
     /** Scrolls the list holding [text] by [total] px in [steps] frames that start and end slowly. */
@@ -544,8 +552,10 @@ class ShowcaseTest {
     }
 
     private fun chip(text: String) {
-        node(text).performScrollTo().performClick()
+        node(text).performScrollTo()
         idle()
+        node(text).performSemanticsAction(SemanticsActions.OnClick)
+        idle(800)
     }
 
     private fun tab(label: String) {

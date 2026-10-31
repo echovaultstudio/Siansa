@@ -90,6 +90,8 @@ jobs:
                   totals[m[1]] = int(m[3])
               elif "System.out: Showcase: " in line:
                   notes.append(line.split("System.out: ", 1)[1].strip())
+              elif re.search(r" [WE] Siansa/|Siansa/(Books|Library|Audiobookshelf)", line):
+                  notes.append("app: " + line.strip()[:300])
           for name, d in sorted(parts.items()):
               if len(d) == totals[name]:
                   open(f"shots/{name}.jpg", "wb").write(base64.b64decode("".join(d[i] for i in sorted(d))))
@@ -98,7 +100,7 @@ jobs:
           for n in [n for n in notes if "FAILED" in n][:9]:
               print("::error::" + n)
           print(f"::notice::{len(parts)} screenshots: {', '.join(sorted(parts))}")
-          for n in [n for n in notes if "FAILED" not in n][:9]:
+          for n in [n for n in notes if "FAILED" not in n and not n.startswith("app: ")][:9]:
               print("::notice::" + n)
           # All of them, with the pictures: GitHub shows only ten notes of a step.
           open("shots/notes.txt", "w").write("\n".join(notes) + "\n")
