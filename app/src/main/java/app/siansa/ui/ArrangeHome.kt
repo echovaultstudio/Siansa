@@ -52,6 +52,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.ui.zIndex
 import app.siansa.data.HomeLook
 import app.siansa.data.HomeSection
@@ -123,6 +125,26 @@ fun ArrangeHomeSheet(
         dragging = null
         offset = 0f
         onChange(items)
+    }
+
+    // A held row near the list's top or bottom edge scrolls it (issue #701), so a row can go anywhere, not only
+    // where the list was when it was picked up. The row stays under the finger as the list moves.
+    val edgePx = with(androidx.compose.ui.platform.LocalDensity.current) { AUTO_SCROLL_EDGE.toPx() }
+    LaunchedEffect(dragging) {
+        val section = dragging ?: return@LaunchedEffect
+        while (dragging == section) {
+            androidx.compose.runtime.withFrameNanos { }
+            val info = list.layoutInfo
+            val current = info.visibleItemsInfo.firstOrNull { it.key == section.id } ?: continue
+            val top = current.offset + offset
+            val speed = autoScrollSpeed(top, top + current.size, info.viewportStartOffset.toFloat(), info.viewportEndOffset.toFloat(), edgePx)
+            if (speed == 0f) continue
+            val moved = list.scrollBy(speed)
+            if (moved != 0f) {
+                offset += moved
+                dragBy(0f)
+            }
+        }
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -335,5 +357,24 @@ private fun SheetTabs(sources: Boolean, onSources: (Boolean) -> Unit) {
                 }
             }
         }
+    }
+}
+
+/** How close to the list's edge a held row starts scrolling it, and how fast it scrolls at most (px a frame). */
+private val AUTO_SCROLL_EDGE = 56.dp
+internal const val AUTO_SCROLL_MAX = 18f
+
+/**
+ * How far to scroll the list this frame while a row is held between [top] and [bottom] (issue #701): nothing in the
+ * middle; within [edge] of the viewport's end or start, faster the deeper the row is into that edge, up to [max].
+ */
+internal fun autoScrollSpeed(top: Float, bottom: Float, viewportStart: Float, viewportEnd: Float, edge: Float, max: Float = AUTO_SCROLL_MAX): Float {
+    if (edge <= 0f) return 0f
+    val intoEnd = bottom - (viewportEnd - edge)
+    val intoStart = (viewportStart + edge) - top
+    return when {
+        intoEnd > 0f -> max * (intoEnd / edge).coerceIn(0f, 1f)
+        intoStart > 0f -> -max * (intoStart / edge).coerceIn(0f, 1f)
+        else -> 0f
     }
 }

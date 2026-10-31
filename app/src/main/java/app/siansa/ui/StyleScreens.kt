@@ -263,9 +263,13 @@ internal fun <T> ArrangeList(
     val saved by rememberUpdatedState(order)
     val on by rememberUpdatedState(shown)
     val change by rememberUpdatedState(onChange)
-    var items by remember(order) { mutableStateOf(order) }
+    // One state for the list's whole life (issue #701). Each row's drag handler is set up once and keeps reading this
+    // state; a state made again for each saved order left later drags moving an old copy, so rows stopped making room.
+    var items by remember { mutableStateOf(order) }
     var dragging by remember { mutableStateOf<T?>(null) }
     var offset by remember { mutableFloatStateOf(0f) }
+    // The saved order (after a drop, an eye or Reset) shows once no row is held.
+    LaunchedEffect(order, dragging) { if (dragging == null && items != order) items = order }
 
     fun start(item: T) {
         dragging = item
