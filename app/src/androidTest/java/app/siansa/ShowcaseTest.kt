@@ -234,17 +234,19 @@ class ShowcaseTest {
                 back()
             }
             step("time machine") {
-                keepPlaying()
+                // The years before this one again (the phone kept only the latest plays), and no new song started
+                // meanwhile, which would cut them off once more.
+                writeHistory(past)
                 libraryAll()
                 chip("Your listening")
                 // The entry, by its line under the title: a chip under Your listening is called Time machine too.
                 click("Your listening · Any month or year")
                 waitText("How you listened, any month or year.")
-                compose.onAllNodesWithTag("month-0").onFirst().performClick()
+                compose.onAllNodesWithTag("month-0").onFirst().performSemanticsAction(SemanticsActions.OnClick)
                 idle(1500)
                 // From three years ago to this one, a picture a year.
                 repeat(2) {
-                    compose.onAllNodesWithContentDescription("Year before").onFirst().performClick()
+                    compose.onAllNodesWithContentDescription("Year before").onFirst().performSemanticsAction(SemanticsActions.OnClick)
                     idle(1200)
                 }
                 val year = LocalDate.now().year
@@ -254,7 +256,7 @@ class ShowcaseTest {
                     idle(2500)
                     shot("timemachine-$y")
                     if (y < year) {
-                        compose.onAllNodesWithContentDescription("Year after").onFirst().performClick()
+                        compose.onAllNodesWithContentDescription("Year after").onFirst().performSemanticsAction(SemanticsActions.OnClick)
                         idle(800)
                     }
                 }
@@ -316,6 +318,8 @@ class ShowcaseTest {
             }
             step("podcasts") {
                 libraryAll()
+                // The Books filter left on from the step before: off again, so the other chips show.
+                if (!exists("Podcasts") && exists("Books")) chip("Books")
                 chip("Podcasts")
                 waitText("The Long Commute", 60_000)
                 click("The Long Commute")
@@ -367,6 +371,15 @@ class ShowcaseTest {
                 plays(1900, listOf("Neon Parish", "Midnight Atlas", "Tove Marin", "Static Avenue", "Brass Meridian"), nights, year - 2) +
                 plays(1300, listOf("Hollow Pines", "Ewan Hale", "Velvet Coast", "Rosa Venn", "Iris Okafor"), mornings, year - 3)
             ).sortedByDescending { it.at }
+        past = events
+        writeHistory(events)
+        println("Showcase: ${events.size} plays over four years, ${events.count { java.time.Instant.ofEpochMilli(it.at).atZone(zone).year == year }} this year")
+    }
+
+    /** All four years of plays: the phone keeps the latest 3000 once a song plays, so the time machine gets them back. */
+    private var past: List<PlayEvent> = emptyList()
+
+    private fun writeHistory(events: List<PlayEvent>) {
         val file = File(app.filesDir, Users.scoped("history.json"))
         file.writeText(AppJson.encodeToString(ListSerializer(PlayEvent.serializer()), events))
         // The store keeps what it read in memory: give it the same list.
@@ -374,7 +387,6 @@ class ShowcaseTest {
         val state = json.javaClass.getDeclaredField("_state").apply { isAccessible = true }.get(json)
         @Suppress("UNCHECKED_CAST")
         (state as MutableStateFlow<Any?>).value = events
-        println("Showcase: ${events.size} plays over four years, ${events.count { java.time.Instant.ofEpochMilli(it.at).atZone(zone).year == year }} this year")
     }
 
     /** A few vibes described in Flow, two of them pinned to Home. */

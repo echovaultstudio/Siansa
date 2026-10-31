@@ -73,8 +73,11 @@ def run(*args):
     subprocess.run(args, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
 
-def lettered(art, title, byline, palette):
-    """A cover: the picture with the title and the byline on a band of the palette's darkest colour."""
+def lettered(art, title, byline, palette, centred=False):
+    """
+    A cover: the picture with the title and the byline on a band of the palette's darkest colour. [centred] keeps the
+    words in the middle 60 %: the app shows a book's cover taller than wide, cutting off its sides.
+    """
     colours = sorted((rgb(c) for c in PALETTES[palette]), key=lambda c: 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2])
     dark, light = colours[0], colours[-1]
     # A light palette's darkest colour is still light: the band goes nearly black, so the words stay clear.
@@ -83,28 +86,36 @@ def lettered(art, title, byline, palette):
     img = art.convert("RGB")
     d = ImageDraw.Draw(img, "RGBA")
     d.rectangle([0, 640, 1000, 1000], fill=dark + (235,))
+    width = 600 if centred else 860
     size = 92 if len(title) < 22 else 74
+    if centred:
+        size = min(size, 72)
     words, lines, line = title.split(), [], ""
     for w in words:
         test = (line + " " + w).strip()
-        if d.textlength(test, font=font(size)) > 860 and line:
+        if d.textlength(test, font=font(size)) > width and line:
             lines.append(line)
             line = w
         else:
             line = test
     lines.append(line)
-    y = 690
-    for text in lines[:2]:
-        d.text((70, y), text, font=font(size), fill=light)
+
+    def place(text, f, y, fill):
+        x = (1000 - d.textlength(text, font=f)) / 2 if centred else 70
+        d.text((x, y), text, font=f, fill=fill)
+
+    y = 690 if len(lines) < 3 else 670
+    for text in lines[:3]:
+        place(text, font(size), y, light)
         y += size + 14
-    d.text((72, y + 18), byline.upper(), font=font(36, "Medium"), fill=light + (190,))
+    place(byline.upper(), font(36, "Medium"), y + 18, light + (190,))
     return img
 
 
 def book(folder, author, title, narrator, year, genre, publisher, palette, style, about, chapters):
     path = os.path.join(folder, author, title)
     os.makedirs(path, exist_ok=True)
-    lettered(cover(author, title, style, palette), title, author, palette).save(os.path.join(path, "cover.jpg"), quality=90)
+    lettered(cover(author, title, style, palette), title, author, palette, centred=True).save(os.path.join(path, "cover.jpg"), quality=90)
     marks, start = [], 0
     for name, minutes in chapters:
         end = start + minutes * 60
