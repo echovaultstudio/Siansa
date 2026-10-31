@@ -57,7 +57,7 @@ More in the [install guide](docs/testing.md).
 <tr>
 <td align="center"><img src="docs/screenshots/search.png" alt="Search, with a radio for each mood" width="240"><br><sub><b>Search</b>: a sound, or a mood radio</sub></td>
 <td align="center"><img src="docs/screenshots/arrange.png" alt="Arrange Home: show, hide and style each section" width="240"><br><sub><b>Arrange Home</b> your way</sub></td>
-<td align="center"><img src="docs/screenshots/home-more.png" alt="More of Home: artist radios, recently added, your genres" width="240"><br><sub><b>More of Home</b>: radios, genres</sub></td>
+<td align="center"><img src="docs/screenshots/home-more.png" alt="More of Home: recently added, your genres and random picks" width="240"><br><sub><b>More of Home</b>: genres, random picks</sub></td>
 </tr>
 </table>
 
