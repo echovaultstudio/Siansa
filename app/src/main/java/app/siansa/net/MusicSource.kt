@@ -19,10 +19,13 @@ import app.siansa.data.Song
  */
 enum class SourceKind(val label: String, val detail: String, val ready: Boolean) {
     OPENSUBSONIC("OpenSubsonic", "Navidrome, Gonic, Airsonic, Ampache and other Subsonic servers", ready = true),
-    JELLYFIN("Jellyfin", "Coming soon", ready = false),
+    JELLYFIN("Jellyfin", "Jellyfin Server 10.9 or later", ready = true),
     EMBY("Emby", "Emby Server", ready = true),
     LOCAL("Files on this phone", "Coming soon", ready = false),
     ;
+
+    /** Emby or Jellyfin, which share one API and Siansa's client for it (issue #703). */
+    val embyLike: Boolean get() = this == EMBY || this == JELLYFIN
 
     companion object {
         /** The saved kind, or OpenSubsonic for anything unknown (and for everyone set up before #113). */

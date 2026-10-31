@@ -145,12 +145,13 @@ class Guests(
     }
 
     private fun sourceOf(kind: SourceKind, user: Int): MusicSource = when (kind) {
-        SourceKind.EMBY -> EmbyApi(
+        SourceKind.EMBY, SourceKind.JELLYFIN -> EmbyApi(
             http,
             settings = { settingsOf(user).current },
             deviceId = { EmbyLogins.deviceId(context) },
             recall = { EmbyLogins.recall(context, user) },
             remember = { EmbyLogins.remember(context, it, user) },
+            jellyfin = kind == SourceKind.JELLYFIN,
         )
         else -> SubsonicApi(http) { settingsOf(user).current }
     }

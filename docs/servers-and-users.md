@@ -7,6 +7,7 @@
 | **Navidrome** (OpenSubsonic) | Everything. Navidrome is what Siansa is tested on most. If your Navidrome has the AudioMuse-AI Navidrome plugin, "similar songs" and Song path can use Navidrome's own sonic similarity. |
 | **Other OpenSubsonic servers** (Gonic, Airsonic, Ampache…) | Browsing, playback, playlists, favourites, scrobbling. Some extras depend on what the server supports (lyrics with timings, sonic similarity). |
 | **Emby** | Browsing, playback, playlists, favourites, play history and "now playing" on Emby. The smart features go through AudioMuse-AI directly. Without AudioMuse, similar songs use Emby's Instant Mix. |
+| **Jellyfin** (10.9 or later) | The same as Emby: browsing, playback, playlists, favourites, play history, "now playing" and lyrics (timed when Jellyfin has them). The smart features go through AudioMuse-AI directly; without it, similar songs use Jellyfin's Instant Mix. |
 
 ## Connecting
 
@@ -15,7 +16,8 @@
 
 - The address can include the port (`http://192.168.1.10:4533`) and a path if your server lives under one.
 - **Server behind a login page?** If a reverse proxy asks for its own login before your server, tap **Add a proxy
-  login** and enter that user name and password too.
+  login** and enter that user name and password too. With Jellyfin this works up to Jellyfin 10.11: Jellyfin 12
+  only takes its login in the same place the proxy's goes.
 - Passwords are stored encrypted with Android's keystore, and never written to the log or to backups.
 
 ## Several users
