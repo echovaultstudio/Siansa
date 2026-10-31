@@ -355,12 +355,17 @@ def tick():
         return {"status": "done", "note": "already ran for another music server in this task"}
     result = {}
     started = time.monotonic()
+    started_at = now_iso()
+    _note_tick({"started_at": started_at})
     for name, job in (("similar", build_similar), ("profiles", measure_missing)):
+        part_started = time.monotonic()
         try:
             result[name] = job()
         except Exception as e:  # one part failing must not stop the other
             logger.exception("siansa_analysis %s failed", name)
             result[name] = {"status": "failed", "error": str(e)}
+        if isinstance(result[name], dict):
+            result[name].setdefault("seconds", round(time.monotonic() - part_started, 1))
     try:
         db = get_db()
         beats_all, profiles_all = measure_all_on(db, "beats"), measure_all_on(db, "profiles")
@@ -373,7 +378,18 @@ def tick():
     except Exception as e:
         logger.exception("siansa_analysis beats failed")
         result["beats"] = {"status": "failed", "error": str(e)}
+    # What this round did, for the settings page's "Last round" and "next round" lines (Siansa issue #765).
+    _note_tick({"started_at": started_at, "finished_at": now_iso(), "seconds": round(time.monotonic() - started, 1),
+                "parts": {name: {k: part.get(k) for k in ("status", "measured", "failed", "seconds", "note") if k in part}
+                          for name, part in result.items() if isinstance(part, dict)}})
     return result
+
+
+def _note_tick(record):
+    try:
+        store.set_state("last_tick", record, get_db())
+    except Exception as e:  # the page's note must never stop the work
+        logger.warning("siansa_analysis couldn't note the round: %s", e)
 
 
 # The beat grids start no round with less than this left of the tick's slot.

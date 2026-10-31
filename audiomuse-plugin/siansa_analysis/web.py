@@ -16,6 +16,7 @@ the asked music server's ids for songs in the similar lists. Like AudioMuse's ow
 """
 
 import json
+from datetime import datetime, timezone
 from html import escape
 
 from flask import Blueprint, jsonify, redirect, request, url_for
@@ -55,6 +56,10 @@ def collect(db):
         "built": built,
         "profiles": status.profiles(counts, profiles_job),
         "similar": status.similar(inputs, built, similar_job, similarity.ALGORITHM_VERSION),
+        # Where the rounds are (Siansa issue #765): the last round, the schedule and what holds AudioMuse's queue.
+        "last_tick": store.get_state("last_tick", {}, db) or {},
+        "cron": store.scheduled_tick(db),
+        "blocking": store.blocking_task(db),
     }
 
 
@@ -241,14 +246,29 @@ def _meter(s, label):
             f'aria-valuemax="100" aria-valuenow="{s.percent}"><div class="mx-fill" style="width:{s.percent}%"></div></div>')
 
 
-def _all_block(part, to_measure, busy, on, what, round_note):
-    """The "measure all" box of a part: a warning and a start button, or, while on, a stop button."""
+def _reload_script(ms):
+    """Reloads the page every ``ms``, but never while a field is in use or changed and not saved: a number being
+    typed into "Songs per run" would be lost (Siansa issue #765, now that the page reloads between rounds too)."""
+    return ("<script>(function(){var dirty=false;document.addEventListener('input',function(){dirty=true});"
+            "function tick(){var a=document.activeElement;"
+            "if(dirty||(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))){setTimeout(tick,%d);return}"
+            "location.reload()}setTimeout(tick,%d)})()</script>" % (ms, ms))
+
+
+def _all_block(part, to_measure, busy, on, what, round_note, rounds=("", False), last=""):
+    """The "measure all" box of a part: a warning and a start button, or, while on, where the rounds are (a round
+    running, between rounds, or waiting and why: Siansa issue #765), the last round, and a stop button."""
     action = "measure_all" if part == "profiles" else "beats_all"
     stop = "stop_all" if part == "profiles" else "stop_beats_all"
     if on:
+        line, attention = rounds
+        now_line = (f'<p class="mx-help{" mx-attention" if attention else ""}" data-rounds><strong>{escape(line)}</strong></p>'
+                    if line else "")
+        last_line = f'<p class="mx-help">{escape(last)}</p>' if last else ""
         return f"""<div class="mx-warning" role="status"><strong>Measuring every song{what}.</strong> Rounds of
       {status.ALL_ROUND_SECONDS // 60} minutes every 15 minutes until all are done. While a round runs, AudioMuse
       waits with its own jobs (analysis, clustering, scheduled tasks).
+      {now_line}{last_line}
       <form method="post" class="mx-actions"><button type="submit" name="action" value="{stop}">Stop measuring all</button></form></div>"""
     if not to_measure:
         return ""
@@ -270,10 +290,18 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
     beat_counts = state.get("beat_counts") or status.beats_counts(0, 0, 0, 0)
     beats_job = state.get("beats_job") or {}
     beats_batch_size = jobs.DEFAULT_BEATS_BATCH if beats_batch_size is None else int(beats_batch_size)
+    now = datetime.now(timezone.utc)
+    profiles_running = status.job_running(state["profiles_job"], now)
+    beats_running = status.job_running(beats_job, now)
     working = "working" in (p.kind, sim.kind, b.kind) and (
-        state["profiles_job"].get("status") == "running" or state["similar_job"].get("status") == "running"
-        or beats_job.get("status") == "running")
-    refresh = "<script>setTimeout(function(){location.reload()},15000)</script>" if working else ""
+        profiles_running or state["similar_job"].get("status") == "running" or beats_running)
+    # While every song is being measured, the page keeps itself current between rounds too (issue #765): before,
+    # it stopped updating once a round ended, so the count looked stuck though the next round had moved it on.
+    any_all = bool(state.get("measure_all")) or bool(state.get("beats_all"))
+    refresh = _reload_script(15000 if working else 30000) if working or any_all else ""
+    rounds = status.round_status(beats_job, state["profiles_job"], state.get("last_tick"), state.get("cron"),
+                                 state.get("blocking"), now)
+    last_round = status.last_round_text(state.get("last_tick"), now)
     note = f'<p class="mx-help"><strong>{escape(message)}</strong></p>' if message else ""
     failures = ""
     if state.get("failures"):
@@ -284,11 +312,11 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
     profiles_error = state["profiles_job"].get("error")
     measure_all = bool(state.get("measure_all"))
     # Both parts read songs one at a time under one lock, so neither starts while the other runs.
-    measuring = state["profiles_job"].get("status") == "running" or beats_job.get("status") == "running"
+    measuring = profiles_running or beats_running
     busy = " disabled" if measuring else ""
     left = status.time_left(counts["to_measure"], state.get("rate"), measure_all, int(batch_size))
     left_line = f'<p class="mx-help">At this pace, every song is measured in {escape(left)}.</p>' if left else ""
-    all_block = _all_block("profiles", counts["to_measure"], busy, measure_all, "", "")
+    all_block = _all_block("profiles", counts["to_measure"], busy, measure_all, "", "", rounds, last_round)
     beats_all = bool(state.get("beats_all"))
     beats_left = status.time_left(beat_counts["to_measure"], state.get("rate"), beats_all, max(beats_batch_size, 1)) if (beats_batch_size or beats_all) else None
     beats_left_line = (f'<p class="mx-help">At this pace, every song has its beat grid in {escape(beats_left)}.</p>'
@@ -296,7 +324,7 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
     if not beats_batch_size and not beats_all and beat_counts["to_measure"]:
         beats_left_line = '<p class="mx-help">Songs per run is 0: songs are measured for their beats only when you press a button here (and new songs as AudioMuse analyses them).</p>'
     beats_all_block = _all_block("beats", beat_counts["to_measure"], busy, beats_all, " for their beats",
-                                 " Their loudness and fades stay in use meanwhile.")
+                                 " Their loudness and fades stay in use meanwhile.", rounds, last_round)
     beats_error = beats_job.get("error")
     beats_failures = ""
     if beat_counts["failed"]:

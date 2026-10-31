@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.4.1",
+      "min_core_version": "3.6.4",
+      "changelog": "Measuring every song: the settings page now says where the rounds are (a round running and how many it has measured, between rounds and when the next starts, waiting for one of AudioMuse's own jobs, or no round starting because the scheduled task is off) and what the last round did, and keeps itself current between rounds. Before, it stopped updating when a round ended, so the count looked stuck. A round that stopped without finishing (the worker restarted) no longer keeps the page on \"Measuring\" with its buttons off. The beat grids section says what 0.4.0 measures (the phrases) and why songs are read again.",
+      "imageUrl": ""
+    },
+    {
       "version": "0.4.0",
       "min_core_version": "3.6.4",
       "changelog": "Finds the phrases at each end of a song (the 4 or 8 bars it's built from: where parts come in or drop out), so Siansa's DJ radio can mix phrase on phrase, as a DJ does. The outro is read over the song's last minute. Beat grids are measured again in the background, as 0.3.0 did; the downbeat is found more surely (the kick counts double, read around the beat).",

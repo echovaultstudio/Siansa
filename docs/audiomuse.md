@@ -74,6 +74,12 @@ can't be read is tried again later (after an hour, 6 hours, a day, then 3 days);
 has **Try them all again now** (0.3.2). Songs on none of AudioMuse's music servers (removed, or not matched yet)
 are counted apart.
 
+While **Measure all** is on (0.4.1), the page says where the rounds are and updates by itself: a round running and
+how many it has measured, **Between rounds** with when the next one starts (rounds run 12 of every 15 minutes, so
+the count pauses for about 3 minutes between them), waiting for one of AudioMuse-AI's own jobs to finish, or that
+no round is starting because the plugin's scheduled task is switched off (Administration › Scheduled Tasks). Under
+it, **Last round** says what the last round did.
+
 ## Several music servers in one AudioMuse-AI
 
 AudioMuse-AI 3 can serve several music servers (for example Navidrome and Emby). Each one has a **display
