@@ -3,18 +3,34 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Siansa open source</title>
+<title>Open source · Siansa</title>
+<meta name="description" content="Siansa is free software under the GNU GPL, built on open-source libraries.">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F3F6F8" media="(prefers-color-scheme: light)">
+<meta property="og:title" content="Open source · Siansa">
+<meta property="og:description" content="Siansa is free software under the GNU GPL, built on open-source libraries.">
+<meta property="og:image" content="https://{{DOMAIN}}/og.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.ico" sizes="48x48">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/style.css?v=9">
+<link rel="stylesheet" href="/style.css?v=10">
 </head>
 <body>
-<header class="site-nav">
-<a class="brand" href="/"><img src="/favicon-32.png" alt="" width="24" height="24">Siansa</a>
-<nav><a href="/features">What Siansa can do</a><a href="/tracking">Feature tracking</a><a href="/licenses" aria-current="page">Open source</a><a href="/donate">Donate</a><a href="https://github.com/echovaultstudio/Siansa">Siansa on GitHub</a><a href="https://github.com/echovaultstudio/Siansa/tree/main/docs">Docs</a><a href="/#get">Get Siansa</a></nav>
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar">
+<div class="bar-in">
+<a class="brand" href="/"><img src="/icon.svg" alt="" width="30" height="30">Siansa</a>
+<nav class="nav" aria-label="Site"><a href="/features">Features</a><a href="/tracking">Roadmap</a><a href="/licenses" aria-current="page">Open source</a><a href="/donate">Donate</a><a href="https://github.com/echovaultstudio/Siansa/tree/main/docs">Docs</a><a href="https://github.com/echovaultstudio/Siansa">GitHub</a></nav>
+<a class="btn btn-amber btn-small" href="/#get">Get Siansa</a>
+<details class="menu">
+<summary aria-label="Menu"><svg class="open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><svg class="close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></summary>
+<nav aria-label="Site"><a href="/features">Features</a><a href="/tracking">Roadmap</a><a href="/licenses" aria-current="page">Open source</a><a href="/donate">Donate</a><a href="https://github.com/echovaultstudio/Siansa/tree/main/docs">Docs</a><a href="https://github.com/echovaultstudio/Siansa">GitHub</a><a href="/privacy">Privacy policy</a></nav>
+</details>
+</div>
 </header>
-<main>
+<main id="main" class="page">
 <h1>Open source</h1>
 <p><strong>Siansa is free software</strong>, under the <a href="https://www.gnu.org/licenses/gpl-3.0.html">GNU General
 Public License, version 3 or later</a>. We believe an app that holds your server login should be open to read, and
@@ -105,5 +121,12 @@ Kit License</a> and the <a href="https://developers.google.com/terms">Google API
 <p class="hint">Something missing or wrong here? Tell us on <a href="https://github.com/echovaultstudio/Siansa/issues">GitHub</a>.</p>
 <p><a href="/privacy">Privacy policy</a></p>
 </main>
+<footer class="foot">
+<div class="foot-in">
+<div class="foot-brand"><img src="/icon.svg" alt="" width="36" height="36"><p>Siansa is free software under the GNU GPL,
+made for people who run their own music server. Questions: <a href="mailto:help@{{DOMAIN}}">help@{{DOMAIN}}</a></p></div>
+<nav aria-label="More"><a href="/features">Features</a><a href="/tracking">Roadmap</a><a href="/licenses">Open source</a><a href="/donate">Donate</a><a href="https://github.com/echovaultstudio/Siansa/tree/main/docs">Docs</a><a href="https://github.com/echovaultstudio/Siansa">GitHub</a><a href="/privacy">Privacy policy</a></nav>
+</div>
+</footer>
 </body>
 </html>
