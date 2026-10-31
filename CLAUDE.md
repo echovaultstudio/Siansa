@@ -5,7 +5,7 @@ Source: `app/src/main/java/app/siansa/`. Unit tests: `app/src/test/`. Emulator t
 
 ## Every change
 
-- Build and test before opening a pull request: `gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease :app:bundleRelease`.
+- Build and test before opening a pull request: `gradle :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:assembleRelease :app:bundleRelease`.
   Lint errors fail the build.
 - Add or update unit tests in `app/src/test/` for any logic you change.
 - Add a note file in `changelog.d/` (e.g. `changelog.d/issue-42.md`, see its README) with `### Fixed` /
@@ -26,7 +26,9 @@ Source: `app/src/main/java/app/siansa/`. Unit tests: `app/src/test/`. Emulator t
   Pixel-exact drawing that isn't spacing (a ring, a hairline, an offset) may say `// spacing: exact` on its line.
   Pages use `Space.Page` at their left and right edges and `Space.Section` between sections.
 - Visual changes: keep spacing even (the same gap above and below a row of chips, buttons or a badge) and add
-  a check for it to `app/src/androidTest/java/app/siansa/SpacingTest.kt`.
+  a check for it to the spacing tests of that area in `app/src/androidTest/java/app/siansa/` (`SpacingHomeTest`,
+  `SpacingPlayerTest`, `SpacingSettingsTest`, `SpacingLibraryTest`, `SpacingListeningTest`; shared setup in
+  `SpacingCheck`).
 - Screenshot tests (`app/src/test/java/app/siansa/screenshots/ScreenshotTest.kt`, issue #710): draw a changed or new
   part of a page in a scene there, with long words where text can be cut off. When the look is meant to change, label
   the pull request `record screenshots` (CI records the pictures on GitHub's runner and commits them; pictures made on
@@ -43,12 +45,14 @@ implements them and opens a pull request. Labels show where each one is: `claude
 ## Pull requests
 
 - One issue per pull request; reference it with `Fixes #N`.
+- Label a pull request `ui` when it changes how pages scroll, move or respond to touch (rearranging, the player,
+  gestures): the emulator tests then run on it before merging (`.github/workflows/ui-tests.yml`, issue #713).
 - Reports from the app (Settings › Help › Report a problem) are issues in this repository, with the log kept in the
   private logs repository. GitHub closes a fixed issue on merge, and the release comments on it with the version that
   has the fix (`scripts/notify_fixed.py`, issue #433).
 - Describe before and after, and how it was tested.
 - Don't merge: the owner reviews, and CI (`.github/workflows/ci.yml`) must pass. Pull requests run the build,
-  Lint, unit tests and secret scan; emulator tests run after merging to main.
+  Lint, unit tests and secret scan, and compile the emulator tests; emulator tests run after merging to main.
 
 ## Don'ts
 

@@ -137,18 +137,12 @@ finish the song it has (and the next one, if it was handed that ahead) before it
 
 **DLNA without gaps.** Siansa hands a DLNA TV or speaker the next song while the current one plays, so devices
 that support it go straight on to the next song. Devices that don't get the next song when the current one ends,
-with a short gap. How well a device does this is up to the device.
+with a short gap. How well a device does this is up to the device: some speakers (the JBL Bar 800, for example)
+pause for a few seconds between songs whichever way they get them.
 
 **Chromecast without gaps.** A Chromecast, Google TV or speaker with Chromecast built in gets the whole queue and is
 asked to load the next song about 20 seconds before the current one ends, so it can go straight on. Songs go as MP3,
 which can leave a very short pause between songs that run into each other.
-
-**Speakers that play the queue themselves (experimental).** Some speakers can't take the next song ahead (for
-example the JBL Bar 800), so songs change with a gap of a few seconds. Speakers built on LinkPlay (JBL Bar, WiiM,
-Arylic, Audio Pro and others) can instead be handed the next few songs as a list of their own and play through it by
-themselves. Tap the cog beside the speaker in **Play on** and turn on **Speaker plays the queue**; it's only offered
-on speakers that have it. Siansa keeps the speaker's list in step as the queue changes. If the speaker refuses,
-songs go one at a time as before.
 
 **Original files on DLNA.** Tap the cog beside a DLNA TV or speaker in **Play on** and turn on **Send the original
 file**. It then gets your music as it is (for example FLAC) instead of MP3 320, whenever it says it plays that
