@@ -1,0 +1,152 @@
+app: 10-31 13:39:50.699  2413  2444 I Siansa/Library: Showing every library
+Showcase: sync DONE
+Showcase: 144 songs
+Showcase: 8550 plays over four years, 2950 this year
+Showcase: Discover for you: app.siansa.mix.MixException: Not enough listening history yet. Play some more and try again later.
+Showcase: gestures: on
+app: 10-31 13:39:59.460  2413  2444 W Siansa/AudioMuse: /plugins/siansa_analysis/api/health failed: HTTP 404, error ?: not here
+app: 10-31 13:39:59.489  2413  2444 W Siansa/AudioMuse: /plugins/musix_analysis/api/health failed: HTTP 404, error ?: not here
+app: 10-31 13:39:59.514  2413  2444 W Siansa/AudioMuse: /plugins/siansa_analysis/api/similar/artists failed: HTTP 404, error ?: not here
+app: 10-31 13:39:59.515  2413  2444 W Siansa/Similar: Siansa plugin: AudioMuse doesn't know this song. Has it been analysed? If AudioMuse reads more than one music server, enter its name in Settings › Connections, under the server the song is from (another user's too): Server name in AudioMuse.
+app: 10-31 13:39:59.540  2413  2444 W Siansa/AudioMuse: /plugins/siansa_analysis/api/similar/artists failed: HTTP 404, error ?: not here
+app: 10-31 13:39:59.541  2413  2444 W Siansa/Similar: Siansa plugin: AudioMuse doesn't know this song. Has it been analysed? If AudioMuse reads more than one music server, enter its name in Settings › Connections, under the server the song is from (another user's too): Server name in AudioMuse.
+app: 10-31 13:39:59.581  2413  2483 W Siansa/AudioMuse: /plugins/siansa_analysis/api/similar/artists failed: HTTP 404, error ?: not here
+app: 10-31 13:39:59.583  2413  2483 W Siansa/Similar: Siansa plugin: AudioMuse doesn't know this song. Has it been analysed? If AudioMuse reads more than one music server, enter its name in Settings › Connections, under the server the song is from (another user's too): Server name in AudioMuse.
+app: 10-31 13:39:59.880  2413  2454 I Siansa/Books: Book shelves: 3 from 1 libraries, 8 items
+app: 10-31 13:40:00.005  2413  2454 I Siansa/Books: Podcast shelves: 1 from 1 libraries, 3 items
+app: 10-31 13:40:03.766  2413  2413 W Siansa/Audio: Waited 1589ms for data before playing · song 2GJ1xrbnav69xJ69stsQDH (original) at 20s, 22.4s buffered ahead, wifi, song needs ~320 kbit/s
+app: 10-31 13:40:03.789  2413  2413 W Siansa/Player: Started playing 1611ms after it was chosen
+Showcase: shot home 1080x2400, 311 KB
+Showcase: shot home-more 1080x2400, 358 KB
+Showcase: shot home-more-2 1080x2400, 308 KB
+Showcase: OK home
+Showcase: shot arrange 1080x2400, 160 KB
+Showcase: OK arrange
+app: 10-31 13:40:30.518  2413  2445 I Siansa/Books: All books: 4
+app: 10-31 13:40:30.555  2413  2445 I Siansa/Books: All podcasts: 3
+app: 10-31 13:40:31.038  2413  2413 I Siansa/Books: All books: 4
+app: 10-31 13:40:31.049  2413  2458 I Siansa/Books: All podcasts: 3
+app: 10-31 13:40:31.056  2413  2460 W Siansa/Favorites: Favourite artists not read from Navidrome: The coroutine scope left the composition
+app: 10-31 13:40:31.200  2413  2454 I Siansa/Books: All books: 4
+app: 10-31 13:40:31.210  2413  2454 I Siansa/Books: All podcasts: 3
+app: 10-31 13:40:31.306  2413  2445 I Siansa/Books: All books: 4
+app: 10-31 13:40:31.345  2413  2454 I Siansa/Books: All podcasts: 3
+app: 10-31 13:40:31.738  2413  2459 I Siansa/Books: All books: 4
+app: 10-31 13:40:31.824  2413  2459 I Siansa/Books: All podcasts: 3
+app: 10-31 13:40:32.995  2413  2413 I Siansa/Library: Songs: 144
+Showcase: shot album 1080x2400, 314 KB
+Showcase: OK album
+Showcase: shot now-playing 1080x2400, 426 KB
+Showcase: shot anim-player-00-1400 540x1200, 75 KB
+Showcase: shot anim-player-01-70 540x1200, 77 KB
+Showcase: shot anim-player-02-70 540x1200, 82 KB
+Showcase: shot anim-player-03-70 540x1200, 85 KB
+Showcase: shot anim-player-04-70 540x1200, 90 KB
+Showcase: shot anim-player-05-70 540x1200, 88 KB
+Showcase: shot anim-player-06-70 540x1200, 81 KB
+Showcase: shot anim-player-07-70 540x1200, 71 KB
+Showcase: shot anim-player-08-70 540x1200, 71 KB
+Showcase: shot anim-player-09-70 540x1200, 71 KB
+Showcase: shot anim-player-10-70 540x1200, 71 KB
+Showcase: shot anim-player-11-70 540x1200, 71 KB
+Showcase: shot anim-player-12-70 540x1200, 71 KB
+Showcase: shot anim-player-13-2200 540x1200, 71 KB
+Showcase: shot anim-player-14-60 540x1200, 75 KB
+Showcase: shot anim-player-15-60 540x1200, 81 KB
+Showcase: shot anim-player-16-60 540x1200, 86 KB
+Showcase: shot anim-player-17-60 540x1200, 91 KB
+Showcase: shot anim-player-18-60 540x1200, 87 KB
+Showcase: shot anim-player-19-60 540x1200, 81 KB
+Showcase: shot anim-player-20-60 540x1200, 77 KB
+Showcase: shot anim-player-21-60 540x1200, 76 KB
+Showcase: shot anim-player-22-320 540x1200, 67 KB
+Showcase: shot anim-player-23-320 540x1200, 66 KB
+Showcase: shot anim-player-24-320 540x1200, 66 KB
+Showcase: shot anim-player-25-320 540x1200, 66 KB
+Showcase: shot anim-player-26-320 540x1200, 66 KB
+Showcase: shot anim-player-27-320 540x1200, 66 KB
+Showcase: shot anim-player-28-320 540x1200, 66 KB
+Showcase: shot anim-player-29-320 540x1200, 66 KB
+Showcase: shot anim-player-30-320 540x1200, 66 KB
+Showcase: shot anim-player-31-320 540x1200, 66 KB
+Showcase: shot anim-player-32-320 540x1200, 66 KB
+Showcase: shot anim-player-33-320 540x1200, 66 KB
+Showcase: shot anim-player-34-320 540x1200, 66 KB
+Showcase: shot anim-player-35-320 540x1200, 65 KB
+Showcase: shot anim-player-36-320 540x1200, 65 KB
+Showcase: shot anim-player-37-320 540x1200, 65 KB
+Showcase: shot anim-player-38-320 540x1200, 65 KB
+Showcase: shot anim-player-39-320 540x1200, 65 KB
+Showcase: shot anim-player-40-1800 540x1200, 65 KB
+Showcase: shot lyrics 1080x2400, 222 KB
+app: 10-31 13:41:21.311  2413  2461 I Siansa/Books: All books: 4
+app: 10-31 13:41:21.317  2413  2461 I Siansa/Books: All podcasts: 3
+app: 10-31 13:41:21.396  2413  2574 I Siansa/Books: All books: 4
+app: 10-31 13:41:21.401  2413  2574 I Siansa/Books: All podcasts: 3
+app: 10-31 13:41:21.676  2413  2413 I Siansa/Books: Book shelves: 3 from 1 libraries, 8 items
+app: 10-31 13:41:21.695  2413  2413 I Siansa/Books: Podcast shelves: 1 from 1 libraries, 3 items
+app: 10-31 13:41:22.212  2413  2461 W Siansa/AudioMuse: /plugins/siansa_analysis/api/similar/artists failed: HTTP 404, error ?: not here
+app: 10-31 13:41:22.212  2413  2461 W Siansa/Similar: Siansa plugin: AudioMuse doesn't know this song. Has it been analysed? If AudioMuse reads more than one music server, enter its name in Settings › Connections, under the server the song is from (another user's too): Server name in AudioMuse.
+Showcase: OK now playing
+app: 10-31 13:41:22.717  2413  2461 W Siansa/AudioMuse: /plugins/siansa_analysis/api/similar/artists failed: HTTP 404, error ?: not here
+app: 10-31 13:41:22.718  2413  2461 W Siansa/Similar: Siansa plugin: AudioMuse doesn't know this song. Has it been analysed? If AudioMuse reads more than one music server, enter its name in Settings › Connections, under the server the song is from (another user's too): Server name in AudioMuse.
+app: 10-31 13:41:23.239  2413  2461 W Siansa/AudioMuse: /plugins/siansa_analysis/api/similar/artists failed: HTTP 404, error ?: not here
+app: 10-31 13:41:23.242  2413  2413 W Siansa/Similar: Siansa plugin: AudioMuse doesn't know this song. Has it been analysed? If AudioMuse reads more than one music server, enter its name in Settings › Connections, under the server the song is from (another user's too): Server name in AudioMuse.
+Showcase: shot search 1080x2400, 191 KB
+Showcase: OK search
+Showcase: shot flow 1080x2400, 245 KB
+Showcase: OK flow
+Showcase: shot flow-shape 1080x2400, 206 KB
+Showcase: shot vibe 1080x2400, 234 KB
+Showcase: OK vibe
+app: 10-31 13:41:45.048  2413  2484 I Siansa/Books: All books: 4
+app: 10-31 13:41:45.090  2413  2484 I Siansa/Books: All podcasts: 3
+app: 10-31 13:41:45.364  2413  2572 I Siansa/Books: All books: 4
+app: 10-31 13:41:45.408  2413  2572 I Siansa/Books: All podcasts: 3
+Showcase: shot listening 1080x2400, 262 KB
+Showcase: Top songs from 2338 to 240 px of 2400 (0 swipes)
+Showcase: shot listening-more 1080x2400, 277 KB
+Showcase: Your listening clock from 2768 to 240 px of 2400 (0 swipes)
+Showcase: shot listening-clock 1080x2400, 268 KB
+app: 10-31 13:41:59.480  2413  2461 I Siansa/Books: All books: 4
+app: 10-31 13:41:59.487  2413  2461 I Siansa/Books: All podcasts: 3
+app: 10-31 13:41:59.548  2413  2572 I Siansa/Books: All books: 4
+app: 10-31 13:41:59.553  2413  2572 I Siansa/Books: All podcasts: 3
+Showcase: OK your listening
+Showcase: shot timemachine-2023 1080x2400, 270 KB
+Showcase: shot timemachine-2024 1080x2400, 271 KB
+Showcase: shot timemachine-2025 1080x2400, 268 KB
+Showcase: shot timemachine-2026 1080x2400, 273 KB
+app: 10-31 13:42:27.716  2413  2461 I Siansa/Books: All books: 4
+app: 10-31 13:42:27.720  2413  2461 I Siansa/Books: All podcasts: 3
+Showcase: OK time machine
+app: 10-31 13:42:27.818  2413  2572 I Siansa/Books: All books: 4
+app: 10-31 13:42:27.831  2413  2572 I Siansa/Books: All podcasts: 3
+Showcase: shot smart-search 1080x2400, 190 KB
+Showcase: OK smart search
+app: 10-31 13:42:36.690  2413  2484 I Siansa/Books: All books: 4
+app: 10-31 13:42:36.697  2413  2484 I Siansa/Books: All podcasts: 3
+app: 10-31 13:42:37.348  2413  2574 I Siansa/Books: All books: 4
+app: 10-31 13:42:37.360  2413  2571 I Siansa/Books: All podcasts: 3
+Showcase: shot library 1080x2400, 215 KB
+app: 10-31 13:42:41.080  2413  2574 I Siansa/Library: Songs: 144
+Showcase: shot library-grid 1080x2400, 404 KB
+Showcase: OK library
+Showcase: shot style 1080x2400, 115 KB
+Showcase: OK style
+Showcase: shot settings 1080x2400, 123 KB
+Showcase: OK settings
+app: 10-31 13:42:54.584  2413  2484 I Siansa/Books: All books: 4
+app: 10-31 13:42:54.656  2413  2484 I Siansa/Books: All podcasts: 3
+app: 10-31 13:42:54.908  2413  2588 I Siansa/Books: All books: 4
+app: 10-31 13:42:54.918  2413  2588 I Siansa/Books: All podcasts: 3
+Showcase: shot book 1080x2400, 341 KB
+app: 10-31 13:43:02.394  2413  2413 I Siansa/Books: Continue "The Lighthouse at Merrow Point" from its page
+Showcase: shot book-player 1080x2400, 366 KB
+app: 10-31 13:43:14.049  2413  2461 I Siansa/Books: All books: 4
+app: 10-31 13:43:14.054  2413  2461 I Siansa/Books: All podcasts: 3
+app: 10-31 13:43:14.120  2413  2572 I Siansa/Books: All books: 4
+app: 10-31 13:43:14.147  2413  2572 I Siansa/Books: All podcasts: 3
+Showcase: OK books
+Showcase: shot podcast 1080x2400, 366 KB
+Showcase: OK podcasts
