@@ -74,11 +74,17 @@ can't be read is tried again later (after an hour, 6 hours, a day, then 3 days);
 has **Try them all again now** (0.3.2). Songs on none of AudioMuse's music servers (removed, or not matched yet)
 are counted apart.
 
-While **Measure all** is on (0.4.1), the page says where the rounds are and updates by itself: a round running and
-how many it has measured, **Between rounds** with when the next one starts (rounds run 12 of every 15 minutes, so
-the count pauses for about 3 minutes between them), waiting for one of AudioMuse-AI's own jobs to finish, or that
-no round is starting because the plugin's scheduled task is switched off (Administration › Scheduled Tasks). Under
-it, **Last round** says what the last round did.
+From 0.4.1, **Measure all** goes on **without a break** until every song is measured. Meanwhile AudioMuse-AI waits
+with its own jobs (analysis of new songs, clustering, scheduled tasks), as it does while any plugin job runs. If you
+want them to get a turn, set **Measure all runs** to rounds of 12, 10 or 5 minutes every 15 (the way it ran before
+0.4.1). **Stop now** shows while songs are being measured, whatever started it (Measure all, a batch now, or the
+15-minute task): the run ends after the song it's on, Measure all goes off for both parts, and the songs measured so
+far are kept.
+
+While **Measure all** is on, the page says where it is and updates by itself (never while you're typing in it): how
+many it has measured so far, with rounds **Between rounds** and when the next one starts, waiting for one of
+AudioMuse-AI's own jobs to finish, or that nothing is starting because the plugin's scheduled task is switched off
+(Administration › Scheduled Tasks). Under it, **Last round** says what the last round did.
 
 ## Several music servers in one AudioMuse-AI
 

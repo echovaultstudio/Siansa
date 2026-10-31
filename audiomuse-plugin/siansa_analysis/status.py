@@ -17,9 +17,37 @@ TICK_SECONDS = 15 * 60
 NORMAL_ROUND_SECONDS = 4 * 60
 ALL_ROUND_SECONDS = 12 * 60
 
+# How "Measure all" runs (Siansa issue #765): 0 is without a break, until every song is measured (AudioMuse's own
+# jobs wait meanwhile); otherwise rounds of that many minutes every 15, so AudioMuse's jobs get a turn between them.
+ALL_ROUND_CHOICES = (0, 12, 10, 5)
+DEFAULT_ALL_ROUND_MINUTES = 0
 
-def round_seconds(measure_all):
-    return ALL_ROUND_SECONDS if measure_all else NORMAL_ROUND_SECONDS
+
+def all_round_minutes(value):
+    """The "Measure all" round setting, kept to :data:`ALL_ROUND_CHOICES`."""
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_ALL_ROUND_MINUTES
+    return value if value in ALL_ROUND_CHOICES else DEFAULT_ALL_ROUND_MINUTES
+
+
+def round_seconds(measure_all, all_minutes=DEFAULT_ALL_ROUND_MINUTES):
+    """How long a round may run: a normal round, or while measuring all, the set rounds or ``None`` (no limit)."""
+    if not measure_all:
+        return NORMAL_ROUND_SECONDS
+    minutes = all_round_minutes(all_minutes)
+    return minutes * 60 if minutes else None
+
+
+def all_round_text(all_minutes):
+    """How measuring all runs, in words for the page."""
+    minutes = all_round_minutes(all_minutes)
+    if not minutes:
+        return ("It goes on without a break until every song is measured. Meanwhile AudioMuse waits with its own jobs "
+                "(analysis of new songs, clustering, scheduled tasks).")
+    return (f"It goes in rounds of {minutes} minutes every 15 until every song is measured. While a round runs, "
+            "AudioMuse waits with its own jobs (analysis, clustering, scheduled tasks); between rounds they run.")
 
 
 def next_rate(rate, songs, seconds, keep=500):
@@ -43,15 +71,16 @@ def duration_text(seconds):
     return f"about {int(round(hours / 24))} days"
 
 
-def time_left(to_measure, rate, measure_all, batch):
+def time_left(to_measure, rate, measure_all, batch, all_minutes=DEFAULT_ALL_ROUND_MINUTES):
     """How long measuring every song still takes, in words, or ``None`` before anything was timed."""
     rate = rate or {}
     if to_measure <= 0 or not rate.get("songs"):
         return None
     per_song = float(rate["seconds"]) / float(rate["songs"])
     if measure_all:
-        # Rounds of ALL_ROUND_SECONDS, one per tick.
-        return duration_text(to_measure * per_song * TICK_SECONDS / ALL_ROUND_SECONDS)
+        # Without a break, or rounds of the set minutes, one per tick.
+        round_ = round_seconds(True, all_minutes)
+        return duration_text(to_measure * per_song * (TICK_SECONDS / round_ if round_ else 1))
     per_tick = max(1, min(batch, int(NORMAL_ROUND_SECONDS // max(per_song, 0.1))))
     return duration_text(to_measure / per_tick * TICK_SECONDS)
 
@@ -229,13 +258,15 @@ def last_round_text(tick, now):
     return f"Last round, {when}: " + ("; ".join(said) if said else "nothing to do") + "."
 
 
-def round_status(beats_job, profiles_job, tick, cron, blocking, now):
+def round_status(beats_job, profiles_job, tick, cron, blocking, now, all_minutes=DEFAULT_ALL_ROUND_MINUTES):
     """Where measuring every song stands, in a line for the page, and whether it needs attention:
     a round running, between rounds (and when the next starts), waiting for one of AudioMuse's own jobs, or no round
     starting at all (the scheduled task switched off, or something holding the queue)."""
     for job in (beats_job, profiles_job):
         job = job or {}
         if job_running(job, now):
+            if not all_round_minutes(all_minutes):
+                return f"Measuring without a break: {int(job.get('measured') or 0):,} measured so far.", False
             return f"A round is running: {int(job.get('measured') or 0):,} measured so far.", False
     stale = next((j for j in (beats_job, profiles_job) if (j or {}).get("status") == "running"), None)
     if stale:
@@ -254,6 +285,8 @@ def round_status(beats_job, profiles_job, tick, cron, blocking, now):
     if started is None:
         return lead + "The first round starts with the next scheduled run, within 15 minutes.", False
     until = TICK_SECONDS - started
+    if until > -120 and not all_round_minutes(all_minutes):
+        return lead + f"Starts again with the next scheduled run, {_in(until)}.", False
     if until > -120:
         return lead + f"Between rounds: the next one starts {_in(until)}.", False
     return lead + (f"No round has started since {_ago(started)}. AudioMuse may be holding its queue for its own "

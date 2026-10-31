@@ -131,6 +131,29 @@ def measure_all_on(db, part="profiles"):
     return bool((store.get_state(PARTS[part]["all"], {}, db) or {}).get("on"))
 
 
+def all_round_minutes():
+    """How "Measure all" runs (Siansa issue #765): 0 without a break, else rounds of that many minutes."""
+    return status.all_round_minutes(get_setting("all_round_minutes", status.DEFAULT_ALL_ROUND_MINUTES))
+
+
+def cancel(db=None):
+    """"Stop now" on the settings page (Siansa issue #765): the run measuring now ends after the song it's on,
+    and "Measure all" goes off for both parts, so no round starts again by itself."""
+    db = db or get_db()
+    at = now_iso()
+    store.set_state("cancel", {"at": at}, db)
+    for part in PARTS.values():
+        if (store.get_state(part["all"], {}, db) or {}).get("on"):
+            store.set_state(part["all"], {"on": False, "stopped_at": at}, db)
+    logger.info("siansa_analysis: stopped by hand")
+
+
+def cancelled_since(db, since):
+    """Whether "Stop now" was pressed at or after ``since`` (an ISO time from :func:`now_iso`)."""
+    at = (store.get_state("cancel", {}, db) or {}).get("at")
+    return bool(at) and str(at) >= str(since)
+
+
 # Songs per round of beat grids at most: as many as a round's time allows (issue #657), in practice no limit.
 MAX_BEATS_BATCH = 100_000
 
@@ -161,10 +184,10 @@ def measure_part(part, budget_seconds=None, batch=None):
     """Measures the songs ``part`` still needs ("profiles" or "beats"), a round at a time.
 
     A normal round measures one batch (that part's "Songs per run" setting) within
-    :data:`status.NORMAL_ROUND_SECONDS`. With that part's "Measure all" on, a round goes on until
-    :data:`status.ALL_ROUND_SECONDS`, and the scheduled tick keeps starting rounds until every song is measured or
-    it is stopped. The rounds end with a few minutes free, because AudioMuse-AI doesn't start its own jobs (such as
-    analysis) while a plugin job runs. Both parts measure a song in full, so a song measured for its beats gets
+    :data:`status.NORMAL_ROUND_SECONDS`. With that part's "Measure all" on, it goes on without a break until every
+    song is measured (the default), or in rounds of the set minutes that the scheduled tick keeps starting, ending
+    with a few minutes free, because AudioMuse-AI doesn't start its own jobs (such as analysis) while a plugin job
+    runs (Siansa issue #765). "Stop now" ends it after the song it's on. Both parts measure a song in full, so a song measured for its beats gets
     its loudness and ramps again too (the same values).
     """
     spec = PARTS[part]
@@ -172,9 +195,11 @@ def measure_part(part, budget_seconds=None, batch=None):
     if not store.try_lock(db, "profiles"):
         return {"status": "busy"}
     started = time.monotonic()
+    begun = now_iso()
     measured = failed = skipped = 0
     all_on = measure_all_on(db, part)
-    budget = budget_seconds or status.round_seconds(all_on)
+    budget = budget_seconds or status.round_seconds(all_on, all_round_minutes()) or float("inf")
+    told = started  # when the page last heard how far it is
     folder = tempfile.mkdtemp(prefix="siansa_analysis_")
     rate = store.get_state("profiles_rate", {}, db) or {}
     try:
@@ -184,7 +209,7 @@ def measure_part(part, budget_seconds=None, batch=None):
         store.set_state(spec["job"], {"status": "running", "started_at": now_iso(), "all": all_on, "measured": 0,
                                       "error": None}, db)
         tried = set()
-        stopped = False
+        stopped = halted = False
         while len(tried) < limit and not stopped:
             rows = [r for r in store.songs_to_measure(db, min(25, limit - len(tried)) + len(tried), beats=spec["beats"])
                     if r[0] not in tried]
@@ -195,7 +220,10 @@ def measure_part(part, budget_seconds=None, batch=None):
                 if left <= 5:
                     stopped = True
                     break
-                if all_on and not measure_all_on(db, part):  # "Stop" on the settings page
+                if cancelled_since(db, begun):  # "Stop now" (Siansa issue #765)
+                    all_on, stopped, halted = False, True, True
+                    break
+                if all_on and not measure_all_on(db, part):  # "Stop measuring all" on the settings page
                     all_on, stopped = False, True
                     break
                 tried.add(item_id)
@@ -223,9 +251,11 @@ def measure_part(part, budget_seconds=None, batch=None):
                 finally:
                     if path and os.path.exists(path):
                         os.remove(path)
-                if measured and measured % 10 == 0:
+                # Every 10 songs, or a minute: the page counts a job it hasn't heard from in a while as stopped.
+                if (len(tried) % 10 == 0 or time.monotonic() - told >= 60) and tried:
+                    told = time.monotonic()
                     store.set_state(spec["job"], {"status": "running", "started_at": now_iso(), "all": all_on,
-                                                  "measured": measured, "error": None}, db)
+                                                  "measured": measured, "failed": failed, "error": None}, db)
         seconds = round(time.monotonic() - started, 1)
         store.set_state("profiles_rate", status.next_rate(rate, measured + failed, seconds), db)
         if all_on and not store.songs_to_measure(db, 1, beats=spec["beats"]):
@@ -233,6 +263,8 @@ def measure_part(part, budget_seconds=None, batch=None):
             logger.info("siansa_analysis: every song is measured%s", " for its beats" if spec["beats"] else "")
         result = {"status": "idle", "finished_at": now_iso(), "measured": measured, "failed": failed,
                   "other_server": skipped, "seconds": seconds, "error": None}
+        if halted:
+            result["note"] = "stopped by hand"
         store.set_state(spec["job"], result, db)
         logger.info("siansa_analysis %s: %s measured, %s failed in %.0f s", part, measured, failed, seconds)
         return result
@@ -370,11 +402,20 @@ def tick():
         db = get_db()
         beats_all, profiles_all = measure_all_on(db, "beats"), measure_all_on(db, "profiles")
         spent = time.monotonic() - started
-        left = (status.ALL_ROUND_SECONDS if beats_all and not profiles_all else status.round_seconds(profiles_all)) - spent
-        if left >= MIN_BEATS_ROUND_SECONDS:
-            result["beats"] = measure_beats(budget_seconds=left)
+        minutes = all_round_minutes()
+        if (result.get("profiles") or {}).get("note") == "stopped by hand":
+            result["beats"] = {"status": "idle", "note": "stopped by hand"}
+        elif not minutes and (beats_all or profiles_all):
+            # Measuring all without a break: the beat grids go on after the profiles until done (or a normal
+            # round of them, when only the profiles were being measured all).
+            result["beats"] = measure_beats()
         else:
-            result["beats"] = {"status": "idle", "note": "no time left this round"}
+            all_round = (minutes or 12) * 60
+            left = (all_round if beats_all and not profiles_all else status.round_seconds(profiles_all, minutes)) - spent
+            if left >= MIN_BEATS_ROUND_SECONDS:
+                result["beats"] = measure_beats(budget_seconds=left)
+            else:
+                result["beats"] = {"status": "idle", "note": "no time left this round"}
     except Exception as e:
         logger.exception("siansa_analysis beats failed")
         result["beats"] = {"status": "failed", "error": str(e)}
@@ -397,7 +438,13 @@ MIN_BEATS_ROUND_SECONDS = 30
 
 
 def prepare_now():
-    return measure_missing()
+    result = measure_missing()
+    # Measuring all without a break: the beat grids follow straight on when they're being measured all too.
+    db = get_db()
+    if (not all_round_minutes() and measure_all_on(db, "beats") and isinstance(result, dict)
+            and result.get("status") == "idle" and result.get("note") != "stopped by hand"):
+        return {"profiles": result, "beats": measure_beats()}
+    return result
 
 
 def beats_now():
