@@ -3,6 +3,21 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.46.0beta — 2026-10-31
+
+### Fixed
+- A DJ blend no longer gives up when the end of the old song is still loading at the moment it should start: it waits a moment for it, so the next song blends in instead of coming in with a cut.
+
+### Added
+- **Choose the colour behind everything.** Settings › Style › Themes › Pages and cards: Grey, Warm grey, Blue grey,
+  or Match theme for the colour scheme's own tinted backgrounds (Siansa's purple among them).
+
+### Changed
+- **Pages, cards, menus and sheets are grey now**, like Spotify, instead of tinted purple. That's the now playing ⋮
+  menu, Home's tiles and cards, and the Your listening pages too.
+- **Swiping the mini player to change the song gives a short buzz**, so you feel the song change. It follows your
+  phone's touch vibration setting.
+
 ## 0.45.0beta — 2026-10-31
 
 ### Added
