@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
@@ -197,7 +196,7 @@ internal fun PinnedBanner(
     }
 }
 
-/** A slim card: a play badge, the title and the song count. One tap plays the songs; the arrow opens the page. */
+/** A slim card: a play badge, the title and the song count. The ▶ plays the songs; the rest of the card opens the page (issue #730). */
 @Composable
 internal fun PinnedPlayButton(
     card: PinnedCard,
@@ -206,7 +205,8 @@ internal fun PinnedPlayButton(
     play: (List<Song>, Int, Boolean) -> Unit,
     // ⏸ while this card's songs play: a tap pauses them (issue #644). Passed in, so the card draws without the player.
     playback: ListPlayback = ListPlayback.IDLE,
-) {    val colors = tileColors(card.id)
+) {
+    val colors = tileColors(card.id)
     Row(
         Modifier
             .padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current)
@@ -214,20 +214,22 @@ internal fun PinnedPlayButton(
             .height(64.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .clickable { playback.press { play(songs, 0, true) } }
+            .clickable(onClickLabel = "Open ${card.title}", onClick = open)
             .testTag("pinnedButton"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier.size(64.dp).background(Brush.linearGradient(listOf(colors.first, colors.second))),
-            contentAlignment = Alignment.Center,
-        ) { Icon(if (playback.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, tint = Color.White, modifier = Modifier.size(32.dp)) }
+        PlayBadge(colors, playing = playback.playing, title = card.title, onPlay = { playback.press { play(songs, 0, true) } }, tag = "pinnedButtonPlay")
         Column(Modifier.weight(1f).padding(horizontal = Space.Medium)) {
             Text(card.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(if (playback.playing) "Playing · tap to pause" else "Tap to play" + (countText(card, songs)?.let { " · $it" } ?: ""), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(pinnedButtonCaption(playback.playing, countText(card, songs)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        IconButton(onClick = open) { Icon(Icons.Rounded.ChevronRight, "Open ${card.title}") }
     }
+}
+
+/** What a custom play button card says under its title: "Playing", else its song count or "Tap to open". */
+internal fun pinnedButtonCaption(playing: Boolean, count: String?): String = when {
+    playing -> "Playing" + (count?.let { " · $it" } ?: "")
+    else -> count ?: "Tap to open"
 }
 
 /** "24 songs"; nothing for an album card, whose details already say Albums. */
