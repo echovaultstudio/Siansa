@@ -19,6 +19,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -102,12 +104,17 @@ class ShowcaseTest {
         try {
             step("home") {
                 tab("Home")
-                waitText("Recently added", 60_000)
-                idle(4000)
+                waitText("Today's mix", 90_000)
+                idle(5000)
                 shot("home")
                 swipe()
                 idle(2500)
                 shot("home-more")
+                swipe()
+                idle(2500)
+                shot("home-more-2")
+                compose.onRoot().performTouchInput { repeat(3) { swipeDown(startY = top + bottom * 0.2f, endY = bottom * 0.85f) } }
+                idle(800)
             }
             step("arrange") {
                 tab("Home")
@@ -122,6 +129,7 @@ class ShowcaseTest {
                 libraryAll()
                 chip("Music")
                 chip("Albums")
+                scrollTo("Low Tide")
                 click("Low Tide")
                 waitText("Harbour Lights")
                 idle(2500)
@@ -269,8 +277,33 @@ class ShowcaseTest {
             problems += "$name: ${e.javaClass.simpleName}: ${e.message?.lineSequence()?.firstOrNull()}$at"
             println("Showcase: FAILED $name: ${e.message?.lineSequence()?.firstOrNull()}$at")
             runCatching { shot("FAIL-" + name.replace(' ', '-')) }
-            repeat(3) { runCatching { closeSheet() } }
+            repeat(3) { if (popupWindows() > 0) runCatching { closeSheet() } }
+            println("Showcase: on screen after $name: " + runCatching { onScreenTexts().take(400) }.getOrDefault("?"))
         }
+    }
+
+    /** How many of the app's windows besides the main one are showing (sheets, menus, dialogs). */
+    private fun popupWindows(): Int {
+        var count = 0
+        instrumentation.runOnMainSync {
+            val global = Class.forName("android.view.WindowManagerGlobal")
+            val instance = global.getMethod("getInstance").invoke(null)
+            @Suppress("UNCHECKED_CAST")
+            val views = (global.getDeclaredField("mViews").apply { isAccessible = true }.get(instance) as List<android.view.View>).toList()
+            count = views.count { it.isShown } - 1
+        }
+        return count.coerceAtLeast(0)
+    }
+
+    private fun onScreenTexts(): String = compose.onAllNodes(androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.Text))
+        .fetchSemanticsNodes().joinToString(" | ") { it.config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString(" / ") }
+
+    /** Scrolls the page's list until [text] is drawn. */
+    private fun scrollTo(text: String) {
+        if (exists(text)) return
+        compose.onAllNodes(androidx.compose.ui.test.hasScrollToNodeAction()).onFirst()
+            .performScrollToNode(onPage(text))
+        idle(500)
     }
 
     private fun idle(ms: Long = 300) {
