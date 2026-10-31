@@ -41,9 +41,7 @@ import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Subtitles
 import androidx.compose.material.icons.rounded.Bedtime
@@ -274,7 +272,6 @@ private fun MenuDivider() {
 // ---- Cards under the player ----
 
 private val CardShape = RoundedCornerShape(12.dp)
-private val CardSurface = Color(0xFF1C1630)
 
 /** The lyrics preview card under the player, in a colour from the cover; hidden when the song has no lyrics. */
 @Composable
@@ -309,9 +306,9 @@ fun LyricsPreviewCard(lyrics: Lyrics?, tint: Color, onOpen: () -> Unit) {
     }
 }
 
-/** About the artist: their photo, how much of them is in the library, the start of the biography. */
+/** About the artist: their photo, how much of them is in the library, the start of the biography, on [surface]. */
 @Composable
-fun AboutArtistCard(song: Song, onOpenArtist: () -> Unit) {
+fun AboutArtistCard(song: Song, surface: Color, onOpenArtist: () -> Unit) {
     val graph = LocalGraph.current
     val artistId = song.artistId ?: song.artists.firstOrNull()?.id ?: return
     val local by loadState("artist-$artistId") {
@@ -320,13 +317,13 @@ fun AboutArtistCard(song: Song, onOpenArtist: () -> Unit) {
     val info by loadState("info-$artistId") { graph.source.artistInfo(artistId) }
     val artist = local.valueOrNull()
     val name = artist?.first?.name ?: song.artists.firstOrNull()?.name ?: song.artist
-    Column(Modifier.padding(horizontal = Space.Page).fillMaxWidth().clip(CardShape).background(CardSurface).clickable(onClick = onOpenArtist)) {
+    Column(Modifier.padding(horizontal = Space.Page).fillMaxWidth().clip(CardShape).background(surface).clickable(onClick = onOpenArtist)) {
         Box(Modifier.fillMaxWidth().height(170.dp)) {
             // Navidrome's artist image through its cover endpoint (issue #206).
             Cover(artist?.first?.coverArt ?: "ar-$artistId", LARGE_COVER, Modifier.fillMaxSize(), RoundedCornerShape(0.dp))
             Box(
                 Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.55f), 0.45f to Color.Transparent, 1f to CardSurface),
+                    Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.55f), 0.45f to Color.Transparent, 1f to surface),
                 ),
             )
             CardTitle("About the artist", Modifier.padding(Space.Page))
@@ -354,9 +351,9 @@ fun AboutArtistCard(song: Song, onOpenArtist: () -> Unit) {
     }
 }
 
-/** About this song: what Song details knows, in a small grid. Hidden until Navidrome answers. */
+/** About this song: what Song details knows, in a small grid, on [surface]. Hidden until Navidrome answers. */
 @Composable
-fun AboutSongCard(song: Song, onOpenDetails: () -> Unit) {
+fun AboutSongCard(song: Song, surface: Color, onOpenDetails: () -> Unit) {
     val graph = LocalGraph.current
     val details by loadState("details-${song.id}") { graph.source.songDetails(song.id) }
     val d = details.valueOrNull() ?: return
@@ -367,7 +364,7 @@ fun AboutSongCard(song: Song, onOpenDetails: () -> Unit) {
         d.playCount?.let { "Plays" to "$it" },
     )
     if (cells.isEmpty()) return
-    Column(Modifier.padding(horizontal = Space.Page).fillMaxWidth().clip(CardShape).background(CardSurface).clickable(onClick = onOpenDetails).padding(Space.Page)) {
+    Column(Modifier.padding(horizontal = Space.Page).fillMaxWidth().clip(CardShape).background(surface).clickable(onClick = onOpenDetails).padding(Space.Page)) {
         CardTitle("About this song")
         cells.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth().padding(bottom = Space.Medium)) {
@@ -403,35 +400,6 @@ private fun Pill(text: String, filled: Boolean, onClick: () -> Unit) {
             .padding(horizontal = Space.Page, vertical = Space.Small),
     )
 }
-
-/** The small header that appears once the player scrolls up to the cards: song, heart and play/pause. */
-@Composable
-fun PlayerMiniHeader(song: Song?, isPlaying: Boolean, progress: Float, liked: Boolean, onHeart: () -> Unit, onPlayPause: () -> Unit, onTop: () -> Unit) {
-    Column(Modifier.fillMaxWidth().testTag("playerMiniHeader")) {
-    Column(Modifier.fillMaxWidth().background(MINI_HEADER).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().clickable(onClick = onTop).padding(start = Space.Page, end = Space.Tight, top = Space.Small, bottom = Space.Small), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(song?.title.orEmpty(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(song?.artist.orEmpty(), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.62f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            IconButton(onClick = onHeart, enabled = song != null) {
-                Icon(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (liked) "Remove from liked songs" else "Like", tint = if (liked) Accent else Color.White)
-            }
-            IconButton(onClick = onPlayPause) {
-                Icon(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, "Play or pause", tint = Color.White, modifier = Modifier.size(30.dp))
-            }
-        }
-        Box(Modifier.fillMaxWidth().height(2.dp).background(Color.White.copy(alpha = 0.15f))) {
-            Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).height(2.dp).background(Color.White))
-        }
-    }
-    // The page scrolling under the header fades into it instead of showing a sliced line of text (issue #683).
-    Box(Modifier.fillMaxWidth().height(Space.Section).background(Brush.verticalGradient(0f to MINI_HEADER, 0.5f to MINI_HEADER, 1f to MINI_HEADER.copy(alpha = 0f))).testTag("playerMiniHeaderFade"))
-    }
-}
-
-/** The small now playing header's colour. */
-private val MINI_HEADER = Color(0xFF221C2E)
 
 // ---- Lyrics, opened ----
 

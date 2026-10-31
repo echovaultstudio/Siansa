@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import app.siansa.data.HomeLook
 import app.siansa.data.NavTab
-import app.siansa.data.Song
 import app.siansa.data.SyncPhase
 import app.siansa.data.SyncProgress
 import app.siansa.data.TopBarStyle
@@ -40,7 +39,6 @@ import app.siansa.ui.GradientTile
 import app.siansa.ui.HomeItem
 import app.siansa.ui.HomeLookRow
 import app.siansa.ui.MixShapeControls
-import app.siansa.ui.PlayerMiniHeader
 import app.siansa.ui.ProgressCard
 import app.siansa.ui.RuleCard
 import app.siansa.ui.SiansaTheme
@@ -54,6 +52,13 @@ import app.siansa.ui.TopBarChoice
 import app.siansa.ui.bottomBarStops
 import app.siansa.ui.icon
 import app.siansa.ui.playerColors
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.lerp
+import app.siansa.ui.nowPlayingCardColor
+import app.siansa.ui.pageBottomColor
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
 import org.junit.Test
@@ -109,7 +114,6 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             listOf(false, true).flatMap { dark -> listOf(1f, 1.3f).map { font -> arrayOf<Any>(scene, dark, font) } }
         }
 
-        private val song = Song(id = "1", title = "So Nearly", artist = "Lonely The Brave", album = "The Day's War")
 
         /**
          * Now playing's own colours, white on the cover's dark colours in light mode too: the player's colour scheme
@@ -156,9 +160,26 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     BottomTabs(NavTab.default, "home") {}
                 }
             },
-            // Now playing: the small header when scrolled down (issue #683).
-            Scene("player_mini_header") {
-                OnPlayer { PlayerMiniHeader(song, isPlaying = true, progress = 0.4f, liked = false, onHeart = {}, onPlayPause = {}, onTop = {}) }
+            // Now playing's cards take the cover's colour (#717): what a bright, a dark, a black-and-white and a colourless
+            // cover give, each card on the page's colour under it, with the cards' white text.
+            Scene("player_card_colours") {
+                OnPlayer {
+                    Column(Modifier.fillMaxWidth()) {
+                        listOf(Color(0xFFE53935), Color(0xFFFFD54F), Color(0xFF1E2A78), Color(0xFF9E9E9E), Color.Black).forEach { cover ->
+                            // The page's tint, as rememberCoverColor makes it from the cover's colour.
+                            val tint = lerp(cover, Color.Black, 0.35f)
+                            Box(Modifier.fillMaxWidth().background(pageBottomColor(tint)).padding(horizontal = Space.Page, vertical = Space.Small)) {
+                                Column(
+                                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(nowPlayingCardColor(tint)).padding(Space.Page),
+                                    verticalArrangement = Arrangement.spacedBy(Space.Tight),
+                                ) {
+                                    Text("About the artist", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                    Text("Lonely The Brave are a rock band from Cambridge, England.", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f))
+                                }
+                            }
+                        }
+                    }
+                }
             },
             // The queue's mix controls ("Surprises", issue #677).
             Scene("queue_mix_shape") {
