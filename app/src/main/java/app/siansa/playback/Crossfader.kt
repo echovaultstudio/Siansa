@@ -464,7 +464,9 @@ internal class Crossfader(
             main.seekTo(incomingIndex, target)
             return
         }
-        main.setPlaybackSpeed(baseSpeed * beat.speed * BeatMatch.nudge(error))
+        // Only a change worth hearing is sent: re-tuning the time-stretcher every 50 ms is heard as a flutter (#773).
+        val wanted = baseSpeed * beat.speed * BeatMatch.nudge(error)
+        if (BeatMatch.worthChanging(main.playbackParameters.speed, wanted)) main.setPlaybackSpeed(wanted)
     }
 
     /** The hall for the echo, on the output mix, with the tail sent to it at nothing yet (issue #759). */

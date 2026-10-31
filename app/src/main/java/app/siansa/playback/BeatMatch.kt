@@ -49,7 +49,7 @@ object BeatMatch {
     /** Closer than this, the two songs count as in step. */
     const val IN_STEP_MS = 12L
     /** Further apart than this, the next song jumps into step rather than catching up by speed. */
-    const val JUMP_MS = 90L
+    const val JUMP_MS = 150L
     /** How many step readings go into the smoothed error (at 20 ms ticks, a tenth of a second). */
     const val STEP_READINGS = 5
     /** After the blend, the next song eases back to its own speed over this long. */
@@ -215,10 +215,13 @@ object BeatMatch {
         fun describe(): String = if (checks == 0) "beats not checked" else "beats typically ${total / checks} ms apart, at worst $worst ms ($checks checks)"
     }
 
-    /** How long getting the next song to a point takes at first, before Siansa has measured it on this phone (issue #747). */
-    const val DEFAULT_SEEK_LAG_MS = 150L
+    /** How long getting the next song to a point takes at first, before Siansa has measured it on this phone (issue
+     *  #747). Phones do it in 20 to 70 ms (issue #773: 150 sent the song ahead by a jump's worth). */
+    const val DEFAULT_SEEK_LAG_MS = 60L
     /** Longer than this, a measured lag is a stall, not the phone's usual delay. */
-    const val MAX_SEEK_LAG_MS = 600L
+    const val MAX_SEEK_LAG_MS = 300L
+    /** A lead this far off what the phone actually takes is a bad reading, not a lesson. */
+    const val LAG_LESSON_MS = 150L
 
     /**
      * What a jump costs on this phone, learned from the last one (issue #747): the next song was sent [leadMs] ahead
@@ -229,12 +232,26 @@ object BeatMatch {
      */
     fun learnedLag(previous: Long, leadMs: Long, errorMs: Long): Long {
         val took = leadMs - errorMs
-        if (took > MAX_SEEK_LAG_MS) return previous
+        // A stall, or a reading taken once the song had already drifted (issue #773): nothing to learn.
+        if (took > MAX_SEEK_LAG_MS || abs(took - previous) > LAG_LESSON_MS) return previous
         return ((previous + took) / 2).coerceIn(0L, MAX_SEEK_LAG_MS)
     }
 
-    /** The speed nudge that brings the next song back in step over about a second: ahead, a touch slower. */
-    fun nudge(errorMs: Long): Float = if (abs(errorMs) <= IN_STEP_MS) 1f else (1f - errorMs / 1000f).coerceIn(0.97f, 1.03f)
+    /** The most a nudge may change the speed: DJ software syncs within about 1 %, and more is heard as pitch. */
+    const val NUDGE_MAX = 0.01f
+    /** A nudge brings the song in step over about this long; quicker swings are heard as warble (issue #773). */
+    const val NUDGE_OVER_MS = 2_500f
+
+    /** The speed nudge that brings the next song back in step over a couple of seconds: ahead, a touch slower. */
+    fun nudge(errorMs: Long): Float =
+        if (abs(errorMs) <= IN_STEP_MS) 1f else (1f - errorMs / NUDGE_OVER_MS).coerceIn(1f - NUDGE_MAX, 1f + NUDGE_MAX)
+
+    /**
+     * Whether a changed speed is worth sending to the player (issue #773): every change re-tunes the time-stretcher
+     * and is heard as a flutter, so a nudge within [NUDGE_STEP] of the one playing is left as it is.
+     */
+    const val NUDGE_STEP = 0.0015f
+    fun worthChanging(playing: Float, wanted: Float): Boolean = abs(playing - wanted) >= NUDGE_STEP
 
     /**
      * The step error that decides a jump or a nudge (issue #759): the middle of the last few readings, as one

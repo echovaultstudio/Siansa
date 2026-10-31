@@ -75,11 +75,15 @@ class BeatMatchTest {
 
     @Test fun nudgesAreTinyAndEasingIsAStraightLineBack() {
         assertEquals(1f, BeatMatch.nudge(5))
-        assertEquals(0.98f, BeatMatch.nudge(20), 1e-4f)  // ahead: slower
-        assertEquals(1.02f, BeatMatch.nudge(-20), 1e-4f)
-        // Never more than 3 %: 90 ms out of step is made up in about 3 s, which can't be heard (issue #759).
-        assertEquals(0.97f, BeatMatch.nudge(90), 1e-4f)
-        assertEquals(1.03f, BeatMatch.nudge(-200), 1e-4f)
+        assertEquals(0.992f, BeatMatch.nudge(20), 1e-4f)  // ahead: slower, 20 ms made up over 2.5 s
+        assertEquals(1.008f, BeatMatch.nudge(-20), 1e-4f)
+        // Never more than 1 % (issue #773: 3 % was heard as pitch): 90 ms out of step is made up in about 9 s.
+        assertEquals(0.99f, BeatMatch.nudge(90), 1e-4f)
+        assertEquals(1.01f, BeatMatch.nudge(-200), 1e-4f)
+        // A change the time-stretcher would be re-tuned for only when it's worth it (a flutter otherwise).
+        assertFalse(BeatMatch.worthChanging(1.0120f, 1.0125f))
+        assertTrue(BeatMatch.worthChanging(1.012f, 1.014f))
+        assertTrue(BeatMatch.worthChanging(1.012f, 1f))
         assertEquals(1.016f, BeatMatch.eased(1.016f, 0), 1e-5f)
         assertEquals(1.008f, BeatMatch.eased(1.016f, BeatMatch.EASE_MS / 2), 1e-5f)
         assertEquals(1f, BeatMatch.eased(1.016f, BeatMatch.EASE_MS + 1), 1e-5f)
@@ -305,14 +309,17 @@ class BeatMatchTest {
     }
 
     @Test fun aJumpAllowsForHowLongJumpingTakesOnThisPhone() {
-        // Issue #747: sent 0 ms ahead, the next song settled 185 ms behind: getting there took 185 ms. Averaged with
-        // the 150 ms Siansa starts from, the next jump is sent 167 ms ahead.
-        assertEquals(167L, BeatMatch.learnedLag(BeatMatch.DEFAULT_SEEK_LAG_MS, leadMs = 0, errorMs = -185))
-        // Sent 167 ms ahead and landed 10 ms ahead: it took 157 ms.
-        assertEquals(162L, BeatMatch.learnedLag(167, leadMs = 167, errorMs = 10))
+        // Issue #747: sent 0 ms ahead, the next song settled 85 ms behind: getting there took 85 ms. Averaged with
+        // the 60 ms Siansa starts from, the next jump is sent 72 ms ahead.
+        assertEquals(72L, BeatMatch.learnedLag(BeatMatch.DEFAULT_SEEK_LAG_MS, leadMs = 0, errorMs = -85))
+        // Sent 72 ms ahead and landed 10 ms ahead: it took 62 ms.
+        assertEquals(67L, BeatMatch.learnedLag(72, leadMs = 72, errorMs = 10))
         // A stall (the song buffering for seconds) isn't learned as the phone's usual delay: what was known stays.
-        assertEquals(167L, BeatMatch.learnedLag(167, leadMs = 150, errorMs = -2_000))
-        assertEquals(167L, BeatMatch.learnedLag(167, leadMs = 0, errorMs = -(BeatMatch.MAX_SEEK_LAG_MS + 1)))
+        assertEquals(67L, BeatMatch.learnedLag(67, leadMs = 60, errorMs = -2_000))
+        assertEquals(67L, BeatMatch.learnedLag(67, leadMs = 0, errorMs = -(BeatMatch.MAX_SEEK_LAG_MS + 1)))
+        // Issue #773 (the owner's log): sent 178 ms ahead, a reading of -94 taken once the song had drifted said
+        // the jump took 272 ms, and the lead grew blend by blend. A lesson that far from what's known isn't one.
+        assertEquals(67L, BeatMatch.learnedLag(67, leadMs = 178, errorMs = -94))
         // A jump that landed early can't make the delay negative.
         assertEquals(0L, BeatMatch.learnedLag(0, leadMs = 0, errorMs = 300))
     }
