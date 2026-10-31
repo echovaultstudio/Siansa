@@ -141,4 +141,39 @@ class BeatMatchTest {
         assertNull(b.intro)
         assertNull(b.outro)
     }
+
+    @Test fun theLogSaysWhatWasMeasuredAndWhyABlendWasntBeatMatched() {
+        // Issue #744: a report sent after a blend that sounded off shows which case it was.
+        assertEquals("128.0 BPM, beat 0.90, steady 0.90, bars found", outro.describe())
+        assertEquals("120.0 BPM, beat 0.10, steady 0.90, no bars found", pad.describe())
+        val matched = BeatMatch.note(outro, intro, applies = true)
+        assertEquals("out: 128.0 BPM, beat 0.90, steady 0.90, bars found · in: 126.0 BPM, beat 0.90, steady 0.90, bars found", matched)
+        assertTrue(BeatMatch.note(null, intro, true).endsWith("not beat-matched: the plugin hasn't measured the beat at the end of the song going out"))
+        assertTrue(BeatMatch.note(outro, null, true).endsWith("not beat-matched: the plugin hasn't measured the beat at the start of the next song"))
+        assertTrue(BeatMatch.note(outro, pad, true).endsWith("not beat-matched: the start of the next song isn't beat-driven and steady enough"))
+        assertTrue(BeatMatch.note(pad, intro, true).endsWith("not beat-matched: the end of the song going out isn't beat-driven and steady enough"))
+        assertTrue(BeatMatch.note(outro, intro.copy(bpm = 110.0), true).endsWith("not beat-matched: 128.0 and 110.0 BPM are too far apart"))
+        assertTrue(BeatMatch.note(outro, intro, applies = false).endsWith("not beat-matched: beat-matching is set for DJ radio only"))
+    }
+
+    @Test fun aSmartPlanCarriesTheBeatNote() {
+        val next = song.copy(id = "b", albumId = "al2")
+        // A few seconds of quiet tail and intro, so the blend that isn't beat-matched still has a length.
+        val a = profile("a", outro, null, quietTailMs = 3_000)
+        val b = profile("b", null, intro, headMs = 2_000)
+        val matched = Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 310_000, 300_000, a, b, beatMatch = true)!!
+        assertNotNull(matched.beat)
+        assertFalse(matched.beatNote!!, matched.beatNote!!.contains("not beat-matched"))
+        val elsewhere = Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 310_000, 300_000, a, b, beatMatch = false)!!
+        assertTrue(elsewhere.beatNote!!, elsewhere.beatNote!!.endsWith("beat-matching is set for DJ radio only"))
+        // Fixed crossfades don't look at beats at all.
+        assertNull(Crossfade.plan(CrossfadeMode.FIXED, 16_000, song, next, 310_000, 300_000, a, b)!!.beatNote)
+    }
+
+    @Test fun keepingInStepIsMeasured() {
+        val stats = BeatMatch.StepStats()
+        assertEquals("beats not checked", stats.describe())
+        listOf(4L, -8L, 12L, -20L).forEach(stats::add)
+        assertEquals("beats typically 11 ms apart, at worst 20 ms (4 checks)", stats.describe())
+    }
 }
