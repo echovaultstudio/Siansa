@@ -22,11 +22,13 @@ class CrossfadeHandoverTest {
     }
 
     @Test fun behindCatchesUpAheadWaits() {
-        assertEquals(1.04f, Crossfade.tailSpeed(20), 0.0001f)
-        assertEquals(0.96f, Crossfade.tailSpeed(-20), 0.0001f)
-        // Never more than 6% off.
-        assertEquals(1.06f, Crossfade.tailSpeed(200), 0.0001f)
-        assertEquals(0.94f, Crossfade.tailSpeed(-200), 0.0001f)
+        // Silent, so it may hurry (issue #747): 84 ms behind is made up in under half a second.
+        assertEquals(1.05f, Crossfade.tailSpeed(20), 0.0001f)
+        assertEquals(0.95f, Crossfade.tailSpeed(-20), 0.0001f)
+        assertEquals(1.21f, Crossfade.tailSpeed(84), 0.0001f)
+        // Never more than a quarter off.
+        assertEquals(1.25f, Crossfade.tailSpeed(200), 0.0001f)
+        assertEquals(0.75f, Crossfade.tailSpeed(-200), 0.0001f)
     }
 
     @Test fun theLogSaysWhyThereIsNoFade() {
