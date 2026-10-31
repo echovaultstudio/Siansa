@@ -154,6 +154,18 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     HomeLookRow(HomeLook.BUTTON, "liked", "Liked songs", items("Evian"))
                 }
             },
+            // Play button cards (issue #730): only the ▶ plays, no arrow at the end. A Home section, a custom card, the same
+            // card while it plays, and long titles that must end in "…" before the card's edge.
+            Scene("home_play_buttons") {
+                val songs = (1..24).map { app.siansa.data.Song(id = "s$it", title = "Song $it", artist = "Artist") }
+                val card = app.siansa.mix.PinnedCard(id = "pin-scene-a", title = "Shuffle it", look = app.siansa.mix.CardLook.BUTTON)
+                val long = app.siansa.mix.PinnedCard(id = "pin-scene-b", title = "Unbelievably long playlistname for rainy evenings", look = app.siansa.mix.CardLook.BUTTON)
+                Column {
+                    HomeLookRow(HomeLook.BUTTON, "added", "Recently added", items("Evian", "Revenant"), openAll = {}, play = {})
+                    app.siansa.ui.PinnedPlayButton(card, songs, open = {}, play = { _, _, _ -> })
+                    app.siansa.ui.PinnedPlayButton(long, songs, open = {}, play = { _, _, _ -> }, playback = app.siansa.ui.ListPlayback(loaded = true, playing = true) {})
+                }
+            },
             // The tabs along the bottom, on the bar's fade (light mode, issue #699).
             Scene("bottom_tabs") {
                 Column(Modifier.background(Brush.verticalGradient(*bottomBarStops(MaterialTheme.colorScheme.surface)))) {

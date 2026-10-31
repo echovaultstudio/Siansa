@@ -21,7 +21,6 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -59,7 +58,7 @@ data class HomeItem(
  * - Tiles: a row of covers to swipe through, [openAll] behind the title;
  * - Banner: one wide card with the first covers fanned at the right, and Play (or Open);
  * - List: the first [LIST] listed, [openAll] behind the title;
- * - Play button: a slim card that plays the row ([play]) or, when it can't be played as one, opens it.
+ * - Play button: a slim card that opens the row; its ▶ plays it ([play]). Without [play] it's an arrow (issue #730).
  * [play] plays the row's music; [songs] (when known) lets the button show ⏸ while they play. Without [openAll]
  * the first item stands in for the row.
  */

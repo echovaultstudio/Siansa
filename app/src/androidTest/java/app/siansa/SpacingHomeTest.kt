@@ -161,6 +161,34 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Play button left margin is the page margin", button.left - screen.left, Space.Page, 1.dp)
     }
 
+    /**
+     * Play button cards (issue #730): the ▶ badge fills the card's start, top to bottom, and the title sits a step from
+     * it, on a custom card and a Home section alike.
+     */
+    @Test fun playBadgeFillsTheCardsStart() {
+        val card = app.siansa.mix.PinnedCard.new("Shuffle it").copy(look = app.siansa.mix.CardLook.BUTTON, favourites = true)
+        val songs = (1..3).map { app.siansa.data.Song(id = "s$it", title = "Song $it", artist = "Artist") }
+        val items = (1..6).map { app.siansa.ui.HomeItem("a$it", "Album $it", "Artist", open = {}) }
+        compose.setContent {
+            SiansaTheme {
+                Column {
+                    app.siansa.ui.PinnedPlayButton(card, songs, open = {}, play = { _, _, _ -> })
+                    app.siansa.ui.HomeLookRow(app.siansa.data.HomeLook.BUTTON, "added", "Recently added", items, openAll = {}, play = {})
+                }
+            }
+        }
+        for ((cardTag, title) in listOf("pinnedButton" to "Shuffle it", "homeLookButton" to "Recently added")) {
+            val box = compose.onNodeWithTag(cardTag).getBoundsInRoot()
+            val badge = compose.onNodeWithTag(cardTag + "Play").getBoundsInRoot()
+            val text = compose.onNode(hasText(title), useUnmergedTree = true).getBoundsInRoot()
+            assertEven("$cardTag: the badge starts at the card's edge", badge.left, box.left, 1.dp)
+            assertEven("$cardTag: the badge is the card's full height", badge.bottom - badge.top, box.bottom - box.top, 1.dp)
+            assertEven("$cardTag: the badge's top and bottom", badge.top - box.top, box.bottom - badge.bottom, 1.dp)
+            assertEven("$cardTag: the title sits a step from the badge", text.left - badge.right, Space.Medium, 1.dp)
+            assertTrue("$cardTag: the badge is big enough to tap", badge.bottom - badge.top >= 48.dp)
+        }
+    }
+
     /** Home's rows in another look (issue #655): the banner and the play button card sit a page margin from both edges. */
     @Test fun homeLookCardsHaveEvenPageMargins() {
         val items = (1..6).map { app.siansa.ui.HomeItem("a$it", "Album $it", "Artist", open = {}) }
