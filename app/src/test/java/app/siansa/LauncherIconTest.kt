@@ -7,13 +7,19 @@ import java.io.File
 import kotlin.math.hypot
 import kotlin.math.sqrt
 
-/** The launcher icon (issues #54, #407): sound bars with echo rings, centred and inside the circle every launcher shows. */
+/**
+ * The launcher icon (issues #54, #407, #726): sound bars with their reflection between echo rings (Siansa's double half
+ * circles), centred and inside the circle every launcher shows.
+ */
 class LauncherIconTest {
     private data class Bar(val left: Double, val top: Double, val right: Double, val bottom: Double)
+    private data class Reflection(val left: Double, val top: Double, val right: Double, val bottom: Double)
     private data class Ring(val x1: Double, val y1: Double, val r: Double, val x2: Double, val y2: Double, val stroke: Double)
 
     // A bar: "Mx,ya r,r 0 0,1 w,0v h a r,r 0 0,1 -w,0z", round caps above and below.
     private val barPath = Regex("""M([\d.]+),([\d.]+)a([\d.]+),[\d.]+ 0 0,1 ([\d.]+),0v([\d.]+)a[\d.]+,[\d.]+ 0 0,1 -[\d.]+,0z""")
+    // A bar's reflection, drawn from its far end up: "Mx,yv-h a r,r 0 0,1 w,0v h a r,r 0 0,1 -w,0z".
+    private val reflectionPath = Regex("""M([\d.]+),([\d.]+)v-([\d.]+)a([\d.]+),[\d.]+ 0 0,1 ([\d.]+),0v[\d.]+a[\d.]+,[\d.]+ 0 0,1 -[\d.]+,0z""")
     // An echo ring: "Mx,yA r,r 0 0,s x,y" with its stroke width.
     private val ringPath = Regex("""M([\d.]+),([\d.]+)A([\d.]+),[\d.]+ 0 0,[01] ([\d.]+),([\d.]+)"[^/]*?strokeWidth="([\d.]+)"""")
 
@@ -23,6 +29,11 @@ class LauncherIconTest {
     private fun bars(name: String): List<Bar> = barPath.findAll(xml(name)).map {
         val (x, y, r, w, h) = it.destructured
         Bar(x.toDouble(), y.toDouble() - r.toDouble(), x.toDouble() + w.toDouble(), y.toDouble() + h.toDouble() + r.toDouble())
+    }.toList()
+
+    private fun reflections(name: String): List<Reflection> = reflectionPath.findAll(xml(name)).map {
+        val (x, y, h, r, w) = it.destructured
+        Reflection(x.toDouble(), y.toDouble() - h.toDouble() - r.toDouble(), x.toDouble() + w.toDouble(), y.toDouble() + r.toDouble())
     }.toList()
 
     private fun rings(name: String): List<Ring> = ringPath.findAll(xml(name)).map {
@@ -36,11 +47,35 @@ class LauncherIconTest {
         assertEquals(54.0, (bars.minOf { it.left } + bars.maxOf { it.right }) / 2, 0.05)
     }
 
-    @Test fun barsDoNotSitLow() {
+    @Test fun barsSitAboveTheirReflection() {
         val bars = bars("ic_launcher_foreground")
         val middle = (bars.minOf { it.top } + bars.maxOf { it.bottom }) / 2
-        // Bars sharing a bottom line look heavy at the bottom, so the group sits slightly above the centre.
-        assertTrue("bars' middle is $middle", middle in 50.0..54.0)
+        // The reflection fading under the bars balances them, so the bars themselves sit a little above the centre.
+        assertTrue("bars' middle is $middle", middle in 48.0..52.0)
+    }
+
+    @Test fun eachBarHasItsReflectionRightUnderIt() {
+        val bars = bars("ic_launcher_foreground")
+        val reflections = reflections("ic_launcher_foreground")
+        assertEquals(5, reflections.size)
+        for (bar in bars) {
+            val mirror = reflections.single { kotlin.math.abs(it.left - bar.left) < 0.01 }
+            assertEquals("same width", bar.right, mirror.right, 0.01)
+            assertTrue("under the bar: ${mirror.top} below ${bar.bottom}", mirror.top >= bar.bottom && mirror.top - bar.bottom <= 2)
+            assertTrue("no longer than its bar", mirror.bottom - mirror.top <= bar.bottom - bar.top + 0.01)
+        }
+    }
+
+    @Test fun theReflectionFadesOut() {
+        // Each reflection's colour ends fully transparent ("#00…"), so it fades away like a real one.
+        val fills = Regex("""v-[^"]+"[^<]*<aapt:attr name="android:fillColor">(.*?)</aapt:attr>""", RegexOption.DOT_MATCHES_ALL)
+            .findAll(xml("ic_launcher_foreground")).map { it.groupValues[1] }.toList()
+        assertEquals(5, fills.size)
+        for (fill in fills) {
+            val colours = Regex("""android:color="#([0-9A-F]{2})""").findAll(fill).map { it.groupValues[1].toInt(16) }.toList()
+            assertTrue("starts faint: $colours", colours.first() in 1..160)
+            assertEquals("ends transparent: $colours", 0, colours.last())
+        }
     }
 
     @Test fun echoRingsSitEvenlyOnBothSides() {
@@ -59,6 +94,11 @@ class LauncherIconTest {
                 assertTrue("bar corner ($x,$y)", hypot(x - 54, y - 54) <= 33)
             }
         }
+        for (mirror in reflections("ic_launcher_foreground")) {
+            for ((x, y) in listOf(mirror.left to mirror.bottom, mirror.right to mirror.bottom)) {
+                assertTrue("reflection corner ($x,$y)", hypot(x - 54, y - 54) <= 33)
+            }
+        }
         for (ring in rings("ic_launcher_foreground")) {
             // The arc bulges out from its chord: its furthest point is the chord's middle pushed out by the sagitta.
             val half = hypot(ring.x2 - ring.x1, ring.y2 - ring.y1) / 2
@@ -73,5 +113,6 @@ class LauncherIconTest {
     @Test fun themedIconMatchesTheColouredOne() {
         assertEquals(bars("ic_launcher_foreground"), bars("ic_launcher_monochrome"))
         assertEquals(rings("ic_launcher_foreground"), rings("ic_launcher_monochrome"))
+        assertEquals(reflections("ic_launcher_foreground"), reflections("ic_launcher_monochrome"))
     }
 }
