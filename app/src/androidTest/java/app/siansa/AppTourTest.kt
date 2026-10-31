@@ -103,7 +103,10 @@ class AppTourTest {
                     while (SystemClock.elapsedRealtime() < until && graph.sync.progress.value.running) SystemClock.sleep(300)
                     idle(500)
                     shot("01b1-source-filter-synced", popups = true)
-                    if (compose.onAllNodesWithText("Artists", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) problems += "source filter: no artists, albums and songs after Sync"
+                    // Issue #693: one line under the server, with a single tick once it's done, and the server's own line
+                    // counting its artists, albums and songs.
+                    if (compose.onAllNodesWithTag("source-sync-done", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) problems += "source filter: no tick after Sync"
+                    if (compose.onAllNodesWithText("artists", substring = true, useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) problems += "source filter: no artists, albums and songs after Sync"
                 } ?: run { problems += "source filter: no Sync button" }
                 // The same panel's other tab (issue #152).
                 click("Arrange")
@@ -325,7 +328,8 @@ class AppTourTest {
                 tab("Settings")
                 idle(800)
                 shot("18-settings")
-                listOf("Users", "Connections", "Playback", "Style", "Downloads", "Scrobbling", "Storage", "Help").forEachIndexed { i, page ->
+                // Users joined Connections in 0.43; Cards has a page of its own.
+                listOf("Connections", "Playback", "Style", "Cards", "Downloads", "Scrobbling", "Storage", "Help").forEachIndexed { i, page ->
                     tab("Settings")
                     click(page)
                     idle(1200)

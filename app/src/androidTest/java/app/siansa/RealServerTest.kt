@@ -99,6 +99,12 @@ class RealServerTest {
 
     private fun songOf(album: Album): Song = runBlocking { graph.subsonic.album(album.id).songs.first() }
 
+    /** Has Navidrome make (and keep) a cover's small version, waiting as long as it takes. */
+    private fun prepareSmallCover(coverId: String) {
+        val client = graph.imageHttp.newBuilder().callTimeout(3, java.util.concurrent.TimeUnit.MINUTES).readTimeout(3, java.util.concurrent.TimeUnit.MINUTES).build()
+        client.newCall(okhttp3.Request.Builder().url(graph.source.coverUrl(coverId, SMALL_COVER)).build()).execute().use { it.body?.bytes() }
+    }
+
     @Test
     fun a_coverKinds() = runBlocking {
         // A clean start: the app tour may already have kept covers.
@@ -106,6 +112,9 @@ class RealServerTest {
         AnimatedCovers.forget(graph)
         SingletonImageLoader.get(app).let { it.memoryCache?.clear(); it.diskCache?.clear() }
         val a = albums()
+        // Navidrome makes a 13 MB GIF's 300 px version slowly the first time (over 40 s on a busy CI machine, issue #736).
+        // Ask for it once first, so this checks Siansa's choice, not the server's speed.
+        prepareSmallCover(a.getValue("Big Animated").coverArt!!)
         val big = AnimatedCovers.kind(graph, a.getValue("Big Animated").coverArt!!)
         val small = AnimatedCovers.kind(graph, a.getValue("Small Animated").coverArt!!)
         val still = AnimatedCovers.kind(graph, a.getValue("Still Album").coverArt!!)

@@ -189,7 +189,8 @@ class SpacingHomeTest : SpacingCheck() {
     @Test fun cardRuleChipsAreEvenlySpaced() {
         val rule = app.siansa.mix.CardRule(app.siansa.mix.RuleField.LABEL, app.siansa.mix.RuleOp.CONTAINS, "Ninja Tune")
         compose.setContent { SiansaTheme { Column { app.siansa.ui.RuleCard(rule, emptyList(), onChange = {}, onRemove = {}) } } }
-        val name = compose.onNodeWithText("Record label", useUnmergedTree = true).getBoundsInRoot()
+        // The name is also the label of the text field below: find the name by its tag.
+        val name = compose.onNodeWithTag("ruleName").getBoundsInRoot()
         val chip = compose.onNodeWithTag("op-CONTAINS").getBoundsInRoot()
         val value = compose.onNodeWithTag("ruleValue").getBoundsInRoot()
         assertEven("Rule chips", chip.top - name.bottom, value.top - chip.bottom, 12.dp)

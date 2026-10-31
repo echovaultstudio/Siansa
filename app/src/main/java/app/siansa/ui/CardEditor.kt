@@ -235,7 +235,7 @@ internal fun RuleCard(rule: CardRule, suggestions: List<String>, onChange: (Card
     Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(12.dp), modifier = modifier.fillMaxWidth()) {
         Column(Modifier.padding(start = Space.Medium, end = Space.Tight, bottom = Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(rule.field.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text(rule.field.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).testTag("ruleName"))
                 IconButton(onClick = onRemove) { Icon(Icons.Rounded.Close, "Remove the rule") }
             }
             Column(Modifier.padding(end = Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
