@@ -3,6 +3,16 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.44.2beta — 2026-10-31
+
+### Fixed
+- **DJ blends no longer stop a moment after they start.** When the next song came in a little off the beat, Siansa
+  nudged it into step, then took that for you skipping and ended the blend at once.
+- **The next song comes in on the beat.** Siansa now learns how long your phone takes to start it at a point, and
+  starts it that much earlier.
+- **Crossfades no longer stumble as they begin.** The fading song is now exactly in step when the fade takes over,
+  instead of repeating a sliver of it.
+
 ## 0.44.1beta — 2026-10-31
 
 ### Fixed
