@@ -173,12 +173,11 @@ object Crossfade {
     }
 
     /**
-     * The silent tail's speed while it gets in step (issues #355, #747): [behindMs] behind the main player, it plays
-     * faster to catch up over about a quarter of a second (slower when ahead), up to a quarter faster: it's silent,
-     * so nobody hears it. Within 10 ms it's in step. (Up to 6 % left it 70 to 126 ms behind when the blend began.)
+     * The silent tail's speed while it gets in step (issue #355): [behindMs] behind the main player, it plays up to
+     * 6% faster to catch up over about half a second (slower when ahead); within 10 ms it's in step.
      */
     fun tailSpeed(behindMs: Long): Float =
-        if (abs(behindMs) <= IN_STEP_MS) 1f else (1f + behindMs / 250f).coerceIn(0.75f, 1.25f)
+        if (abs(behindMs) <= IN_STEP_MS) 1f else (1f + behindMs / 500f).coerceIn(0.94f, 1.06f)
 
     /** Closer than this, the tail and the main player count as in step. */
     const val IN_STEP_MS = 10L
