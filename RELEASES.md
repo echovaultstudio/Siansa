@@ -3,6 +3,15 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.47.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.47.0beta) — 2026-10-31
+
+- [#769](https://github.com/echovaultstudio/Siansa/pull/769) Brand: the banner's tagline as the website's, and an F-Droid sized banner (@Th3K1ngP1n)
+- [#770](https://github.com/echovaultstudio/Siansa/pull/770) Docs: Getting started links the plugin and says it does the DJ blends (@Th3K1ngP1n)
+- [#772](https://github.com/echovaultstudio/Siansa/pull/772) Now playing: a short buzz when repeat or add to playlist is pressed (@Th3K1ngP1n)
+- [#774](https://github.com/echovaultstudio/Siansa/pull/774) DJ blends: no cut at the start, no pitch flutter during the blend (@Th3K1ngP1n)
+- [#775](https://github.com/echovaultstudio/Siansa/pull/775) Screenshots: the crossfade settings pictures on the grey pages (@Th3K1ngP1n)
+- [#777](https://github.com/echovaultstudio/Siansa/pull/777) Today's mix: Auto update and its own tuning; settings sections fold (@Th3K1ngP1n)
+
 ## [0.46.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.46.0beta) — 2026-10-31
 
 - [#762](https://github.com/echovaultstudio/Siansa/pull/762) Grey pages and cards instead of the purple tint, with a choice in Themes (@Th3K1ngP1n)
