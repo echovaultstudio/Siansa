@@ -196,7 +196,9 @@ jobs:
         run: |
           VERSION=$(tr -d '[:space:]' < version.txt)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          mv app/build/outputs/apk/release/app-release.apk siansa-$VERSION.apk
+          # Without the signing key (Dependabot, forks) Gradle names it app-release-unsigned.apk (issue #705).
+          APK=$(ls app/build/outputs/apk/release/app-release*.apk | head -1)
+          mv "$APK" siansa-$VERSION.apk
           mv app/build/outputs/bundle/release/app-release.aab siansa-$VERSION.aab
 
       # Which key signed the release APK, in the run's summary: public information, and it proves a key change took.

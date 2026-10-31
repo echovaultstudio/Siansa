@@ -229,12 +229,28 @@ class AppGraph(val app: Application) {
         remember = { EmbyLogins.remember(app, it) },
     )
 
+    /** A Jellyfin server (issue #703): the Emby client in its Jellyfin mode. */
+    val jellyfin = EmbyApi(
+        http,
+        settings = { settings.current },
+        deviceId = { EmbyLogins.deviceId(app) },
+        recall = { EmbyLogins.recall(app) },
+        remember = { EmbyLogins.remember(app, it) },
+        jellyfin = true,
+    )
+
     /**
      * Where the music comes from (issue #113): what screens, mixes and services use, rather than one server's API.
      * Follows the source in the settings, so picking Emby or Navidrome in setup takes effect at once.
      */
     val source: MusicSource = ActiveSource(
-        pick = { if (settings.current.sourceKind == SourceKind.EMBY) emby else subsonic },
+        pick = {
+            when (settings.current.sourceKind) {
+                SourceKind.EMBY -> emby
+                SourceKind.JELLYFIN -> jellyfin
+                else -> subsonic
+            }
+        },
         // Another shown user's songs, albums and covers go to their own server, of whatever kind (issue #427);
         // a book's cover ("bk-…") to Audiobookshelf (issue #521), through the same cover cache as everything.
         route = { id -> if (id != null && id.startsWith(Book.COVER_PREFIX)) bookCovers else guests.sourceFor(id) },

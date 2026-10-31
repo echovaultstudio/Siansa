@@ -10,7 +10,7 @@ import org.junit.Test
 /** The music source layer (issue #113). */
 class MusicSourceTest {
     @Test fun onlyReadySourcesCanBeChosen() {
-        assertEquals(listOf(SourceKind.OPENSUBSONIC, SourceKind.EMBY), SourceKind.entries.filter { it.ready })
+        assertEquals(listOf(SourceKind.OPENSUBSONIC, SourceKind.JELLYFIN, SourceKind.EMBY), SourceKind.entries.filter { it.ready })
         // The picker lists every kind, ready ones first.
         assertEquals(SourceKind.OPENSUBSONIC, SourceKind.entries.first())
     }
@@ -21,8 +21,11 @@ class MusicSourceTest {
         assertEquals(SourceKind.OPENSUBSONIC, SourceKind.parse(null))
         assertEquals(SourceKind.OPENSUBSONIC, SourceKind.parse("PLEX"))
         // A kind that isn't ready yet can't be in use.
-        assertEquals(SourceKind.OPENSUBSONIC, SourceKind.parse("JELLYFIN"))
+        assertEquals(SourceKind.OPENSUBSONIC, SourceKind.parse("LOCAL"))
         assertEquals(SourceKind.EMBY, SourceKind.parse("EMBY"))
+        // Jellyfin is ready (issue #703), and shares Emby's client.
+        assertEquals(SourceKind.JELLYFIN, SourceKind.parse("JELLYFIN"))
+        assertTrue(SourceKind.JELLYFIN.embyLike && SourceKind.EMBY.embyLike && !SourceKind.OPENSUBSONIC.embyLike)
         assertEquals(SourceKind.OPENSUBSONIC, AppSettings().sourceKind)
     }
 

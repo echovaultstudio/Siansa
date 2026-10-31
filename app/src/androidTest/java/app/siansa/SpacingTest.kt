@@ -54,6 +54,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.siansa.data.AlbumCategory
@@ -148,6 +149,51 @@ class SpacingTest {
         val chipBox = compose.onNodeWithText("albums").getBoundsInRoot()
         val card = compose.onNodeWithTag("source-card").getBoundsInRoot()
         assertEven("Source card libraries", chipBox.top - name.bottom, card.bottom - chipBox.bottom)
+    }
+
+    /** Source filter (issue #693): the sync line starts under the source's name, and its libraries keep their gap below it. */
+    @Test fun sourceSyncLineSitsUnderTheName() {
+        compose.setContent { SiansaTheme { app.siansa.ui.SourceCardForTest(syncLine = "Synced · 12 books") } }
+        val name = compose.onNodeWithText("anna on music.example.com").getBoundsInRoot()
+        val line = compose.onNodeWithText("Synced · 12 books").getBoundsInRoot()
+        val chip = compose.onNodeWithText("albums").getBoundsInRoot()
+        val strip = compose.onNodeWithTag("source-sync-progress").getBoundsInRoot()
+        val tick = compose.onNodeWithTag("source-sync-done", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Sync line starts under the name", tick.left - name.left, 0.dp)
+        assertTrue("The line sits above the libraries", line.bottom <= chip.top)
+        assertEven("Libraries below the sync line", chip.top - strip.bottom, app.siansa.ui.SOURCE_CARD_GAP)
+    }
+
+    /** Arrange Home (issue #694): the spacing step's name stays on one line, even "Compact", with a larger font. */
+    @Test fun homeSpacingLabelIsOneLine() {
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(androidx.compose.ui.platform.LocalDensity.current.density, fontScale = 1.3f),
+            ) {
+                SiansaTheme { Box(Modifier.width(360.dp)) { app.siansa.ui.SpacingRow(gap = 1) { } } }
+            }
+        }
+        val label = compose.onNodeWithTag("homeSpacingLabel").getBoundsInRoot()
+        val title = compose.onNodeWithText("Spacing").getBoundsInRoot()
+        // "Spacing" is one line of a larger style: the label is no taller.
+        assertTrue("\"Compact\" wraps: ${label.bottom - label.top} tall", label.bottom - label.top <= title.bottom - title.top)
+        assertEven("Spacing label centred on the title's line", (label.top + label.bottom) / 2, (title.top + title.bottom) / 2)
+    }
+
+    /** Radios (issue #697): "Melancholy" on a tile stays one whole word, even with a larger font. */
+    @Test fun tileTitleKeepsWholeWords() {
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(androidx.compose.ui.platform.LocalDensity.current.density, fontScale = 1.3f),
+            ) {
+                SiansaTheme { app.siansa.ui.GradientTile("Melancholy", Color(0xFF445566) to Color(0xFF223344), onClick = {}, size = 130.dp) }
+            }
+        }
+        val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        compose.onNodeWithText("Melancholy", useUnmergedTree = true)
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val layout = layouts.single()
+        assertTrue("\"Melancholy\" broke over ${layout.lineCount} lines", layout.lineCount == 1 && !layout.hasVisualOverflow)
     }
 
     /** Home: the one settings button sits centred on the greeting's line (issue #152). */
@@ -281,6 +327,58 @@ class SpacingTest {
         val chips = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Euphoric")), useUnmergedTree = true).getBoundsInRoot()
         val hint = compose.onNodeWithText(app.siansa.mix.MixShape.STEADY.hint).getBoundsInRoot()
         assertEven("Mix shape chips", chips.top - title.bottom, hint.top - chips.bottom)
+    }
+
+    /** Shape the mix: "Surprises" stays on one line beside its slider (issue #677), as tall as one line of text. */
+    @Test fun mixSurpriseLabelIsOneLine() {
+        compose.setContent {
+            SiansaTheme {
+                androidx.compose.foundation.layout.Box(Modifier.width(360.dp)) {
+                    app.siansa.ui.MixShapeControls(app.siansa.mix.MixShape.STEADY, 50) { _, _ -> }
+                }
+            }
+        }
+        val label = compose.onNodeWithTag("mixSurpriseLabel").getBoundsInRoot()
+        val value = compose.onNodeWithText("Some").getBoundsInRoot()
+        val labelHeight = label.bottom - label.top
+        assertTrue("\"Surprises\" wraps: $labelHeight tall", labelHeight < (value.bottom - value.top) * 1.6f)
+        val slider = compose.onNodeWithTag("mixSurprise").getBoundsInRoot()
+        assertEven("Surprise label and slider centres", (label.top + label.bottom) / 2, (slider.top + slider.bottom) / 2)
+    }
+
+    /** Style › Phone's top bar (issue #681): its chips sit evenly between the heading and the hint. */
+    @Test fun topBarChipsAreEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.TopBarChoice(app.siansa.data.TopBarStyle.BLACK) { }
+            }
+        }
+        val title = compose.onNodeWithText("Phone's top bar").getBoundsInRoot()
+        val chips = compose.onNodeWithTag("topBar-HIDDEN").getBoundsInRoot()
+        val hint = compose.onNodeWithText(app.siansa.data.TopBarStyle.BLACK.hint).getBoundsInRoot()
+        assertEven("Top bar chips", chips.top - title.bottom, hint.top - chips.bottom)
+    }
+
+    /** Now playing's small header (issue #683): the fade under it starts right at its edge, across the whole width. */
+    @Test fun playerMiniHeaderFadesFromItsEdge() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.PlayerMiniHeader(null, isPlaying = false, progress = 0.5f, liked = false, onHeart = {}, onPlayPause = {}, onTop = {})
+            }
+        }
+        val header = compose.onNodeWithTag("playerMiniHeader").getBoundsInRoot()
+        val fade = compose.onNodeWithTag("playerMiniHeaderFade", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Fade under the header: left edge and bottom", fade.left - header.left, header.bottom - fade.bottom)
+        assertEven("Fade under the header: width", fade.right - fade.left, header.right - header.left)
+    }
+
+    /** A speaker's settings (issue #691): the "plays the queue" switch sits a tight step above its hint. */
+    @Test fun speakerQueueSwitchSitsCloseAboveItsHint() {
+        val device = app.siansa.playback.dlna.DlnaDevice("uuid:jbl", "JBL BAR 800MK2", null, "http://x/t", null, queueUrl = "http://x/q")
+        compose.setContent { SiansaTheme { app.siansa.ui.SpeakerQueueSwitch(device) } }
+        val row = compose.onNodeWithTag("dlnaSpeakerQueue").getBoundsInRoot()
+        val hint = compose.onNodeWithText("Hands it the next few songs", substring = true).getBoundsInRoot()
+        assertEven("Speaker queue switch and hint", hint.top - row.bottom, app.siansa.ui.Space.Tight)
     }
 
     /** Crossfade and levelling: the Off / Track / Album chips sit evenly between their heading and hint (issue #214). */

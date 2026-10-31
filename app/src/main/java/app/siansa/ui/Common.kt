@@ -466,7 +466,10 @@ fun rememberCardPlay(songs: List<app.siansa.data.Song>): CardPlay {
 }
 
 /** What the slider's step is called. */
-fun homeGapLabel(step: Int): String = listOf("Tight", "Compact", "Normal", "Roomy", "Airy")[step.coerceIn(0, app.siansa.data.AppSettings.HOME_GAP_MAX)]
+fun homeGapLabel(step: Int): String = HOME_GAP_LABELS[step.coerceIn(0, app.siansa.data.AppSettings.HOME_GAP_MAX)]
+
+/** The spacing steps' names, tight to airy. */
+val HOME_GAP_LABELS = listOf("Tight", "Compact", "Normal", "Roomy", "Airy")
 
 /** Room for a song length up to "59:59", so the lengths in a list line up (issue #309). */
 internal val DURATION_WIDTH = 36.dp
@@ -771,14 +774,13 @@ fun GradientTile(
                     RoundedCornerShape(6.dp),
                 )
             }
-            Text(
+            // Whole words only (issue #697): "Melancholy" shrinks a little rather than breaking.
+            WholeWordsText(
                 title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
                 color = Color.White,
                 maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.align(Alignment.TopStart).padding(Space.Medium),
+                modifier = Modifier.align(Alignment.TopStart).padding(Space.Medium).testTag("gradientTileTitle"),
             )
             if (busy) {
                 CircularProgressIndicator(

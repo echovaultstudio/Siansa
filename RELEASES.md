@@ -3,6 +3,40 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.44.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.44.0beta) — 2026-10-31
+
+- [#676](https://github.com/echovaultstudio/Siansa/pull/676) Google Play: say why an upload is refused, on one line, and at which step (@Th3K1ngP1n)
+- [#679](https://github.com/echovaultstudio/Siansa/pull/679) Shape the mix: keep "Surprises" on one line (@Th3K1ngP1n)
+- [#680](https://github.com/echovaultstudio/Siansa/pull/680) Custom cards: Play count for songs, Played and Times skipped rules (@Th3K1ngP1n)
+- [#684](https://github.com/echovaultstudio/Siansa/pull/684) Style: the phone's top bar see-through, black or hidden (@Th3K1ngP1n)
+- [#685](https://github.com/echovaultstudio/Siansa/pull/685) Album pages: the cover fades fully on a short album (@Th3K1ngP1n)
+- [#686](https://github.com/echovaultstudio/Siansa/pull/686) Now playing: the page fades in under the small header (@Th3K1ngP1n)
+- [#688](https://github.com/echovaultstudio/Siansa/pull/688) Connections: change another login's server without switching to it (@Th3K1ngP1n)
+- [#690](https://github.com/echovaultstudio/Siansa/pull/690) Chromecast: load the next song before the current one ends (@Th3K1ngP1n)
+- [#692](https://github.com/echovaultstudio/Siansa/pull/692) DLNA: let LinkPlay speakers (JBL Bar, WiiM…) play the queue themselves (@Th3K1ngP1n)
+- [#695](https://github.com/echovaultstudio/Siansa/pull/695) Source filter: Sync all, Audiobookshelf listed, the sync on one line with one tick (@Th3K1ngP1n)
+- [#696](https://github.com/echovaultstudio/Siansa/pull/696) Arrange Home: the spacing step's name fits on one line (@Th3K1ngP1n)
+- [#698](https://github.com/echovaultstudio/Siansa/pull/698) Tiles and cards keep whole words in their titles (@Th3K1ngP1n)
+- [#700](https://github.com/echovaultstudio/Siansa/pull/700) Light mode: the bar behind the tabs follows the theme (@Th3K1ngP1n)
+- [#702](https://github.com/echovaultstudio/Siansa/pull/702) Rearranging: rows move on every drag; Arrange Home scrolls while a row is held (@Th3K1ngP1n)
+- [#704](https://github.com/echovaultstudio/Siansa/pull/704) Jellyfin as a music source (@Th3K1ngP1n)
+- [#706](https://github.com/echovaultstudio/Siansa/pull/706) CI: name the release APK whether or not it's signed (@Th3K1ngP1n)
+- [#707](https://github.com/echovaultstudio/Siansa/pull/707) Emulator tests: SpacingTest put back together after merging (@Th3K1ngP1n)
+
+## [0.43.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.43.0beta) — 2026-10-30
+
+- [#650](https://github.com/echovaultstudio/Siansa/pull/650) Shape the mix: steady, build, euphoric, wind down and surprises in DJ radio (@Th3K1ngP1n)
+- [#652](https://github.com/echovaultstudio/Siansa/pull/652) Pinned card views draw without the player again (emulator tests) (@Th3K1ngP1n)
+- [#654](https://github.com/echovaultstudio/Siansa/pull/654) Plugin 0.3.1: beat grids get their own section on the settings page (@Th3K1ngP1n)
+- [#656](https://github.com/echovaultstudio/Siansa/pull/656) Change the look of any Home section from Arrange Home (@Th3K1ngP1n)
+- [#658](https://github.com/echovaultstudio/Siansa/pull/658) Plugin 0.3.2: beat grids that failed are tried again, any songs per run (@Th3K1ngP1n)
+- [#660](https://github.com/echovaultstudio/Siansa/pull/660) Plugin 0.3.3: songs on every music server get measured (@Th3K1ngP1n)
+- [#662](https://github.com/echovaultstudio/Siansa/pull/662) Time Machine finds other versions of a song; search finds names typed without an apostrophe (@Th3K1ngP1n)
+- [#664](https://github.com/echovaultstudio/Siansa/pull/664) Custom cards: rules to include and exclude, album cards, order and size (@Th3K1ngP1n)
+- [#666](https://github.com/echovaultstudio/Siansa/pull/666) One Connections page: servers and services, folded; more AI services (@Th3K1ngP1n)
+- [#668](https://github.com/echovaultstudio/Siansa/pull/668) The loudness target applies to ReplayGain tags too (@Th3K1ngP1n)
+- [#670](https://github.com/echovaultstudio/Siansa/pull/670) Next release is 0.43.0beta (@Th3K1ngP1n)
+
 ## [0.40.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.40.0beta) — 2026-10-29
 
 - [#647](https://github.com/echovaultstudio/Siansa/pull/647) Plugin 0.3.0: the beat grid at each end of a song, for beat-matched blends (@Th3K1ngP1n)

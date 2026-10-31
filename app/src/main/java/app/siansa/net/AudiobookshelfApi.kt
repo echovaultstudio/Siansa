@@ -139,6 +139,10 @@ class AudiobookshelfApi(private val http: OkHttpClient, private val settings: ()
             }.orEmpty()
 
     /** A page of a library's items, [sort] as Audiobookshelf names fields ("media.metadata.title", "addedAt"). */
+    /** How many books or podcasts a library has (issue #693), from the total of a one-item page. */
+    suspend fun itemCount(libraryId: String): Int =
+        call("/api/libraries/$libraryId/items?limit=1&page=0").jsonObject.int("total") ?: 0
+
     suspend fun items(libraryId: String, page: Int, limit: Int = 100, sort: String = "media.metadata.title", desc: Boolean = false): List<Book> {
         val root = call("/api/libraries/$libraryId/items?limit=$limit&page=$page&sort=$sort&desc=${if (desc) 1 else 0}").jsonObject
         return root.arr("results").mapNotNull { parseBook(it) }

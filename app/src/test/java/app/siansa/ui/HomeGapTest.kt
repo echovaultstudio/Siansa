@@ -17,4 +17,10 @@ class HomeGapTest {
         assertEquals(Space.Small, homeGap(-3))
         assertEquals(Space.Large, homeGap(9))
     }
+
+    /** The label's width is measured from every step's name (issue #694): the list and the names agree. */
+    @Test fun everyStepsNameIsInTheList() {
+        assertEquals(HOME_GAP_LABELS, (0..AppSettings.HOME_GAP_MAX).map { homeGapLabel(it) })
+        assertEquals("Airy", homeGapLabel(99))
+    }
 }
