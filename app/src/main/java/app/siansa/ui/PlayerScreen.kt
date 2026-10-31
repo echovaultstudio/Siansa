@@ -697,8 +697,11 @@ private fun SeekBar(state: PlayerState) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Controls(state: PlayerState) {
+internal fun Controls(state: PlayerState) {
     val graph = LocalGraph.current
+    // A short buzz for repeat and add to playlist (issue #771), as for the mini player's swipe (#763); the phone's
+    // touch-feedback setting decides whether it's felt.
+    val haptics = LocalHapticFeedback.current
     Row(
         Modifier.fillMaxWidth().padding(vertical = Space.Small),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -711,6 +714,7 @@ private fun Controls(state: PlayerState) {
             on = state.repeatMode != Player.REPEAT_MODE_OFF,
             tag = "repeatButton",
         ) {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             graph.player.cycleRepeat()
             AppLog.i("Player", "Repeat: " + repeatLabel(nextRepeat(state.repeatMode)).lowercase())
         }
@@ -718,7 +722,6 @@ private fun Controls(state: PlayerState) {
             Icon(Icons.Rounded.SkipPrevious, "Previous", Modifier.size(40.dp))
         }
         // Tap to play or pause; press and hold to stop and clear the queue.
-        val haptics = LocalHapticFeedback.current
         Box(
             Modifier
                 .size(68.dp)
@@ -745,6 +748,7 @@ private fun Controls(state: PlayerState) {
         }
         var picking by remember { mutableStateOf(false) }
         StateButton(icon = Icons.Rounded.AddCircleOutline, label = "Add to playlist", on = false, tag = "addToPlaylistButton") {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             if (state.current != null) picking = true
         }
         if (picking) {
