@@ -72,6 +72,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.painter.Painter
@@ -406,7 +407,8 @@ private fun Pill(text: String, filled: Boolean, onClick: () -> Unit) {
 /** The small header that appears once the player scrolls up to the cards: song, heart and play/pause. */
 @Composable
 fun PlayerMiniHeader(song: Song?, isPlaying: Boolean, progress: Float, liked: Boolean, onHeart: () -> Unit, onPlayPause: () -> Unit, onTop: () -> Unit) {
-    Column(Modifier.fillMaxWidth().background(Color(0xFF221C2E)).statusBarsPadding()) {
+    Column(Modifier.fillMaxWidth().testTag("playerMiniHeader")) {
+    Column(Modifier.fillMaxWidth().background(MINI_HEADER).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().clickable(onClick = onTop).padding(start = Space.Page, end = Space.Tight, top = Space.Small, bottom = Space.Small), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(song?.title.orEmpty(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -423,7 +425,13 @@ fun PlayerMiniHeader(song: Song?, isPlaying: Boolean, progress: Float, liked: Bo
             Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).height(2.dp).background(Color.White))
         }
     }
+    // The page scrolling under the header fades into it instead of showing a sliced line of text (issue #683).
+    Box(Modifier.fillMaxWidth().height(Space.Section).background(Brush.verticalGradient(0f to MINI_HEADER, 0.5f to MINI_HEADER, 1f to MINI_HEADER.copy(alpha = 0f))).testTag("playerMiniHeaderFade"))
+    }
 }
+
+/** The small now playing header's colour. */
+private val MINI_HEADER = Color(0xFF221C2E)
 
 // ---- Lyrics, opened ----
 
