@@ -79,6 +79,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -123,7 +124,9 @@ internal fun BottomTabs(shown: List<NavTab>, current: String, onTab: (NavTab) ->
                 selected = current == tab.route,
                 onClick = { onTab(tab) },
                 icon = { Icon(tab.icon(), null) },
-                label = { Text(tab.label, maxLines = 1, softWrap = false, fontSize = 11.sp, letterSpacing = (-0.2).sp) },
+                // One line that gets a little smaller instead of cutting a word: "Your Library" stays whole with a
+                // larger font (issue #720).
+                label = { WholeWordsText(tab.label, LocalTextStyle.current.copy(fontSize = 11.sp, letterSpacing = (-0.2).sp), maxLines = 1) },
             )
         }
     }
