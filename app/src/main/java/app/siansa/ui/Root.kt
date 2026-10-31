@@ -104,8 +104,6 @@ import app.siansa.log.AppLog
 import kotlinx.coroutines.CancellationException
 import app.siansa.playback.PlayerState
 
-private data class Tab(val route: String, val label: String, val icon: ImageVector)
-
 /** A bottom-bar tab's look; which tabs show, and in what order, is set in Settings › Style › Nav Bar (issue #346). */
 internal fun NavTab.icon(): ImageVector = when (this) {
     NavTab.HOME -> Icons.Rounded.Home
@@ -116,7 +114,20 @@ internal fun NavTab.icon(): ImageVector = when (this) {
     NavTab.SETTINGS -> Icons.Rounded.Settings
 }
 
-private fun tabsOf(shown: List<NavTab>): List<Tab> = shown.map { Tab(it.route, it.label, it.icon()) }
+/** The tabs along the bottom, [current] lit; on their own so screenshot tests can draw them (#710). */
+@Composable
+internal fun BottomTabs(shown: List<NavTab>, current: String, onTab: (NavTab) -> Unit) {
+    NavigationBar(containerColor = Color.Transparent, tonalElevation = 0.dp) {
+        shown.forEach { tab ->
+            NavigationBarItem(
+                selected = current == tab.route,
+                onClick = { onTab(tab) },
+                icon = { Icon(tab.icon(), null) },
+                label = { Text(tab.label, maxLines = 1, softWrap = false, fontSize = 11.sp, letterSpacing = (-0.2).sp) },
+            )
+        }
+    }
+}
 
 /** Every route that's a tab, shown or not, so the bar knows which tab a page belongs to. */
 private val allTabRoutes = NavTab.entries.map { it.route }.toSet()
@@ -174,7 +185,6 @@ fun SiansaRoot() {
     // The tab the user is "in", which stays lit while they browse deeper (album, artist…).
     var currentTab by rememberSaveable { mutableStateOf("home") }
     val appSettings by graph.settings.state.collectAsStateWithLifecycle()
-    val tabs = tabsOf(appSettings.navTabs)
 
     LaunchedEffect(route) {
         if (route != null) {
@@ -242,20 +252,11 @@ fun SiansaRoot() {
                                 app.siansa.playback.MiniFor.NONE -> Unit
                             }
                         }
-                        NavigationBar(containerColor = Color.Transparent, tonalElevation = 0.dp) {
-                            tabs.forEach { tab ->
-                                NavigationBarItem(
-                                    selected = currentTab == tab.route,
-                                    onClick = {
-                                        if (tabTapClearsSearch(currentTab, tab.route)) SearchReset.request()
-                                        if (tabTapScrollsHomeToTop(route, tab.route)) HomeScrollToTop.request()
-                                        if (currentTab == tab.route) nav.backToTabTop(tab.route) else nav.switchTab(tab.route)
-                                        currentTab = tab.route
-                                    },
-                                    icon = { Icon(tab.icon, null) },
-                                    label = { Text(tab.label, maxLines = 1, softWrap = false, fontSize = 11.sp, letterSpacing = (-0.2).sp) },
-                                )
-                            }
+                        BottomTabs(appSettings.navTabs, currentTab) { tab ->
+                            if (tabTapClearsSearch(currentTab, tab.route)) SearchReset.request()
+                            if (tabTapScrollsHomeToTop(route, tab.route)) HomeScrollToTop.request()
+                            if (currentTab == tab.route) nav.backToTabTop(tab.route) else nav.switchTab(tab.route)
+                            currentTab = tab.route
                         }
                     }
                 }

@@ -4,6 +4,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
+    id("io.github.takahirom.roborazzi")
 }
 
 // The version people see comes from version.txt (e.g. 0.0.1beta). The hidden versionCode only has to
@@ -64,6 +65,8 @@ android {
     testOptions {
         // Unit tests run on a plain JVM: Android calls they touch return defaults instead of failing.
         unitTests.isReturnDefaultValues = true
+        // The screenshot tests (issue #710) draw with the app's real resources on Robolectric.
+        unitTests.isIncludeAndroidResources = true
         managedDevices {
             localDevices {
                 create("ciPhone") {
@@ -122,7 +125,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.navigation:navigation-compose:2.8.5")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
-    implementation("androidx.palette:palette-ktx:1.0.0")
+    implementation("androidx.palette:palette-ktx:1.1.0")
 
     // Media3 stays on the version the FFmpeg decoder below is built for (Jellyfin's build); update both together.
     implementation("androidx.media3:media3-exoplayer:1.9.0")
@@ -149,6 +152,15 @@ dependencies {
 
     // Fast tests of the app's own logic, run on the build machine on every push (app/src/test).
     testImplementation("junit:junit:4.13.2")
+
+    // Screenshot tests (issue #710): parts of the app drawn on Robolectric and compared with the approved images in
+    // app/src/test/screenshots. Roborazzi takes Compose from the app, so nothing here moves Compose's version.
+    testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.77.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.77.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-junit-rule:1.77.0")
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
 
     // Tests that run on an Android emulator in CI (see .github/workflows/ci.yml).
     androidTestImplementation("androidx.test:runner:1.6.2")
@@ -196,4 +208,9 @@ kotlin {
             "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi",
         )
     }
+}
+
+// Screenshot tests (issue #710): the approved images live next to the tests, so a pull request shows them changing.
+roborazzi {
+    outputDir.set(file("src/test/screenshots"))
 }
