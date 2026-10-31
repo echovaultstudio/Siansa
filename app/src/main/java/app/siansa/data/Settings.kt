@@ -183,6 +183,19 @@ data class AppSettings(
         audiobookshelfUser = page.audiobookshelfUser, audiobookshelfPassword = page.audiobookshelfPassword,
     )
 
+    /**
+     * These settings with the music server's fields taken from [page] (another user's card on the Connections page,
+     * issue #687): its address, login, proxy login and name in AudioMuse. Everything else, AudioMuse and AI included,
+     * keeps its value here.
+     */
+    fun withServerFrom(page: AppSettings): AppSettings = copy(
+        navidromeUrl = page.navidromeUrl, navidromeUser = page.navidromeUser, navidromePassword = page.navidromePassword,
+        proxyUser = page.proxyUser, proxyPassword = page.proxyPassword, audioMuseServer = page.audioMuseServer,
+    )
+
+    /** Whether [other] has a different music server or login from these settings. */
+    fun serverDiffers(other: AppSettings): Boolean = withServerFrom(other) != this
+
     /** Books show once an Audiobookshelf server with a login is set (issue #521). */
     val booksReady: Boolean
         get() = audiobookshelfUrl.isNotBlank() && (audiobookshelfToken.isNotBlank() || (audiobookshelfUser.isNotBlank() && audiobookshelfPassword.isNotBlank()))
