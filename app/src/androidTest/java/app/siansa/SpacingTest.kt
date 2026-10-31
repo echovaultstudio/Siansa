@@ -359,19 +359,6 @@ class SpacingTest {
         assertEven("Top bar chips", chips.top - title.bottom, hint.top - chips.bottom)
     }
 
-    /** Now playing's small header (issue #683): the fade under it starts right at its edge, across the whole width. */
-    @Test fun playerMiniHeaderFadesFromItsEdge() {
-        compose.setContent {
-            SiansaTheme {
-                app.siansa.ui.PlayerMiniHeader(null, isPlaying = false, progress = 0.5f, liked = false, onHeart = {}, onPlayPause = {}, onTop = {})
-            }
-        }
-        val header = compose.onNodeWithTag("playerMiniHeader").getBoundsInRoot()
-        val fade = compose.onNodeWithTag("playerMiniHeaderFade", useUnmergedTree = true).getBoundsInRoot()
-        assertEven("Fade under the header: left edge and bottom", fade.left - header.left, header.bottom - fade.bottom)
-        assertEven("Fade under the header: width", fade.right - fade.left, header.right - header.left)
-    }
-
     /** A speaker's settings (issue #691): the "plays the queue" switch sits a tight step above its hint. */
     @Test fun speakerQueueSwitchSitsCloseAboveItsHint() {
         val device = app.siansa.playback.dlna.DlnaDevice("uuid:jbl", "JBL BAR 800MK2", null, "http://x/t", null, queueUrl = "http://x/q")

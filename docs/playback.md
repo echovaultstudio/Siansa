@@ -108,6 +108,10 @@ Both follow your finger, and let go wherever you like: a hard swipe finishes qui
 a short pull springs back. The mini player fades away as the player rises and comes back as it goes. The book
 player opens and closes the same way.
 
+Scroll down in now playing for **About the artist** and **About this song**. The whole page scrolls as one, in the
+colours of the cover, and the cards take a deep shade of the cover's colour too (a dark grey for a black-and-white
+cover). Scroll back up for the controls.
+
 ## Lyrics
 
 Lyrics come from your server (Navidrome's lyrics, or the lyrics file or tags it reads). Synced lyrics light up line

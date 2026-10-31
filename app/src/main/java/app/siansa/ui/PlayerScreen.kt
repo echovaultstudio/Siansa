@@ -49,8 +49,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -113,7 +111,6 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -193,7 +190,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     val snack = LocalSnack.current
     val openArtist = rememberArtistOpener(beforeOpen = onClose)
     val scroll = rememberScrollState()
-    // The cover's colour, for the lyrics card and the lyrics screen.
+    // The cover's colour, for the page, the cards under the player and the lyrics screen.
     val tint = rememberCoverColor(song?.cover)
     // The song's lyrics, for the lyrics button and the preview card. Cleared as the song changes, so the
     // button doesn't stay lit for a song without lyrics.
@@ -233,7 +230,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     }
 
     // Dragging down (at the top of the page) moves the whole player with the finger; let go far or fast
-    // enough and it closes. Swiping up scrolls down to the cards under the player.
+    // enough and it closes. Swiping up scrolls the whole page down to the cards under the player; swiping
+    // back up brings the controls back (no small header over the page, #717).
     // Dragging down moves the whole sheet with the finger (#600): the sheet holds where it is and settles it.
     val dismissSheet = LocalPlayerSheet.current
     fun dismissedPx(): Float = (1f - dismissSheet.progress.value) * dismissSheet.heightPx
@@ -291,7 +289,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                     Brush.verticalGradient(
                         0f to Color.Black.copy(alpha = 0.25f),
                         0.55f to Color.Black.copy(alpha = 0.45f),
-                        1f to Color.Black.copy(alpha = 0.9f),
+                        // The cover's colour, deep, down to the cards: one page from the top to the end.
+                        1f to pageBottomColor(tint).copy(alpha = 0.9f),
                     )
                 )
             )
@@ -302,7 +301,6 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 // sits under the phone's own buttons (#294). The classic style leaves the top of the lyrics card
                 // peeking in at the bottom, as in Spotify, to show there's more below (issue #346).
                 val pageHeight = if (classic) maxHeight - PLAYER_PEEK - navBar else maxHeight
-                val pageHeightPx = with(LocalDensity.current) { pageHeight.toPx() }
                 val queueButton = @Composable {
                     RoundIcon(
                         Icons.AutoMirrored.Rounded.QueueMusic,
@@ -369,30 +367,13 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                             LyricsPreviewCard(songLyrics, tint) { lyricsOpen = true }
                             Spacer(Modifier.height(Space.Medium))
                         }
-                        AboutArtistCard(song) { openArtist(song) }
+                        // The cards take a deep shade of the cover's colour (#717), so they belong to the page.
+                        val cards = nowPlayingCardColor(tint)
+                        AboutArtistCard(song, cards) { openArtist(song) }
                         Spacer(Modifier.height(Space.Medium))
-                        AboutSongCard(song, onOpenDetails = ::openDetails)
+                        AboutSongCard(song, cards, onOpenDetails = ::openDetails)
                     }
                     Spacer(Modifier.height(Space.Section + navBar))
-                }
-
-                // Once the cards are in view, a small header keeps the song and play/pause at hand.
-                val position by rememberPosition()
-                AnimatedVisibility(
-                    visible = scroll.value > pageHeightPx * 0.6f,
-                    enter = fadeIn(tween(150)),
-                    exit = fadeOut(tween(120)),
-                ) {
-                    val duration = (song?.durationSec ?: 0) * 1000f
-                    PlayerMiniHeader(
-                        song = song,
-                        isPlaying = state.isPlaying,
-                        progress = if (duration > 0f) position / duration else 0f,
-                        liked = song != null && heartChanges.let { graph.favorites.isLiked(song) },
-                        onHeart = { song?.let { graph.favorites.toggle(it) } },
-                        onPlayPause = { graph.player.togglePlay() },
-                        onTop = { scope.launch { scroll.animateScrollTo(0) } },
-                    )
                 }
             }
 
