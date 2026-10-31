@@ -266,40 +266,44 @@ private fun CastSheet(onDismiss: () -> Unit) {
  */
 @Composable
 private fun DlnaDeviceSettings(device: DlnaDevice, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(device.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        text = { DlnaSettingsContent(device) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+    )
+}
+
+/** What a DLNA TV or speaker's settings show, in their own function so the screenshot tests can draw them. */
+@Composable
+internal fun DlnaSettingsContent(device: DlnaDevice) {
     val original by Dlna.original.collectAsStateWithLifecycle()
     val possible = DlnaFormats.playsMoreThanMp3(device.formats)
     val on = device.id in original && possible
     val names = DlnaFormats.names(device.formats)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(device.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                Row(
-                    Modifier.fillMaxWidth().clickable(enabled = possible) { Dlna.setOriginal(device, !on) }.testTag("dlnaOriginal"),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Space.Medium),
-                ) {
-                    Text("Send the original file", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    Switch(checked = on, enabled = possible, onCheckedChange = { Dlna.setOriginal(device, it) })
-                }
-                Text(
-                    if (possible) {
-                        "Plays your music as it is (for example FLAC) instead of MP3 320, when it can play that format. " +
-                            "Better sound, and songs follow without even a tiny gap. Uses more Wi-Fi. Changes from the next song."
-                    } else {
-                        "It didn't say it plays anything but MP3, so it gets MP3 320."
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (names.isNotEmpty()) {
-                    Text("It plays: ${names.joinToString(", ")}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
-    )
+    Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+        Row(
+            Modifier.fillMaxWidth().clickable(enabled = possible) { Dlna.setOriginal(device, !on) }.testTag("dlnaOriginal"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Space.Medium),
+        ) {
+            Text("Send the original file", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Switch(checked = on, enabled = possible, onCheckedChange = { Dlna.setOriginal(device, it) })
+        }
+        Text(
+            if (possible) {
+                "Plays your music as it is (for example FLAC) instead of MP3 320, when it can play that format. " +
+                    "Better sound, and songs follow without even a tiny gap. Uses more Wi-Fi. Changes from the next song."
+            } else {
+                "It didn't say it plays anything but MP3, so it gets MP3 320."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (names.isNotEmpty()) {
+            Text("It plays: ${names.joinToString(", ")}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }
 
 @Composable
