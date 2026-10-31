@@ -141,13 +141,11 @@ fun CollectionPage(
             val lastRow = info.visibleItemsInfo.firstOrNull { it.index == info.totalItemsCount - 2 }
             if (!loaded || listState.firstVisibleItemIndex != 0 || lastRow == null) null
             else roomBelow(
-                maxScrollPx = estimatedMaxScroll(
+                maxScrollPx = rowsPastScreen(
                     scrolledPx = listState.firstVisibleItemScrollOffset.toFloat(),
                     lastBottomPx = (lastRow.offset + lastRow.size).toFloat(),
                     viewportEndPx = info.viewportEndOffset.toFloat(),
                     afterPaddingPx = info.afterContentPadding.toFloat(),
-                    unseenItems = 0,
-                    averageItemPx = 0f,
                 ),
                 coverPx = coverPx,
             )
@@ -280,17 +278,12 @@ fun CollectionPage(
 }
 
 /**
- * How far a list can scroll at most (issue #682): what's below the screen now, the rows not laid out yet at
- * [averageItemPx] each, and the end padding.
+ * How far a page's rows (and the end padding) let it scroll, once its last row is in view: below zero when they don't
+ * fill the screen. A single on a tall phone doesn't: its room must fill the screen first, then add the cover's scroll
+ * (issue #738; with only the cover's scroll it still couldn't scroll at all).
  */
-internal fun estimatedMaxScroll(
-    scrolledPx: Float,
-    lastBottomPx: Float,
-    viewportEndPx: Float,
-    afterPaddingPx: Float,
-    unseenItems: Int,
-    averageItemPx: Float,
-): Float = scrolledPx + (lastBottomPx + unseenItems.coerceAtLeast(0) * averageItemPx + afterPaddingPx - viewportEndPx).coerceAtLeast(0f)
+internal fun rowsPastScreen(scrolledPx: Float, lastBottomPx: Float, viewportEndPx: Float, afterPaddingPx: Float): Float =
+    scrolledPx + lastBottomPx + afterPaddingPx - viewportEndPx
 
 /** How far the cover fades out entirely: the title bar is solid once the page has scrolled this far. */
 internal const val FULL_FADE = 1.1f
@@ -298,7 +291,7 @@ internal const val FULL_FADE = 1.1f
 /**
  * The room to add after a page's last row (issue #723) so it can scroll [FULL_FADE] covers: the cover then fades
  * out as the title comes up under the title bar, as on a long album. [maxScrollPx] is how far its rows alone let it
- * scroll; a page that scrolls far enough already gets none.
+ * scroll ([rowsPastScreen], below zero when they don't fill the screen); a page that scrolls far enough gets none.
  */
 internal fun roomBelow(maxScrollPx: Float, coverPx: Float): Float = (coverPx * FULL_FADE - maxScrollPx).coerceAtLeast(0f)
 

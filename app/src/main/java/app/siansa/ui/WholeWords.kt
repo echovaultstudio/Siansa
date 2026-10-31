@@ -32,9 +32,7 @@ fun WholeWordsText(
         val fitted = remember(text, style, width, maxLines) {
             if (width == Constraints.Infinity || width <= 0) return@remember style
             val scale = wholeWordsScale(
-                // One pixel to spare: a word that fits only to the pixel is still cut on screen ("Melancholy" at 130 %,
-                // issue #738).
-                widestWord = { s -> words(text).maxOfOrNull { measurer.measure(it, scaled(style, s), maxLines = 1, softWrap = false).size.width + 1 } ?: 0 },
+                widestWord = { s -> words(text).maxOfOrNull { measurer.measure(it, scaled(style, s), maxLines = 1, softWrap = false).size.width } ?: 0 },
                 lines = { s -> measurer.measure(text, scaled(style, s), constraints = Constraints(maxWidth = width)).lineCount },
                 width = width,
                 maxLines = maxLines,

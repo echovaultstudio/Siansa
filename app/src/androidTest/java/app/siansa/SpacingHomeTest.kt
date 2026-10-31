@@ -70,10 +70,13 @@ class SpacingHomeTest : SpacingCheck() {
         val layout = layouts.single()
         val box = compose.onNodeWithTag("gradientTileTitle", useUnmergedTree = true).getBoundsInRoot()
         // What was measured, so a failure says why (issue #738).
-        val sizes = "lines=${layout.lineCount}, text ${layout.multiParagraph.width}x${layout.multiParagraph.height} px in " +
-            "${layout.layoutInput.constraints.maxWidth}x${layout.layoutInput.constraints.maxHeight} px, font ${layout.layoutInput.style.fontSize}, " +
-            "box ${box.right - box.left} wide, cut: width=${layout.didOverflowWidth} height=${layout.didOverflowHeight}"
-        assertTrue("\"Melancholy\" doesn't fit on one line: $sizes", layout.lineCount == 1 && !layout.hasVisualOverflow)
+        val sizes = "lines=${layout.lineCount}, word ${layout.getLineRight(0)} px wide in ${layout.size.width} px, " +
+            "font ${layout.layoutInput.style.fontSize}, box ${box.right - box.left} wide, ellipsis=${layout.isLineEllipsized(0)}, " +
+            "too tall=${layout.didOverflowHeight}"
+        // One whole line, no "…", and the word's last letter inside the text's width. (hasVisualOverflow also counts a
+        // paragraph a fraction of a pixel wider than its box, with every letter showing: issue #738.)
+        val fits = layout.lineCount == 1 && !layout.isLineEllipsized(0) && layout.getLineRight(0) <= layout.size.width && !layout.didOverflowHeight
+        assertTrue("\"Melancholy\" doesn't fit on one line: $sizes", fits)
     }
 
     /** Home: the one settings button sits centred on the greeting's line (issue #152). */
