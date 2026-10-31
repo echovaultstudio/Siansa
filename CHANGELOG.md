@@ -3,6 +3,32 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.44.1beta — 2026-10-31
+
+### Fixed
+- Similar songs, similar albums and radios now work for the songs of another user shown with yours (for example your kids' library): their songs go to AudioMuse under that user's own "Server name in AudioMuse".
+- **"Your Library" was cut off in the tabs with a larger font.** The tab names now get a little smaller to fit.
+- **Short albums left an empty gap at the top when scrolled.** A single's page now scrolls its cover away like a long
+  album's: the title comes up under the title bar, and the spare room is below the songs.
+- **A big animated cover could stay still for good.** When your server took too long to make its small version the
+  first time, Siansa showed the cover still and kept it that way. It now asks again the next time it starts.
+- **Home's source filter:** after a sync, the libraries sit just under the sync line, with no extra gap.
+- **Custom card rules:** the ways of comparing (contains, is…) sit evenly between the rule's name and its value.
+
+### Changed
+- **Now playing scrolls as one page.** The small bar that appeared at the top when you scrolled down is gone: it
+  showed the heart and pause button twice and half-covered the song's title. Scroll back up for the controls.
+  About the artist and About this song now take a deep shade of the cover's colour instead of the same purple for
+  every song.
+- **"Speaker plays the queue" is gone.** On the JBL Bar it still paused a few seconds between songs, the same as
+  without it, so it brought nothing. TVs and speakers that take the next song ahead still play without gaps.
+- **A new app icon.** Siansa's sound bars in frost and amber, with a reflection under them, between its double half
+  circles, on black.
+- **Siansa starts in Mono with an amber accent,** to match the new black icon. If you picked a theme yourself in
+  Settings › Style › Themes, it stays as it is.
+- **Play button cards on Home only play from their ▶.** Tapping anywhere else on the card opens it, so it no longer
+  starts playing by accident, and the arrow at the end is gone.
+
 ## 0.44.0beta — 2026-10-31
 
 ### Fixed
