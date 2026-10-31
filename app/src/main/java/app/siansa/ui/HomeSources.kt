@@ -30,6 +30,13 @@ import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Icon
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.ui.graphics.vector.ImageVector
+import app.siansa.data.SyncProgress
+import app.siansa.data.BookSync
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -65,6 +72,9 @@ import app.siansa.log.AppLog
  * music, a Sync button and their libraries to tick. What's hidden is hidden everywhere in the app.
  */
 
+/** The eye (or a source's icon) at the start of a card: the name and the sync line start past it. */
+internal val SOURCE_ICON = 48.dp
+
 /** The gap between a user's name and their libraries, and between the libraries and the card's edge. */
 internal val SOURCE_CARD_GAP = Space.Medium
 
@@ -84,8 +94,31 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
     // The user in use's own music hidden (issue #427): instant, their settings and history stay in use.
     val ownHidden by graph.library.ownHidden.collectAsStateWithLifecycle()
     val libraryStatus by graph.library.status.collectAsStateWithLifecycle()
-    // A sync started from this sheet shows its progress and result here, like the Library sync page (#220).
+    // A sync started from this sheet shows its progress and result here, as one small line (#220, #693).
     var watching by remember { mutableStateOf(false) }
+    // Audiobookshelf, listed with the music servers (issue #693).
+    val bookSync by graph.books.sync.collectAsStateWithLifecycle()
+    var watchingBooks by remember { mutableStateOf(false) }
+    val anySyncing = progress.running || guestStates.values.any { it.running } || bookSync.running
+
+    fun syncAll() {
+        val plan = syncAllPlan(
+            inUseShown = !ownHidden,
+            guests = users.filter { it.id != Users.active }.associate { it.id to graph.guests.sameServerNow(it.id) },
+            shown = shown,
+            booksReady = settings.booksReady,
+        )
+        AppLog.i("Sources", "Sync all: ${plan.describe()}")
+        if (plan.inUse) {
+            watching = true
+            graph.sync.start(full = true)
+        }
+        plan.guests.forEach { graph.guests.sync(it, force = true) }
+        if (plan.books) {
+            watchingBooks = true
+            graph.scope.launch { graph.books.syncAll() }
+        }
+    }
 
     Column(modifier.verticalScroll(rememberScrollState()).padding(horizontal = Space.Page)) {
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
@@ -112,7 +145,14 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
             }
         }
 
-        PanelLabel("Users and libraries")
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) { PanelLabel("Servers and libraries") }
+            FilledTonalButton(
+                onClick = ::syncAll,
+                enabled = !anySyncing,
+                modifier = Modifier.padding(top = Space.Medium).testTag("syncAll"),
+            ) { Text("Sync all") }
+        }
         Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
             users.forEach { user ->
                 val inUse = user.id == Users.active
@@ -163,6 +203,11 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                             }
                         }
                     },
+                    progress = if (inUse && watching && progress.phase != SyncPhase.IDLE) {
+                        { SyncStrip(syncLine(progress), running = progress.running, fraction = progress.fraction, done = progress.phase == SyncPhase.DONE, failed = progress.phase == SyncPhase.FAILED) }
+                    } else if (!inUse && isShown && syncing) {
+                        { SyncStrip("Loading their music… ${guest?.songs ?: 0} songs", running = true, fraction = null, done = false, failed = false) }
+                    } else null,
                     onSync = {
                         if (inUse) {
                             watching = true
@@ -187,9 +232,27 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                         }
                     },
                 )
-                if (inUse && watching && progress.phase != SyncPhase.IDLE) {
-                    Box(Modifier.testTag("source-sync-progress")) { ProgressCard(progress) }
-                }
+            }
+            // Audiobookshelf (issue #693): listed like a server, with Sync; its books aren't hidden from here.
+            if (settings.audiobookshelfUrl.isNotBlank()) {
+                SourceCard(
+                    name = "Audiobookshelf",
+                    status = booksStatus(settings.booksReady, bookSync),
+                    shown = true,
+                    canToggle = false,
+                    syncing = bookSync.running,
+                    libraries = emptyList(),
+                    icon = Icons.AutoMirrored.Rounded.MenuBook,
+                    onToggle = {},
+                    onSync = {
+                        watchingBooks = true
+                        graph.scope.launch { graph.books.syncAll() }
+                    },
+                    canSync = settings.booksReady,
+                    progress = if (watchingBooks && (bookSync.running || bookSync.done || bookSync.error != null)) {
+                        { SyncStrip(booksLine(bookSync), running = bookSync.running, fraction = null, done = bookSync.done, failed = bookSync.error != null) }
+                    } else null,
+                )
             }
         }
         Text(
@@ -217,7 +280,12 @@ internal fun SourceCard(
     libraries: List<Pair<String, Boolean>>,
     onToggle: () -> Unit,
     onSync: () -> Unit,
-    onLibrary: (Int) -> Unit,
+    onLibrary: (Int) -> Unit = {},
+    // A source that can't be hidden from here (Audiobookshelf) shows its own icon instead of the eye.
+    icon: ImageVector? = null,
+    canSync: Boolean = true,
+    // A small line under the name while it syncs, and once when it's done (issue #693).
+    progress: (@Composable () -> Unit)? = null,
 ) {
     Surface(
         shape = RoundedCornerShape(20.dp),
@@ -226,7 +294,9 @@ internal fun SourceCard(
     ) {
         Column(Modifier.padding(start = Space.Tight, end = Space.Medium, top = Space.Tight, bottom = if (libraries.isEmpty()) Space.Tight else SOURCE_CARD_GAP)) {
             Row(Modifier.fillMaxWidth().testTag("source-name"), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onToggle, enabled = canToggle) {
+                if (icon != null) {
+                    Box(Modifier.size(SOURCE_ICON), contentAlignment = Alignment.Center) { Icon(icon, null, tint = Accent) }
+                } else IconButton(onClick = onToggle, enabled = canToggle) {
                     Icon(
                         if (shown) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
                         if (shown) "Hide $name" else "Show $name",
@@ -239,9 +309,10 @@ internal fun SourceCard(
                 }
                 if (shown) {
                     Spacer(Modifier.width(Space.Small))
-                    OutlinedButton(onClick = onSync, enabled = !syncing) { Text(if (syncing) "Syncing" else "Sync") }
+                    OutlinedButton(onClick = onSync, enabled = !syncing && canSync) { Text(if (syncing) "Syncing" else "Sync") }
                 }
             }
+            progress?.let { it() }
             if (libraries.isNotEmpty()) {
                 Spacer(Modifier.height(SOURCE_CARD_GAP))
                 FlowRow(
@@ -380,8 +451,9 @@ internal fun SourceFilterButton(onClick: () -> Unit) {
 
 /** A user's card for the spacing check, with two libraries. */
 @Composable
-internal fun SourceCardForTest() {
+internal fun SourceCardForTest(syncLine: String? = null) {
     SourceCard(
+        progress = syncLine?.let { { SyncStrip(it, running = false, fraction = null, done = true, failed = false) } },
         name = "anna on music.example.com",
         status = "In use",
         shown = true,
@@ -408,3 +480,93 @@ internal fun inUseStatus(syncing: Boolean, status: LibraryStatus?, now: Long = S
     else java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(status.syncedAt))
     return "In use · ${n.format(status.artists)} artists · ${n.format(status.albums)} albums · ${n.format(status.songs)} songs · synced $time"
 }
+
+/**
+ * One small line under a source while it syncs (issue #693): a thin bar while it runs, then a single tick and the
+ * result once it's done, instead of a card that fills the sheet.
+ */
+@Composable
+internal fun SyncStrip(text: String, running: Boolean, fraction: Float?, done: Boolean, failed: Boolean) {
+    Column(
+        // Lined up under the source's name, past the eye.
+        Modifier.fillMaxWidth().padding(start = SOURCE_ICON, end = Space.Tight, bottom = Space.Small).testTag("source-sync-progress"),
+        verticalArrangement = Arrangement.spacedBy(Space.Tight),
+    ) {
+        if (running) {
+            if (fraction != null) LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+            else LinearProgressIndicator(Modifier.fillMaxWidth())
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (done) {
+                Icon(Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp).testTag("source-sync-done"))
+                Spacer(Modifier.width(Space.Tight))
+            }
+            Text(
+                text,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** The music sync on one line (issue #693): the library and the step it's on, or how it ended. */
+internal fun syncLine(p: SyncProgress): String {
+    val n = java.text.NumberFormat.getIntegerInstance()
+    return when (p.phase) {
+        SyncPhase.DONE, SyncPhase.FAILED, SyncPhase.CONNECTING, SyncPhase.SAVING, SyncPhase.IDLE ->
+            syncHeadline(p) + (p.error?.takeIf { p.phase == SyncPhase.FAILED }?.let { ": $it" } ?: "")
+        else -> listOfNotNull(
+            p.libraryName?.let { if (p.libraryCount > 1) "$it (${p.libraryIndex} of ${p.libraryCount})" else it },
+            when (p.phase) {
+                SyncPhase.ARTISTS -> "${n.format(p.artists)} artists"
+                SyncPhase.ALBUMS -> "${n.format(p.albums)} albums"
+                SyncPhase.SONGS -> if (p.songsExpected > 0) "${n.format(p.songs)} of ${n.format(p.songsExpected)} songs" else "${n.format(p.songs)} songs"
+                else -> null
+            },
+        ).joinToString(" · ").ifEmpty { "Syncing…" }
+    }
+}
+
+/** Audiobookshelf's line on its card (issue #693). */
+internal fun booksStatus(ready: Boolean, sync: BookSync): String = when {
+    !ready -> "Not signed in. Set it up in Settings › Connections."
+    sync.running -> "Audiobooks and podcasts · syncing…"
+    sync.done -> "Audiobooks and podcasts · " + booksCounts(sync)
+    else -> "Audiobooks and podcasts"
+}
+
+/** Audiobookshelf's sync on one line (issue #693). */
+internal fun booksLine(sync: BookSync): String = when {
+    sync.running -> "Reading your libraries…"
+    sync.error != null -> "Sync failed: ${sync.error}"
+    sync.done -> "Synced · " + booksCounts(sync)
+    else -> ""
+}
+
+private fun booksCounts(sync: BookSync): String {
+    val n = java.text.NumberFormat.getIntegerInstance()
+    return listOfNotNull(
+        "${n.format(sync.books)} ${if (sync.books == 1) "book" else "books"}",
+        sync.podcasts.takeIf { it > 0 }?.let { "${n.format(it)} ${if (it == 1) "podcast" else "podcasts"}" },
+    ).joinToString(" · ")
+}
+
+/** What Sync all syncs (issue #693): the user in use when their music shows, other shown users on the same server, and Audiobookshelf. */
+internal data class SyncAllPlan(val inUse: Boolean, val guests: List<Int>, val books: Boolean) {
+    fun describe(): String = listOfNotNull(
+        "your music".takeIf { inUse },
+        guests.takeIf { it.isNotEmpty() }?.let { "${it.size} other ${if (it.size == 1) "user" else "users"}" },
+        "Audiobookshelf".takeIf { books },
+    ).joinToString(", ").ifEmpty { "nothing shown" }
+}
+
+/** [guests]: each other user and whether they're on the same server (null while that's being checked). */
+internal fun syncAllPlan(inUseShown: Boolean, guests: Map<Int, Boolean?>, shown: Set<Int>, booksReady: Boolean): SyncAllPlan =
+    SyncAllPlan(
+        inUse = inUseShown,
+        guests = guests.filter { (id, same) -> same == true && id in shown }.keys.sorted(),
+        books = booksReady,
+    )

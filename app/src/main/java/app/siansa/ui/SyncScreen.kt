@@ -162,22 +162,7 @@ internal fun ProgressCard(p: SyncProgress) {
                     else -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                 }
                 Spacer(Modifier.width(Space.Medium))
-                Text(
-                    when (p.phase) {
-                        SyncPhase.DONE -> when {
-                            p.upToDate -> "Up to date: your server hasn't scanned since the last sync"
-                            p.changedAlbums in 1 until p.albums -> "Updated ${p.changedAlbums} new or changed albums"
-                            p.changedAlbums == 0 -> "Up to date: no albums changed"
-                            else -> "Sync finished"
-                        }
-                        SyncPhase.FAILED -> "Sync failed"
-                        SyncPhase.CONNECTING -> "Connecting to your server…"
-                        SyncPhase.SAVING -> "Saving to the phone…"
-                        else -> "Syncing " + (p.libraryName ?: "library") +
-                            if (p.libraryCount > 1) " (${p.libraryIndex} of ${p.libraryCount})" else ""
-                    },
-                    style = MaterialTheme.typography.titleSmall,
-                )
+                Text(syncHeadline(p), style = MaterialTheme.typography.titleSmall)
             }
 
             StepRow(Icons.Rounded.Person, "Artists", n.format(p.artists), active = p.phase == SyncPhase.ARTISTS, done = p.phase.ordinal > SyncPhase.ARTISTS.ordinal)
@@ -210,6 +195,25 @@ internal fun ProgressCard(p: SyncProgress) {
     }
 }
 
+/**
+ * What the sync is doing, or how it ended. The one tick is the header's, once the whole sync is done (issue #693):
+ * the steps don't tick, as they start again for each library.
+ */
+internal fun syncHeadline(p: SyncProgress): String = when (p.phase) {
+    SyncPhase.DONE -> when {
+        p.upToDate -> "Up to date: your server hasn't scanned since the last sync"
+        p.changedAlbums in 1 until p.albums -> "Updated ${p.changedAlbums} new or changed albums"
+        p.changedAlbums == 0 -> "Up to date: no albums changed"
+        else -> "Sync finished"
+    }
+    SyncPhase.FAILED -> "Sync failed"
+    SyncPhase.CONNECTING -> "Connecting to your server…"
+    SyncPhase.SAVING -> "Saving to the phone…"
+    SyncPhase.IDLE -> ""
+    else -> "Syncing " + (p.libraryName ?: "library") +
+        if (p.libraryCount > 1) " (${p.libraryIndex} of ${p.libraryCount})" else ""
+}
+
 @Composable
 private fun StepRow(icon: ImageVector, label: String, value: String, active: Boolean, done: Boolean) {
     val color = when {
@@ -222,9 +226,6 @@ private fun StepRow(icon: ImageVector, label: String, value: String, active: Boo
         Spacer(Modifier.width(Space.Medium))
         Text(label, style = MaterialTheme.typography.bodyLarge, color = color, modifier = Modifier.weight(1f))
         Text(value, style = MaterialTheme.typography.bodyLarge, color = color)
-        Box(Modifier.width(28.dp), contentAlignment = Alignment.CenterEnd) {
-            if (done) Icon(Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-        }
     }
     Spacer(Modifier.height(0.dp))
 }
