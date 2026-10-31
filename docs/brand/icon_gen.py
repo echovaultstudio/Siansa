@@ -156,5 +156,5 @@ if __name__ == "__main__":
     open(os.path.join(res, "ic_launcher_monochrome.xml"), "w").write(vector(mono=True))
     # The part launchers show (the middle 72 of 108), on black: the Play Store icon and the banner start from this.
     open(os.path.join(brand, "siansa-icon.svg"), "w").write(svg("#000000", "18 18 72 72"))
-    # The same without a background, cropped closer, for the website on its own dark colours.
-    open(os.path.join(brand, "siansa-mark.svg"), "w").write(svg(None, "24 24 60 60"))
+    # The same without a background, for the website on its own colours: just wide enough for the outer half circles.
+    open(os.path.join(brand, "siansa-mark.svg"), "w").write(svg(None, "20 20 68 68"))
