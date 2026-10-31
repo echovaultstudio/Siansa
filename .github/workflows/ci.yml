@@ -130,21 +130,31 @@ jobs:
           SIANSA_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
           SIANSA_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIANSA_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          EVENT: ${{ github.event_name }}
         run: |
           set -o pipefail
-          gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease :app:bundleRelease --continue --stacktrace 2>&1 | tee gradle-build.txt
+          # Pull requests also compare the screenshot tests' pictures with the approved ones (issue #710). Only there:
+          # they're recorded on GitHub's runners (screenshots.yml), and another machine may draw a pixel differently.
+          VERIFY=""; [ "$EVENT" = "pull_request" ] && VERIFY="-Proborazzi.test.verify=true"
+          gradle :app:testDebugUnitTest $VERIFY :app:lintDebug :app:assembleRelease :app:bundleRelease --continue --stacktrace 2>&1 | tee gradle-build.txt
 
       - name: Test and lint results
         if: always()
         run: |
           python3 - <<'PY'
           import glob, xml.etree.ElementTree as ET
+          pictures = 0
           for f in glob.glob("app/build/test-results/testDebugUnitTest/*.xml"):
               for case in ET.parse(f).getroot().iter("testcase"):
                   fail = case.find("failure")
                   if fail is not None:
                       msg = (fail.get("message") or fail.text or "").replace("\n", " ")[:300]
                       print(f"::error::Unit test {case.get('classname').split('.')[-1]}.{case.get('name')} failed: {msg}")
+                      pictures += case.get("classname", "").endswith("ScreenshotTest")
+          if pictures:
+              print(f"::warning::{pictures} screenshots differ from the approved ones. The before, after and difference "
+                    "images are in the reports artifact (outputs/roborazzi). If the new look is meant, label the pull "
+                    "request 'record screenshots' to approve it.")
           errors = warnings = 0
           for f in glob.glob("app/build/reports/lint-results-debug.xml"):
               for issue in ET.parse(f).getroot().iter("issue"):
@@ -226,6 +236,7 @@ jobs:
             gradle-build.txt
             app/build/reports/
             app/build/test-results/
+            app/build/outputs/roborazzi/
 
   device-tests:
     name: Emulator tests against Navidrome

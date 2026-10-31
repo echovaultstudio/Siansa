@@ -27,6 +27,10 @@ Source: `app/src/main/java/app/siansa/`. Unit tests: `app/src/test/`. Emulator t
   Pages use `Space.Page` at their left and right edges and `Space.Section` between sections.
 - Visual changes: keep spacing even (the same gap above and below a row of chips, buttons or a badge) and add
   a check for it to `app/src/androidTest/java/app/siansa/SpacingTest.kt`.
+- Screenshot tests (`app/src/test/java/app/siansa/screenshots/ScreenshotTest.kt`, issue #710): draw a changed or new
+  part of a page in a scene there, with long words where text can be cut off. When the look is meant to change, label
+  the pull request `record screenshots` (CI records the pictures on GitHub's runner and commits them; pictures made on
+  another machine can differ by a pixel), then look at the committed pictures in light and dark before asking for review.
 - Navigate and change screen state only on the main thread.
 
 ## Automatic issues

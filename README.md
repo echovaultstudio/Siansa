@@ -84,6 +84,7 @@ Every push to `main` and every pull request runs `.github/workflows/ci.yml`:
 |---|---|
 | **Build** (`assembleRelease`) | Syntax and type errors; the release APK must compile and shrink with R8. |
 | **Unit tests** (`app/src/test`) | Mistakes in the app's own logic: server addresses, cover detection, ReplayGain, release types, name matching, the home-network check. Run in seconds, no phone needed. |
+| **Screenshot tests** (`app/src/test/java/app/siansa/screenshots`) | Parts of the app drawn in light and dark, at normal and 130 % font size, and compared pixel by pixel with the approved pictures in `app/src/test/screenshots`: words cut off, text too faint in light mode, gaps that moved. Drawn on the build machine (Roborazzi on Robolectric), no phone needed. Pull requests only. When a new look is meant, label the pull request `record screenshots`: `.github/workflows/screenshots.yml` draws the pictures again and commits them to it, so the review shows them. |
 | **Plugin tests** (`audiomuse-plugin/tests`) | Mistakes in the AudioMuse-AI plugin: loudness against the BS.1770 reference, fade shapes, the ramp layout the app reads, similar lists and when they rebuild. |
 | **Android Lint** | Likely crashes, wrong Android API use for older versions, and security issues. Errors appear as annotations on the commit. |
 | **Secret scan** (gitleaks, `.gitleaks.toml`) | Passwords, tokens or API keys committed anywhere in the history. |

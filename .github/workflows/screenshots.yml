@@ -1,0 +1,70 @@
+name: Screenshots
+
+# Approves the screenshot tests' pictures (issue #710). Label a pull request "record screenshots": this draws every
+# scene in app/src/test/java/app/siansa/screenshots/ScreenshotTest.kt on GitHub's runner, commits the pictures to
+# the pull request's branch (app/src/test/screenshots/) and takes the label off. The pull request then shows the
+# pictures that changed, and CI compares later pushes with them.
+#
+# GitHub doesn't start CI for a commit its own workflow made, so the pictures' commit has no checks of its own; it
+# changes no code, and the next push is checked against the new pictures.
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: screenshots-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  record:
+    name: Record screenshots
+    # Only branches of this repository: a fork's branch can't be pushed to with this workflow's token.
+    if: github.event.label.name == 'record screenshots' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.14.3"
+
+      # Draws every scene again; pictures of scenes that no longer exist are removed.
+      - name: Record
+        run: |
+          gradle :app:testDebugUnitTest --tests "app.siansa.screenshots.*" \
+            -Proborazzi.test.record=true -Proborazzi.cleanupOldScreenshots=true --stacktrace
+
+      - name: Commit the pictures
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -A app/src/test/screenshots
+          if git diff --cached --quiet; then
+            echo "::notice::The pictures are the same as the approved ones; nothing to commit."
+            exit 0
+          fi
+          git diff --cached --stat | tee -a "$GITHUB_STEP_SUMMARY"
+          git commit -q -m "Screenshots recorded for the pull request's look"
+          git push -q origin "HEAD:$BRANCH"
+          echo "::notice::$(git diff --name-only HEAD~1 | wc -l) pictures recorded and committed."
+
+      - name: Take the label off
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --remove-label "record screenshots"
