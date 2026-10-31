@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -144,6 +145,19 @@ fun ThemesScreen(nav: NavController) {
             )
             Text(
                 "Album, artist and now playing pages keep their colours from the cover.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = SWATCH_GAP),
+            )
+
+            // Pages, cards, sheets and menus: grey by default instead of the theme's tint (issue #761).
+            ThemeLabel("Pages and cards")
+            SurfaceSwatches(choice.surfaces, themeOwn = themeScheme(choice.colours, dark, choice.pureBlack, choice.seed, SurfaceColour.THEME), dark = dark, onPick = { pick ->
+                AppLog.i("Themes", "Pages and cards: ${pick.label}")
+                graph.settings.setSurfaceColour(pick.name)
+            }, modifier = Modifier.padding(horizontal = Space.Page))
+            Text(
+                "The colour behind everything: pages, cards, menus and sheets. Match theme tints them with the theme's colour.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = SWATCH_GAP),
@@ -333,6 +347,44 @@ internal fun SelectionSwatches(selected: SelectionColour, onPick: (SelectionColo
                     }
                 }
                 repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+/**
+ * The colours for pages and cards (issue #761), as circles four to a row: each shows its card colour on its page
+ * colour, in light or [dark] as the app is now. "Match theme" shows the theme's own ([themeOwn]).
+ */
+@Composable
+internal fun SurfaceSwatches(selected: SurfaceColour, themeOwn: ColorScheme, dark: Boolean, onPick: (SurfaceColour) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth().testTag("surfaceSwatches")) {
+        SurfaceColour.entries.forEach { option ->
+            val scheme = if (option == SurfaceColour.THEME) themeOwn else themeOwn.withSurfaces(option, dark)
+            Column(
+                Modifier.weight(1f).selectable(option == selected, role = Role.RadioButton) { onPick(option) }.testTag("surface-${option.name}"),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .then(if (option == selected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape).padding(4.dp) else Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)) // spacing: exact (the ring around the chosen colour)
+                        .clip(CircleShape)
+                        .background(scheme.background),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // The card colour as a smaller circle on the page colour.
+                    Box(Modifier.size(24.dp).clip(CircleShape).background(scheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+                        if (option == selected) Icon(Icons.Rounded.Check, null, tint = scheme.onSurface, modifier = Modifier.size(16.dp))
+                    }
+                }
+                Text(
+                    option.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = Space.Small),
+                )
             }
         }
     }

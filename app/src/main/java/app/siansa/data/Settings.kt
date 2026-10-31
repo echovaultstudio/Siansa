@@ -141,6 +141,8 @@ data class AppSettings(
     val themeSeed: Int = DEFAULT_THEME_SEED,
     /** The accent colour, by name ("AMBER", "THEME"…), issues #313, #728. */
     val themeSelection: String = DEFAULT_THEME_SELECTION,
+    /** Pages, cards, sheets and menus, by name ("GREY", "WARM", "COOL", "THEME"), issue #761. */
+    val surfaceColour: String = "GREY",
     /** Where song loudness and fade shapes come from (issue #60): ReplayGain tags, or the Siansa plugin. */
     val loudnessSource: LoudnessSource = LoudnessSource.TAGS,
     /** The loudness, in LUFS, that measured levelling brings songs towards. */
@@ -374,6 +376,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         pureBlack = prefs.getBoolean("pure_black", false),
         themeSeed = prefs.getInt("theme_seed", DEFAULT_THEME_SEED),
         themeSelection = prefs.getString("theme_selection", null) ?: defaultSelectionFor(prefs.getString("theme_colours", null)),
+        surfaceColour = prefs.getString("surface_colour", null) ?: "GREY",
         loudnessSource = LoudnessSource.parse(prefs.getString("loudness_source", null)),
         loudnessTarget = prefs.getInt("loudness_target", AppSettings.DEFAULT_LOUDNESS_TARGET),
         crossfade = CrossfadeMode.parse(prefs.getString("crossfade", null)),
@@ -598,6 +601,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setDownloadedOnly(on: Boolean) {
         prefs.edit().putBoolean("downloaded_only", on).apply()
         _state.value = _state.value.copy(downloadedOnly = on)
+    }
+
+    fun setSurfaceColour(name: String) {
+        prefs.edit().putString("surface_colour", name).apply()
+        _state.value = _state.value.copy(surfaceColour = name)
     }
 
     fun setSelectionColour(name: String) {
