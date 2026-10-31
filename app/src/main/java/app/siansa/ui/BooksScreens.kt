@@ -256,7 +256,7 @@ private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen:
         // The words start a page's gap after the cover, which sits a page's gap in: the cover's width plus both.
         Column(Modifier.align(Alignment.TopStart).padding(start = CARD_COVER_WIDTH + Space.Page + Space.Page, top = Space.Page, end = Space.Page)) {
             Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = Accent, fontWeight = FontWeight.Bold)
-            Text(book.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            WholeWordsText(book.title, MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 2)
             Text(
                 listOfNotNull(
                     book.author.takeIf { it.isNotBlank() },

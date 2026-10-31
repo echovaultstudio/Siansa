@@ -260,7 +260,7 @@ private fun CarouselCard(
             Cover(coverArt, 300, Modifier.size(96.dp).align(Alignment.TopEnd).padding(Space.Page), RoundedCornerShape(8.dp))
         }
         Column(Modifier.align(Alignment.BottomStart).padding(Space.Page).fillMaxWidth(0.7f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-            Text(name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            WholeWordsText(name, MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 2)
             Text(caption, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f), maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         Box(Modifier.align(Alignment.BottomEnd).padding(Space.Page)) {

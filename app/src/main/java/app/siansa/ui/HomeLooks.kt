@@ -119,7 +119,7 @@ private fun HomeBanner(id: String, title: String, items: List<HomeItem>, open: (
                 }
             }
             Column(Modifier.padding(Space.Page).fillMaxWidth(0.55f)) {
-                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                WholeWordsText(title, MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 2)
                 Spacer(Modifier.height(Space.Tight))
                 Text(items.take(3).joinToString(" · ") { it.title }, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(Space.Page))

@@ -714,14 +714,7 @@ private fun HeroMix(
                         }
                         Text("Today's mix", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.85f))
                     }
-                    Text(
-                        mix.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    WholeWordsText(mix.title, MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 3)
                     Text(
                         if (resume != null) "${mix.songs.size} tracks · Play carries on from ${resume.title}" else "${mix.songs.size} tracks",
                         style = MaterialTheme.typography.bodySmall,
