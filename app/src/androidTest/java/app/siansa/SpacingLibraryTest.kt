@@ -1,5 +1,6 @@
 package app.siansa
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,14 +21,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.siansa.data.AlbumCategory
@@ -443,5 +447,40 @@ class SpacingLibraryTest : SpacingCheck() {
         compose.waitForIdle()
         thumb = compose.onNodeWithTag("fastScrollThumb", useUnmergedTree = true).getBoundsInRoot()
         assertEven("Handle at the bottom", thumb.bottom, bar.bottom, 1.dp)
+    }
+
+    /**
+     * A single's page (issue #723): scrolled to its end, its title comes up under the title bar like a long album's,
+     * with no empty band left where the cover was. The spare room goes below its one song.
+     */
+    @Test fun aShortAlbumScrollsItsCoverAway() {
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
+        val song = app.siansa.data.Song(id = "single-1", title = "The only song", artist = "Sunborn", album = "A single")
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalGraph provides graph) {
+                SiansaTheme {
+                    app.siansa.ui.CollectionPage(
+                        nav = androidx.navigation.compose.rememberNavController(),
+                        title = "A single",
+                        color = androidx.compose.ui.graphics.Color(0xFF3A3A44),
+                        songs = listOf(song),
+                        cover = { m -> Box(m.background(androidx.compose.ui.graphics.Color.Gray)) },
+                        header = { androidx.compose.material3.Text("Sunborn") },
+                        numbered = true,
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        // To the end of the page: the room after the song.
+        compose.onNode(androidx.compose.ui.test.hasScrollToIndexAction()).performScrollToIndex(2)
+        compose.waitForIdle()
+        val bar = compose.onNodeWithTag("fadingTitleBar").getBoundsInRoot()
+        // The page's own title, not the title bar's: the lower of the two.
+        val title = compose.onAllNodesWithText("A single").fetchSemanticsNodes().maxBy { it.boundsInRoot.top }
+        val titleTop = with(compose.density) { title.boundsInRoot.top.toDp() }
+        assertTrue("The title sits under the title bar: ${titleTop.value} dp vs bar ${bar.bottom.value} dp",
+            abs((titleTop - bar.bottom).value) <= Space.Page.value)
+        compose.onNodeWithText("The only song").assertIsDisplayed()
     }
 }

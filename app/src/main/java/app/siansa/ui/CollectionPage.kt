@@ -4,6 +4,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.material.icons.rounded.AddCircle
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.filterNotNull
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -126,29 +130,31 @@ fun CollectionPage(
     val scrolled by remember {
         derivedStateOf { if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 100_000f }
     }
-    // How far the list can scroll at most: a short album can't scroll a whole cover's height, so the fade is stretched
-    // to reach its end there (issue #682). Rows not laid out yet count as the average of those shown, so the fade
-    // doesn't jump when the end comes into view.
-    val maxScroll by remember {
-        derivedStateOf {
+    // Room after a short page's last row (issue #723), so every page can scroll its cover away: a single's title comes
+    // up under the title bar like a long album's, instead of the cover fading and leaving its space empty (#682). It's
+    // worked out once the last row is in view, from the rows alone, so it never changes because of itself.
+    var roomPx by remember { mutableFloatStateOf(0f) }
+    val loaded = songs != null
+    LaunchedEffect(listState, coverPx, loaded) {
+        snapshotFlow {
             val info = listState.layoutInfo
-            val visible = info.visibleItemsInfo
-            val last = visible.lastOrNull()
-            val rows = visible.filter { it.index > 0 }
-            if (listState.firstVisibleItemIndex != 0 || last == null || rows.isEmpty()) null
-            else estimatedMaxScroll(
-                scrolledPx = listState.firstVisibleItemScrollOffset.toFloat(),
-                lastBottomPx = (last.offset + last.size).toFloat(),
-                viewportEndPx = info.viewportEndOffset.toFloat(),
-                afterPaddingPx = info.afterContentPadding.toFloat(),
-                unseenItems = info.totalItemsCount - 1 - last.index,
-                averageItemPx = rows.sumOf { it.size }.toFloat() / rows.size,
+            val lastRow = info.visibleItemsInfo.firstOrNull { it.index == info.totalItemsCount - 2 }
+            if (!loaded || listState.firstVisibleItemIndex != 0 || lastRow == null) null
+            else roomBelow(
+                maxScrollPx = estimatedMaxScroll(
+                    scrolledPx = listState.firstVisibleItemScrollOffset.toFloat(),
+                    lastBottomPx = (lastRow.offset + lastRow.size).toFloat(),
+                    viewportEndPx = info.viewportEndOffset.toFloat(),
+                    afterPaddingPx = info.afterContentPadding.toFloat(),
+                    unseenItems = 0,
+                    averageItemPx = 0f,
+                ),
+                coverPx = coverPx,
             )
-        }
+        }.filterNotNull().collect { roomPx = it }
     }
-    val faded = fadeScroll(scrolled, coverPx, maxScroll)
-    val progress = (faded / coverPx).coerceIn(0f, 1f)
-    val barAlpha = ((faded - coverPx * 0.8f) / (coverPx * 0.3f)).coerceIn(0f, 1f)
+    val progress = (scrolled / coverPx).coerceIn(0f, 1f)
+    val barAlpha = ((scrolled - coverPx * 0.8f) / (coverPx * 0.3f)).coerceIn(0f, 1f)
     val surface = MaterialTheme.colorScheme.surface
     // Albums with several discs get a heading above each disc (its title, or "Disc 2").
     val discs = remember(songs, numbered, discTitles) { if (numbered && songs != null) discHeaders(songs, discTitles) else emptyMap() }
@@ -243,6 +249,10 @@ fun CollectionPage(
                 }
             }
             footer()
+            // Last: the room a short page needs to scroll its cover away (above). Nothing is drawn in it.
+            item(key = "room", contentType = "room") {
+                Spacer(Modifier.fillMaxWidth().height(with(density) { roomPx.toDp() }).testTag("collectionRoom"))
+            }
         }
 
         // Shown once the cover has scrolled away, so it never covers the page's buttons. The top of the list is
@@ -286,16 +296,11 @@ internal fun estimatedMaxScroll(
 internal const val FULL_FADE = 1.1f
 
 /**
- * How far along the cover's fade the page is, as a scroll distance: [scrolled] itself, or on a page too short to
- * scroll [FULL_FADE] covers ([maxScroll], known once its end is in view) stretched so the fade ends with the page
- * (issue #682). A page that can't scroll at all doesn't fade.
+ * The room to add after a page's last row (issue #723) so it can scroll [FULL_FADE] covers: the cover then fades
+ * out as the title comes up under the title bar, as on a long album. [maxScrollPx] is how far its rows alone let it
+ * scroll; a page that scrolls far enough already gets none.
  */
-internal fun fadeScroll(scrolled: Float, coverPx: Float, maxScroll: Float?): Float {
-    val full = coverPx * FULL_FADE
-    if (maxScroll == null || maxScroll >= full) return scrolled
-    if (maxScroll <= 0f) return 0f
-    return (scrolled * full / maxScroll).coerceAtMost(full)
-}
+internal fun roomBelow(maxScrollPx: Float, coverPx: Float): Float = (coverPx * FULL_FADE - maxScrollPx).coerceAtLeast(0f)
 
 /**
  * The title bar over a page tinted with its cover's colour (albums, playlists, books): just a back button over the
@@ -308,7 +313,8 @@ internal fun FadingTitleBar(nav: NavController, title: String, color: Color, bar
             .fillMaxWidth()
             .background(color.copy(alpha = barAlpha))
             .statusBarsPadding()
-            .padding(horizontal = Space.Tight, vertical = Space.Tight),
+            .padding(horizontal = Space.Tight, vertical = Space.Tight)
+            .testTag("fadingTitleBar"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // No shading behind the arrow (issue #228).
