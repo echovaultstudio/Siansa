@@ -196,6 +196,12 @@ class BeatMatchTest {
         assertFalse(quiet.copy(barMs = null).matchableAsIntro)
         assertFalse(quiet.copy(steady = 0.3f).matchableAsIntro)
         assertNotNull(BeatMatch.plan(outro, quiet, 310_000, 16_000))
+        // Not a clash, though: without beat-matching, a drum outro into a quiet build-up keeps the long smart blend.
+        assertFalse(BeatMatch.bothRhythmic(outro, quiet))
+        val next = song.copy(id = "b", albumId = "al2")
+        val plain = Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 310_000, 300_000, profile("a", outro, null, quietTailMs = 6_000), profile("b", null, quiet, headMs = 8_000), beatMatch = false)!!
+        assertEquals(14_000L, plain.overlapMs)
+        assertNotNull(Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 310_000, 300_000, profile("a", outro, null, quietTailMs = 6_000), profile("b", null, quiet, headMs = 8_000), beatMatch = true)!!.beat)
         assertTrue(BeatMatch.note(outro, quiet.copy(barMs = null), true).endsWith("(steady, but its bars aren't clear)"))
         assertTrue(BeatMatch.note(outro, quiet.copy(steady = 0.3f), true).endsWith("isn't beat-driven and steady enough"))
     }

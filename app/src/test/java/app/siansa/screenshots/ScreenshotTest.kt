@@ -42,6 +42,7 @@ import app.siansa.ui.MixShapeControls
 import app.siansa.ui.ProgressCard
 import app.siansa.playback.BeatMatchMode
 import app.siansa.ui.BeatMatchSection
+import app.siansa.ui.CROSSFADE_GAP
 import app.siansa.ui.RuleCard
 import app.siansa.ui.SiansaTheme
 import app.siansa.ui.SourceCardForTest
@@ -241,7 +242,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             },
             // Beat-matched blends with the echo switch (issue #759).
             Scene("crossfade_beat_match") {
-                Column(Modifier.padding(Space.Page)) { BeatMatchSection(BeatMatchMode.DJ_RADIO, echo = true, onMode = {}, onEcho = {}) }
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP)) { BeatMatchSection(BeatMatchMode.DJ_RADIO, echo = true, onMode = {}, onEcho = {}) }
             },
             // Custom card editor: a rule (issue #663).
             Scene("card_rule") {

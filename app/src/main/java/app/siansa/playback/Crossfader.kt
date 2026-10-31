@@ -211,7 +211,8 @@ internal class Crossfader(
         if (until <= ON_TIME_MS) {
             // A primed tail takes over only once it's in step, or a while later anyway (issue #759).
             val t = tail
-            if (primed && t != null && t.isPlaying && until > -Crossfade.HANDOVER_WAIT_MS &&
+            val wait = min(Crossfade.HANDOVER_WAIT_MS, plan?.beat?.outgoing?.beatLengthMs?.toLong() ?: Crossfade.HANDOVER_WAIT_MS)
+            if (primed && t != null && t.isPlaying && until > -wait &&
                 abs(main.currentPosition - t.currentPosition) > Crossfade.HANDOVER_STEP_MS) return ALIGN_MS
             begin()
             return 0
@@ -353,8 +354,10 @@ internal class Crossfader(
                 // The rest of the song moves from the main player to the tail in a short equal-power blend of the
                 // two copies; they play in step, so it's heard as one.
                 val h = (elapsed.toFloat() / HANDOVER_MS).coerceIn(0f, 1f)
-                t.volume = tailBase * sleep * Crossfade.fadeIn(h)
-                level = Crossfade.fadeOut(h)
+                // To where the fade-out already is, when the handover came late (it waited for the tail to be in step).
+                val out = ((t.currentPosition - startAt).toFloat() / planned.overlapMs).coerceIn(0f, 1f)
+                t.volume = tailBase * sleep * Crossfade.fadeIn(h) * Crossfade.fadeOut(out)
+                level = Crossfade.fadeOut(h) * Crossfade.fadeOut(out)
                 onLevel()
                 if (elapsed >= HANDOVER_MS && t.isPlaying) {
                     switched = true
@@ -386,7 +389,7 @@ internal class Crossfader(
                 val tailDone = out >= 1f || t.playbackState == Player.STATE_ENDED || t.playbackState == Player.STATE_IDLE
                 t.volume = if (tailDone) 0f else tailBase * sleep * Crossfade.fadeOut(out)
                 val beat = planned.beat
-                if (beat != null && reverb != null) echo(t, planned, beat, tailDone)
+                if (beat != null && reverb != null) echo(t, planned, beat, tailDone, tailBase * sleep)
                 val heard = if (main.currentMediaItemIndex == incomingIndex) (main.currentPosition - (beat?.incomingStartMs ?: 0L)).coerceAtLeast(0L) else 0L
                 val fadedIn = (heard.toFloat() / planned.fadeInMs).coerceIn(0f, 1f)
                 level = Crossfade.fadeIn(fadedIn)
@@ -418,13 +421,14 @@ internal class Crossfader(
         if (position == seekTarget || main.playbackState != Player.STATE_READY) return
         val reading = beat.error(t.currentPosition, position)
         stepStats.add(reading)
-        seekLead?.let { lead ->
-            // The first real position after a jump says how long getting there took on this phone (issue #747).
-            seekLag = BeatMatch.learnedLag(seekLag, lead, reading)
-            seekLead = null
-        }
         // One reading can be 90 ms off and back the next moment: the middle of the last few decides (issue #759).
         val error = smoothed.add(reading) ?: return
+        seekLead?.let { lead ->
+            // The first settled error after a jump says how long getting there took on this phone (issue #747);
+            // nothing has nudged the song yet, so the readings it's the middle of are of one and the same error.
+            seekLag = BeatMatch.learnedLag(seekLag, lead, error)
+            seekLead = null
+        }
         // A jump is a cut in the sound: only while the new song is still quiet, early in the blend. After that
         // the speed brings it in step, which can't be heard.
         val early = now - switchedAt < JUMP_WINDOW_MS && jumps < MAX_JUMPS
@@ -463,7 +467,7 @@ internal class Crossfader(
      * Sends more of the tail to the hall through its last bar; once the tail is done, pauses it and lets the hall
      * ring for [ECHO_RING_MS] before the fade ends.
      */
-    private fun echo(t: ExoPlayer, planned: FadePlan, beat: BeatMatch.Plan, tailDone: Boolean) {
+    private fun echo(t: ExoPlayer, planned: FadePlan, beat: BeatMatch.Plan, tailDone: Boolean, level: Float) {
         val id = reverb?.id ?: return
         if (tailDone) {
             if (echoUntil == 0L) {
@@ -474,7 +478,8 @@ internal class Crossfader(
         }
         val bar = beat.outgoing.beatLengthMs * BeatMatch.BEATS_PER_BAR
         val left = planned.overlapMs - (t.currentPosition - startAt)
-        val send = (((bar - left) / bar).toFloat().coerceIn(0f, 1f) * ECHO_SEND)
+        // The hall gets the song before its volume (levelling, the sleep timer): [level] goes into the send.
+        val send = ((bar - left) / bar).toFloat().coerceIn(0f, 1f) * ECHO_SEND * level
         if (abs(send - echoSend) >= 0.02f) {
             echoSend = send
             t.setAuxEffectInfo(AuxEffectInfo(id, send))

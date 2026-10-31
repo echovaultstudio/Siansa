@@ -60,7 +60,7 @@ object BeatMatch {
     }
 
     /** Both ends are beat-driven and steady: a blend between them either keeps the beats in step or clashes. */
-    fun bothRhythmic(outgoing: BeatEnd?, incoming: BeatEnd?): Boolean = outgoing?.matchable == true && incoming?.matchableAsIntro == true
+    fun bothRhythmic(outgoing: BeatEnd?, incoming: BeatEnd?): Boolean = outgoing?.matchable == true && incoming?.matchable == true
 
     /**
      * One beat-matched blend: it starts at [startMs] of the song going out and lasts [overlapMs] ([bars] whole
