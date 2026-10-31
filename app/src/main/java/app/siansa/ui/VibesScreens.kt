@@ -110,6 +110,7 @@ fun VibesScreen(nav: NavController) {
                     modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
                 )
             }
+            item { TodaysMixPanel() }
             item { SituationPanel() }
             item { CarouselPanel(nav) }
             error?.let { item { ErrorText(it) } }
@@ -155,6 +156,59 @@ fun VibesScreen(nav: NavController) {
             },
             dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
         )
+    }
+}
+
+/**
+ * Home's Today's mix (issue #776): whether it's made by itself, and its own tuning over the vibe's, in one place.
+ * A chip "Vibe's own" leaves a setting to the vibe that makes the mix.
+ */
+@Composable
+fun TodaysMixPanel() {
+    val graph = LocalGraph.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    val daily = settings.dailyMix
+    val scope = rememberCoroutineScope()
+    fun set(next: app.siansa.data.DailyMix) = graph.settings.setDailyMix(next)
+    // A tuning change with Auto update on remakes the mix (issue #776), in the app's scope so leaving the page
+    // doesn't cancel it; the tile on Home shows the new one.
+    fun tune(next: app.siansa.data.DailyMix) {
+        set(next)
+        if (next.autoUpdate && settings.audioMuseReady) graph.scope.launch { runCatching { graph.generator.ensureCurrent(force = true) } }
+    }
+    Card(Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Small).testTag("todaysMix")) {
+        Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+            Text("Today's mix", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                "The mix at the top of Home, made by the vibe for the hour. Settings here apply to it whichever vibe makes it; " +
+                    "\"Vibe's own\" keeps what that vibe says.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            SwitchRow("Auto update", daily.autoUpdate) { set(daily.copy(autoUpdate = it)) }
+            Hint(
+                if (daily.autoUpdate) "The mix follows the time of day: a new one is made as the day or the hour's vibe moves on, and when a setting here changes."
+                else "The mix you last made with ↻ stays, whatever the day or the hour, until you press ↻ again.",
+            )
+            TuningRow("Songs", daily.length, app.siansa.data.DailyMix.LENGTHS, { "$it" }, "dailyLength") { tune(daily.copy(length = it)) }
+            TuningRow("Surprise", daily.surprise, listOf(0, 15, 30, 50, 70), { "$it %" }, "dailySurprise") { tune(daily.copy(surprise = it)) }
+            Hint("How much of the mix comes from outside your usual artists and sound.")
+            TuningRow("Leave out most played", daily.leaveOutTopPlayed, app.siansa.data.DailyMix.LEAVE_OUT, { if (it == 0) "None" else "Top $it" }, "dailyLeaveOut") { tune(daily.copy(leaveOutTopPlayed = it)) }
+            TuningRow("Days before a repeat", daily.repeatDays, app.siansa.data.DailyMix.REPEAT_DAYS, { if (it == 0) "Any" else "$it" }, "dailyRepeat") { tune(daily.copy(repeatDays = it)) }
+        }
+    }
+}
+
+/** A tuning of Today's mix: "Vibe's own" (null) or one of [choices], as chips. */
+@Composable
+internal fun TuningRow(label: String, value: Int?, choices: List<Int>, text: (Int) -> String, tag: String, onPick: (Int?) -> Unit) {
+    Text(label, style = MaterialTheme.typography.bodyLarge)
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()).testTag(tag),
+        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+    ) {
+        FilterChip(selected = value == null, onClick = { onPick(null) }, label = { Text("Vibe's own") })
+        choices.forEach { c -> FilterChip(selected = value == c, onClick = { onPick(c) }, label = { Text(text(c)) }) }
     }
 }
 

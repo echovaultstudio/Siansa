@@ -61,6 +61,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -143,7 +144,8 @@ fun HomeScreen(nav: NavController) {
                     else -> graph.generator.ensureToday()
                 }
                 if (selector == null || selector.id == current?.selectorId) current = mix
-                if (mix == null) error = "No vibe covers this hour. Add one in Settings, under Vibes."
+                // Auto update off (issue #776): no mix yet isn't an error; the tile offers to make one.
+                if (mix == null && (force || graph.settings.current.dailyMix.autoUpdate)) error = "No vibe covers this hour. Add one in Settings, under Vibes."
                 if (open && mix != null) nav.navigate("mix/${mix.id}")
                 if (open && mix == null) launch.notify(error!!)
             } catch (e: CancellationException) {
@@ -350,6 +352,8 @@ fun HomeScreen(nav: NavController) {
                             )
                             busySelector == "current" -> BuildingCard()
                             aiDown != null -> AiUnavailable(aiDown, Modifier.padding(horizontal = Space.Page, vertical = Space.Small))
+                            // Auto update off (issue #776): a tile that makes the mix when you ask.
+                            !homeSettings.dailyMix.autoUpdate && aiMixes && error == null -> MakeTodayCard(onMake = { build(null, force = true, open = false) })
                             else -> Unit
                         }
                     }
@@ -748,6 +752,21 @@ private fun HeroMix(
                     Icon(if (card.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (card.playing) "Pause" else "Play", Modifier.size(30.dp))
                 }
             }
+        }
+    }
+}
+
+/** Today's mix with Auto update off (issue #776): nothing is made until you ask. */
+@Composable
+internal fun MakeTodayCard(onMake: () -> Unit) {
+    Card(Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Small).testTag("makeToday")) {
+        Row(Modifier.padding(Space.Page), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Today's mix", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("None made yet. Auto update is off in Daily Vibe settings, so it's made when you ask.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.width(Space.Page))
+            FilledTonalButton(onClick = onMake) { Text("Make it") }
         }
     }
 }

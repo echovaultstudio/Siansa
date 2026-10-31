@@ -99,32 +99,39 @@ fun CrossfadeScreen(nav: NavController) {
             }
             LevellingNow(settings)
             HorizontalDivider()
-            Heading("Levelling")
-            ReplayGainRow(settings.replayGain) { graph.settings.save(graph.settings.current.copy(replayGain = it)) }
-            Hint("Evens out loudness. Track: every song at the same level. Album: an album's loud and quiet songs keep their difference. Off: songs play as they are.")
-            // The target applies to ReplayGain tags too (issue #667), so it's there whenever levelling is on.
-            if (settings.replayGain != ReplayGainMode.OFF) {
-                LoudnessTargetRow(settings.loudnessTarget) { graph.settings.setLoudness(target = it) }
-                Hint("How loud songs are brought to, by the plugin's measurement or by ReplayGain tags. −18 is ReplayGain's own level and leaves room for loud songs. −14 is louder, like Spotify, but quiet songs can't be raised to it.")
-            }
-            Hint(levellingHint(settings))
-            HorizontalDivider()
-            Heading("Crossfade")
-            CrossfadeModeRow(settings.crossfade) { graph.settings.setCrossfade(mode = it) }
-            Hint(crossfadeHint(settings))
-            if (settings.crossfade != CrossfadeMode.OFF) {
-                CrossfadeLengthRow(settings.crossfadeSeconds, smart = settings.crossfade == CrossfadeMode.SMART) {
-                    graph.settings.setCrossfade(seconds = it)
+            // The sections below fold (issue #776): their heading and what's set show; tap to open.
+            val levellingSummary = if (settings.replayGain == ReplayGainMode.OFF) "Off" else "${settings.replayGain.label} · −${-settings.loudnessTarget} LUFS"
+            FoldSection("Levelling", levellingSummary) {
+                ReplayGainRow(settings.replayGain) { graph.settings.save(graph.settings.current.copy(replayGain = it)) }
+                Hint("Evens out loudness. Track: every song at the same level. Album: an album's loud and quiet songs keep their difference. Off: songs play as they are.")
+                // The target applies to ReplayGain tags too (issue #667), so it's there whenever levelling is on.
+                if (settings.replayGain != ReplayGainMode.OFF) {
+                    LoudnessTargetRow(settings.loudnessTarget) { graph.settings.setLoudness(target = it) }
+                    Hint("How loud songs are brought to, by the plugin's measurement or by ReplayGain tags. −18 is ReplayGain's own level and leaves room for loud songs. −14 is louder, like Spotify, but quiet songs can't be raised to it.")
                 }
-                Hint("Only on this phone: on a TV or speaker, songs play back to back. Not used with Repeat one, or while the sleep timer lets a song finish.")
+                Hint(levellingHint(settings))
+            }
+            HorizontalDivider()
+            val crossfadeSummary = if (settings.crossfade == CrossfadeMode.OFF) "Off" else "${settings.crossfade.label} · ${settings.crossfadeSeconds} s"
+            FoldSection("Crossfade", crossfadeSummary) {
+                CrossfadeModeRow(settings.crossfade) { graph.settings.setCrossfade(mode = it) }
+                Hint(crossfadeHint(settings))
+                if (settings.crossfade != CrossfadeMode.OFF) {
+                    CrossfadeLengthRow(settings.crossfadeSeconds, smart = settings.crossfade == CrossfadeMode.SMART) {
+                        graph.settings.setCrossfade(seconds = it)
+                    }
+                    Hint("Only on this phone: on a TV or speaker, songs play back to back. Not used with Repeat one, or while the sleep timer lets a song finish.")
+                }
             }
             if (settings.crossfade == CrossfadeMode.SMART && settings.loudnessSource == LoudnessSource.PLUGIN) {
                 HorizontalDivider()
-                Heading("Beat-matched blends (experimental)")
-                BeatMatchSection(
-                    settings.beatMatch, settings.blendBars, settings.echoTail,
-                    graph.settings::setBeatMatch, graph.settings::setBlendBars, graph.settings::setEchoTail,
-                )
+                val blendSummary = if (settings.beatMatch == BeatMatchMode.OFF) "Off" else "${settings.beatMatch.label} · ${settings.blendBars} bars" + if (settings.echoTail) " · echo" else ""
+                FoldSection("Beat-matched blends (experimental)", blendSummary, tag = "beat-matched-blends") {
+                    BeatMatchSection(
+                        settings.beatMatch, settings.blendBars, settings.echoTail,
+                        graph.settings::setBeatMatch, graph.settings::setBlendBars, graph.settings::setEchoTail,
+                    )
+                }
             }
         }
     }

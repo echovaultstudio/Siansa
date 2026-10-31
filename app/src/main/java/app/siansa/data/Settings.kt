@@ -41,6 +41,48 @@ const val DEFAULT_THEME_SELECTION = "AMBER"
  */
 internal fun defaultSelectionFor(savedColours: String?): String = if (savedColours == null) DEFAULT_THEME_SELECTION else "THEME"
 
+/**
+ * Home's Today's mix (issue #776). It's built from the vibe covering the hour (Daily Vibe settings), and each
+ * vibe has its own length, surprise and so on; a setting here that isn't null replaces the vibe's for Today's mix
+ * only, so one place tunes the mix you see first, whatever vibe made it. [autoUpdate] off: the mix is made or
+ * remade only when you ask (↻ on its tile), never by itself when the app opens or in the background.
+ */
+data class DailyMix(
+    val autoUpdate: Boolean = true,
+    /** Songs in the mix, or null for the vibe's own. */
+    val length: Int? = null,
+    /** Share from outside your usual sound, percent, or null for the vibe's own. */
+    val surprise: Int? = null,
+    /** Your this many most played songs stay out, or null for the vibe's own. */
+    val leaveOutTopPlayed: Int? = null,
+    /** Days before a song may come back, or null for the vibe's own. */
+    val repeatDays: Int? = null,
+) {
+    fun clean(): DailyMix = copy(
+        length = length?.coerceIn(LENGTHS.first(), LENGTHS.last()),
+        surprise = surprise?.coerceIn(0, 100),
+        leaveOutTopPlayed = leaveOutTopPlayed?.coerceIn(0, 80),
+        repeatDays = repeatDays?.coerceIn(0, 30),
+    )
+
+    /** [vibe] with this mix's tuning over it, for Today's mix. */
+    fun applyTo(vibe: Selector): Selector = vibe.copy(
+        length = length ?: vibe.length,
+        surprise = surprise ?: vibe.surprise,
+        leaveOutTopPlayed = leaveOutTopPlayed ?: vibe.leaveOutTopPlayed,
+        repeatDays = repeatDays ?: vibe.repeatDays,
+    )
+
+    /** Whether any tuning replaces the vibe's own. */
+    val tuned: Boolean get() = length != null || surprise != null || leaveOutTopPlayed != null || repeatDays != null
+
+    companion object {
+        val LENGTHS = listOf(20, 30, 40, 60, 80)
+        val LEAVE_OUT = listOf(0, 20, 50, 80)
+        val REPEAT_DAYS = listOf(0, 1, 3, 7, 14)
+    }
+}
+
 data class AppSettings(
     /** Where the music comes from (issue #113); the server fields below are its address and login. */
     val sourceKind: SourceKind = SourceKind.OPENSUBSONIC,
@@ -166,6 +208,8 @@ data class AppSettings(
     val mixShape: MixShape = MixShape.STEADY,
     /** How far a DJ mix may stray from the last song, 0 (close neighbours only) to 100 (adventurous). */
     val mixSurprise: Int = DEFAULT_MIX_SURPRISE,
+    /** Home's Today's mix (issue #776): whether it's made by itself, and tuning over the vibe's own. */
+    val dailyMix: DailyMix = DailyMix(),
 ) {
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
@@ -399,6 +443,13 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .takeIf { it in AppSettings.BLEND_BAR_CHOICES } ?: AppSettings.DEFAULT_BLEND_BARS,
         mixShape = MixShape.parse(prefs.getString("mix_shape", null)),
         mixSurprise = prefs.getInt("mix_surprise", AppSettings.DEFAULT_MIX_SURPRISE).coerceIn(0, 100),
+        dailyMix = DailyMix(
+            autoUpdate = prefs.getBoolean("daily_auto", true),
+            length = prefs.getInt("daily_length", -1).takeIf { it > 0 },
+            surprise = prefs.getInt("daily_surprise", -1).takeIf { it >= 0 },
+            leaveOutTopPlayed = prefs.getInt("daily_leave_out", -1).takeIf { it >= 0 },
+            repeatDays = prefs.getInt("daily_repeat_days", -1).takeIf { it >= 0 },
+        ),
     )
 
     /**
@@ -663,6 +714,19 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     }
 
     /** The shape and surprise of a DJ mix (issue #649). */
+    /** Today's mix's own settings (issue #776). */
+    fun setDailyMix(daily: DailyMix) {
+        val d = daily.clean()
+        prefs.edit()
+            .putBoolean("daily_auto", d.autoUpdate)
+            .putInt("daily_length", d.length ?: -1)
+            .putInt("daily_surprise", d.surprise ?: -1)
+            .putInt("daily_leave_out", d.leaveOutTopPlayed ?: -1)
+            .putInt("daily_repeat_days", d.repeatDays ?: -1)
+            .apply()
+        _state.value = _state.value.copy(dailyMix = d)
+    }
+
     fun setMixShape(shape: MixShape = _state.value.mixShape, surprise: Int = _state.value.mixSurprise) {
         val s = surprise.coerceIn(0, 100)
         prefs.edit().putString("mix_shape", shape.name).putInt("mix_surprise", s).apply()

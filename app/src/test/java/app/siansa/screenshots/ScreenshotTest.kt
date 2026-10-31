@@ -43,6 +43,10 @@ import app.siansa.ui.MixShapeControls
 import app.siansa.ui.ProgressCard
 import app.siansa.playback.BeatMatchMode
 import app.siansa.ui.BeatMatchSection
+import app.siansa.ui.FoldSection
+import app.siansa.ui.SwitchRow
+import app.siansa.ui.TuningRow
+import app.siansa.data.DailyMix
 import app.siansa.ui.CROSSFADE_GAP
 import app.siansa.ui.RuleCard
 import app.siansa.ui.SiansaTheme
@@ -261,6 +265,19 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             // Beat-matched blends with the echo switch (issue #759).
             Scene("crossfade_beat_match") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP)) { BeatMatchSection(BeatMatchMode.DJ_RADIO, bars = 8, echo = true, onMode = {}, onBars = {}, onEcho = {}) }
+            },
+            // Today's mix settings (issue #776): the switch and tuning chips, and a folded settings section with its
+            // summary, then one opened (the arrow turned).
+            Scene("todays_mix_settings") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    SwitchRow("Auto update", true) {}
+                    TuningRow("Songs", 40, DailyMix.LENGTHS, { "$it" }, "dailyLength") {}
+                    TuningRow("Leave out most played", null, DailyMix.LEAVE_OUT, { if (it == 0) "None" else "Top $it" }, "dailyLeaveOut") {}
+                    FoldSection("Streaming quality", "Wi-Fi Original · mobile Opus 128", tag = "quality") { Text("Body") }
+                    FoldSection("Beat-matched blends (experimental)", "DJ radio · 16 bars · echo", tag = "blends", startOpen = true) {
+                        Text("Incomprehensibilities of the uncharacteristically long settings body")
+                    }
+                }
             },
             // Custom card editor: a rule (issue #663).
             Scene("card_rule") {

@@ -75,15 +75,31 @@ class MixGenerator(private val graph: AppGraph) {
         val today = LocalDate.now().toString()
         val vibes = graph.selectors.all()
         val current = currentSelector()
-        MixRules.todaysMix(graph.mixes.all(), today, current?.id, vibes.map { it.id }.toSet())?.let { return it }
-        AppLog.i("Mix", "No mix yet today: making the first, for ${current?.name ?: "no vibe"}")
-        return current?.let { ensure(it, force = false) }
+        val auto = graph.settings.current.dailyMix.autoUpdate
+        MixRules.todaysMixBy(auto, graph.mixes.all(), today, current?.id, vibes.map { it.id }.toSet())?.let { return it }
+        // Auto update off (issue #776): the mix is made only when asked, by ↻ (ensureCurrent with force).
+        if (!auto) {
+            AppLog.i("Mix", "No mix made yet, and Today's mix doesn't update by itself: waiting for ↻")
+            return null
+        }
+        AppLog.i("Mix", "No mix for this hour's vibe yet today: making one for ${current?.name ?: "no vibe"}")
+        return current?.let { ensure(todaysTuning(it), force = false) }
     }
 
     /** Today's mix for the selector covering this hour, built if it doesn't exist yet. */
     suspend fun ensureCurrent(force: Boolean = false): Mix? {
         val selector = currentSelector() ?: return null
-        return ensure(selector, force)
+        return ensure(todaysTuning(selector), force)
+    }
+
+    /** [vibe] with Today's mix's own tuning over it (issue #776), logged when it changes anything. */
+    private fun todaysTuning(vibe: Selector): Selector {
+        val daily = graph.settings.current.dailyMix
+        if (!daily.tuned) return vibe
+        val tuned = daily.applyTo(vibe)
+        AppLog.i("Mix", "Today's mix tuned over ${vibe.name}: ${tuned.length} songs, ${tuned.surprise} % surprise, " +
+            "leaving out ${tuned.leaveOutTopPlayed} most played, ${tuned.repeatDays} days before a repeat")
+        return tuned
     }
 
     suspend fun ensure(selector: Selector, force: Boolean): Mix = mutex.withLock {

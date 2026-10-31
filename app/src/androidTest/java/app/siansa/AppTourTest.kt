@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.performTouchInput
@@ -409,6 +410,9 @@ class AppTourTest {
                     idle(1000)
                     shot("19j-crossfade")
                     // Issue #214: levelling (ReplayGain) lives here now, with what levels the song playing now.
+                    // Its section folds (issue #776): open it first.
+                    compose.onNodeWithTag("section-levelling-header").performClick()
+                    idle(600)
                     if (compose.onAllNodesWithText("Album").fetchSemanticsNodes().isEmpty()) problems += "Levelling chips missing on Crossfade and levelling"
                     val now = compose.onAllNodesWithTag("levelling-now", useUnmergedTree = true).fetchSemanticsNodes()
                     if (now.isEmpty()) problems += "No 'levelled by' line on Crossfade and levelling"
