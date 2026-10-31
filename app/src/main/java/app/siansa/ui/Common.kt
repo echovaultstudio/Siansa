@@ -774,14 +774,13 @@ fun GradientTile(
                     RoundedCornerShape(6.dp),
                 )
             }
-            Text(
+            // Whole words only (issue #697): "Melancholy" shrinks a little rather than breaking.
+            WholeWordsText(
                 title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
                 color = Color.White,
                 maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.align(Alignment.TopStart).padding(Space.Medium),
+                modifier = Modifier.align(Alignment.TopStart).padding(Space.Medium).testTag("gradientTileTitle"),
             )
             if (busy) {
                 CircularProgressIndicator(
