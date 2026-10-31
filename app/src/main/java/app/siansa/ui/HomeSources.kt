@@ -312,7 +312,11 @@ internal fun SourceCard(
                     OutlinedButton(onClick = onSync, enabled = !syncing && canSync) { Text(if (syncing) "Syncing" else "Sync") }
                 }
             }
-            progress?.let { it() }
+            progress?.let {
+                it()
+                // Room under the line when nothing follows it (with libraries, their gap below does it).
+                if (libraries.isEmpty()) Spacer(Modifier.height(Space.Small))
+            }
             if (libraries.isNotEmpty()) {
                 Spacer(Modifier.height(SOURCE_CARD_GAP))
                 FlowRow(
@@ -489,7 +493,7 @@ internal fun inUseStatus(syncing: Boolean, status: LibraryStatus?, now: Long = S
 internal fun SyncStrip(text: String, running: Boolean, fraction: Float?, done: Boolean, failed: Boolean) {
     Column(
         // Lined up under the source's name, past the eye.
-        Modifier.fillMaxWidth().padding(start = SOURCE_ICON, end = Space.Tight, bottom = Space.Small).testTag("source-sync-progress"),
+        Modifier.fillMaxWidth().padding(start = SOURCE_ICON, end = Space.Tight).testTag("source-sync-progress"),
         verticalArrangement = Arrangement.spacedBy(Space.Tight),
     ) {
         if (running) {

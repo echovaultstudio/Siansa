@@ -68,7 +68,12 @@ class SpacingHomeTest : SpacingCheck() {
         compose.onNodeWithText("Melancholy", useUnmergedTree = true)
             .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
         val layout = layouts.single()
-        assertTrue("\"Melancholy\" broke over ${layout.lineCount} lines", layout.lineCount == 1 && !layout.hasVisualOverflow)
+        val box = compose.onNodeWithTag("gradientTileTitle", useUnmergedTree = true).getBoundsInRoot()
+        // What was measured, so a failure says why (issue #738).
+        val sizes = "lines=${layout.lineCount}, text ${layout.multiParagraph.width}x${layout.multiParagraph.height} px in " +
+            "${layout.layoutInput.constraints.maxWidth}x${layout.layoutInput.constraints.maxHeight} px, font ${layout.layoutInput.style.fontSize}, " +
+            "box ${box.right - box.left} wide, cut: width=${layout.didOverflowWidth} height=${layout.didOverflowHeight}"
+        assertTrue("\"Melancholy\" doesn't fit on one line: $sizes", layout.lineCount == 1 && !layout.hasVisualOverflow)
     }
 
     /** Home: the one settings button sits centred on the greeting's line (issue #152). */

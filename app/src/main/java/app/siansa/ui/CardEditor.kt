@@ -1,6 +1,7 @@
 package app.siansa.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -233,10 +235,14 @@ private fun NumberField(label: String, value: String, modifier: Modifier = Modif
 @Composable
 internal fun RuleCard(rule: CardRule, suggestions: List<String>, onChange: (CardRule) -> Unit, onRemove: () -> Unit, modifier: Modifier = Modifier) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(12.dp), modifier = modifier.fillMaxWidth()) {
-        Column(Modifier.padding(start = Space.Medium, end = Space.Tight, bottom = Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+        Column(Modifier.padding(start = Space.Medium, end = Space.Tight, top = Space.Medium, bottom = Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(rule.field.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).testTag("ruleName"))
-                IconButton(onClick = onRemove) { Icon(Icons.Rounded.Close, "Remove the rule") }
+                // The close button keeps its 48 dp to tap but takes only its icon's height in the line: the chips sit as
+                // far below the name as the value sits below them (issue #738).
+                Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                    IconButton(onClick = onRemove, modifier = Modifier.requiredSize(48.dp)) { Icon(Icons.Rounded.Close, "Remove the rule") }
+                }
             }
             Column(Modifier.padding(end = Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
