@@ -32,8 +32,10 @@ import app.siansa.mix.CardRule
 import app.siansa.mix.MixShape
 import app.siansa.mix.RuleField
 import app.siansa.mix.RuleOp
+import app.siansa.playback.dlna.DlnaDevice
 import app.siansa.ui.ArrangeList
 import app.siansa.ui.BottomTabs
+import app.siansa.ui.DlnaSettingsContent
 import app.siansa.ui.GradientTile
 import app.siansa.ui.HomeItem
 import app.siansa.ui.HomeLookRow
@@ -192,6 +194,14 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             Scene("sync_card_done") {
                 Column(Modifier.padding(Space.Page)) {
                     ProgressCard(SyncProgress(phase = SyncPhase.DONE, artists = 1195, albums = 2455, songs = 43194, changedAlbums = 12))
+                }
+            },
+            // A speaker's settings behind the cog in Play on (beta testers #23; "Speaker plays the queue" left in #721).
+            Scene("cast_speaker_settings") {
+                Column(Modifier.padding(Space.Section)) {
+                    DlnaSettingsContent(
+                        DlnaDevice("uuid:jbl", "JBL BAR 800MK2", null, "http://speaker/transport", null, formats = setOf("audio/mpeg", "audio/flac", "audio/wav")),
+                    )
                 }
             },
             // Custom card editor: a rule (issue #663).

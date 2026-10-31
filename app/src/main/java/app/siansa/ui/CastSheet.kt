@@ -260,71 +260,50 @@ private fun CastSheet(onDismiss: () -> Unit) {
     settingsOf?.let { device -> DlnaDeviceSettings(device) { settingsOf = null } }
 }
 
-/** The speaker plays the coming songs through itself, on LinkPlay speakers (issue #691). Experimental. */
-@Composable
-internal fun SpeakerQueueSwitch(device: DlnaDevice) {
-    val queued by Dlna.speakerQueue.collectAsStateWithLifecycle()
-    val on = device.id in queued
-    Column(verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-        Row(
-            Modifier.fillMaxWidth().clickable { Dlna.setSpeakerQueue(device, !on) }.testTag("dlnaSpeakerQueue"),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Space.Medium),
-        ) {
-            Text("Speaker plays the queue (experimental)", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            Switch(checked = on, onCheckedChange = { Dlna.setSpeakerQueue(device, it) })
-        }
-        Text(
-            "Hands it the next few songs, so it goes straight on to the next one instead of waiting for this phone. " +
-                "For speakers that can't take the next song ahead. Starts the next time you play on it.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
 /**
  * A DLNA TV or speaker's settings (the cog beside it, beta testers #23): whether it gets the original file
  * (FLAC, WAV…) instead of MP3 320, for the formats it says it plays. Lossless, and no encoder gap between songs.
  */
 @Composable
 private fun DlnaDeviceSettings(device: DlnaDevice, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(device.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        text = { DlnaSettingsContent(device) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+    )
+}
+
+/** What a DLNA TV or speaker's settings show, in their own function so the screenshot tests can draw them. */
+@Composable
+internal fun DlnaSettingsContent(device: DlnaDevice) {
     val original by Dlna.original.collectAsStateWithLifecycle()
     val possible = DlnaFormats.playsMoreThanMp3(device.formats)
     val on = device.id in original && possible
     val names = DlnaFormats.names(device.formats)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(device.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                Row(
-                    Modifier.fillMaxWidth().clickable(enabled = possible) { Dlna.setOriginal(device, !on) }.testTag("dlnaOriginal"),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Space.Medium),
-                ) {
-                    Text("Send the original file", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    Switch(checked = on, enabled = possible, onCheckedChange = { Dlna.setOriginal(device, it) })
-                }
-                Text(
-                    if (possible) {
-                        "Plays your music as it is (for example FLAC) instead of MP3 320, when it can play that format. " +
-                            "Better sound, and songs follow without even a tiny gap. Uses more Wi-Fi. Changes from the next song."
-                    } else {
-                        "It didn't say it plays anything but MP3, so it gets MP3 320."
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (names.isNotEmpty()) {
-                    Text("It plays: ${names.joinToString(", ")}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                // LinkPlay speakers (JBL Bar, WiiM…) can play the coming songs through by themselves (issue #691).
-                if (device.queueUrl != null) SpeakerQueueSwitch(device)
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
-    )
+    Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+        Row(
+            Modifier.fillMaxWidth().clickable(enabled = possible) { Dlna.setOriginal(device, !on) }.testTag("dlnaOriginal"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Space.Medium),
+        ) {
+            Text("Send the original file", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Switch(checked = on, enabled = possible, onCheckedChange = { Dlna.setOriginal(device, it) })
+        }
+        Text(
+            if (possible) {
+                "Plays your music as it is (for example FLAC) instead of MP3 320, when it can play that format. " +
+                    "Better sound, and songs follow without even a tiny gap. Uses more Wi-Fi. Changes from the next song."
+            } else {
+                "It didn't say it plays anything but MP3, so it gets MP3 320."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (names.isNotEmpty()) {
+            Text("It plays: ${names.joinToString(", ")}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }
 
 @Composable

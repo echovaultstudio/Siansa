@@ -60,29 +60,12 @@ object Dlna {
      */
     val original: StateFlow<Set<String>> = _original.asStateFlow()
 
-    private val _speakerQueue = MutableStateFlow<Set<String>>(emptySet())
-    /**
-     * The speakers (by id) that are handed the coming songs and play them through by themselves, with LinkPlay's queue
-     * (issue #691). Experimental, so it's turned on per speaker with the cog.
-     */
-    val speakerQueue: StateFlow<Set<String>> = _speakerQueue.asStateFlow()
-
     /** Reads the devices' settings kept on the phone; called when the device list opens. */
     fun load(context: Context) {
         if (prefs != null) return
         val p = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         prefs = p
         _original.value = p.getStringSet(ORIGINAL, emptySet()).orEmpty().toSet()
-        _speakerQueue.value = p.getStringSet(SPEAKER_QUEUE, emptySet()).orEmpty().toSet()
-    }
-
-    /** Turns the speaker's own queue on or off for [device]; it applies the next time music moves to it. */
-    fun setSpeakerQueue(device: DlnaDevice, on: Boolean) {
-        val now = if (on) _speakerQueue.value + device.id else _speakerQueue.value - device.id
-        if (now == _speakerQueue.value) return
-        _speakerQueue.value = now
-        prefs?.edit()?.putStringSet(SPEAKER_QUEUE, now)?.apply()
-        AppLog.i("DLNA", "${device.name}: " + if (on) "plays the queue itself (LinkPlay)" else "gets one song at a time")
     }
 
     /** Turns sending the original file on or off for [device]; it applies from the next song. */
@@ -222,13 +205,8 @@ object Dlna {
                 .onFailure { AppLog.d("DLNA", "${device.name} didn't say which formats it plays: ${it.message}") }
                 .getOrNull()?.takeIf { it.isNotEmpty() }
         }
-        // LinkPlay's own queue, for playing songs through without gaps (issue #691).
-        if (device.queueUrl != null && withQueue.add(device.id)) AppLog.i("DLNA", "${device.name} has LinkPlay's queue")
         device.copy(formats = formats)
     }
-
-    /** Speakers whose LinkPlay queue was logged, so each shows once. */
-    private val withQueue = java.util.Collections.synchronizedSet(HashSet<String>())
 
     /**
      * The type of a song's original file (e.g. audio/flac), asked once per song: from the file type the song came
@@ -253,7 +231,6 @@ object Dlna {
     private const val PREFS = "dlna"
     private const val KNOWN = "known_locations"
     private const val ORIGINAL = "original_files"
-    private const val SPEAKER_QUEUE = "speaker_queue"
     /** How long devices may wait before answering (SSDP's MX; 1 is the least it allows). */
     private const val SEARCH_WAIT_S = 1
     /** How long one search listens for answers. */
