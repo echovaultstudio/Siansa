@@ -161,6 +161,20 @@ class SpacingTest {
         assertEven("Sync line starts under the name", tick.left - name.left, 0.dp)
         assertTrue("The line sits above the libraries", line.bottom <= chip.top)
         assertEven("Libraries below the sync line", chip.top - strip.bottom, app.siansa.ui.SOURCE_CARD_GAP)
+    /** Arrange Home (issue #694): the spacing step's name stays on one line, even "Compact", with a larger font. */
+    @Test fun homeSpacingLabelIsOneLine() {
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(androidx.compose.ui.platform.LocalDensity.current.density, fontScale = 1.3f),
+            ) {
+                SiansaTheme { Box(Modifier.width(360.dp)) { app.siansa.ui.SpacingRow(gap = 1) { } } }
+            }
+        }
+        val label = compose.onNodeWithTag("homeSpacingLabel").getBoundsInRoot()
+        val title = compose.onNodeWithText("Spacing").getBoundsInRoot()
+        // "Spacing" is one line of a larger style: the label is no taller.
+        assertTrue("\"Compact\" wraps: ${label.bottom - label.top} tall", label.bottom - label.top <= title.bottom - title.top)
+        assertEven("Spacing label centred on the title's line", (label.top + label.bottom) / 2, (title.top + title.bottom) / 2)
     }
 
     /** Home: the one settings button sits centred on the greeting's line (issue #152). */

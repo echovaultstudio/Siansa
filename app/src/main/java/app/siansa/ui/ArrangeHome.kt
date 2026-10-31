@@ -276,7 +276,15 @@ private fun HomeLookDialog(section: HomeSection, current: HomeLook, onPick: (Hom
  * every gap on Home grows or shrinks together.
  */
 @Composable
-private fun SpacingRow(gap: Int, onChange: (Int) -> Unit) {
+internal fun SpacingRow(gap: Int, onChange: (Int) -> Unit) {
+    // As wide as the longest step's name at the phone's font size, on one line (issue #694), so the slider keeps
+    // its length as the name changes.
+    val style = MaterialTheme.typography.bodyMedium
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val labelWidth = androidx.compose.runtime.remember(style, density) {
+        with(density) { HOME_GAP_LABELS.maxOf { measurer.measure(it, style, maxLines = 1, softWrap = false).size.width }.toDp() }
+    }
     Row(Modifier.fillMaxWidth().padding(horizontal = Space.Page).testTag("homeSpacing"), verticalAlignment = Alignment.CenterVertically) {
         Text("Spacing", style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.width(Space.Page))
@@ -289,7 +297,14 @@ private fun SpacingRow(gap: Int, onChange: (Int) -> Unit) {
             modifier = Modifier.weight(1f).testTag("homeSpacingSlider"),
         )
         Spacer(Modifier.width(Space.Page))
-        Text(homeGapLabel(gap), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(56.dp))
+        Text(
+            homeGapLabel(gap),
+            style = style,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.width(labelWidth).testTag("homeSpacingLabel"),
+        )
     }
 }
 
