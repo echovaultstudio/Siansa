@@ -75,7 +75,7 @@ private fun ReportPage(nav: NavController, rangeId: String) {
     // Another range shows the loading circle straight away, not the last report (like the time machine).
     val report by loadStateFresh(range) { graph.insights.report(range) }
 
-    Box(Modifier.fillMaxSize().background(Brand.Plum)) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item {
                 val r = report.valueOrNull()
@@ -133,8 +133,8 @@ internal fun ReportBody(r: ListeningReport, nav: NavController, songs: (@Composa
             StatTile(n.format(r.plays), "plays", null, Modifier.weight(1f).fillMaxHeight(), Brand.VioletDeep)
         }
         Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-            StatTile(n.format(r.artistCount), "artists", r.newArtists?.let { "$it new to you" }, Modifier.weight(1f).fillMaxHeight(), Brand.PlumHigh)
-            StatTile(n.format(r.trackCount), "different songs", null, Modifier.weight(1f).fillMaxHeight(), Brand.PlumHigh)
+            StatTile(n.format(r.artistCount), "artists", r.newArtists?.let { "$it new to you" }, Modifier.weight(1f).fillMaxHeight(), MaterialTheme.colorScheme.surfaceContainerHighest)
+            StatTile(n.format(r.trackCount), "different songs", null, Modifier.weight(1f).fillMaxHeight(), MaterialTheme.colorScheme.surfaceContainerHighest)
         }
     }
 

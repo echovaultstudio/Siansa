@@ -78,7 +78,7 @@ private fun FingerprintPage(nav: NavController) {
     }
     val list = songs.valueOrNull().orEmpty()
 
-    Box(Modifier.fillMaxSize().background(Brand.Plum)) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         LazyColumn(Modifier.fillMaxSize().testTag("fingerprint"), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item {
                 ListeningHeader(nav, "Your sonic fingerprint", "What the music you play most sounds like. Made once a day.") {
