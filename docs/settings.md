@@ -48,6 +48,8 @@ See [Playback](playback.md) and [Discovery](discovery.md).
   playing pages keep their colours from the cover.
 - **Now playing**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in.
 - **Mini player** and **bottom bar**: hold a row and drag it to reorder; tap the eye to show or hide it.
+- **Phone's top bar** (the clock and battery): **See-through** (the app shows behind it), **Black**, or **Hidden** for
+  full screen. When it's hidden, swipe down from the top of the screen to see it for a moment; on phones with a camera hole at the top, pages stay just below it.
 
 ## Scrobbling
 

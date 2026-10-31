@@ -298,6 +298,17 @@ class SpacingTest {
         assertTrue("\"Surprises\" wraps: $labelHeight tall", labelHeight < (value.bottom - value.top) * 1.6f)
         val slider = compose.onNodeWithTag("mixSurprise").getBoundsInRoot()
         assertEven("Surprise label and slider centres", (label.top + label.bottom) / 2, (slider.top + slider.bottom) / 2)
+    /** Style › Phone's top bar (issue #681): its chips sit evenly between the heading and the hint. */
+    @Test fun topBarChipsAreEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.TopBarChoice(app.siansa.data.TopBarStyle.BLACK) { }
+            }
+        }
+        val title = compose.onNodeWithText("Phone's top bar").getBoundsInRoot()
+        val chips = compose.onNodeWithTag("topBar-HIDDEN").getBoundsInRoot()
+        val hint = compose.onNodeWithText(app.siansa.data.TopBarStyle.BLACK.hint).getBoundsInRoot()
+        assertEven("Top bar chips", chips.top - title.bottom, hint.top - chips.bottom)
     }
 
     /** Crossfade and levelling: the Off / Track / Album chips sit evenly between their heading and hint (issue #214). */
