@@ -3,6 +3,15 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.44.2beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.44.2beta) — 2026-10-31
+
+- [#743](https://github.com/echovaultstudio/Siansa/pull/743) Showcase screenshots: the app on the emulator with a made-up library (@Th3K1ngP1n)
+- [#746](https://github.com/echovaultstudio/Siansa/pull/746) Crossfade log: why a blend was or wasn't beat-matched, and how well it kept in step (@Th3K1ngP1n)
+- [#748](https://github.com/echovaultstudio/Siansa/pull/748) Blends: a jump no longer stops the blend, the next song lands on the beat, no stumble at the start (@Th3K1ngP1n)
+- [#752](https://github.com/echovaultstudio/Siansa/pull/752) Licences page: the website's current copy (wordmark header, versioned links) (@Th3K1ngP1n)
+- [#755](https://github.com/echovaultstudio/Siansa/pull/755) Revert the blend fixes (#748): back to a pull request, not a release yet (@Th3K1ngP1n)
+- [#756](https://github.com/echovaultstudio/Siansa/pull/756) Blends: our own jump no longer stops the blend, the next song lands on the beat, and the tail keeps in step (@Th3K1ngP1n)
+
 ## [0.44.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.44.1beta) — 2026-10-31
 
 - [#671](https://github.com/echovaultstudio/Siansa/pull/671) Bump androidx.palette:palette-ktx from 1.0.0 to 1.1.0 in the androidx group (@dependabot[bot])
