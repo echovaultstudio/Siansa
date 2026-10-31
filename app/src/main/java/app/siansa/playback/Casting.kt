@@ -147,7 +147,8 @@ class CastItems(private val api: MusicSource) : MediaItemConverter {
             // and falls back to the MP3 above when it can't.
             .setCustomData(JSONObject().put(SONG_ID, mediaItem.mediaId).put(ORIGINAL_URL, api.streamUrl(mediaItem.mediaId)))
             .build()
-        return MediaQueueItem.Builder(info).build()
+        // The TV loads the next song ahead (issue #689), so it can go straight on instead of fetching it once this one ends.
+        return MediaQueueItem.Builder(info).setAutoplay(true).setPreloadTime(CAST_PRELOAD_SECONDS).build()
     }
 
     override fun toMediaItem(mediaQueueItem: MediaQueueItem): MediaItem {
@@ -169,6 +170,13 @@ class CastItems(private val api: MusicSource) : MediaItemConverter {
         const val TV_COVER = 800
     }
 }
+
+/**
+ * How many seconds ahead the Cast device loads a song (issue #689). Cast counts it back from where the song starts,
+ * the end of the one before, so it's the same for every song: a short song before it just means loading starts
+ * as soon as that one does.
+ */
+const val CAST_PRELOAD_SECONDS = 20.0
 
 /** The queue, song and position on the TV, in play order. */
 data class CastSpot<T>(val items: List<T>, val index: Int, val positionMs: Long)

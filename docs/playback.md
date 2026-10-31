@@ -135,6 +135,10 @@ finish the song it has (and the next one, if it was handed that ahead) before it
 that support it go straight on to the next song. Devices that don't get the next song when the current one ends,
 with a short gap. How well a device does this is up to the device.
 
+**Chromecast without gaps.** A Chromecast, Google TV or speaker with Chromecast built in gets the whole queue and is
+asked to load the next song about 20 seconds before the current one ends, so it can go straight on. Songs go as MP3,
+which can leave a very short pause between songs that run into each other.
+
 **Original files on DLNA.** Tap the cog beside a DLNA TV or speaker in **Play on** and turn on **Send the original
 file**. It then gets your music as it is (for example FLAC) instead of MP3 320, whenever it says it plays that
 format; other songs still go as MP3 320. Better sound, and no tiny gap between songs, but it uses more Wi-Fi. The
