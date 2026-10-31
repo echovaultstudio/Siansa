@@ -3,6 +3,29 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.44.0beta — 2026-10-31
+
+### Fixed
+- Shape the mix: "Surprises" no longer breaks over two lines next to its slider.
+- Albums, playlists and mixes with only a few songs: the cover now fades away fully and the title bar turns solid when you scroll to the end.
+- Now playing: when you scroll down, the page now fades in under the small header, instead of a cut-off line of text showing below it.
+- Arrange Home: the spacing step's name ("Compact") no longer breaks over two lines.
+- Tiles, banners and cards no longer break a long word in two ("Melanchol / y"): the title gets a little smaller instead.
+- Light mode: the tabs at the bottom are easy to see again; the bar behind them is now light too.
+- Rearranging the nav bar and mini player buttons no longer gets stuck after the first move: rows make room every time.
+- Arrange Home: holding a row near the top or bottom scrolls the list, so a row can be moved anywhere.
+
+### Added
+- Custom cards: song cards can now use **Play count**, and song and album cards get **Played** (when it was last played, for example "not in the last 90 days") and, for songs, **Times skipped**. Most played puts a song's own plays first.
+- Settings › Style › Phone's top bar: keep it see-through, make it black, or hide it for full screen (swipe down from the top to see it for a moment).
+- Play on a speaker: LinkPlay speakers (JBL Bar, WiiM, Arylic and others) can play the next few songs by themselves, so songs follow without the usual few-second gap. Experimental: turn it on with the cog beside the speaker.
+- Jellyfin (10.9 or later) as a music server, alongside Navidrome and Emby: browsing, playback, playlists, favourites, play history, "now playing" on Jellyfin and lyrics.
+
+### Changed
+- Settings › Connections: every server's card now shows its address and login, so you can change a server that isn't in use without switching to it first.
+- Chromecast: the TV or speaker now loads the next song before the current one ends, so songs follow each other with little or no gap.
+- Home › Source filter: a **Sync all** button, Audiobookshelf listed with your music servers, and each sync shown on one small line under the server, with a single tick when it's done.
+
 ## 0.43.0beta — 2026-10-30
 
 ### Fixed
