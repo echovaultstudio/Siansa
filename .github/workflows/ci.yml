@@ -240,119 +240,19 @@ jobs:
             app/build/outputs/roborazzi/
 
   device-tests:
-    name: Emulator tests against Navidrome
+    name: Emulator tests
     needs: [checks, quick]
-    # Not on pull requests (20 minutes each); after merges to main that change the app, every night, and on demand.
+    # Not on pull requests here (20 minutes each; a pull request labelled "ui" has them from ui-tests.yml); after merges
+    # to main that change the app, every night, and on demand.
     if: >-
       always() && needs.checks.result == 'success' && github.event_name != 'pull_request' &&
       (github.event_name == 'workflow_dispatch' || needs.quick.outputs.emulator == 'true')
-    # Your own runner when the RUNS_ON variable names it (e.g. ["self-hosted", "siansa"]), else GitHub's.
-    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
-    timeout-minutes: 60
-    steps:
-      # The emulator needs ~7.5 GB for its storage; the runner image leaves too little free.
-      - name: Free disk space
-        # Only on GitHub's machines: it deletes system folders, never on your own runner.
-        if: runner.environment == 'github-hosted'
-        run: |
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /usr/share/swift /opt/hostedtoolcache/CodeQL /usr/local/lib/node_modules || true
-          echo "::notice::Free disk: $(df -h / | awk 'NR==2{print $4}')"
-
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: "8.14.3"
-
-      - name: Install ffmpeg
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
-
-      - name: Start Navidrome with the test library
-        run: scripts/test-server.sh
-
-      - name: Enable KVM
-        # GitHub's machines need it opened up; your own runner's user is in the kvm group instead.
-        if: runner.environment == 'github-hosted'
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Run tests on a managed emulator
-        run: |
-          set -o pipefail
-          # After merges: Android 13. Nightly: Android 16, the version the app targets (issue #494). One emulator a run.
-          device=ciPhone; [ "${{ github.event_name }}" = "schedule" ] && device=android16
-          echo "::notice::Emulator: $device"
-          gradle ":app:${device}DebugAndroidTest" \
-            -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
-            -Pandroid.experimental.testOptions.managedDevices.setupTimeoutMinutes=20 \
-            -Pandroid.testInstrumentationRunnerArguments.navidromeUrl=http://10.0.2.2:5533 2>&1 | tee gradle.txt
-          
-      # Results as annotations, so they can be read without downloading logs.
-      - name: Test output
-        if: always()
-        run: |
-          grep -A8 "What went wrong" gradle.txt 2>/dev/null | head -12 | while IFS= read -r line; do [ -n "$line" ] && echo "::error::$line"; done || true
-          # Kotlin compile errors in the emulator tests, with file and line (they don't show up in the Build job).
-          grep -E "^e: file://" gradle.txt 2>/dev/null | sort -u | head -30 | sed -E 's#^e: file://[^ ]*/app/(src/[^:]+):([0-9]+):([0-9]+) (.*)#::error file=app/\1,line=\2,col=\3::\4#' || true
-          grep -E "Tests? .*(passed|failed)|BUILD (SUCCESSFUL|FAILED)" gradle.txt 2>/dev/null | tail -3 | while IFS= read -r line; do echo "::notice::$line"; done || true
-          find app/build/outputs -iname "logcat*.txt" -exec cat {} + > logcat.txt 2>/dev/null || true
-          grep -h "System.out" logcat.txt 2>/dev/null | grep -E "Kinds:|drawable:|setup|Tour: " | sed 's/.*System.out: //' | head -40 | while IFS= read -r line; do echo "::notice::$line"; done || true
-          for f in $(find app/build/outputs/androidTest-results -name "*.xml"); do
-            [ -f "$f" ] || continue
-            python3 - "$f" <<'PY'
-          import sys, xml.etree.ElementTree as ET
-          for case in ET.parse(sys.argv[1]).getroot().iter("testcase"):
-              fail = case.find("failure")
-              name = case.get("name")
-              if fail is not None:
-                  msg = (fail.get("message") or fail.text or "").replace("\n", " ")[:400]
-                  print(f"::error::FAILED {name}: {msg}")
-              else:
-                  print(f"::notice::PASSED {name} ({case.get('time')}s)")
-          PY
-          done
-
-      # The app tour's screenshots (TOURSHOT lines in the log) as images in the device-test-results artifact.
-      - name: Tour screenshots
-        if: always()
-        run: |
-          [ -f logcat.txt ] || exit 0
-          python3 - <<'PY'
-          import re, base64, os, collections
-          parts, totals = collections.defaultdict(dict), {}
-          for line in open("logcat.txt", errors="ignore"):
-              m = re.search(r"TOURSHOT (\S+) (\d+)/(\d+) (\S+)", line)
-              if m:
-                  parts[m[1]][int(m[2])] = m[4]
-                  totals[m[1]] = int(m[3])
-          os.makedirs("screens", exist_ok=True)
-          for name, d in parts.items():
-              if len(d) == totals[name]:
-                  open(f"screens/{name}.jpg", "wb").write(base64.b64decode("".join(d[i] for i in sorted(d))))
-              else:
-                  print(f"{name}: only {len(d)} of {totals[name]} parts")
-          print(len(os.listdir("screens")), "screenshots")
-          PY
-          grep -h "System.out" logcat.txt | grep -E "Tour: |song starts" | sed 's/.*System.out: //' > screens/tour.txt || true
-          grep -h "TOURLOG " logcat.txt | sed 's/.*TOURLOG //' > screens/tour-log.txt || true
-
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: device-test-results
-          path: |
-            app/build/reports/
-            app/build/outputs/androidTest-results/
-            logcat.txt
-            screens/
-            ${{ runner.temp }}/navidrome-test/*.log
+    uses: ./.github/workflows/device-tests.yml
+    with:
+      # After merges: Android 13. Nightly: Android 16, the version the app targets (issue #494). One emulator a run.
+      device: ${{ github.event_name == 'schedule' && 'android16' || 'ciPhone' }}
+      # Your own runner when the RUNS_ON variable names it (e.g. ["self-hosted", "siansa"]), else GitHub's.
+      runs-on: ${{ vars.RUNS_ON || '"ubuntu-latest"' }}
 
   release:
     name: Publish release

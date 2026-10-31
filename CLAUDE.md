@@ -43,6 +43,8 @@ implements them and opens a pull request. Labels show where each one is: `claude
 ## Pull requests
 
 - One issue per pull request; reference it with `Fixes #N`.
+- Label a pull request `ui` when it changes how pages scroll, move or respond to touch (rearranging, the player,
+  gestures): the emulator tests then run on it before merging (`.github/workflows/ui-tests.yml`, issue #713).
 - Reports from the app (Settings › Help › Report a problem) are issues in this repository, with the log kept in the
   private logs repository. GitHub closes a fixed issue on merge, and the release comments on it with the version that
   has the fix (`scripts/notify_fixed.py`, issue #433).

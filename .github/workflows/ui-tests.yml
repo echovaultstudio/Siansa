@@ -1,0 +1,27 @@
+name: UI tests
+
+# The emulator tests on a pull request labelled "ui" (issue #713), before it's merged: for changes to how pages look,
+# scroll or move (rearranging, the player, gestures). They run on GitHub's runner, never the home one (issue #535),
+# beside CI rather than after it, and again on each push while the label is on. Taking the label off stops them.
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-tests-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  device-tests:
+    name: Emulator tests
+    # A push or reopen with the label on, or the label just added (not another label).
+    if: >-
+      contains(github.event.pull_request.labels.*.name, 'ui') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'ui')
+    uses: ./.github/workflows/device-tests.yml
+    with:
+      device: ciPhone
+      runs-on: '"ubuntu-latest"'
