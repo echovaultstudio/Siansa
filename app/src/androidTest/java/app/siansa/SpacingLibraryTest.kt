@@ -457,9 +457,14 @@ class SpacingLibraryTest : SpacingCheck() {
         val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
         val song = app.siansa.data.Song(id = "single-1", title = "The only song", artist = "Sunborn", album = "A single")
         compose.setContent {
-            // The page's song rows need the navigation controller too (their ⋮ menu): without it the app crashes.
+            // The page's song rows need the navigation controller and the snackbar too (their ⋮ menu, "Added to the
+            // queue"): without them the app crashes.
             val nav = androidx.navigation.compose.rememberNavController()
-            androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalGraph provides graph, app.siansa.ui.LocalNav provides nav) {
+            androidx.compose.runtime.CompositionLocalProvider(
+                app.siansa.ui.LocalGraph provides graph,
+                app.siansa.ui.LocalNav provides nav,
+                app.siansa.ui.LocalSnack provides androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() },
+            ) {
                 SiansaTheme {
                     app.siansa.ui.CollectionPage(
                         nav = nav,
