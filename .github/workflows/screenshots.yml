@@ -2,8 +2,9 @@ name: Screenshots
 
 # Approves the screenshot tests' pictures (issue #710). Label a pull request "record screenshots": this draws every
 # scene in app/src/test/java/app/siansa/screenshots/ScreenshotTest.kt on GitHub's runner, commits the pictures to
-# the pull request's branch (app/src/test/screenshots/) and takes the label off. The pull request then shows the
-# pictures that changed, and CI compares later pushes with them.
+# the pull request's branch (app/src/test/screenshots/), comments on the pull request with every picture that differs
+# from main, before and after (scripts/screenshot_comment.py), and takes the label off. Merging the pull request
+# approves the pictures: later pull requests are compared with them.
 #
 # GitHub doesn't start CI for a commit its own workflow made, so the pictures' commit has no checks of its own; it
 # changes no code, and the next push is checked against the new pictures.
@@ -30,6 +31,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.ref }}
+          # The whole history, to find where the pull request left main for the comment's "before" pictures.
+          fetch-depth: 0
 
       - uses: actions/setup-java@v6
         with:
@@ -86,6 +89,17 @@ jobs:
           git commit -q -m "Screenshots recorded for the pull request's look"
           git push -q origin "HEAD:$BRANCH"
           echo "::notice::$(git diff --name-only HEAD~1 | wc -l) pictures recorded and committed."
+
+      # One comment on the pull request (updated on later recordings) with every picture that differs from main,
+      # before and after, so they can be judged on the conversation tab before merging approves them.
+      - name: Pictures on the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch -q origin "$BASE"
+          python3 scripts/screenshot_comment.py "$GITHUB_REPOSITORY" "$PR" "$(git merge-base HEAD "origin/$BASE")" "$(git rev-parse HEAD)"
 
       - name: Take the label off
         if: always()

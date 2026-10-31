@@ -30,7 +30,8 @@ Source: `app/src/main/java/app/siansa/`. Unit tests: `app/src/test/`. Emulator t
 - Screenshot tests (`app/src/test/java/app/siansa/screenshots/ScreenshotTest.kt`, issue #710): draw a changed or new
   part of a page in a scene there, with long words where text can be cut off. When the look is meant to change, label
   the pull request `record screenshots` (CI records the pictures on GitHub's runner and commits them; pictures made on
-  another machine can differ by a pixel), then look at the committed pictures in light and dark before asking for review.
+  another machine can differ by a pixel), then check the pictures in the comment it posts (each one that differs from main, before and after) in light and dark
+  before asking for review. The owner approves them by merging.
 - Navigate and change screen state only on the main thread.
 
 ## Automatic issues
