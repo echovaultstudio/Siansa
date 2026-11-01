@@ -750,19 +750,22 @@ internal fun ImageCacheSection() {
             )
         }
     }
-    OutlinedButton(onClick = {
-        scope.launch {
-            withContext(Dispatchers.IO) {
-                val loader = SingletonImageLoader.get(context)
-                loader.memoryCache?.clear()
-                loader.diskCache?.clear()
-                CoverStore.clear()
-                AnimatedCovers.forget(graph)
+    // Its tag on a box around it: the box takes the button's whole touch area, as the chips above count theirs.
+    Box(Modifier.testTag("imageCacheClear")) {
+        OutlinedButton(onClick = {
+            scope.launch {
+                withContext(Dispatchers.IO) {
+                    val loader = SingletonImageLoader.get(context)
+                    loader.memoryCache?.clear()
+                    loader.diskCache?.clear()
+                    CoverStore.clear()
+                    AnimatedCovers.forget(graph)
+                }
+                AppLog.i("Downloads", "Image cache cleared")
+                refresh++
             }
-            AppLog.i("Downloads", "Image cache cleared")
-            refresh++
-        }
-    }, modifier = Modifier.testTag("imageCacheClear")) { Text("Clear image cache") }
+        }) { Text("Clear image cache") }
+    }
     if (settings.imageCacheMb != atStart) {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
