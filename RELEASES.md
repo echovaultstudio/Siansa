@@ -3,6 +3,12 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.48.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.48.0beta) — 2026-11-01
+
+- [#779](https://github.com/echovaultstudio/Siansa/pull/779) Now playing menu: no MENUSHUFFLE badge on the shuffle row (@Th3K1ngP1n)
+- [#781](https://github.com/echovaultstudio/Siansa/pull/781) Settings: grouped and reordered, sections open by default (@Th3K1ngP1n)
+- [#787](https://github.com/echovaultstudio/Siansa/pull/787) DJ radio: shaping the mix changes the very next song (@Th3K1ngP1n)
+
 ## [0.47.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.47.0beta) — 2026-10-31
 
 - [#769](https://github.com/echovaultstudio/Siansa/pull/769) Brand: the banner's tagline as the website's, and an F-Droid sized banner (@Th3K1ngP1n)
