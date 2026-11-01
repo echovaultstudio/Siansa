@@ -84,7 +84,7 @@ blend them the way a DJ mixes:
   end together. Without phrases, the blend starts on a bar of the song going out, the next song starts on its first
   downbeat, and the blend is the Blend length in whole bars. Either way the next song plays a touch faster or slower (up
   to 8 %, pitch kept) so its beats keep time with the old song's, then eases back to its own speed over about 25
-  seconds, too slowly to hear.
+  seconds, in small steps too slight to hear.
 - **Everywhere**: the same in every smart crossfade.
 - **Off**: fades don't follow the beat.
 

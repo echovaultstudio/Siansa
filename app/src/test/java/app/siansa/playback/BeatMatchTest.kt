@@ -235,6 +235,26 @@ class BeatMatchTest {
         assertEquals("beats not checked", stats.describe())
         listOf(4L, -8L, 12L, -20L).forEach(stats::add)
         assertEquals("beats typically 11 ms apart, at worst 20 ms (4 checks)", stats.describe())
+        // The smoothed errors say how far apart the beats mostly were (issue #796).
+        listOf(5L, -12L, 30L, 40L, 8L).forEach(stats::addSettled)
+        assertEquals("beats typically 11 ms apart, at worst 20 ms (4 checks); smoothed, 12 ms apart, within 20 ms 60 % of the time", stats.describe())
+    }
+
+    /**
+     * Issue #796: easing back after a blend changed the speed every 200 ms (125 times over 25 s), and every change
+     * re-tunes the time-stretcher (issue #773). Now only steps of at least [BeatMatch.NUDGE_STEP] are sent.
+     */
+    @Test fun easingBackGoesInFewStepsWorthHearing() {
+        var playing = 0.968f
+        var changes = 0
+        for (elapsed in 0L..BeatMatch.EASE_MS + 200 step 200) {
+            BeatMatch.easeStep(0.968f, elapsed, playing)?.let { playing = it; changes++ }
+        }
+        assertEquals(1f, playing, 1e-6f)
+        assertTrue("$changes changes", changes in 15..25)
+        // Nothing to send when already where it should be, and the listener's own speed is the end point.
+        assertNull(BeatMatch.easeStep(0.968f, 0, 0.968f))
+        assertEquals(1.25f, BeatMatch.easeStep(0.968f, BeatMatch.EASE_MS, 1.2f, base = 1.25f)!!, 1e-6f)
     }
 
     // ---- Phrase on phrase (issue #757) ----
