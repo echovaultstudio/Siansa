@@ -52,13 +52,16 @@ import java.time.LocalDate
 fun NoticesRow(nav: NavController, graph: AppGraph, settings: AppSettings) {
     val sync by graph.sync.progress.collectAsStateWithLifecycle()
     val failed = sync.phase == SyncPhase.FAILED
-    var notices by remember { mutableStateOf<List<Notice>>(emptyList()) }
+    // From the last shown, so the row doesn't vanish and come back each time it scrolls into view.
+    var notices by remember { mutableStateOf(graph.notices.shown) }
     LaunchedEffect(failed, settings.booksReady, settings.notices) {
-        notices = withContext(Dispatchers.IO) {
+        val fresh = withContext(Dispatchers.IO) {
             val candidates = noticeCandidates(graph, settings, failed)
             Notices.order(candidates, settings.notices, graph.notices.taps(), graph.notices.hidden())
         }
-        AppLog.d("Home", "Notices: ${notices.joinToString { it.key }.ifEmpty { "none" }}")
+        if (fresh != notices) AppLog.d("Home", "Notices: ${fresh.joinToString { it.key }.ifEmpty { "none" }}")
+        notices = fresh
+        graph.notices.shown = fresh
     }
     NoticeChips(
         notices,
@@ -71,6 +74,7 @@ fun NoticesRow(nav: NavController, graph: AppGraph, settings: AppSettings) {
             AppLog.i("Home", "Notice hidden: ${notice.key}")
             graph.notices.hide(notice.key)
             notices = notices - notice
+            graph.notices.shown = notices
         },
     )
 }
@@ -119,9 +123,12 @@ private suspend fun noticeCandidates(graph: AppGraph, settings: AppSettings, syn
     if (syncFailed) add(Notices.needsYou())
     if (settings.booksReady) {
         try {
+            // Progress is only loaded by the Books screens otherwise: without this, Carry on missed on a cold start.
+            // Both reads are kept for a minute, so scrolling past doesn't ask the server again.
+            graph.books.refreshProgress()
             val progress = graph.books.progress.value
             val now = System.currentTimeMillis()
-            graph.books.inProgress()
+            graph.books.inProgressFresh(now)
                 .mapNotNull { book -> progress[book.id]?.takeIf { Notices.recentlyPlayed(it.updatedAt, now) }?.let { book to it.updatedAt } }
                 .maxByOrNull { it.second }
                 ?.let { (book, _) -> add(Notices.carryOn(book.id, book.title)) }

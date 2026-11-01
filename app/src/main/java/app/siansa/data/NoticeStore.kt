@@ -9,6 +9,12 @@ import app.siansa.mix.Notices
  * the ones you use first, and the notices you hid.
  */
 class NoticeStore(context: Context) {
+    /**
+     * The notices last shown, kept in memory (issue #784): Home's row starts from them when it comes back into view,
+     * so the chips don't vanish and pop back, pushing the page down, each time you scroll past or come back to Home.
+     */
+    @Volatile var shown: List<app.siansa.mix.Notice> = emptyList()
+
     private val prefs by lazy { context.getSharedPreferences(Users.scoped("notices"), Context.MODE_PRIVATE) }
 
     fun taps(): Map<NoticeKind, Int> = parseTaps(prefs.getString(KEY_TAPS, null))

@@ -115,14 +115,24 @@ object Notices {
     fun newAlbums(count: Int, newestId: String): Notice? = if (count <= 0) null else
         Notice(NoticeKind.NEW_ALBUMS, "new_albums:$newestId", if (count == 1) "1 new album" else "$count new albums", "home/newest")
 
-    /** How many of [created] (the albums' "created" dates, ISO) are from the last [NEW_ALBUM_DAYS] days. */
-    fun newAlbumCount(created: List<String?>, today: LocalDate): Int {
-        val from = today.minusDays(NEW_ALBUM_DAYS.toLong())
+    /**
+     * How many of [created] (the albums' "created" dates, ISO) are from the last [NEW_ALBUM_DAYS] days: today and the
+     * days before it, on the phone's calendar ([zone]). A date with a time is read in [zone], so an album added late
+     * in the evening counts on the day it was here, not the server's UTC day.
+     */
+    fun newAlbumCount(created: List<String?>, today: LocalDate, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): Int {
+        val from = today.minusDays(NEW_ALBUM_DAYS.toLong() - 1)
         return created.count { date ->
-            val day = date?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return@count false
+            val day = date?.let { localDay(it, zone) } ?: return@count false
             !day.isBefore(from) && !day.isAfter(today)
         }
     }
+
+    /** The calendar day of an ISO date or date-time, in [zone] when it has a time; null when it can't be read. */
+    private fun localDay(iso: String, zone: java.time.ZoneId): LocalDate? =
+        runCatching { java.time.OffsetDateTime.parse(iso).atZoneSameInstant(zone).toLocalDate() }.getOrNull()
+            ?: runCatching { java.time.Instant.parse(iso).atZone(zone).toLocalDate() }.getOrNull()
+            ?: runCatching { LocalDate.parse(iso.take(10)) }.getOrNull()
 
     /** "Your October", in the first [MONTH_DAYS] days of November; null the rest of the month. */
     fun yourMonth(today: LocalDate): Notice? {
