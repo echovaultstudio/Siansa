@@ -240,7 +240,9 @@ internal fun CoverRowItem(action: CoverRowAction, divider: Boolean) {
                 }
                 .testTag("coverRowCover"),
         ) {
-            Cover(row.cover, 150, Modifier.fillMaxSize(), RoundedCornerShape(8.dp))
+            // No cover: the same grey square Cover draws, without asking for one.
+            if (row.cover != null) Cover(row.cover, 150, Modifier.fillMaxSize(), RoundedCornerShape(8.dp))
+            else Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
             if (action.playing) {
                 Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) {
                     Icon(Icons.Rounded.Pause, null, tint = Accent, modifier = Modifier.size(32.dp))
@@ -281,7 +283,7 @@ internal fun CoverRowItem(action: CoverRowAction, divider: Boolean) {
 /** Small dots under a shelf of columns, the one in view wider. */
 @Composable
 private fun PageDots(count: Int, current: Int, modifier: Modifier = Modifier) {
-    Row(modifier.testTag("coverRowsDots"), horizontalArrangement = Arrangement.spacedBy(DOT_GAP)) {
+    Row(modifier.testTag("coverRowsDots"), horizontalArrangement = Arrangement.spacedBy(Space.Tight)) {
         repeat(count) { i ->
             val on = i == current.coerceIn(0, count - 1)
             Box(
@@ -297,4 +299,3 @@ private val COVER = 80.dp
 private val PROGRESS = 4.dp  // spacing: exact
 private val COLUMN_PEEK = 56.dp  // spacing: exact
 private val DOT = 6.dp  // spacing: exact
-private val DOT_GAP = 5.dp  // spacing: exact
