@@ -21,41 +21,52 @@ class NoticesTest {
     private val all = listOf(month, artists, albums, book, sync)
 
     @Test fun automaticPutsWhatNeedsYouFirstThenWhatYoureInThenWhatsNew() {
-        val order = Notices.order(all, NoticePrefs(), emptyMap(), emptySet())
+        val order = Notices.order(all, NoticePrefs(), emptyMap())
         assertEquals(listOf(sync, book, month, artists, albums), order)
     }
 
     @Test fun withinATierTheKindsYouTapMostComeFirst() {
-        val order = Notices.order(all, NoticePrefs(), mapOf(NoticeKind.NEW_ALBUMS to 5, NoticeKind.NEW_ARTISTS to 2), emptySet())
+        val order = Notices.order(all, NoticePrefs(), mapOf(NoticeKind.NEW_ALBUMS to 5, NoticeKind.NEW_ARTISTS to 2))
         assertEquals(listOf(sync, book, albums, artists, month), order)
     }
 
     @Test fun tapsDontLiftAKindAboveAHigherTier() {
-        val order = Notices.order(all, NoticePrefs(), mapOf(NoticeKind.YOUR_MONTH to 99), emptySet())
+        val order = Notices.order(all, NoticePrefs(), mapOf(NoticeKind.YOUR_MONTH to 99))
         assertEquals(listOf(sync, book), order.take(2))
     }
 
     @Test fun pinnedKindsComeFirstInTheOrderPinned() {
         val prefs = NoticePrefs().with(NoticeKind.YOUR_MONTH, NoticeMode.PINNED).with(NoticeKind.NEW_ALBUMS, NoticeMode.PINNED)
-        val order = Notices.order(all, prefs, emptyMap(), emptySet())
+        val order = Notices.order(all, prefs, emptyMap())
         assertEquals(listOf(month, albums, sync, book, artists), order)
     }
 
-    @Test fun offKindsAndHiddenNoticesAreLeftOut() {
+    @Test fun offKindsAreLeftOut() {
         val prefs = NoticePrefs().with(NoticeKind.CARRY_ON, NoticeMode.OFF)
-        val order = Notices.order(all, prefs, emptyMap(), setOf(month.key))
+        val order = Notices.order(all, prefs, emptyMap())
         assertFalse(book in order)
-        assertFalse(month in order)
-        assertEquals(3, order.size)
+        assertEquals(4, order.size)
     }
 
     @Test fun atMostFiveShow() {
         val many = all + Notices.carryOn("b2", "Emma")
-        assertEquals(Notices.MAX, Notices.order(many, NoticePrefs(), emptyMap(), emptySet()).size)
+        assertEquals(Notices.MAX, Notices.order(many, NoticePrefs(), emptyMap()).size)
+    }
+
+    @Test fun pinnedNoticesAlwaysShowAndAutomaticOnesFillTheRest() {
+        val emma = Notices.carryOn("b2", "Emma")
+        val prefs = NoticePrefs().with(NoticeKind.CARRY_ON, NoticeMode.PINNED).with(NoticeKind.NEW_ARTISTS, NoticeMode.PINNED)
+        // Two books and the artists are pinned: they take three of the five places; sync and the month fill the rest.
+        assertEquals(listOf(book, emma, artists, sync, month), Notices.order(all + emma, prefs, emptyMap()))
+        // Pinned ones never get pushed out, even past the cap.
+        val books = (1..6).map { Notices.carryOn("b$it", "Book $it") }
+        val order = Notices.order(books + sync, NoticePrefs().with(NoticeKind.CARRY_ON, NoticeMode.PINNED), emptyMap())
+        assertEquals(books, order)
+        assertFalse(sync in order)
     }
 
     @Test fun nothingToSayShowsNothing() {
-        assertTrue(Notices.order(emptyList(), NoticePrefs(), emptyMap(), emptySet()).isEmpty())
+        assertTrue(Notices.order(emptyList(), NoticePrefs(), emptyMap()).isEmpty())
     }
 
     @Test fun modesRoundTripKeepingThePinnedOrder() {
@@ -114,14 +125,6 @@ class NoticesTest {
         assertFalse(Notices.recentlyPlayed(0, now))
         assertEquals("book/b1", book.route)
         assertEquals("Carry on: Dune", book.text)
-    }
-
-    @Test fun hiddenNoticesKeepTheNewest() {
-        var hidden = emptyList<String>()
-        repeat(Notices.MAX_HIDDEN + 10) { hidden = Notices.hide(hidden, "k$it") }
-        assertEquals(Notices.MAX_HIDDEN, hidden.size)
-        assertEquals("k${Notices.MAX_HIDDEN + 9}", hidden.last())
-        assertEquals(listOf("a", "b"), Notices.hide(listOf("b", "a"), "b"))
     }
 
     @Test fun tapsRoundTrip() {

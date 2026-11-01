@@ -643,7 +643,7 @@ internal fun BoxScope.MoreChipsHint(scroll: ScrollState) {
 }
 
 /** The chips' text size. */
-private val PILL_FONT = 14.sp
+internal val PILL_FONT = 14.sp
 
 /** How wide the fade at the end of the chip row is: the blend, then the › button's own space. */
 private val MORE_FADE = 96.dp

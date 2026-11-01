@@ -318,7 +318,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         app.siansa.mix.Notices.carryOn("b", "The Extraordinarily Long Chronicles of Wandering Mapmakers"),
                         app.siansa.mix.Notices.newAlbums(3, "a")!!,
                     ),
-                    onOpen = {}, onHide = {},
+                    onOpen = {},
                 )
             },
             // The Settings start page in groups (issue #780), and Settings › Home's rows with what's set.

@@ -67,10 +67,7 @@ data class NoticePrefs(val modes: Map<NoticeKind, NoticeMode> = emptyMap(), val 
     }
 }
 
-/**
- * One chip. [key] names what it's about ("carry_on:book-12", "month:2026-10"), so hiding it hides only that one:
- * next month's report shows again.
- */
+/** One chip. [key] names what it's about ("carry_on:book-12", "month:2026-10"), so the row can tell two apart. */
 data class Notice(val kind: NoticeKind, val key: String, val text: String, val route: String)
 
 object Notices {
@@ -86,21 +83,19 @@ object Notices {
     /** Your month shows in the first days of the next month. */
     const val MONTH_DAYS = 7
 
-    /** Hidden notices remembered, the newest kept. */
-    const val MAX_HIDDEN = 100
-
     /**
-     * The chips to show, in order: pinned kinds first, in the order they were pinned; then the automatic ones by
-     * tier, and within a tier the kinds you tap most first ([taps]). Off kinds and [hidden] notices are left out.
+     * The chips to show, in order: pinned kinds first, in the order they were pinned, and always, however many there
+     * are (issue #794); the automatic ones fill what's left of [max], by tier, and within a tier the kinds you tap
+     * most first ([taps]). Off kinds are left out.
      */
-    fun order(candidates: List<Notice>, prefs: NoticePrefs, taps: Map<NoticeKind, Int>, hidden: Set<String>, max: Int = MAX): List<Notice> {
-        val shown = candidates.filter { prefs.modeOf(it.kind) != NoticeMode.OFF && it.key !in hidden }.distinctBy { it.key }
+    fun order(candidates: List<Notice>, prefs: NoticePrefs, taps: Map<NoticeKind, Int>, max: Int = MAX): List<Notice> {
+        val shown = candidates.filter { prefs.modeOf(it.kind) != NoticeMode.OFF }.distinctBy { it.key }
         val pinned = prefs.pinned.flatMap { kind -> shown.filter { it.kind == kind } }
         val auto = shown.filter { prefs.modeOf(it.kind) == NoticeMode.AUTO }
             .withIndex()
             .sortedWith(compareBy<IndexedValue<Notice>> { it.value.kind.tier }.thenByDescending { taps[it.value.kind] ?: 0 }.thenBy { it.index })
             .map { it.value }
-        return (pinned + auto).take(max.coerceAtLeast(0))
+        return pinned + auto.take((max - pinned.size).coerceAtLeast(0))
     }
 
     fun needsYou(): Notice = Notice(NoticeKind.NEEDS_YOU, "needs:sync:${LocalDate.now()}", "Library sync failed", "settings/connections")
@@ -144,9 +139,6 @@ object Notices {
 
     fun newArtists(count: Int, today: LocalDate): Notice? = if (count <= 0) null else
         Notice(NoticeKind.NEW_ARTISTS, "artists:$today", if (count == 1) "1 artist for you" else "$count artists for you", "discover/artists")
-
-    /** [hidden] with [key] added, keeping the newest [MAX_HIDDEN]. */
-    fun hide(hidden: List<String>, key: String): List<String> = (hidden - key + key).takeLast(MAX_HIDDEN)
 
     private const val DAY_MS = 24L * 60 * 60 * 1000
 }

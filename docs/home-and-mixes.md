@@ -37,8 +37,8 @@ cards** keep their own looks: their cog opens **Settings › Home › Cards**.
 
 ## Notices
 
-A row of chips at the top of Home, only when there's something to say. Tap a chip to open it; its **×** hides that
-one (next month's report or the next new albums show again).
+A row of chips at the top of Home, only when there's something to say. Tap a chip to open it. Chips come and go on
+their own: a finished book, albums older than three days or last month's report once the week is over drop out.
 
 | Notice | When it shows | Opens |
 |---|---|---|
@@ -50,8 +50,9 @@ one (next month's report or the next new albums show again).
 
 At most five show. By default they're ordered for you: what needs you first, then what you're in the middle of, then
 what's new; among the new ones, the kinds you tap most come first. In **Settings › Home › Notices** you can hide the
-row, or set each kind to **Pinned** (always first, in the order you pin them), **Automatic** or **Off**. The cog on
-Notices in Arrange Home opens the same page.
+row, or set each kind to **Pinned**, **Automatic** or **Off**. Pinned kinds always show, first and in the order you
+pin them, and are never pushed out by other notices; the automatic ones fill the places left. The cog on Notices in
+Arrange Home opens the same page.
 
 ## Vibes and today's mix
 
