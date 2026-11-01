@@ -3,6 +3,18 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.49.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.49.0beta) — 2026-11-01
+
+- [#790](https://github.com/echovaultstudio/Siansa/pull/790) Home: Cover rows as a look for every section in Arrange Home (@Th3K1ngP1n)
+- [#791](https://github.com/echovaultstudio/Siansa/pull/791) AudioMuse: a missing Siansa plugin is told from an unknown song (@Th3K1ngP1n)
+- [#793](https://github.com/echovaultstudio/Siansa/pull/793) Emby, Jellyfin: an album without a cover of its own shows its first song's on its page (@Th3K1ngP1n)
+- [#795](https://github.com/echovaultstudio/Siansa/pull/795) Home's notice chips as Your Library's pills; an × beside a pin unpins it (@Th3K1ngP1n)
+- [#797](https://github.com/echovaultstudio/Siansa/pull/797) DJ blends: no long blend over an unknown beat, fewer bars into short songs (#796) (@Th3K1ngP1n)
+- [#799](https://github.com/echovaultstudio/Siansa/pull/799) DJ mix shapes: a fixed number of songs, so the next song follows a reshape (#798) (@Th3K1ngP1n)
+- [#801](https://github.com/echovaultstudio/Siansa/pull/801) Cover rows: no arrow, dots follow the swipe; Settings › Home: Notices and Cards (#800) (@Th3K1ngP1n)
+- [#803](https://github.com/echovaultstudio/Siansa/pull/803) Plugin 0.4.2: breakbeats read at their tempo (#802) (@Th3K1ngP1n)
+- [#805](https://github.com/echovaultstudio/Siansa/pull/805) Review fixes and Cover rows screenshots for the merged pull requests (@Th3K1ngP1n)
+
 ## [0.48.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.48.0beta) — 2026-11-01
 
 - [#779](https://github.com/echovaultstudio/Siansa/pull/779) Now playing menu: no MENUSHUFFLE badge on the shuffle row (@Th3K1ngP1n)
