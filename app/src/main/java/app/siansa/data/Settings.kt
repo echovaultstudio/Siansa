@@ -42,7 +42,7 @@ const val DEFAULT_THEME_SELECTION = "AMBER"
 internal fun defaultSelectionFor(savedColours: String?): String = if (savedColours == null) DEFAULT_THEME_SELECTION else "THEME"
 
 /**
- * Home's Today's mix (issue #776). It's built from the vibe covering the hour (Daily Vibe settings), and each
+ * Home's Today's mix (issue #776). It's built from the vibe covering the hour (Mixes and vibes), and each
  * vibe has its own length, surprise and so on; a setting here that isn't null replaces the vibe's for Today's mix
  * only, so one place tunes the mix you see first, whatever vibe made it. [autoUpdate] off: the mix is made or
  * remade only when you ask (↻ on its tile), never by itself when the app opens or in the background.

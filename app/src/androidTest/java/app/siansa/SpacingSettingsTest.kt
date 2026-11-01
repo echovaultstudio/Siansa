@@ -143,10 +143,13 @@ class SpacingSettingsTest : SpacingCheck() {
 
     /** A folded settings section (issue #776): the arrow is centred on the heading, open or folded. */
     @Test fun foldSectionArrowIsCentredOnItsHeading() {
+        // The real default, not a forced one (issue #780): nothing remembered for this section yet.
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        app.siansa.ui.FoldMemory.setFolded(context, "radio", false)
         compose.setContent {
             SiansaTheme {
                 Column {
-                    app.siansa.ui.FoldSection("Song radio", "A little", tag = "radio", startOpen = true) { Box(Modifier.fillMaxWidth().height(40.dp).testTag("radio-content")) }
+                    app.siansa.ui.FoldSection("Song radio", "A little", tag = "radio") { Box(Modifier.fillMaxWidth().height(40.dp).testTag("radio-content")) }
                 }
             }
         }
@@ -158,6 +161,25 @@ class SpacingSettingsTest : SpacingCheck() {
         compose.onNodeWithTag("section-radio-header").performClick()
         compose.waitForIdle()
         assertTrue(compose.onAllNodesWithTag("radio-content").fetchSemanticsNodes().isEmpty())
+        // Folded once, it stays folded the next time the page opens.
+        assertTrue(app.siansa.ui.FoldMemory.isFolded(context, "radio"))
+        app.siansa.ui.FoldMemory.setFolded(context, "radio", false)
+    }
+
+    /** Downloads › Image cache (issue #780, moved from Storage): the size chips sit evenly between their label and Clear. */
+    @Test fun imageCacheChipsAreEvenlySpaced() {
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalGraph provides graph) {
+                SiansaTheme {
+                    Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) { app.siansa.ui.ImageCacheSection() }
+                }
+            }
+        }
+        val label = compose.onNodeWithText("Maximum size").getBoundsInRoot()
+        val chips = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("No limit")), useUnmergedTree = true).getBoundsInRoot()
+        val clear = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Clear image cache")), useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Image cache chips", chips.top - label.bottom, clear.top - chips.bottom)
     }
 
     /** Beat-matched blends (issue #759): the 4 / 8 / 16 bars chips sit evenly between "Blend length" and their hint. */

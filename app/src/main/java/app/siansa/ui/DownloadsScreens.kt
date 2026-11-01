@@ -719,12 +719,14 @@ private fun CoverDownloadSection() {
  * take on the phone, its largest size and a way to clear it. A new size applies after the app restarts.
  */
 @Composable
-private fun ImageCacheSection() {
+internal fun ImageCacheSection() {
     val graph = LocalGraph.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    val atStart = remember { settings.imageCacheMb }
+    // The size the image loader runs with, from the app's start: kept however this list item scrolls or the page is
+    // left and opened again, so "Restart now" stays until the restart (issue #780).
+    val atStart = app.siansa.imageCacheMbInUse ?: settings.imageCacheMb
     var refresh by remember { mutableIntStateOf(0) }
     val used by loadState("image-cache-$refresh") {
         withContext(Dispatchers.IO) { (SingletonImageLoader.get(context).diskCache?.size ?: 0L) + CoverStore.sizeBytes() }

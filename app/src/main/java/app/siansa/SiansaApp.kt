@@ -19,6 +19,12 @@ import kotlinx.coroutines.launch
 import app.siansa.covers.CoverDownload
 import app.siansa.data.SyncPhase
 
+/**
+ * The image cache size the image loader was built with at start (issue #780): a different size picked since applies
+ * only after a restart, and the Downloads page says so for as long as that's true. Null until the loader is built.
+ */
+@Volatile var imageCacheMbInUse: Int? = null
+
 class SiansaApp : Application(), SingletonImageLoader.Factory {
     lateinit var graph: AppGraph
         private set
@@ -81,6 +87,7 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
      */
     override fun newImageLoader(context: PlatformContext): ImageLoader {
         val mb = graph.settings.current.imageCacheMb
+        imageCacheMbInUse = mb
         val unlimited = mb <= 0
         val bytes = if (unlimited) Long.MAX_VALUE / 4 else mb.coerceAtLeast(50) * 1024L * 1024L
         val directory = imageCacheDir(this, unlimited)
