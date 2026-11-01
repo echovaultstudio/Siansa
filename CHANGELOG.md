@@ -3,6 +3,41 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.48.0beta — 2026-11-01
+
+### Fixed
+- The Shuffle row in now playing's menu no longer shows a stray purple "MENUSHUFFLE" label.
+- With large text, a menu item whose name wraps to two lines is no longer cut off.
+- **Shaping a DJ mix now changes the very next song.** Picking a shape or surprise looks again at the radio's songs
+  and a fresh lot like the one playing, so the next song follows the new shape (calmer for a wind down, brighter for
+  euphoric), with songs that don't fit taken out and new ones put in. Before, it only reordered the songs already
+  queued, so the next one often stayed the same.
+
+### Added
+- **Cover rows, a new look for your own cards.** Each row is a cover with who it's by, what it is and how long it is
+  beside it, three to a column; swipe sideways for more. Tap the cover to play or carry on, tap the row to open it,
+  and ⋮ (or press and hold) for more.
+- **Cards of audiobooks and podcast episodes.** A custom card can now hold Audiobooks, Podcast episodes (the newest
+  of your podcasts) or Keep listening (books and episodes you're partway through) from Audiobookshelf. They show as
+  Cover rows, with how far you've got along the bottom of each cover.
+- **Notices on Home.** A row of chips at the top of Home when there's something to say: the library sync failed, a
+  book or episode to carry on with, new albums in your library, last month's report in the first week of a month,
+  and new artists for you. Tap one to open it, or its × to hide it. They're ordered for you by default; in
+  Settings › Home › Notices you can hide the row, or pin, keep automatic or turn off each kind.
+
+### Changed
+- **Settings are grouped and reordered**, so each setting is where you'd look for it. The start page has six groups:
+  Sources, Listening, Home and mixes, Look, Your listening and App.
+  - **Streaming and data** (new) has the streaming quality and loading songs ahead, both moved from Playback, and the
+    song cache.
+  - **Audiobooks and podcasts** (new) has the book player's skip buttons.
+  - **Home** (new) opens the source filter, Arrange Home and Cards.
+  - The image cache moved to Downloads, next to Download all covers. Animated covers moved to Style. Storage is gone.
+  - What's new is in About. The Time Machine's "songs not in your library" switch is also in Scrobbling and history.
+  - Connections is now **Servers and services**, Daily Vibe settings **Mixes and vibes**, Scrobbling **Scrobbling
+    and history**, and Backup **Backup and restore**.
+- **Settings sections start open.** Tap a heading to fold it; it stays folded the next time you come back.
+
 ## 0.47.0beta — 2026-10-31
 
 ### Fixed
