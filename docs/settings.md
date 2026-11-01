@@ -76,10 +76,9 @@ in Servers and services. See [Audiobooks and podcasts](books.md).
 
 ## Home
 
-- **Source filter**: whose music shows, everywhere in the app, and **Only downloaded music**.
-- **Arrange Home**: the order of Home's sections, which are hidden, each section's look, and the spacing.
+The source filter (whose music shows, and **Only downloaded music**) and **Arrange Home** (the order of Home's
+sections, which are hidden, their looks and the spacing) are behind the button at the top of Home, not here.
 
-  Both open the same panel as the button at the top of Home.
 - **Notices**: the row of chips at the top of Home: show it or not, and each kind **Pinned** (always first, in the
   order you pin them), **Automatic** (the default: ordered by what needs you and what you tap) or **Off**. See
   [Notices](home-and-mixes.md#notices).

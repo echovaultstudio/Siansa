@@ -12,6 +12,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
@@ -382,6 +386,20 @@ class SpacingHomeTest : SpacingCheck() {
         val dots = compose.onNodeWithTag("coverRowsDots").getBoundsInRoot()
         val after = compose.onNodeWithTag("after").getBoundsInRoot()
         assertEven("Gap above and below the dots", dots.top - column.bottom.toDp(), after.top - dots.bottom, 1.dp)
+    }
+
+    /** Cover rows (issue #800): swiping to the last column moves the dots along, though it can't reach the left edge. */
+    @Test fun coverRowsDotsFollowTheSwipe() {
+        fun a(i: Int) = app.siansa.ui.CoverRowAction(
+            app.siansa.mix.CoverRow("$i", app.siansa.mix.CoverRow.Kind.ALBUM, null, "Artist $i", "Album $i", "11 songs"),
+            false, {}, {}, emptyList(),
+        )
+        compose.setContent { SiansaTheme { app.siansa.ui.CoverRowsShelf("Keep listening", (1..6).map(::a)) {} } }
+        val dots = compose.onNodeWithTag("coverRowsDots")
+        dots.assert(androidx.compose.ui.test.SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "1 of 2"))
+        compose.onAllNodesWithTag("coverRowsColumn").onFirst().performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        dots.assert(androidx.compose.ui.test.SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "2 of 2"))
     }
 
     private fun Float.toDp() = with(compose.density) { this@toDp.toDp() }
