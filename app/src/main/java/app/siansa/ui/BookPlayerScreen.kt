@@ -496,7 +496,7 @@ private fun BookMenu(book: Book, onDismiss: () -> Unit, onOpenBook: () -> Unit, 
                     graph.bookPlayer.bookmark(notify)
                     onDismiss()
                 }
-                MenuRow(Icons.Rounded.Bedtime, "Sleep at the end of the chapter", tag = if (graph.bookPlayer.sleepAtChapterEnd) "on" else null) {
+                MenuRow(Icons.Rounded.Bedtime, "Sleep at the end of the chapter", badge = if (graph.bookPlayer.sleepAtChapterEnd) "on" else null) {
                     graph.bookPlayer.toggleSleepAtChapterEnd()
                     onDismiss()
                 }
