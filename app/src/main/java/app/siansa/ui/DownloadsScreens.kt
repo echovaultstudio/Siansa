@@ -740,8 +740,7 @@ internal fun ImageCacheSection() {
             style = MaterialTheme.typography.bodyLarge,
         )
     }
-    // A step more under the label: Clear's own touch margin adds the same under the chips, so they sit evenly between (#780).
-    Text("Maximum size", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = Space.Tight).testTag("imageCacheLabel"))
+    Text("Maximum size", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("imageCacheLabel"))
     Row(Modifier.horizontalScroll(rememberScrollState()).testTag("imageCacheChips"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         cacheSizes.forEach { mb ->
             FilterChip(
