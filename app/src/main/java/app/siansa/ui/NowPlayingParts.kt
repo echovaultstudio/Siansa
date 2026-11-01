@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -243,8 +244,10 @@ private fun MenuRow(icon: Painter, label: String, tint: Color? = null, enabled: 
         Modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onClick)
-            .height(MENU_ROW_HEIGHT)
-            .padding(horizontal = Space.Page),
+            // At least a row's height; a label that wraps (large font, long words) gets a taller row instead of being
+            // cut off (issue #778).
+            .heightIn(min = MENU_ROW_HEIGHT)
+            .padding(horizontal = Space.Page, vertical = Space.Tight),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, tint = tint ?: color.copy(alpha = if (enabled) 0.85f else 0.45f), modifier = Modifier.size(24.dp))
