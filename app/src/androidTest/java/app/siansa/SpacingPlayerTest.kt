@@ -33,6 +33,24 @@ class SpacingPlayerTest : SpacingCheck() {
         assertEven("Menu rows", app.siansa.ui.MENU_ROW_HEIGHT, 48.dp, tolerance = 0.dp)
     }
 
+    /** A menu row whose label wraps (issue #778) grows to fit it, with the same gap above and below; a short one stays 48 dp. */
+    @Test fun aWrappedMenuLabelFitsItsRow() {
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.width(280.dp)) {
+                    app.siansa.ui.MenuRow(Icons.Rounded.Palette, "Short") { }
+                    app.siansa.ui.MenuRow(Icons.Rounded.Palette, "Sleep at the end of the chapter, uncharacteristically", badge = "on") { }
+                }
+            }
+        }
+        val short = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Short")), useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Short row", short.bottom - short.top, 48.dp, 1.dp)
+        val row = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Sleep", substring = true)), useUnmergedTree = true).getBoundsInRoot()
+        val label = compose.onNodeWithText("Sleep", substring = true, useUnmergedTree = true).getBoundsInRoot()
+        assertTrue("The label (${label.top}..${label.bottom}) fits its row (${row.top}..${row.bottom})", label.top >= row.top && label.bottom <= row.bottom)
+        assertEven("Wrapped label centred", label.top - row.top, row.bottom - label.bottom, 2.dp)
+    }
+
     /** Shape the mix (issue #649): the shape chips sit evenly between their title and the hint under them. */
     @Test fun mixShapeChipsAreEvenlySpaced() {
         compose.setContent {

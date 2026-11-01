@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -176,7 +177,7 @@ fun PlayerMenu(
                 }
                 // Shuffle moved here from beside the controls (issue #370); lit while it's on.
                 val shuffled = graph.player.state.collectAsStateWithLifecycle().value.shuffle
-                MenuRow(Icons.Rounded.Shuffle, if (shuffled) "Shuffle: on" else "Shuffle: off", tint = if (shuffled) Accent else null, tag = "menuShuffle") {
+                MenuRow(Icons.Rounded.Shuffle, if (shuffled) "Shuffle: on" else "Shuffle: off", tint = if (shuffled) Accent else null) {
                     graph.player.toggleShuffle()
                     notify(if (shuffled) "Shuffle off" else "Shuffle on")
                     onDismiss()
@@ -214,7 +215,7 @@ fun PlayerMenu(
                     Icons.Rounded.Bedtime,
                     "Sleep timer",
                     tint = if (timer != null) Accent else null,
-                    tag = timer?.leftMs(now)?.let { sleepTimeShort(it) } ?: if (timer != null) "On" else null,
+                    badge = timer?.leftMs(now)?.let { sleepTimeShort(it) } ?: if (timer != null) "On" else null,
                 ) { onDismiss(); onOpenSleepTimer() }
             }
         }
@@ -229,27 +230,32 @@ fun PlayerMenu(
 }
 
 @Composable
-internal fun MenuRow(icon: ImageVector, label: String, tint: Color? = null, enabled: Boolean = true, tag: String? = null, onClick: () -> Unit) =
-    MenuRow(rememberVectorPainter(icon), label, tint, enabled, tag, onClick)
+internal fun MenuRow(icon: ImageVector, label: String, tint: Color? = null, enabled: Boolean = true, badge: String? = null, onClick: () -> Unit) =
+    MenuRow(rememberVectorPainter(icon), label, tint, enabled, badge, onClick)
 
-/** A row of the menu with a drawn icon, such as [SimilarAlbumsPainter]. */
+/**
+ * A row of the menu with a drawn icon, such as [SimilarAlbumsPainter]. [badge] is shown at the end of the row, in
+ * capitals ("ON"): it's what the person reads, not a test tag (issue #778: the shuffle row showed "MENUSHUFFLE").
+ */
 @Composable
-private fun MenuRow(icon: Painter, label: String, tint: Color? = null, enabled: Boolean = true, tag: String? = null, onClick: () -> Unit) {
+private fun MenuRow(icon: Painter, label: String, tint: Color? = null, enabled: Boolean = true, badge: String? = null, onClick: () -> Unit) {
     val color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
     Row(
         Modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onClick)
-            .height(MENU_ROW_HEIGHT)
-            .padding(horizontal = Space.Page),
+            // At least a row's height; a label that wraps (large font, long words) gets a taller row instead of being
+            // cut off (issue #778).
+            .heightIn(min = MENU_ROW_HEIGHT)
+            .padding(horizontal = Space.Page, vertical = Space.Tight),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, tint = tint ?: color.copy(alpha = if (enabled) 0.85f else 0.45f), modifier = Modifier.size(24.dp))
         Spacer(Modifier.width(Space.Page))
         Text(label, style = MaterialTheme.typography.bodyLarge, color = tint ?: color, modifier = Modifier.weight(1f))
-        if (tag != null) {
+        if (badge != null) {
             Text(
-                tag.uppercase(),
+                badge.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.secondary,

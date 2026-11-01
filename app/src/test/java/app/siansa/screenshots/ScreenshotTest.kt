@@ -43,6 +43,10 @@ import app.siansa.ui.MixShapeControls
 import app.siansa.ui.ProgressCard
 import app.siansa.playback.BeatMatchMode
 import app.siansa.ui.BeatMatchSection
+import app.siansa.ui.MenuRow
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material.icons.rounded.Shuffle
 import app.siansa.ui.FoldSection
 import app.siansa.ui.SwitchRow
 import app.siansa.ui.TuningRow
@@ -260,6 +264,13 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     DlnaSettingsContent(
                         DlnaDevice("uuid:jbl", "JBL BAR 800MK2", null, "http://speaker/transport", null, formats = setOf("audio/mpeg", "audio/flac", "audio/wav")),
                     )
+                }
+            },
+            // Menu rows (issue #778): no badge on shuffle, a word badge where one says something.
+            Scene("menu_rows") {
+                Column {
+                    MenuRow(Icons.Rounded.Shuffle, "Shuffle: off") {}
+                    MenuRow(Icons.Rounded.Bedtime, "Sleep at the end of the chapter, uncharacteristically", badge = "on") {}
                 }
             },
             // Beat-matched blends with the echo switch (issue #759).
