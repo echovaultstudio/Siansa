@@ -81,11 +81,25 @@ internal fun coverRowsOf(card: PinnedCard, content: CardContent, progress: Map<S
     !card.contents.fromBooks -> content.songs.map(CoverRows::song)
     else -> {
         val rows = content.books.map { it to CoverRows.book(it, progress[it.id]) } +
-            content.episodes.map { (podcast, ep) -> podcast to CoverRows.episode(podcast, ep, progress[podcast.id]?.takeIf { it.episodeId == ep.id }) }
-        if (card.contents == CardContents.LISTENING) rows.sortedByDescending { progress[it.first.id]?.updatedAt ?: 0L }.map { it.second }
+            content.episodes.map { (podcast, ep) -> podcast to CoverRows.episode(podcast, ep, episodeProgressOf(content, progress, podcast, ep)) }
+        if (card.contents == CardContents.LISTENING) rows.sortedByDescending { (book, row) ->
+            val ep = content.episodes.firstOrNull { "episode-${it.second.id}" == row.key }
+            (if (ep != null) episodeProgressOf(content, progress, ep.first, ep.second) else progress[book.id])?.updatedAt ?: 0L
+        }.map { it.second }
         else rows.map { it.second }
     }
 }
+
+/**
+ * An episode's own progress (issue #782): its entry in [CardContent.episodeProgress], else the podcast's, when that
+ * is this episode's. None means it hasn't been started: "new".
+ */
+internal fun episodeProgressOf(content: CardContent, progress: Map<String, BookProgress>, podcast: app.siansa.data.Book, ep: app.siansa.net.Episode): BookProgress? =
+    content.episodeProgress[ep.id] ?: progress[podcast.id]?.takeIf { it.episodeId == ep.id }
+
+/** Whether the episode [episodeId] of [podcastId] is the one the book player has (issue #782: by id, not title). */
+internal fun isEpisodePlaying(playerBookId: String?, playerEpisodeId: String?, podcastId: String, episodeId: String): Boolean =
+    playerBookId == podcastId && playerEpisodeId == episodeId
 
 /** What each row of a card does, with the player's state for the one playing. */
 @Composable
@@ -142,7 +156,7 @@ private fun rememberCoverRowActions(nav: NavController, card: PinnedCard, conten
             )
             episode != null -> {
                 val (podcast, ep) = episode
-                val isThis = books.book?.id == podcast.id && books.book?.title == ep.title
+                val isThis = isEpisodePlaying(books.book?.id, graph.bookPlayer.episodeId, podcast.id, ep.id)
                 CoverRowAction(
                     row,
                     playing = books.playing && isThis,
@@ -202,7 +216,7 @@ internal fun CoverRowsShelf(title: String, actions: List<CoverRowAction>, open: 
             }
         }
         if (columns.size > 1) {
-            PageDots(columns.size, list.firstVisibleItemIndex, Modifier.align(Alignment.CenterHorizontally).padding(top = Space.Small))
+            PageDots(columns.size, list.firstVisibleItemIndex, Modifier.align(Alignment.CenterHorizontally).padding(vertical = Space.Small))
         }
     }
 }

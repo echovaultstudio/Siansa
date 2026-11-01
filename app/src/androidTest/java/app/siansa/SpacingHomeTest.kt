@@ -331,4 +331,33 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Gaps between chips", mon.left - all.right, tue.left - mon.right, 1.dp)
         assertEven("Chip tops", all.top, mon.top, 1.dp)
     }
+
+    /**
+     * Cover rows (issue #782): the three rows of a column are one height apart, and the page dots sit with the same
+     * gap above them (under the rows) as below (before what follows).
+     */
+    @Test fun coverRowsAndTheirDotsAreEvenlySpaced() {
+        fun a(i: Int) = app.siansa.ui.CoverRowAction(
+            app.siansa.mix.CoverRow("$i", app.siansa.mix.CoverRow.Kind.ALBUM, null, "Artist $i", "Album $i", "11 songs"),
+            false, {}, {}, emptyList(),
+        )
+        compose.setContent {
+            SiansaTheme {
+                Column {
+                    app.siansa.ui.CoverRowsShelf("Recently added", (1..5).map(::a)) {}
+                    Box(Modifier.fillMaxWidth().height(24.dp).testTag("after"))
+                }
+            }
+        }
+        val rows = compose.onAllNodesWithTag("coverRow").fetchSemanticsNodes().take(3).map { it.boundsInRoot }
+        val step1 = rows[1].top - rows[0].top
+        val step2 = rows[2].top - rows[1].top
+        assertEquals("Rows one height apart", step1, step2, 1f)
+        val column = compose.onAllNodesWithTag("coverRowsColumn").fetchSemanticsNodes().first().boundsInRoot
+        val dots = compose.onNodeWithTag("coverRowsDots").getBoundsInRoot()
+        val after = compose.onNodeWithTag("after").getBoundsInRoot()
+        assertEven("Gap above and below the dots", dots.top - column.bottom.toDp(), after.top - dots.bottom, 1.dp)
+    }
+
+    private fun Float.toDp() = with(compose.density) { this@toDp.toDp() }
 }

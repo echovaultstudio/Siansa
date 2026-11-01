@@ -6,6 +6,7 @@ import app.siansa.data.Album
 import app.siansa.net.Episode
 import app.siansa.data.BookSort
 import app.siansa.data.Book
+import app.siansa.data.BookProgress
 import app.siansa.data.JsonFile
 import app.siansa.data.Song
 import app.siansa.data.Users
@@ -235,6 +236,8 @@ data class CardContent(
     val albums: List<Album>,
     val books: List<Book> = emptyList(),
     val episodes: List<Pair<Book, Episode>> = emptyList(),
+    /** Each episode's own progress, by episode id (issue #782); a podcast's progress is only its latest episode's. */
+    val episodeProgress: Map<String, BookProgress> = emptyMap(),
 ) {
     val isEmpty: Boolean get() = songs.isEmpty() && albums.isEmpty() && books.isEmpty() && episodes.isEmpty()
 }
@@ -287,10 +290,15 @@ class PinnedCards(private val graph: AppGraph, context: Context) {
         val started = System.currentTimeMillis()
         val random = Random(daySeed(card.id, day, round))
         if (card.contents.fromBooks) {
-            val content = bookContent(card, random)
-            AppLog.i("Cards", "Custom card \"${card.title}\": ${content.books.size} books, ${content.episodes.size} episodes in ${System.currentTimeMillis() - started}ms")
-            made.keys.removeAll { !it.startsWith(day.toString()) }
-            made[key] = content
+            val (content, whole) = bookContent(card, random)
+            AppLog.i("Cards", "Custom card \"${card.title}\": ${content.books.size} books, ${content.episodes.size} episodes in ${System.currentTimeMillis() - started}ms" +
+                if (whole) "" else " (some requests failed: read again next time)")
+            // Kept for the day only when it's whole and not Keep listening, which follows what you play (issue #782):
+            // a failed or partial load, or what you're partway through, is read again next time.
+            if (bookCardKeptForTheDay(card.contents, whole, content.isEmpty)) {
+                made.keys.removeAll { !it.startsWith(day.toString()) }
+                made[key] = content
+            }
             return content
         }
         val (songs, albums) = when {
@@ -329,27 +337,43 @@ class PinnedCards(private val graph: AppGraph, context: Context) {
      * A card of books or episodes from Audiobookshelf (issue #782): the audiobooks in the card's order, the newest
      * episodes of the podcasts played or added most lately, or what's in progress, the most recent first.
      */
-    private suspend fun bookContent(card: PinnedCard, random: Random): CardContent {
+    /** The content, and whether every request for it worked (a partial one isn't kept for the day). */
+    private suspend fun bookContent(card: PinnedCard, random: Random): Pair<CardContent, Boolean> {
         if (!graph.settings.current.booksReady) throw IllegalStateException("Set up Audiobookshelf in Settings › Servers and services first")
         val size = card.size.coerceIn(1, MAX_SIZE)
-        runCatching { graph.books.refreshProgress() }
+        var whole = true
+        /** One podcast's episodes; a failure leaves it out and marks the content partial. A cancel goes on up. */
+        suspend fun episodesOf(podcast: Book): List<Episode> = try {
+            graph.audiobookshelf.episodes(podcast.id)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            whole = false
+            AppLog.w("Cards", "Episodes of \"${podcast.title}\" couldn't be read: ${e.message}")
+            emptyList()
+        }
+        try {
+            graph.books.refreshProgress()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            whole = false
+        }
         val progress = graph.books.progress.value
-        return when (card.contents) {
+        val content = when (card.contents) {
             CardContents.BOOKS -> {
                 val all = graph.books.all(podcasts = false, sort = if (card.sort == CardSort.NAME) BookSort.TITLE else BookSort.ADDED)
                 CardContent(emptyList(), emptyList(), books = if (card.sort == CardSort.RANDOM) all.shuffled(random).take(size) else all.take(size))
             }
             CardContents.EPISODES -> {
                 val podcasts = graph.books.all(podcasts = true, sort = BookSort.RECENT).take(EPISODE_PODCASTS)
-                val episodes = podcasts.flatMap { podcast ->
-                    runCatching { graph.audiobookshelf.episodes(podcast.id) }.getOrDefault(emptyList()).take(EPISODES_EACH).map { podcast to it }
-                }
+                val episodes = podcasts.flatMap { podcast -> episodesOf(podcast).take(EPISODES_EACH).map { podcast to it } }
                 val ordered = when (card.sort) {
                     CardSort.NAME -> episodes.sortedBy { it.second.title.lowercase() }
                     CardSort.RANDOM -> episodes.shuffled(random)
                     else -> episodes.sortedByDescending { it.second.publishedAt }
                 }
-                CardContent(emptyList(), emptyList(), episodes = ordered.take(size))
+                CardContent(emptyList(), emptyList(), episodes = ordered.take(size), episodeProgress = episodeProgress())
             }
             else -> {
                 // Keep listening: books part-way through, and the episode each podcast in progress was left on.
@@ -357,11 +381,31 @@ class PinnedCards(private val graph: AppGraph, context: Context) {
                 val books = started.filter { !it.podcast }
                 val episodes = started.filter { it.podcast }.mapNotNull { podcast ->
                     val episodeId = progress[podcast.id]?.episodeId ?: return@mapNotNull null
-                    runCatching { graph.audiobookshelf.episodes(podcast.id) }.getOrDefault(emptyList()).firstOrNull { it.id == episodeId }?.let { podcast to it }
+                    episodesOf(podcast).firstOrNull { it.id == episodeId }?.let { podcast to it }
                 }
-                CardContent(emptyList(), emptyList(), books = books.take(size), episodes = episodes.take(size))
+                val byEpisode = episodeProgress()
+                // "How many" counts books and episodes together: the most recently listened first, then cut once.
+                val (keptBooks, keptEpisodes) = keepListening(books, episodes, size) { item ->
+                    when (item) {
+                        is Book -> progress[item.id]?.updatedAt ?: 0L
+                        is Episode -> byEpisode[item.id]?.updatedAt ?: progress[item.podcastId]?.takeIf { it.episodeId == item.id }?.updatedAt ?: 0L
+                        else -> 0L
+                    }
+                }
+                CardContent(emptyList(), emptyList(), books = keptBooks, episodes = keptEpisodes, episodeProgress = byEpisode)
             }
         }
+        return content to whole
+    }
+
+    /** Each episode's own progress (issue #782), or none when it can't be read: the podcast's latest is used then. */
+    private suspend fun episodeProgress(): Map<String, BookProgress> = try {
+        episodeProgressById(graph.audiobookshelf.progressList())
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        AppLog.w("Cards", "Episode progress couldn't be read: ${e.message}")
+        emptyMap()
     }
 
     /** What this phone and the server's counts say about each song's plays. */
@@ -381,4 +425,33 @@ class PinnedCards(private val graph: AppGraph, context: Context) {
         /** An album card plays this many of its albums, in turn. */
         const val PLAY_ALBUMS = 10
     }
+}
+
+/**
+ * Whether a card of books or episodes is kept for the day (issue #782): only a whole, non-empty load, and never
+ * Keep listening, which follows what you play. Anything else is read again next time the card shows.
+ */
+fun bookCardKeptForTheDay(contents: CardContents, whole: Boolean, empty: Boolean): Boolean =
+    whole && !empty && contents != CardContents.LISTENING
+
+/** Each podcast episode's own progress, by episode id (issue #782); books, which have no episode, are left out. */
+fun episodeProgressById(all: List<BookProgress>): Map<String, BookProgress> =
+    all.filter { it.episodeId != null }.groupBy { it.episodeId!! }.mapValues { (_, list) -> list.maxBy { it.updatedAt } }
+
+/**
+ * Keep listening's [books] and [episodes] together, the most recently listened first ([lastListened], epoch ms),
+ * and at most [size] of them in all (issue #782: each was cut to [size] on its own, so a card could hold twice).
+ */
+fun keepListening(
+    books: List<Book>,
+    episodes: List<Pair<Book, Episode>>,
+    size: Int,
+    lastListened: (Any) -> Long,
+): Pair<List<Book>, List<Pair<Book, Episode>>> {
+    val merged = (books.map { it as Any to lastListened(it) } + episodes.map { it as Any to lastListened(it.second) })
+        .sortedByDescending { it.second }
+        .take(size.coerceAtLeast(0))
+        .map { it.first }
+    @Suppress("UNCHECKED_CAST")
+    return merged.filterIsInstance<Book>() to merged.filterIsInstance<Pair<*, *>>().map { it as Pair<Book, Episode> }
 }
