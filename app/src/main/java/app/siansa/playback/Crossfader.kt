@@ -101,6 +101,10 @@ internal class Crossfader(
     /** The step error smoothed over the last few readings, which decides jumps and nudges (issue #759). */
     private var smoothed = BeatMatch.SmoothedError()
     private var switchedAt = 0L
+    /** The blend got ready knew the next song's fade shape; without it, it's planned again when that arrives. */
+    private var plannedWithNext = true
+    /** How often the silent tail jumped to catch up before this blend. */
+    private var tailJumps = 0
     /** After a beat-matched blend: the matched speed being eased back from, and since when. */
     private var easingFrom = 0f
     private var easingSince = 0L
@@ -207,6 +211,7 @@ internal class Crossfader(
                 skipped = item.mediaId
                 return LOOK_MS
             }
+            plannedWithNext = profiles.cached(next.id) != null
             arm(item, planned, at, primeFrom(position, at))
         }
         val speed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
@@ -263,6 +268,7 @@ internal class Crossfader(
         val now = SystemClock.elapsedRealtime()
         if (abs(behind) > COARSE_MS && now - lastCoarseAlign > 600) {
             lastCoarseAlign = now
+            tailJumps++
             t.seekTo(main.currentPosition + COARSE_LEAD_MS)
             return
         }
@@ -280,6 +286,7 @@ internal class Crossfader(
         startAt = at
         primeAt = from
         primed = false
+        tailJumps = 0
         phase = Phase.READY
         val length = main.duration.takeIf { it > 0 }
         val where = length?.let { " · starts at ${clock(at)} of ${clock(it)}" }.orEmpty()
@@ -346,13 +353,21 @@ internal class Crossfader(
         if (planned.beat != null && settings().echoTail) openEcho(t)
         val wasPrimed = primed && t.isPlaying
         val drift = t.currentPosition - main.currentPosition
+        // Out of step at the handover, the two copies blend apart for a moment, heard as a smear or a wobble
+        // (issue #796): what the tail was doing, to see next time why it didn't catch up.
+        val catchUp = if (wasPrimed && abs(drift) > Crossfade.HANDOVER_STEP_MS) {
+            " · not caught up: playing at %.2f×, %d jump%s, %s".format(
+                java.util.Locale.ROOT, t.playbackParameters.speed, tailJumps, if (tailJumps == 1) "" else "s",
+                if (t.playbackState == Player.STATE_BUFFERING) "loading" else "ready",
+            )
+        } else ""
         t.setPlaybackSpeed(main.playbackParameters.speed.takeIf { it > 0f } ?: 1f)
         t.volume = 0f
         if (!t.isPlaying) t.play()
         AppLog.i(
             "Crossfade",
             "Fading ${item.mediaId} into ${main.getMediaItemAt(nextIndex).mediaId}: ${planned.why} · " +
-                if (wasPrimed) "tail in step (${if (drift >= 0) "+" else ""}$drift ms)" else "tail started now (not primed in time)",
+                if (wasPrimed) "tail in step (${if (drift >= 0) "+" else ""}$drift ms)$catchUp" else "tail started now (not primed in time)",
         )
         handler.post(fadeTick)
     }
@@ -616,6 +631,17 @@ internal class Crossfader(
         skipped = null
         disarm()
         poke()
+    }
+
+    /**
+     * Fade shapes arrived for [ids] (issue #796): a blend got ready before the next song's arrived is planned
+     * again, so it can take that song's beat into account.
+     */
+    fun profilesArrived(ids: Set<String>) {
+        val next = main.nextMediaItemIndex.takeIf { it != C.INDEX_UNSET }?.let { main.getMediaItemAt(it).mediaId } ?: return
+        if (!Crossfade.planAgainForShape(phase == Phase.READY, plannedWithNext, primed, startAt - main.currentPosition, next in ids)) return
+        AppLog.d("Crossfade", "The next song's fade shape arrived: planning the blend again")
+        replan()
     }
 
     override fun onRepeatModeChanged(repeatMode: Int) = replan()

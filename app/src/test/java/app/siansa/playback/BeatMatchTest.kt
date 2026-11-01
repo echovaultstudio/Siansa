@@ -291,13 +291,56 @@ class BeatMatchTest {
         assertEquals(5_000L, plan.cutMs)
         assertEquals(15_000L, plan.overlapMs)
         assertTrue(plan.why, plan.why.contains("phrase on phrase"))
-        // Into a short song the blend is held to a third of it and isn't beat-matched: the part-phrase isn't left
-        // out then, as it would only lose the ending.
+        // Into a short song the blend must fit a third of it (13.3 s of 40 s): it's laid again over half a phrase
+        // (issue #796), still letting the song go at the end of its last phrase, rather than blended out of step.
         val short = Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 305_000, 40_000, a, b, beatMatch = true)!!
-        assertNull(short.beat)
-        assertEquals(0L, short.cutMs)
-        assertEquals(13_333L, short.overlapMs)
-        assertFalse(short.why, short.why.contains("phrase"))
+        assertNotNull(short.beat)
+        assertEquals(7_500L, short.overlapMs)
+        assertEquals(5_000L, short.cutMs)
+        assertTrue(short.why, short.why.contains("fewer bars"))
+    }
+
+    /**
+     * Issue #796, from a report: two 175 BPM drum and bass songs, the next one 21.5 s long. The 16-bar blend didn't
+     * fit a third of it, so it was dropped and the two beats blended out of step for 7 s. Now it's laid over the
+     * bars that fit.
+     */
+    @Test fun aBlendIntoAShortSongIsLaidOverFewerBars() {
+        val dnbOut = BeatEnd(bpm = 175.0, beatMs = 85_000.0, barMs = 85_000.0, rhythm = 0.87f, steady = 0.88f)
+        val dnbIn = BeatEnd(bpm = 175.0, beatMs = 200.0, barMs = 200.0, rhythm = 0.9f, steady = 0.89f)
+        val next = song.copy(id = "b", albumId = "al2")
+        val plan = Crossfade.plan(
+            CrossfadeMode.SMART, 20_000, song, next, 86_848, 21_542,
+            profile("a", dnbOut, null), profile("b", null, dnbIn), beatMatch = true, blendBars = 16,
+        )!!
+        assertNotNull(plan.why, plan.beat)
+        assertTrue(plan.why, plan.overlapMs <= 21_542 / 3)
+        assertEquals(4, plan.beat!!.bars)  // 4 bars at 175 BPM are 5.5 s; 8 would be 11 s
+        assertTrue(plan.why, plan.why.contains("fewer bars"))
+    }
+
+    /**
+     * Issue #796, from a report: the song going out keeps a steady beat and the next song hasn't been measured, so
+     * nothing can be laid on its beat. A 20 s blend clashed all the way; now it's as short as a clash is kept.
+     */
+    /** Issue #796: a blend got ready without the next song's shape is planned again when it arrives, while there's time. */
+    @Test fun aBlendIsPlannedAgainWhenTheNextSongsShapeArrives() {
+        assertTrue(Crossfade.planAgainForShape(ready = true, plannedWithNext = false, primed = false, untilFadeMs = 20_000, arrived = true))
+        assertFalse(Crossfade.planAgainForShape(ready = true, plannedWithNext = true, primed = false, untilFadeMs = 20_000, arrived = true))
+        assertFalse(Crossfade.planAgainForShape(ready = true, plannedWithNext = false, primed = false, untilFadeMs = 20_000, arrived = false))
+        assertFalse(Crossfade.planAgainForShape(ready = true, plannedWithNext = false, primed = true, untilFadeMs = 20_000, arrived = true))
+        assertFalse(Crossfade.planAgainForShape(ready = true, plannedWithNext = false, primed = false, untilFadeMs = 2_000, arrived = true))
+        assertFalse(Crossfade.planAgainForShape(ready = false, plannedWithNext = false, primed = false, untilFadeMs = 20_000, arrived = true))
+    }
+
+    @Test fun aSteadyBeatIntoAnUnmeasuredSongBlendsOnlyForAMoment() {
+        val next = song.copy(id = "b", albumId = "al2")
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 20_000, song, next, 310_000, 300_000, profile("a", outro, null), null, beatMatch = true)!!
+        assertEquals(BeatMatch.CLASH_MS, plan.overlapMs)
+        assertTrue(plan.why, plan.why.contains("isn't known"))
+        // Without a beat going out (a pad, a fade), or with plain crossfades, the full length as before.
+        assertEquals(20_000L, Crossfade.plan(CrossfadeMode.SMART, 20_000, song, next, 310_000, 300_000, profile("a", pad, null), null)!!.overlapMs)
+        assertEquals(20_000L, Crossfade.plan(CrossfadeMode.FIXED, 20_000, song, next, 310_000, 300_000, profile("a", outro, null), null)!!.overlapMs)
     }
 
     @Test fun mixedPhraseLengthsUseTheLongerOne() {
