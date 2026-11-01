@@ -151,6 +151,27 @@ class BeatMatchTest {
         assertTrue(Crossfade.whyNoFade(CrossfadeMode.SMART, 16_000, song, next, profile("a", outro, null), profile("b", null, far), beatMatch = true)!!.contains("too far apart"))
     }
 
+    /**
+     * Issue #796, from a drum and bass log: an outro read at 106 BPM, beat-driven (0.80) but "steady 0.00" (breaks
+     * often read that way), into a 168 BPM intro with a steady beat. Neither can be laid on the other, and the 6.9 s
+     * smart blend clashed (skipped 2.6 s in). Two ends that keep a beat now blend short whether or not they're steady;
+     * likewise a beat-driven end into a song with no measurements (a 30 s blend, skipped 7 s in).
+     */
+    @Test fun twoBeatsBlendShortEvenWhenOneIsntSteady() {
+        val next = song.copy(id = "b", albumId = "al2")
+        val breaks = BeatEnd(bpm = 106.2, beatMs = 300_000.0, barMs = null, rhythm = 0.80f, steady = 0.0f)
+        val dnb = BeatEnd(bpm = 168.0, beatMs = 500.0, barMs = null, rhythm = 0.90f, steady = 0.76f, phraseMs = 500.0, phraseBars = 8)
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 30_000, song, next, 310_000, 300_000,
+            profile("a", breaks, null, quietTailMs = 6_900), profile("b", null, dnb), beatMatch = true)!!
+        assertEquals(BeatMatch.CLASH_MS, plan.overlapMs)
+        val unknown = Crossfade.plan(CrossfadeMode.SMART, 30_000, song, next, 310_000, 300_000,
+            profile("a", breaks.copy(bpm = 86.2, rhythm = 0.90f, steady = 0.09f), null), null, beatMatch = true)!!
+        assertEquals(BeatMatch.CLASH_MS, unknown.overlapMs)
+        // A beatless end either side keeps the long blend.
+        assertEquals(6_900L, Crossfade.plan(CrossfadeMode.SMART, 30_000, song, next, 310_000, 300_000,
+            profile("a", breaks.copy(rhythm = 0.22f), null, quietTailMs = 6_900), profile("b", null, dnb))!!.overlapMs)
+    }
+
     @Test fun theProfileAnswerCarriesTheGrids() {
         val profiles = PluginProfiles.parse(
             """{"schema_version":1,"profiles":[{"track_id":"a","ref_lufs":-9.5,"start_ramp":"","end_ramp":"","duration_ms":310000,""" +
@@ -235,6 +256,26 @@ class BeatMatchTest {
         assertEquals("beats not checked", stats.describe())
         listOf(4L, -8L, 12L, -20L).forEach(stats::add)
         assertEquals("beats typically 11 ms apart, at worst 20 ms (4 checks)", stats.describe())
+        // The smoothed errors say how far apart the beats mostly were (issue #796).
+        listOf(5L, -12L, 30L, 40L, 8L).forEach(stats::addSettled)
+        assertEquals("beats typically 11 ms apart, at worst 20 ms (4 checks); smoothed, 12 ms apart, within 20 ms 60 % of the time", stats.describe())
+    }
+
+    /**
+     * Issue #796: easing back after a blend changed the speed every 200 ms (125 times over 25 s), and every change
+     * re-tunes the time-stretcher (issue #773). Now only steps of at least [BeatMatch.NUDGE_STEP] are sent.
+     */
+    @Test fun easingBackGoesInFewStepsWorthHearing() {
+        var playing = 0.968f
+        var changes = 0
+        for (elapsed in 0L..BeatMatch.EASE_MS + 200 step 200) {
+            BeatMatch.easeStep(0.968f, elapsed, playing)?.let { playing = it; changes++ }
+        }
+        assertEquals(1f, playing, 1e-6f)
+        assertTrue("$changes changes", changes in 15..25)
+        // Nothing to send when already where it should be, and the listener's own speed is the end point.
+        assertNull(BeatMatch.easeStep(0.968f, 0, 0.968f))
+        assertEquals(1.25f, BeatMatch.easeStep(0.968f, BeatMatch.EASE_MS, 1.2f, base = 1.25f)!!, 1e-6f)
     }
 
     // ---- Phrase on phrase (issue #757) ----
@@ -291,13 +332,56 @@ class BeatMatchTest {
         assertEquals(5_000L, plan.cutMs)
         assertEquals(15_000L, plan.overlapMs)
         assertTrue(plan.why, plan.why.contains("phrase on phrase"))
-        // Into a short song the blend is held to a third of it and isn't beat-matched: the part-phrase isn't left
-        // out then, as it would only lose the ending.
+        // Into a short song the blend must fit a third of it (13.3 s of 40 s): it's laid again over half a phrase
+        // (issue #796), still letting the song go at the end of its last phrase, rather than blended out of step.
         val short = Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 305_000, 40_000, a, b, beatMatch = true)!!
-        assertNull(short.beat)
-        assertEquals(0L, short.cutMs)
-        assertEquals(13_333L, short.overlapMs)
-        assertFalse(short.why, short.why.contains("phrase"))
+        assertNotNull(short.beat)
+        assertEquals(7_500L, short.overlapMs)
+        assertEquals(5_000L, short.cutMs)
+        assertTrue(short.why, short.why.contains("fewer bars"))
+    }
+
+    /**
+     * Issue #796, from a report: two 175 BPM drum and bass songs, the next one 21.5 s long. The 16-bar blend didn't
+     * fit a third of it, so it was dropped and the two beats blended out of step for 7 s. Now it's laid over the
+     * bars that fit.
+     */
+    @Test fun aBlendIntoAShortSongIsLaidOverFewerBars() {
+        val dnbOut = BeatEnd(bpm = 175.0, beatMs = 85_000.0, barMs = 85_000.0, rhythm = 0.87f, steady = 0.88f)
+        val dnbIn = BeatEnd(bpm = 175.0, beatMs = 200.0, barMs = 200.0, rhythm = 0.9f, steady = 0.89f)
+        val next = song.copy(id = "b", albumId = "al2")
+        val plan = Crossfade.plan(
+            CrossfadeMode.SMART, 20_000, song, next, 86_848, 21_542,
+            profile("a", dnbOut, null), profile("b", null, dnbIn), beatMatch = true, blendBars = 16,
+        )!!
+        assertNotNull(plan.why, plan.beat)
+        assertTrue(plan.why, plan.overlapMs <= 21_542 / 3)
+        assertEquals(4, plan.beat!!.bars)  // 4 bars at 175 BPM are 5.5 s; 8 would be 11 s
+        assertTrue(plan.why, plan.why.contains("fewer bars"))
+    }
+
+    /**
+     * Issue #796, from a report: the song going out keeps a steady beat and the next song hasn't been measured, so
+     * nothing can be laid on its beat. A 20 s blend clashed all the way; now it's as short as a clash is kept.
+     */
+    /** Issue #796: a blend got ready without the next song's shape is planned again when it arrives, while there's time. */
+    @Test fun aBlendIsPlannedAgainWhenTheNextSongsShapeArrives() {
+        assertTrue(Crossfade.planAgainForShape(ready = true, plannedWithNext = false, primed = false, untilFadeMs = 20_000, arrived = true))
+        assertFalse(Crossfade.planAgainForShape(ready = true, plannedWithNext = true, primed = false, untilFadeMs = 20_000, arrived = true))
+        assertFalse(Crossfade.planAgainForShape(ready = true, plannedWithNext = false, primed = false, untilFadeMs = 20_000, arrived = false))
+        assertFalse(Crossfade.planAgainForShape(ready = true, plannedWithNext = false, primed = true, untilFadeMs = 20_000, arrived = true))
+        assertFalse(Crossfade.planAgainForShape(ready = true, plannedWithNext = false, primed = false, untilFadeMs = 2_000, arrived = true))
+        assertFalse(Crossfade.planAgainForShape(ready = false, plannedWithNext = false, primed = false, untilFadeMs = 20_000, arrived = true))
+    }
+
+    @Test fun aSteadyBeatIntoAnUnmeasuredSongBlendsOnlyForAMoment() {
+        val next = song.copy(id = "b", albumId = "al2")
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 20_000, song, next, 310_000, 300_000, profile("a", outro, null), null, beatMatch = true)!!
+        assertEquals(BeatMatch.CLASH_MS, plan.overlapMs)
+        assertTrue(plan.why, plan.why.contains("isn't known"))
+        // Without a beat going out (a pad, a fade), or with plain crossfades, the full length as before.
+        assertEquals(20_000L, Crossfade.plan(CrossfadeMode.SMART, 20_000, song, next, 310_000, 300_000, profile("a", pad, null), null)!!.overlapMs)
+        assertEquals(20_000L, Crossfade.plan(CrossfadeMode.FIXED, 20_000, song, next, 310_000, 300_000, profile("a", outro, null), null)!!.overlapMs)
     }
 
     @Test fun mixedPhraseLengthsUseTheLongerOne() {

@@ -101,9 +101,18 @@ internal class Crossfader(
     /** The step error smoothed over the last few readings, which decides jumps and nudges (issue #759). */
     private var smoothed = BeatMatch.SmoothedError()
     private var switchedAt = 0L
+    /** The blend got ready knew the next song's fade shape; without it, it's planned again when that arrives. */
+    private var plannedWithNext = true
+    /** How often the silent tail jumped to catch up before this blend. */
+    private var tailJumps = 0
     /** After a beat-matched blend: the matched speed being eased back from, and since when. */
     private var easingFrom = 0f
     private var easingSince = 0L
+    private var easeChanges = 0
+    /** The last 4-bar stage of a beat-matched blend logged. */
+    private var loggedStage = 0
+    /** When the silent tail's catch-up was last logged. */
+    private var tailLoggedAt = 0L
     /**
      * The echo at the end of a beat-matched blend (issue #759): a hall reverb on the phone's output mix that the
      * tail is sent to, more and more over its last bar, as a DJ echoes a track out; then the tail is paused and the
@@ -207,6 +216,7 @@ internal class Crossfader(
                 skipped = item.mediaId
                 return LOOK_MS
             }
+            plannedWithNext = profiles.cached(next.id) != null
             arm(item, planned, at, primeFrom(position, at))
         }
         val speed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
@@ -263,10 +273,16 @@ internal class Crossfader(
         val now = SystemClock.elapsedRealtime()
         if (abs(behind) > COARSE_MS && now - lastCoarseAlign > 600) {
             lastCoarseAlign = now
+            tailJumps++
             t.seekTo(main.currentPosition + COARSE_LEAD_MS)
             return
         }
         t.setPlaybackSpeed(mainSpeed * Crossfade.tailSpeed(behind))
+        // Twice a second, how the catch-up goes (issue #796: the tail was ~160 ms behind at three handovers).
+        if (abs(behind) > Crossfade.HANDOVER_STEP_MS && now - tailLoggedAt >= 500) {
+            tailLoggedAt = now
+            AppLog.d("Crossfade", "Tail catching up: $behind ms behind, playing at %.2f×".format(java.util.Locale.ROOT, t.playbackParameters.speed))
+        }
     }
 
     private fun arm(item: MediaItem, planned: FadePlan, at: Long, from: Long) {
@@ -280,6 +296,7 @@ internal class Crossfader(
         startAt = at
         primeAt = from
         primed = false
+        tailJumps = 0
         phase = Phase.READY
         val length = main.duration.takeIf { it > 0 }
         val where = length?.let { " · starts at ${clock(at)} of ${clock(it)}" }.orEmpty()
@@ -338,6 +355,7 @@ internal class Crossfader(
         jumps = 0
         stepStats = BeatMatch.StepStats()
         smoothed = BeatMatch.SmoothedError()
+        loggedStage = 0
         seekLead = null
         seekTarget = -1L
         stopEasing()
@@ -346,13 +364,21 @@ internal class Crossfader(
         if (planned.beat != null && settings().echoTail) openEcho(t)
         val wasPrimed = primed && t.isPlaying
         val drift = t.currentPosition - main.currentPosition
+        // Out of step at the handover, the two copies blend apart for a moment, heard as a smear or a wobble
+        // (issue #796): what the tail was doing, to see next time why it didn't catch up.
+        val catchUp = if (wasPrimed && abs(drift) > Crossfade.HANDOVER_STEP_MS) {
+            " · not caught up: playing at %.2f×, %d jump%s, %s".format(
+                java.util.Locale.ROOT, t.playbackParameters.speed, tailJumps, if (tailJumps == 1) "" else "s",
+                if (t.playbackState == Player.STATE_BUFFERING) "loading" else "ready",
+            )
+        } else ""
         t.setPlaybackSpeed(main.playbackParameters.speed.takeIf { it > 0f } ?: 1f)
         t.volume = 0f
         if (!t.isPlaying) t.play()
         AppLog.i(
             "Crossfade",
             "Fading ${item.mediaId} into ${main.getMediaItemAt(nextIndex).mediaId}: ${planned.why} · " +
-                if (wasPrimed) "tail in step (${if (drift >= 0) "+" else ""}$drift ms)" else "tail started now (not primed in time)",
+                if (wasPrimed) "tail in step (${if (drift >= 0) "+" else ""}$drift ms)$catchUp" else "tail started now (not primed in time)",
         )
         handler.post(fadeTick)
     }
@@ -441,6 +467,15 @@ internal class Crossfader(
         stepStats.add(reading)
         // One reading can be 90 ms off and back the next moment: the middle of the last few decides (issue #759).
         val error = smoothed.add(reading) ?: return
+        stepStats.addSettled(error)
+        // Every 4 bars, how far apart the beats are and the speed (issue #796): a report then says when in the blend
+        // it went out of step, not only that it did.
+        val bars4 = (beat.outgoing.beatLengthMs * BeatMatch.BEATS_PER_BAR * 4).toLong().coerceAtLeast(1L)
+        val stage = ((t.currentPosition - beat.startMs) / bars4).toInt()
+        if (stage > loggedStage) {
+            loggedStage = stage
+            AppLog.d("Crossfade", "Beat-matching, ${stage * 4} bars in: ${if (error > 0) "+" else ""}$error ms out of step, next song at %.4f×".format(java.util.Locale.ROOT, main.playbackParameters.speed))
+        }
         seekLead?.let { lead ->
             // The first settled error after a jump says how long getting there took on this phone (issue #747);
             // nothing has nudged the song yet, so the readings it's the middle of are of one and the same error.
@@ -522,11 +557,14 @@ internal class Crossfader(
         override fun run() {
             if (easingFrom == 0f) return
             val elapsed = SystemClock.elapsedRealtime() - easingSince
-            val speed = BeatMatch.eased(easingFrom, elapsed)
-            main.setPlaybackSpeed(baseSpeed * speed)
+            // Only steps worth hearing as a tempo change: each one re-tunes the time-stretcher (issue #796).
+            BeatMatch.easeStep(easingFrom, elapsed, main.playbackParameters.speed, baseSpeed)?.let {
+                easeChanges++
+                main.setPlaybackSpeed(it)
+            }
             if (elapsed >= BeatMatch.EASE_MS) {
                 easingFrom = 0f
-                AppLog.d("Crossfade", "Beat-matching: back at the song's own speed")
+                AppLog.d("Crossfade", "Beat-matching: back at the song's own speed, in $easeChanges steps")
             } else {
                 handler.postDelayed(this, EASE_TICK_MS)
             }
@@ -536,6 +574,7 @@ internal class Crossfader(
     private fun startEasing(beat: BeatMatch.Plan) {
         easingFrom = beat.speed
         easingSince = SystemClock.elapsedRealtime()
+        easeChanges = 0
         AppLog.i(
             "Crossfade",
             "Beat-matched blend done (${beat.shiftPercent} %): ${stepStats.describe()}, $jumps jump${if (jumps == 1) "" else "s"}, " +
@@ -616,6 +655,17 @@ internal class Crossfader(
         skipped = null
         disarm()
         poke()
+    }
+
+    /**
+     * Fade shapes arrived for [ids] (issue #796): a blend got ready before the next song's arrived is planned
+     * again, so it can take that song's beat into account.
+     */
+    fun profilesArrived(ids: Set<String>) {
+        val next = main.nextMediaItemIndex.takeIf { it != C.INDEX_UNSET }?.let { main.getMediaItemAt(it).mediaId } ?: return
+        if (!Crossfade.planAgainForShape(phase == Phase.READY, plannedWithNext, primed, startAt - main.currentPosition, next in ids)) return
+        AppLog.d("Crossfade", "The next song's fade shape arrived: planning the blend again")
+        replan()
     }
 
     override fun onRepeatModeChanged(repeatMode: Int) = replan()

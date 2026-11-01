@@ -726,9 +726,20 @@ class PlaybackService : MediaSessionService() {
             val ids = upcomingIds(player, Preload.profilesAhead(graph.settings.current, Streaming.isUnmetered(this@PlaybackService)))
             scope.launch {
                 val found: Map<String, TrackProfile> = graph.profiles.fetch(ids)
+                withContext(Dispatchers.Main) { crossfader?.profilesArrived(found.keys) }
                 val profile = found[song.id] ?: return@launch
                 withContext(Dispatchers.Main) { if (current?.id == song.id) relevel(profile) }
             }
+        }
+
+        /**
+         * The songs after this one changed (a radio started, a DJ mix was reshaped or topped up, issue #796): their
+         * fade shapes are fetched now. They used to come only when a song started, so a song queued while another
+         * played had none when its blend was planned, and got a fixed one that took no notice of its beat.
+         */
+        override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+            if (reason != Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) return
+            current?.let(::fetchProfiles)
         }
 
         // The current song is fully downloaded: now the next one can be fetched without slowing it down.
