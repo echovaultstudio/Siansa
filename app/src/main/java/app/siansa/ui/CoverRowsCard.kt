@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
@@ -263,8 +264,10 @@ internal fun CoverRowItem(action: CoverRowAction, divider: Boolean) {
                 }
                 .testTag("coverRowCover"),
         ) {
-            // No cover: the same grey square Cover draws, without asking for one.
-            if (row.cover != null) Cover(row.cover, 150, Modifier.fillMaxSize(), RoundedCornerShape(8.dp))
+            // No cover: the row's colours as a block (a radio, a genre), else the same grey square Cover draws.
+            val shape = if (row.round) CircleShape else RoundedCornerShape(8.dp)
+            if (row.cover != null) Cover(row.cover, 150, Modifier.fillMaxSize(), shape)
+            else if (row.colors != null) Box(Modifier.fillMaxSize().clip(shape).background(Brush.linearGradient(listOf(Color(row.colors.first), Color(row.colors.second)))))
             else Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
             if (action.playing) {
                 Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) {
