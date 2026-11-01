@@ -39,6 +39,31 @@ import org.junit.runner.RunWith
 /** Even spacing, measured on a real screen: Home, its cards and rows, the source filter, mixes, vibes and discovery. Shared setup in [SpacingCheck]. */
 @RunWith(AndroidJUnit4::class)
 class SpacingHomeTest : SpacingCheck() {
+    /** Notices (issue #784): the chips sit one section gap below what's above, the same gap as below them, and a small gap apart. */
+    @Test fun noticeChipsSitEvenly() {
+        compose.setContent {
+            SiansaTheme {
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalSectionGap provides Space.Page) {
+                    Column {
+                        Box(Modifier.fillMaxWidth().height(24.dp).testTag("above"))
+                        app.siansa.ui.NoticeChips(
+                            listOf(app.siansa.mix.Notices.carryOn("b", "Dune"), app.siansa.mix.Notices.newAlbums(2, "a")!!),
+                            onOpen = {}, onHide = {},
+                        )
+                        Box(Modifier.fillMaxWidth().padding(top = Space.Page).height(24.dp).testTag("below"))
+                    }
+                }
+            }
+        }
+        val above = compose.onNodeWithTag("above").getBoundsInRoot()
+        val below = compose.onNodeWithTag("below").getBoundsInRoot()
+        val first = compose.onNodeWithTag("notice-carry_on").getBoundsInRoot()
+        val second = compose.onNodeWithTag("notice-new_albums").getBoundsInRoot()
+        val row = compose.onNodeWithTag("noticesRow").getBoundsInRoot()
+        assertEven("Notices: above and below", row.top - above.bottom, below.top - row.bottom)
+        assertEven("Notices: between chips", second.left - first.right, Space.Small, tolerance = 1.dp)
+    }
+
     /** Arrange Home (issue #694): the spacing step's name stays on one line, even "Compact", with a larger font. */
     @Test fun homeSpacingLabelIsOneLine() {
         compose.setContent {

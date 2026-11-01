@@ -373,6 +373,7 @@ class AppGraph(val app: Application) {
     val insights = Insights(this)
     val radios = Radios(this)
     val suggestions = ArtistSuggestions(this)
+    val notices = app.siansa.data.NoticeStore(app)
     /** Whether the server and AudioMuse can be reached, for offline messages and playing only downloads. */
     val connection = Connection(app, http, { settings.current }, scope)
     val player = PlayerConnection(app, source).apply {

@@ -284,6 +284,8 @@ fun HomeScreen(nav: NavController) {
         for (section in HomeSection.visible(homeOrder, homeHidden)) {
             val look = homeSettings.homeLooks[section] ?: HomeLook.AS_IS
             when (section) {
+                // The chips row (issue #784); its kinds are set in Settings › Home › Notices.
+                HomeSection.NOTICES -> item(key = "notices") { NoticesRow(nav, graph, homeSettings) }
                 HomeSection.QUICK -> {
                     // Quick access, like the top grid in Spotify (issue #271): Liked songs always first, then what
                     // you played last; until there's enough of that, today's mixes, playlists and recent albums.
