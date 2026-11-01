@@ -176,6 +176,10 @@ class SpacingSettingsTest : SpacingCheck() {
                 }
             }
         }
+        // "In use" is worked out in the background and comes in above the label, moving everything down a line: wait
+        // for it, or it can land between two of the readings below (48 dp above but 12 below, issue #800).
+        compose.waitUntil(5_000) { compose.onAllNodes(androidx.compose.ui.test.hasText("In use", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForIdle()
         // By their tags: the row of chips scrolls sideways, so one chip's bounds can be off to the side.
         val label = compose.onNodeWithTag("imageCacheLabel").getBoundsInRoot()
         val chips = compose.onNodeWithTag("imageCacheChips").getBoundsInRoot()

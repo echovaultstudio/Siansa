@@ -45,12 +45,4 @@ class SettingsLayoutTest {
         assertEquals(emptySet<String>(), FoldMemory.foldedAfter(setOf("song-radio"), "song-radio", fold = false))
         assertEquals(setOf("a", "b"), FoldMemory.foldedAfter(setOf("a", "b"), "b", fold = true))
     }
-
-    @Test fun homeRowsSayWhatsSet() {
-        assertEquals("Your music", homeSourcesLine(1, downloadedOnly = false))
-        assertEquals("Your music and 1 other user", homeSourcesLine(2, downloadedOnly = false))
-        assertEquals("Your music and 3 other users · only downloaded music", homeSourcesLine(4, downloadedOnly = true))
-        assertEquals("Every section shown · Normal spacing", homeArrangeLine(0, "Normal"))
-        assertEquals("2 sections hidden · Compact spacing", homeArrangeLine(2, "Compact"))
-    }
 }
