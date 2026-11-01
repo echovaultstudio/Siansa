@@ -638,7 +638,6 @@ internal suspend fun artistRadioArtists(graph: AppGraph, count: Int = ArtistRadi
 /** Opens a Home row's full list; navigation stays on the main thread (it's called from a tap). */
 private fun NavController.openAll(section: app.siansa.ui.HomeSection): () -> Unit = { navigate(section.route) }
 
-/** An album as an item of a row in another look (issue #655). */
 /** An album as a Home item: its artist (or [subtitle]) above, its name, and for Cover rows its song count and year, and a play of it. */
 private fun albumItem(album: Album, subtitle: String, play: (() -> Unit)? = null, open: () -> Unit) = HomeItem(
     album.id, album.name, subtitle, album.coverArt, open = open, play = play,
