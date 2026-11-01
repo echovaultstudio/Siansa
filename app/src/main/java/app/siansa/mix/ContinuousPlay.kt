@@ -283,16 +283,21 @@ class ContinuousPlay(private val graph: AppGraph) {
      * [songs] in DJ order after [last] (issue #337): smooth changes in tempo and key, the most alike first. A song
      * radio in DJ mode uses this too. [songs] as they are when AudioMuse's analysis isn't available.
      */
-    suspend fun djArrange(last: Song, songs: List<Song>): List<Song> {
-        if (songs.size < 2) return songs
+    suspend fun djArrange(last: Song, songs: List<Song>, count: Int = songs.size, likeness: ((String) -> Double)? = null): List<Song> {
+        if (songs.size < 2) return songs.take(count)
         val byId = songs.associateBy { it.id }
         val hits = songs.map { app.siansa.net.ClapHit(it.id, it.title, it.artist, it.album, 0.0) }
-        val ids = djIds(last, hits, songs.size) ?: return songs
+        val ids = djIds(last, hits, count, likeness) ?: return songs.take(count)
         return ids.mapNotNull { byId[it] }
     }
 
     /** DJ mode's order of [hits] after [last]; null when AudioMuse's analysis isn't available (Steady order then). */
-    private suspend fun djIds(last: Song, hits: List<app.siansa.net.ClapHit>, count: Int = TOP_UP): List<String>? {
+    /**
+     * [likeness] says how alike each song is to [last] (0..1); without it, the order of [hits] says so, the most
+     * alike first, as AudioMuse returns them. A reshape passes its own (issue #786): the queue's order isn't
+     * likeness, and ranking by it kept whatever was next where it was, whatever the shape.
+     */
+    private suspend fun djIds(last: Song, hits: List<app.siansa.net.ClapHit>, count: Int = TOP_UP, likeness: ((String) -> Double)? = null): List<String>? {
         if (!graph.settings.current.audioMuseReady) {
             AppLog.i("KeepPlaying", "DJ needs AudioMuse; adding in Steady order")
             return null
@@ -308,7 +313,7 @@ class ContinuousPlay(private val graph: AppGraph) {
         val seed = DjTrack(last.id, last.artist, 1.0, seedFeatures?.tempo, seedFeatures?.key, seedFeatures?.scale, energy[last.id], lift(seedFeatures))
         val pool = hits.mapIndexed { i, hit ->
             val f = features[hit.id]
-            DjTrack(hit.id, hit.artist, likenessByRank(i, hits.size), f?.tempo, f?.key, f?.scale, energy[hit.id], lift(f))
+            DjTrack(hit.id, hit.artist, likeness?.invoke(hit.id) ?: likenessByRank(i, hits.size), f?.tempo, f?.key, f?.scale, energy[hit.id], lift(f))
         }
         val settings = graph.settings.current
         val shape = settings.mixShape

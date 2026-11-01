@@ -73,6 +73,56 @@ class MixShapeTest {
         assertEquals(0.5, energyByRank(mapOf("only" to 0.2))["only"]!!, 1e-9)
     }
 
+    /**
+     * Issue #786, from the owner's log: a DJ radio from an 89 BPM song in A# minor at energy 0.29, with these seven
+     * queued. Whatever the shape, the next song stayed "89 D# e0.71": among the seven it's the only one at a tempo
+     * that mixes, so reordering them could never change it. A reshape now also looks at a fresh lot like the song
+     * playing; with calm and bright songs near 89 BPM among them, the next song follows the shape.
+     */
+    private val logSeed = DjTrack("seed", "Seed", 1.0, 89.0, "A#", "minor", energy = 0.29)
+    private val logQueued = listOf(
+        DjTrack("q1", "A", 0.8, 89.0, "D#", "minor", energy = 0.71),
+        DjTrack("q2", "B", 0.8, 94.0, "A#", "minor", energy = 0.86),
+        DjTrack("q3", "C", 0.8, 94.0, "A", "minor", energy = 0.14),
+        DjTrack("q4", "D", 0.8, 125.0, "F#", "minor", energy = 0.43),
+        DjTrack("q5", "E", 0.8, 156.0, "F#", "minor", energy = 0.57),
+        DjTrack("q6", "F", 0.8, 156.0, "C", "minor", energy = 1.0),
+        DjTrack("q7", "G", 0.8, 117.0, "A#", "minor", energy = 0.0),
+    )
+    private val fresh = listOf(
+        DjTrack("calm", "H", 0.8, 90.0, "A#", "minor", energy = 0.05),
+        DjTrack("bright", "I", 0.8, 88.0, "F", "minor", energy = 0.95, lift = 0.9),
+    )
+
+    @Test fun theQueuedSevenAloneCouldNeverMoveTheNextSong() {
+        for (shape in MixShape.entries) assertEquals(shape.name, "q1", djOrder(logSeed, logQueued, 7, shape).first().id)
+    }
+
+    @Test fun withAFreshLotTheNextSongFollowsTheShape() {
+        val pool = logQueued + fresh
+        assertEquals("calm", djOrder(logSeed, pool, 7, MixShape.WIND_DOWN).first().id)
+        // Euphoric climbs over a few songs: the first goes up, and the bright one comes early.
+        val up = djOrder(logSeed, pool, 7, MixShape.EUPHORIC)
+        assertTrue(up.map { it.id }.toString(), up.first().energy!! > logSeed.energy!!)
+        assertTrue(up.map { it.id }.toString(), up.take(3).any { it.id == "bright" })
+        // Steady stays as close as can be: the queued song at the same tempo and a neighbouring key.
+        assertEquals("q1", djOrder(logSeed, pool, 7, MixShape.STEADY).first().id)
+        // As many as were queued; the ones that don't fit are left out.
+        assertEquals(7, djOrder(logSeed, pool, 7, MixShape.WIND_DOWN).size)
+    }
+
+    @Test fun aReshapeRanksBySoundNotByQueuePlace() {
+        // AudioMuse's list of songs like the one playing, the most alike first.
+        val like = reshapeLikeness(listOf("calm", "q3", "q1", "bright"))
+        assertEquals(1.0, like("calm"), 1e-9)
+        assertEquals(0.75, like("q3"), 1e-9)
+        assertTrue(like("q1") > like("bright"))
+        // A queued song AudioMuse didn't list: neither first nor last on that alone.
+        assertEquals(NOT_LISTED_LIKENESS, like("q7"), 1e-9)
+        // Songs left out of the queue may come back in a later top-up.
+        assertEquals(listOf("q5", "q6"), reshapeLeftOut(listOf("q1", "q5", "q6", "q7"), listOf("calm", "q1", "q7")))
+    }
+
     @Test fun theSurpriseSliderSaysWhatItMeans() {
         assertEquals("None", surpriseLabel(0))
         assertEquals("A few", surpriseLabel(20))
