@@ -266,6 +266,13 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     )
                 }
             },
+            // Menu rows (issue #778): no badge on shuffle, a word badge where one says something.
+            Scene("menu_rows") {
+                Column {
+                    MenuRow(Icons.Rounded.Shuffle, "Shuffle: off") {}
+                    MenuRow(Icons.Rounded.Bedtime, "Sleep at the end of the chapter, uncharacteristically", badge = "on") {}
+                }
+            },
             // Beat-matched blends with the echo switch (issue #759).
             Scene("crossfade_beat_match") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP)) { BeatMatchSection(BeatMatchMode.DJ_RADIO, bars = 8, echo = true, onMode = {}, onBars = {}, onEcho = {}) }
@@ -281,13 +288,6 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     FoldSection("Beat-matched blends (experimental)", "DJ radio · 16 bars · echo", tag = "blends", startOpen = true) {
                         Text("Incomprehensibilities of the uncharacteristically long settings body")
                     }
-                }
-            },
-            // Menu rows (issue #778): no badge on shuffle, a word badge where one says something.
-            Scene("menu_rows") {
-                Column {
-                    MenuRow(Icons.Rounded.Shuffle, "Shuffle: off") {}
-                    MenuRow(Icons.Rounded.Bedtime, "Sleep at the end of the chapter, uncharacteristically", badge = "on") {}
                 }
             },
             // Custom card editor: a rule (issue #663).
