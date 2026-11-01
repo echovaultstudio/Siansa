@@ -89,8 +89,7 @@ going, up to your crossfade length:
 - the next track of the same album (same or next disc) isn't faded, so live albums and DJ mixes stay gapless.
 
 The current song fades out over the whole overlap and the next one fades in, both "equal power" so the loudness
-doesn't dip in the middle. Without measurements, the fixed length is used, except after a song that ends on a steady
-beat: then the blend is short, since the next song's beat can't be followed. Siansa fetches the measurements of the
+doesn't dip in the middle. Without measurements, the fixed length is used, except after a song that ends on a beat: then the blend is short, since the next song's beat can't be followed. Siansa fetches the measurements of the
 next few songs whenever the queue changes, so a radio or a reshaped DJ mix has them before its first blend.
 
 ## When a song counts (scrobbling)

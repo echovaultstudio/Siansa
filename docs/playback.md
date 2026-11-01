@@ -65,8 +65,8 @@ Same page. **Off**, a **fixed** length (1–30 seconds, 6 by default), or **Smar
   end counts: a silence or a quiet passage mid-song never starts the next song, a soft ending that stays at one low
   level is played, and nothing is left out before three quarters of the song. The log says what was left out.
 - Songs that run straight on within one album aren't faded, so they stay gapless.
-- Without the plugin's measurements, Smart uses the fixed length. When the song going out keeps a steady beat but
-  the next song hasn't been measured, the blend is short instead, so the two beats don't clash for the whole length.
+- Without the plugin's measurements, Smart uses the fixed length. When the song going out keeps a beat but the
+  next song hasn't been measured, the blend is short instead, so the two beats don't clash for the whole length.
 
 ### Beat-matched blends (experimental)
 

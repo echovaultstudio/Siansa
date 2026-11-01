@@ -122,7 +122,8 @@ object Crossfade {
         val (cut, cutWhy) = if (mode == CrossfadeMode.SMART) endCut(currentProfile, currentDurationMs, maxMs) else 0L to null
         val outro = currentProfile?.outro
         val intro = nextProfile?.intro
-        val rhythmic = mode == CrossfadeMode.SMART && BeatMatch.bothRhythmic(outro, intro)
+        // Both ends keep a beat (steady or not): unless laid beat on beat, a long blend clashes (issue #796).
+        val rhythmic = mode == CrossfadeMode.SMART && BeatMatch.wouldClash(outro, intro)
         // Beat-matched (issue #646): a DJ blend over whole bars, beat on beat, when both ends have a steady beat;
         // a quiet, steady intro with clear bars is laid on the beat too (issue #759), but doesn't count as a clash.
         val matchable = mode == CrossfadeMode.SMART && outro?.matchable == true && intro?.matchableAsIntro == true
@@ -141,9 +142,9 @@ object Crossfade {
                 why += " · beats would clash, so a short blend"
             }
             FadePlan(overlap, head.coerceIn(MIN_FADE_IN_MS, overlap.coerceAtLeast(MIN_FADE_IN_MS)), why, cut)
-        } else if (mode == CrossfadeMode.SMART && outro?.matchable == true && nextProfile == null) {
-            // The song going out keeps a steady beat and the next song's isn't known, so it can't be laid on it: a
-            // long blend would clash for its whole length (20 s of two beats, issue #796), so a short one.
+        } else if (mode == CrossfadeMode.SMART && BeatMatch.beatDriven(outro) && nextProfile == null) {
+            // The song going out keeps a beat and the next song's isn't known, so it can't be laid on it: a long
+            // blend would clash for its whole length (20 and 30 s of two beats, issue #796), so a short one.
             val overlap = min(maxMs, BeatMatch.CLASH_MS)
             FadePlan(overlap, overlap, "smart: the next song's beat isn't known, so a short blend", cut)
         } else {

@@ -151,6 +151,27 @@ class BeatMatchTest {
         assertTrue(Crossfade.whyNoFade(CrossfadeMode.SMART, 16_000, song, next, profile("a", outro, null), profile("b", null, far), beatMatch = true)!!.contains("too far apart"))
     }
 
+    /**
+     * Issue #796, from a drum and bass log: an outro read at 106 BPM, beat-driven (0.80) but "steady 0.00" (breaks
+     * often read that way), into a 168 BPM intro with a steady beat. Neither can be laid on the other, and the 6.9 s
+     * smart blend clashed (skipped 2.6 s in). Two ends that keep a beat now blend short whether or not they're steady;
+     * likewise a beat-driven end into a song with no measurements (a 30 s blend, skipped 7 s in).
+     */
+    @Test fun twoBeatsBlendShortEvenWhenOneIsntSteady() {
+        val next = song.copy(id = "b", albumId = "al2")
+        val breaks = BeatEnd(bpm = 106.2, beatMs = 300_000.0, barMs = null, rhythm = 0.80f, steady = 0.0f)
+        val dnb = BeatEnd(bpm = 168.0, beatMs = 500.0, barMs = null, rhythm = 0.90f, steady = 0.76f, phraseMs = 500.0, phraseBars = 8)
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 30_000, song, next, 310_000, 300_000,
+            profile("a", breaks, null, quietTailMs = 6_900), profile("b", null, dnb), beatMatch = true)!!
+        assertEquals(BeatMatch.CLASH_MS, plan.overlapMs)
+        val unknown = Crossfade.plan(CrossfadeMode.SMART, 30_000, song, next, 310_000, 300_000,
+            profile("a", breaks.copy(bpm = 86.2, rhythm = 0.90f, steady = 0.09f), null), null, beatMatch = true)!!
+        assertEquals(BeatMatch.CLASH_MS, unknown.overlapMs)
+        // A beatless end either side keeps the long blend.
+        assertEquals(6_900L, Crossfade.plan(CrossfadeMode.SMART, 30_000, song, next, 310_000, 300_000,
+            profile("a", breaks.copy(rhythm = 0.22f), null, quietTailMs = 6_900), profile("b", null, dnb))!!.overlapMs)
+    }
+
     @Test fun theProfileAnswerCarriesTheGrids() {
         val profiles = PluginProfiles.parse(
             """{"schema_version":1,"profiles":[{"track_id":"a","ref_lufs":-9.5,"start_ramp":"","end_ramp":"","duration_ms":310000,""" +

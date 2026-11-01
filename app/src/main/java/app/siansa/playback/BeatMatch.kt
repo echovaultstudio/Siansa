@@ -69,6 +69,15 @@ object BeatMatch {
     fun bothRhythmic(outgoing: BeatEnd?, incoming: BeatEnd?): Boolean = outgoing?.matchable == true && incoming?.matchable == true
 
     /**
+     * The end keeps a beat, steady or not (issue #796): drum and bass breaks often read as unsteady (or at the wrong
+     * tempo), so they can't be matched, but two of them laid on each other out of step still clash.
+     */
+    fun beatDriven(end: BeatEnd?): Boolean = end != null && end.bpm > 0 && end.rhythm >= MIN_RHYTHM
+
+    /** Both ends keep a beat, steady or not: an unmatched blend between them clashes, so it's kept short. */
+    fun wouldClash(outgoing: BeatEnd?, incoming: BeatEnd?): Boolean = beatDriven(outgoing) && beatDriven(incoming)
+
+    /**
      * One beat-matched blend: it starts at [startMs] of the song going out and lasts [overlapMs] ([bars] whole
      * bars of it), to that song's end; the next song starts at [incomingStartMs] of its own time, at [speed];
      * [onBars] when downbeat meets downbeat, else beat meets beat.
