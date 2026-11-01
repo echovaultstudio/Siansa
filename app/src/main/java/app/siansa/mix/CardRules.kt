@@ -19,9 +19,13 @@ import java.time.temporal.ChronoUnit
  */
 
 /** What a custom card lists: songs, or whole albums. */
-enum class CardContents(val label: String, val hint: String) {
+enum class CardContents(val label: String, val hint: String, val fromBooks: Boolean = false) {
     SONGS("Songs", "Single songs that match the rules"),
     ALBUMS("Albums", "Whole albums that match the rules; playing the card plays them in turn"),
+    // From Audiobookshelf (issue #782): no rules, just the order.
+    BOOKS("Audiobooks", "Your audiobooks from Audiobookshelf", fromBooks = true),
+    EPISODES("Podcast episodes", "The newest episodes of your podcasts", fromBooks = true),
+    LISTENING("Keep listening", "Books and episodes you're partway through, the most recent first", fromBooks = true),
 }
 
 /** The kind of value a rule checks, which decides the ways it can compare. */

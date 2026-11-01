@@ -279,6 +279,23 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // Cover rows (issue #782): albums with one playing and long names cut off, then books and an episode with
+            // their progress along the cover.
+            Scene("cover_rows") {
+                fun a(row: app.siansa.mix.CoverRow, playing: Boolean = false) = app.siansa.ui.CoverRowAction(row, playing, {}, {}, listOf("Add to queue" to {}))
+                Column {
+                    app.siansa.ui.CoverRowsShelf("Recently added albums", listOf(
+                        a(app.siansa.mix.CoverRow("1", app.siansa.mix.CoverRow.Kind.ALBUM, null, "Fontaines D.C.", "Romance", "11 songs · 2024")),
+                        a(app.siansa.mix.CoverRow("2", app.siansa.mix.CoverRow.Kind.ALBUM, null, "Vince Staples", "Dark Times", "13 songs · 2024"), playing = true),
+                        a(app.siansa.mix.CoverRow("3", app.siansa.mix.CoverRow.Kind.ALBUM, null, "Unbelievably Long Artist Name Collective", "An album title long enough to be cut off", "24 songs")),
+                        a(app.siansa.mix.CoverRow("4", app.siansa.mix.CoverRow.Kind.ALBUM, null, "Rammstein", "Zeit", "11 songs")),
+                    )) {}
+                    app.siansa.ui.CoverRowsShelf("Keep listening", listOf(
+                        a(app.siansa.mix.CoverRow("5", app.siansa.mix.CoverRow.Kind.BOOK, null, "Andy Weir", "Project Hail Mary", "16 h 10 min · 6 h left", progress = 0.62f)),
+                        a(app.siansa.mix.CoverRow("6", app.siansa.mix.CoverRow.Kind.EPISODE, null, "Rocket Hour", "Ep. 479 · Exploring the Dopamine Chamber", "58 min · 46 min left", progress = 0.2f)),
+                    )) {}
+                }
+            },
             // Custom card editor: a rule (issue #663).
             Scene("card_rule") {
                 Column(Modifier.padding(Space.Page)) {

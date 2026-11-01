@@ -81,11 +81,11 @@ fun PinnedCardSection(nav: NavController, card: PinnedCard, aiDown: String?) {
                 modifier = Modifier.padding(horizontal = Space.Page).testTag("pinnedProblem"),
             )
         }
-        is Load.Ok -> if (load.value.songs.isNotEmpty() || load.value.albums.isNotEmpty()) PinnedCardLook(card, load.value, open, ::play, nav)
+        is Load.Ok -> if (!load.value.isEmpty) PinnedCardLook(card, load.value, open, ::play, nav)
         else {
             SectionTitle(card.title)
             Text(
-                "No songs match yet. Change the card in Settings › Cards.",
+                if (card.contents.fromBooks) "Nothing here yet." else "No songs match yet. Change the card in Settings › Cards.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Space.Page).testTag("pinnedProblem"),
@@ -96,6 +96,12 @@ fun PinnedCardSection(nav: NavController, card: PinnedCard, aiDown: String?) {
 
 @Composable
 private fun PinnedCardLook(card: PinnedCard, content: CardContent, open: () -> Unit, play: (List<Song>, Int, Boolean) -> Unit, nav: NavController) {
+    // Cover rows (issue #782): albums, songs, books or episodes, a cover with its details beside it. Books and
+    // episodes only come in this look.
+    if (card.look == CardLook.COVER_ROWS || card.contents.fromBooks) {
+        CoverRowsCard(nav, card, content, open)
+        return
+    }
     val songs = content.songs
     // An album card (issue #663): its tiles and list are its albums; its banner and button play them in turn.
     if (card.contents == CardContents.ALBUMS && card.look in setOf(CardLook.TILES, CardLook.ALBUMS, CardLook.LIST)) {
@@ -149,6 +155,7 @@ private fun PinnedCardLook(card: PinnedCard, content: CardContent, open: () -> U
             }
         }
         CardLook.BUTTON -> PinnedPlayButton(card, songs, open, play, rememberListPlayback(songs))
+        CardLook.COVER_ROWS -> CoverRowsCard(nav, card, content, open)
     }
 }
 
@@ -245,6 +252,20 @@ fun PinnedCardScreen(nav: NavController, id: String) {
     val content by loadStateFresh("pinned-songs-$id-$round-${c?.hashCode()}") { c?.let { graph.pinnedCards.content(it, round) } }
     val title = c?.title ?: "Your card"
     val colors = tileColors(id)
+    // A card of books or episodes (issue #782): its page lists every row the way the card shows them.
+    if (c?.contents?.fromBooks == true) {
+        Screen(title = title, nav = nav) { padding ->
+            LoadBox(content, Modifier.padding(top = padding.calculateTopPadding())) { found ->
+                if (found == null || found.isEmpty) {
+                    Text("Nothing here yet.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(Space.Page).testTag("pinnedProblem"))
+                } else {
+                    CoverRowsPage(nav, c, found, Modifier.fillMaxSize())
+                }
+            }
+        }
+        return
+    }
     // An album card's page is its albums, like a label's (issue #663).
     if (c?.contents == CardContents.ALBUMS) {
         Screen(title = title, nav = nav, actions = {
