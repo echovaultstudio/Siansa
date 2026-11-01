@@ -3,6 +3,42 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.49.0beta — 2026-11-01
+
+### Fixed
+- When the Siansa Analysis plugin isn't installed on AudioMuse, Similar albums now says so, instead of "AudioMuse
+  doesn't know this song". Home no longer asks that server for similar artists on every visit while it's missing.
+- On Emby and Jellyfin, an album with no cover of its own now shows its first song's cover on its page, as the
+  player already did, instead of an empty square.
+- **Beats clashed in some DJ blends.** A song queued while another played (a radio just started, a reshaped mix)
+  had no measured start yet when its blend was planned, so it got a long fixed blend that ignored its beat; its
+  measurements are now fetched as soon as it's queued. A song that ends on a beat no longer blends at length into a
+  song that hasn't been measured, nor into one that starts on a beat it can't be matched to (often drum and bass,
+  whose breaks rarely read as steady): the blend is short. A beat-matched blend into a short song is laid over
+  fewer bars instead of being blended out of step.
+- **A flutter after a DJ blend.** As the next song eased back to its own speed it changed speed every 200 ms, and
+  each change can be heard. It now eases back in about 20 steps.
+- **Cover rows: no arrow beside the card's title**, as on Home's other titles; tapping the title still opens it.
+- **Cover rows: the dots under the card follow your swipe.** They stayed on the first column.
+- **Drum and bass was never beat-matched in DJ blends.** The Siansa plugin read its tempo at two thirds (113 BPM for
+  170), with the beats off the music. Plugin 0.4.2 reads it right and measures every song's beats again in the
+  background; update it in AudioMuse-AI.
+
+### Added
+- **Cover rows for Home's own sections.** The look picker in Arrange Home (the cog on a section) now offers Cover rows,
+  the look custom cards got in 0.48: covers with their details beside them, three to a column. Albums show their song
+  count and year, and their cover plays them; books and podcasts show how far you are; a radio or genre shows its colours.
+
+### Changed
+- **Home's notice chips look like Your Library's chips**: the same round pills, without an ×. A notice kind you set to
+  **Pinned** in Settings › Home › Notices now always shows and is never pushed out by other notices; the automatic
+  ones come and go as needed and fill the places left.
+- **Changing a DJ mix's shape moves the very next song.** A build or a wind down now takes about eight songs and a
+  euphoric climb three, however many songs the radio has queued. Spread over all of them (up to 30), the next song
+  hardly changed and the shape took hours.
+- **Settings › Home has just Notices and Cards.** The source filter and Arrange Home are on the button at the top of
+  Home.
+
 ## 0.48.0beta — 2026-11-01
 
 ### Fixed
