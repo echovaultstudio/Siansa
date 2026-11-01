@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
@@ -36,6 +35,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +46,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -194,11 +196,18 @@ internal fun CoverRowsShelf(title: String, actions: List<CoverRowAction>, open: 
                 .padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current, bottom = Space.Small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // No arrow beside the title, as Home's other titles (issue #268); a tap still opens the card's page.
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         val columns = actions.chunked(CoverRows.PER_COLUMN)
         val list = rememberLazyListState()
+        // The column most in view: the last one can never be first on screen, as it can't scroll past its edge.
+        val current by remember(list) {
+            derivedStateOf {
+                val info = list.layoutInfo
+                CoverRows.columnInView(info.visibleItemsInfo.map { it.index to (it.offset to it.size) }, info.viewportStartOffset, info.viewportEndOffset)
+            }
+        }
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             // One column fills the page but for the next one's edge, so it's plain there are more.
             val columnWidth = if (columns.size > 1) maxWidth - COLUMN_PEEK else maxWidth - Space.Page * 2
@@ -216,7 +225,7 @@ internal fun CoverRowsShelf(title: String, actions: List<CoverRowAction>, open: 
             }
         }
         if (columns.size > 1) {
-            PageDots(columns.size, list.firstVisibleItemIndex, Modifier.align(Alignment.CenterHorizontally).padding(vertical = Space.Small))
+            PageDots(columns.size, current, Modifier.align(Alignment.CenterHorizontally).padding(vertical = Space.Small))
         }
     }
 }
@@ -297,9 +306,10 @@ internal fun CoverRowItem(action: CoverRowAction, divider: Boolean) {
 /** Small dots under a shelf of columns, the one in view wider. */
 @Composable
 private fun PageDots(count: Int, current: Int, modifier: Modifier = Modifier) {
-    Row(modifier.testTag("coverRowsDots"), horizontalArrangement = Arrangement.spacedBy(Space.Tight)) {
+    val shown = current.coerceIn(0, count - 1)
+    Row(modifier.testTag("coverRowsDots").semantics { stateDescription = "${shown + 1} of $count" }, horizontalArrangement = Arrangement.spacedBy(Space.Tight)) {
         repeat(count) { i ->
-            val on = i == current.coerceIn(0, count - 1)
+            val on = i == shown
             Box(
                 Modifier.height(DOT).width(if (on) DOT * 2.5f else DOT).clip(CircleShape)
                     .background(MaterialTheme.colorScheme.onSurface.copy(alpha = if (on) 0.8f else 0.25f)),

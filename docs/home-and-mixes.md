@@ -161,7 +161,7 @@ on a page of its own:
   **Cover rows** (below).
 
 **Cover rows**: each row is a cover with three lines beside it, three rows to a column; swipe sideways for the next
-three, and tap the card's title for all of them.
+three (the dots under the card show which of them you're on), and tap the card's title for all of them.
 
 | Card holds | First line | Second line | Third line |
 |---|---|---|---|

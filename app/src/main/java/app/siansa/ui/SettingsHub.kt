@@ -117,7 +117,7 @@ fun SettingsHub(nav: NavController) {
             HubRow(Icons.Rounded.DownloadForOffline, "Downloads") { nav.navigate("downloads") }
             HubRow(Icons.AutoMirrored.Rounded.MenuBook, "Audiobooks and podcasts") { nav.navigate("settings/books") }
             HubGroup("Home and mixes")
-            // Source filter, Arrange Home and Cards, also behind Home's own button.
+            // Notices and Cards; Source filter and Arrange Home are behind Home's own button.
             HubRow(Icons.Rounded.Home, "Home") { nav.navigate("settings/home") }
             // Today's mix, the daily vibes and the moment (was Daily Vibe settings, issue #339).
             HubRow(Icons.Rounded.Schedule, "Mixes and vibes") { nav.navigate("vibes") }

@@ -33,6 +33,19 @@ object CoverRows {
     /** Rows per column on Home. */
     const val PER_COLUMN = 3
 
+    /**
+     * Which column the dots under a shelf mark (issue #782): the one with most of itself on screen, the earlier on a
+     * tie. Not the first on screen: the last column can't scroll to the left edge, so that one would never be marked.
+     * [visible] is each column on screen as index to (offset, size), in pixels, as the row lays them out.
+     */
+    fun columnInView(visible: List<Pair<Int, Pair<Int, Int>>>, viewportStart: Int, viewportEnd: Int): Int =
+        visible.maxWithOrNull(
+            compareBy<Pair<Int, Pair<Int, Int>>> { (_, at) ->
+                val (offset, size) = at
+                (minOf(offset + size, viewportEnd) - maxOf(offset, viewportStart)).coerceAtLeast(0)
+            }.thenByDescending { it.first },
+        )?.first ?: 0
+
     fun album(album: Album): CoverRow = CoverRow(
         key = "album-${album.id}",
         kind = CoverRow.Kind.ALBUM,

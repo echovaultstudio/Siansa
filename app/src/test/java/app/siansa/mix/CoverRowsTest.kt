@@ -18,6 +18,18 @@ class CoverRowsTest {
     private val podcast = Book(id = "p1", title = "Rocket Hour", podcast = true)
     private val episode = Episode("e1", "p1", "Exploring the Dopamine Chamber", null, 2000L, 58 * 60, null, "479")
 
+    @Test fun theDotsMarkTheColumnMostInView() {
+        // Two columns of 860 px in a 1000 px row, 40 px at its edges and 30 between (the video in issue #782).
+        assertEquals(0, CoverRows.columnInView(listOf(0 to (40 to 860), 1 to (930 to 860)), 0, 1000))
+        // Swiped to the end: the last column can't reach the left edge, but it is the one in view.
+        assertEquals(1, CoverRows.columnInView(listOf(0 to (-790 to 860), 1 to (100 to 860)), 0, 1000))
+        // Halfway, the one past the middle; on a tie, the earlier.
+        assertEquals(1, CoverRows.columnInView(listOf(0 to (-500 to 860), 1 to (390 to 860)), 0, 1000))
+        assertEquals(0, CoverRows.columnInView(listOf(0 to (-360 to 860), 1 to (500 to 860)), 0, 1000))
+        assertEquals(2, CoverRows.columnInView(listOf(1 to (-800 to 860), 2 to (90 to 860), 3 to (980 to 860)), 0, 1000))
+        assertEquals(0, CoverRows.columnInView(emptyList(), 0, 1000))
+    }
+
     @Test fun anAlbumSaysItsArtistSongsAndYear() {
         val row = CoverRows.album(Album(id = "a1", name = "Romance", artist = "Fontaines D.C.", songCount = 11, year = 2024))
         assertEquals("Fontaines D.C.", row.small)

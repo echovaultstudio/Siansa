@@ -14,6 +14,16 @@ class SettingsNamesTest {
         assertFalse("HubRow still takes a summary", Regex("""fun HubRow\([^)]*subtitle""").containsMatchIn(hub))
     }
 
+    /** Settings › Home has Notices and Cards; the source filter and Arrange Home are only behind Home's own button. */
+    @Test fun homeSettingsLeaveTheFilterToHome() {
+        val pages = File(ui, "SettingsPages.kt").readText()
+        val home = pages.substringAfter("fun HomeSettingsScreen(").substringBefore("\n}\n")
+        assertTrue(home.contains("PageLink(\"Notices\"") && home.contains("PageLink(\"Cards\""))
+        assertFalse("Settings › Home still links the source filter", home.contains("\"Source filter\""))
+        assertFalse("Settings › Home still links Arrange Home", home.contains("\"Arrange Home\""))
+        assertFalse("Settings › Home still opens Home's panel", home.contains("HomeSettingsSheet"))
+    }
+
     @Test fun noArrowsOnSettingsPages() {
         for (name in listOf("SettingsHub.kt", "StyleScreens.kt", "ConnectionsHub.kt", "CarouselEditor.kt", "DownloadsScreens.kt")) {
             assertFalse("$name still draws an arrow beside a setting", File(ui, name).readText().contains("KeyboardArrowRight"))

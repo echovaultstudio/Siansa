@@ -320,8 +320,8 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.MenuBook, "Audiobooks and podcasts") {}
                     app.siansa.ui.HubGroup("Home and mixes")
                     Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                        app.siansa.ui.PageLink("Source filter", app.siansa.ui.homeSourcesLine(3, downloadedOnly = true), "s") {}
-                        app.siansa.ui.PageLink("Arrange Home", app.siansa.ui.homeArrangeLine(2, "Normal"), "a") {}
+                        app.siansa.ui.PageLink("Notices", app.siansa.ui.noticesLine(true, app.siansa.mix.NoticePrefs()), "n") {}
+                        app.siansa.ui.PageLink("Cards", "Made for you and your own cards", "c") {}
                     }
                 }
             },
