@@ -176,9 +176,10 @@ class SpacingSettingsTest : SpacingCheck() {
                 }
             }
         }
-        val label = compose.onNodeWithText("Maximum size").getBoundsInRoot()
-        val chips = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("No limit")), useUnmergedTree = true).getBoundsInRoot()
-        val clear = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Clear image cache")), useUnmergedTree = true).getBoundsInRoot()
+        // By their tags: the row of chips scrolls sideways, so one chip's bounds can be off to the side.
+        val label = compose.onNodeWithTag("imageCacheLabel").getBoundsInRoot()
+        val chips = compose.onNodeWithTag("imageCacheChips").getBoundsInRoot()
+        val clear = compose.onNodeWithTag("imageCacheClear").getBoundsInRoot()
         assertEven("Image cache chips", chips.top - label.bottom, clear.top - chips.bottom)
     }
 

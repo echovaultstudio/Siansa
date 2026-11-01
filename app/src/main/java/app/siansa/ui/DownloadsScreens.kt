@@ -740,8 +740,8 @@ internal fun ImageCacheSection() {
             style = MaterialTheme.typography.bodyLarge,
         )
     }
-    Text("Maximum size", style = MaterialTheme.typography.bodyLarge)
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Text("Maximum size", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("imageCacheLabel"))
+    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("imageCacheChips"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         cacheSizes.forEach { mb ->
             FilterChip(
                 selected = settings.imageCacheMb == mb,
@@ -762,7 +762,7 @@ internal fun ImageCacheSection() {
             AppLog.i("Downloads", "Image cache cleared")
             refresh++
         }
-    }) { Text("Clear image cache") }
+    }, modifier = Modifier.testTag("imageCacheClear")) { Text("Clear image cache") }
     if (settings.imageCacheMb != atStart) {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
