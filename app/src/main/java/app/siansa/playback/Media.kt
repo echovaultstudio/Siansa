@@ -110,3 +110,10 @@ fun queueInsertIndex(currentIndex: Int, count: Int, isQueued: (Int) -> Boolean):
     while (at < count && isQueued(at)) at++
     return at
 }
+
+/**
+ * What "Remove songs up to here" on a queue row at [index] takes out: every song before it, so that song
+ * becomes the first in the queue. Empty when there's nothing before it or the index isn't in the queue.
+ */
+fun queueRemoveUpTo(index: Int, count: Int): IntRange =
+    if (index <= 0 || index >= count) IntRange.EMPTY else 0 until index

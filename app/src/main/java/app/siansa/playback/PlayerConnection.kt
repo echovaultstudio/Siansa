@@ -215,6 +215,27 @@ class PlayerConnection(
         }
     }
 
+    /**
+     * Takes one song out of the queue (its ⋮ menu, or a swipe to the left in the queue). Removing the song
+     * playing moves on to the next one; the player keeps the current index right by itself.
+     */
+    fun removeFromQueue(index: Int) = withController { c ->
+        if (index !in 0 until c.mediaItemCount) return@withController
+        AppLog.i("Queue", "Removed ${c.getMediaItemAt(index).mediaId} from the queue at ${index + 1} of ${c.mediaItemCount}")
+        c.removeMediaItem(index)
+    }
+
+    /**
+     * "Remove songs up to here" on a queue row: every song before it goes, so it becomes the first in the queue.
+     * When the song playing is among them, the row's song starts playing.
+     */
+    fun removeQueueUpTo(index: Int) = withController { c ->
+        val range = queueRemoveUpTo(index, c.mediaItemCount)
+        if (range.isEmpty()) return@withController
+        AppLog.i("Queue", "Removed ${range.count()} songs before ${index + 1} of ${c.mediaItemCount} from the queue")
+        c.removeMediaItems(range.first, range.last + 1)
+    }
+
     /** Keeps the current song playing and swaps everything after it for [songs]. */
     /** [auto]: the songs were picked by a song radio, not chosen, and the queue marks them (issue #337). */
     fun replaceUpcoming(songs: List<Song>, auto: Boolean = false) {

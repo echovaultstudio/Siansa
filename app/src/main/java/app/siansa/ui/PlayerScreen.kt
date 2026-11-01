@@ -95,6 +95,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -845,9 +846,23 @@ private fun QueueView(state: PlayerState) {
                         onClick = { graph.player.skipTo(index) },
                         highlighted = playing,
                         swipeToQueue = false,
+                        // Swipe to queue in reverse: a red strip takes the song out.
+                        swipeToRemove = { graph.player.removeFromQueue(index) },
                         subtitle = artistAndAlbum(song),
                         nowPlaying = playing,
                         autoAdded = index in state.auto,
+                        extraMenu = { close ->
+                            DropdownMenuItem(text = { Text("Remove from queue") }, onClick = {
+                                close()
+                                graph.player.removeFromQueue(index)
+                            })
+                            if (index > 0) {
+                                DropdownMenuItem(text = { Text("Remove songs up to here") }, onClick = {
+                                    close()
+                                    graph.player.removeQueueUpTo(index)
+                                })
+                            }
+                        },
                     )
                 }
             }
