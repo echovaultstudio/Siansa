@@ -154,6 +154,89 @@ def tempo(onset, fps=RATE / HOP):
     return 60.0 * fps / lag_f, float(np.clip(acf[lag], 0, 1))
 
 
+# ---- related tempos (Siansa issue #802) ---------------------------------------------------------------------------
+
+TRY_RATIOS = (2.0, 0.5, 1.5, 2.0 / 3.0, 4.0 / 3.0, 0.75)  # of the tempo found, also tried
+TRY_PEAKS = 4  # and the envelope's strongest repeats in range, as tempos
+OCTAVE_TOLERANCE = 0.03  # two tempos this close to double or half of each other are one family
+SWITCH_MARGIN = 1.15  # another family must fit this much better to replace the one found
+
+
+def _repeats(onset, fps=RATE / HOP, count=TRY_PEAKS):
+    """The tempos (BPM) of the onset envelope's strongest repeats between MIN_BPM and MAX_BPM, strongest first."""
+    x = onset - onset.mean()
+    n = x.size
+    if n < 4 or not np.any(x):
+        return []
+    spectrum = np.fft.rfft(x, 2 * n)
+    acf = np.fft.irfft(spectrum * np.conj(spectrum))[:n]
+    acf = acf / (acf[0] + 1e-9)
+    peaks = []
+    for lag in range(2, n - 1):
+        bpm = 60.0 * fps / lag
+        if MIN_BPM <= bpm <= MAX_BPM and acf[lag] > 0 and acf[lag] > acf[lag - 1] and acf[lag] >= acf[lag + 1]:
+            peaks.append((acf[lag], bpm))
+    return [bpm for _, bpm in sorted(peaks, reverse=True)[:count]]
+
+
+def fit_tempo(onset, bpm, fps=RATE / HOP):
+    """How well beats at ``bpm`` fit: their onsets against the envelope's mean, times how steady the line through
+    them is (0 when too few beats). A tempo whose beats miss the music reads as unsteady and lands on weak onsets."""
+    found = track_beats(onset, bpm, fps)
+    if found.size < MIN_BEATS:
+        return 0.0
+    times = (refine(onset, found) * HOP + FRAME / 2) * 1000.0 / RATE
+    _, _, rms = fit_line(times)
+    steady = float(np.clip(1.0 - rms / 30.0, 0, 1)) ** 2
+    at_beats = onset[np.clip(found, 0, onset.size - 1)].mean() / (onset.mean() + 1e-9)
+    return float(at_beats * steady)
+
+
+def _same_family(a, b, tolerance=OCTAVE_TOLERANCE):
+    """Whether ``b`` is ``a`` or double, half, four times or a quarter of it: tempos that mix the same."""
+    return any(abs(b / (a * r) - 1) <= tolerance for r in (1.0, 2.0, 0.5, 4.0, 0.25))
+
+
+def _prior(bpm):
+    return float(np.exp(-0.5 * (np.log2(bpm / PRIOR_BPM)) ** 2))
+
+
+def settle_tempo(onset, bpm, fps=RATE / HOP):
+    """The tempo to place the beats at (Siansa issue #802): the one found, unless a tempo two thirds, one and a half,
+    four thirds or three quarters of it (or another strong repeat) fits clearly better. Drum and bass breaks repeat
+    every 1, 1.5 and 2 beats, and the pull towards 120 BPM picked the 1.5-beat repeat: two thirds of the tempo, beats
+    off the music and "unsteady". Double and half are one family and mix alike; within the family that wins, the
+    member that fits best. Fits are weighed by distance from 120 BPM, as the tempo itself is chosen."""
+    tried = {bpm}
+    tried.update(bpm * r for r in TRY_RATIOS if MIN_BPM <= bpm * r <= MAX_BPM)
+    tried.update(_repeats(onset, fps))
+    fits = {t: fit_tempo(onset, t, fps) for t in sorted(tried)}
+    families = []  # (best fit in the family, members)
+    for t in sorted(fits):
+        for family in families:
+            if _same_family(family[1][0], t):
+                family[1].append(t)
+                break
+        else:
+            families.append([0.0, [t]])
+    # Each tempo by its fit for its distance from 120 BPM, as the tempo itself is chosen: a slower grid lands only on
+    # the strongest hits and so "fits" better by itself (house at 62 against 124, hip-hop at 60 against 90).
+    score = {t: fits[t] * _prior(t) for t in fits}
+    for family in families:
+        family[0] = max(score[t] for t in family[1])
+    found = next(f for f in families if bpm in f[1])
+    best = max(families, key=lambda f: f[0])
+    if best is not found and best[0] > found[0] * SWITCH_MARGIN:
+        chosen = max(best[1], key=score.get)
+    else:
+        # The same family: double or half of the tempo found only when it fits clearly better (175 BPM breaks read as
+        # an unsteady 87.5), so four-to-the-floor keeps its tempo, not half of it.
+        member = max(found[1], key=score.get)
+        chosen = member if score[member] > score[bpm] * SWITCH_MARGIN else bpm
+    DEBUG and print("tempo", round(bpm, 2), "->", round(chosen, 2), {round(t, 1): round(v, 2) for t, v in fits.items()})
+    return chosen
+
+
 # ---- beats ----------------------------------------------------------------------------------------------------
 
 def track_beats(onset, bpm, fps=RATE / HOP, tightness=TIGHTNESS):
@@ -293,6 +376,7 @@ def grid(samples, offset_ms, rate=RATE, from_end=False):
     bpm, strength = tempo(onset, fps)
     if bpm is None:
         return None
+    bpm = settle_tempo(onset, bpm, fps)
     beats = track_beats(onset, bpm, fps)
     if beats.size < MIN_BEATS:
         return None
