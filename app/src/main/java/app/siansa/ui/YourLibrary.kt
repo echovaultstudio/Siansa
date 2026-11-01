@@ -120,7 +120,7 @@ import java.util.Locale
  * What an entry is, and the chips above the list. Albums, artists and songs sit under one Music chip (issue #497),
  * so the row of chips fits better; [chip] is false for those three.
  */
-private enum class Kind(val label: String, val chip: Boolean = true) {
+internal enum class Kind(val label: String, val chip: Boolean = true) {
     FAVOURITES("Favourites"), PLAYLIST("Playlists"), MIX("Mixes"), MUSIC("Music"),
     ALBUM("Albums", chip = false), ARTIST("Artists", chip = false), SONG("Songs", chip = false),
     LISTENING("Your listening"),
@@ -136,7 +136,7 @@ private enum class Sort(val label: String) {
 }
 
 /** One row (or tile) in the library. */
-private data class Entry(
+internal data class Entry(
     val key: String,
     val kind: Kind?,
     val title: String,
@@ -643,7 +643,7 @@ internal fun BoxScope.MoreChipsHint(scroll: ScrollState) {
 }
 
 /** The chips' text size. */
-private val PILL_FONT = 14.sp
+internal val PILL_FONT = 14.sp
 
 /** How wide the fade at the end of the chip row is: the blend, then the › button's own space. */
 private val MORE_FADE = 96.dp
@@ -736,11 +736,25 @@ private fun EntryCover(e: Entry, modifier: Modifier, big: Boolean) {
     }
 }
 
+/**
+ * The subtitle, with the pin marker before it on a pinned entry. A pin you made has an × after the marker that
+ * unpins in one tap (issue #794): before, unpinning took a long hold, so a pin looked permanent. Liked songs and
+ * your listening are always pinned and have no ×.
+ */
 @Composable
-private fun Subtitle(e: Entry, pinned: Boolean, modifier: Modifier = Modifier) {
+private fun Subtitle(e: Entry, pinned: Boolean, modifier: Modifier = Modifier, onUnpin: (() -> Unit)? = null) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         if (pinned) {
             Icon(Icons.Rounded.PushPin, "Pinned", tint = Accent, modifier = Modifier.size(14.dp))
+            if (onUnpin != null && !e.alwaysPinned) {
+                Icon(
+                    Icons.Rounded.Close,
+                    contentDescription = "Unpin ${e.title}",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // A small icon with a bigger tap area: a step of padding on each side, clickable before the padding.
+                    modifier = Modifier.clickable(onClickLabel = "Unpin") { onUnpin() }.padding(horizontal = Space.Tight).size(14.dp).testTag("unpin-${e.key}"),
+                )
+            }
             Spacer(Modifier.width(Space.Tight))
         }
         Text(
@@ -755,7 +769,7 @@ private fun Subtitle(e: Entry, pinned: Boolean, modifier: Modifier = Modifier) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun RowEntry(e: Entry, pinned: Boolean, held: Boolean, onClick: () -> Unit, onHold: () -> Unit, onTogglePin: () -> Unit) = LongerHold {
+internal fun RowEntry(e: Entry, pinned: Boolean, held: Boolean, onClick: () -> Unit, onHold: () -> Unit, onTogglePin: () -> Unit) = LongerHold {
     Row(
         Modifier
             .fillMaxWidth()
@@ -770,7 +784,7 @@ private fun RowEntry(e: Entry, pinned: Boolean, held: Boolean, onClick: () -> Un
         Column(Modifier.weight(1f)) {
             Text(e.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(Space.Tight))
-            Subtitle(e, pinned)
+            Subtitle(e, pinned, onUnpin = onTogglePin)
         }
         if (held) {
             Spacer(Modifier.width(Space.Small))
@@ -796,7 +810,7 @@ private fun GridEntry(e: Entry, pinned: Boolean, held: Boolean, onClick: () -> U
         }
         Spacer(Modifier.height(Space.Small))
         Text(e.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Subtitle(e, pinned)
+        Subtitle(e, pinned, onUnpin = onTogglePin)
     }
 }
 

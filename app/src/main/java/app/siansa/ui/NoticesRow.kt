@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
@@ -16,7 +18,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Warning
-import androidx.compose.material3.AssistChip
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -89,25 +91,41 @@ internal fun NoticeChips(notices: List<Notice>, onOpen: (Notice) -> Unit, onHide
         horizontalArrangement = Arrangement.spacedBy(Space.Small),
     ) {
         items(notices, key = { it.key }) { notice ->
-            AssistChip(
-                onClick = { onOpen(notice) },
-                label = { Text(notice.text, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                leadingIcon = { Icon(noticeIcon(notice.kind), null, Modifier.size(18.dp)) },
-                trailingIcon = {
-                    Icon(
-                        Icons.Rounded.Close,
-                        contentDescription = "Hide",
-                        modifier = Modifier.size(18.dp).clickable(onClickLabel = "Hide this notice") { onHide(notice) },
-                    )
-                },
-                modifier = Modifier.widthIn(max = NOTICE_MAX_WIDTH).testTag("notice-${notice.kind.id}"),
-            )
+            // The same pill as Your Library's chips (issue #794), not Material's outlined assist chip.
+            NoticePill(notice, onOpen = { onOpen(notice) }, onHide = { onHide(notice) })
         }
     }
 }
 
 /** A long book title is cut off rather than making one chip fill the screen. */
 internal val NOTICE_MAX_WIDTH = 280.dp
+
+/** One notice as a pill in Your Library's style: an icon, the text, and an × that hides it. */
+@Composable
+private fun NoticePill(notice: Notice, onOpen: () -> Unit, onHide: () -> Unit) {
+    androidx.compose.material3.Surface(
+        onClick = onOpen,
+        shape = androidx.compose.foundation.shape.CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.widthIn(max = NOTICE_MAX_WIDTH).testTag("notice-${notice.kind.id}"),
+    ) {
+        Row(
+            Modifier.padding(start = Space.Medium, end = Space.Small, top = Space.Small, bottom = Space.Small),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Space.Small),
+        ) {
+            Icon(noticeIcon(notice.kind), null, Modifier.size(18.dp), tint = Accent)
+            Text(notice.text, style = MaterialTheme.typography.labelLarge, fontSize = PILL_FONT, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            Icon(
+                Icons.Rounded.Close,
+                contentDescription = "Hide",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.clickable(onClickLabel = "Hide this notice") { onHide() }.size(18.dp),
+            )
+        }
+    }
+}
 
 private fun noticeIcon(kind: NoticeKind): ImageVector = when (kind) {
     NoticeKind.NEEDS_YOU -> Icons.Rounded.Warning

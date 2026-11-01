@@ -18,6 +18,8 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performSemanticsAction
@@ -62,6 +64,39 @@ class SpacingHomeTest : SpacingCheck() {
         val row = compose.onNodeWithTag("noticesRow").getBoundsInRoot()
         assertEven("Notices: above and below", row.top - above.bottom, below.top - row.bottom)
         assertEven("Notices: between chips", second.left - first.right, Space.Small, tolerance = 1.dp)
+    }
+
+    /** Home's notice chips are Your Library's pills (issue #794): the same height, so Home and the library match. */
+    @Test fun noticeChipsMatchTheLibrarysPills() {
+        compose.setContent {
+            SiansaTheme {
+                Column {
+                    app.siansa.ui.LibraryPill("Books", active = false) {}
+                    app.siansa.ui.NoticeChips(listOf(app.siansa.mix.Notices.newAlbums(2, "a")!!), onOpen = {}, onHide = {})
+                }
+            }
+        }
+        val pill = compose.onNodeWithTag("libraryPill", useUnmergedTree = true).onParent().getBoundsInRoot()
+        val notice = compose.onNodeWithTag("notice-new_albums").getBoundsInRoot()
+        assertEven("Notice chip as tall as a library pill", notice.bottom - notice.top, pill.bottom - pill.top, 2.dp)
+    }
+
+    /** A pinned entry in Your Library has an × that unpins it in one tap (issue #794); an always-pinned one hasn't. */
+    @Test fun aPinHasAnXThatUnpins() {
+        var unpinned = 0
+        val mine = app.siansa.ui.Entry("pl-1", app.siansa.ui.Kind.PLAYLIST, "Emerald Strings", "Playlist · Max", "x")
+        val always = app.siansa.ui.Entry("liked", app.siansa.ui.Kind.PLAYLIST, "Liked songs", "Playlist", "y", alwaysPinned = true)
+        compose.setContent {
+            SiansaTheme {
+                Column {
+                    app.siansa.ui.RowEntry(mine, pinned = true, held = false, onClick = {}, onHold = {}, onTogglePin = { unpinned++ })
+                    app.siansa.ui.RowEntry(always, pinned = true, held = false, onClick = {}, onHold = {}, onTogglePin = { unpinned++ })
+                }
+            }
+        }
+        compose.onNodeWithTag("unpin-pl-1", useUnmergedTree = true).performClick()
+        assertEquals(1, unpinned)
+        assertTrue(compose.onAllNodesWithTag("unpin-liked", useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
     }
 
     /** Arrange Home (issue #694): the spacing step's name stays on one line, even "Compact", with a larger font. */
