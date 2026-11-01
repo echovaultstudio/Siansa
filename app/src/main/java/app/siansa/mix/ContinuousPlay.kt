@@ -47,27 +47,36 @@ fun continuousTopUpDue(
  */
 enum class MixShape(val label: String, val hint: String) {
     STEADY("Steady vibes", "Stays where it is: songs as close as can be to the last one."),
-    BUILD("Steady build", "The energy climbs song by song, from where it is now to the top."),
+    BUILD("Steady build", "The energy climbs song by song, from where it is now to the top in about eight songs."),
     EUPHORIC("Euphoric", "Climbs to a high in a few songs and stays there, the brightest songs first."),
-    WIND_DOWN("Wind down", "The energy falls song by song, towards the calmest.");
+    WIND_DOWN("Wind down", "The energy falls song by song, to the calmest in about eight songs.");
 
     /**
-     * The energy (0..1) the song picked [index]th of [count] should have, from [from] (the energy where the mix
-     * is now); null when the shape has no say (Steady) or [from] is unknown and the shape needs it.
+     * The energy (0..1) the song picked [index]th (0 the next) should have, from [from] (the energy where the mix is
+     * now); null when the shape has no say (Steady). Unknown, [from] counts as the middle.
+     *
+     * A build or a wind down takes [SHAPE_SONGS] songs and a euphoric climb [PEAK_SONGS], however many songs are
+     * queued (issue #798): spread over all of them (13 or 30 in a radio), the next song's target hardly moved, so
+     * reshaping the mix kept the same next song and only later ones changed.
      */
-    fun target(from: Double?, index: Int, count: Int): Double? {
+    fun target(from: Double?, index: Int): Double? {
         val start = from ?: 0.5
-        val progress = (index + 1).toDouble() / count.coerceAtLeast(1)
+        fun along(songs: Int) = ((index + 1).toDouble() / songs).coerceAtMost(1.0)
         return when (this) {
             STEADY -> null
-            BUILD -> start + (1 - start) * progress
-            EUPHORIC -> start + (1 - start) * (progress * 3).coerceAtMost(1.0)
-            WIND_DOWN -> start * (1 - progress)
+            BUILD -> start + (1 - start) * along(SHAPE_SONGS)
+            EUPHORIC -> start + (1 - start) * along(PEAK_SONGS)
+            WIND_DOWN -> start * (1 - along(SHAPE_SONGS))
         }
     }
 
     companion object {
         fun parse(name: String?): MixShape = entries.firstOrNull { it.name == name } ?: STEADY
+
+        /** A build reaches the top, and a wind down the calmest, over this many songs: about half an hour. */
+        const val SHAPE_SONGS = 8
+        /** A euphoric mix is at its high after this many songs. */
+        const val PEAK_SONGS = 3
     }
 }
 
@@ -172,7 +181,7 @@ fun djOrder(seed: DjTrack, pool: List<DjTrack>, count: Int, shape: MixShape = Mi
     val picked = ArrayList<DjTrack>(count)
     var tail = seed
     while (picked.size < count && left.isNotEmpty()) {
-        val target = shape.target(seed.energy, picked.size, count)
+        val target = shape.target(seed.energy, picked.size)
         val next = left.maxBy { transition(tail, it, surprise, wild[it.id] ?: 0.0, target, bright = shape == MixShape.EUPHORIC) }
         picked += next
         left -= next
@@ -322,8 +331,10 @@ class ContinuousPlay(private val graph: AppGraph) {
         AppLog.d(
             "KeepPlaying",
             "DJ (${shape.label.lowercase()}, surprise ${settings.mixSurprise} %) from ${seed.tempo?.let { "%.0f BPM".format(it) } ?: "unknown tempo"} ${seed.key.orEmpty()} ${seed.scale.orEmpty()}" +
-                "${seed.energy?.let { " energy %.2f".format(it) } ?: ""}: " +
-                order.joinToString { t -> "${t.tempo?.let { "%.0f".format(it) } ?: "?"} ${t.key.orEmpty()}${t.energy?.let { " e%.2f".format(it) } ?: ""}" },
+                "${seed.energy?.let { " energy %.2f".format(it) } ?: ""}" +
+                // Where the shape aims the next song, and each song's likeness (issue #798): what decided the next one.
+                "${shape.target(seed.energy, 0)?.let { ", next aimed at energy %.2f".format(it) } ?: ""}: " +
+                order.joinToString { t -> "${t.tempo?.let { "%.0f".format(it) } ?: "?"} ${t.key.orEmpty()}${t.energy?.let { " e%.2f".format(it) } ?: ""} l%.2f".format(t.likeness) },
         )
         return order.map { it.id }
     }

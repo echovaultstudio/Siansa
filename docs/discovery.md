@@ -28,9 +28,13 @@ stay where they are.
 | Shape | What happens |
 |---|---|
 | **Steady vibes** (default) | Stays where it is: songs as close as can be to the last one. |
-| **Steady build** | The energy climbs song by song, from where it is now to the top. |
-| **Euphoric** | Climbs to a high in a few songs and stays there, with the brightest (happy, party) songs first. |
-| **Wind down** | The energy falls song by song, towards the calmest. |
+| **Steady build** | The energy climbs song by song, from where it is now to the top in about eight songs. |
+| **Euphoric** | Climbs to a high in three songs and stays there, with the brightest (happy, party) songs first. |
+| **Wind down** | The energy falls song by song, to the calmest in about eight songs. |
+
+The next song only changes when another song fits the new shape better and still mixes: a build's next song is only
+a step livelier, and a radio with few songs at a tempo that mixes may have just the one. **Surprises** lets the mix
+stray further.
 
 **Surprises** (None, A few, Some, Lots): at None every song is a close neighbour of the last in tempo and how
 alike it is; the further right, the further a song may stray, though its key still has to go with the last
