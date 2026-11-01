@@ -278,7 +278,7 @@ class EmbyApi(
         val songs = items("ParentId" to id, "IncludeItemTypes" to "Audio", "SortBy" to "SortName")
             .map(::parseSong)
             .sortedWith(compareBy({ it.disc ?: 1 }, { it.track ?: Int.MAX_VALUE }))
-        return AlbumDetail(parseAlbum(album), songs, info = Tags.embyAlbum(album))
+        return AlbumDetail(albumWithSongCover(parseAlbum(album), songs), songs, info = Tags.embyAlbum(album))
     }
 
     override suspend fun artists(folderId: String?): List<Artist> =
@@ -598,6 +598,15 @@ class EmbyApi(
             suffix = o.str("Container")?.lowercase()?.takeIf { it.isNotBlank() },
         )
     }
+
+    /**
+     * An album with no image of its own shows its first song's (beta report 0f576bc5, issue #792): Emby serves a
+     * song's cover from the file's own art, so the player showed art while the album page asked for the album
+     * item's image and got 404. Only on the album page, where the songs are known; lists stay as Emby says.
+     */
+    internal fun albumWithSongCover(album: Album, songs: List<Song>): Album =
+        if (album.coverArt != null) album
+        else album.copy(coverArt = songs.firstNotNullOfOrNull { s -> s.coverArt?.takeIf { it != album.id } })
 
     internal fun parseAlbum(o: JsonObject): Album {
         val albumArtist = o.arr("AlbumArtists").firstOrNull()

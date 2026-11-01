@@ -275,4 +275,27 @@ class EmbyApiTest {
         assertEquals("/Users/u1/PlayedItems/s1", played.path)
         assertTrue(played.query.isEmpty())
     }
+
+    /**
+     * Beta report 0f576bc5 (issue #792): Emby had no image on the album item, but served each song's cover from its
+     * file. The player showed art; the album page asked for the album's own image and got 404.
+     */
+    @Test fun anAlbumWithoutItsOwnImageShowsItsFirstSongs() {
+        val api = EmbyApi(OkHttpClient(), { settings })
+        val album = app.siansa.data.Album(id = "53640", name = "Bossanova", artist = "Pixies", coverArt = null)
+        val songs = listOf(
+            app.siansa.data.Song(id = "53593", title = "Bone Machine", artist = "Pixies", album = "Bossanova", albumId = "53640", coverArt = "53593"),
+            app.siansa.data.Song(id = "53594", title = "Rock Music", artist = "Pixies", album = "Bossanova", albumId = "53640", coverArt = "53594"),
+        )
+        assertEquals("53593", api.albumWithSongCover(album, songs).coverArt)
+        // A song without its own picture points at the album's, which is the one that isn't there: skipped.
+        val bare = app.siansa.data.Song(id = "1", title = "x", artist = "y", album = "z", albumId = "53640", coverArt = "53640")
+        assertEquals("53594", api.albumWithSongCover(album, listOf(bare, songs[1])).coverArt)
+        assertEquals(null, api.albumWithSongCover(album, listOf(bare)).coverArt)
+        // An album with its own image keeps it.
+        assertEquals("own", api.albumWithSongCover(album.copy(coverArt = "own"), songs).coverArt)
+        // An album's id stands in for a cover on Subsonic servers only.
+        assertTrue(SourceKind.OPENSUBSONIC.albumIdIsCover)
+        assertTrue(!SourceKind.EMBY.albumIdIsCover && !SourceKind.JELLYFIN.albumIdIsCover)
+    }
 }
