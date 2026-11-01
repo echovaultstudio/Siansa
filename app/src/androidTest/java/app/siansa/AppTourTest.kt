@@ -320,8 +320,7 @@ class AppTourTest {
                 else if (compose.onAllNodesWithText("Radios").fetchSemanticsNodes().isEmpty()) problems += "Back from a search didn't return to the search page"
             }
             step("vibes") {
-                tab("Settings")
-                click("Mixes and vibes")
+                settingsRow("Mixes and vibes")
                 idle(1000)
                 shot("17-vibes")
             }
@@ -343,8 +342,7 @@ class AppTourTest {
                     idle(400)
                 }
                 // Issue #302: Download all covers sits at the bottom of Downloads, under the song download settings.
-                tab("Settings")
-                click("Downloads")
+                settingsRow("Downloads")
                 idle(800)
                 compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Download all covers"))
                 idle(600)
@@ -363,9 +361,8 @@ class AppTourTest {
                     graph.settings.setTheme("DARK", "SUNSET", true)
                     idle(1200)
                     shot("19d-home-sunset-pure-black")
-                    tab("Settings")
                     // Themes is inside Style since issue #346.
-                    click("Style")
+                    settingsRow("Style")
                     waitText("Theme")
                     click("Theme")
                     waitText("Pure black")
@@ -398,8 +395,7 @@ class AppTourTest {
                 }
             }
             step("equaliser") {
-                tab("Settings")
-                click("Playback")
+                settingsRow("Playback")
                 click("Equaliser")
                 idle(1200)
                 shot("19b-equaliser")
@@ -408,8 +404,7 @@ class AppTourTest {
             }
             step("crossfade and levelling") {
                 try {
-                    tab("Settings")
-                    click("Playback")
+                    settingsRow("Playback")
                     click("Crossfade and levelling")
                     idle(1000)
                     shot("19j-crossfade")
@@ -572,6 +567,17 @@ class AppTourTest {
     }
 
     /** Bottom tabs: the last node with that label is the tab itself. */
+    /**
+     * A row of the Settings start page, scrolled into view first: the page keeps its scroll, and since the groups
+     * (issue #780) it's longer than the screen, so a row can be under the top bar.
+     */
+    private fun settingsRow(page: String) {
+        tab("Settings")
+        waitText(page)
+        compose.onAllNodes(hasTestTag("hubRow") and hasText(page)).onFirst().performScrollTo().performClick()
+        idle()
+    }
+
     private fun tab(label: String) {
         waitText(label)
         val nodes = compose.onAllNodesWithText(label)
