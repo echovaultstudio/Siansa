@@ -40,6 +40,72 @@ def drums(bpm, seconds=30.0, first=0.3, accent=True, noise=0.0, drift=0.0, seed=
     return x.astype(np.float32)
 
 
+def pattern(bpm, hits, seconds=30.0, seed=3):
+    """A drum pattern looped for ``seconds``: ``hits`` maps "kick", "snare" or "hat" to beat positions in a bar of
+    four (a two-step drum and bass break is kicks on 0 and 2.5, snares on 1 and 3)."""
+    rng = np.random.default_rng(seed)
+    x = np.zeros(int(seconds * RATE))
+    n = int(0.25 * RATE)
+    t = np.arange(n) / RATE
+    sounds = {
+        "kick": np.sin(2 * np.pi * (50 + 80 * np.exp(-t * 30)) * t) * np.exp(-t * 12),
+        "snare": rng.normal(0, 1, n) * np.exp(-t * 25) * 0.7 + np.sin(2 * np.pi * 190 * t) * np.exp(-t * 20) * 0.4,
+        "hat": np.diff(rng.normal(0, 1, n), prepend=0) * np.exp(-t * 80) * 0.15,
+    }
+    beat = 60 / bpm
+    for bar in range(int(seconds / (4 * beat)) + 1):
+        for kind, positions in hits.items():
+            for p in positions:
+                i = int((bar * 4 + p) * beat * RATE)
+                if i + n < x.size:
+                    x[i:i + n] += sounds[kind]
+    return x.astype(np.float32)
+
+
+TWO_STEP = {"kick": [0, 2.5], "snare": [1, 3], "hat": [i / 2 for i in range(8)]}
+ROLLING = {"kick": [0, 0.75, 2.5, 2.75], "snare": [1, 3], "hat": [i / 4 for i in range(16)]}
+HOUSE = {"kick": [0, 1, 2, 3], "snare": [1, 3], "hat": [0.5, 1.5, 2.5, 3.5]}
+HIP_HOP = {"kick": [0, 1.75, 2.5], "snare": [1, 3], "hat": [i / 2 for i in range(8)]}
+
+
+def mixes_with(bpm, true_bpm):
+    """Whether ``bpm`` is ``true_bpm`` or double or half of it, within 1 %: the same for a beat-matched blend."""
+    return any(abs(bpm / (true_bpm * r) - 1) <= 0.01 for r in (1, 2, 0.5))
+
+
+class RelatedTempoTest(unittest.TestCase):
+    """Siansa issue #802: drum and bass read at two thirds of its tempo (113 for 170), beats off the music."""
+
+    def test_a_break_read_at_two_thirds_is_read_at_its_tempo_or_half(self):
+        x = pattern(170, TWO_STEP)
+        onset, _, _ = beats.onset_envelope(x)
+        found, _ = beats.tempo(onset)
+        self.assertAlmostEqual(found, 170 * 2 / 3, delta=1.5)  # how it read before
+        g = beats.grid(x, 0)
+        self.assertTrue(mixes_with(g.bpm, 170), g)
+        self.assertGreater(g.steady, 0.7)
+
+    def test_other_misreadings_of_breaks(self):
+        # Four sevenths (100 for 175), and half time that read as unsteady at 87.5.
+        for hits, bpm in ((ROLLING, 175), (ROLLING, 170), (TWO_STEP, 175)):
+            g = beats.grid(pattern(bpm, hits), 0)
+            self.assertTrue(mixes_with(g.bpm, bpm), (bpm, g))
+            self.assertGreater(g.steady, 0.7, (bpm, g))
+
+    def test_four_to_the_floor_and_hip_hop_keep_their_tempo(self):
+        for hits, bpm in ((HOUSE, 120), (HOUSE, 124), (HOUSE, 128), (HIP_HOP, 90), (HIP_HOP, 95)):
+            g = beats.grid(pattern(bpm, hits), 0)
+            self.assertAlmostEqual(g.bpm, bpm, delta=0.5, msg=str(g))
+        # House at 132 read as 66 before: now its own tempo.
+        self.assertAlmostEqual(beats.grid(pattern(132, HOUSE), 0).bpm, 132, delta=0.5)
+
+    def test_families_are_double_and_half(self):
+        self.assertTrue(beats._same_family(86.0, 172.0))
+        self.assertTrue(beats._same_family(62.0, 124.0))
+        self.assertFalse(beats._same_family(115.0, 172.0))
+        self.assertFalse(beats._same_family(100.0, 175.0))
+
+
 class GridTest(unittest.TestCase):
     def test_tempo_to_a_fraction_and_the_beats_to_a_few_ms(self):
         g = beats.grid(drums(128.0), 0)

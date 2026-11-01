@@ -403,9 +403,10 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
   {elsewhere_line}
   <p class="mx-help">The tempo, beats, bars and phrases at each end of a song, for beat-matched blends in
     Siansa's DJ radio (experimental): with the phrases (plugin 0.4.0: the 4 or 8 bars a song is built from, read
-    over its last minute) the blends go phrase on phrase, as a DJ mixes. New songs get theirs with their volume
-    and fade profile. Songs measured before plugin 0.4.0 are read again for them (the sound isn't kept, only what
-    was measured), a batch at a time after the profiles each 15 minutes, songs the app is about to play first.
+    over its last minute) the blends go phrase on phrase, as a DJ mixes. Plugin 0.4.2 reads the tempo of drum and
+    bass and other breakbeats right, where it often read two thirds of it. New songs get theirs with their volume
+    and fade profile. Songs measured before plugin 0.4.2 are read again (the sound isn't kept, only what was
+    measured), a batch at a time after the profiles each 15 minutes, songs the app is about to play first.
     Their loudness, fades and earlier beat grids stay in use meanwhile; a song without its phrases blends bar on
     bar, one without its grid the plain way. Songs per run can be any number: a round stops when its time is up (4
     minutes; measuring all goes on as set below), so a big number means "as many as fit". 0 measures them only when

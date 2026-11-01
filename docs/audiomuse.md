@@ -81,6 +81,10 @@ want them to get a turn, set **Measure all runs** to rounds of 12, 10 or 5 minut
 15-minute task): the run ends after the song it's on, Measure all goes off for both parts, and the songs measured so
 far are kept.
 
+From 0.4.2 the tempo of drum and bass and other breakbeats is read right. It often came out at two thirds (113 BPM for
+170), with the beats off the music, so those songs were never beat-matched. Updating measures every song's beat
+grids again in the background, songs Siansa is about to play first; the loudness and fades stay in use meanwhile.
+
 While **Measure all** is on, the page says where it is and updates by itself (never while you're typing in it): how
 many it has measured so far, with rounds **Between rounds** and when the next one starts, waiting for one of
 AudioMuse-AI's own jobs to finish, or that nothing is starting because the plugin's scheduled task is switched off

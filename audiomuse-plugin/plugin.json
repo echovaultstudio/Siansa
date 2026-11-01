@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.4.2",
+      "min_core_version": "3.6.4",
+      "changelog": "Reads the tempo of drum and bass and other breakbeats right. A break repeats every beat, every one and a half and every two, and the tempo often came out at two thirds (113 BPM for 170), with the beats off the music, so Siansa never beat-matched them. Now the tempos related to the one found (double, half, one and a half, two thirds, four thirds, three quarters, and the strongest repeats) are each tried, and another is used only when its beats clearly sit better on the music; four-to-the-floor keeps its tempo. Every song's beat grids are measured again in the background, songs the app is about to play first.",
+      "imageUrl": ""
+    },
+    {
       "version": "0.4.1",
       "min_core_version": "3.6.4",
       "changelog": "Measure all goes on without a break until every song is measured (AudioMuse's own jobs wait meanwhile); rounds of 12, 10 or 5 minutes every 15 can be set instead, as before. Stop now ends any run measuring songs (Measure all, a batch now or the 15-minute task) after the song it's on. The settings page now says where the rounds are (a round running and how many it has measured, between rounds and when the next starts, waiting for one of AudioMuse's own jobs, or no round starting because the scheduled task is off) and what the last round did, and keeps itself current between rounds. Before, it stopped updating when a round ended, so the count looked stuck. A round that stopped without finishing (the worker restarted) no longer keeps the page on \"Measuring\" with its buttons off. The beat grids section says what 0.4.0 measures (the phrases) and why songs are read again.",
