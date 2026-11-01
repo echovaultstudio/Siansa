@@ -19,8 +19,11 @@ When you start a radio you can also pick **Steady** or **DJ** order (see Keep pl
 ### Shape the mix
 
 While a DJ radio plays, the queue (pull up from now playing) has **Shape the mix**: what the energy does over the
-songs not yet played, and how far the mix may stray. Each change puts those songs in a new order, starting with
-the next one; the song playing and anything you queued yourself stay where they are.
+songs not yet played, and how far the mix may stray. Each change picks the radio's next songs again, starting
+with the very next one: from the ones queued and a fresh lot that sound like the song playing, so a wind down finds
+calmer songs and a euphoric mix brighter ones at a tempo that still mixes. The queue keeps as many songs as before;
+ones that don't fit the new shape go, and may come back later. The song playing and anything you queued yourself
+stay where they are.
 
 | Shape | What happens |
 |---|---|

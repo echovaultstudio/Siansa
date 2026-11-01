@@ -27,6 +27,22 @@ enum class RadioDrift(val label: String, val hint: String) {
     }
 }
 
+/**
+ * How alike each song is to the one playing, for a reshape (issue #786): by its place in AudioMuse's list of songs
+ * like the one playing ([likePlaying], the most alike first), as a top-up ranks them; a song not on it (queued from
+ * further away) counts as fairly alike, so it neither wins nor loses on that alone.
+ */
+fun reshapeLikeness(likePlaying: List<String>): (String) -> Double {
+    val at = likePlaying.withIndex().associate { (i, id) -> id to i }
+    return { id -> at[id]?.let { likenessByRank(it, likePlaying.size) } ?: NOT_LISTED_LIKENESS }
+}
+
+/** The likeness of a queued song AudioMuse didn't list as like the one playing. */
+const val NOT_LISTED_LIKENESS = 0.5
+
+/** The radio's queued songs a reshape left out, so a later top-up may bring them back (issue #786). */
+fun reshapeLeftOut(queued: List<String>, picked: List<String>): List<String> = queued.filter { it !in picked.toSet() }
+
 /** Where a top-up looks for songs: like the first song, like the one playing, or like the one playing but kept near the first. */
 enum class RadioAnchor { SEED, CURRENT, CURRENT_NEAR_SEED }
 
@@ -64,6 +80,8 @@ class SongRadio(private val graph: AppGraph) {
         private set
 
     private var watcher: Job? = null
+    /** The reshape being worked out; a newer one replaces it, so the last shape picked is the one that lands. */
+    private var reshaping: Job? = null
     private val heard = LinkedHashSet<String>()
     private var topping = false
     private var topUps = 0
@@ -114,9 +132,14 @@ class SongRadio(private val graph: AppGraph) {
     }
 
     /**
-     * The mix's shape or surprise changed (issue #649): the radio's songs not yet played are put in DJ order again
-     * from the one playing, so the new shape starts with the next song. Only in DJ mode, and only the songs the
-     * radio added; anything you queued yourself stays where it is, first.
+     * The mix's shape or surprise changed (issue #649): the radio's songs not yet played are picked again from the
+     * one playing, so the new shape starts with the next song. Only in DJ mode, and only the songs the radio added;
+     * anything you queued yourself stays where it is, first.
+     *
+     * The picks come from the radio's queued songs and a fresh lot like the one playing (issue #786): with only the
+     * queued ones there was often nothing calmer, brighter or more surprising at a tempo that mixes, so the next
+     * song stayed the same and only later ones moved. As many are queued as before; ones that don't fit the new
+     * shape go, and may come back later.
      */
     fun reshape() {
         if (_seed.value == null || mode != ContinuousMode.DJ) return
@@ -126,25 +149,62 @@ class SongRadio(private val graph: AppGraph) {
         val mine = upcoming.filter { it.index in state.auto }.map { it.value }
         val yours = upcoming.filter { it.index !in state.auto }.map { it.value }
         if (mine.size < 2) return
-        graph.scope.launch {
+        reshaping?.cancel()
+        reshaping = graph.scope.launch {
             val started = System.currentTimeMillis()
-            val arranged = runCatching { arrange(mode, yours.lastOrNull() ?: current, mine) }
-                .onFailure { AppLog.w("SongRadio", "Couldn't reshape the mix: ${it.message}") }
-                .getOrNull() ?: return@launch
+            val reshaped = try {
+                reshapePicks(current, yours.lastOrNull() ?: current, mine)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e  // a newer shape was picked
+            } catch (e: Exception) {
+                AppLog.w("SongRadio", "Couldn't reshape the mix: ${e.message}")
+                null
+            } ?: return@launch
+            val (arranged, fresh) = reshaped
             val s = graph.settings.current
-            AppLog.i("SongRadio", "Reshaped ${arranged.size} songs (${s.mixShape.label.lowercase()}, surprise ${s.mixSurprise} %) in ${System.currentTimeMillis() - started}ms")
+            val kept = arranged.count { a -> mine.any { it.id == a.id } }
+            AppLog.i(
+                "SongRadio",
+                "Reshaped (${s.mixShape.label.lowercase()}, surprise ${s.mixSurprise} %): ${arranged.size} songs, $kept kept, " +
+                    "${arranged.size - kept} new of $fresh found, ${mine.size - kept} left out, next \"${arranged.firstOrNull()?.title}\" " +
+                    "in ${System.currentTimeMillis() - started}ms",
+            )
             withContext(Dispatchers.Main) {
                 // Still the same radio and song: otherwise the queue has moved on and the order would be stale.
                 val now = graph.player.state.value
-                if (_seed.value != null && now.current?.id == current.id) graph.player.replaceUpcoming(yours, arranged)
+                if (_seed.value != null && now.current?.id == current.id) {
+                    graph.player.replaceUpcoming(yours, arranged)
+                    // Songs left out may come back in a later top-up; the new ones count as heard.
+                    heard -= reshapeLeftOut(mine.map { it.id }, arranged.map { it.id }).toSet()
+                    heard += arranged.map { it.id }
+                }
             }
         }
+    }
+
+    /**
+     * The songs for a reshape after [after] (the playing song, or the last one you queued): from [queued] and a
+     * fresh lot like [playing], each by how alike AudioMuse says it is to [playing]. Returns them and how many new
+     * ones were found.
+     */
+    private suspend fun reshapePicks(playing: Song, after: Song, queued: List<Song>): Pair<List<Song>, Int> {
+        val like = graph.sonic.similar(playing.id, (RESHAPE_POOL + heard.size).coerceAtMost(MAX_POOL))
+        val queuedIds = queued.map { it.id }.toSet()
+        val fresh = graph.generator.resolveHits(like.filter { it.id != playing.id && it.id !in heard && it.id !in queuedIds })
+            .filter { it.id != playing.id && it.id !in heard && it.id !in queuedIds }
+            .distinctBy { it.id }
+            .take(RESHAPE_POOL)
+        val rank = reshapeLikeness(like.map { it.id })
+        val arranged = graph.continuousPlay.djArrange(after, queued + fresh, count = queued.size) { id -> rank(id) }
+        return arranged to fresh.size
     }
 
     fun stop() {
         if (_seed.value != null) AppLog.i("SongRadio", "Stopped")
         watcher?.cancel()
         watcher = null
+        reshaping?.cancel()
+        reshaping = null
         _seed.value = null
     }
 
@@ -213,5 +273,7 @@ class SongRadio(private val graph: AppGraph) {
     private companion object {
         const val TOP_UP = 20
         const val MAX_POOL = 500
+        /** New songs a reshape looks at, beside the ones queued (issue #786). */
+        const val RESHAPE_POOL = 30
     }
 }
