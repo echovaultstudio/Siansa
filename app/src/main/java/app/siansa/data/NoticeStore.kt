@@ -2,11 +2,10 @@ package app.siansa.data
 
 import android.content.Context
 import app.siansa.mix.NoticeKind
-import app.siansa.mix.Notices
 
 /**
  * What the notices on Home remember (issue #784), for each user: how often each kind was tapped, so Automatic puts
- * the ones you use first, and the notices you hid.
+ * the ones you use first.
  */
 class NoticeStore(context: Context) {
     /**
@@ -24,17 +23,8 @@ class NoticeStore(context: Context) {
         prefs.edit().putString(KEY_TAPS, formatTaps(taps)).apply()
     }
 
-    fun hidden(): Set<String> = hiddenList().toSet()
-
-    fun hide(key: String) {
-        prefs.edit().putString(KEY_HIDDEN, Notices.hide(hiddenList(), key).joinToString("\n")).apply()
-    }
-
-    private fun hiddenList(): List<String> = prefs.getString(KEY_HIDDEN, null).orEmpty().split('\n').filter { it.isNotBlank() }
-
     companion object {
         private const val KEY_TAPS = "taps"
-        private const val KEY_HIDDEN = "hidden"
 
         /** "carry_on:3,month:1"; unknown kinds and bad counts are dropped. */
         fun parseTaps(saved: String?): Map<NoticeKind, Int> = saved.orEmpty().split(',').mapNotNull { part ->
