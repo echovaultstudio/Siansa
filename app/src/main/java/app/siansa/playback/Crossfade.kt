@@ -122,7 +122,8 @@ object Crossfade {
         val (cut, cutWhy) = if (mode == CrossfadeMode.SMART) endCut(currentProfile, currentDurationMs, maxMs) else 0L to null
         val outro = currentProfile?.outro
         val intro = nextProfile?.intro
-        val rhythmic = mode == CrossfadeMode.SMART && BeatMatch.bothRhythmic(outro, intro)
+        // Both ends keep a beat (steady or not): unless laid beat on beat, a long blend clashes (issue #796).
+        val rhythmic = mode == CrossfadeMode.SMART && BeatMatch.wouldClash(outro, intro)
         // Beat-matched (issue #646): a DJ blend over whole bars, beat on beat, when both ends have a steady beat;
         // a quiet, steady intro with clear bars is laid on the beat too (issue #759), but doesn't count as a clash.
         val matchable = mode == CrossfadeMode.SMART && outro?.matchable == true && intro?.matchableAsIntro == true
@@ -141,6 +142,11 @@ object Crossfade {
                 why += " · beats would clash, so a short blend"
             }
             FadePlan(overlap, head.coerceIn(MIN_FADE_IN_MS, overlap.coerceAtLeast(MIN_FADE_IN_MS)), why, cut)
+        } else if (mode == CrossfadeMode.SMART && BeatMatch.beatDriven(outro) && nextProfile == null) {
+            // The song going out keeps a beat and the next song's isn't known, so it can't be laid on it: a long
+            // blend would clash for its whole length (20 and 30 s of two beats, issue #796), so a short one.
+            val overlap = min(maxMs, BeatMatch.CLASH_MS)
+            FadePlan(overlap, overlap, "smart: the next song's beat isn't known, so a short blend", cut)
         } else {
             FadePlan(maxMs, maxMs, if (mode == CrossfadeMode.SMART) "smart without profiles: fixed ${maxMs} ms" else "fixed ${maxMs} ms", cut)
         }
@@ -156,15 +162,24 @@ object Crossfade {
         // is dropped: its start must stay on the bar).
         val shortest = listOf(currentDurationMs - plan.cutMs, nextDurationMs).filter { it > 0 }.minOrNull()
         if (shortest != null && plan.overlapMs > shortest / 3) {
-            val overlap = shortest / 3
             val dropped = plan.beat != null
-            plan = plan.copy(
-                overlapMs = overlap, fadeInMs = min(plan.fadeInMs, overlap).coerceAtLeast(MIN_FADE_IN_MS), beat = null,
-                // A phrase plan's cut (its last part-phrase) goes with it: without the plan it would only lose the ending.
-                cutMs = if (dropped) cut else plan.cutMs,
-                why = if (dropped) "smart: a third of the shorter song" + (cutWhy?.let { " · $it" } ?: "") else plan.why,
-                beatNote = if (dropped) "${plan.beatNote} · not beat-matched: the blend would be over a third of a song" else plan.beatNote,
-            )
+            // A beat-matched blend too long for a short song is laid again over fewer bars that fit (issue #796):
+            // dropping it left two steady beats blending out of step for a third of the song.
+            val third = listOf(currentDurationMs - cut, nextDurationMs).filter { it > 0 }.minOrNull()?.div(3) ?: 0L
+            val shorter = if (dropped) BeatMatch.plan(outro!!, intro!!, currentDurationMs - cut, third)?.takeIf { it.overlapMs <= third } else null
+            plan = if (shorter != null) {
+                FadePlan(shorter.overlapMs, shorter.overlapMs, shorter.why + " · fewer bars, to fit a short song" + (cutWhy?.let { " · $it" } ?: ""), cut + shorter.cutMs, shorter, plan.beatNote)
+            } else {
+                // Two steady beats that can't be laid on each other blend only for a moment, as above.
+                val overlap = if (dropped && rhythmic) min(shortest / 3, BeatMatch.CLASH_MS) else shortest / 3
+                plan.copy(
+                    overlapMs = overlap, fadeInMs = min(plan.fadeInMs, overlap).coerceAtLeast(MIN_FADE_IN_MS), beat = null,
+                    // A phrase plan's cut (its last part-phrase) goes with it: without the plan it would only lose the ending.
+                    cutMs = if (dropped) cut else plan.cutMs,
+                    why = if (dropped) (if (overlap < shortest / 3) "smart: beats would clash, so a short blend" else "smart: a third of the shorter song") + (cutWhy?.let { " · $it" } ?: "") else plan.why,
+                    beatNote = if (dropped) "${plan.beatNote} · not beat-matched: not even one bar fits in a third of a song" else plan.beatNote,
+                )
+            }
         }
         return if (plan.overlapMs < MIN_OVERLAP_MS) null else plan
     }
@@ -187,6 +202,17 @@ object Crossfade {
      */
     fun tailSpeed(behindMs: Long): Float =
         if (abs(behindMs) <= IN_STEP_MS) 1f else (1f + behindMs / 400f).coerceIn(0.75f, 1.25f)
+
+    /**
+     * Whether a blend got [ready] is planned again because the next song's fade shape [arrived] (issue #796): only
+     * when it was planned without one ([plannedWithNext] false), and not once the tail plays ([primed]) or with less
+     * than [REPLAN_MS] to go ([untilFadeMs]), when planning again would call the blend off rather than better it.
+     */
+    fun planAgainForShape(ready: Boolean, plannedWithNext: Boolean, primed: Boolean, untilFadeMs: Long, arrived: Boolean): Boolean =
+        ready && !plannedWithNext && !primed && untilFadeMs >= REPLAN_MS && arrived
+
+    /** A blend is planned again for a fade shape that arrived only with at least this long to go. */
+    const val REPLAN_MS = 3_000L
 
     /** Closer than this, the tail and the main player count as in step. */
     const val IN_STEP_MS = 10L

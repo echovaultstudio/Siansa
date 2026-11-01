@@ -65,7 +65,8 @@ Same page. **Off**, a **fixed** length (1–30 seconds, 6 by default), or **Smar
   end counts: a silence or a quiet passage mid-song never starts the next song, a soft ending that stays at one low
   level is played, and nothing is left out before three quarters of the song. The log says what was left out.
 - Songs that run straight on within one album aren't faded, so they stay gapless.
-- Without the plugin's measurements, Smart uses the fixed length.
+- Without the plugin's measurements, Smart uses the fixed length. When the song going out keeps a beat but the
+  next song hasn't been measured, the blend is short instead, so the two beats don't clash for the whole length.
 
 ### Beat-matched blends (experimental)
 
@@ -83,7 +84,7 @@ blend them the way a DJ mixes:
   end together. Without phrases, the blend starts on a bar of the song going out, the next song starts on its first
   downbeat, and the blend is the Blend length in whole bars. Either way the next song plays a touch faster or slower (up
   to 8 %, pitch kept) so its beats keep time with the old song's, then eases back to its own speed over about 25
-  seconds, too slowly to hear.
+  seconds, in small steps too slight to hear.
 - **Everywhere**: the same in every smart crossfade.
 - **Off**: fades don't follow the beat.
 
@@ -94,7 +95,8 @@ so their beats clash only for a moment. A beatless ending or start keeps the sma
 **Blend length** (4, 8 or 16 bars; 8 by default): how long a beat-matched blend is, counted in bars the way a DJ
 counts it. It's apart from the crossfade length, so ordinary fades can stay short while DJ blends run long: 8 bars
 is about 15 seconds at 128 BPM, 16 bars about 30. A blend starts on a bar, so it runs to the song's end a part-bar
-longer, and it never takes more than a third of a song.
+longer, and it never takes more than a third of a song: into a short song it's laid over fewer bars, still beat
+on beat.
 
 **Echo at the end** (on by default): over the last bar of a blend the old song rings out in a hall, as a DJ
 echoes a track out, so the join is softer. A phone whose reverb can't be opened plays the blend plain.

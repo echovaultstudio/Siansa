@@ -69,6 +69,15 @@ object BeatMatch {
     fun bothRhythmic(outgoing: BeatEnd?, incoming: BeatEnd?): Boolean = outgoing?.matchable == true && incoming?.matchable == true
 
     /**
+     * The end keeps a beat, steady or not (issue #796): drum and bass breaks often read as unsteady (or at the wrong
+     * tempo), so they can't be matched, but two of them laid on each other out of step still clash.
+     */
+    fun beatDriven(end: BeatEnd?): Boolean = end != null && end.bpm > 0 && end.rhythm >= MIN_RHYTHM
+
+    /** Both ends keep a beat, steady or not: an unmatched blend between them clashes, so it's kept short. */
+    fun wouldClash(outgoing: BeatEnd?, incoming: BeatEnd?): Boolean = beatDriven(outgoing) && beatDriven(incoming)
+
+    /**
      * One beat-matched blend: it starts at [startMs] of the song going out and lasts [overlapMs] ([bars] whole
      * bars of it), to that song's end; the next song starts at [incomingStartMs] of its own time, at [speed];
      * [onBars] when downbeat meets downbeat, else beat meets beat.
@@ -205,15 +214,36 @@ object BeatMatch {
         private var total = 0L
         private var worst = 0L
 
+        /** The smoothed errors ([SmoothedError]), which decide jumps and nudges: single readings can be 90 ms off. */
+        private val settled = ArrayList<Long>()
+
         fun add(errorMs: Long) {
             checks++
             total += abs(errorMs)
             worst = maxOf(worst, abs(errorMs))
         }
 
-        /** "beats typically 6 ms apart, at worst 18 ms (412 checks)". */
-        fun describe(): String = if (checks == 0) "beats not checked" else "beats typically ${total / checks} ms apart, at worst $worst ms ($checks checks)"
+        fun addSettled(errorMs: Long) {
+            settled += abs(errorMs)
+        }
+
+        /**
+         * "beats typically 6 ms apart, at worst 18 ms (412 checks)", and from the smoothed errors (issue #796) how far
+         * apart they mostly were and how much of the blend they were within [AUDIBLE_MS]: the single readings jump
+         * about, so the typical figure alone didn't tell a blend out of step from a noisy one.
+         */
+        fun describe(): String {
+            if (checks == 0) return "beats not checked"
+            val raw = "beats typically ${total / checks} ms apart, at worst $worst ms ($checks checks)"
+            if (settled.isEmpty()) return raw
+            val middle = settled.sorted()[settled.size / 2]
+            val within = settled.count { it <= AUDIBLE_MS } * 100 / settled.size
+            return "$raw; smoothed, $middle ms apart, within $AUDIBLE_MS ms $within % of the time"
+        }
     }
+
+    /** Beats further apart than this are heard as two (a flam): DJs keep within about 10 to 20 ms. */
+    const val AUDIBLE_MS = 20L
 
     /** How long getting the next song to a point takes at first, before Siansa has measured it on this phone (issue
      *  #747). Phones do it in 20 to 70 ms (issue #773: 150 sent the song ahead by a jump's worth). */
@@ -267,6 +297,18 @@ object BeatMatch {
             if (recent.size < STEP_READINGS) return null
             return recent.sorted()[recent.size / 2]
         }
+    }
+
+    /**
+     * The speed to send while easing back after a blend, [elapsedMs] after it ended, with the song playing at
+     * [playing] (both times [base], the listener's own speed); null when it isn't worth a change yet (issue #796).
+     * Every change re-tunes the time-stretcher and is heard (issue #773), so the ease goes in steps of [NUDGE_STEP]
+     * at least: about 20 for a 3 % match, where a change every 200 ms made 125 of them.
+     */
+    fun easeStep(matched: Float, elapsedMs: Long, playing: Float, base: Float = 1f): Float? {
+        if (elapsedMs >= EASE_MS) return if (playing != base) base else null
+        val wanted = base * eased(matched, elapsedMs)
+        return wanted.takeIf { abs(playing - it) >= NUDGE_STEP * base }
     }
 
     /** The speed [elapsedMs] after the blend ended: from [matched] back to 1, a straight line over [EASE_MS]. */
