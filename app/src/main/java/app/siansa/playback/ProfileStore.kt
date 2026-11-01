@@ -144,7 +144,7 @@ class ProfileStore(
         fun friendly(message: String?): String {
             val text = message.orEmpty()
             return when {
-                "HTTP 404" in text -> "The Siansa plugin isn't installed on this AudioMuse server"
+                app.siansa.net.AudioMuseErrors.PLUGIN_MISSING in text || "HTTP 404" in text -> app.siansa.net.AudioMuseErrors.PLUGIN_MISSING
                 // Without a login, AudioMuse sends its login page instead of an answer.
                 "isn't JSON" in text || "needs a login" in text -> "AudioMuse wants a login for the plugin: check the AudioMuse login in Settings › Servers and services"
                 text.isBlank() -> "Couldn't reach the Siansa plugin"

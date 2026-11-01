@@ -160,8 +160,11 @@ class AudioMuseApi(
             if (!response.isSuccessful) {
                 val code = json?.int("error_code")
                 val reason = json?.str("error_message") ?: json?.str("error") ?: json?.str("message") ?: body.take(120).ifBlank { "no details" }
-                AppLog.w("AudioMuse", "${request.url.encodedPath} failed: HTTP ${response.code}, error ${code ?: "?"}: $reason")
-                throw AudioMuseHttpException(AudioMuseErrors.message(code, response.code, reason), code, response.code)
+                val path = request.url.encodedPath
+                val message = if (path.contains("/plugins/")) AudioMuseErrors.pluginMessage(code, response.code, reason, body) else AudioMuseErrors.message(code, response.code, reason)
+                // A web page as the reason is noise in the log: say what it means instead.
+                AppLog.w("AudioMuse", "$path failed: HTTP ${response.code}, error ${code ?: "?"}: ${if (AudioMuseErrors.isWebPage(body)) "a web page, not the API (the plugin isn't installed)" else reason}")
+                throw AudioMuseHttpException(message, code, response.code)
             }
             element ?: throw ApiException("AudioMuse sent something that isn't JSON. Is the address its API port?")
         }

@@ -13,6 +13,20 @@ object AudioMuseErrors {
         "music server, enter its name in Settings › Servers and services, under the server the song is from (another user's " +
         "too): Server name in AudioMuse."
 
+    /**
+     * The Siansa plugin isn't installed on this AudioMuse (issue #788): a plugin call answered by AudioMuse's own web
+     * page, not JSON. Before, this read as "doesn't know this song", which sent a tester after the wrong thing.
+     */
+    const val PLUGIN_MISSING = "The Siansa Analysis plugin isn't installed on this AudioMuse. Add it under Plugins in " +
+        "AudioMuse (see the docs, AudioMuse-AI › Install the Siansa Analysis plugin)."
+
+    /** Whether a failed answer is a web page rather than the API: AudioMuse's page for a path it doesn't have. */
+    fun isWebPage(body: String): Boolean = body.trimStart().startsWith("<!doctype", ignoreCase = true) || body.trimStart().startsWith("<html", ignoreCase = true)
+
+    /** The message for a failed call to the plugin's path: a web page for 404 means the plugin isn't there. */
+    fun pluginMessage(code: Int?, http: Int, reason: String, body: String): String =
+        if (code == null && http == 404 && isWebPage(body)) PLUGIN_MISSING else message(code, http, reason)
+
     fun message(code: Int?, http: Int, reason: String): String = when (code) {
         1003 -> "AudioMuse didn't understand the request: $reason"
         1004 -> NOT_KNOWN
