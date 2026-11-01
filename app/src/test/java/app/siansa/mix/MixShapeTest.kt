@@ -16,14 +16,34 @@ class MixShapeTest {
     private val seed = DjTrack("seed", "Seed", 1.0, 124.0, "C", "major", energy = 0.4, lift = 0.2)
 
     @Test fun theShapesSayWhereTheEnergyGoes() {
-        assertNull(MixShape.STEADY.target(0.4, 0, 10))
-        assertEquals(0.4 + 0.6 * 0.1, MixShape.BUILD.target(0.4, 0, 10)!!, 1e-9)
-        assertEquals(1.0, MixShape.BUILD.target(0.4, 9, 10)!!, 1e-9)
-        assertEquals(1.0, MixShape.EUPHORIC.target(0.4, 3, 10)!!, 1e-9)  // at the top after a third of the songs
-        assertEquals(0.4 + 0.6 * 0.3, MixShape.EUPHORIC.target(0.4, 0, 10)!!, 1e-9)
-        assertEquals(0.0, MixShape.WIND_DOWN.target(0.4, 9, 10)!!, 1e-9)
-        assertEquals(0.5 * 0.9, MixShape.WIND_DOWN.target(null, 0, 10)!!, 1e-9)  // unknown energy counts as the middle
+        assertNull(MixShape.STEADY.target(0.4, 0))
+        assertEquals(0.4 + 0.6 / 8, MixShape.BUILD.target(0.4, 0)!!, 1e-9)
+        assertEquals(1.0, MixShape.BUILD.target(0.4, 7)!!, 1e-9)  // at the top after eight songs
+        assertEquals(1.0, MixShape.BUILD.target(0.4, 20)!!, 1e-9)  // and stays there
+        assertEquals(0.4 + 0.6 / 3, MixShape.EUPHORIC.target(0.4, 0)!!, 1e-9)
+        assertEquals(1.0, MixShape.EUPHORIC.target(0.4, 2)!!, 1e-9)  // at the top after three
+        assertEquals(0.0, MixShape.WIND_DOWN.target(0.4, 7)!!, 1e-9)
+        assertEquals(0.5 * 7 / 8, MixShape.WIND_DOWN.target(null, 0)!!, 1e-9)  // unknown energy counts as the middle
         assertEquals(MixShape.STEADY, MixShape.parse("nonsense"))
+    }
+
+    /**
+     * Issue #798, from a report: a DJ radio of 30 songs at 134 BPM, the energy now 0.32 (by rank). Spread over all 30,
+     * the next song's target was 0.31 to 0.39 in every shape, so the same next song (energy 0.33) came first in all of
+     * them. Now a shape doesn't depend on how many songs are queued: the next song's target is the same with 13 or 30.
+     */
+    @Test fun theNextSongFollowsTheShapeHoweverManyAreQueued() {
+        val now = DjTrack("now", "Now", 1.0, 134.0, "A", "minor", energy = 0.32, lift = 0.2)
+        val songs = (0..29).map { i -> DjTrack("s$i", "Artist $i", likeness = 0.8, tempo = 134.0, key = "A", scale = "minor", energy = i / 29.0, lift = 0.2) }
+        val next = MixShape.entries.associateWith { djOrder(now, songs, 30, it).first().energy!! }
+        // The next song already moves: up a step, down a step, a third of the way to the top (it was 0.34, 0.31, 0.38).
+        assertTrue(next.toString(), next.getValue(MixShape.BUILD) >= 0.32 + 0.05)
+        assertTrue(next.toString(), next.getValue(MixShape.WIND_DOWN) <= 0.32 - 0.03)
+        assertTrue(next.toString(), next.getValue(MixShape.EUPHORIC) >= 0.5)
+        // The same next song whether 13 or 30 are queued.
+        MixShape.entries.forEach { shape ->
+            assertEquals(shape.name, djOrder(now, songs, 30, shape).first().id, djOrder(now, songs, 13, shape).first().id)
+        }
     }
 
     @Test fun aBuildClimbsAndAWindDownFalls() {
