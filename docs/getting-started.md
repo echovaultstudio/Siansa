@@ -27,7 +27,7 @@ Not on the list yet? [Ask for an invite](https://siansa.app).
 
 1. **Where's your music?** Pick your server type: OpenSubsonic (Navidrome and others), Jellyfin or Emby.
 2. **Smart extras.** Choose **Add AudioMuse-AI** if you have it, or **Not now**. You can add it later in
-   Settings › Connections.
+   Settings › Servers and services.
 3. **Connections.** Enter your server's address (for example `http://192.168.1.10:4533`), user name and
    password. Tap **Test**, then **Save**. If you added AudioMuse-AI, enter its address and its API token (or
    user name and password) too.
@@ -39,7 +39,7 @@ That's it: Home fills with your mixes and recent music.
 
 ## Updating
 
-Google Play and F-Droid update Siansa by themselves. **Settings › What's new** shows what changed in the version
+Google Play and F-Droid update Siansa by themselves. **Settings › About › What's new** shows what changed in the version
 you have; tap it to see every version's changes.
 
 ## Next

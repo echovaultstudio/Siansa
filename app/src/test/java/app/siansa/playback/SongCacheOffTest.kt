@@ -6,7 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The song cache can be switched off in Settings › Storage (songCacheMb = 0); loading ahead stays separate. */
+/** The song cache can be switched off in Settings › Streaming and data (songCacheMb = 0); loading ahead stays separate. */
 class SongCacheOffTest {
     @Test fun zeroMeansOff() {
         assertFalse(songCacheOn(AppSettings(songCacheMb = 0)))

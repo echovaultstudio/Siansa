@@ -17,7 +17,7 @@ The **cog** on a section changes its look, to any of the custom cards' looks:
 A section in another look says which under its name. **Play** in a banner or the ▶ of a play button card plays the section:
 today's mix or the carousel's first mix where they left off, or the albums of Rediscover, Recently played, Recently
 added and Random picks in order. Sections of radios, playlists, genres, books and Made for you open instead. **Your
-cards** keep their own looks: their cog opens **Settings › Cards**.
+cards** keep their own looks: their cog opens **Settings › Home › Cards**.
 
 | Section | What it shows |
 |---|---|
@@ -37,7 +37,7 @@ cards** keep their own looks: their cog opens **Settings › Cards**.
 ## Vibes and today's mix
 
 A **vibe** covers part of the day. Siansa starts with Morning, Daytime, Evening and Night. When you open the app,
-the vibe for the current hour builds **today's mix**. **Settings › Daily Vibe settings** lets you change them:
+the vibe for the current hour builds **today's mix**. **Settings › Mixes and vibes** lets you change them:
 
 - **Name**, **Days** (or every day), and **hours** (0–23; a vibe from 22 to 5 runs past midnight). When several
   vibes fit, the most specific wins: one set for a day before an everyday one, one for some hours before an
@@ -53,7 +53,7 @@ the vibe for the current hour builds **today's mix**. **Settings › Daily Vibe 
 
 How the songs are picked is explained in [How it works](how-it-works.md#todays-mix-and-vibes).
 
-**Today's mix** has settings of its own at the top of **Settings › Daily Vibe settings**, which apply to it whichever
+**Today's mix** has settings of its own at the top of **Settings › Mixes and vibes**, which apply to it whichever
 vibe makes it:
 
 - **Auto update** (on by default): the mix follows the time of day. A new one is made as the day or the hour's vibe
@@ -98,12 +98,12 @@ same day; Siansa tells you which one already has them.
   Koito, ListenBrainz or Last.fm when you use them. It opens straight away and checks your server for changes while
   the cog turns, like a playlist. Until there's enough to go on, it isn't shown.
 - **Discover for you**: songs that sound like your taste, from artists you don't play much (only with AudioMuse-AI).
-- **Cards of your own** (**Settings › Cards › Made for you**): pick what a card shows (for example a genre or a
+- **Cards of your own** (**Settings › Home › Cards › Made for you**): pick what a card shows (for example a genre or a
   period) and name it. Each card gets new songs every day.
 
 ## Your cards
 
-Custom cards you make yourself (**Settings › Cards › Custom cards**), shown on Home in its **Your cards** section
+Custom cards you make yourself (**Settings › Home › Cards › Custom cards**), shown on Home in its **Your cards** section
 (move it under Arrange Home; the cards' own order is set in Settings). **Add a custom card** or tap one to change it,
 on a page of its own:
 

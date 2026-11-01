@@ -1,5 +1,8 @@
 package app.siansa.screenshots
 
+import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.Equalizer
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -273,9 +276,24 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     SwitchRow("Auto update", true) {}
                     TuningRow("Songs", 40, DailyMix.LENGTHS, { "$it" }, "dailyLength") {}
                     TuningRow("Leave out most played", null, DailyMix.LEAVE_OUT, { if (it == 0) "None" else "Top $it" }, "dailyLeaveOut") {}
-                    FoldSection("Streaming quality", "Wi-Fi Original · mobile Opus 128", tag = "quality") { Text("Body") }
+                    FoldSection("Streaming quality", "Wi-Fi Original · mobile Opus 128", tag = "quality", startOpen = false) { Text("Body") }
                     FoldSection("Beat-matched blends (experimental)", "DJ radio · 16 bars · echo", tag = "blends", startOpen = true) {
                         Text("Incomprehensibilities of the uncharacteristically long settings body")
+                    }
+                }
+            },
+            // The Settings start page in groups (issue #780), and Settings › Home's rows with what's set.
+            Scene("settings_groups") {
+                Column {
+                    app.siansa.ui.HubGroup("Sources", first = true)
+                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Dns, "Servers and services") {}
+                    app.siansa.ui.HubGroup("Listening")
+                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Playback") {}
+                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.MenuBook, "Audiobooks and podcasts") {}
+                    app.siansa.ui.HubGroup("Home and mixes")
+                    Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        app.siansa.ui.PageLink("Source filter", app.siansa.ui.homeSourcesLine(3, downloadedOnly = true), "s") {}
+                        app.siansa.ui.PageLink("Arrange Home", app.siansa.ui.homeArrangeLine(2, "Normal"), "a") {}
                     }
                 }
             },

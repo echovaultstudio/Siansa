@@ -321,7 +321,7 @@ class AppTourTest {
             }
             step("vibes") {
                 tab("Settings")
-                click("Daily Vibe settings")
+                click("Mixes and vibes")
                 idle(1000)
                 shot("17-vibes")
             }
@@ -330,9 +330,13 @@ class AppTourTest {
                 idle(800)
                 shot("18-settings")
                 // Users joined Connections in 0.43; Cards has a page of its own.
-                listOf("Connections", "Playback", "Style", "Cards", "Downloads", "Scrobbling", "Storage", "Help").forEachIndexed { i, page ->
+                // Grouped and renamed in issue #780.
+                listOf("Servers and services", "Playback", "Streaming and data", "Downloads", "Audiobooks and podcasts", "Home", "Style", "Scrobbling and history", "Help").forEachIndexed { i, page ->
                     tab("Settings")
-                    click(page)
+                    // The row itself, not the Home tab of the same name, scrolled into view on the longer page.
+                    waitText(page)
+                    compose.onAllNodes(hasTestTag("hubRow") and hasText(page)).onFirst().performScrollTo().performClick()
+                    idle()
                     idle(1200)
                     shot("19-settings-${i + 1}-" + page.lowercase().replace(' ', '-'))
                     back()
@@ -410,9 +414,11 @@ class AppTourTest {
                     idle(1000)
                     shot("19j-crossfade")
                     // Issue #214: levelling (ReplayGain) lives here now, with what levels the song playing now.
-                    // Its section folds (issue #776): open it first.
-                    compose.onNodeWithTag("section-levelling-header").performClick()
-                    idle(600)
+                    // Its section folds (issue #776); open by default since #780, so open it only if it was folded.
+                    if (compose.onAllNodesWithTag("section-levelling-body").fetchSemanticsNodes().isEmpty()) {
+                        compose.onNodeWithTag("section-levelling-header").performClick()
+                        idle(600)
+                    }
                     if (compose.onAllNodesWithText("Album").fetchSemanticsNodes().isEmpty()) problems += "Levelling chips missing on Crossfade and levelling"
                     val now = compose.onAllNodesWithTag("levelling-now", useUnmergedTree = true).fetchSemanticsNodes()
                     if (now.isEmpty()) problems += "No 'levelled by' line on Crossfade and levelling"

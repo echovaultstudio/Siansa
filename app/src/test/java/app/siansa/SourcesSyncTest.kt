@@ -41,7 +41,7 @@ class SourcesSyncTest {
     }
 
     @Test fun audiobookshelfSaysWhatItHas() {
-        assertEquals("Not signed in. Set it up in Settings › Connections.", booksStatus(false, BookSync()))
+        assertEquals("Not signed in. Set it up in Settings › Servers and services.", booksStatus(false, BookSync()))
         assertEquals("Audiobooks and podcasts · syncing…", booksStatus(true, BookSync(running = true)))
         assertEquals("Audiobooks and podcasts · 312 books · 4 podcasts", booksStatus(true, BookSync(books = 312, podcasts = 4, done = true)))
         assertEquals("Synced · 1 book", booksLine(BookSync(books = 1, done = true)))

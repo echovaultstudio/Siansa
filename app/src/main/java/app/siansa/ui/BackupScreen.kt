@@ -91,7 +91,7 @@ fun BackupScreen(nav: NavController) {
         }
     }
 
-    Screen(title = "Backup", nav = nav) { padding ->
+    Screen(title = "Backup and restore", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),

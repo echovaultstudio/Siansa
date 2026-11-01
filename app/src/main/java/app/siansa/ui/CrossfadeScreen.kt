@@ -75,7 +75,7 @@ fun CrossfadeScreen(nav: NavController) {
             Hint(settings.loudnessSource.detail + ".")
             if (settings.loudnessSource == LoudnessSource.PLUGIN) {
                 if (!settings.audioMuseReady) {
-                    Hint("Set up AudioMuse in Settings › Connections first. Until then, song tags are used.")
+                    Hint("Set up AudioMuse in Settings › Servers and services first. Until then, song tags are used.")
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                         OutlinedButton(onClick = {

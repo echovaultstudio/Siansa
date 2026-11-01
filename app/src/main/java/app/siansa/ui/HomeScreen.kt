@@ -446,7 +446,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.CARDS -> {
-                    // Your cards (issue #622), in the order set in Settings › Cards; each is its own row.
+                    // Your cards (issue #622), in the order set in Settings › Home › Cards; each is its own row.
                     pinnedCards.orEmpty().filter { it.shown }.forEach { card ->
                         item(key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
                     }
@@ -574,30 +574,8 @@ fun HomeScreen(nav: NavController) {
     }
     }
     if (arranging) {
-        ArrangeHomeSheet(homeOrder, homeHidden, gap = homeSettings.homeGap, onGapChange = {
-            AppLog.i("Home", "Spacing: ${homeGapLabel(it)}")
-            graph.settings.setHomeGap(it)
-        }, onChange = {
-            AppLog.i("Home", "Arranged: ${HomeSection.format(it)}")
-            graph.settings.setHomeOrder(it)
-        }, onHiddenChange = {
-            AppLog.i("Home", "Hidden: ${HomeSection.formatHidden(it).ifEmpty { "none" }}")
-            graph.settings.setHomeHidden(it)
-        }, onDismiss = { arranging = false }, startOnSources = true,
-            looks = homeSettings.homeLooks,
-            onLookChange = { section, look ->
-                AppLog.i("Home", "${section.label} looks: ${look.label}")
-                graph.settings.setHomeLook(section, look)
-            },
-            onResetLooks = {
-                AppLog.i("Home", "Every row back in its own look")
-                graph.settings.resetHomeLooks()
-            },
-            onOpenCards = {
-                arranging = false
-                nav.navigate("settings/cards")
-            },
-        )
+        // The same panel opens from Settings › Home (issue #780).
+        HomeSettingsSheet(nav, startOnSources = true) { arranging = false }
     }
 }
 
@@ -763,7 +741,7 @@ internal fun MakeTodayCard(onMake: () -> Unit) {
         Row(Modifier.padding(Space.Page), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Today's mix", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("None made yet. Auto update is off in Daily Vibe settings, so it's made when you ask.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("None made yet. Auto update is off in Settings › Mixes and vibes, so it's made when you ask.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(Space.Page))
             FilledTonalButton(onClick = onMake) { Text("Make it") }

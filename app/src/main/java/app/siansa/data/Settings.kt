@@ -130,7 +130,7 @@ data class AppSettings(
     val logging: Boolean = false,
     /** What of the moment the vibes may use for today's mix (Vibes panel, issue #247). */
     val situation: SituationOptions = SituationOptions(),
-    /** Parts of the app whose detailed log entries are left out (Settings › Logs › Detail, issue #237). */
+    /** Parts of the app whose detailed log entries are left out (Settings › Help › Detail, issue #237). */
     val scrobbleNavidrome: Boolean = true,
     /** How much of a song must be heard, in percent, before it's scrobbled (issue #270). */
     val scrobblePercent: Int = 50,

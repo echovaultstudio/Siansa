@@ -78,7 +78,7 @@ Both update on their own. Or build it from this source (below): a build of your 
    - **Your server**: address (e.g. `http://192.168.1.10:4533`), username, password.
    - **AudioMuse-AI**: address of its web/API port (e.g. `http://192.168.1.10:8000`) and its API token if authentication is on. Text search (CLAP) must be enabled.
    - **OpenRouter** (optional): API key and model id (default `google/gemini-2.5-flash`; any OpenRouter model id works).
-   - **Audiobookshelf** (optional, under Settings › Users): address and an API token or login.
+   - **Audiobookshelf** (optional, under Settings › Servers and services): address and an API token or login.
 2. Use **Test** next to each section, then **Save**.
 3. Optional: install the **Siansa plugin** on AudioMuse-AI (see [`audiomuse-plugin/`](audiomuse-plugin/README.md)) and choose it
    under Settings › Crossfade and levelling. It measures each song's loudness and how it starts and ends, for

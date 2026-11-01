@@ -2,7 +2,7 @@
 
 ## Streaming quality
 
-**Settings › Playback › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
+**Settings › Streaming and data › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
 
 - **Original**: the file as it is on your server. Best on Wi-Fi.
 - **Opus 96–320 kbit/s**: converted by your server (Navidrome's "opus" transcoding profile), to save data.
@@ -13,10 +13,10 @@ Siansa always plays the quality you chose; it never switches by itself. Changes 
 
 ## Song cache and loading ahead
 
-- **Song cache** (**Settings › Storage**, 2 GB by default): songs are kept on the phone as they play, so replays
+- **Song cache** (**Settings › Streaming and data**, 2 GB by default): songs are kept on the phone as they play, so replays
   and skips start at once and survive a bad connection. Only original-quality streams are cached. **Off** keeps
   no song once it has played (the songs already cached are removed); it applies from the next song.
-- **Load songs ahead** (**Settings › Playback**): while a song plays, Siansa loads the next ones, one at a time, so
+- **Load songs ahead** (**Settings › Streaming and data**): while a song plays, Siansa loads the next ones, one at a time, so
   they start at once and keep playing if the connection drops. 2 on Wi-Fi and 1 on mobile data by default, up to
   5. Only original files are loaded ahead. This works with the song cache off too, for up to 3 songs: each is held
   only until it has played.

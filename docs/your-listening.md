@@ -28,7 +28,7 @@ from AudioMuse-AI's analysis of the songs closest to the sound of your most play
 
 ## Scrobbling
 
-**Settings › Scrobbling**:
+**Settings › Scrobbling and history**:
 
 - **When a song counts**: once more than the chosen share of it has played (50% by default), or four minutes,
   whichever comes first. Songs under 30 seconds never count. Listens made offline are sent later.

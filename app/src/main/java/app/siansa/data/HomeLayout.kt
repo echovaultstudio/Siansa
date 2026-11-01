@@ -12,7 +12,7 @@ enum class HomeSection(val id: String, val label: String) {
     BOOKS("books", "Your books"),
     PODCASTS("podcasts", "Your podcasts"),
     MADE_FOR_YOU("made", "Made for you"),
-    /** Custom cards pinned to Home (issue #622); each shows in its own look, in the order set in Settings › Cards. */
+    /** Custom cards pinned to Home (issue #622); each shows in its own look, in the order set in Settings › Home › Cards. */
     CARDS("cards", "Your cards"),
     REDISCOVER("rediscover", "Rediscover"),
     RADIOS("radios", "Radios"),
@@ -23,7 +23,7 @@ enum class HomeSection(val id: String, val label: String) {
     GENRES("genres", "Your genres"),
     RANDOM("random", "Random picks");
 
-    /** Its look can be changed under Arrange Home (issue #655); Your cards each have their own, in Settings › Cards. */
+    /** Its look can be changed under Arrange Home (issue #655); Your cards each have their own, in Settings › Home › Cards. */
     val lookable: Boolean get() = this != CARDS
 
     companion object {

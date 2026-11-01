@@ -317,7 +317,11 @@ fun SiansaRoot() {
                 composable("settings/style/nav-bar") { NavBarStyleScreen(nav) }
                 composable("settings/equaliser") { EqualiserScreen(nav) }
                 composable("settings/crossfade") { CrossfadeScreen(nav) }
-                composable("settings/storage") { StorageScreen(nav) }
+                // Storage became Streaming and data (issue #780); the old address opens it.
+                composable("settings/storage") { StreamingDataScreen(nav) }
+                composable("settings/streaming") { StreamingDataScreen(nav) }
+                composable("settings/books") { BooksSettingsScreen(nav) }
+                composable("settings/home") { HomeSettingsScreen(nav) }
                 composable("downloads") { DownloadsScreen(nav) }
                 composable("downloads/add") { DownloadPickerScreen(nav) }
                 composable("downloads/songs") { DownloadedSongsScreen(nav) }
