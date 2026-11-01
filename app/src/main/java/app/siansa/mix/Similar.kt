@@ -84,15 +84,34 @@ class Similar(private val graph: AppGraph) {
         return kept
     }
 
+    /**
+     * The AudioMuse address the Siansa plugin was last found missing on, and when (issue #788): Home asks for
+     * similar artists on every visit, which was three failing calls a visit on a server without the plugin.
+     * It's asked again after [PLUGIN_RECHECK_MS], or at once when the address changes.
+     */
+    @Volatile private var pluginMissingOn: Pair<String, Long>? = null
+
+    /** Whether the plugin is known to be missing on the server set now (so a call to it isn't worth making). */
+    fun pluginKnownMissing(now: Long = System.currentTimeMillis()): Boolean {
+        val (server, at) = pluginMissingOn ?: return false
+        return server == graph.settings.current.audioMuseUrl && now - at < PLUGIN_RECHECK_MS
+    }
+
     /** Artists that sound like [name], as "Fans also like" shows them; empty when the plugin isn't there. */
     suspend fun artists(name: String): List<SimilarArtist> {
-        if (!graph.settings.current.audioMuseReady) return emptyList()
+        if (!graph.settings.current.audioMuseReady || pluginKnownMissing()) return emptyList()
         val hits = try {
             SimilarPlugin.parseArtists(ask(SimilarPlugin.artistsQuery(name)))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            AppLog.d("Similar", "No plugin artists like $name: ${e.message}")
+            if (e.message?.contains(app.siansa.net.AudioMuseErrors.PLUGIN_MISSING) == true) {
+                // Said once, then left alone for a while, instead of once per artist per visit.
+                AppLog.w("Similar", app.siansa.net.AudioMuseErrors.PLUGIN_MISSING + " Similar artists and albums need it; asking again in an hour.")
+                pluginMissingOn = graph.settings.current.audioMuseUrl to System.currentTimeMillis()
+            } else {
+                AppLog.d("Similar", "No plugin artists like $name: ${e.message}")
+            }
             return emptyList()
         }
         val byName = hits.associateWith { graph.library.artistByName(it.artist) }
@@ -123,5 +142,7 @@ class Similar(private val graph: AppGraph) {
 
     companion object {
         const val SONGS = 50
+        /** How long a missing plugin is taken as still missing before asking again. */
+        const val PLUGIN_RECHECK_MS = 60L * 60 * 1000
     }
 }

@@ -36,6 +36,8 @@ Song radio, similar songs or similar albums say "AudioMuse doesn't know this son
    ```
    If it doesn't know the song, run **Align** for that server in AudioMuse-AI's setup, or an analysis.
 4. **Similar albums and artists** also need the Siansa Analysis plugin, up to date (**Plugins** in AudioMuse-AI).
+   Without it, Similar albums says so: "The Siansa Analysis plugin isn't installed on this AudioMuse", and Home's
+   artist radios and "Fans also like" quietly do without (the log says why, once an hour).
 
 ## Mixes or Flow come out empty
 

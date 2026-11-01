@@ -313,7 +313,7 @@ class ProfileStoreTest {
     @Test fun aFailingPluginIsLeftAloneForAWhile() = runBlocking {
         reply = { throw ApiException("AudioMuse answered HTTP 404: not found") }
         assertTrue(store.fetch(listOf("a")).isEmpty())
-        assertEquals("The Siansa plugin isn't installed on this AudioMuse server", store.problem)
+        assertEquals(app.siansa.net.AudioMuseErrors.PLUGIN_MISSING, store.problem)
         store.fetch(listOf("a"))
         assertEquals(1, asked.size)
         time += ProfileStore.BACK_OFF_MS + 1
