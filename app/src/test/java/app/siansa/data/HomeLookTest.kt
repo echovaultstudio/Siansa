@@ -32,7 +32,7 @@ class HomeLookTest {
     }
 
     @Test fun theLooksAreTheCustomCardsLooks() {
-        assertEquals(listOf("As it is", "Tiles", "Banner", "List", "Play button"), HomeLook.entries.map { it.label })
+        assertEquals(listOf("As it is", "Tiles", "Banner", "List", "Play button", "Cover rows"), HomeLook.entries.map { it.label })
     }
 
     @Test fun theSlimCardSaysWhatATapDoes() {
@@ -46,5 +46,23 @@ class HomeLookTest {
         assertEquals("24 songs", app.siansa.ui.pinnedButtonCaption(playing = false, count = "24 songs"))
         assertEquals("Playing · 24 songs", app.siansa.ui.pinnedButtonCaption(playing = true, count = "24 songs"))
         assertEquals("Tap to open", app.siansa.ui.pinnedButtonCaption(playing = false, count = null))
+    }
+
+    /** Cover rows on Home (issue #789): a Home item becomes a row, colours standing in where there's no cover. */
+    @Test fun aHomeItemBecomesACoverRow() {
+        val album = app.siansa.ui.HomeItem("a", "Romance", "Fontaines D.C.", "cover-1", open = {}, play = {}, meta = "11 songs · 2024")
+        val row = app.siansa.ui.coverRowOf(album)
+        assertEquals("Fontaines D.C.", row.small)
+        assertEquals("Romance", row.title)
+        assertEquals("11 songs · 2024", row.meta)
+        assertEquals("cover-1", row.cover)
+        assertEquals(null, row.colors)
+        val radio = app.siansa.ui.HomeItem("r", "Melancholy radio", colors = androidx.compose.ui.graphics.Color(0xFF4B2BD6) to androidx.compose.ui.graphics.Color(0xFF8FD3C8), open = {})
+        val block = app.siansa.ui.coverRowOf(radio)
+        assertEquals(null, block.cover)
+        assertEquals(0xFF4B2BD6L to 0xFF8FD3C8L, block.colors)
+        val artist = app.siansa.ui.HomeItem("x", "Someone radio", round = true, coverArt = "c", open = {}, progress = 0.4f)
+        assertEquals(true, app.siansa.ui.coverRowOf(artist).round)
+        assertEquals(0.4f, app.siansa.ui.coverRowOf(artist).progress)
     }
 }

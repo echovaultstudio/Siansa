@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -51,6 +52,12 @@ data class HomeItem(
     /** A round cover (an artist). */
     val round: Boolean = false,
     val open: () -> Unit,
+    /** Plays this item (an album, a mix): Cover rows' cover does it. Without one, the cover opens the item. */
+    val play: (() -> Unit)? = null,
+    /** A third line for Cover rows ("11 songs · 2024"); the subtitle is the small line above the title. */
+    val meta: String = "",
+    /** How far through, 0..1, for a book or an episode: a bar along the cover in Cover rows. */
+    val progress: Float? = null,
 )
 
 /**
@@ -79,8 +86,34 @@ fun HomeLookRow(
         HomeLook.BANNER -> HomeBanner(id, title, items, open, play, songs)
         HomeLook.LIST -> HomeList(title, items, open)
         HomeLook.BUTTON -> HomeButton(id, title, items, open, play, songs)
+        HomeLook.COVER_ROWS -> HomeCoverRows(title, items, open)
     }
 }
+
+/**
+ * Cover rows for a row of Home (issue #789): the same shelf as a custom card's, three rows to a column. Each item's
+ * cover plays it when it has a play, else opens it; the row opens it. The first [CoverRows.ON_HOME] items.
+ */
+@Composable
+private fun HomeCoverRows(title: String, items: List<HomeItem>, open: () -> Unit) {
+    val actions = items.take(app.siansa.mix.CoverRows.ON_HOME).map { item -> CoverRowAction(coverRowOf(item), playing = false, open = item.open, play = item.play ?: item.open, menu = emptyList()) }
+    CoverRowsShelf(title, actions, open)
+}
+
+/** A Home item as a cover row: subtitle above, title, then its third line; colours where there's no cover. */
+internal fun coverRowOf(item: HomeItem): app.siansa.mix.CoverRow = app.siansa.mix.CoverRow(
+    key = item.key,
+    kind = app.siansa.mix.CoverRow.Kind.OTHER,
+    cover = item.coverArt,
+    small = item.subtitle,
+    title = item.title,
+    meta = item.meta,
+    progress = item.progress,
+    colors = if (item.coverArt == null) argb(item.colors.first) to argb(item.colors.second) else null,
+    round = item.round,
+)
+
+private fun argb(c: Color): Long = c.toArgb().toLong() and 0xFFFFFFFFL
 
 @Composable
 private fun HomeItemTile(item: HomeItem) {

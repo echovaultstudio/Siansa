@@ -2,6 +2,7 @@ package app.siansa
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -47,5 +48,26 @@ class PlayButtonCardTest {
         compose.onNodeWithTag("homeLookButtonPlay").performClick()
         assertEquals("a tap on ▶ plays", 1 to 1, opened to played)
         assertTrue("no arrow to open it", compose.onAllNodes(androidx.compose.ui.test.hasContentDescription("Open Recently added")).fetchSemanticsNodes().isEmpty())
+    }
+
+    /** A Home section in Cover rows (issue #789): the cover plays an album that has a play, else opens the item; the row opens it. */
+    @Test fun aHomeSectionInCoverRowsPlaysFromTheCover() {
+        var opened = 0
+        var played = 0
+        var radioOpened = 0
+        val items = listOf(
+            app.siansa.ui.HomeItem("a1", "Album one", "Artist", open = { opened++ }, play = { played++ }, meta = "11 songs"),
+            app.siansa.ui.HomeItem("r1", "Melancholy radio", open = { radioOpened++ }),
+        )
+        compose.setContent {
+            SiansaTheme { Column { app.siansa.ui.HomeLookRow(app.siansa.data.HomeLook.COVER_ROWS, "recent", "Recently played", items, openAll = {}) } }
+        }
+        compose.onNodeWithText("Album one").performClick()
+        assertEquals("a tap on the row opens the album", 1 to 0, opened to played)
+        compose.onAllNodesWithTag("coverRowCover")[0].performClick()
+        assertEquals("a tap on the cover plays it", 1 to 1, opened to played)
+        // No play of its own: the radio's cover opens it, as the row does.
+        compose.onAllNodesWithTag("coverRowCover")[1].performClick()
+        assertEquals(1, radioOpened)
     }
 }
