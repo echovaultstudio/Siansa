@@ -1,5 +1,12 @@
 package app.siansa.ui
 
+import app.siansa.covers.CoverStore
+import app.siansa.log.AppLog
+import coil3.SingletonImageLoader
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.material3.Card
+import androidx.compose.material3.Button
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -320,6 +327,8 @@ fun DownloadsScreen(nav: NavController) {
                         OutlinedButton(onClick = { removeAll = true }) { Text("Remove all downloads") }
                     }
                     CoverDownloadSection()
+                    // The image cache, with the covers it keeps (issue #780, moved here from Storage).
+                    ImageCacheSection()
                 }
             }
         }
@@ -428,7 +437,7 @@ fun DownloadPickerScreen(nav: NavController) {
                 is Load.Ok -> {
                     if (o.value.isEmpty()) item {
                         Text(
-                            "Nothing here yet. Sync your library first (Settings → Library sync).",
+                            "Nothing here yet. Sync your library first (Settings › Servers and services, under your server).",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(Space.Page),
@@ -644,7 +653,7 @@ private fun CoverDownloadSection() {
     var refresh by remember { mutableIntStateOf(0) }
     HorizontalDivider()
     Heading("Download all covers")
-    Hint("Fetches every album, artist and playlist cover in the background, so browsing never waits for one. Runs after each library sync and once a day, and only fetches covers that aren't on the phone yet. Choose No limit in Storage › Image cache so none are removed again.")
+    Hint("Fetches every album, artist and playlist cover in the background, so browsing never waits for one. Runs after each library sync and once a day, and only fetches covers that aren't on the phone yet. Choose No limit under Image cache, below, so none are removed again.")
     val download by CoverDownload.progress.collectAsStateWithLifecycle()
     // Check the network again once a download finishes.
     var wasRunning by remember { mutableStateOf(false) }
@@ -702,5 +711,67 @@ private fun CoverDownloadSection() {
             CoverDownload.startNow(context, graph)
             refresh++
         }) { Text("Download covers now") }
+    }
+}
+
+/**
+ * The image cache (issue #780, moved here from Storage, next to Download all covers): what covers and artist photos
+ * take on the phone, its largest size and a way to clear it. A new size applies after the app restarts.
+ */
+@Composable
+internal fun ImageCacheSection() {
+    val graph = LocalGraph.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    // The size the image loader runs with, from the app's start: kept however this list item scrolls or the page is
+    // left and opened again, so "Restart now" stays until the restart (issue #780).
+    val atStart = app.siansa.imageCacheMbInUse ?: settings.imageCacheMb
+    var refresh by remember { mutableIntStateOf(0) }
+    val used by loadState("image-cache-$refresh") {
+        withContext(Dispatchers.IO) { (SingletonImageLoader.get(context).diskCache?.size ?: 0L) + CoverStore.sizeBytes() }
+    }
+    HorizontalDivider()
+    Heading("Image cache")
+    Hint("Covers and artist photos are saved as they load, so they show instantly next time and without a connection. The oldest are removed when the cache is full. With no limit nothing is removed, and Android won't clear them when the phone runs low on space.")
+    used.valueOrNull()?.let { bytes ->
+        Text(
+            if (settings.imageCacheMb <= 0) "In use: ${formatBytes(bytes)}" else "In use: ${formatBytes(bytes)} of ${formatMb(settings.imageCacheMb)}",
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
+    Text("Maximum size", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("imageCacheLabel"))
+    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("imageCacheChips"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        cacheSizes.forEach { mb ->
+            FilterChip(
+                selected = settings.imageCacheMb == mb,
+                onClick = { graph.settings.setImageCacheMb(mb) },
+                label = { Text(if (mb <= 0) "No limit" else formatMb(mb)) },
+            )
+        }
+    }
+    // Its tag on a box around it: the box takes the button's whole touch area, as the chips above count theirs.
+    Box(Modifier.testTag("imageCacheClear")) {
+        OutlinedButton(onClick = {
+            scope.launch {
+                withContext(Dispatchers.IO) {
+                    val loader = SingletonImageLoader.get(context)
+                    loader.memoryCache?.clear()
+                    loader.diskCache?.clear()
+                    CoverStore.clear()
+                    AnimatedCovers.forget(graph)
+                }
+                AppLog.i("Downloads", "Image cache cleared")
+                refresh++
+            }
+        }) { Text("Clear image cache") }
+    }
+    if (settings.imageCacheMb != atStart) {
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                Text("The new size applies after the app restarts.", style = MaterialTheme.typography.bodyMedium)
+                Button(onClick = { restartApp(context) }) { Text("Restart now") }
+            }
+        }
     }
 }

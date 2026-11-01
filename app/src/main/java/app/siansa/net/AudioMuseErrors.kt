@@ -7,10 +7,10 @@ package app.siansa.net
 object AudioMuseErrors {
     /**
      * A song AudioMuse can't find. Besides "not analysed yet", the usual cause is AudioMuse reading another server
-     * than this user's (an Emby user, beta report 810dc85c): its name in AudioMuse goes in Settings › Connections.
+     * than this user's (an Emby user, beta report 810dc85c): its name in AudioMuse goes in Settings › Servers and services.
      */
     const val NOT_KNOWN = "AudioMuse doesn't know this song. Has it been analysed? If AudioMuse reads more than one " +
-        "music server, enter its name in Settings › Connections, under the server the song is from (another user's " +
+        "music server, enter its name in Settings › Servers and services, under the server the song is from (another user's " +
         "too): Server name in AudioMuse."
 
     fun message(code: Int?, http: Int, reason: String): String = when (code) {

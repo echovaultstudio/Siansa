@@ -77,7 +77,7 @@ fun ScrobblingScreen(nav: NavController) {
         }
     }
 
-    Screen(title = "Scrobbling", nav = nav) { padding ->
+    Screen(title = "Scrobbling and history", nav = nav) { padding ->
         Column(
             Modifier
                 .padding(top = padding.calculateTopPadding())
@@ -185,6 +185,13 @@ fun ScrobblingScreen(nav: NavController) {
                 }) { Text("Test and save") }
             }
             lbStatus?.let { Status(it) }
+            }
+
+            HorizontalDivider()
+            // Your listening's Time Machine (issue #780): its option was only on its own page; it stays there too.
+            FoldSection("Time Machine", if (settings.timeMachineMissing) "Shows songs not in your library" else "Only songs in your library") {
+                SwitchRow("Show songs not in your library", settings.timeMachineMissing) { graph.settings.setTimeMachineMissing(it) }
+                Hint("Songs you played back then that aren't in your library now are listed too, marked, so you can find them again.")
             }
         }
     }

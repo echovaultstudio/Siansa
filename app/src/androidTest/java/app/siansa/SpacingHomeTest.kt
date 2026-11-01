@@ -39,6 +39,31 @@ import org.junit.runner.RunWith
 /** Even spacing, measured on a real screen: Home, its cards and rows, the source filter, mixes, vibes and discovery. Shared setup in [SpacingCheck]. */
 @RunWith(AndroidJUnit4::class)
 class SpacingHomeTest : SpacingCheck() {
+    /** Notices (issue #784): the chips sit one section gap below what's above, the same gap as below them, and a small gap apart. */
+    @Test fun noticeChipsSitEvenly() {
+        compose.setContent {
+            SiansaTheme {
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalSectionGap provides Space.Page) {
+                    Column {
+                        Box(Modifier.fillMaxWidth().height(24.dp).testTag("above"))
+                        app.siansa.ui.NoticeChips(
+                            listOf(app.siansa.mix.Notices.carryOn("b", "Dune"), app.siansa.mix.Notices.newAlbums(2, "a")!!),
+                            onOpen = {}, onHide = {},
+                        )
+                        Box(Modifier.fillMaxWidth().padding(top = Space.Page).height(24.dp).testTag("below"))
+                    }
+                }
+            }
+        }
+        val above = compose.onNodeWithTag("above").getBoundsInRoot()
+        val below = compose.onNodeWithTag("below").getBoundsInRoot()
+        val first = compose.onNodeWithTag("notice-carry_on").getBoundsInRoot()
+        val second = compose.onNodeWithTag("notice-new_albums").getBoundsInRoot()
+        val row = compose.onNodeWithTag("noticesRow").getBoundsInRoot()
+        assertEven("Notices: above and below", row.top - above.bottom, below.top - row.bottom)
+        assertEven("Notices: between chips", second.left - first.right, Space.Small, tolerance = 1.dp)
+    }
+
     /** Arrange Home (issue #694): the spacing step's name stays on one line, even "Compact", with a larger font. */
     @Test fun homeSpacingLabelIsOneLine() {
         compose.setContent {
@@ -331,4 +356,33 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Gaps between chips", mon.left - all.right, tue.left - mon.right, 1.dp)
         assertEven("Chip tops", all.top, mon.top, 1.dp)
     }
+
+    /**
+     * Cover rows (issue #782): the three rows of a column are one height apart, and the page dots sit with the same
+     * gap above them (under the rows) as below (before what follows).
+     */
+    @Test fun coverRowsAndTheirDotsAreEvenlySpaced() {
+        fun a(i: Int) = app.siansa.ui.CoverRowAction(
+            app.siansa.mix.CoverRow("$i", app.siansa.mix.CoverRow.Kind.ALBUM, null, "Artist $i", "Album $i", "11 songs"),
+            false, {}, {}, emptyList(),
+        )
+        compose.setContent {
+            SiansaTheme {
+                Column {
+                    app.siansa.ui.CoverRowsShelf("Recently added", (1..5).map(::a)) {}
+                    Box(Modifier.fillMaxWidth().height(24.dp).testTag("after"))
+                }
+            }
+        }
+        val rows = compose.onAllNodesWithTag("coverRow").fetchSemanticsNodes().take(3).map { it.boundsInRoot }
+        val step1 = rows[1].top - rows[0].top
+        val step2 = rows[2].top - rows[1].top
+        assertEquals("Rows one height apart", step1, step2, 1f)
+        val column = compose.onAllNodesWithTag("coverRowsColumn").fetchSemanticsNodes().first().boundsInRoot
+        val dots = compose.onNodeWithTag("coverRowsDots").getBoundsInRoot()
+        val after = compose.onNodeWithTag("after").getBoundsInRoot()
+        assertEven("Gap above and below the dots", dots.top - column.bottom.toDp(), after.top - dots.bottom, 1.dp)
+    }
+
+    private fun Float.toDp() = with(compose.density) { this@toDp.toDp() }
 }

@@ -6,6 +6,7 @@ import app.siansa.mix.Dice
 import app.siansa.data.ArtistPhotos
 import app.siansa.data.audioMuseUserFor
 import app.siansa.data.Users
+import app.siansa.data.NoticeStore
 import app.siansa.data.SavedVibes
 import app.siansa.mix.MixResume
 import app.siansa.data.RecentPlays
@@ -373,6 +374,7 @@ class AppGraph(val app: Application) {
     val insights = Insights(this)
     val radios = Radios(this)
     val suggestions = ArtistSuggestions(this)
+    val notices = NoticeStore(app)
     /** Whether the server and AudioMuse can be reached, for offline messages and playing only downloads. */
     val connection = Connection(app, http, { settings.current }, scope)
     val player = PlayerConnection(app, source).apply {

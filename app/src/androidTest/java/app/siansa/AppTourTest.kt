@@ -320,8 +320,7 @@ class AppTourTest {
                 else if (compose.onAllNodesWithText("Radios").fetchSemanticsNodes().isEmpty()) problems += "Back from a search didn't return to the search page"
             }
             step("vibes") {
-                tab("Settings")
-                click("Daily Vibe settings")
+                settingsRow("Mixes and vibes")
                 idle(1000)
                 shot("17-vibes")
             }
@@ -330,17 +329,20 @@ class AppTourTest {
                 idle(800)
                 shot("18-settings")
                 // Users joined Connections in 0.43; Cards has a page of its own.
-                listOf("Connections", "Playback", "Style", "Cards", "Downloads", "Scrobbling", "Storage", "Help").forEachIndexed { i, page ->
+                // Grouped and renamed in issue #780.
+                listOf("Servers and services", "Playback", "Streaming and data", "Downloads", "Audiobooks and podcasts", "Home", "Style", "Scrobbling and history", "Help").forEachIndexed { i, page ->
                     tab("Settings")
-                    click(page)
+                    // The row itself, not the Home tab of the same name, scrolled into view on the longer page.
+                    waitText(page)
+                    compose.onAllNodes(hasTestTag("hubRow") and hasText(page)).onFirst().performScrollTo().performClick()
+                    idle()
                     idle(1200)
                     shot("19-settings-${i + 1}-" + page.lowercase().replace(' ', '-'))
                     back()
                     idle(400)
                 }
                 // Issue #302: Download all covers sits at the bottom of Downloads, under the song download settings.
-                tab("Settings")
-                click("Downloads")
+                settingsRow("Downloads")
                 idle(800)
                 compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Download all covers"))
                 idle(600)
@@ -359,9 +361,8 @@ class AppTourTest {
                     graph.settings.setTheme("DARK", "SUNSET", true)
                     idle(1200)
                     shot("19d-home-sunset-pure-black")
-                    tab("Settings")
                     // Themes is inside Style since issue #346.
-                    click("Style")
+                    settingsRow("Style")
                     waitText("Theme")
                     click("Theme")
                     waitText("Pure black")
@@ -394,8 +395,7 @@ class AppTourTest {
                 }
             }
             step("equaliser") {
-                tab("Settings")
-                click("Playback")
+                settingsRow("Playback")
                 click("Equaliser")
                 idle(1200)
                 shot("19b-equaliser")
@@ -404,15 +404,16 @@ class AppTourTest {
             }
             step("crossfade and levelling") {
                 try {
-                    tab("Settings")
-                    click("Playback")
+                    settingsRow("Playback")
                     click("Crossfade and levelling")
                     idle(1000)
                     shot("19j-crossfade")
                     // Issue #214: levelling (ReplayGain) lives here now, with what levels the song playing now.
-                    // Its section folds (issue #776): open it first.
-                    compose.onNodeWithTag("section-levelling-header").performClick()
-                    idle(600)
+                    // Its section folds (issue #776); open by default since #780, so open it only if it was folded.
+                    if (compose.onAllNodesWithTag("section-levelling-body").fetchSemanticsNodes().isEmpty()) {
+                        compose.onNodeWithTag("section-levelling-header").performClick()
+                        idle(600)
+                    }
                     if (compose.onAllNodesWithText("Album").fetchSemanticsNodes().isEmpty()) problems += "Levelling chips missing on Crossfade and levelling"
                     val now = compose.onAllNodesWithTag("levelling-now", useUnmergedTree = true).fetchSemanticsNodes()
                     if (now.isEmpty()) problems += "No 'levelled by' line on Crossfade and levelling"
@@ -566,6 +567,17 @@ class AppTourTest {
     }
 
     /** Bottom tabs: the last node with that label is the tab itself. */
+    /**
+     * A row of the Settings start page, scrolled into view first: the page keeps its scroll, and since the groups
+     * (issue #780) it's longer than the screen, so a row can be under the top bar.
+     */
+    private fun settingsRow(page: String) {
+        tab("Settings")
+        waitText(page)
+        compose.onAllNodes(hasTestTag("hubRow") and hasText(page)).onFirst().performScrollTo().performClick()
+        idle()
+    }
+
     private fun tab(label: String) {
         waitText(label)
         val nodes = compose.onAllNodesWithText(label)

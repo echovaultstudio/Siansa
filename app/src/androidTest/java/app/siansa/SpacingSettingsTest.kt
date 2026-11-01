@@ -143,6 +143,9 @@ class SpacingSettingsTest : SpacingCheck() {
 
     /** A folded settings section (issue #776): the arrow is centred on the heading, open or folded. */
     @Test fun foldSectionArrowIsCentredOnItsHeading() {
+        // The real default, not a forced one (issue #780): nothing remembered for this section yet.
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        app.siansa.ui.FoldMemory.setFolded(context, "radio", false)
         compose.setContent {
             SiansaTheme {
                 Column {
@@ -151,13 +154,33 @@ class SpacingSettingsTest : SpacingCheck() {
             }
         }
         val header = compose.onNodeWithTag("section-radio-header").getBoundsInRoot()
-        val arrow = compose.onNode(hasContentDescription("Open Song radio"), useUnmergedTree = true).getBoundsInRoot()
+        // Open by default (issue #780): the body is there and the arrow says Fold; a tap folds it.
+        val arrow = compose.onNode(hasContentDescription("Fold Song radio"), useUnmergedTree = true).getBoundsInRoot()
         assertEven("Fold arrow centred", arrow.top - header.top, header.bottom - arrow.bottom, 2.dp)
-        // Folded by default: the body isn't there; a tap opens it.
-        assertTrue(compose.onAllNodesWithTag("radio-content").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithTag("radio-content").assertExists()
         compose.onNodeWithTag("section-radio-header").performClick()
         compose.waitForIdle()
-        compose.onNodeWithTag("radio-content").assertExists()
+        assertTrue(compose.onAllNodesWithTag("radio-content").fetchSemanticsNodes().isEmpty())
+        // Folded once, it stays folded the next time the page opens.
+        assertTrue(app.siansa.ui.FoldMemory.isFolded(context, "radio"))
+        app.siansa.ui.FoldMemory.setFolded(context, "radio", false)
+    }
+
+    /** Downloads › Image cache (issue #780, moved from Storage): the size chips sit evenly between their label and Clear. */
+    @Test fun imageCacheChipsAreEvenlySpaced() {
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalGraph provides graph) {
+                SiansaTheme {
+                    Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) { app.siansa.ui.ImageCacheSection() }
+                }
+            }
+        }
+        // By their tags: the row of chips scrolls sideways, so one chip's bounds can be off to the side.
+        val label = compose.onNodeWithTag("imageCacheLabel").getBoundsInRoot()
+        val chips = compose.onNodeWithTag("imageCacheChips").getBoundsInRoot()
+        val clear = compose.onNodeWithTag("imageCacheClear").getBoundsInRoot()
+        assertEven("Image cache chips", chips.top - label.bottom, clear.top - chips.bottom)
     }
 
     /** Beat-matched blends (issue #759): the 4 / 8 / 16 bars chips sit evenly between "Blend length" and their hint. */
@@ -284,6 +307,26 @@ class SpacingSettingsTest : SpacingCheck() {
         assertEven("Settings rows", with(compose.density) { rows[0].height.toDp() }, with(compose.density) { rows[1].height.toDp() }, 1.dp)
     }
 
+    /** Settings' groups (issue #780): each group's label sits the same distance above its first row, and its left edge
+     *  lines up with the rows' page margin. */
+    @Test fun settingsGroupLabelsSitEvenlyOverTheirRows() {
+        compose.setContent {
+            SiansaTheme {
+                Column {
+                    app.siansa.ui.HubGroup("Sources", first = true)
+                    HubRow(Icons.Rounded.Palette, "Servers and services") { }
+                    app.siansa.ui.HubGroup("Look")
+                    HubRow(Icons.Rounded.Palette, "Style") { }
+                }
+            }
+        }
+        val labels = compose.onAllNodesWithTag("hubGroup").fetchSemanticsNodes().map { it.boundsInRoot }
+        val rows = compose.onAllNodesWithTag("hubRow").fetchSemanticsNodes().map { it.boundsInRoot }
+        fun dp(px: Float) = with(compose.density) { px.toDp() }
+        assertEven("Label to its row", dp(rows[0].top - labels[0].bottom), dp(rows[1].top - labels[1].bottom), 1.dp)
+        assertTrue("A group stands apart from the row above it", dp(labels[1].top - rows[0].bottom) > dp(rows[1].top - labels[1].bottom))
+    }
+
     /** First run (issue #113): every source in the picker is one row height, the text centred against its icon. */
     @Test fun sourceRowsAreOneHeight() {
         compose.setContent { MusicSourceRows() }
@@ -293,7 +336,7 @@ class SpacingSettingsTest : SpacingCheck() {
         gaps.forEach { assertEven("Gap between source rows", gaps[0], it, 1.dp) }
     }
 
-    /** Settings › Connections (issue #665): folded cards are one height, evenly spaced, the page margin from the edges. */
+    /** Settings › Servers and services (issue #665): folded cards are one height, evenly spaced, the page margin from the edges. */
     @Test fun connectionCardsAreEven() {
         compose.setContent {
             SiansaTheme {

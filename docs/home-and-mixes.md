@@ -17,10 +17,11 @@ The **cog** on a section changes its look, to any of the custom cards' looks:
 A section in another look says which under its name. **Play** in a banner or the ▶ of a play button card plays the section:
 today's mix or the carousel's first mix where they left off, or the albums of Rediscover, Recently played, Recently
 added and Random picks in order. Sections of radios, playlists, genres, books and Made for you open instead. **Your
-cards** keep their own looks: their cog opens **Settings › Cards**.
+cards** keep their own looks: their cog opens **Settings › Home › Cards**.
 
 | Section | What it shows |
 |---|---|
+| **Notices** | A row of chips at the top when there's something to say (see [Notices](#notices)). |
 | **Shortcuts** | Liked songs first, then the albums, playlists and mixes you played from last. Until there's enough of that, today's mixes, your playlists and recent albums. |
 | **Today's mix** | The day's mix, made for the vibe of the hour it's made in (see below). |
 | **Your mixes carousel** | Three or four mixes of your own for each part of the day, side by side. |
@@ -34,10 +35,28 @@ cards** keep their own looks: their cog opens **Settings › Cards**.
 | **Your genres** | Genre radios from your library. |
 | **Random picks** | A random selection to dig into. |
 
+## Notices
+
+A row of chips at the top of Home, only when there's something to say. Tap a chip to open it; its **×** hides that
+one (next month's report or the next new albums show again).
+
+| Notice | When it shows | Opens |
+|---|---|---|
+| **Library sync failed** | The last library sync didn't finish. | Servers and services |
+| **Carry on: …** | A book or podcast episode you played in the last week and haven't finished. | The book |
+| **3 new albums** | Albums added to your library in the last three days. | Recently added |
+| **Your October** | The first week of a month: last month's listening. | The month's report |
+| **4 artists for you** | New artists to try were found today. | Artists for you |
+
+At most five show. By default they're ordered for you: what needs you first, then what you're in the middle of, then
+what's new; among the new ones, the kinds you tap most come first. In **Settings › Home › Notices** you can hide the
+row, or set each kind to **Pinned** (always first, in the order you pin them), **Automatic** or **Off**. The cog on
+Notices in Arrange Home opens the same page.
+
 ## Vibes and today's mix
 
 A **vibe** covers part of the day. Siansa starts with Morning, Daytime, Evening and Night. When you open the app,
-the vibe for the current hour builds **today's mix**. **Settings › Daily Vibe settings** lets you change them:
+the vibe for the current hour builds **today's mix**. **Settings › Mixes and vibes** lets you change them:
 
 - **Name**, **Days** (or every day), and **hours** (0–23; a vibe from 22 to 5 runs past midnight). When several
   vibes fit, the most specific wins: one set for a day before an everyday one, one for some hours before an
@@ -53,7 +72,7 @@ the vibe for the current hour builds **today's mix**. **Settings › Daily Vibe 
 
 How the songs are picked is explained in [How it works](how-it-works.md#todays-mix-and-vibes).
 
-**Today's mix** has settings of its own at the top of **Settings › Daily Vibe settings**, which apply to it whichever
+**Today's mix** has settings of its own at the top of **Settings › Mixes and vibes**, which apply to it whichever
 vibe makes it:
 
 - **Auto update** (on by default): the mix follows the time of day. A new one is made as the day or the hour's vibe
@@ -98,17 +117,19 @@ same day; Siansa tells you which one already has them.
   Koito, ListenBrainz or Last.fm when you use them. It opens straight away and checks your server for changes while
   the cog turns, like a playlist. Until there's enough to go on, it isn't shown.
 - **Discover for you**: songs that sound like your taste, from artists you don't play much (only with AudioMuse-AI).
-- **Cards of your own** (**Settings › Cards › Made for you**): pick what a card shows (for example a genre or a
+- **Cards of your own** (**Settings › Home › Cards › Made for you**): pick what a card shows (for example a genre or a
   period) and name it. Each card gets new songs every day.
 
 ## Your cards
 
-Custom cards you make yourself (**Settings › Cards › Custom cards**), shown on Home in its **Your cards** section
+Custom cards you make yourself (**Settings › Home › Cards › Custom cards**), shown on Home in its **Your cards** section
 (move it under Arrange Home; the cards' own order is set in Settings). **Add a custom card** or tap one to change it,
 on a page of its own:
 
 - **Shows**: **Songs**, or whole **Albums**. Playing an album card plays its first albums in turn; its page lists
-  every album.
+  every album. With Audiobookshelf set up, also **Audiobooks**, **Podcast episodes** (the newest few of your
+  podcasts) or **Keep listening** (books and episodes you're partway through, the most recent first). These have no
+  rules, only an order (recently added, A to Z or random) and how many, and show as Cover rows.
 - **Comes from** (songs only): **From your library**, by rules, or **By sound**: describe a sound ("rainy jazz
   piano") and AudioMuse-AI finds songs that match (only with AudioMuse-AI).
 - **Rules**: each says what to keep or leave out, and the card keeps what matches **every rule** or **any rule**.
@@ -136,7 +157,23 @@ on a page of its own:
   added, most played (a song's own plays first), or A to Z; and **How many, at most** (up to 500).
 - **Look on Home**: **Song tiles** (a row of covers; for an album card, **Album tiles**), **Album row** (the albums
   the songs come from), **Banner** (one wide card with the first covers and Play and Shuffle), **Song list** (the
-  first five; for an album card, **Album list**) and **Play button** (a slim card: its ▶ plays it, the rest opens it).
+  first five; for an album card, **Album list**), **Play button** (a slim card: its ▶ plays it, the rest opens it) and
+  **Cover rows** (below).
+
+**Cover rows**: each row is a cover with three lines beside it, three rows to a column; swipe sideways for the next
+three, and tap the card's title for all of them.
+
+| Card holds | First line | Second line | Third line |
+|---|---|---|---|
+| Albums | the artist | the album | how many songs, the year |
+| Songs | the artist | the song | its album, its length |
+| Audiobooks | the author | the book | its length, the time left |
+| Podcast episodes | the podcast | the episode (with its number) | its length, the time left, or "new" |
+
+Tap a cover to play it or carry on where you stopped; tap it again to pause. Tap the rest of the row to open it.
+**⋮**, or press and hold the row, for more: Add to queue and Go to artist for an album; Play next, Add to queue and
+Go to album for a song; Play from the start for a book. Books and episodes you've started show how far you've got
+along the bottom of the cover. The one playing has a pause sign over its cover and a ♪ before its first line.
 
 A card made before rules keeps working: its genre, years, artist, album, words and favourites become rules the
 first time you change it. A random card's page has a button for a new set right away. Tap a card's title (or a play button card

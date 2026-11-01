@@ -6,7 +6,7 @@ Your listening.
 
 ## Setting it up
 
-**Settings › Connections › Servers › Audiobookshelf**: the server's web address (for example `192.168.1.10:13378`) and
+**Settings › Servers and services › Servers › Audiobookshelf**: the server's web address (for example `192.168.1.10:13378`) and
 either an **API token** (in Audiobookshelf, under your user) or your username and password. **Test** checks the
 login and says how many book and podcast libraries the user can see.
 
@@ -55,7 +55,7 @@ down to close. There's no shuffle, repeat, queue or crossfade.
 
 - The **chapter** is at the top; tap it to open the book's page.
 - **↺ and ↻** skip back and forward: 10 s back and 30 s forward to start with, each 10 to 90 s in
-  **Settings › Playback › Books**. **⏮ ⏭** at the ends go to the previous and next chapter.
+  **Settings › Audiobooks and podcasts**. **⏮ ⏭** at the ends go to the previous and next chapter.
 - The bar is the chapter's. How far you are in the whole book, and how long is left, is under the controls.
 - **Speed** (bottom left) steps from 0.5× to 3× and is remembered per book. The **moon** (bottom right) stops the
   book at the end of the chapter. **Bookmark** (next to the title) marks the current time, kept on the server.

@@ -1,5 +1,10 @@
 package app.siansa.ui
 
+import androidx.compose.material.icons.rounded.SwapVert
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.rounded.Dashboard
 import android.content.Context
 import android.content.Intent
@@ -94,38 +99,59 @@ import java.text.DateFormat
 import java.util.Date
 import kotlin.math.roundToInt
 
-/** Settings start page: one entry per area, each opening its own page. Just the names (issue #375). */
+/**
+ * Settings start page (issue #780): one entry per area, each opening its own page, in six groups so each setting is
+ * where you'd look for it. Just the names (issue #375).
+ */
 @Composable
 fun SettingsHub(nav: NavController) {
     Screen(title = "Settings", nav = nav) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
+            HubGroup("Sources", first = true)
             // Servers (each login with its own library and sync) and services, on one page (issue #665).
-            HubRow(Icons.Rounded.Dns, "Connections") { nav.navigate("settings/connections") }
+            HubRow(Icons.Rounded.Dns, "Servers and services") { nav.navigate("settings/connections") }
+            HubGroup("Listening")
             HubRow(Icons.Rounded.Equalizer, "Playback") { nav.navigate("settings/playback") }
-            // Themes moved into Style, with the now playing, mini player and nav bar looks (issue #346).
-            HubRow(Icons.Rounded.Palette, "Style") { nav.navigate("settings/style") }
-            HubRow(Icons.Rounded.GraphicEq, "Scrobbling") { nav.navigate("settings/scrobbling") }
-            // The daily mixes' times of day; the tab's own vibes are on that tab (issue #339).
-            HubRow(Icons.Rounded.Schedule, "Daily Vibe settings") { nav.navigate("vibes") }
-            // Made for you cards and custom cards pinned to Home (issue #622).
-            HubRow(Icons.Rounded.Dashboard, "Cards") { nav.navigate("settings/cards") }
+            // Streaming quality, loading ahead and the song cache: what decides data use and offline play.
+            HubRow(Icons.Rounded.SwapVert, "Streaming and data") { nav.navigate("settings/streaming") }
             HubRow(Icons.Rounded.DownloadForOffline, "Downloads") { nav.navigate("downloads") }
-            HubRow(Icons.Rounded.Storage, "Storage") { nav.navigate("settings/storage") }
-            HubRow(Icons.Rounded.Backup, "Backup") { nav.navigate("settings/backup") }
-            HubRow(Icons.Rounded.NewReleases, "What's new") { nav.navigate("settings/whatsnew") }
-            // The version and links to the open-source licences, the docs and the privacy policy (#576).
-            HubRow(Icons.Rounded.Info, "About") { nav.navigate("settings/about") }
-            // Debug logs and Report a problem in one place, last (#567).
+            HubRow(Icons.AutoMirrored.Rounded.MenuBook, "Audiobooks and podcasts") { nav.navigate("settings/books") }
+            HubGroup("Home and mixes")
+            // Source filter, Arrange Home and Cards, also behind Home's own button.
+            HubRow(Icons.Rounded.Home, "Home") { nav.navigate("settings/home") }
+            // Today's mix, the daily vibes and the moment (was Daily Vibe settings, issue #339).
+            HubRow(Icons.Rounded.Schedule, "Mixes and vibes") { nav.navigate("vibes") }
+            HubGroup("Look")
+            // Theme, now playing, mini player, nav bar, the phone's top bar and animated covers (issue #346).
+            HubRow(Icons.Rounded.Palette, "Style") { nav.navigate("settings/style") }
+            HubGroup("Your listening")
+            HubRow(Icons.Rounded.GraphicEq, "Scrobbling and history") { nav.navigate("settings/scrobbling") }
+            HubGroup("App")
+            HubRow(Icons.Rounded.Backup, "Backup and restore") { nav.navigate("settings/backup") }
+            // Debug logs and Report a problem in one place (#567).
             HubRow(Icons.Rounded.BugReport, "Help") { nav.navigate("settings/help") }
+            // The version, What's new and links to the licences, the docs and the privacy policy (#576).
+            HubRow(Icons.Rounded.Info, "About") { nav.navigate("settings/about") }
+            Spacer(Modifier.height(Space.Section))
         }
     }
 }
 
-/**
- * Help (#567): debug logs and reporting a problem, in one place at the foot of Settings. The steps to a useful report
- * are on the page: turn on debug logs, make the problem happen a few times, then send it. The full log, to read,
- * save or share, is a tap away.
- */
+/** A group's label on the Settings start page (issue #780): not a page, just a heading over its rows. */
+@Composable
+internal fun HubGroup(label: String, first: Boolean = false) {
+    Text(
+        label.uppercase(),
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = Space.Page, end = Space.Page, top = if (first) Space.Small else Space.Section, bottom = Space.Tight)
+            .testTag("hubGroup"),
+    )
+}
+
 @Composable
 fun HelpScreen(nav: NavController) {
     val graph = LocalGraph.current
@@ -190,7 +216,7 @@ internal fun crossfadeSummary(s: AppSettings): String {
     return "$fade · $levelling"
 }
 
-private fun formatMb(mb: Int): String = if (mb >= 1024) "${"%.0f".format(mb / 1024.0)} GB" else "$mb MB"
+internal fun formatMb(mb: Int): String = if (mb >= 1024) "${"%.0f".format(mb / 1024.0)} GB" else "$mb MB"
 internal fun formatBytes(bytes: Long): String = when {
     bytes >= 1L shl 30 -> "%.1f GB".format(bytes / (1L shl 30).toDouble())
     bytes >= 1L shl 20 -> "%.0f MB".format(bytes / (1L shl 20).toDouble())
@@ -227,14 +253,8 @@ fun PlaybackSettingsScreen(nav: NavController) {
                 }
             }
             HorizontalDivider()
-            // Each section folds (issue #776): the heading and what's set show; tap to open.
-            FoldSection("Streaming quality", "Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}") {
-                Hint(ServerWords.streamingHint(settings.sourceKind))
-                QualityRow("On Wi-Fi", settings.transcodeWifiKbps) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
-                QualityRow("On mobile data", settings.transcodeMobileKbps) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
-                Hint("Siansa always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
-            }
-            HorizontalDivider()
+            // Each section folds (issue #776); open by default, folded ones stay folded (issue #780). Streaming
+            // quality and loading ahead moved to Streaming and data, the books' skips to Audiobooks and podcasts.
             FoldSection("Song radio", settings.radioDrift.label) {
                 Hint("A song radio always starts with its song. How far may it wander from it?")
                 RadioDriftChips(settings.radioDrift) { graph.settings.setRadioDrift(it) }
@@ -250,25 +270,6 @@ fun PlaybackSettingsScreen(nav: NavController) {
             FoldSection("Wind down", "${settings.windDownSongs} songs") {
                 Hint("With the sleep timer's Wind down switched on and no time picked, how many calmer songs play before the music ends?")
                 WindDownChips(settings.windDownSongs) { graph.settings.save(graph.settings.current.copy(windDownSongs = it)) }
-            }
-            HorizontalDivider()
-            val preloadChoices = Preload.choices(settings)
-            FoldSection("Load songs ahead", "Wi-Fi ${settings.preloadWifi.coerceIn(preloadChoices)} · mobile ${settings.preloadMobile.coerceIn(preloadChoices)}") {
-                Hint("While a song plays, Siansa loads the next ones, one at a time, so they start at once and keep playing if the connection drops. Fewer means less data. Only original files are loaded ahead.")
-                if (settings.songCacheMb <= 0) Hint("The song cache is off (Settings › Storage), so up to 3 songs are loaded ahead, and each is removed once it has played.")
-                PreloadRow("On Wi-Fi", settings.preloadWifi.coerceIn(preloadChoices), "preload-wifi", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadWifi = it)) }
-                PreloadRow("On mobile data", settings.preloadMobile.coerceIn(preloadChoices), "preload-mobile", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadMobile = it)) }
-            }
-            // Only with an Audiobookshelf server (issue #521): how far the book player's skip buttons jump.
-            if (settings.booksReady) {
-                HorizontalDivider()
-                FoldSection("Books", "Back ${settings.bookSkipBackSec} s · forward ${settings.bookSkipForwardSec} s") {
-                    Hint("How far the book player's skip buttons jump.")
-                    Text("Back", style = MaterialTheme.typography.bodyMedium)
-                    SkipChips(settings.bookSkipBackSec, "bookSkipBack") { graph.settings.save(graph.settings.current.copy(bookSkipBackSec = it)) }
-                    Text("Forward", style = MaterialTheme.typography.bodyMedium)
-                    SkipChips(settings.bookSkipForwardSec, "bookSkipForward") { graph.settings.save(graph.settings.current.copy(bookSkipForwardSec = it)) }
-                }
             }
         }
     }
@@ -375,7 +376,7 @@ private fun QualityRow(label: String, value: Int, onPick: (Int) -> Unit) {
     }
 }
 
-private val cacheSizes = listOf(100, 250, 500, 1024, 2048, 5120, 0)
+internal val cacheSizes = listOf(100, 250, 500, 1024, 2048, 5120, 0)
 // 0 is Off: songs stream without being kept on the phone.
 private val songCacheSizes = listOf(0, 512, 1024, 2048, 5120, 10240, 20480)
 
@@ -383,13 +384,17 @@ private data class StorageUsage(val images: Long, val songs: Long, val downloads
 
 /** Image and song cache sizes and usage, and what else the app keeps on the phone. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+/**
+ * Settings › Streaming and data (issue #780, was Storage): the quality songs stream at, how many load ahead and the
+ * song cache: what decides data use and playing on without a connection. The image cache is under Downloads ›
+ * Covers on the phone, animated covers under Style.
+ */
 @Composable
-fun StorageScreen(nav: NavController) {
+fun StreamingDataScreen(nav: NavController) {
     val graph = LocalGraph.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    val imagesAtStart = remember { settings.imageCacheMb }
     val songsAtStart = remember { settings.songCacheMb }
     var refresh by remember { mutableIntStateOf(0) }
     val usage by loadState(refresh) {
@@ -404,23 +409,32 @@ fun StorageScreen(nav: NavController) {
         }
     }
 
-    Screen(title = "Storage", nav = nav) { padding ->
+    Screen(title = "Streaming and data", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
-            // Each section folds (issue #776): the heading and what it holds show; tap to open.
+            // Each section folds (issue #776); open by default, folded ones stay folded (issue #780).
             val u = usage.valueOrNull()
-            FoldSection("Downloads", u?.let { "In use: ${formatBytes(it.downloads)}" }) {
-                Hint("Music you chose to keep on the phone isn't part of the song cache and is never removed by itself.")
-                u?.let { Text("In use: ${formatBytes(it.downloads)}", style = MaterialTheme.typography.bodyLarge) }
-                OutlinedButton(onClick = { nav.navigate("downloads") }) { Text("Manage downloads") }
+            FoldSection("Streaming quality", "Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}") {
+                Hint(ServerWords.streamingHint(settings.sourceKind))
+                QualityRow("On Wi-Fi", settings.transcodeWifiKbps) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
+                QualityRow("On mobile data", settings.transcodeMobileKbps) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
+                Hint("Siansa always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
+            }
+            HorizontalDivider()
+            val preloadChoices = Preload.choices(settings)
+            FoldSection("Load songs ahead", "Wi-Fi ${settings.preloadWifi.coerceIn(preloadChoices)} · mobile ${settings.preloadMobile.coerceIn(preloadChoices)}") {
+                Hint("While a song plays, Siansa loads the next ones, one at a time, so they start at once and keep playing if the connection drops. Fewer means less data. Only original files are loaded ahead.")
+                if (settings.songCacheMb <= 0) Hint("The song cache is off (below), so up to 3 songs are loaded ahead, and each is removed once it has played.")
+                PreloadRow("On Wi-Fi", settings.preloadWifi.coerceIn(preloadChoices), "preload-wifi", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadWifi = it)) }
+                PreloadRow("On mobile data", settings.preloadMobile.coerceIn(preloadChoices), "preload-mobile", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadMobile = it)) }
             }
 
             HorizontalDivider()
             val songSummary = if (settings.songCacheMb <= 0) "Off" else u?.let { "${formatBytes(it.songs)} of ${formatMb(settings.songCacheMb)}" } ?: formatMb(settings.songCacheMb)
             FoldSection("Song cache", songSummary) {
-            Hint("Songs are kept on the phone as they play, and the next song in the queue is fetched ahead, so replays and skips start at once and survive a bad connection. Only original-quality streams are cached. Off keeps nothing once it has played; songs loaded ahead (Settings › Playback) are held only until they play.")
+            Hint("Songs are kept on the phone as they play, and the next song in the queue is fetched ahead, so replays and skips start at once and survive a bad connection. Only original-quality streams are cached. Off keeps nothing once it has played; songs loaded ahead (above) are held only until they play.")
             usage.valueOrNull()?.let { u ->
                 Text(
                     if (settings.songCacheMb <= 0) "Off: songs aren't kept after they play"
@@ -461,50 +475,8 @@ fun StorageScreen(nav: NavController) {
             }) { Text("Clear song cache") }
             }
 
-            HorizontalDivider()
-            val imageSummary = u?.let { "${formatBytes(it.images)}" + if (settings.imageCacheMb > 0) " of ${formatMb(settings.imageCacheMb)}" else "" }
-            FoldSection("Image cache", imageSummary) {
-            Hint("Covers and artist photos are saved as they load, so they show instantly next time and without a connection. The oldest are removed when the cache is full. With no limit nothing is removed, and Android won't clear them when the phone runs low on space.")
-            usage.valueOrNull()?.let { u ->
-                Text(
-                    if (settings.imageCacheMb <= 0) "In use: ${formatBytes(u.images)}"
-                    else "In use: ${formatBytes(u.images)} of ${formatMb(settings.imageCacheMb)}",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-            Text("Maximum size", style = MaterialTheme.typography.bodyLarge)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                cacheSizes.forEach { mb ->
-                    FilterChip(
-                        selected = settings.imageCacheMb == mb,
-                        onClick = { graph.settings.setImageCacheMb(mb) },
-                        label = { Text(if (mb <= 0) "No limit" else formatMb(mb)) },
-                    )
-                }
-            }
-            OutlinedButton(onClick = {
-                scope.launch {
-                    withContext(Dispatchers.IO) {
-                        val loader = SingletonImageLoader.get(context)
-                        loader.memoryCache?.clear()
-                        loader.diskCache?.clear()
-                        CoverStore.clear()
-                        AnimatedCovers.forget(graph)
-                    }
-                    AppLog.i("Storage", "Image cache cleared")
-                    refresh++
-                }
-            }) { Text("Clear image cache") }
-            }
-
-            HorizontalDivider()
-            FoldSection("Animated covers", if (settings.animatedCovers) "On" else "Off") {
-            SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
-            Hint("When an album folder has an animated cover (cover.gif or cover.webp), it moves on the album page and in now playing; lists show its first frame. Your server may not shrink an animated WebP (Navidrome can't), so it's downloaded once in full and kept on the phone.")  // server-name: ok (an example of a server that can't)
-            }
-
             // Switching the song cache off applies from the next song; a new size needs a restart.
-            if (settings.imageCacheMb != imagesAtStart || (settings.songCacheMb != songsAtStart && settings.songCacheMb > 0)) {
+            if (settings.songCacheMb != songsAtStart && settings.songCacheMb > 0) {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                         Text("New cache sizes apply after the app restarts.", style = MaterialTheme.typography.bodyMedium)
@@ -524,7 +496,7 @@ fun StorageScreen(nav: NavController) {
     }
 }
 
-private fun restartApp(context: Context) {
+internal fun restartApp(context: Context) {
     val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
     val component = launch.component ?: return
     context.startActivity(Intent.makeRestartActivityTask(component))

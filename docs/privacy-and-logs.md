@@ -47,5 +47,5 @@ Before you send, try to make the problem happen once more with the log on, so th
 
 ## Backups
 
-Backups (**Settings › Backup**) are files you save and keep yourself. They never hold passwords, tokens or API
+Backups (**Settings › Backup and restore**) are files you save and keep yourself. They never hold passwords, tokens or API
 keys, so after restoring on a new phone you sign in to your servers again.

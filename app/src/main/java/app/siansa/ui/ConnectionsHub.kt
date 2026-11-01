@@ -75,7 +75,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
- * Settings › Connections (issue #665): everything Siansa connects to, on one page, where Users and Connections were
+ * Settings › Servers and services (issue #665): everything Siansa connects to, on one page, where Users and Connections were
  * two. **Servers**: each music server login (a "user": its own library, history and settings), with its address,
  * login, its name in AudioMuse-AI and its library sync, then Audiobookshelf. **Services**: AudioMuse-AI and the AI
  * service that writes mix titles and sound searches. Each folds open with its arrow, folded to start with; [open]
@@ -147,7 +147,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
     }
 
     Screen(
-        title = "Connections",
+        title = "Servers and services",
         nav = nav,
         actions = { IconButton(onClick = ::save, modifier = Modifier.testTag("connectionsSave")) { Icon(Icons.Rounded.Check, "Save") } },
     ) { padding ->

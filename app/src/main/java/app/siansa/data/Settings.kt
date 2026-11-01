@@ -42,7 +42,7 @@ const val DEFAULT_THEME_SELECTION = "AMBER"
 internal fun defaultSelectionFor(savedColours: String?): String = if (savedColours == null) DEFAULT_THEME_SELECTION else "THEME"
 
 /**
- * Home's Today's mix (issue #776). It's built from the vibe covering the hour (Daily Vibe settings), and each
+ * Home's Today's mix (issue #776). It's built from the vibe covering the hour (Mixes and vibes), and each
  * vibe has its own length, surprise and so on; a setting here that isn't null replaces the vibe's for Today's mix
  * only, so one place tunes the mix you see first, whatever vibe made it. [autoUpdate] off: the mix is made or
  * remade only when you ask (↻ on its tile), never by itself when the app opens or in the background.
@@ -130,7 +130,7 @@ data class AppSettings(
     val logging: Boolean = false,
     /** What of the moment the vibes may use for today's mix (Vibes panel, issue #247). */
     val situation: SituationOptions = SituationOptions(),
-    /** Parts of the app whose detailed log entries are left out (Settings › Logs › Detail, issue #237). */
+    /** Parts of the app whose detailed log entries are left out (Settings › Help › Detail, issue #237). */
     val scrobbleNavidrome: Boolean = true,
     /** How much of a song must be heard, in percent, before it's scrobbled (issue #270). */
     val scrobblePercent: Int = 50,
@@ -175,6 +175,8 @@ data class AppSettings(
     val downloadedOnly: Boolean = false,
     /** The time machine lists songs that aren't in your library, marked (issue #234). */
     val timeMachineMissing: Boolean = true,
+    /** How each kind of notice on Home shows (issue #784): pinned, automatic (the default) or off. */
+    val notices: app.siansa.mix.NoticePrefs = app.siansa.mix.NoticePrefs(),
     /** Theme (issue #148): "AUTO", "LIGHT" or "DARK"; colours by name ("MONO", "OCEAN"…); pure black when dark. */
     val themeMode: String = "AUTO",
     val themeColours: String = DEFAULT_THEME_COLOURS,
@@ -423,6 +425,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
         timeMachineMissing = prefs.getBoolean("time_machine_missing", true),
+        notices = app.siansa.mix.NoticePrefs.parse(prefs.getString("notices", null)),
         themeMode = prefs.getString("theme_mode", "AUTO") ?: "AUTO",
         themeColours = prefs.getString("theme_colours", null) ?: DEFAULT_THEME_COLOURS,
         pureBlack = prefs.getBoolean("pure_black", false),
@@ -569,6 +572,12 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setTimeMachineMissing(on: Boolean) {
         prefs.edit().putBoolean("time_machine_missing", on).apply()
         _state.value = _state.value.copy(timeMachineMissing = on)
+    }
+
+    fun setNoticeMode(kind: app.siansa.mix.NoticeKind, mode: app.siansa.mix.NoticeMode) {
+        val notices = _state.value.notices.with(kind, mode)
+        prefs.edit().putString("notices", notices.format()).apply()
+        _state.value = _state.value.copy(notices = notices)
     }
 
     fun setAnimatedCovers(on: Boolean) {

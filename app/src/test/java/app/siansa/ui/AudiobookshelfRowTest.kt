@@ -5,7 +5,7 @@ import app.siansa.data.AppSettings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The cards' second lines on Settings › Connections (issue #665): what each is, and whether it's set up. */
+/** The cards' second lines on Settings › Servers and services (issue #665): what each is, and whether it's set up. */
 class AudiobookshelfRowTest {
     @Test fun audiobookshelfSaysWhetherItIsSetUp() {
         assertEquals("Audiobooks and podcasts · set up", absLine(ready = true))

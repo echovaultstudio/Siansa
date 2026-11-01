@@ -96,6 +96,11 @@ fun StyleScreen(nav: NavController) {
                 AppLog.i("Style", "Phone's top bar: ${it.name.lowercase()}")
                 graph.settings.setTopBar(it)
             }
+            // Animated covers (issue #780, moved here from Storage): it's how covers look.
+            Column(Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Section, bottom = Space.Section), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
+                Hint("When an album folder has an animated cover (cover.gif or cover.webp), it moves on the album page and in now playing; lists show its first frame. Your server may not shrink an animated WebP (Navidrome can't), so it's downloaded once in full and kept on the phone.")  // server-name: ok (an example of a server that can't)
+            }
         }
     }
 }

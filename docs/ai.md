@@ -6,7 +6,7 @@ pick for mix titles and sound searches, and only if you set one up.
 
 ## Mix titles and sound searches
 
-**Settings › Connections › AI**: pick the service, then its key and a model. Picking a service fills in its usual
+**Settings › Servers and services › AI**: pick the service, then its key and a model. Picking a service fills in its usual
 model; any model it offers works. **AI titles and sound searches** turns it on or off, and **Test** asks it to say
 hello.
 
@@ -39,7 +39,7 @@ plainer.
 
 ## Situation
 
-The **Use the moment** panel (in **Settings › Daily Vibe settings**) lets today's mixes suit what's going on
+The **Use the moment** panel (in **Settings › Mixes and vibes**) lets today's mixes suit what's going on
 around you. Each part is switched on by itself, and is read once when a mix is made, never in the background:
 
 | Part | How it's read |

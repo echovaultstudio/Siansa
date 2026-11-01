@@ -21,33 +21,33 @@ class SettingsNamesTest {
     }
 
     /**
-     * Servers and services are one entry, Connections, called what its page is called (#565, #665): no separate
-     * Users entry, and the page has Servers and Services.
+     * Servers and services are one entry, called what its page is called (#565, #665, #780): no separate Users entry,
+     * and the page has Servers and Services.
      */
     @Test fun serversAndServicesAreOneConnectionsEntry() {
         val hub = File(ui, "SettingsHub.kt").readText()
-        assertTrue("Settings has no \"Connections\" entry", hub.contains("HubRow(Icons.Rounded.Dns, \"Connections\")"))
+        assertTrue("Settings has no \"Servers and services\" entry", hub.contains("HubRow(Icons.Rounded.Dns, \"Servers and services\")"))
         assertFalse("Users is still its own entry", hub.contains("\"Users\")"))
         val page = File(ui, "ConnectionsHub.kt").readText()
-        assertTrue("The page isn't called Connections", page.contains("title = \"Connections\""))
+        assertTrue("The page isn't called Servers and services", page.contains("title = \"Servers and services\""))
         assertTrue("No Servers section", page.contains("SectionHeading(\"Servers\")"))
         assertTrue("No Services section", page.contains("SectionHeading(\"Services\")"))
     }
 
-    /** #567: Report a problem and Logs are one entry, Help, with the bug icon, at the foot of Settings. */
-    @Test fun helpIsOneEntryAtTheBottom() {
+    /** #567: Report a problem and Logs are one entry, Help, with the bug icon, in the App group at the foot of Settings (#780). */
+    @Test fun helpIsOneEntryInTheLastGroup() {
         val hub = File(ui, "SettingsHub.kt").readText()
         val rows = Regex("""HubRow\(Icons\.Rounded\.(\w+), "([^"]+)"\)""").findAll(hub).map { it.groupValues[1] to it.groupValues[2] }.toList()
         assertTrue("No rows found", rows.isNotEmpty())
-        assertTrue("Help isn't last with the bug icon: ${rows.last()}", rows.last() == ("BugReport" to "Help"))
+        assertTrue("Help isn't next to last with the bug icon: ${rows.takeLast(2)}", rows[rows.size - 2] == ("BugReport" to "Help"))
         assertFalse("Report a problem is still its own entry", rows.any { it.second == "Report a problem" })
         assertFalse("Logs is still its own entry", rows.any { it.second == "Logs" })
     }
 
-    /** #576: About sits just above Help, with the info icon. */
-    @Test fun aboutIsJustAboveHelp() {
+    /** #576, #780: About, with the info icon, is the last row, just below Help. */
+    @Test fun aboutIsLastJustBelowHelp() {
         val hub = File(ui, "SettingsHub.kt").readText()
         val rows = Regex("""HubRow\(Icons\.Rounded\.(\w+), "([^"]+)"\)""").findAll(hub).map { it.groupValues[1] to it.groupValues[2] }.toList()
-        assertTrue("About isn't just above Help: ${rows.takeLast(2)}", rows.takeLast(2) == listOf("Info" to "About", "BugReport" to "Help"))
+        assertTrue("About isn't last, below Help: ${rows.takeLast(2)}", rows.takeLast(2) == listOf("BugReport" to "Help", "Info" to "About"))
     }
 }

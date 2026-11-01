@@ -117,7 +117,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
     }
 
     Screen(
-        title = if (firstRun) "Connect your servers" else "Connections",
+        title = if (firstRun) "Connect your servers" else "Servers and services",
         nav = if (firstRun && !fromPicker) null else nav,
         actions = { IconButton(onClick = { save() }) { Icon(Icons.Rounded.Check, "Save") } },
     ) { padding ->
@@ -190,6 +190,30 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
     }
 }
 
+/**
+ * Which settings sections were folded (issue #780): sections start open, and one folded stays folded on later
+ * visits, by its tag.
+ */
+internal object FoldMemory {
+    private const val PREFS = "settings_folds"
+    private const val KEY = "folded"
+
+    fun isFolded(context: android.content.Context, tag: String): Boolean =
+        runCatching { tag in prefs(context).getStringSet(KEY, null).orEmpty() }.getOrDefault(false)
+
+    fun setFolded(context: android.content.Context, tag: String, folded: Boolean) {
+        runCatching {
+            val now = prefs(context).getStringSet(KEY, null).orEmpty()
+            prefs(context).edit().putStringSet(KEY, foldedAfter(now, tag, folded)).apply()
+        }
+    }
+
+    /** [folded] with [tag] added or taken out. */
+    fun foldedAfter(folded: Set<String>, tag: String, fold: Boolean): Set<String> = if (fold) folded + tag else folded - tag
+
+    private fun prefs(context: android.content.Context) = context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+}
+
 @Composable
 internal fun Heading(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -197,24 +221,31 @@ internal fun Heading(text: String) {
 
 /**
  * A settings page's section that folds (issue #776): its heading and a line of what's set, with the arrow
- * Connections uses, turned when open. Folded by default, so a page shows what's on it at a glance; the body is
- * only built when open. [summary] says the setting's state while folded ("On · Rock", "6 s"). The open state is
- * kept while the page lives.
+ * Connections uses, turned when open. Open by default, so every setting shows (issue #780); fold one to keep the
+ * page short, and it stays folded the next time ([FoldMemory]). The body is only built when open. [summary] says
+ * the setting's state while folded ("On · Rock", "6 s"). [startOpen] overrides the remembered state (pictures and
+ * tests).
  */
 @Composable
 internal fun FoldSection(
     title: String,
     summary: String? = null,
     tag: String = title.lowercase().replace(Regex("[^a-z0-9]+"), "-"),
-    startOpen: Boolean = false,
+    startOpen: Boolean? = null,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
-    var open by androidx.compose.runtime.saveable.rememberSaveable(tag) { mutableStateOf(startOpen) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var open by androidx.compose.runtime.saveable.rememberSaveable(tag) {
+        mutableStateOf(startOpen ?: !FoldMemory.isFolded(context, tag))
+    }
     val turn by androidx.compose.animation.core.animateFloatAsState(if (open) 180f else 0f, label = "fold")
     Column(Modifier.fillMaxWidth().testTag("section-$tag")) {
         Row(
             Modifier.fillMaxWidth()
-                .clickable(onClickLabel = if (open) "Fold" else "Open") { open = !open }
+                .clickable(onClickLabel = if (open) "Fold" else "Open") {
+                    open = !open
+                    FoldMemory.setFolded(context, tag, !open)
+                }
                 .padding(vertical = Space.Small)
                 .testTag("section-$tag-header"),
             verticalAlignment = Alignment.CenterVertically,

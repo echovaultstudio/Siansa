@@ -159,6 +159,9 @@ class BookPlayer(private val graph: AppGraph, private val context: Context = gra
     /** The episode playing, when it's a podcast (issue #521); null for a book. */
     private var episode: app.siansa.net.Episode? = null
 
+    /** The podcast episode playing, by id, or null for a book (issue #782: two episodes can share a title). */
+    val episodeId: String? get() = episode?.id
+
     /**
      * A podcast's ▶ on Home or its page (beta #45): a podcast itself has no audio, its episodes do, so this plays
      * the episode in progress, else the newest one.

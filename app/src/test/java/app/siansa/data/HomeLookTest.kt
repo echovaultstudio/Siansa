@@ -22,10 +22,13 @@ class HomeLookTest {
         assertEquals("", HomeLook.format(mapOf(HomeSection.RECENT to HomeLook.AS_IS)))
     }
 
-    @Test fun yourCardsKeepTheirOwnLooks() {
+    @Test fun yourCardsAndNoticesKeepTheirOwnLooks() {
         assertFalse(HomeSection.CARDS.lookable)
-        assertTrue(HomeSection.entries.filter { it != HomeSection.CARDS }.all { it.lookable })
+        // Notices are always a row of chips (issue #784).
+        assertFalse(HomeSection.NOTICES.lookable)
+        assertTrue(HomeSection.entries.filter { it != HomeSection.CARDS && it != HomeSection.NOTICES }.all { it.lookable })
         assertTrue(HomeLook.parse("cards:banner").isEmpty())
+        assertTrue(HomeLook.parse("notices:list").isEmpty())
     }
 
     @Test fun theLooksAreTheCustomCardsLooks() {
