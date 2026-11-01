@@ -21,6 +21,7 @@ cards** keep their own looks: their cog opens **Settings › Home › Cards**.
 
 | Section | What it shows |
 |---|---|
+| **Notices** | A row of chips at the top when there's something to say (see [Notices](#notices)). |
 | **Shortcuts** | Liked songs first, then the albums, playlists and mixes you played from last. Until there's enough of that, today's mixes, your playlists and recent albums. |
 | **Today's mix** | The day's mix, made for the vibe of the hour it's made in (see below). |
 | **Your mixes carousel** | Three or four mixes of your own for each part of the day, side by side. |
@@ -33,6 +34,24 @@ cards** keep their own looks: their cog opens **Settings › Home › Cards**.
 | **Recently added** | The newest albums on your server. |
 | **Your genres** | Genre radios from your library. |
 | **Random picks** | A random selection to dig into. |
+
+## Notices
+
+A row of chips at the top of Home, only when there's something to say. Tap a chip to open it; its **×** hides that
+one (next month's report or the next new albums show again).
+
+| Notice | When it shows | Opens |
+|---|---|---|
+| **Library sync failed** | The last library sync didn't finish. | Servers and services |
+| **Carry on: …** | A book or podcast episode you played in the last week and haven't finished. | The book |
+| **3 new albums** | Albums added to your library in the last three days. | Recently added |
+| **Your October** | The first week of a month: last month's listening. | The month's report |
+| **4 artists for you** | New artists to try were found today. | Artists for you |
+
+At most five show. By default they're ordered for you: what needs you first, then what you're in the middle of, then
+what's new; among the new ones, the kinds you tap most come first. In **Settings › Home › Notices** you can hide the
+row, or set each kind to **Pinned** (always first, in the order you pin them), **Automatic** or **Off**. The cog on
+Notices in Arrange Home opens the same page.
 
 ## Vibes and today's mix
 

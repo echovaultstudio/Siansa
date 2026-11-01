@@ -164,6 +164,18 @@ class BookRepository(private val api: AudiobookshelfApi, private val settings: (
     /** Books the listener is part-way through, newest first, for "Continue listening". */
     suspend fun inProgress(): List<Book> = api.inProgress().also { list -> list.forEach { booksById[it.id] = it } }
 
+    @Volatile private var inProgressAt = 0L
+    @Volatile private var inProgressKept: List<Book> = emptyList()
+
+    /**
+     * [inProgress], read again only when the last read is older than [FRESH_MS] (issue #784): Home's notices ask
+     * each time their row comes back into view, and scrolling past mustn't ask the server each time (#569).
+     */
+    suspend fun inProgressFresh(now: Long = System.currentTimeMillis()): List<Book> {
+        if (isFresh(inProgressAt, now)) return inProgressKept
+        return inProgress().also { inProgressKept = it; inProgressAt = now }
+    }
+
     companion object {
         const val PAGE = 100
         /** How long Home's shelves and the progress count as fresh: scrolling past doesn't ask the server again (#569). */

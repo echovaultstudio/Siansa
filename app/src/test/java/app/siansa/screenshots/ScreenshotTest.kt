@@ -282,6 +282,17 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // The notices row at the top of Home (issue #784), with a long book title cut off.
+            Scene("home_notices") {
+                app.siansa.ui.NoticeChips(
+                    listOf(
+                        app.siansa.mix.Notice(app.siansa.mix.NoticeKind.NEEDS_YOU, "n", "Library sync failed", "x"),
+                        app.siansa.mix.Notices.carryOn("b", "The Extraordinarily Long Chronicles of Wandering Mapmakers"),
+                        app.siansa.mix.Notices.newAlbums(3, "a")!!,
+                    ),
+                    onOpen = {}, onHide = {},
+                )
+            },
             // The Settings start page in groups (issue #780), and Settings › Home's rows with what's set.
             Scene("settings_groups") {
                 Column {

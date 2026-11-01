@@ -5,6 +5,8 @@ package app.siansa.data
  * moved to Dscvr (issue #339); saved orders that still name it simply drop it.
  */
 enum class HomeSection(val id: String, val label: String) {
+    /** A row of chips: what needs you, what you're partway through, what's new (issue #784). */
+    NOTICES("notices", "Notices"),
     QUICK("quick", "Shortcuts"),
     TODAY("today", "Today's mix"),
     CAROUSEL("carousel", "Your mixes carousel"),
@@ -24,7 +26,7 @@ enum class HomeSection(val id: String, val label: String) {
     RANDOM("random", "Random picks");
 
     /** Its look can be changed under Arrange Home (issue #655); Your cards each have their own, in Settings › Home › Cards. */
-    val lookable: Boolean get() = this != CARDS
+    val lookable: Boolean get() = this != CARDS && this != NOTICES
 
     companion object {
         val default: List<HomeSection> = entries.toList()

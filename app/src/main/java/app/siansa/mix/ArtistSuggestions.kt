@@ -56,6 +56,12 @@ class ArtistSuggestions(private val graph: AppGraph) {
         }
     }
 
+    /** Today's artists if they were already found today, without looking for new ones; for Home's notices (issue #784). */
+    fun savedToday(): List<SuggestedArtist> {
+        val saved = memory ?: load()
+        return if (saved != null && saved.date == LocalDate.now().toString()) saved.artists else emptyList()
+    }
+
     private suspend fun build(): List<SuggestedArtist> {
         if (!graph.library.isSynced) return emptyList()
         val seeds = graph.taste.profile().topArtists.take(SEEDS)

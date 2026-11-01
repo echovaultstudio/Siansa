@@ -80,6 +80,9 @@ in Servers and services. See [Audiobooks and podcasts](books.md).
 - **Arrange Home**: the order of Home's sections, which are hidden, each section's look, and the spacing.
 
   Both open the same panel as the button at the top of Home.
+- **Notices**: the row of chips at the top of Home: show it or not, and each kind **Pinned** (always first, in the
+  order you pin them), **Automatic** (the default: ordered by what needs you and what you tap) or **Off**. See
+  [Notices](home-and-mixes.md#notices).
 - **Cards**:
   - **Made for you**: cards of your own on Home's Made for you. Each gets new songs every day; tap a name to change it.
   - **Custom cards**: cards pinned to Home's **Your cards** section, each with a name, a look (song tiles, album row, banner, song list or play button) and its songs, from your library by tags (genre, years, artist, album, title words, favourites) or by a sound described to AudioMuse-AI. Tap a card to change its name, look or rules; the switch takes it off Home without removing it. See [Your cards](home-and-mixes.md#your-cards).

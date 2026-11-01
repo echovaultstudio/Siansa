@@ -1,6 +1,7 @@
 package app.siansa.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,7 +27,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.siansa.data.HomeSection
 import app.siansa.log.AppLog
+import app.siansa.mix.NoticeKind
+import app.siansa.mix.NoticeMode
+import app.siansa.mix.NoticePrefs
 
 /**
  * Settings › Audiobooks and podcasts (issue #780): the book player's skip buttons (moved here from Playback) and the
@@ -90,10 +96,72 @@ fun HomeSettingsScreen(nav: NavController) {
                 panel = false
             }
             HorizontalDivider()
+            PageLink("Notices", noticesLine(HomeSection.NOTICES !in settings.homeHidden, settings.notices), "homeNotices") {
+                nav.navigate("settings/home/notices")
+            }
+            HorizontalDivider()
             PageLink("Cards", "Made for you and your own cards", "homeCards") { nav.navigate("settings/cards") }
         }
     }
     panel?.let { sources -> HomeSettingsSheet(nav, startOnSources = sources) { panel = null } }
+}
+
+/**
+ * Settings › Home › Notices (issue #784): the chips at the top of Home, shown or not, and each kind pinned (always
+ * first, in the order pinned), automatic (ordered by what matters and what you tap) or off.
+ */
+@Composable
+fun NoticesSettingsScreen(nav: NavController) {
+    val graph = LocalGraph.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    val shown = HomeSection.NOTICES !in settings.homeHidden
+    Screen(title = "Notices", nav = nav) { padding ->
+        Column(
+            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
+            verticalArrangement = Arrangement.spacedBy(Space.Medium),
+        ) {
+            SwitchRow("Show notices on Home", shown) { on ->
+                AppLog.i("Settings", "Notices on Home: $on")
+                graph.settings.setHomeHidden(if (on) settings.homeHidden - HomeSection.NOTICES else settings.homeHidden + HomeSection.NOTICES)
+            }
+            Hint("A row of chips at the top of Home. Automatic puts what needs you first, then what you're in the middle of, then what's new. Pinned ones always come first.")
+            if (shown) {
+                NoticeKind.entries.forEach { kind ->
+                    HorizontalDivider()
+                    Column(Modifier.testTag("noticeKind"), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                        Column {
+                            Heading(kind.label)
+                            Hint(kind.hint)
+                        }
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                            NoticeMode.entries.forEach { mode ->
+                                FilterChip(
+                                    selected = settings.notices.modeOf(kind) == mode,
+                                    onClick = {
+                                        AppLog.i("Settings", "Notices › ${kind.label}: ${mode.label}")
+                                        graph.settings.setNoticeMode(kind, mode)
+                                    },
+                                    label = { Text(mode.label) },
+                                    modifier = Modifier.testTag("notice-${kind.id}-${mode.id}"),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** "Shown · 1 pinned · 2 off", "Hidden": what's set, under Notices' row. */
+internal fun noticesLine(shown: Boolean, prefs: NoticePrefs): String {
+    if (!shown) return "Hidden"
+    val off = NoticeKind.entries.count { prefs.modeOf(it) == NoticeMode.OFF }
+    return listOfNotNull(
+        "Shown",
+        prefs.pinned.size.takeIf { it > 0 }?.let { "$it pinned" },
+        off.takeIf { it > 0 }?.let { "$it off" },
+    ).joinToString(" · ")
 }
 
 /** "Your music and 1 other user · only downloaded music": what the source filter shows, under its row. */

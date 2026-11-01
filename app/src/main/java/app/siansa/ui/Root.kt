@@ -322,6 +322,7 @@ fun SiansaRoot() {
                 composable("settings/streaming") { StreamingDataScreen(nav) }
                 composable("settings/books") { BooksSettingsScreen(nav) }
                 composable("settings/home") { HomeSettingsScreen(nav) }
+                composable("settings/home/notices") { NoticesSettingsScreen(nav) }
                 composable("downloads") { DownloadsScreen(nav) }
                 composable("downloads/add") { DownloadPickerScreen(nav) }
                 composable("downloads/songs") { DownloadedSongsScreen(nav) }
