@@ -45,6 +45,13 @@ Song radio, similar songs or similar albums say "AudioMuse doesn't know this son
 - The log line "Left out N songs that aren't in the libraries you sync" means AudioMuse-AI found songs, but not in
   the music shown.
 
+## An album's cover shows while it plays but not on its page (Emby, Jellyfin)
+
+Emby and Jellyfin keep a cover on the album, and one on each song (from the file's own art). When the album has
+none of its own, Siansa shows the first song's on the album page, so the page and the player agree. In album lists
+a grey square means Emby or Jellyfin has no cover on that album: give the album one there (Identify, or a
+`cover.jpg` in its folder) and it shows everywhere.
+
 ## Songs show the wrong length, or the seek bar jumps
 
 Some files carry a wrong length in their header (often Dolby E-AC3 .m4a). Siansa uses your server's length when
