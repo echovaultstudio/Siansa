@@ -1,4 +1,4 @@
 ### Changed
-- **Home's notice chips look like Your Library's chips**: the same round pills.
-- **A pinned entry in Your Library has an × beside its pin** that unpins it in one tap. Holding the entry still works
-  too. Liked songs and your listening are always pinned and have no ×.
+- **Home's notice chips look like Your Library's chips**: the same round pills, without an ×. A notice kind you set to
+  **Pinned** in Settings › Home › Notices now always shows and is never pushed out by other notices; the automatic
+  ones come and go as needed and fill the places left.

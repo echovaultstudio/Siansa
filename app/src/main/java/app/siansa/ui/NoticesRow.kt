@@ -1,6 +1,5 @@
 package app.siansa.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,7 +13,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.BarChart
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Warning
@@ -48,7 +46,8 @@ import java.time.LocalDate
 
 /**
  * The notices at the top of Home (issue #784): a row of chips for what needs you, what you're partway through and
- * what's new. A tap opens it; the × hides that one. Nothing shows when there's nothing to say.
+ * what's new. A tap opens it. Pinned kinds always show; the automatic ones come and go as they're needed (issue
+ * #794). Nothing shows when there's nothing to say.
  */
 @Composable
 fun NoticesRow(nav: NavController, graph: AppGraph, settings: AppSettings) {
@@ -59,7 +58,7 @@ fun NoticesRow(nav: NavController, graph: AppGraph, settings: AppSettings) {
     LaunchedEffect(failed, settings.booksReady, settings.notices) {
         val fresh = withContext(Dispatchers.IO) {
             val candidates = noticeCandidates(graph, settings, failed)
-            Notices.order(candidates, settings.notices, graph.notices.taps(), graph.notices.hidden())
+            Notices.order(candidates, settings.notices, graph.notices.taps())
         }
         if (fresh != notices) AppLog.d("Home", "Notices: ${fresh.joinToString { it.key }.ifEmpty { "none" }}")
         notices = fresh
@@ -72,18 +71,12 @@ fun NoticesRow(nav: NavController, graph: AppGraph, settings: AppSettings) {
             graph.notices.tap(notice.kind)
             nav.navigate(notice.route)
         },
-        onHide = { notice ->
-            AppLog.i("Home", "Notice hidden: ${notice.key}")
-            graph.notices.hide(notice.key)
-            notices = notices - notice
-            graph.notices.shown = notices
-        },
     )
 }
 
 /** The chips themselves, one gap from the section above (Home's section gap); nothing when [notices] is empty. */
 @Composable
-internal fun NoticeChips(notices: List<Notice>, onOpen: (Notice) -> Unit, onHide: (Notice) -> Unit) {
+internal fun NoticeChips(notices: List<Notice>, onOpen: (Notice) -> Unit) {
     if (notices.isEmpty()) return
     LazyRow(
         Modifier.fillMaxWidth().padding(top = LocalSectionGap.current).testTag("noticesRow"),
@@ -92,7 +85,7 @@ internal fun NoticeChips(notices: List<Notice>, onOpen: (Notice) -> Unit, onHide
     ) {
         items(notices, key = { it.key }) { notice ->
             // The same pill as Your Library's chips (issue #794), not Material's outlined assist chip.
-            NoticePill(notice, onOpen = { onOpen(notice) }, onHide = { onHide(notice) })
+            NoticePill(notice, onOpen = { onOpen(notice) })
         }
     }
 }
@@ -100,9 +93,9 @@ internal fun NoticeChips(notices: List<Notice>, onOpen: (Notice) -> Unit, onHide
 /** A long book title is cut off rather than making one chip fill the screen. */
 internal val NOTICE_MAX_WIDTH = 280.dp
 
-/** One notice as a pill in Your Library's style: an icon, the text, and an × that hides it. */
+/** One notice as a pill in Your Library's style: an icon and the text. */
 @Composable
-private fun NoticePill(notice: Notice, onOpen: () -> Unit, onHide: () -> Unit) {
+private fun NoticePill(notice: Notice, onOpen: () -> Unit) {
     androidx.compose.material3.Surface(
         onClick = onOpen,
         shape = androidx.compose.foundation.shape.CircleShape,
@@ -111,18 +104,12 @@ private fun NoticePill(notice: Notice, onOpen: () -> Unit, onHide: () -> Unit) {
         modifier = Modifier.widthIn(max = NOTICE_MAX_WIDTH).testTag("notice-${notice.kind.id}"),
     ) {
         Row(
-            Modifier.padding(start = Space.Medium, end = Space.Small, top = Space.Small, bottom = Space.Small),
+            Modifier.padding(horizontal = Space.Medium, vertical = Space.Small),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.Small),
         ) {
             Icon(noticeIcon(notice.kind), null, Modifier.size(18.dp), tint = Accent)
-            Text(notice.text, style = MaterialTheme.typography.labelLarge, fontSize = PILL_FONT, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-            Icon(
-                Icons.Rounded.Close,
-                contentDescription = "Hide",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.clickable(onClickLabel = "Hide this notice") { onHide() }.size(18.dp),
-            )
+            Text(notice.text, style = MaterialTheme.typography.labelLarge, fontSize = PILL_FONT, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
         }
     }
 }
