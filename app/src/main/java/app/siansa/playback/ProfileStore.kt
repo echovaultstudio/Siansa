@@ -100,7 +100,7 @@ class ProfileStore(
 
     private fun fail(why: String) {
         synchronized(lock) { backOffUntil = now() + BACK_OFF_MS }
-        if (problem != why) AppLog.w("Loudness", "$why. Trying again in ${BACK_OFF_MS / 60_000} minutes; until then song tags are used")
+        if (problem != why) AppLog.w("Loudness", "${why.trimEnd('.')}. Trying again in ${BACK_OFF_MS / 60_000} minutes; until then song tags are used")
         problem = why
     }
 
