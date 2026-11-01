@@ -20,7 +20,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
- * One chat completion from the AI service set in Settings › Connections (issue #665: OpenRouter, OpenAI, Anthropic,
+ * One chat completion from the AI service set in Settings › Servers and services (issue #665: OpenRouter, OpenAI, Anthropic,
  * Google Gemini, Mistral, Groq, Ollama or another with the same API). Only small prompts are ever sent.
  */
 class ChatApi(

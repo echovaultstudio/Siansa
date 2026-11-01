@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -65,6 +66,8 @@ fun AboutScreen(nav: NavController) {
                     modifier = Modifier.testTag("aboutVersion"),
                 )
             }
+            // What's new (issue #780): was a row of its own on the Settings start page.
+            AboutRow(Icons.Rounded.NewReleases, "What's new", "The changes in this version", "aboutWhatsNew") { nav.navigate("settings/whatsnew") }
             AboutLinks.all.forEachIndexed { i, (title, line, url) ->
                 val icon = listOf(Icons.Rounded.Code, Icons.AutoMirrored.Rounded.MenuBook, Icons.Rounded.PrivacyTip)[i]
                 AboutRow(icon, title, line, "aboutLink-$i") {

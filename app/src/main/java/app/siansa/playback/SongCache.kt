@@ -20,7 +20,7 @@ fun songCacheKey(uri: Uri): String {
     return "song:$id:$format:$rate"
 }
 
-/** Whether songs are kept on the phone as they play: Settings › Storage › Song cache, where 0 means Off. */
+/** Whether songs are kept on the phone as they play: Settings › Streaming and data › Song cache, where 0 means Off. */
 fun songCacheOn(settings: AppSettings): Boolean = settings.songCacheMb > 0
 
 /**

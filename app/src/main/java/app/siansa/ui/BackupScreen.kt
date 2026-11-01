@@ -91,7 +91,7 @@ fun BackupScreen(nav: NavController) {
         }
     }
 
-    Screen(title = "Backup", nav = nav) { padding ->
+    Screen(title = "Backup and restore", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
@@ -99,7 +99,7 @@ fun BackupScreen(nav: NavController) {
             Hint(
                 "A backup holds your settings, vibes, mixes, play history, Home and library layout, and anything else " +
                     "you set up in Siansa. Passwords, tokens and API keys are never included: after restoring on a new phone, " +
-                    "enter them again under Connections. Your library comes back with the next sync.",
+                    "enter them again under Settings › Servers and services. Your library comes back with the next sync.",
             )
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 Button(enabled = !busy, onClick = { saver.launch("siansa-backup-${stamp()}.json") }) {

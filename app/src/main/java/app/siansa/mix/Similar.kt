@@ -109,7 +109,7 @@ class Similar(private val graph: AppGraph) {
     }
 
     private suspend fun ask(query: String): JsonObject {
-        if (!graph.settings.current.audioMuseReady) throw IllegalStateException("Set up AudioMuse in Settings › Connections first")
+        if (!graph.settings.current.audioMuseReady) throw IllegalStateException("Set up AudioMuse in Settings › Servers and services first")
         val answer = try {
             graph.audioMuse.plugin(query)
         } catch (e: CancellationException) {

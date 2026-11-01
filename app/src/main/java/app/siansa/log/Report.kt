@@ -69,7 +69,7 @@ object Report {
 
     /** A short explanation for a failed send, for the tester. */
     fun failure(code: Int): String = when (code) {
-        413 -> "The log is too big to send. Use Save logs under Settings › Logs and send the file to help@siansa.app."
+        413 -> "The log is too big to send. Use Save logs under Settings › Help and send the file to help@siansa.app."
         429 -> "Too many reports just now. Please try again in an hour."
         in 500..599 -> "The beta server had a problem. Please try again later."
         else -> "The report couldn't be sent (error $code)."

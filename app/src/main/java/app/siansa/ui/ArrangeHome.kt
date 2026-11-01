@@ -57,8 +57,44 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.ui.zIndex
 import app.siansa.data.HomeLook
 import app.siansa.data.HomeSection
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.siansa.log.AppLog
 import app.siansa.data.moved
 import app.siansa.data.movesFirstVisible
+
+/**
+ * Home's settings panel with the saved settings, from Home's button or Settings › Home (issue #780): Sources
+ * ([startOnSources]) or Arrange. Your cards' cog closes it and opens Settings › Home › Cards.
+ */
+@Composable
+fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Boolean, onDismiss: () -> Unit) {
+    val graph = LocalGraph.current
+    val s by graph.settings.state.collectAsStateWithLifecycle()
+    ArrangeHomeSheet(s.homeOrder, s.homeHidden, gap = s.homeGap, onGapChange = {
+        AppLog.i("Home", "Spacing: ${homeGapLabel(it)}")
+        graph.settings.setHomeGap(it)
+    }, onChange = {
+        AppLog.i("Home", "Arranged: ${HomeSection.format(it)}")
+        graph.settings.setHomeOrder(it)
+    }, onHiddenChange = {
+        AppLog.i("Home", "Hidden: ${HomeSection.formatHidden(it).ifEmpty { "none" }}")
+        graph.settings.setHomeHidden(it)
+    }, onDismiss = onDismiss, startOnSources = startOnSources,
+        looks = s.homeLooks,
+        onLookChange = { section, look ->
+            AppLog.i("Home", "${section.label} looks: ${look.label}")
+            graph.settings.setHomeLook(section, look)
+        },
+        onResetLooks = {
+            AppLog.i("Home", "Every row back in its own look")
+            graph.settings.resetHomeLooks()
+        },
+        onOpenSettings = { section ->
+            onDismiss()
+            nav.navigate(if (section == HomeSection.NOTICES) "settings/home/notices" else "settings/cards")
+        },
+    )
+}
 
 /**
  * Home settings, behind Home's top-right buttons: Sources (whose music shows, see [SourcesPanel]) and Arrange.
@@ -78,11 +114,12 @@ fun ArrangeHomeSheet(
     // The gap between Home's sections, a step of the spacing scale (#554).
     gap: Int = AppSettings.HOME_GAP_DEFAULT,
     onGapChange: (Int) -> Unit = {},
-    // Each row's look (issue #655), changed with its cog; Your cards' cog opens Settings › Cards.
+    // Each row's look (issue #655), changed with its cog; Your cards' cog opens Settings › Home › Cards, and
+    // Notices' cog Settings › Home › Notices (issue #784).
     looks: Map<HomeSection, HomeLook> = emptyMap(),
     onLookChange: (HomeSection, HomeLook) -> Unit = { _, _ -> },
     onResetLooks: () -> Unit = {},
-    onOpenCards: () -> Unit = {},
+    onOpenSettings: (HomeSection) -> Unit = {},
 ) {
     var picking by remember { mutableStateOf<HomeSection?>(null) }
     picking?.let { section ->
@@ -222,12 +259,16 @@ fun ArrangeHomeSheet(
                                 }
                             }
                             IconButton(
-                                onClick = { if (section.lookable) picking = section else onOpenCards() },
+                                onClick = { if (section.lookable) picking = section else onOpenSettings(section) },
                                 modifier = Modifier.testTag("homeLookCog"),
                             ) {
                                 Icon(
                                     Icons.Rounded.Settings,
-                                    contentDescription = if (section.lookable) "Look of ${section.label}" else "Your cards in Settings",
+                                    contentDescription = when {
+                                        section.lookable -> "Look of ${section.label}"
+                                        section == HomeSection.NOTICES -> "Notices in Settings"
+                                        else -> "Your cards in Settings"
+                                    },
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }

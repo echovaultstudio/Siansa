@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 /**
  * The app's diagnostic log (issues #180, #237), kept in the app's private storage for sharing when something
- * goes wrong. Each entry is one [LogEvent]: written as a readable line (siansa.log, shown under Settings › Logs)
+ * goes wrong. Each entry is one [LogEvent]: written as a readable line (siansa.log, shown under Settings › Help)
  * and as a line of JSON (events.jsonl) with its component, event name, session and trace ids and fields.
  *
  * - Nothing is written while logging is off. The last [RECENT] events are always kept in memory, and if the

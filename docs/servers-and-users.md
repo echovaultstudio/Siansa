@@ -11,7 +11,7 @@
 
 ## Connecting
 
-**Settings › Connections**, under **Servers**: open the server in use for its address, user name and password, with
+**Settings › Servers and services**, under **Servers**: open the server in use for its address, user name and password, with
 **Test** and **Save**. The first time, Siansa asks for them when it starts.
 
 - The address can include the port (`http://192.168.1.10:4533`) and a path if your server lives under one.
@@ -22,7 +22,7 @@
 
 ## Several users
 
-**Settings › Connections › Servers** holds every login on this phone, one card each. Each user has their own
+**Settings › Servers and services › Servers** holds every login on this phone, one card each. Each user has their own
 library, play history and settings. A user can be on the same server or a different one, of either type.
 
 - Open another user's card to change its server address, user name, password, proxy login, name and name in
@@ -43,7 +43,7 @@ The **filter button at the top of Home** opens the source filter. There you can:
 - **Show other users' music next to yours**, for users on the **same server** as you (for example two logins on
   one Navidrome). Their albums, artists, songs and playlists appear in your library, and everything about their
   music (streaming, covers, lyrics, scrobbles) uses *their* login. Users on another server (another address, or
-  Emby next to Navidrome) can't be shown together: switch to them in **Settings › Connections** instead.
+  Emby next to Navidrome) can't be shown together: switch to them in **Settings › Servers and services** instead.
   Siansa recognises your server by its songs, so a user who reaches it at another address (a domain instead
   of an IP) still counts as the same server; while it checks, that user shows "Checking whether it's your server…".
 - **Hide your own music**, to see only another user's.
@@ -52,7 +52,7 @@ The **filter button at the top of Home** opens the source filter. There you can:
 - **Sync** one server, or **Sync all** to sync every music library that's shown and Audiobookshelf at once. Each
   server shows how its sync is going on one small line under its name, with a tick once it's done.
 
-Every server set up in **Settings › Connections** is listed, Audiobookshelf too (with how many books and podcasts it
+Every server set up in **Settings › Servers and services** is listed, Audiobookshelf too (with how many books and podcasts it
 has after a sync). Audiobookshelf's books aren't hidden from here: Home's **Arrange** hides their rows.
 
 Song radios, mixes, the dice and recently played only use what the filter shows.
@@ -61,7 +61,7 @@ Song radios, mixes, the dice and recently played only use what the filter shows.
 playlist, a playlist on your server only takes its own user's songs (Kids' playlists take Kids' songs), and a
 playlist on this phone takes anyone's. Playlists that can't take the songs are greyed out.
 
-**Scrobbling for other users**: in **Settings › Scrobbling › Users** you can turn a user off, so songs from their
+**Scrobbling for other users**: in **Settings › Scrobbling and history › Users** you can turn a user off, so songs from their
 library aren't sent anywhere while you listen as you.
 
 ## Playlists on your server
@@ -72,7 +72,7 @@ rewrites every hour) show as soon as the answer comes. No library sync is needed
 
 ## Library sync
 
-Siansa keeps a copy of each user's library list on the phone (**Settings › Connections**, in the card of the server
+Siansa keeps a copy of each user's library list on the phone (**Settings › Servers and services**, in the card of the server
 in use: **Library sync**):
 
 - It checks for changes when the app starts. If your server hasn't scanned since the last sync, nothing is

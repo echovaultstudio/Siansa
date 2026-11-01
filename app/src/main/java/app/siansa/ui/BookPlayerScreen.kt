@@ -428,7 +428,7 @@ private fun SideButton(icon: androidx.compose.ui.graphics.vector.ImageVector, la
     }
 }
 
-/** ↺ or ↻ with the seconds it skips (Settings › Playback › Books), the size of now playing's previous and next. */
+/** ↺ or ↻ with the seconds it skips (Settings › Audiobooks and podcasts), the size of now playing's previous and next. */
 @Composable
 internal fun SkipButton(back: Boolean, seconds: Int, tag: String, onClick: () -> Unit) {
     Box(

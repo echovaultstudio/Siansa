@@ -38,7 +38,7 @@ object PlayerFactory {
             .setCacheKeyFactory { spec -> songCacheKey(spec.uri) }
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
             .setEventListener(PlaybackDiagnostics.cacheListener)
-        // With the song cache off (Settings › Storage) and nothing loaded ahead, songs stream straight from the server.
+        // With the song cache off (Settings › Streaming and data) and nothing loaded ahead, songs stream straight from the server.
         // With it off but songs loaded ahead, they pass through its store and are removed once played.
         val switching = CachingSwitchDataSource.Factory(cacheFactory, http) {
             Preload.usesCacheStore(graph.settings.current, Streaming.isUnmetered(context))

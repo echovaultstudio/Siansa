@@ -106,7 +106,7 @@ class ProfileStore(
 
     /** For the "Test" button: whether the plugin answers, in plain words. Clears any back-off. */
     suspend fun check(): CheckResult {
-        if (!settings().audioMuseReady) return CheckResult(false, "Set up AudioMuse in Settings › Connections first")
+        if (!settings().audioMuseReady) return CheckResult(false, "Set up AudioMuse in Settings › Servers and services first")
         synchronized(lock) { backOffUntil = 0L }
         return try {
             val health = get(HEALTH_PATH) as? JsonObject
@@ -146,7 +146,7 @@ class ProfileStore(
             return when {
                 "HTTP 404" in text -> "The Siansa plugin isn't installed on this AudioMuse server"
                 // Without a login, AudioMuse sends its login page instead of an answer.
-                "isn't JSON" in text || "needs a login" in text -> "AudioMuse wants a login for the plugin: check the AudioMuse login in Settings › Connections"
+                "isn't JSON" in text || "needs a login" in text -> "AudioMuse wants a login for the plugin: check the AudioMuse login in Settings › Servers and services"
                 text.isBlank() -> "Couldn't reach the Siansa plugin"
                 else -> text
             }
