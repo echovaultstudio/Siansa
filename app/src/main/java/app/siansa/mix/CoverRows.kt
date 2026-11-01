@@ -21,8 +21,12 @@ data class CoverRow(
     val title: String,
     val meta: String,
     val progress: Float? = null,
+    /** Two colours (ARGB) drawn as a block where there's no cover: a radio or a genre on Home (issue #789). */
+    val colors: Pair<Long, Long>? = null,
+    /** A round cover (an artist). */
+    val round: Boolean = false,
 ) {
-    enum class Kind { ALBUM, SONG, BOOK, EPISODE }
+    enum class Kind { ALBUM, SONG, BOOK, EPISODE, OTHER }
 }
 
 /** What a card's rows are, from what it holds. */

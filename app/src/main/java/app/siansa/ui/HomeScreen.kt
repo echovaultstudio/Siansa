@@ -458,7 +458,7 @@ fun HomeScreen(nav: NavController) {
                     item(key = "rediscover") {
                         val albums = lovedBefore.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
-                            HomeLookRow(look, "rediscover", "Rediscover", albums.map { r -> albumItem(r.album, rediscoverSubtitle(r)) { nav.navigate("album/${r.album.id}") } },
+                            HomeLookRow(look, "rediscover", "Rediscover", albums.map { r -> albumItem(r.album, rediscoverSubtitle(r), play = { playAlbums(r.album.name, listOf(r.album)) }) { nav.navigate("album/${r.album.id}") } },
                                 openAll = nav.openAll(app.siansa.ui.HomeSection.Rediscover), play = albums.takeIf { it.isNotEmpty() }?.let { { playAlbums("Rediscover", it.map { r -> r.album }) } })
                         } else Shelf("Rediscover", lovedBefore.valueOrNull().orEmpty(), key = { it.album.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Rediscover)) { r ->
                             AlbumTile(
@@ -503,7 +503,7 @@ fun HomeScreen(nav: NavController) {
                     item(key = "recent") {
                         val albums = recentAlbums.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
-                            HomeLookRow(look, "recent", "Recently played", albums.map { a -> albumItem(a, a.artist) { nav.navigate("album/${a.id}") } },
+                            HomeLookRow(look, "recent", "Recently played", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
                                 openAll = nav.openAll(app.siansa.ui.HomeSection.RecentlyPlayed), play = albums.takeIf { it.isNotEmpty() }?.let { { playAlbums("Recently played", it) } })
                         } else Shelf("Recently played", recentAlbums.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.RecentlyPlayed)) { album ->
                             AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
@@ -536,7 +536,7 @@ fun HomeScreen(nav: NavController) {
                     item(key = "added") {
                         val albums = newest.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
-                            HomeLookRow(look, "added", "Recently added", albums.map { a -> albumItem(a, a.artist) { nav.navigate("album/${a.id}") } },
+                            HomeLookRow(look, "added", "Recently added", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
                                 openAll = nav.openAll(app.siansa.ui.HomeSection.RecentlyAdded), play = albums.takeIf { it.isNotEmpty() }?.let { { playAlbums("Recently added", it) } })
                         } else Shelf("Recently added", newest.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.RecentlyAdded)) { album ->
                             AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
@@ -564,7 +564,7 @@ fun HomeScreen(nav: NavController) {
                     item(key = "random") {
                         val albums = rediscover.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
-                            HomeLookRow(look, "random", "Random picks", albums.map { a -> albumItem(a, a.artist) { nav.navigate("album/${a.id}") } },
+                            HomeLookRow(look, "random", "Random picks", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
                                 openAll = nav.openAll(app.siansa.ui.HomeSection.RandomPicks), play = albums.takeIf { it.isNotEmpty() }?.let { { playAlbums("Random picks", it) } })
                         } else Shelf("Random picks", rediscover.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.RandomPicks)) { album ->
                             AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
@@ -639,7 +639,11 @@ internal suspend fun artistRadioArtists(graph: AppGraph, count: Int = ArtistRadi
 private fun NavController.openAll(section: app.siansa.ui.HomeSection): () -> Unit = { navigate(section.route) }
 
 /** An album as an item of a row in another look (issue #655). */
-private fun albumItem(album: Album, subtitle: String, open: () -> Unit) = HomeItem(album.id, album.name, subtitle, album.coverArt, open = open)
+/** An album as a Home item: its artist (or [subtitle]) above, its name, and for Cover rows its song count and year, and a play of it. */
+private fun albumItem(album: Album, subtitle: String, play: (() -> Unit)? = null, open: () -> Unit) = HomeItem(
+    album.id, album.name, subtitle, album.coverArt, open = open, play = play,
+    meta = listOfNotNull(app.siansa.mix.CoverRows.songCount(album.songCount), album.year?.toString()).joinToString(" · "),
+)
 
 /** A row of albums played as one plays this many of them, in order. */
 private const val PLAY_ALBUMS = 10

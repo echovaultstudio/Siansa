@@ -86,7 +86,9 @@ fun BooksCarousel(nav: NavController, podcasts: Boolean, look: app.siansa.data.H
     if (look != app.siansa.data.HomeLook.AS_IS) {
         // Another look, picked under Arrange Home (issue #655).
         HomeLookRow(look, if (podcasts) "podcasts" else "books", if (podcasts) "Your podcasts" else "Your books", cards.map { (label, book) ->
-            HomeItem(book.id, book.title, label, book.cover, open = { nav.navigate("book/${book.id}") })
+            // For Cover rows (issue #789): the author under the shelf label, the length and how far, and the bar.
+            val row = app.siansa.mix.CoverRows.book(book, progress[book.id])
+            HomeItem(book.id, book.title, label, book.cover, open = { nav.navigate("book/${book.id}") }, meta = listOf(row.small, row.meta).filter { it.isNotBlank() }.joinToString(" · "), progress = row.progress)
         })
         return
     }

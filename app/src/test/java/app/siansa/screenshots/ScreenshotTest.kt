@@ -169,6 +169,14 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     HomeLookRow(HomeLook.BUTTON, "liked", "Liked songs", items("Evian"))
                 }
             },
+            // Cover rows for a Home section (issue #789): albums with a third line, and a radio with colours instead of a cover.
+            Scene("home_cover_rows") {
+                HomeLookRow(HomeLook.COVER_ROWS, "recent", "Recently played", listOf(
+                    HomeItem("a1", "Romance", "Fontaines D.C.", null, open = {}, play = {}, meta = "11 songs · 2024"),
+                    HomeItem("a2", "An album title long enough to be cut off at the edge", "Unbelievably Long Artist Name Collective", null, open = {}, play = {}, meta = "24 songs"),
+                    HomeItem("r1", "Melancholy radio", colors = Color(0xFF4B2BD6) to Color(0xFF8FD3C8), open = {}),
+                ), openAll = {})
+            },
             // Play button cards (issue #730): only the ▶ plays, no arrow at the end. A Home section, a custom card, the same
             // card while it plays, and long titles that must end in "…" before the card's edge.
             Scene("home_play_buttons") {

@@ -74,7 +74,8 @@ enum class HomeLook(val id: String, val label: String, val hint: String) {
     TILES("tiles", "Tiles", "A row of covers to swipe through"),
     BANNER("banner", "Banner", "One wide card with the first covers and a button"),
     LIST("list", "List", "The first five listed, the rest a tap away"),
-    BUTTON("button", "Play button", "A slim card: one tap plays it, or opens it");
+    BUTTON("button", "Play button", "A slim card: one tap plays it, or opens it"),
+    COVER_ROWS("cover_rows", "Cover rows", "Covers with their details beside them, three to a column, to swipe through");
 
     companion object {
         /** Reads the saved looks ("recent:list,added:banner"); unknown sections and looks are dropped. */
