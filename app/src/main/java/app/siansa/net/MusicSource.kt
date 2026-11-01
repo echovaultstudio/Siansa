@@ -24,6 +24,13 @@ enum class SourceKind(val label: String, val detail: String, val ready: Boolean)
     LOCAL("Files on this phone", "Coming soon", ready = false),
     ;
 
+    /**
+     * Whether an album's id can be asked for as a cover (issue #792): on Subsonic servers it can (Navidrome's
+     * album ids double as cover ids), so an album without a cover of its own still gets one. On Emby and Jellyfin
+     * the album item has to have an image, and asking for one it hasn't got is a 404.
+     */
+    val albumIdIsCover: Boolean get() = this == OPENSUBSONIC
+
     /** Emby or Jellyfin, which share one API and Siansa's client for it (issue #703). */
     val embyLike: Boolean get() = this == EMBY || this == JELLYFIN
 

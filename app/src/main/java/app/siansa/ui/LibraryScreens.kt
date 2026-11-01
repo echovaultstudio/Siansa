@@ -338,7 +338,9 @@ fun AlbumScreen(nav: NavController, id: String) {
             subtitle
         },
         cover = { m ->
-            BigCover(d?.album?.coverArt, d?.album?.coverArt ?: d?.album?.id, m, RoundedCornerShape(6.dp))
+            // The album's id stands in for a missing cover only where that works (issue #792).
+            val standIn = d?.album?.id?.takeIf { graph.settings.current.sourceKind.albumIdIsCover }
+            BigCover(d?.album?.coverArt, d?.album?.coverArt ?: standIn, m, RoundedCornerShape(6.dp))
         },
         header = {
             if (d != null) {
