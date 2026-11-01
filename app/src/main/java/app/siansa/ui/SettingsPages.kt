@@ -64,38 +64,19 @@ fun BooksSettingsScreen(nav: NavController) {
 }
 
 /**
- * Settings › Home (issue #780): whose music shows (the source filter), Home's sections and their looks (Arrange
- * Home), and the cards. The first two open the same panel as Home's own button.
+ * Settings › Home (issue #780): the notices and the cards. The source filter and Arrange Home are only behind the
+ * button at the top of Home, where they act on what's in front of you.
  */
 @Composable
 fun HomeSettingsScreen(nav: NavController) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    val shown by graph.guests.shown.collectAsStateWithLifecycle()
-    var panel by remember { mutableStateOf<Boolean?>(null) }  // true: Sources, false: Arrange
     Screen(title = "Home", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
-            PageLink(
-                "Source filter",
-                homeSourcesLine(shown.size, settings.downloadedOnly),
-                "homeSources",
-            ) {
-                AppLog.i("Settings", "Home › Source filter")
-                panel = true
-            }
-            HorizontalDivider()
-            PageLink(
-                "Arrange Home",
-                homeArrangeLine(settings.homeHidden.size, homeGapLabel(settings.homeGap)),
-                "homeArrange",
-            ) {
-                AppLog.i("Settings", "Home › Arrange Home")
-                panel = false
-            }
-            HorizontalDivider()
+            // Source filter and Arrange Home are only behind the button at the top of Home.
             PageLink("Notices", noticesLine(HomeSection.NOTICES !in settings.homeHidden, settings.notices), "homeNotices") {
                 nav.navigate("settings/home/notices")
             }
@@ -103,7 +84,6 @@ fun HomeSettingsScreen(nav: NavController) {
             PageLink("Cards", "Made for you and your own cards", "homeCards") { nav.navigate("settings/cards") }
         }
     }
-    panel?.let { sources -> HomeSettingsSheet(nav, startOnSources = sources) { panel = null } }
 }
 
 /**
@@ -162,26 +142,6 @@ internal fun noticesLine(shown: Boolean, prefs: NoticePrefs): String {
         prefs.pinned.size.takeIf { it > 0 }?.let { "$it pinned" },
         off.takeIf { it > 0 }?.let { "$it off" },
     ).joinToString(" · ")
-}
-
-/** "Your music and 1 other user · only downloaded music": what the source filter shows, under its row. */
-internal fun homeSourcesLine(shownUsers: Int, downloadedOnly: Boolean): String {
-    val who = when (val others = shownUsers - 1) {
-        in Int.MIN_VALUE..0 -> "Your music"
-        1 -> "Your music and 1 other user"
-        else -> "Your music and $others other users"
-    }
-    return if (downloadedOnly) "$who · only downloaded music" else who
-}
-
-/** "Every section shown · Normal spacing", "2 sections hidden · Compact spacing". */
-internal fun homeArrangeLine(hidden: Int, spacing: String): String {
-    val sections = when (hidden) {
-        0 -> "Every section shown"
-        1 -> "1 section hidden"
-        else -> "$hidden sections hidden"
-    }
-    return "$sections · $spacing spacing"
 }
 
 /** A row on a settings page that opens another page or panel: its name, a line of what's set, and an arrow. */
