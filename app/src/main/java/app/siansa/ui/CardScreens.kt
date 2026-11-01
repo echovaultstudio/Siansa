@@ -54,6 +54,7 @@ import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.FormatListBulleted
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.ViewCarousel
+import androidx.compose.material.icons.rounded.ViewAgenda
 import androidx.compose.material.icons.rounded.ViewDay
 import androidx.compose.material3.Switch
 import app.siansa.mix.CardKind
@@ -191,6 +192,7 @@ internal fun lookIcon(look: CardLook) = when (look) {
     CardLook.BANNER -> Icons.Rounded.ViewDay
     CardLook.LIST -> Icons.Rounded.FormatListBulleted
     CardLook.BUTTON -> Icons.Rounded.PlayCircle
+    CardLook.COVER_ROWS -> Icons.Rounded.ViewAgenda
 }
 
 /** Picking what a new card shows: a kind, and a genre or years where it needs one. */

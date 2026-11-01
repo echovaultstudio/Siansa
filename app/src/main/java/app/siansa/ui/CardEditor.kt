@@ -49,6 +49,7 @@ import androidx.navigation.NavController
 import app.siansa.log.AppLog
 import app.siansa.mix.CardContents
 import app.siansa.mix.CardLook
+import app.siansa.mix.BOOK_SORTS
 import app.siansa.mix.CardRule
 import app.siansa.mix.CardSort
 import app.siansa.mix.CardSource
@@ -84,7 +85,7 @@ fun CardEditorScreen(nav: NavController, id: String) {
 
     fun save() {
         val done = card ?: return
-        problem = pinnedCardProblem(done, audioMuseReady)
+        problem = pinnedCardProblem(done, audioMuseReady, booksReady = graph.settings.current.booksReady)
         if (problem != null) return
         scope.launch {
             if (isNew) graph.pinnedCards.add(done) else graph.pinnedCards.update(done)
@@ -115,13 +116,20 @@ fun CardEditorScreen(nav: NavController, id: String) {
 
             EditorHeading("Shows")
             ChipRow(CardContents.entries, c.contents, { it.label }, "contents") { contents ->
-                // Albums come from the library, and only by rules that albums have.
+                // Albums come from the library, and only by rules that albums have. Books and episodes come from
+                // Audiobookshelf, without rules, as Cover rows (issue #782).
                 change(
                     c.copy(
                         contents = contents,
-                        source = if (contents == CardContents.ALBUMS) CardSource.LIBRARY else c.source,
-                        rules = c.rules.filter { if (contents == CardContents.ALBUMS) it.field.albums else it.field.songs },
-                        look = if (contents == CardContents.ALBUMS && c.look == CardLook.ALBUMS) CardLook.TILES else c.look,
+                        source = if (contents != CardContents.SONGS) CardSource.LIBRARY else c.source,
+                        rules = if (contents.fromBooks) emptyList() else c.rules.filter { if (contents == CardContents.ALBUMS) it.field.albums else it.field.songs },
+                        look = when {
+                            contents.fromBooks -> CardLook.COVER_ROWS
+                            c.contents.fromBooks -> CardLook.TILES
+                            contents == CardContents.ALBUMS && c.look == CardLook.ALBUMS -> CardLook.TILES
+                            else -> c.look
+                        },
+                        sort = if (contents.fromBooks && c.sort !in BOOK_SORTS) CardSort.ADDED else c.sort,
                     ),
                 )
             }
@@ -133,7 +141,14 @@ fun CardEditorScreen(nav: NavController, id: String) {
                 Hint(c.source.hint)
             }
 
-            if (c.source == CardSource.SOUND && c.contents == CardContents.SONGS) {
+            if (c.contents.fromBooks) {
+                if (!graph.settings.current.booksReady) Hint("Needs Audiobookshelf, set up in Settings › Servers and services.")
+                EditorHeading("Order")
+                ChipRow(BOOK_SORTS, c.sort, { it.label }, "sort") { change(c.copy(sort = it)) }
+                NumberField("How many, at most", c.size.toString(), Modifier.fillMaxWidth().testTag("cardSize")) { v ->
+                    change(c.copy(size = v.toIntOrNull()?.coerceIn(0, MAX_SIZE) ?: 0))
+                }
+            } else if (c.source == CardSource.SOUND && c.contents == CardContents.SONGS) {
                 if (!audioMuseReady) Hint("Needs AudioMuse-AI, set up in Settings › Servers and services.")
                 OutlinedTextField(c.sound, { change(c.copy(sound = it)) }, label = { Text("The sound") }, placeholder = { Text("rainy jazz piano") }, modifier = Modifier.fillMaxWidth().testTag("pinnedSound"))
             } else {
@@ -172,7 +187,11 @@ fun CardEditorScreen(nav: NavController, id: String) {
 
             EditorHeading("Look on Home")
             // An album card's tiles are its albums, so it has no separate album row.
-            val looks = if (c.contents == CardContents.ALBUMS) CardLook.entries - CardLook.ALBUMS else CardLook.entries
+            val looks = when {
+                c.contents.fromBooks -> listOf(CardLook.COVER_ROWS)
+                c.contents == CardContents.ALBUMS -> CardLook.entries - CardLook.ALBUMS
+                else -> CardLook.entries
+            }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                 looks.forEach { look ->
                     FilterChip(
@@ -346,5 +365,7 @@ internal fun lookHint(look: CardLook, contents: CardContents): String = when {
     contents == CardContents.ALBUMS && look == CardLook.TILES -> "A row of the albums, to swipe through"
     contents == CardContents.ALBUMS && look == CardLook.LIST -> "The first five albums listed, the rest a tap away"
     contents == CardContents.ALBUMS && look == CardLook.BUTTON -> "A slim card that plays the albums in turn when tapped"
+    look == CardLook.COVER_ROWS && contents.fromBooks -> "Covers with the author or podcast, the title and how long beside them; tap a cover to carry on"
+    look == CardLook.COVER_ROWS && contents == CardContents.ALBUMS -> "Album covers with the artist, the album and its songs beside them, three to a column"
     else -> look.hint
 }

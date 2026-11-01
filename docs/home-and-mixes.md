@@ -127,7 +127,9 @@ Custom cards you make yourself (**Settings › Home › Cards › Custom cards**
 on a page of its own:
 
 - **Shows**: **Songs**, or whole **Albums**. Playing an album card plays its first albums in turn; its page lists
-  every album.
+  every album. With Audiobookshelf set up, also **Audiobooks**, **Podcast episodes** (the newest few of your
+  podcasts) or **Keep listening** (books and episodes you're partway through, the most recent first). These have no
+  rules, only an order (recently added, A to Z or random) and how many, and show as Cover rows.
 - **Comes from** (songs only): **From your library**, by rules, or **By sound**: describe a sound ("rainy jazz
   piano") and AudioMuse-AI finds songs that match (only with AudioMuse-AI).
 - **Rules**: each says what to keep or leave out, and the card keeps what matches **every rule** or **any rule**.
@@ -155,7 +157,23 @@ on a page of its own:
   added, most played (a song's own plays first), or A to Z; and **How many, at most** (up to 500).
 - **Look on Home**: **Song tiles** (a row of covers; for an album card, **Album tiles**), **Album row** (the albums
   the songs come from), **Banner** (one wide card with the first covers and Play and Shuffle), **Song list** (the
-  first five; for an album card, **Album list**) and **Play button** (a slim card: its ▶ plays it, the rest opens it).
+  first five; for an album card, **Album list**), **Play button** (a slim card: its ▶ plays it, the rest opens it) and
+  **Cover rows** (below).
+
+**Cover rows**: each row is a cover with three lines beside it, three rows to a column; swipe sideways for the next
+three, and tap the card's title for all of them.
+
+| Card holds | First line | Second line | Third line |
+|---|---|---|---|
+| Albums | the artist | the album | how many songs, the year |
+| Songs | the artist | the song | its album, its length |
+| Audiobooks | the author | the book | its length, the time left |
+| Podcast episodes | the podcast | the episode (with its number) | its length, the time left, or "new" |
+
+Tap a cover to play it or carry on where you stopped; tap it again to pause. Tap the rest of the row to open it.
+**⋮**, or press and hold the row, for more: Add to queue and Go to artist for an album; Play next, Add to queue and
+Go to album for a song; Play from the start for a book. Books and episodes you've started show how far you've got
+along the bottom of the cover. The one playing has a pause sign over its cover and a ♪ before its first line.
 
 A card made before rules keeps working: its genre, years, artist, album, words and favourites become rules the
 first time you change it. A random card's page has a button for a new set right away. Tap a card's title (or a play button card

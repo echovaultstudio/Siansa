@@ -167,8 +167,11 @@ class AudiobookshelfApi(private val http: OkHttpClient, private val settings: ()
     }
 
     /** Every progress the user has, by book id, in one call (the user's own record). */
-    suspend fun allProgress(): Map<String, BookProgress> =
-        latestProgress(call("/api/me").jsonObject.arr("mediaProgress").mapNotNull { p -> p.str("libraryItemId")?.let { parseProgress(p, it) } })
+    suspend fun allProgress(): Map<String, BookProgress> = latestProgress(progressList())
+
+    /** Every progress the user has, one per book and one per podcast episode (issue #782: each episode's own). */
+    suspend fun progressList(): List<BookProgress> =
+        call("/api/me").jsonObject.arr("mediaProgress").mapNotNull { p -> p.str("libraryItemId")?.let { parseProgress(p, it) } }
 
     /** Sets where the listener is in a book, as the server's record. */
     suspend fun setProgress(bookId: String, currentSec: Double, durationSec: Double, finished: Boolean? = null) {
