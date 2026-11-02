@@ -40,9 +40,11 @@ class DeckFilterTest {
         assertEquals(0.5, deck.process(0.5, 0), 0.0)
         // A target set from the fade: the filter moves there a step per buffer, so it can't click.
         deck.lowCutHz = DeckFilter.LOW_CUT_HZ
-        assertTrue(deck.prepare(48_000, 2))
         assertFalse(deck.idle)
-        var buffers = 1
+        // The first steps of the sweep are below 20 Hz, as good as off: nothing to apply yet.
+        repeat(3) { assertFalse(deck.prepare(48_000, 2)) }
+        assertTrue(deck.prepare(48_000, 2))
+        var buffers = 4
         while (deck.describe() != "low cut 200 Hz, bass +0 dB") {
             deck.prepare(48_000, 2)
             buffers++

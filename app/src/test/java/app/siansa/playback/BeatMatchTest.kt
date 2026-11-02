@@ -432,7 +432,7 @@ class BeatMatchTest {
         assertEquals(16, BeatMatch.barsFor(outro, intro, 16))  // 1.6 %: as set
         assertEquals(BeatMatch.BIG_SHIFT_BARS, BeatMatch.barsFor(outro, intro.copy(bpm = 121.0), 16))  // 5.8 %
         assertEquals(4, BeatMatch.barsFor(outro, intro.copy(bpm = 121.0), 4))  // never more than set
-        assertEquals(16, BeatMatch.barsFor(outro, pad, 16))  // nothing to match: no cap
+        assertEquals(16, BeatMatch.barsFor(outro, intro.copy(bpm = 110.0), 16))  // too far apart to match: no cap
         val next = song.copy(id = "b", albumId = "al2")
         val plan = Crossfade.plan(
             CrossfadeMode.SMART, 30_000, song, next, 310_000, 300_000,
