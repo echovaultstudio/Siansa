@@ -3,6 +3,12 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.50.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.50.1beta) — 2026-11-02
+
+- [#810](https://github.com/echovaultstudio/Siansa/pull/810) Swipe to remove from the queue goes left to right, behind a strip (@Th3K1ngP1n)
+- [#812](https://github.com/echovaultstudio/Siansa/pull/812) Emby and Jellyfin: album lists show a song's picture when the album has none of its own (@Th3K1ngP1n)
+- [#814](https://github.com/echovaultstudio/Siansa/pull/814) Beat-matched blends: judge the tail and the next song once positions are real; open-loop nudge (@Th3K1ngP1n)
+
 ## [0.50.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.50.0beta) — 2026-11-02
 
 - [#806](https://github.com/echovaultstudio/Siansa/pull/806) Take songs out of the queue: swipe left, Remove from queue, Remove songs up to here (@Th3K1ngP1n)
