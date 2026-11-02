@@ -407,4 +407,54 @@ class BeatMatchTest {
         // A jump that landed early can't make the delay negative.
         assertEquals(0L, BeatMatch.learnedLag(0, leadMs = 0, errorMs = 300))
     }
+
+    @Test fun aTempoReadAtHalfTimeIsCountedTheWayADjCounts() {
+        // Issue #807: drum and bass read at 87 BPM made "16 bars" a 44 s blend. Doubled into the DJ range, the
+        // beat and bar marks stay (every beat is on the doubled grid) and a phrase has twice the bars.
+        val dnb = BeatEnd(bpm = 87.0, beatMs = 85_000.0, barMs = 85_000.0, rhythm = 0.9f, steady = 0.8f, phraseMs = 85_000.0, phraseBars = 8)
+        val counted = dnb.inDjRange()
+        assertEquals(174.0, counted.bpm, 1e-9)
+        assertEquals(85_000.0, counted.beatMs, 0.0)
+        assertEquals(85_000.0, counted.barMs!!, 0.0)
+        assertEquals(16, counted.phraseBars)
+        assertEquals(0.9f, counted.rhythm)
+        // House read at 63 goes to 126; tempos already in the range are left alone; 200 stays (above would leave the range).
+        assertEquals(126.0, dnb.copy(bpm = 63.0).inDjRange().bpm, 1e-9)
+        assertEquals(128.0, outro.inDjRange().bpm, 1e-9)
+        assertEquals(198.0, dnb.copy(bpm = 99.0).inDjRange().bpm, 1e-9)
+        // A blend's bars are now real bars: 16 bars at 174 BPM is 22 s, not 44.
+        assertTrue(BeatMatch.maxMsFor(counted, 16) < 25_000)
+        assertTrue(BeatMatch.maxMsFor(dnb, 16) > 44_000)
+    }
+
+    @Test fun aBigShiftOfTempoGetsAShorterBlend() {
+        // Issue #807: 130 into 122 BPM (6 %) over 16 bars was heard as a change of tone for half a minute.
+        assertEquals(16, BeatMatch.barsFor(outro, intro, 16))  // 1.6 %: as set
+        assertEquals(BeatMatch.BIG_SHIFT_BARS, BeatMatch.barsFor(outro, intro.copy(bpm = 121.0), 16))  // 5.8 %
+        assertEquals(4, BeatMatch.barsFor(outro, intro.copy(bpm = 121.0), 4))  // never more than set
+        assertEquals(16, BeatMatch.barsFor(outro, intro.copy(bpm = 110.0), 16))  // too far apart to match: no cap
+        val next = song.copy(id = "b", albumId = "al2")
+        val plan = Crossfade.plan(
+            CrossfadeMode.SMART, 30_000, song, next, 310_000, 300_000,
+            profile("a", outro, null), profile("b", null, intro.copy(bpm = 121.0)), beatMatch = true, blendBars = 16,
+        )!!
+        assertEquals(8, plan.beat!!.bars)
+    }
+
+    @Test fun aTrackOfAContinuousMixIsNeverBeatMatched() {
+        // Issue #807: "(Mixed)" tracks already hold their neighbours blended in; a third song over that clashes.
+        assertTrue(Crossfade.continuousMix(song.copy(title = "Remind Me Why (Mixed)")))
+        assertTrue(Crossfade.continuousMix(song.copy(title = "Feeling Fades [Mixed]")))
+        assertTrue(Crossfade.continuousMix(song.copy(album = "Rezident Live at Anjunadeep Open Air London 2025 (DJ Mix)")))
+        assertTrue(Crossfade.continuousMix(song.copy(album = "In Search of Sunrise 17 (mixed by Markus Schulz)")))
+        assertFalse(Crossfade.continuousMix(song.copy(title = "Mixed Feelings", album = "Remixed")))
+        val mixed = song.copy(title = "Remind Me Why (Mixed)")
+        val next = song.copy(id = "b", albumId = "al2")
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 20_000, mixed, next, 310_000, 300_000, profile("a", outro, null), profile("b", null, intro), beatMatch = true)!!
+        assertNull(plan.beat)
+        assertEquals(BeatMatch.CLASH_MS, plan.overlapMs)  // two beats that aren't laid on each other: a short blend
+        assertTrue(plan.beatNote, plan.beatNote!!.contains("part of a continuous mix"))
+        // The same mix's next track runs straight on, gapless, as before.
+        assertNull(Crossfade.plan(CrossfadeMode.SMART, 20_000, mixed.copy(track = 3), mixed.copy(id = "c", track = 4), 310_000, 300_000, profile("a", outro, null), profile("c", null, intro), beatMatch = true))
+    }
 }

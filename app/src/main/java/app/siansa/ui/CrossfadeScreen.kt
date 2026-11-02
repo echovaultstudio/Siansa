@@ -125,11 +125,12 @@ fun CrossfadeScreen(nav: NavController) {
             }
             if (settings.crossfade == CrossfadeMode.SMART && settings.loudnessSource == LoudnessSource.PLUGIN) {
                 HorizontalDivider()
-                val blendSummary = if (settings.beatMatch == BeatMatchMode.OFF) "Off" else "${settings.beatMatch.label} · ${settings.blendBars} bars" + if (settings.echoTail) " · echo" else ""
+                val blendSummary = if (settings.beatMatch == BeatMatchMode.OFF) "Off" else "${settings.beatMatch.label} · ${settings.blendBars} bars" +
+                    (if (settings.bassSwap) " · bass swap" else "") + (if (settings.echoTail) " · echo" else "")
                 FoldSection("Beat-matched blends (experimental)", blendSummary, tag = "beat-matched-blends") {
                     BeatMatchSection(
-                        settings.beatMatch, settings.blendBars, settings.echoTail,
-                        graph.settings::setBeatMatch, graph.settings::setBlendBars, graph.settings::setEchoTail,
+                        settings.beatMatch, settings.blendBars, settings.echoTail, settings.bassSwap,
+                        graph.settings::setBeatMatch, graph.settings::setBlendBars, graph.settings::setEchoTail, graph.settings::setBassSwap,
                     )
                 }
             }
@@ -156,15 +157,17 @@ private fun crossfadeHint(s: AppSettings): String = when (s.crossfade) {
     }
 }
 
-/** The beat-matched blends' choice, its hint, and the echo at the end (issue #759), for the page and its screenshot. */
+/** The beat-matched blends' choice, its hint, the echo at the end (issue #759) and the bass swap (issue #807), for the page and its screenshot. */
 @Composable
 internal fun BeatMatchSection(
     mode: BeatMatchMode,
     bars: Int,
     echo: Boolean,
+    bassSwap: Boolean,
     onMode: (BeatMatchMode) -> Unit,
     onBars: (Int) -> Unit,
     onEcho: (Boolean) -> Unit,
+    onBassSwap: (Boolean) -> Unit,
 ) {
     BeatMatchRow(mode, onMode)
     Hint(beatMatchHint(mode))
@@ -176,6 +179,8 @@ internal fun BeatMatchSection(
             }
         }
         Hint("Apart from the crossfade length: 8 bars is about 15 seconds at 128 BPM. A blend never takes more than a third of a song.")
+        SwitchRow("Bass swap", bassSwap, onBassSwap)
+        Hint("Over the first half of a blend the old song's bass is taken away as the new song's comes in, as a DJ does with the EQ, so two kick drums never play at once.")
         SwitchRow("Echo at the end", echo, onEcho)
         Hint("Over the last bar of a blend the old song rings out in a hall, as a DJ echoes a track out, so the join is softer. Phones without the effect play the blend plain.")
     }

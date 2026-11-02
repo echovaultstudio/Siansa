@@ -57,6 +57,20 @@ data class BeatEnd(
      */
     val matchableAsIntro: Boolean get() = matchable || (bpm > 0 && steady >= BeatMatch.MIN_STEADY && barMs != null)
 
+    /**
+     * The same grid counted the way a DJ counts (issue #807): a tempo the plugin read at half time (drum and bass at
+     * 87, house at 63) is doubled, as often as it takes to reach [BeatMatch.DJ_RANGE_LOW]. The beat and bar marks
+     * stay (every beat is on the doubled grid, and the bar is the start of one of its bars); a phrase has twice the
+     * bars. Without this, "16 bars" of a track read at 87 BPM was a 44 s blend.
+     */
+    fun inDjRange(): BeatEnd {
+        var end = this
+        while (end.bpm > 0 && end.bpm < BeatMatch.DJ_RANGE_LOW && end.bpm * 2 <= BeatMatch.DJ_RANGE_HIGH) {
+            end = end.copy(bpm = end.bpm * 2, phraseBars = end.phraseBars?.let { it * 2 })
+        }
+        return end
+    }
+
     /** For the log (issue #744): "128.0 BPM, beat 0.82, steady 0.91, bars found". */
     fun describe(): String = "%.1f BPM, beat %.2f, steady %.2f, %s".format(
         java.util.Locale.ROOT, bpm, rhythm, steady,
@@ -185,7 +199,7 @@ object PluginProfiles {
             steady = (p.dbl("${prefix}_steady") ?: 0.0).toFloat().coerceIn(0f, 1f),
             phraseMs = p.dbl("${prefix}_phrase_ms")?.takeIf { it.isFinite() },
             phraseBars = p.dbl("${prefix}_phrase_bars")?.takeIf { it.isFinite() && it >= 1 }?.toInt(),
-        )
+        ).inDjRange()
     }
 
     fun parse(text: String): List<TrackProfile> =

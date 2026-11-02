@@ -64,7 +64,11 @@ class EqFilterBank(val design: EqDesign, val channels: Int) {
  * audio comes out as float, which the player then turns into 16-bit.
  */
 @OptIn(UnstableApi::class)
-class EqualiserProcessor(private val settings: () -> EqSettings) : BaseAudioProcessor() {
+class EqualiserProcessor(
+    /** The bass swap of a beat-matched blend (issue #807), after the equaliser; at rest it changes nothing. */
+    val deck: DeckFilter = DeckFilter(),
+    private val settings: () -> EqSettings,
+) : BaseAudioProcessor() {
     // The setting heard now (null = off, sound passes untouched) and its filters.
     private var applied: EqSettings? = null
     private var bank: EqFilterBank? = null
@@ -98,6 +102,7 @@ class EqualiserProcessor(private val settings: () -> EqSettings) : BaseAudioProc
         val filters = bank
         val limiter = limiter ?: PeakLimiter(format.sampleRate, channels, ceilingFor(format.encoding)).also { limiter = it }
         if (frame.size != channels) frame = DoubleArray(channels)
+        val swap = deck.prepare(format.sampleRate, channels)
         repeat(frames) {
             if (fadeLeft > 0) {
                 // Glide from the old sound to the new, so switching never jumps in level or clicks.
@@ -116,6 +121,7 @@ class EqualiserProcessor(private val settings: () -> EqSettings) : BaseAudioProc
                     frame[c] = filters?.process(x, c) ?: x
                 }
             }
+            if (swap) for (c in 0 until channels) frame[c] = deck.process(frame[c], c)
             limiter.process(frame)
             for (c in 0 until channels) write(output, frame[c])
         }
