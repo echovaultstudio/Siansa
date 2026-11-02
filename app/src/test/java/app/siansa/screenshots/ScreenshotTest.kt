@@ -286,7 +286,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             },
             // Beat-matched blends with the echo switch (issue #759).
             Scene("crossfade_beat_match") {
-                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP)) { BeatMatchSection(BeatMatchMode.DJ_RADIO, bars = 8, echo = true, onMode = {}, onBars = {}, onEcho = {}) }
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP)) { BeatMatchSection(BeatMatchMode.DJ_RADIO, bars = 8, echo = true, bassSwap = true, onMode = {}, onBars = {}, onEcho = {}, onBassSwap = {}) }
             },
             // Today's mix settings (issue #776): the switch and tuning chips, and a folded settings section with its
             // summary, then one opened (the arrow turned).

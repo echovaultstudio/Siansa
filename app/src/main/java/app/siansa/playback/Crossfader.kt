@@ -15,7 +15,6 @@ import app.siansa.data.AppSettings
 import app.siansa.data.Song
 import app.siansa.log.AppLog
 import kotlin.math.abs
-import kotlin.math.min
 import kotlin.math.max
 
 /**
@@ -45,9 +44,11 @@ import kotlin.math.max
 internal class Crossfader(
     private val main: ExoPlayer,
     private val handler: Handler,
-    private val newTail: () -> ExoPlayer,
+    private val newTail: () -> PlayerFactory.Built,
     private val settings: () -> AppSettings,
     private val profiles: ProfileStore,
+    /** The main player's bass swap (issue #807): the next song's low end held back and let in through a blend. */
+    private val mainDeck: DeckFilter,
     /** The levelling volume of a song (ReplayGain or measured), as the main player would play it. */
     private val levelOf: (Song) -> Float,
     private val sleepLevel: () -> Float,
@@ -67,6 +68,10 @@ internal class Crossfader(
 
     private var phase = Phase.IDLE
     private var tail: ExoPlayer? = null
+    /** The tail player's bass swap (issue #807): the old song's low end taken away through a blend. */
+    private var tailDeck: DeckFilter? = null
+    /** Keeps the silent tail in step before the fade (issue #807); it learns what a jump costs on this phone. */
+    private val tailSync = TailSync()
     private var outgoing: String? = null
     private var plan: FadePlan? = null
     private var startAt = 0L
@@ -81,7 +86,6 @@ internal class Crossfader(
     private var primed = false
     /** The fade is waiting for a tail that is still loading (logged once, issue #767). */
     private var waitingForTail = false
-    private var lastCoarseAlign = 0L
     /** A song whose fade was given up or isn't wanted, until the queue moves on or changes. */
     private var skipped: String? = null
     /** The main player's own speed before a beat-matched blend changed it. */
@@ -103,8 +107,6 @@ internal class Crossfader(
     private var switchedAt = 0L
     /** The blend got ready knew the next song's fade shape; without it, it's planned again when that arrives. */
     private var plannedWithNext = true
-    /** How often the silent tail jumped to catch up before this blend. */
-    private var tailJumps = 0
     /** After a beat-matched blend: the matched speed being eased back from, and since when. */
     private var easingFrom = 0f
     private var easingSince = 0L
@@ -227,7 +229,9 @@ internal class Crossfader(
         if (until <= ON_TIME_MS) {
             // A primed tail takes over only once it's in step, or a while later anyway (issue #759).
             val t = tail
-            val wait = min(Crossfade.HANDOVER_WAIT_MS, plan?.beat?.outgoing?.beatLengthMs?.toLong() ?: Crossfade.HANDOVER_WAIT_MS)
+            // A beat-matched blend may start up to a bar late rather than out of step (issue #807): a bar later is
+            // still on the grid, and the blend is one bar shorter.
+            val wait = plan?.beat?.outgoing?.let { (it.beatLengthMs * BeatMatch.BEATS_PER_BAR).toLong() } ?: Crossfade.HANDOVER_WAIT_MS
             // A tail still loading (it just jumped to catch up) gets a moment too, or the blend would be called off
             // and the next song come in with a cut (issue #767).
             if (t != null) {
@@ -259,34 +263,42 @@ internal class Crossfader(
         t.volume = 0f
         t.play()
         primed = true
+        tailSync.primed(SystemClock.elapsedRealtime())
         AppLog.d("Crossfade", "Tail playing silently from ${primeAt} ms, ${startAt - primeAt} ms before the fade")
     }
 
     /**
-     * Keeps the silent tail in step with the main player: far off (more than [COARSE_MS]), it jumps to just ahead
-     * of it; otherwise it plays a few percent faster or slower until they match ([tailSpeed]).
+     * Keeps the silent tail in step with the main player ([TailSync], issue #807): once its position is real, a
+     * jump or two to just ahead of the main player by what a jump costs on this phone, then a slight nudge of speed.
      */
     private fun align(mainSpeed: Float) {
         val t = tail ?: return
         if (!t.isPlaying) return
-        val behind = main.currentPosition - t.currentPosition
         val now = SystemClock.elapsedRealtime()
-        if (abs(behind) > COARSE_MS && now - lastCoarseAlign > 600) {
-            lastCoarseAlign = now
-            tailJumps++
-            t.seekTo(main.currentPosition + COARSE_LEAD_MS)
-            return
-        }
-        t.setPlaybackSpeed(mainSpeed * Crossfade.tailSpeed(behind))
-        // Twice a second, how the catch-up goes (issue #796: the tail was ~160 ms behind at three handovers).
-        if (abs(behind) > Crossfade.HANDOVER_STEP_MS && now - tailLoggedAt >= 500) {
-            tailLoggedAt = now
-            AppLog.d("Crossfade", "Tail catching up: $behind ms behind, playing at %.2f×".format(java.util.Locale.ROOT, t.playbackParameters.speed))
+        val position = main.currentPosition
+        when (val action = tailSync.step(now, position - t.currentPosition, position)) {
+            TailSync.Action.Wait -> if (t.playbackParameters.speed != mainSpeed) t.setPlaybackSpeed(mainSpeed)
+            is TailSync.Action.Jump -> {
+                AppLog.d("Crossfade", "Tail jumping to catch up (jump ${action.jumps}): to ${action.targetMs} ms, ${tailSync.learnedLead} ms ahead of the main player")
+                t.seekTo(action.targetMs)
+            }
+            is TailSync.Action.Speed -> {
+                val wanted = mainSpeed * action.factor
+                if (BeatMatch.worthChanging(t.playbackParameters.speed, wanted) || (action.factor == 1f && t.playbackParameters.speed != mainSpeed)) t.setPlaybackSpeed(wanted)
+                // Twice a second, how the catch-up goes (issue #796: the tail was ~160 ms behind at three handovers).
+                if (abs(action.behindMs) > Crossfade.HANDOVER_STEP_MS && now - tailLoggedAt >= 500) {
+                    tailLoggedAt = now
+                    AppLog.d("Crossfade", "Tail catching up: ${action.behindMs} ms behind, playing at %.3f×".format(java.util.Locale.ROOT, t.playbackParameters.speed))
+                }
+            }
         }
     }
 
     private fun arm(item: MediaItem, planned: FadePlan, at: Long, from: Long) {
-        val t = tail ?: newTail().also { tail = it }
+        val t = tail ?: newTail().let { built ->
+            tailDeck = built.deck
+            built.player
+        }.also { tail = it }
         t.volume = 0f
         t.playWhenReady = false
         t.setMediaItem(item, from)
@@ -296,7 +308,6 @@ internal class Crossfader(
         startAt = at
         primeAt = from
         primed = false
-        tailJumps = 0
         phase = Phase.READY
         val length = main.duration.takeIf { it > 0 }
         val where = length?.let { " · starts at ${clock(at)} of ${clock(it)}" }.orEmpty()
@@ -315,11 +326,19 @@ internal class Crossfader(
 
     private fun releaseTail() {
         closeEcho()
+        resetDecks()
         tail?.let { t ->
             runCatching { t.stop() }
             t.release()
         }
         tail = null
+        tailDeck = null
+    }
+
+    /** Both decks' bass back as it was (issue #807). */
+    private fun resetDecks() {
+        mainDeck.reset()
+        tailDeck?.reset()
     }
 
     // ---- The fade ----
@@ -366,8 +385,9 @@ internal class Crossfader(
         val drift = t.currentPosition - main.currentPosition
         // Out of step at the handover, the two copies blend apart for a moment, heard as a smear or a wobble
         // (issue #796): what the tail was doing, to see next time why it didn't catch up.
+        val tailJumps = tailSync.jumpsMade
         val catchUp = if (wasPrimed && abs(drift) > Crossfade.HANDOVER_STEP_MS) {
-            " · not caught up: playing at %.2f×, %d jump%s, %s".format(
+            " · not caught up: playing at %.3f×, %d jump%s, %s".format(
                 java.util.Locale.ROOT, t.playbackParameters.speed, tailJumps, if (tailJumps == 1) "" else "s",
                 if (t.playbackState == Player.STATE_BUFFERING) "loading" else "ready",
             )
@@ -411,6 +431,12 @@ internal class Crossfader(
                     expectSeek = true
                     val beat = planned.beat
                     if (beat != null) {
+                        // The bass swap (issue #807) starts with the next song's low end held back; it comes in as
+                        // the old song's goes, over the first half of the blend.
+                        if (settings().bassSwap) {
+                            mainDeck.shelfDb = DeckFilter.SHELF_START_DB
+                            AppLog.d("Crossfade", "Bass swap over the first ${SWAP_FRACTION_PERCENT} % of the blend: next song's bass held back ${-DeckFilter.SHELF_START_DB.toInt()} dB, old song's cut up to ${DeckFilter.LOW_CUT_HZ.toInt()} Hz")
+                        }
                         // The new song comes in at the matched speed, where it should be right now against the old
                         // song's beats (the old song's position is the tail's).
                         main.setPlaybackSpeed(baseSpeed * beat.speed)
@@ -434,6 +460,7 @@ internal class Crossfader(
                 t.volume = if (tailDone) 0f else tailBase * sleep * Crossfade.fadeOut(out)
                 val beat = planned.beat
                 if (beat != null && reverb != null) echo(t, planned, beat, tailDone, tailBase * sleep)
+                if (beat != null && settings().bassSwap) swapBass(out)
                 val heard = if (main.currentMediaItemIndex == incomingIndex) (main.currentPosition - (beat?.incomingStartMs ?: 0L)).coerceAtLeast(0L) else 0L
                 val fadedIn = (heard.toFloat() / planned.fadeInMs).coerceIn(0f, 1f)
                 level = Crossfade.fadeIn(fadedIn)
@@ -482,26 +509,39 @@ internal class Crossfader(
             seekLag = BeatMatch.learnedLag(seekLag, lead, error)
             seekLead = null
         }
-        // A jump is a cut in the sound: only while the new song is still quiet, early in the blend. After that
-        // the speed brings it in step, which can't be heard.
-        val early = now - switchedAt < JUMP_WINDOW_MS && jumps < MAX_JUMPS
+        // A jump is a cut in the sound: only while the new song is still quiet, early in the blend, and once at
+        // most (issue #807: a second jump was always chasing a reading that wasn't real). After that the speed
+        // brings it in step, which can't be heard. A stall (the song held up loading, well behind) is the one
+        // thing worth a second jump, and says nothing about what a jump costs.
+        val stalled = error < -BeatMatch.STALL_MS
+        val early = now - switchedAt < JUMP_WINDOW_MS && jumps < (if (stalled) MAX_JUMPS_STALLED else MAX_JUMPS)
         if (abs(error) > BeatMatch.JUMP_MS && early && main.isCurrentMediaItemSeekable) {
             jumps++
             switchedAt = now
             smoothed = BeatMatch.SmoothedError()
             val lead = seekLag
-            seekLead = lead
+            seekLead = if (stalled) null else lead
             // Our own jump, not the listener moving in the song: the blend carries on (issue #747).
             expectSeek = true
             val target = beat.incomingAt(t.currentPosition) + lead
             seekTarget = target
-            AppLog.d("Crossfade", "Beat-matching: the next song is ${if (error > 0) "+" else ""}$error ms out of step; jumping to $target ms (jump $jumps)")
+            AppLog.d("Crossfade", "Beat-matching: the next song is ${if (error > 0) "+" else ""}$error ms out of step${if (stalled) " (it stalled)" else ""}; jumping to $target ms (jump $jumps)")
             main.seekTo(incomingIndex, target)
             return
         }
         // Only a change worth hearing is sent: re-tuning the time-stretcher every 50 ms is heard as a flutter (#773).
         val wanted = baseSpeed * beat.speed * BeatMatch.nudge(error)
         if (BeatMatch.worthChanging(main.playbackParameters.speed, wanted)) main.setPlaybackSpeed(wanted)
+    }
+
+    /**
+     * The bass swap [out] of the way through the blend (issue #807): over its first [SWAP_FRACTION], the old
+     * song's low end is cut away (a high-pass sweeping up) while the next song's is let in (a shelf rising).
+     */
+    private fun swapBass(out: Float) {
+        val t = (out / SWAP_FRACTION).toDouble()
+        tailDeck?.lowCutHz = DeckFilter.lowCutAt(t)
+        mainDeck.shelfDb = DeckFilter.shelfAt(t)
     }
 
     /** The hall for the echo, on the output mix, with the tail sent to it at nothing yet (issue #759). */
@@ -686,7 +726,7 @@ internal class Crossfader(
         /** How often to look while a song plays. */
         const val LOOK_MS = 1_000L
         /** The tail is made ready this long before the longest possible fade. */
-        const val PREPARE_MS = 8_000L
+        const val PREPARE_MS = 10_000L
         /** A fade needs at least this long to get ready, or that song plays on without one. */
         const val MIN_PREPARE_MS = 1_500L
         /** Starting this close to the planned moment is on time. */
@@ -694,23 +734,26 @@ internal class Crossfader(
         /** The blend as the tail takes the song over from the main player: short, as two copies a few ms apart
          *  sound like one through a comb while both play (issue #759). */
         const val HANDOVER_MS = 60L
-        /** The tail starts playing, silent, this long before the fade, to be sounding and in step by then. */
-        const val PREROLL_MS = 3_000L
+        /** The tail starts playing, silent, this long before the fade, to be sounding and in step by then: its
+         *  position takes a moment to be real, and each jump another (issue #807, [TailSync.SETTLE_MS]). */
+        const val PREROLL_MS = 8_000L
         /** While the tail plays silently, how often its step is checked. */
         const val ALIGN_MS = 50L
-        /** Further apart than this, the tail jumps to the main player rather than catching up by speed. */
-        const val COARSE_MS = 250L
-        /** How far ahead of the main player the tail jumps, as it takes a moment to start again. */
-        const val COARSE_LEAD_MS = 100L
         /** Volume steps during a fade: 50 a second. */
         const val TICK_MS = 20L
         /** How long after the old song has faded out to wait for the new one to start fading in. */
         const val GIVE_UP_MS = 10_000L
-        /** After a seek in a beat-matched blend, how long before the new song's position is trusted. */
-        const val SETTLE_MS = 250L
-        /** How often the new song may be jumped into step in one blend, and only this soon after it came in. */
-        const val MAX_JUMPS = 2
-        const val JUMP_WINDOW_MS = 1_500L
+        /** After a seek in a beat-matched blend, how long before the new song's position is trusted (issue #807:
+         *  for most of a second a track just started reports where its buffer is, not what's heard). */
+        const val SETTLE_MS = 800L
+        /** How often the new song may be jumped into step in one blend (once more after a stall), and only this
+         *  soon after it came in. */
+        const val MAX_JUMPS = 1
+        const val MAX_JUMPS_STALLED = 2
+        const val JUMP_WINDOW_MS = 3_000L
+        /** The bass swap (issue #807) runs over this much of the blend from its start. */
+        const val SWAP_FRACTION = 0.5f
+        const val SWAP_FRACTION_PERCENT = 50
         /** How often the speed moves while easing back after a beat-matched blend. */
         const val EASE_TICK_MS = 200L
         /** The echo at the end (issue #759): how much of the tail goes to the hall by the end of its last bar, and

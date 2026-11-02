@@ -113,9 +113,10 @@ class PlaybackService : MediaSessionService() {
         crossfader = Crossfader(
             main = exo,
             handler = handler,
-            newTail = { PlayerFactory.build(this, graph, ::kbpsFor, handleAudioFocus = false).player },
+            newTail = { PlayerFactory.build(this, graph, ::kbpsFor, handleAudioFocus = false) },
             settings = { graph.settings.current },
             profiles = graph.profiles,
+            mainDeck = built.deck,
             levelOf = { song -> Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id)) },
             sleepLevel = { sleepLevel },
             allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true },

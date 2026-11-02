@@ -192,7 +192,7 @@ class SpacingSettingsTest : SpacingCheck() {
         compose.setContent {
             SiansaTheme {
                 Column(verticalArrangement = Arrangement.spacedBy(app.siansa.ui.CROSSFADE_GAP)) {
-                    app.siansa.ui.BeatMatchSection(app.siansa.playback.BeatMatchMode.DJ_RADIO, 8, true, { }, { }, { })
+                    app.siansa.ui.BeatMatchSection(app.siansa.playback.BeatMatchMode.DJ_RADIO, 8, true, true, { }, { }, { }, { })
                 }
             }
         }

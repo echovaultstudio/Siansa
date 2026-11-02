@@ -32,6 +32,13 @@ object BeatMatch {
     const val MIN_STEADY = 0.5f
     /** A song is played at most this much faster or slower to match (DJ decks go to ±8 %). */
     const val MAX_SHIFT = 0.08
+    /** A shift past this is heard as a change of tone over a long blend (issue #807): the blend is kept to
+     *  [BIG_SHIFT_BARS] bars, so the song is back at its own speed sooner. */
+    const val BIG_SHIFT = 0.04
+    const val BIG_SHIFT_BARS = 8
+    /** The tempos a DJ counts in (issue #807): a grid read at half time is doubled into this range ([BeatEnd.inDjRange]). */
+    const val DJ_RANGE_LOW = 100.0
+    const val DJ_RANGE_HIGH = 200.0
     /** Two rhythmic ends that can't be matched blend over this, so their beats clash only for a moment. */
     const val CLASH_MS = 1_500L
     const val BEATS_PER_BAR = 4
@@ -46,10 +53,18 @@ object BeatMatch {
      */
     fun maxMsFor(outgoing: BeatEnd, bars: Int): Long =
         (outgoing.beatLengthMs * ((bars + 1) * BEATS_PER_BAR - 0.5)).toLong()
+
+    /** The bars a blend from [outgoing] into [incoming] may have within [blendBars]: fewer for a big shift of tempo. */
+    fun barsFor(outgoing: BeatEnd, incoming: BeatEnd, blendBars: Int): Int {
+        val shift = speed(outgoing, incoming)?.let { abs(it - 1.0) } ?: return blendBars
+        return if (shift > BIG_SHIFT) minOf(blendBars, BIG_SHIFT_BARS) else blendBars
+    }
     /** Closer than this, the two songs count as in step. */
     const val IN_STEP_MS = 12L
     /** Further apart than this, the next song jumps into step rather than catching up by speed. */
     const val JUMP_MS = 150L
+    /** This far behind, the next song stalled loading (issue #807): worth a jump even after the one allowed. */
+    const val STALL_MS = 400L
     /** How many step readings go into the smoothed error (at 20 ms ticks, a tenth of a second). */
     const val STEP_READINGS = 5
     /** After the blend, the next song eases back to its own speed over this long. */

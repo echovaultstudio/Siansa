@@ -204,6 +204,8 @@ data class AppSettings(
     val beatMatch: BeatMatchMode = BeatMatchMode.DJ_RADIO,
     /** The old song rings out in a hall over the last bar of a beat-matched blend (issue #759). */
     val echoTail: Boolean = true,
+    /** The bass swaps from the old song to the new over the first half of a beat-matched blend (issue #807). */
+    val bassSwap: Boolean = true,
     /** How many bars a beat-matched blend aims at, apart from the crossfade length (issue #759). */
     val blendBars: Int = DEFAULT_BLEND_BARS,
     /** The shape of a DJ mix (issue #649): what the energy does over the next songs. */
@@ -442,6 +444,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         crossfadeSeconds = prefs.getInt("crossfade_s", AppSettings.DEFAULT_CROSSFADE_SECONDS).coerceIn(AppSettings.CROSSFADE_SECONDS),
         beatMatch = BeatMatchMode.parse(prefs.getString("beat_match", null)),
         echoTail = prefs.getBoolean("echo_tail", true),
+        bassSwap = prefs.getBoolean("bass_swap", true),
         blendBars = prefs.getInt("blend_bars", AppSettings.DEFAULT_BLEND_BARS)
             .takeIf { it in AppSettings.BLEND_BAR_CHOICES } ?: AppSettings.DEFAULT_BLEND_BARS,
         mixShape = MixShape.parse(prefs.getString("mix_shape", null)),
@@ -720,6 +723,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setEchoTail(on: Boolean) {
         prefs.edit().putBoolean("echo_tail", on).apply()
         _state.value = _state.value.copy(echoTail = on)
+    }
+
+    fun setBassSwap(on: Boolean) {
+        prefs.edit().putBoolean("bass_swap", on).apply()
+        _state.value = _state.value.copy(bassSwap = on)
     }
 
     /** The shape and surprise of a DJ mix (issue #649). */

@@ -84,7 +84,8 @@ blend them the way a DJ mixes:
   end together. Without phrases, the blend starts on a bar of the song going out, the next song starts on its first
   downbeat, and the blend is the Blend length in whole bars. Either way the next song plays a touch faster or slower (up
   to 8 %, pitch kept) so its beats keep time with the old song's, then eases back to its own speed over about 25
-  seconds, in small steps too slight to hear.
+  seconds, in small steps too slight to hear. A shift of more than 4 % is kept to 8 bars, however long the Blend
+  length, so the song is back at its own speed sooner.
 - **Everywhere**: the same in every smart crossfade.
 - **Off**: fades don't follow the beat.
 
@@ -98,8 +99,17 @@ is about 15 seconds at 128 BPM, 16 bars about 30. A blend starts on a bar, so it
 longer, and it never takes more than a third of a song: into a short song it's laid over fewer bars, still beat
 on beat.
 
+**Bass swap** (on by default): over the first half of a blend the old song's bass is taken away (a filter sweeping
+up to about 200 Hz) while the new song's, held back at first, is let in, as a DJ does with the EQ: two kick drums
+never play at once, so a blend a few ms out of step is heard as a mix, not a flam.
+
 **Echo at the end** (on by default): over the last bar of a blend the old song rings out in a hall, as a DJ
 echoes a track out, so the join is softer. A phone whose reverb can't be opened plays the blend plain.
+
+Tempos are counted the way a DJ counts: a beat the plugin read at half time (drum and bass at 87, house at 63)
+is doubled, so a blend's bars are real bars. Tracks of a continuous mix ("(Mixed)", "[Mixed]", a "DJ Mix" or
+"Mixed by" album) already hold the neighbouring tracks blended in, so they're never beat-matched: into and out of
+one the blend is short, and within its album the tracks run straight on, gapless.
 
 A quiet build-up that
 keeps a steady beat with clear bars is laid on the old song's beats too, so when its drums come in they're in
@@ -107,7 +117,10 @@ step.
 
 It's experimental: downbeats are the hardest thing to hear in a recording, so when either song's bars aren't clear
 the songs are laid beat on beat instead, and a mix can land a beat off. The log says how each blend was planned and
-how far the next song was out of step. Songs the plugin measured before it measured beats keep their loudness and
+how far the next song was out of step. Behind the scenes, a second copy of the song going out plays silently for
+the last 8 seconds before a blend and is brought in step with the one you hear (a jump or two, then a slight nudge
+of speed), so it can take the song over without a hitch; a blend may start up to a bar late rather than out of
+step. Songs the plugin measured before it measured beats keep their loudness and
 fades and get their beats when the plugin measures them again: see the **Beat grids** section on the plugin's settings page
 ([AudioMuse-AI](audiomuse.md)).
 

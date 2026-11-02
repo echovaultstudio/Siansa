@@ -25,7 +25,7 @@ import app.siansa.log.AppLog
  */
 @OptIn(UnstableApi::class)
 object PlayerFactory {
-    class Built(val player: ExoPlayer, val cacheFactory: CacheDataSource.Factory)
+    class Built(val player: ExoPlayer, val cacheFactory: CacheDataSource.Factory, /** The player's bass swap (issue #807). */ val deck: DeckFilter)
 
     /** [kbpsFor] picks, per song id, Opus kbit/s or 0 for the original file. */
     fun build(context: Context, graph: AppGraph, kbpsFor: (String) -> Int, handleAudioFocus: Boolean = true): Built {
@@ -94,6 +94,6 @@ object PlayerFactory {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
-        return Built(player, cacheFactory)
+        return Built(player, cacheFactory, equaliser.deck)
     }
 }
