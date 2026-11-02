@@ -117,6 +117,7 @@ class PlaybackService : MediaSessionService() {
             settings = { graph.settings.current },
             profiles = graph.profiles,
             mainDeck = built.deck,
+            mainTap = built.tap,
             levelOf = { song -> Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id)) },
             sleepLevel = { sleepLevel },
             allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true },

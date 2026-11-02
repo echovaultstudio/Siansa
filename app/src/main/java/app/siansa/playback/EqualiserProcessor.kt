@@ -67,6 +67,8 @@ class EqFilterBank(val design: EqDesign, val channels: Int) {
 class EqualiserProcessor(
     /** The bass swap of a beat-matched blend (issue #807), after the equaliser; at rest it changes nothing. */
     val deck: DeckFilter = DeckFilter(),
+    /** Listens to the sound, so a crossfade's silent tail can be lined up by it (issue #818). */
+    val tap: SoundTap = SoundTap(),
     private val settings: () -> EqSettings,
 ) : BaseAudioProcessor() {
     // The setting heard now (null = off, sound passes untouched) and its filters.
@@ -96,13 +98,23 @@ class EqualiserProcessor(
         val channels = format.channelCount
         val inBytes = Util.getPcmFrameSize(format.encoding, channels)
         val outBytes = Util.getPcmFrameSize(outputAudioFormat.encoding, channels)
-        val frames = inputBuffer.remaining() / inBytes
-        val output = replaceOutputBuffer(frames * outBytes)
+        val arrived = inputBuffer.remaining() / inBytes
+        tap.begin(format.sampleRate, channels, System.nanoTime())
+        // Lining the silent tail up (issue #818): frames swallowed (it was behind) or silence put in first (ahead).
+        val dropped = tap.takeDrop(arrived)
+        if (dropped > 0) inputBuffer.position(inputBuffer.position() + dropped * inBytes)
+        val inserted = tap.takeInsert()
+        val frames = arrived - dropped
+        val output = replaceOutputBuffer((frames + inserted) * outBytes)
         follow(format)
         val filters = bank
         val limiter = limiter ?: PeakLimiter(format.sampleRate, channels, ceilingFor(format.encoding)).also { limiter = it }
         if (frame.size != channels) frame = DoubleArray(channels)
         val swap = deck.prepare(format.sampleRate, channels)
+        repeat(inserted) {
+            tap.add(0f)
+            for (c in 0 until channels) write(output, 0.0)
+        }
         repeat(frames) {
             if (fadeLeft > 0) {
                 // Glide from the old sound to the new, so switching never jumps in level or clicks.
@@ -121,6 +133,9 @@ class EqualiserProcessor(
                     frame[c] = filters?.process(x, c) ?: x
                 }
             }
+            var sum = 0f
+            for (c in 0 until channels) sum += frame[c].toFloat()
+            tap.add(sum)
             if (swap) for (c in 0 until channels) frame[c] = deck.process(frame[c], c)
             limiter.process(frame)
             for (c in 0 until channels) write(output, frame[c])
@@ -228,11 +243,13 @@ class EqualiserProcessor(
     override fun onFlush(streamMetadata: AudioProcessor.StreamMetadata) {
         reportSong()
         clear()
+        tap.flush()
     }
 
     override fun onReset() {
         reportSong()
         clear()
+        tap.flush()
         framesSinceReport = 0
     }
 

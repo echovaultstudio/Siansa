@@ -49,6 +49,8 @@ internal class Crossfader(
     private val profiles: ProfileStore,
     /** The main player's bass swap (issue #807): the next song's low end held back and let in through a blend. */
     private val mainDeck: DeckFilter,
+    /** The main player's sound (issue #818): what the silent tail is lined up with. */
+    private val mainTap: SoundTap,
     /** The levelling volume of a song (ReplayGain or measured), as the main player would play it. */
     private val levelOf: (Song) -> Float,
     private val sleepLevel: () -> Float,
@@ -70,8 +72,22 @@ internal class Crossfader(
     private var tail: ExoPlayer? = null
     /** The tail player's bass swap (issue #807): the old song's low end taken away through a blend. */
     private var tailDeck: DeckFilter? = null
-    /** Keeps the silent tail in step before the fade (issue #807); it learns what a jump costs on this phone. */
+    /** The tail player's sound (issue #818), matched against the main player's to line the tail up. */
+    private var tailTap: SoundTap? = null
+    /** Keeps the silent tail in step before the fade by positions (issue #807), when its sound can't be matched. */
     private val tailSync = TailSync()
+    /**
+     * Lining the tail up by its sound (issue #818): whether that's in use for this fade (else positions), the step
+     * last measured by sound (ms behind; null until measured or after a correction), when to measure next, how
+     * often a match failed and how often the tail was corrected, and whether a measurement is being worked out.
+     */
+    private var bySound = true
+    private var soundStep: Long? = null
+    private var measureAt = 0L
+    private var soundMisses = 0
+    private var corrections = 0
+    private var measuring = false
+    private val worker = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "siansa-align").apply { isDaemon = true } }
     private var outgoing: String? = null
     private var plan: FadePlan? = null
     private var startAt = 0L
@@ -135,6 +151,7 @@ internal class Crossfader(
         stopEasing()
         main.removeListener(this)
         releaseTail()
+        worker.shutdownNow()
         phase = Phase.IDLE
     }
 
@@ -224,7 +241,9 @@ internal class Crossfader(
         val speed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
         // A beat-matched blend lands the new song on the bar: its tail must be in step, so it's primed early.
         if (!primed && position >= primeAt - ON_TIME_MS) prime()
-        if (primed) align(speed)
+        if (primed) {
+            if (bySound) alignBySound() else align(speed)
+        }
         val until = ((startAt - position) / speed).toLong()
         if (until <= ON_TIME_MS) {
             // A primed tail takes over only once it's in step, or a while later anyway (issue #759).
@@ -236,7 +255,9 @@ internal class Crossfader(
             // and the next song come in with a cut (issue #767).
             if (t != null) {
                 val loading = t.playbackState == Player.STATE_BUFFERING
-                if (Crossfade.waitForTail(primed, loading, t.isPlaying, until, main.currentPosition - t.currentPosition, wait)) {
+                // By sound, the step is what was last measured; not yet measured counts as out of step.
+                val step = if (bySound) soundStep ?: UNKNOWN_STEP_MS else main.currentPosition - t.currentPosition
+                if (Crossfade.waitForTail(primed, loading, t.isPlaying, until, step, wait)) {
                     if (loading && !waitingForTail) {
                         waitingForTail = true
                         AppLog.d("Crossfade", "Waiting for the tail to load (it jumped to catch up)")
@@ -263,8 +284,72 @@ internal class Crossfader(
         t.volume = 0f
         t.play()
         primed = true
-        tailSync.primed(SystemClock.elapsedRealtime())
+        val now = SystemClock.elapsedRealtime()
+        tailSync.primed(now)
+        bySound = true
+        soundStep = null
+        soundMisses = 0
+        corrections = 0
+        measureAt = now + FILL_MS
         AppLog.d("Crossfade", "Tail playing silently from ${primeAt} ms, ${startAt - primeAt} ms before the fade")
+    }
+
+    /**
+     * Lines the silent tail up by its sound (issue #818, [SoundAlign]): once both players' output buffers have
+     * filled, the tail's last stretch of sound is looked for in the main player's, and the tail swallows or puts in
+     * as many frames as it's behind or ahead. Measured again once that has gone out; in step, checked now and
+     * then. When the sound can't be matched (a quiet passage) the positions take over ([align]).
+     */
+    private fun alignBySound() {
+        val t = tail ?: return
+        val tap = tailTap ?: return
+        val now = SystemClock.elapsedRealtime()
+        if (measuring || now < measureAt || !t.isPlaying || tap.pending) return
+        val reference = mainTap.snapshot() ?: return
+        val follower = tap.snapshot() ?: return
+        val expected = main.currentPosition - t.currentPosition
+        val nanos = System.nanoTime()
+        measuring = true
+        worker.execute {
+            val match = runCatching { SoundAlign.match(reference, follower, nanos, expected, SoundAlign.RANGE_MS) }.getOrNull()
+            handler.post { measured(t, tap, match, expected) }
+        }
+    }
+
+    private fun measured(t: ExoPlayer, tap: SoundTap, match: SoundAlign.Match?, positionsSaid: Long) {
+        measuring = false
+        if (phase != Phase.READY || tail !== t || !primed) return
+        val now = SystemClock.elapsedRealtime()
+        if (match == null || !match.sure) {
+            soundMisses++
+            val why = match?.toString() ?: "nothing to match"
+            if (soundMisses >= MAX_SOUND_MISSES) {
+                bySound = false
+                tailSync.primed(now)
+                AppLog.i("Crossfade", "The tail's sound can't be matched ($why): keeping it in step by positions instead")
+            } else {
+                measureAt = now + RETRY_MS
+                AppLog.d("Crossfade", "The tail's sound wasn't matched yet ($why); trying again")
+            }
+            return
+        }
+        val behind = match.behindMs
+        if (abs(behind) <= SoundAlign.IN_STEP_MS || corrections >= MAX_CORRECTIONS) {
+            soundStep = behind
+            measureAt = now + CHECK_MS
+            AppLog.d("Crossfade", "Tail in step by its sound: $match (positions say ${if (positionsSaid >= 0) "+" else ""}$positionsSaid ms)" +
+                if (abs(behind) > SoundAlign.IN_STEP_MS) " · left as is after $corrections corrections" else "")
+            return
+        }
+        corrections++
+        soundStep = null
+        tap.correct(match.behindFrames)
+        measureAt = now + SETTLE_SOUND_MS
+        AppLog.d(
+            "Crossfade",
+            "Tail lined up by its sound (correction $corrections): it was $match, positions said ${if (positionsSaid >= 0) "+" else ""}$positionsSaid ms; " +
+                if (behind > 0) "swallowing ${match.behindFrames} frames" else "putting in ${-match.behindFrames} frames of silence",
+        )
     }
 
     /**
@@ -297,6 +382,7 @@ internal class Crossfader(
     private fun arm(item: MediaItem, planned: FadePlan, at: Long, from: Long) {
         val t = tail ?: newTail().let { built ->
             tailDeck = built.deck
+            tailTap = built.tap.also { it.keep(TAIL_KEEP_SECONDS) }
             built.player
         }.also { tail = it }
         t.volume = 0f
@@ -333,6 +419,7 @@ internal class Crossfader(
         }
         tail = null
         tailDeck = null
+        tailTap = null
     }
 
     /** Both decks' bass back as it was (issue #807). */
@@ -383,10 +470,11 @@ internal class Crossfader(
         if (planned.beat != null && settings().echoTail) openEcho(t)
         val wasPrimed = primed && t.isPlaying
         val drift = t.currentPosition - main.currentPosition
+        val sound = soundStep?.let { -it }  // behind is negative drift
         // Out of step at the handover, the two copies blend apart for a moment, heard as a smear or a wobble
         // (issue #796): what the tail was doing, to see next time why it didn't catch up.
         val tailJumps = tailSync.jumpsMade
-        val catchUp = if (wasPrimed && abs(drift) > Crossfade.HANDOVER_STEP_MS) {
+        val catchUp = if (wasPrimed && !bySound && abs(drift) > Crossfade.HANDOVER_STEP_MS) {
             " · not caught up: playing at %.3f×, %d jump%s, %s".format(
                 java.util.Locale.ROOT, t.playbackParameters.speed, tailJumps, if (tailJumps == 1) "" else "s",
                 if (t.playbackState == Player.STATE_BUFFERING) "loading" else "ready",
@@ -398,7 +486,12 @@ internal class Crossfader(
         AppLog.i(
             "Crossfade",
             "Fading ${item.mediaId} into ${main.getMediaItemAt(nextIndex).mediaId}: ${planned.why} · " +
-                if (wasPrimed) "tail in step (${if (drift >= 0) "+" else ""}$drift ms)$catchUp" else "tail started now (not primed in time)",
+                when {
+                    !wasPrimed -> "tail started now (not primed in time)"
+                    bySound && sound != null -> "tail in step by its sound (${if (sound >= 0) "+" else ""}$sound ms; positions say ${if (drift >= 0) "+" else ""}$drift ms, $corrections correction${if (corrections == 1) "" else "s"})"
+                    bySound -> "tail not yet matched by its sound (positions say ${if (drift >= 0) "+" else ""}$drift ms, $corrections correction${if (corrections == 1) "" else "s"})"
+                    else -> "tail in step (${if (drift >= 0) "+" else ""}$drift ms)$catchUp"
+                },
         )
         handler.post(fadeTick)
     }
@@ -749,6 +842,20 @@ internal class Crossfader(
         /** The tail starts playing, silent, this long before the fade, to be sounding and in step by then: its
          *  position takes a while to be real, and each jump and nudge another (issues #807, #813, [TailSync.SETTLE_MS]). */
         const val PREROLL_MS = 14_000L
+        /** Lining the tail up by its sound (issue #818): how long after it starts both output buffers are full and
+         *  the buffer moments say where the output stands; how long a correction takes to go out (the output buffer,
+         *  up to 750 ms, then a new window of sound); how soon to try again after no match; how often to check once
+         *  in step; how many misses before positions take over; how many corrections at most. */
+        const val FILL_MS = 1_500L
+        const val SETTLE_SOUND_MS = 1_300L
+        const val RETRY_MS = 700L
+        const val CHECK_MS = 4_000L
+        const val MAX_SOUND_MISSES = 3
+        const val MAX_CORRECTIONS = 4
+        /** Not yet measured by sound counts as this far out of step: the handover waits for it (up to a bar). */
+        const val UNKNOWN_STEP_MS = 999L
+        /** How much sound the tail keeps (its window is 300 ms); the main player keeps [SoundTap]'s default. */
+        const val TAIL_KEEP_SECONDS = 1
         /** While the tail plays silently, how often its step is checked. */
         const val ALIGN_MS = 50L
         /** Volume steps during a fade: 50 a second. */

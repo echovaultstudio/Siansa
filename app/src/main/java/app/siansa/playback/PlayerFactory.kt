@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.PlaybackParameters
+import androidx.media3.common.audio.AudioProcessor
+import androidx.media3.common.audio.AudioProcessorChain
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.ResolvingDataSource
@@ -20,12 +23,34 @@ import app.siansa.AppGraph
 import app.siansa.log.AppLog
 
 /**
+ * The player's audio processors (the equaliser, Media3's silence skipping and speed change), with the position
+ * told about frames the tail swallowed or silence put in to line it up (issue #818): media time that went by
+ * without being heard.
+ */
+@OptIn(UnstableApi::class)
+class DeckProcessorChain(private val equaliser: EqualiserProcessor) : AudioProcessorChain {
+    private val inner = DefaultAudioSink.DefaultAudioProcessorChain(equaliser)
+    override fun getAudioProcessors(): Array<AudioProcessor> = inner.audioProcessors
+    override fun applyPlaybackParameters(playbackParameters: PlaybackParameters): PlaybackParameters = inner.applyPlaybackParameters(playbackParameters)
+    override fun applySkipSilenceEnabled(skipSilenceEnabled: Boolean): Boolean = inner.applySkipSilenceEnabled(skipSilenceEnabled)
+    override fun getMediaDuration(playoutDuration: Long): Long = inner.getMediaDuration(playoutDuration) + equaliser.tap.mediaAdjustUs()
+    override fun getSkippedOutputFrameCount(): Long = inner.skippedOutputFrameCount
+}
+
+/**
  * Builds the player exactly as the app uses it, so the playback service and the automated tests run
  * the same streaming setup.
  */
 @OptIn(UnstableApi::class)
 object PlayerFactory {
-    class Built(val player: ExoPlayer, val cacheFactory: CacheDataSource.Factory, /** The player's bass swap (issue #807). */ val deck: DeckFilter)
+    class Built(
+        val player: ExoPlayer,
+        val cacheFactory: CacheDataSource.Factory,
+        /** The player's bass swap (issue #807). */
+        val deck: DeckFilter,
+        /** The player's sound, for lining a crossfade's tail up (issue #818). */
+        val tap: SoundTap,
+    )
 
     /** [kbpsFor] picks, per song id, Opus kbit/s or 0 for the original file. */
     fun build(context: Context, graph: AppGraph, kbpsFor: (String) -> Int, handleAudioFocus: Boolean = true): Built {
@@ -79,7 +104,7 @@ object PlayerFactory {
                 DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(enableFloatOutput)
                     .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
-                    .setAudioProcessors(arrayOf(equaliser))
+                    .setAudioProcessorChain(DeckProcessorChain(equaliser))
                     .build()
         }.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
         AppLog.i("Player", "FFmpeg decoders " + if (FfmpegLibrary.isAvailable()) "ready (${FfmpegLibrary.getVersion()})" else "not available")
@@ -97,7 +122,7 @@ object PlayerFactory {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
-        return Built(player, cacheFactory, equaliser.deck)
+        return Built(player, cacheFactory, equaliser.deck, equaliser.tap)
     }
 
     /** How much of a song (and then of the next) is loaded ahead: a minute, more than the longest blend. */
