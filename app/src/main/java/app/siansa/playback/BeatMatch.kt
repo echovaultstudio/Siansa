@@ -81,6 +81,56 @@ object BeatMatch {
         return if (abs(ratio - 1) <= MAX_SHIFT) ratio.toFloat() else null
     }
 
+    /**
+     * A track made on a grid (issue #820): its tempo is a whole number of BPM (a DAW's), to [GRID_BPM_TOLERANCE],
+     * and its beat is steady. Such a track's downbeats and phrases are counted from its first beat, as DJ software
+     * assumes, so they're known even where the plugin couldn't hear them.
+     */
+    fun onAGrid(end: BeatEnd): Boolean =
+        end.bpm > 0 && abs(end.bpm - end.bpm.roundToLong()) <= GRID_BPM_TOLERANCE && end.steady >= MIN_STEADY
+
+    /**
+     * The end of a song going out with its bars and 8-bar phrases assumed from the song's grid (issue #820), when
+     * the plugin found none and the song is [onAGrid] at both ends at one tempo: the first beat (or the first
+     * downbeat, when found) is a downbeat and a phrase start, and the beat at the end is a whole number of beats
+     * after it, else nothing is assumed. A downbeat the plugin found at the end is kept, and must sit on the
+     * counted bars for the phrases to be assumed. Unchanged when nothing is missing or the song isn't on a grid.
+     */
+    fun assumedGrid(start: BeatEnd?, end: BeatEnd): BeatEnd {
+        if (end.barMs != null && end.phraseMs != null) return end
+        if (start == null || !onAGrid(end) || !onAGrid(start) || start.bpm.roundToLong() != end.bpm.roundToLong()) return end
+        val beat = 60_000.0 / end.bpm.roundToLong()
+        val first = start.barMs ?: start.beatMs
+        val counted = (end.beatMs - first) / beat
+        val beats = counted.roundToLong()
+        if (beats < BEATS_PER_BAR || abs(counted - beats) > GRID_BEAT_TOLERANCE) return end
+        val phraseBeats = ASSUMED_PHRASE_BARS * BEATS_PER_BAR
+        // The last downbeat and phrase start at or before the end's beat, counted from the first.
+        val bar = end.barMs ?: (end.beatMs - (beats % BEATS_PER_BAR) * beat)
+        val barBeats = ((bar - first) / beat).roundToLong()
+        if (barBeats % BEATS_PER_BAR != 0L) return end  // the plugin's downbeat isn't on the counted bars: the first beat wasn't one
+        val phrase = end.phraseMs ?: (bar - (barBeats % phraseBeats) * beat)
+        return end.copy(barMs = bar, phraseMs = phrase, phraseBars = end.phraseBars ?: ASSUMED_PHRASE_BARS, assumed = true)
+    }
+
+    /**
+     * The start of the next song with its first downbeat and phrase assumed to be its first beat (issue #820),
+     * when the plugin found none and the song is [onAGrid]: as DJ software assumes of a track made on a grid.
+     */
+    fun assumedIntro(intro: BeatEnd): BeatEnd {
+        if (intro.barMs != null && intro.phraseMs != null) return intro
+        if (!onAGrid(intro) || intro.beatMs < 0) return intro
+        val bar = intro.barMs ?: intro.beatMs
+        return intro.copy(barMs = bar, phraseMs = intro.phraseMs ?: bar, phraseBars = intro.phraseBars ?: ASSUMED_PHRASE_BARS, assumed = true)
+    }
+
+    /** A tempo this close to a whole number of BPM, steady, is a grid's (issue #820). */
+    const val GRID_BPM_TOLERANCE = 0.05
+    /** The end's beat must be this close to a whole number of beats from the first for the grid to be assumed. */
+    const val GRID_BEAT_TOLERANCE = 0.3
+    /** Phrases assumed of a track on a grid: 8 bars, the common unit of house and techno. */
+    const val ASSUMED_PHRASE_BARS = 8
+
     /** Both ends are beat-driven and steady: a blend between them either keeps the beats in step or clashes. */
     fun bothRhythmic(outgoing: BeatEnd?, incoming: BeatEnd?): Boolean = outgoing?.matchable == true && incoming?.matchable == true
 
@@ -126,8 +176,8 @@ object BeatMatch {
             get() = "beat-matched %.1f → %.1f BPM (%s %%), %d bar%s (%.1f s), %s%s".format(
                 java.util.Locale.ROOT, incoming.bpm, outgoing.bpm, shiftPercent, bars, if (bars == 1) "" else "s", overlapMs / 1000.0,
                 when {
-                    phraseBars != null -> "phrase on phrase ($phraseBars-bar phrases)"
-                    onBars -> "bar on bar"
+                    phraseBars != null -> "phrase on phrase ($phraseBars-bar phrases${if (outgoing.assumed || incoming.assumed) ", assumed" else ""})"
+                    onBars -> "bar on bar${if (outgoing.assumed || incoming.assumed) " (assumed)" else ""}"
                     else -> "beat on beat"
                 },
                 if (cutMs > 0) ", let go at the end of its last phrase (%.1f s left out)".format(java.util.Locale.ROOT, cutMs / 1000.0) else "",
