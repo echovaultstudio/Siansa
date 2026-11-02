@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.AutoAwesome
@@ -499,6 +500,8 @@ fun SongRow(
     subtitle: String? = artistAndAlbum(song),
     // Swipe from right to left adds the song to the queue (not in the queue itself).
     swipeToQueue: Boolean = true,
+    // In the queue: swipe from right to left takes the song out of it (the swipe to queue in reverse, red).
+    swipeToRemove: (() -> Unit)? = null,
     // Extra items at the end of the ⋮ menu (such as removing it from a playlist); call close() when picked.
     extraMenu: @Composable (close: () -> Unit) -> Unit = {},
     // The song playing now (queue, album and playlist pages): its cover, or its number when covers are
@@ -519,7 +522,7 @@ fun SongRow(
     // Offline, songs that aren't downloaded are dimmed: they can't play until the connection is back.
     val connection by graph.connection.state.collectAsStateWithLifecycle()
     val unavailable = connection.offline && !graph.downloads.isDownloaded(song.id)
-    SwipeToQueue(song, enabled = swipeToQueue, onQueued = { launch.notify("Added to the queue") }) { rowBackground ->
+    val row: @Composable (Modifier) -> Unit = { rowBackground ->
         Row(
             Modifier
                 .fillMaxWidth()
@@ -656,6 +659,11 @@ fun SongRow(
                 }
             }
         }
+    }
+    if (swipeToRemove != null) {
+        SwipeToRemove(onRemove = swipeToRemove, content = row)
+    } else {
+        SwipeToQueue(song, enabled = swipeToQueue, onQueued = { launch.notify("Added to the queue") }, content = row)
     }
     if (pickPlaylist) {
         AddToPlaylistDialog(listOf(song)) { message ->
@@ -905,17 +913,67 @@ fun SwipeToQueue(song: Song, enabled: Boolean, onQueued: () -> Unit, content: @C
         return
     }
     val graph = LocalGraph.current
-    val context = LocalContext.current
     val current by rememberUpdatedState(song)
     val queued by rememberUpdatedState(onQueued)
+    SongSwipe(
+        label = "Add to queue",
+        icon = Icons.AutoMirrored.Rounded.QueueMusic,
+        colour = Accent,
+        onColour = OnAccent,
+        done = QueueHaptics.Kind.ADDED,
+        onDone = {
+            AppLog.i("Queue", "Swiped ${current.id} into the queue")
+            graph.player.addToQueue(current)
+            queued()
+        },
+        content = content,
+    )
+}
+
+/**
+ * The same gesture inside the queue, in reverse: drag a queued song from right to left and it's taken out of
+ * the queue, behind a red strip with a bin instead of the amber one (the swipe that put it there was amber).
+ */
+@Composable
+fun SwipeToRemove(onRemove: () -> Unit, content: @Composable (Modifier) -> Unit) {
+    val remove by rememberUpdatedState(onRemove)
+    SongSwipe(
+        label = "Remove from queue",
+        icon = Icons.Rounded.Delete,
+        colour = RemoveRed,
+        onColour = Color.White,
+        done = QueueHaptics.Kind.REMOVED,
+        onDone = { remove() },
+        content = content,
+    )
+}
+
+/** The red behind a queued song swiped away: a warning, unlike the amber of anything that plays. */
+val RemoveRed = Color(0xFFE5534B)
+
+/**
+ * A right-to-left swipe on a song row past [SWIPE_TO_QUEUE_FRACTION] of its width: [onDone] runs with the
+ * [done] buzz, and the row slides back. A strip in [colour] with [label] and [icon] shows behind it while
+ * dragging, with a click as it appears. [content] gets a background for the row, solid only while it's dragged.
+ */
+@Composable
+private fun SongSwipe(
+    label: String,
+    icon: ImageVector,
+    colour: Color,
+    onColour: Color,
+    done: QueueHaptics.Kind,
+    onDone: () -> Unit,
+    content: @Composable (Modifier) -> Unit,
+) {
+    val context = LocalContext.current
+    val finish by rememberUpdatedState(onDone)
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.EndToStart) {
-                // A firmer buzz when the song is added.
-                QueueHaptics.vibrate(context, QueueHaptics.Kind.ADDED)
-                AppLog.i("Queue", "Swiped ${current.id} into the queue")
-                graph.player.addToQueue(current)
-                queued()
+                // A firmer buzz when the song is added or removed.
+                QueueHaptics.vibrate(context, done)
+                finish()
             }
             // Never stays swiped away: the row slides back.
             false
@@ -923,7 +981,7 @@ fun SwipeToQueue(song: Song, enabled: Boolean, onQueued: () -> Unit, content: @C
         positionalThreshold = { width -> width * SWIPE_TO_QUEUE_FRACTION },
     )
     val swiping = state.dismissDirection == SwipeToDismissBoxValue.EndToStart
-    // A clear tap the moment the amber "Add to queue" strip shows, as the swipe starts.
+    // A clear tap the moment the strip shows, as the swipe starts.
     LaunchedEffect(swiping) {
         if (swiping) QueueHaptics.vibrate(context, QueueHaptics.Kind.START)
     }
@@ -932,14 +990,14 @@ fun SwipeToQueue(song: Song, enabled: Boolean, onQueued: () -> Unit, content: @C
         enableDismissFromStartToEnd = false,
         backgroundContent = {
             Row(
-                Modifier.fillMaxSize().background(if (swiping) Accent else Color.Transparent).padding(horizontal = Space.Section),
+                Modifier.fillMaxSize().background(if (swiping) colour else Color.Transparent).padding(horizontal = Space.Section),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End,
             ) {
                 if (swiping) {
-                    Text("Add to queue", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = OnAccent)
+                    Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = onColour)
                     Spacer(Modifier.width(Space.Medium))
-                    Icon(Icons.AutoMirrored.Rounded.QueueMusic, null, tint = OnAccent)
+                    Icon(icon, null, tint = onColour)
                 }
             }
         },
@@ -954,7 +1012,7 @@ fun SwipeToQueue(song: Song, enabled: Boolean, onQueued: () -> Unit, content: @C
  * but they're skipped when touch vibration is turned off in the phone's settings.
  */
 object QueueHaptics {
-    enum class Kind { START, ADDED }
+    enum class Kind { START, ADDED, REMOVED }
 
     /** What to play: a predefined effect id (Android 10+), else a pulse of [pulseMs]. */
     data class Effect(val predefined: Int?, val pulseMs: Long)
@@ -963,8 +1021,8 @@ object QueueHaptics {
     fun effect(kind: Kind, sdk: Int): Effect = when (kind) {
         // As the amber strip appears: a crisp click.
         Kind.START -> if (sdk >= 29) Effect(VibrationEffect.EFFECT_CLICK, 0) else Effect(null, 25)
-        // Song added: a heavier click.
-        Kind.ADDED -> if (sdk >= 29) Effect(VibrationEffect.EFFECT_HEAVY_CLICK, 0) else Effect(null, 45)
+        // Song added or taken out of the queue: a heavier click.
+        Kind.ADDED, Kind.REMOVED -> if (sdk >= 29) Effect(VibrationEffect.EFFECT_HEAVY_CLICK, 0) else Effect(null, 45)
     }
 
     fun vibrate(context: Context, kind: Kind) {
