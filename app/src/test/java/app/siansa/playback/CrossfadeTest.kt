@@ -193,6 +193,19 @@ class CrossfadePlanTest {
         assertEquals(0f, Crossfade.fadeIn(0f), 0f)
         assertEquals(1f, Crossfade.fadeIn(2f), 0.0001f)
     }
+
+    @Test fun aFadeEndsWhenTheQueueIsClearedOrItsNextSongTakenOut() {
+        // Issue #822: stopping the player mid-fade left the old song playing from its silent copy.
+        assertNull(Crossfade.incomingAfterQueueChange(emptyList(), "b", 1))
+        assertNull(Crossfade.incomingAfterQueueChange(listOf("x", "y"), "b", 1))
+        assertNull(Crossfade.incomingAfterQueueChange(listOf("a", "b"), null, 1))
+        // Unchanged, or songs added after it: it carries on where it is.
+        assertEquals(1, Crossfade.incomingAfterQueueChange(listOf("a", "b", "c", "d"), "b", 1))
+        // A song taken out before it (a radio trimming what was played): it follows.
+        assertEquals(0, Crossfade.incomingAfterQueueChange(listOf("b", "c"), "b", 1))
+        // In the queue twice: the place nearest where it was.
+        assertEquals(4, Crossfade.incomingAfterQueueChange(listOf("b", "x", "y", "z", "b"), "b", 5))
+    }
 }
 
 /** Levelling from measured loudness, with ReplayGain tags as the fallback (issue #60). */
@@ -353,17 +366,4 @@ class ProfileStoreTest {
 
 private object PluginProfilesJson {
     fun parse(text: String): JsonElement = app.siansa.data.AppJson.parseToJsonElement(text)
-
-    @Test fun aFadeEndsWhenTheQueueIsClearedOrItsNextSongTakenOut() {
-        // Issue #822: stopping the player mid-fade left the old song playing from its silent copy.
-        assertNull(Crossfade.incomingAfterQueueChange(emptyList(), "b", 1))
-        assertNull(Crossfade.incomingAfterQueueChange(listOf("x", "y"), "b", 1))
-        assertNull(Crossfade.incomingAfterQueueChange(listOf("a", "b"), null, 1))
-        // Unchanged, or songs added after it: it carries on where it is.
-        assertEquals(1, Crossfade.incomingAfterQueueChange(listOf("a", "b", "c", "d"), "b", 1))
-        // A song taken out before it (a radio trimming what was played): it follows.
-        assertEquals(0, Crossfade.incomingAfterQueueChange(listOf("b", "c"), "b", 1))
-        // In the queue twice: the place nearest where it was.
-        assertEquals(4, Crossfade.incomingAfterQueueChange(listOf("b", "x", "y", "z", "b"), "b", 5))
-    }
 }
