@@ -42,6 +42,8 @@ data class BeatEnd(
     val steady: Float,
     val phraseMs: Double? = null,
     val phraseBars: Int? = null,
+    /** The bars or phrases weren't measured but assumed from the song's grid (issue #820, [BeatMatch.assumedGrid]). */
+    val assumed: Boolean = false,
 ) {
     val beatLengthMs: Double get() = 60_000.0 / bpm
 
@@ -75,6 +77,8 @@ data class BeatEnd(
     fun describe(): String = "%.1f BPM, beat %.2f, steady %.2f, %s".format(
         java.util.Locale.ROOT, bpm, rhythm, steady,
         when {
+            assumed && phraseBars != null -> "bars and $phraseBars-bar phrases assumed from the first beat"
+            assumed -> "bars assumed from the first beat"
             phraseBars != null -> "$phraseBars-bar phrases found"
             barMs != null -> "bars found, no phrases"
             else -> "no bars found"

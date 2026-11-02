@@ -483,4 +483,77 @@ class BeatMatchTest {
         val otherAlbum = Crossfade.plan(CrossfadeMode.SMART, 20_000, mixed, mixed.copy(id = "c", albumId = "al2"), 310_000, 300_000, profile("a", outro, null), profile("c", null, intro), beatMatch = true)!!
         assertFalse(otherAlbum.why, otherAlbum.why.contains("one album"))
     }
+
+    // ---- The grid of a track made in a DAW, assumed where the plugin found no bars or phrases (issue #820) ----
+
+    private val beat126 = 60_000.0 / 126
+    /** A track at 126 BPM whose first beat is at 500 ms, with no bars found at either end. */
+    private val gridStart = BeatEnd(bpm = 126.0, beatMs = 500.0, barMs = null, rhythm = 0.8f, steady = 0.85f)
+    private val gridEnd = BeatEnd(bpm = 126.0, beatMs = 500.0 + 600 * beat126 + 0.1 * beat126, barMs = null, rhythm = 0.8f, steady = 0.85f)
+
+    @Test fun barsAndPhrasesAreAssumedFromTheFirstBeatOfATrackOnAGrid() {
+        val end = BeatMatch.assumedGrid(gridStart, gridEnd)
+        assertTrue(end.assumed)
+        // 600 beats after the first: a downbeat (600 is 150 bars), 24 beats into a 32-beat phrase.
+        assertEquals(gridEnd.beatMs, end.barMs!!, 1e-6)
+        assertEquals(gridEnd.beatMs - 24 * beat126, end.phraseMs!!, 1e-6)
+        assertEquals(BeatMatch.ASSUMED_PHRASE_BARS, end.phraseBars)
+        assertTrue(end.describe(), end.describe().contains("assumed from the first beat"))
+        // A beat later at the end: the downbeat is the beat before it.
+        val later = BeatMatch.assumedGrid(gridStart, gridEnd.copy(beatMs = gridEnd.beatMs + beat126))
+        assertEquals(gridEnd.beatMs, later.barMs!!, 1e-6)
+    }
+
+    @Test fun nothingIsAssumedOffAGrid() {
+        assertFalse(BeatMatch.assumedGrid(gridStart, gridEnd.copy(bpm = 126.4)).assumed)  // not a whole number of BPM
+        assertFalse(BeatMatch.assumedGrid(gridStart.copy(steady = 0.3f), gridEnd).assumed)  // not steady
+        assertFalse(BeatMatch.assumedGrid(gridStart.copy(bpm = 125.0), gridEnd).assumed)  // tempos differ
+        assertFalse(BeatMatch.assumedGrid(null, gridEnd).assumed)
+        // The end's beat is half a beat off the count from the first: not one grid.
+        assertFalse(BeatMatch.assumedGrid(gridStart, gridEnd.copy(beatMs = gridEnd.beatMs + 0.4 * beat126)).assumed)
+        // The plugin's downbeat at the end isn't on the counted bars: the first beat wasn't a downbeat.
+        val offBar = gridEnd.copy(barMs = gridEnd.beatMs - beat126)
+        assertFalse(BeatMatch.assumedGrid(gridStart, offBar).assumed)
+        assertNull(BeatMatch.assumedGrid(gridStart, offBar).phraseMs)
+        // Nothing missing: untouched.
+        assertFalse(BeatMatch.assumedGrid(gridStart, gridEnd.copy(barMs = gridEnd.beatMs, phraseMs = 1.0, phraseBars = 16)).assumed)
+    }
+
+    @Test fun phrasesAreAssumedFromADownbeatThePluginFound() {
+        // Bars found at the end but no phrases: the phrase is counted from the first beat up to that downbeat.
+        val end = BeatMatch.assumedGrid(gridStart, gridEnd.copy(barMs = gridEnd.beatMs))
+        assertTrue(end.assumed)
+        assertEquals(gridEnd.beatMs - 24 * beat126, end.phraseMs!!, 1e-6)
+    }
+
+    @Test fun theNextSongsFirstBeatIsItsDownbeatAndPhraseOnAGrid() {
+        val start = BeatMatch.assumedIntro(gridStart)
+        assertTrue(start.assumed)
+        assertEquals(500.0, start.barMs!!, 0.0)
+        assertEquals(500.0, start.phraseMs!!, 0.0)
+        assertEquals(8, start.phraseBars)
+        assertFalse(BeatMatch.assumedIntro(gridStart.copy(bpm = 126.3)).assumed)
+        assertFalse(BeatMatch.assumedIntro(intro.copy(phraseMs = 1_000.0, phraseBars = 16)).assumed)
+    }
+
+    @Test fun aBlendBetweenTwoTracksOnAGridIsLaidPhraseOnPhrase() {
+        // Issue #820: with no bars found the blend was beat on beat, from wherever the song's end put it.
+        val next = song.copy(id = "b", albumId = "al2")
+        val length = (gridEnd.beatMs + 2 * beat126).toLong()  // the song ends two beats after its last measured beat
+        val plan = Crossfade.plan(
+            CrossfadeMode.SMART, 30_000, song, next, length, 300_000,
+            TrackProfile("a", -10.0, listOf(RampPoint(-18, 0)), listOf(RampPoint(-18, 0)), length, intro = gridStart, outro = gridEnd),
+            TrackProfile("b", -10.0, listOf(RampPoint(-18, 0)), listOf(RampPoint(-18, 0)), 300_000, intro = gridStart.copy(bpm = 128.0)),
+            beatMatch = true, blendBars = 16,
+        )!!
+        val beat = plan.beat!!
+        assertEquals(8, beat.phraseBars)
+        assertTrue(beat.why, beat.why.contains("phrase on phrase (8-bar phrases, assumed)"))
+        // It starts on an assumed phrase start of the song going out (a whole number of 32 beats after its first beat)...
+        val fromFirst = (beat.startMs - 500.0) / beat126
+        assertEquals(0.0, (fromFirst / 32 - Math.round(fromFirst / 32)) * 32, 0.15)  // the end's beat was measured a tenth of a beat off
+        // ...and the next song comes in on its first beat.
+        assertEquals(500L, beat.incomingStartMs)
+        assertTrue(plan.beatNote, plan.beatNote!!.contains("assumed"))
+    }
 }

@@ -120,8 +120,9 @@ object Crossfade {
         // Smart: the dead air and the long fade-out at the end are left out first (issue #628); the blend is planned
         // from the song's new end.
         val (cut, cutWhy) = if (mode == CrossfadeMode.SMART) endCut(currentProfile, currentDurationMs, maxMs) else 0L to null
-        val outro = currentProfile?.outro
-        val intro = nextProfile?.intro
+        // Where the plugin found no bars or phrases, a track made on a grid has them assumed from its first beat (issue #820).
+        val outro = currentProfile?.outro?.let { BeatMatch.assumedGrid(currentProfile.intro, it) }
+        val intro = nextProfile?.intro?.let { BeatMatch.assumedIntro(it) }
         // Both ends keep a beat (steady or not): unless laid beat on beat, a long blend clashes (issue #796).
         val rhythmic = mode == CrossfadeMode.SMART && BeatMatch.wouldClash(outro, intro)
         // Beat-matched (issue #646): a DJ blend over whole bars, beat on beat, when both ends have a steady beat;
