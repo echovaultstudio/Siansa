@@ -2,6 +2,7 @@ package app.siansa
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -16,11 +17,15 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.siansa.ui.SiansaTheme
 import app.siansa.ui.Space
 import app.siansa.ui.StateButton
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -49,6 +54,30 @@ class SpacingPlayerTest : SpacingCheck() {
         val label = compose.onNodeWithText("Sleep", substring = true, useUnmergedTree = true).getBoundsInRoot()
         assertTrue("The label (${label.top}..${label.bottom}) fits its row (${row.top}..${row.bottom})", label.top >= row.top && label.bottom <= row.bottom)
         assertEven("Wrapped label centred", label.top - row.top, row.bottom - label.bottom, 2.dp)
+    }
+
+    /**
+     * Swipe to remove in the queue goes left to right (issue #809), the reverse of swipe to queue: a right swipe
+     * takes the song out, with the red strip's bin and label at the left edge, where the row slid away from; a left
+     * swipe does nothing.
+     */
+    @Test fun aQueuedSongIsRemovedBySwipingRight() {
+        var removed = 0
+        compose.setContent {
+            SiansaTheme {
+                Box(Modifier.width(360.dp).testTag("queued")) {
+                    app.siansa.ui.SwipeToRemove(rowColour = app.siansa.ui.QUEUE_ROW, onRemove = { removed++ }) { background ->
+                        Box(Modifier.then(background).fillMaxWidth().height(56.dp))
+                    }
+                }
+            }
+        }
+        compose.onNodeWithTag("queued").performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        assertEquals("A left swipe leaves the queue alone", 0, removed)
+        compose.onNodeWithTag("queued").performTouchInput { swipeRight() }
+        compose.waitForIdle()
+        assertEquals("A right swipe takes the song out", 1, removed)
     }
 
     /** Shape the mix (issue #649): the shape chips sit evenly between their title and the hint under them. */

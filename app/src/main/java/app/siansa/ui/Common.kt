@@ -502,6 +502,8 @@ fun SongRow(
     swipeToQueue: Boolean = true,
     // In the queue: swipe from right to left takes the song out of it (the swipe to queue in reverse, red).
     swipeToRemove: (() -> Unit)? = null,
+    /** What a row swiped to remove covers the red strip with: now playing's queue is on a see-through surface. */
+    swipeRowColour: Color = MaterialTheme.colorScheme.surface,
     // Extra items at the end of the ⋮ menu (such as removing it from a playlist); call close() when picked.
     extraMenu: @Composable (close: () -> Unit) -> Unit = {},
     // The song playing now (queue, album and playlist pages): its cover, or its number when covers are
@@ -661,7 +663,7 @@ fun SongRow(
         }
     }
     if (swipeToRemove != null) {
-        SwipeToRemove(onRemove = swipeToRemove, content = row)
+        SwipeToRemove(rowColour = swipeRowColour, onRemove = swipeToRemove, content = row)
     } else {
         SwipeToQueue(song, enabled = swipeToQueue, onQueued = { launch.notify("Added to the queue") }, content = row)
     }
@@ -931,11 +933,12 @@ fun SwipeToQueue(song: Song, enabled: Boolean, onQueued: () -> Unit, content: @C
 }
 
 /**
- * The same gesture inside the queue, in reverse: drag a queued song from right to left and it's taken out of
- * the queue, behind a red strip with a bin instead of the amber one (the swipe that put it there was amber).
+ * The same gesture inside the queue, in reverse: drag a queued song from left to right (the opposite way to the
+ * swipe that put it there) and it's taken out of the queue, behind a red strip with a bin instead of the amber one
+ * (issue #809). [rowColour] is what the row covers the strip with: now playing's surface is see-through.
  */
 @Composable
-fun SwipeToRemove(onRemove: () -> Unit, content: @Composable (Modifier) -> Unit) {
+fun SwipeToRemove(rowColour: Color, onRemove: () -> Unit, content: @Composable (Modifier) -> Unit) {
     val remove by rememberUpdatedState(onRemove)
     SongSwipe(
         label = "Remove from queue",
@@ -943,6 +946,8 @@ fun SwipeToRemove(onRemove: () -> Unit, content: @Composable (Modifier) -> Unit)
         colour = RemoveRed,
         onColour = Color.White,
         done = QueueHaptics.Kind.REMOVED,
+        direction = SwipeToDismissBoxValue.StartToEnd,
+        rowColour = rowColour,
         onDone = { remove() },
         content = content,
     )
@@ -952,9 +957,10 @@ fun SwipeToRemove(onRemove: () -> Unit, content: @Composable (Modifier) -> Unit)
 val RemoveRed = Color(0xFFE5534B)
 
 /**
- * A right-to-left swipe on a song row past [SWIPE_TO_QUEUE_FRACTION] of its width: [onDone] runs with the
- * [done] buzz, and the row slides back. A strip in [colour] with [label] and [icon] shows behind it while
- * dragging, with a click as it appears. [content] gets a background for the row, solid only while it's dragged.
+ * A swipe on a song row in [direction] past [SWIPE_TO_QUEUE_FRACTION] of its width: [onDone] runs with the [done]
+ * buzz, and the row slides back. A strip in [colour] with [label] and [icon] shows behind it while dragging, on the
+ * side the row slides away from, with a click as it appears. [content] gets a background for the row, [rowColour]
+ * (the theme's surface by default), solid only while it's dragged, so the strip shows only where the row has moved.
  */
 @Composable
 private fun SongSwipe(
@@ -964,13 +970,15 @@ private fun SongSwipe(
     onColour: Color,
     done: QueueHaptics.Kind,
     onDone: () -> Unit,
+    direction: SwipeToDismissBoxValue = SwipeToDismissBoxValue.EndToStart,
+    rowColour: Color = MaterialTheme.colorScheme.surface,
     content: @Composable (Modifier) -> Unit,
 ) {
     val context = LocalContext.current
     val finish by rememberUpdatedState(onDone)
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) {
+            if (value == direction) {
                 // A firmer buzz when the song is added or removed.
                 QueueHaptics.vibrate(context, done)
                 finish()
@@ -980,29 +988,38 @@ private fun SongSwipe(
         },
         positionalThreshold = { width -> width * SWIPE_TO_QUEUE_FRACTION },
     )
-    val swiping = state.dismissDirection == SwipeToDismissBoxValue.EndToStart
+    val swiping = state.dismissDirection == direction
     // A clear tap the moment the strip shows, as the swipe starts.
     LaunchedEffect(swiping) {
         if (swiping) QueueHaptics.vibrate(context, QueueHaptics.Kind.START)
     }
+    val fromStart = direction == SwipeToDismissBoxValue.StartToEnd
     SwipeToDismissBox(
         state = state,
-        enableDismissFromStartToEnd = false,
+        enableDismissFromStartToEnd = fromStart,
+        enableDismissFromEndToStart = !fromStart,
         backgroundContent = {
             Row(
-                Modifier.fillMaxSize().background(if (swiping) colour else Color.Transparent).padding(horizontal = Space.Section),
+                Modifier.fillMaxSize().background(if (swiping) colour else Color.Transparent).padding(horizontal = Space.Section).testTag("swipeStrip"),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End,
+                // The label and icon sit on the side the row slides away from, where the strip shows first.
+                horizontalArrangement = if (fromStart) Arrangement.Start else Arrangement.End,
             ) {
                 if (swiping) {
-                    Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = onColour)
-                    Spacer(Modifier.width(Space.Medium))
-                    Icon(icon, null, tint = onColour)
+                    if (fromStart) {
+                        Icon(icon, null, tint = onColour)
+                        Spacer(Modifier.width(Space.Medium))
+                        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = onColour)
+                    } else {
+                        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = onColour)
+                        Spacer(Modifier.width(Space.Medium))
+                        Icon(icon, null, tint = onColour)
+                    }
                 }
             }
         },
     ) {
-        content(if (swiping) Modifier.background(MaterialTheme.colorScheme.surface) else Modifier)
+        content(if (swiping) Modifier.background(rowColour) else Modifier)
     }
 }
 

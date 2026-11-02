@@ -145,8 +145,8 @@ changes, and when you press **Repeat** or **Add to playlist** in now playing (if
 phone's settings).
 
 Pull up from now playing, or tap the queue button, for the queue. Tap a song to jump to it. Swipe a song to the
-left to take it out of the queue: the same swipe that adds a song elsewhere, in reverse, behind a red strip instead
-of an amber one, with the same buzz. Its ⋮ menu has **Remove from queue** too, and **Remove songs up to here**,
+right to take it out of the queue: the swipe that adds a song elsewhere, in reverse, behind a red strip instead of
+an amber one, with the same buzz. Its ⋮ menu has **Remove from queue** too, and **Remove songs up to here**,
 which clears every song before that one so it comes next (if one of them was playing, that song starts). **Save
 queue as playlist** (the filled circle) keeps the whole queue.
 
