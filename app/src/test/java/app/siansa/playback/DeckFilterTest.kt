@@ -42,9 +42,9 @@ class DeckFilterTest {
         deck.lowCutHz = DeckFilter.LOW_CUT_HZ
         assertFalse(deck.idle)
         // The first steps of the sweep are below 20 Hz, as good as off: nothing to apply yet.
-        repeat(3) { assertFalse(deck.prepare(48_000, 2)) }
+        repeat(2) { assertFalse(deck.prepare(48_000, 2)) }  // 8 and 16 Hz
         assertTrue(deck.prepare(48_000, 2))
-        var buffers = 4
+        var buffers = 3
         while (deck.describe() != "low cut 200 Hz, bass +0 dB") {
             deck.prepare(48_000, 2)
             buffers++
