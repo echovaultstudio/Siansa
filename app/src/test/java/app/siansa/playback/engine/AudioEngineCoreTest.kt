@@ -121,7 +121,7 @@ class AudioEngineCoreTest {
         stream.play()
         val cued = deck.cueNow(2_000_000, 96_000, 48_000)!!
         assertEquals(44_100L, cued.targetFrame)
-        val out = FloatArray(48_000 * 3 * 2)
+        val out = FloatArray((48_000 * 3 + 256) * 2)
         var mix = 0L
         while (mix < 48_000 * 3) {
             stream.render(out, mix.toInt(), 256, mix, 48_000)
