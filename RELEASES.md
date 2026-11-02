@@ -3,6 +3,11 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.51.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.51.1beta) — 2026-11-02
+
+- [#823](https://github.com/echovaultstudio/Siansa/pull/823) Crossfade: a fade ends when the player stops or the queue changes; beat-matched blends off by default (@Th3K1ngP1n)
+- [#825](https://github.com/echovaultstudio/Siansa/pull/825) Siansa Dev: a test build of the mixer branch, installed next to Siansa (@Th3K1ngP1n)
+
 ## [0.51.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.51.0beta) — 2026-11-02
 
 - [#817](https://github.com/echovaultstudio/Siansa/pull/817) DJ blends: load the next song ahead; resample instead of time-stretch (@Th3K1ngP1n)

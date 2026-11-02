@@ -3,6 +3,14 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.51.1beta — 2026-11-02
+
+### Fixed
+- **Stopping during a crossfade left the old song playing**, with nothing on screen to stop it. A fade now ends with the player, when the queue is cleared or another song is chosen.
+
+### Changed
+- **Beat-matched blends are off by default.** On many phones they still drift out of step; turn them on in Settings › Crossfade and levelling › Beat-matched blends. If you already chose DJ radio or Everywhere, that stays.
+
 ## 0.51.0beta — 2026-11-02
 
 ### Fixed
