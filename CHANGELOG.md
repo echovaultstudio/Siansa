@@ -3,6 +3,22 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.50.1beta — 2026-11-02
+
+### Fixed
+- **Swipe to remove from the queue goes the other way now.** Swipe a queued song to the right to take it out: the
+  reverse of the swipe that adds a song. The red strip shows behind the song as it slides, like the amber one when
+  adding, instead of filling the whole row.
+- **Emby and Jellyfin: album pictures were missing from lists.** An album whose art is in its song files rather
+  than in the album folder showed its picture on its page and in the player, but not in Home, Your Library, search
+  or an artist's albums. Those lists now show the first song's picture too.
+- **Beat-matched blends still began a touch out of step.** The phone reports a wrong position for a few seconds
+  after a jump; the silent copy of the song going out, and the next song after it comes in, are now judged only
+  once the position is real. The copy starts 14 seconds ahead instead of 8 and is nudged into step in one measured
+  move rather than chased.
+- **The log said a song started playing minutes after it was chosen** when it had run straight on from the last
+  one; it no longer counts from the wrong moment.
+
 ## 0.50.0beta — 2026-11-02
 
 ### Fixed
