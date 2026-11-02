@@ -76,6 +76,8 @@ internal class Crossfader(
     private var plan: FadePlan? = null
     private var startAt = 0L
     private var incomingIndex = C.INDEX_UNSET
+    /** The song the fade under way goes into, to tell the queue changing under it (issue #822). */
+    private var incomingId: String? = null
     private var tailBase = 1f
     private var startedAt = 0L
     private var switched = false
@@ -369,6 +371,7 @@ internal class Crossfader(
         }
         tailBase = levelOf(item.toSong())
         incomingIndex = nextIndex
+        incomingId = main.getMediaItemAt(nextIndex).mediaId
         startedAt = SystemClock.elapsedRealtime()
         switched = false
         jumps = 0
@@ -685,6 +688,11 @@ internal class Crossfader(
         if (!playWhenReady) cancel("paused") else poke()
     }
 
+    override fun onPlaybackStateChanged(playbackState: Int) {
+        // The player was stopped (issue #822): a fade under way ends with it, its silent copy too.
+        if (playbackState == Player.STATE_IDLE) cancel("the player stopped")
+    }
+
     override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
         if (playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE) cancel("another app took the sound")
     }
@@ -694,7 +702,12 @@ internal class Crossfader(
     }
 
     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-        if (phase == Phase.FADING) return
+        if (phase == Phase.FADING) {
+            // The fade's own move into the next song carries on; anything else (another song chosen, the queue
+            // cleared) ends it, with the old song's copy stopped (issue #822).
+            if (mediaItem == null || (mediaItem.mediaId != incomingId && mediaItem.mediaId != outgoing)) cancel("another song was chosen")
+            return
+        }
         stopEasing()
         skipped = null
         if (phase == Phase.READY && mediaItem?.mediaId != outgoing) disarm()
@@ -702,7 +715,15 @@ internal class Crossfader(
     }
 
     override fun onTimelineChanged(timeline: Timeline, reason: Int) {
-        if (reason != Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED || phase == Phase.FADING) return
+        if (reason != Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) return
+        if (phase == Phase.FADING) {
+            // Stopped, or the next song taken out of the queue: the fade can't go on (issue #822). Songs added or
+            // taken out around it move it, which the fade follows.
+            val queue = (0 until main.mediaItemCount).map { main.getMediaItemAt(it).mediaId }
+            val moved = Crossfade.incomingAfterQueueChange(queue, incomingId, incomingIndex)
+            if (moved == null) cancel(if (queue.isEmpty()) "the queue was cleared" else "the queue changed") else incomingIndex = moved
+            return
+        }
         // The next song may be another one now: plan again.
         skipped = null
         disarm()

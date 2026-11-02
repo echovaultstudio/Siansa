@@ -94,7 +94,8 @@ class BeatMatchTest {
         assertFalse(BeatMatchMode.DJ_RADIO.appliesTo(djRadio = false))
         assertTrue(BeatMatchMode.EVERYWHERE.appliesTo(djRadio = false))
         assertFalse(BeatMatchMode.OFF.appliesTo(djRadio = true))
-        assertEquals(BeatMatchMode.DJ_RADIO, BeatMatchMode.parse(null))
+        assertEquals(BeatMatchMode.OFF, BeatMatchMode.parse(null))  // off unless chosen (issue #822)
+        assertEquals(BeatMatchMode.DJ_RADIO, BeatMatchMode.parse("DJ_RADIO"))
     }
 
     // ---- In a crossfade plan ----

@@ -256,6 +256,20 @@ object Crossfade {
      * a primed tail that is still loading waits up to [LOADING_WAIT_MS]; one that plays but is [stepMs] apart from
      * the main player waits up to [waitMs] to get within [HANDOVER_STEP_MS]. Otherwise the fade begins now.
      */
+    /**
+     * Where the song a fade under way goes into is in the queue now (issue #822), or null when the fade can't go on:
+     * the queue was cleared (the player stopped), or that song was taken out (the queue swapped for another).
+     * Songs added or taken out around it (a radio topping up) move it, which the fade follows. Without this the
+     * fade carried on with the old song playing from its silent copy after the player was stopped, with nothing on
+     * screen to stop it.
+     */
+    fun incomingAfterQueueChange(queue: List<String>, incomingId: String?, incomingIndex: Int): Int? {
+        if (queue.isEmpty() || incomingId == null) return null
+        if (incomingIndex in queue.indices && queue[incomingIndex] == incomingId) return incomingIndex
+        // The same song may be in the queue twice: the place nearest where it was.
+        return queue.indices.filter { queue[it] == incomingId }.minByOrNull { kotlin.math.abs(it - incomingIndex) }
+    }
+
     fun waitForTail(primed: Boolean, loading: Boolean, playing: Boolean, untilMs: Long, stepMs: Long, waitMs: Long): Boolean = when {
         !primed -> false
         loading -> untilMs > -LOADING_WAIT_MS

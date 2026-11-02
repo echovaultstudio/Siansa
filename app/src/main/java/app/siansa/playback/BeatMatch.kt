@@ -15,7 +15,8 @@ enum class BeatMatchMode(val label: String) {
     fun appliesTo(djRadio: Boolean): Boolean = this == EVERYWHERE || (this == DJ_RADIO && djRadio)
 
     companion object {
-        fun parse(value: String?): BeatMatchMode = entries.firstOrNull { it.name == value } ?: DJ_RADIO
+        /** Off unless chosen (issue #822): blends laid on the beat still drift out of step on many phones. */
+        fun parse(value: String?): BeatMatchMode = entries.firstOrNull { it.name == value } ?: OFF
     }
 }
 
