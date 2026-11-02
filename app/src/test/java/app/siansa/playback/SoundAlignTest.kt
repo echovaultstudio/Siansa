@@ -16,7 +16,7 @@ class SoundAlignTest {
     private val song = FloatArray(rate * 8).also { s ->
         val random = Random(7)
         // Noise with a beat on it: broadband enough to match to the sample, repetitive enough to have a wrong place a bar away.
-        for (i in s.indices) s[i] = (random.nextFloat() * 2 - 1) * 0.3f + sin(i * 2 * Math.PI * 55 / rate).toFloat() * 0.3f
+        for (i in s.indices) s[i] = (random.nextFloat() * 2 - 1) * 0.3f + sin(i * 2 * Math.PI * 55 / rate).toFloat() * 0.1f
     }
 
     /**
@@ -44,13 +44,13 @@ class SoundAlignTest {
 
     @Test fun findsHowFarBehindTheTailIsToTheSample() {
         val now = 10_000_000_000L
-        val mainStart = now - 5_000_000_000L  // the main player has played 5 s from the song's start
+        val mainStart = now - 6_500_000_000L  // the main player has played 6.5 s from the song's start
         val tailStartFrame = 4 * rate  // the tail joined at 4.0 s of the song...
-        val tailStart = now - 800_000_000L  // ...800 ms ago, so it's heard at 4.8 s while the main player is at 5.0 s
-        val main = snapshot(0, mainStart, now, 3)
-        val tail = snapshot(tailStartFrame, tailStart, now, 1)
+        val tailStart = now - 2_300_000_000L  // ...2.3 s ago, so it's heard at 6.3 s while the main player is at 6.5 s
+        val main = snapshot(0, mainStart, now, SoundTap.MAIN_KEEP_SECONDS)
+        val tail = snapshot(tailStartFrame, tailStart, now, Crossfader.TAIL_KEEP_SECONDS)
         val match = SoundAlign.match(main, tail, now, expectedBehindMs = 150, rangeMs = SoundAlign.RANGE_MS)!!
-        val truth = (5.0 - 4.8) * rate
+        val truth = (6.5 - 6.3) * rate
         assertTrue(match.toString(), abs(match.behindFrames - truth) <= d)
         assertEquals(200, match.behindMs)
         assertTrue(match.toString(), match.sure)
@@ -59,9 +59,9 @@ class SoundAlignTest {
 
     @Test fun findsATailThatIsAhead() {
         val now = 10_000_000_000L
-        val main = snapshot(0, now - 5_000_000_000L, now, 3)
-        // The tail started at 4.5 s of the song 600 ms ago: it's heard at 5.1 s, 100 ms ahead of the main player.
-        val tail = snapshot((4.5 * rate).toInt(), now - 600_000_000L, now, 1)
+        val main = snapshot(0, now - 6_900_000_000L, now, SoundTap.MAIN_KEEP_SECONDS)
+        // The tail started at 4.5 s of the song 2.5 s ago: it's heard at 7.0 s, 100 ms ahead of the main player at 6.9 s.
+        val tail = snapshot((4.5 * rate).toInt(), now - 2_500_000_000L, now, Crossfader.TAIL_KEEP_SECONDS)
         val match = SoundAlign.match(main, tail, now, expectedBehindMs = 0, rangeMs = SoundAlign.RANGE_MS)!!
         assertEquals(-100, match.behindMs)
         assertTrue(match.sure)
@@ -69,29 +69,30 @@ class SoundAlignTest {
 
     @Test fun aWrongGuessOfWhereToLookStillFindsIt() {
         val now = 10_000_000_000L
-        val main = snapshot(0, now - 5_000_000_000L, now, 3)
-        val tail = snapshot(4 * rate, now - 800_000_000L, now, 1)
+        val main = snapshot(0, now - 6_500_000_000L, now, SoundTap.MAIN_KEEP_SECONDS)
+        val tail = snapshot(4 * rate, now - 2_300_000_000L, now, Crossfader.TAIL_KEEP_SECONDS)
         // The positions said the tail was 900 ms behind; it's 200 ms behind, within the range looked at.
         assertEquals(200, SoundAlign.match(main, tail, now, expectedBehindMs = 900, rangeMs = SoundAlign.RANGE_MS)!!.behindMs)
     }
 
     @Test fun silenceAndTooLittleSoundGiveNoMatch() {
         val now = 10_000_000_000L
-        val main = snapshot(0, now - 5_000_000_000L, now, 3)
-        val tail = snapshot(4 * rate, now - 800_000_000L, now, 1)
+        val main = snapshot(0, now - 6_500_000_000L, now, SoundTap.MAIN_KEEP_SECONDS)
+        val tail = snapshot(4 * rate, now - 2_300_000_000L, now, Crossfader.TAIL_KEEP_SECONDS)
         val quiet = SoundTap.Snapshot(rate, d, FloatArray(tail.sound.size) { 0.0001f }, tail.endFrame, tail.marks)
         assertNull(SoundAlign.match(main, quiet, now, 0, SoundAlign.RANGE_MS))
-        val short = SoundTap.Snapshot(rate, d, tail.sound.copyOf(100), tail.endFrame, tail.marks)
+        // Too little kept: the window is taken 1.2 s back from the end, so less than 1.5 s won't do.
+        val short = SoundTap.Snapshot(rate, d, tail.sound.copyOf(rate / d), tail.endFrame, tail.marks)
         assertNull(SoundAlign.match(main, short, now, 0, SoundAlign.RANGE_MS))
         assertNull(SoundAlign.match(SoundTap.Snapshot(48_000, d, main.sound, main.endFrame, main.marks), tail, now, 0, SoundAlign.RANGE_MS))
     }
 
     @Test fun aDifferentSongIsNotAMatch() {
         val now = 10_000_000_000L
-        val main = snapshot(0, now - 5_000_000_000L, now, 3)
+        val main = snapshot(0, now - 6_500_000_000L, now, SoundTap.MAIN_KEEP_SECONDS)
         val random = Random(3)
-        val other = FloatArray(rate) { (random.nextFloat() * 2 - 1) * 0.3f }
-        val tail = SoundTap.Snapshot(rate, d, FloatArray(rate / d) { k -> other[k * d] }, (4.8 * rate).toLong() / d * d, main.marks)
+        val other = FloatArray(2 * rate) { (random.nextFloat() * 2 - 1) * 0.3f }
+        val tail = SoundTap.Snapshot(rate, d, FloatArray(2 * rate / d) { k -> other[k * d] }, (6.3 * rate).toLong() / d * d, main.marks)
         val match = SoundAlign.match(main, tail, now, 0, SoundAlign.RANGE_MS)
         assertNotNull(match)
         assertTrue(match.toString(), !match!!.sure)
@@ -99,7 +100,7 @@ class SoundAlignTest {
 
     @Test fun theOutputLineIgnoresALateBuffer() {
         val now = 10_000_000_000L
-        val s = snapshot(0, now - 5_000_000_000L, now, 3)
+        val s = snapshot(0, now - 5_000_000_000L, now, SoundTap.MAIN_KEEP_SECONDS)
         assertEquals(5.0 * rate, s.framesAt(now), 2.0)
         assertEquals(5.5 * rate, s.framesAt(now + 500_000_000L), 2.0)
     }

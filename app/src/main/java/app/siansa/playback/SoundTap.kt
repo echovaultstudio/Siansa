@@ -44,7 +44,7 @@ class SoundTap {
     private var accumulator = 0f
     private var accumulated = 0
     private val marks = ArrayDeque<Mark>()
-    private var keptSeconds = 3
+    private var keptSeconds = MAIN_KEEP_SECONDS
 
     /** Pending correction, read and cleared by the processor at its next buffer. */
     @Volatile private var pendingDrop = 0L
@@ -145,6 +145,9 @@ class SoundTap {
     val pending: Boolean get() = pendingDrop > 0 || pendingInsert > 0
 
     companion object {
+        /** How much sound a main player keeps: the tail's window, taken [SoundAlign.RANGE_MS] back, lies within it
+         *  for a tail up to that far behind. */
+        const val MAIN_KEEP_SECONDS = 4
         /** Frames to a kept sample: 44.1 kHz is kept at about 11 kHz, which places a match to a tenth of a ms. */
         const val DECIMATION = 4
         /** How many buffer moments are kept to place the output: at 5 to 90 ms a buffer, the last second or so. */

@@ -842,11 +842,11 @@ internal class Crossfader(
         /** The tail starts playing, silent, this long before the fade, to be sounding and in step by then: its
          *  position takes a while to be real, and each jump and nudge another (issues #807, #813, [TailSync.SETTLE_MS]). */
         const val PREROLL_MS = 14_000L
-        /** Lining the tail up by its sound (issue #818): how long after it starts both output buffers are full and
-         *  the buffer moments say where the output stands; how long a correction takes to go out (the output buffer,
+        /** Lining the tail up by its sound (issue #818): how long after it starts both output buffers are full, the
+         *  buffer moments say where the output stands and it has played the 1.5 s its window is taken from; how long a correction takes to go out (the output buffer,
          *  up to 750 ms, then a new window of sound); how soon to try again after no match; how often to check once
          *  in step; how many misses before positions take over; how many corrections at most. */
-        const val FILL_MS = 1_500L
+        const val FILL_MS = 2_000L
         const val SETTLE_SOUND_MS = 1_300L
         const val RETRY_MS = 700L
         const val CHECK_MS = 4_000L
@@ -854,8 +854,8 @@ internal class Crossfader(
         const val MAX_CORRECTIONS = 4
         /** Not yet measured by sound counts as this far out of step: the handover waits for it (up to a bar). */
         const val UNKNOWN_STEP_MS = 999L
-        /** How much sound the tail keeps (its window is 300 ms); the main player keeps [SoundTap]'s default. */
-        const val TAIL_KEEP_SECONDS = 1
+        /** How much sound the tail keeps: its window (300 ms) taken 1.2 s back from its end. */
+        const val TAIL_KEEP_SECONDS = 2
         /** While the tail plays silently, how often its step is checked. */
         const val ALIGN_MS = 50L
         /** Volume steps during a fade: 50 a second. */

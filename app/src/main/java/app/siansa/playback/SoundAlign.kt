@@ -8,11 +8,14 @@ import kotlin.math.sqrt
  * Finds how far the silent tail is behind the main player by the sound itself (issue #818). Pure maths over two
  * [SoundTap.Snapshot]s; [Crossfader] applies the answer.
  *
- * Both players play the same song, so the tail's last [WINDOW_MS] of sound occur somewhere in the main player's
- * last few seconds. The place they match best (normalised cross-correlation) says which frame of the main
- * player's stream each frame of the tail's is; with where each stream's output stands right now
+ * Both players play the same song, so a [WINDOW_MS] stretch of the tail's sound occurs somewhere in the main
+ * player's last few seconds. The stretch is taken [RANGE_MS] back from the tail's end, as a tail that far ahead
+ * has sound the main player hasn't played yet. The place they match best (normalised cross-correlation) says which
+ * frame of the main player's stream each frame of the tail's is; with where each stream's output stands right now
  * ([SoundTap.Snapshot.framesAt]) that gives how far behind the tail is heard, to a tenth of a ms. A match is
- * trusted when its peak stands clearly above the rest ([MIN_PEAK], [MIN_MARGIN]) and the window isn't near silence.
+ * trusted when its peak stands clearly above the best match elsewhere ([MIN_PEAK], [MIN_MARGIN]; elsewhere is
+ * further off than a note's period, [APART_MS], as a held bass note matches itself a period on) and the window
+ * isn't near silence.
  */
 object SoundAlign {
     class Match(
@@ -38,16 +41,17 @@ object SoundAlign {
         val d = follower.decimation
         val rate = follower.decimatedRate
         val window = WINDOW_MS * rate / 1000
-        if (follower.sound.size < window || reference.sound.size < window) return null
+        val back = (rangeMs * rate / 1000).toInt()
+        if (follower.sound.size < window + back || reference.sound.size < window) return null
         val f = follower.sound
-        val fStart = f.size - window
+        val fStart = f.size - window - back
         var energy = 0.0
         for (i in 0 until window) energy += f[fStart + i] * f[fStart + i]
         val rms = sqrt(energy / window)
         if (rms < MIN_RMS) return null
 
         // The window's first frame in the tail's numbering, and where both outputs stand now.
-        val windowFrame = follower.endFrame - window.toLong() * d
+        val windowFrame = follower.endFrame - (window + back).toLong() * d
         val followerNow = follower.framesAt(nowNanos)
         val referenceNow = reference.framesAt(nowNanos)
         val referenceFirstFrame = reference.endFrame - reference.sound.size.toLong() * d
@@ -96,8 +100,8 @@ object SoundAlign {
     /** A match is trusted from this strength, and when it stands this far above the best match elsewhere. */
     const val MIN_PEAK = 0.5f
     const val MIN_MARGIN = 0.15f
-    /** "Elsewhere" is further than this from the best match: the same beat a bar later, not the same place. */
-    const val APART_MS = 10
+    /** "Elsewhere" is further than this from the best match: a held note matches itself a period on (up to 50 ms). */
+    const val APART_MS = 50
     /** Where the tail is looked for: this far either side of what the players' positions say. */
     const val RANGE_MS = 1_200L
     /** Lined up to within this, the tail is in step by its sound. */
