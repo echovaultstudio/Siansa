@@ -26,7 +26,8 @@ class EmbyApiTest {
 
     /** Answers like an Emby server; [answer] gets each request after the login, which is handled here. */
     private class FakeEmby(val tokens: MutableList<String> = mutableListOf("t1", "t2"), val answer: (Seen) -> Pair<Int, String>) {
-        val seen = mutableListOf<Seen>()
+        // Requests can come in at once (album covers are looked up a few at a time): kept in a list that's safe for that.
+        val seen: MutableList<Seen> = java.util.Collections.synchronizedList(mutableListOf())
         val client: OkHttpClient = OkHttpClient.Builder().addInterceptor(Interceptor { respond(it.request()) }).build()
 
         private fun respond(request: Request): Response {
