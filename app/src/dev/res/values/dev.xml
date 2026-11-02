@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Siansa Dev (issue #824): the test build of the new audio engine, installed next to Siansa. Its own name and a
+     purple icon, so the two are told apart on the home screen and in the app switcher. -->
+<resources>
+    <string name="app_name">Siansa Dev</string>
+    <color name="ic_launcher_background_dev">#4A1D7A</color>
+</resources>

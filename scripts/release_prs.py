@@ -60,7 +60,8 @@ def is_release_commit(commit):
 
 def releases_with_commits(name):
     """Releases oldest first, each with the commits since the release before it."""
-    releases = [r for r in api(f"repos/{name}/releases?per_page=100") if not r["draft"]]
+    # Only the app's own releases (v…): the Siansa Dev pre-release (dev-latest, issue #824) isn't one.
+    releases = [r for r in api(f"repos/{name}/releases?per_page=100") if not r["draft"] and not r.get("prerelease") and r["tag_name"].startswith("v")]
     releases.sort(key=lambda r: r["published_at"])
     previous = None
     for r in releases:

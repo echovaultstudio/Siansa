@@ -38,6 +38,25 @@ class Grouping(unittest.TestCase):
         self.assertEqual(([p["number"] for p in prs], direct), ([1], 0))
 
 
+class DevBuild(unittest.TestCase):
+    def test_the_dev_pre_release_is_not_a_release(self):
+        # Siansa Dev's pre-release (issue #824) must not become a section of the release history.
+        listed = [dict(release("v0.1.0"), draft=False), dict(release("dev-latest"), draft=False, prerelease=True),
+                  dict(release("v0.2.0"), draft=True)]
+        calls = []
+
+        def fake_api(path):
+            calls.append(path)
+            return listed if path.endswith("/releases?per_page=100") else []
+
+        original = rp.api
+        rp.api = fake_api
+        try:
+            self.assertEqual([r["tag_name"] for r in rp.releases_with_commits("o/r")], ["v0.1.0"])
+        finally:
+            rp.api = original
+
+
 class Page(unittest.TestCase):
     def test_newest_first_with_links(self):
         text = rp.render(rp.group([release("v0.1.0", commit("a")), release("v0.2.0", commit("b"))],
