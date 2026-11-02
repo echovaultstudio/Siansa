@@ -3,6 +3,10 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.51.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.51.0beta) — 2026-11-02
+
+- [#817](https://github.com/echovaultstudio/Siansa/pull/817) DJ blends: load the next song ahead; resample instead of time-stretch (@Th3K1ngP1n)
+
 ## [0.50.1beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.50.1beta) — 2026-11-02
 
 - [#810](https://github.com/echovaultstudio/Siansa/pull/810) Swipe to remove from the queue goes left to right, behind a strip (@Th3K1ngP1n)
