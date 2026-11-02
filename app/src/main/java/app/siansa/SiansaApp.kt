@@ -42,6 +42,7 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
         registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: android.app.Activity) {
                 if (graph.settings.current.situation.movement) graph.scope.launch { graph.situation.noteSteps() }
+                graph.connection.cameToFront()
             }
             override fun onActivityCreated(activity: android.app.Activity, state: android.os.Bundle?) = Unit
             override fun onActivityResumed(activity: android.app.Activity) = Unit
