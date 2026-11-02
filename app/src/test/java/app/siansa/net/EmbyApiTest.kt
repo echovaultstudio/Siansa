@@ -224,7 +224,27 @@ class EmbyApiTest {
         }
         val detail = EmbyApi(server.client, { settings }).artist("ar1")
         assertEquals(listOf("a1"), detail.albums.map { it.id })
-        assertEquals("ar1", server.seen.last().query["ArtistIds"])
+        assertEquals("ar1", server.seen.first { it.query["IncludeItemTypes"] == "MusicAlbum" }.query["ArtistIds"])
+    }
+
+    /** Issue #811 (beta report 80dcb26b): album lists showed nothing where the player showed the song's art. */
+    @Test fun anAlbumListShowsSongCoversForAlbumsWithoutTheirOwn() = runBlocking {
+        val server = FakeEmby { seen ->
+            when (seen.query["ParentId"]) {
+                "a1" -> 200 to """{"Items":[{"Id":"s0","Name":"Intro","Type":"Audio","AlbumId":"a1"},
+                    {"Id":"s1","Name":"Shadow Box","Type":"Audio","AlbumId":"a1","ImageTags":{"Primary":"t"}}]}"""
+                "a3" -> 200 to """{"Items":[{"Id":"s3","Name":"Bare","Type":"Audio","AlbumId":"a3"}]}"""
+                else -> 200 to """{"Items":[{"Id":"a1","Name":"Untrue"},{"Id":"a2","Name":"Own","ImageTags":{"Primary":"x"}},{"Id":"a3","Name":"Bare"}]}"""
+            }
+        }
+        val api = EmbyApi(server.client, { settings })
+        val albums = api.albums("newest", 20, 0)
+        assertEquals(listOf("s1", "a2", null), albums.map { it.coverArt })  // the first song with a picture; its own; none
+        // Only the albums without a picture were asked, each once: a second list asks nothing more.
+        val lookups = { server.seen.count { it.query["IncludeItemTypes"] == "Audio" } }
+        assertEquals(2, lookups())
+        assertEquals(listOf("s1", "a2", null), api.albums("newest", 20, 0).map { it.coverArt })
+        assertEquals(2, lookups())
     }
 
     @Test fun artistRadioIsTheArtistsInstantMix() = runBlocking {
