@@ -277,14 +277,14 @@ internal class Crossfader(
         val now = SystemClock.elapsedRealtime()
         val position = main.currentPosition
         when (val action = tailSync.step(now, position - t.currentPosition, position)) {
-            TailSync.Action.Wait -> if (t.playbackParameters.speed != mainSpeed) t.setPlaybackSpeed(mainSpeed)
+            TailSync.Action.Wait -> setSpeed(t, mainSpeed)
             is TailSync.Action.Jump -> {
                 AppLog.d("Crossfade", "Tail jumping to catch up (jump ${action.jumps}): to ${action.targetMs} ms, ${tailSync.learnedLead} ms ahead of the main player")
                 t.seekTo(action.targetMs)
             }
             is TailSync.Action.Speed -> {
                 val wanted = mainSpeed * action.factor
-                if (BeatMatch.worthChanging(t.playbackParameters.speed, wanted) || (action.factor == 1f && t.playbackParameters.speed != mainSpeed)) t.setPlaybackSpeed(wanted)
+                if (BeatMatch.worthChanging(t.playbackParameters.speed, wanted) || action.factor == 1f) setSpeed(t, wanted)
                 // Twice a second, how the catch-up goes (issue #796: the tail was ~160 ms behind at three handovers).
                 if (abs(action.behindMs) > Crossfade.HANDOVER_STEP_MS && now - tailLoggedAt >= 500) {
                     tailLoggedAt = now
@@ -392,7 +392,7 @@ internal class Crossfader(
                 if (t.playbackState == Player.STATE_BUFFERING) "loading" else "ready",
             )
         } else ""
-        t.setPlaybackSpeed(main.playbackParameters.speed.takeIf { it > 0f } ?: 1f)
+        setSpeed(t, main.playbackParameters.speed.takeIf { it > 0f } ?: 1f)
         t.volume = 0f
         if (!t.isPlaying) t.play()
         AppLog.i(
@@ -439,7 +439,7 @@ internal class Crossfader(
                         }
                         // The new song comes in at the matched speed, where it should be right now against the old
                         // song's beats (the old song's position is the tail's).
-                        main.setPlaybackSpeed(baseSpeed * beat.speed)
+                        setSpeed(main, baseSpeed * beat.speed)
                         // Sent ahead by what getting there takes on this phone, so it lands on the beat (issue #747).
                         val lead = seekLag
                         seekLead = lead
@@ -531,7 +531,7 @@ internal class Crossfader(
         }
         // Only a change worth hearing is sent: re-tuning the time-stretcher every 50 ms is heard as a flutter (#773).
         val wanted = baseSpeed * beat.speed * BeatMatch.nudge(error)
-        if (BeatMatch.worthChanging(main.playbackParameters.speed, wanted)) main.setPlaybackSpeed(wanted)
+        if (BeatMatch.worthChanging(main.playbackParameters.speed, wanted)) setSpeed(main, wanted)
     }
 
     /**
@@ -592,15 +592,27 @@ internal class Crossfader(
         echoUntil = 0L
     }
 
+    /**
+     * Plays [player] at [speed] (issue #816). The pitch follows the speed, as a DJ's pitch fader does: the sound is
+     * resampled, which keeps every drum hit as it was. Time-stretching to keep the key (Media3's Sonic, made for
+     * speech) chops music into small pieces and joins them, heard as a stutter like a song catching up after
+     * buffering; it's only used when the listener asks to keep the key. The main player's own speed ([baseSpeed],
+     * 1 for music) stays stretched, so only the blend's shift moves the pitch: at most 0.7 of a semitone at 4 %.
+     */
+    private fun setSpeed(player: ExoPlayer, speed: Float) {
+        val wanted = BeatMatch.parameters(speed, baseSpeed, settings().keepKey)
+        if (player.playbackParameters != wanted) player.playbackParameters = wanted
+    }
+
     /** After a beat-matched blend, the new song eases back to its own speed. */
     private val easeTick = object : Runnable {
         override fun run() {
             if (easingFrom == 0f) return
             val elapsed = SystemClock.elapsedRealtime() - easingSince
-            // Only steps worth hearing as a tempo change: each one re-tunes the time-stretcher (issue #796).
+            // Only steps worth hearing as a tempo change: each one re-tunes the resampler (issue #796).
             BeatMatch.easeStep(easingFrom, elapsed, main.playbackParameters.speed, baseSpeed)?.let {
                 easeChanges++
-                main.setPlaybackSpeed(it)
+                setSpeed(main, it)
             }
             if (elapsed >= BeatMatch.EASE_MS) {
                 easingFrom = 0f
@@ -629,7 +641,7 @@ internal class Crossfader(
         handler.removeCallbacks(easeTick)
         if (easingFrom != 0f) {
             easingFrom = 0f
-            main.setPlaybackSpeed(baseSpeed)
+            setSpeed(main, baseSpeed)
         }
     }
 
@@ -637,7 +649,7 @@ internal class Crossfader(
         handler.removeCallbacks(fadeTick)
         val beat = plan?.beat
         if (beat != null && phase == Phase.FADING && switched) {
-            if (main.currentMediaItemIndex == incomingIndex) startEasing(beat) else main.setPlaybackSpeed(baseSpeed)
+            if (main.currentMediaItemIndex == incomingIndex) startEasing(beat) else setSpeed(main, baseSpeed)
         }
         phase = Phase.IDLE
         primed = false
