@@ -28,7 +28,10 @@ library, play history and settings. A user can be on the same server or a differ
 - Open another user's card to change its server address, user name, password, proxy login, name and name in
   AudioMuse without switching to it; **Save** keeps the changes. **Switch to it** (Siansa restarts) saves them first;
   **Remove** takes it off the phone.
-- **Add a music server** for another login (on the same server or a different one).
+- **Add a music server** for another login (on the same server or a different one): a **New server** card opens on
+  the same page, with the server type (OpenSubsonic, Jellyfin or Emby), its address, user name, password and **Test**.
+  Nothing is added until you tap **Save**, and the music keeps playing; **Cancel** or going back leaves nothing
+  behind. Saved, it shows as another login: **Switch to it** there when you want to use it (Siansa restarts).
 - **Name shown in Siansa**, in the card of the server in use, shows a name like "Home" instead of its address.
 - **Remove** a user to take their library, history and settings off the phone. Nothing changes on the server.
 - **Name a server** with the pencil next to a user, for example "Home" or "Kids". That user then shows the name

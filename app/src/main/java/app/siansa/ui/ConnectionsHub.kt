@@ -98,7 +98,38 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
     val othersSaved = remember(changes) { users.filter { it.id != Users.active }.associate { it.id to SettingsRepository(context, it.id).current } }
     var others by remember(changes) { mutableStateOf(othersSaved) }
     var otherNames by remember(changes) { mutableStateOf(users.filter { it.id != Users.active }.associate { it.id to it.serverName.orEmpty() }) }
+    // A server being added (issue #828): only on this page until it's saved, so nothing is added, switched to or
+    // restarted before then, and the music plays on.
+    var adding by rememberSaveable { mutableStateOf(false) }
+    var newServer by remember { mutableStateOf(AppSettings()) }
+    var newName by remember { mutableStateOf("") }
     fun toggle(key: String) { opened = if (key in opened) opened - key else opened + key }
+
+    /** Keeps the server being added as another login; false (with [problem] set) when it can't be. */
+    fun saveNew(): Boolean {
+        if (newServer.navidromeUrl.isBlank() || newServer.navidromeUser.isBlank()) {
+            problem = "New server: enter its address and username first"
+            return false
+        }
+        val id = try {
+            Users.add(context) { id ->
+                val store = SettingsRepository(context, id)
+                store.save(store.current.withServerFrom(newServer).copy(sourceKind = newServer.sourceKind))
+            }
+        } catch (e: Exception) {
+            problem = "New server: ${e.message}"
+            return false
+        }
+        if (newName.isNotBlank()) Users.setServerName(context, id, newName)
+        AppLog.i("Settings", "Server added as another login: ${newServer.sourceKind.label} ${AppLog.redact(newServer.navidromeUrl)} as ${newServer.navidromeUser}")
+        adding = false
+        newServer = AppSettings()
+        newName = ""
+        problem = null
+        opened = opened + "user-$id"
+        changes++
+        return true
+    }
 
     /** Keeps another login's changed server settings and name; false (with [problem] set) when they can't be. */
     fun saveOther(user: UserEntry): Boolean {
@@ -121,7 +152,9 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
     }
 
     fun save() {
-        // Other logins first: each save writes the shared AudioMuse and AI settings too, and the page's own come last.
+        // A server being added, then the other logins: each save writes the shared AudioMuse and AI settings too, and
+        // the page's own come last.
+        if (adding && !saveNew()) return
         for (user in users) if (user.id != Users.active && !saveOther(user)) return
         val before = graph.settings.current
         try {
@@ -205,14 +238,30 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 AudiobookshelfFields(graph, draft) { draft = it; problem = null }
                 Button(onClick = ::save, modifier = Modifier.fillMaxWidth()) { Text("Save") }
             }
-            Row(
-                Modifier.fillMaxWidth().clickable { Users.addAndSwitch(context) }.padding(vertical = Space.Medium).testTag("addServer"),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Rounded.Add, null, tint = MaterialTheme.colorScheme.primary)
-                Column(Modifier.weight(1f).padding(start = Space.Page)) {
-                    Text("Add a music server", style = MaterialTheme.typography.bodyLarge)
-                    Hint("Another login on a server, or another server, with its own library. Siansa restarts and asks for it. To show several together, use the filter button on Home.")
+            if (adding) {
+                FoldCard(
+                    icon = Icons.Rounded.Add,
+                    title = "New server",
+                    subtitle = "Not saved yet",
+                    accent = false,
+                    expanded = true,
+                    onToggle = {},
+                    tag = "fold-newServer",
+                ) {
+                    ServerKindChips(newServer.sourceKind) { newServer = newServer.copy(sourceKind = it); problem = null }
+                    ServerFields(graph, newServer, { newServer = it; problem = null }, newName, { newName = it }, nav, inUse = false)
+                    NewServerButtons(onSave = { saveNew() }, onCancel = { adding = false; newServer = AppSettings(); newName = ""; problem = null })
+                }
+            } else {
+                Row(
+                    Modifier.fillMaxWidth().clickable { adding = true }.padding(vertical = Space.Medium).testTag("addServer"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Rounded.Add, null, tint = MaterialTheme.colorScheme.primary)
+                    Column(Modifier.weight(1f).padding(start = Space.Page)) {
+                        Text("Add a music server", style = MaterialTheme.typography.bodyLarge)
+                        Hint("Another login on a server, or another server, with its own library. Nothing is added until you save it, and the music keeps playing. To show several together, use the filter button on Home.")
+                    }
                 }
             }
 
@@ -528,3 +577,25 @@ internal fun aiModelFor(provider: AiProvider, typed: String): String = provider.
 
 /** The Audiobookshelf card's line: the kind of server, and whether it's set up. */
 internal fun absLine(ready: Boolean): String = if (ready) "Audiobooks and podcasts · set up" else "Audiobooks and podcasts · not set up"
+
+/** The new server's type (issue #828): the servers Siansa can play from, as chips. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun ServerKindChips(kind: SourceKind, onKind: (SourceKind) -> Unit) {
+    Text("Server type", style = MaterialTheme.typography.bodyLarge)
+    FlowRow(Modifier.testTag("serverKinds"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        SourceKind.entries.filter { it.ready }.forEach { k ->
+            FilterChip(selected = kind == k, onClick = { onKind(k) }, label = { Text(k.label) }, modifier = Modifier.testTag("serverKind-${k.name}"))
+        }
+    }
+}
+
+/** Save or cancel the server being added (issue #828): switching to it is a separate step, once it's saved. */
+@Composable
+internal fun NewServerButtons(onSave: () -> Unit, onCancel: () -> Unit) {
+    Hint("Saved, it shows above as another login. Switch to it there when you want to use it (Siansa restarts).")
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        Button(onClick = onSave, modifier = Modifier.testTag("saveNewServer")) { Text("Save") }
+        OutlinedButton(onClick = onCancel) { Text("Cancel") }
+    }
+}
