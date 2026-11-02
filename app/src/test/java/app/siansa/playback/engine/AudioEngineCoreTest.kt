@@ -254,4 +254,41 @@ class AudioEngineCoreTest {
         repeat(20) { stream.render(out, 0, 256, mix, 44_100); mix += 256 }
         assertEquals(0.2f, out[200], 0.01f)
     }
+
+    @Test fun aJumpThatLandsPastItsPointStillComesInOnTheGrid() {
+        // 0.52.0-dev: a jump lands on the start of a decoded block, up to 0.1 s past where it was sent; the next song
+        // came in that much early (beats 13 to 96 ms apart all through the blend).
+        val deck = MixCore.Deck("main")
+        deck.cueNext(1_000_000, 44_100, 44_100, seekUs = 700_000)
+        deck.flushed()
+        deck.mark(0, 1_050_000)
+        val stream = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        deck.add(stream)
+        stream.write(float(FloatArray(44_100 * 2) { i -> if (i / 2 == 0) 1f else 0f }))
+        stream.play()
+        val out = FloatArray(512)
+        var mix = 0L
+        var click = -1L
+        while (mix < 60_000) {
+            stream.render(out, 0, 256, mix, 44_100)
+            for (i in 0 until 256) if (out[i * 2] > 0.5f) click = mix + i
+            mix += 256
+        }
+        // 1.050 s is 50 ms after the cued 1.000 s: 2 205 frames after mix frame 44 100.
+        assertEquals(46_305L, click)
+    }
+
+    @Test fun aStreamLeftHeldByAFadeIsFreed() {
+        val stream = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        stream.write(float(FloatArray(44_100 * 2) { 0.4f }))
+        stream.play()
+        stream.cutAt(100)
+        val out = FloatArray(512)
+        stream.render(out, 0, 256, 0, 44_100)
+        assertTrue(stream.held)
+        stream.freeHold()
+        var mix = 256L
+        repeat(10) { stream.render(out, 0, 256, mix, 44_100); mix += 256 }
+        assertEquals(0.4f, out[400], 0.01f)
+    }
 }

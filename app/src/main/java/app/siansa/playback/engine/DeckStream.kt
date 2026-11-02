@@ -226,15 +226,17 @@ class DeckStream(
      * couldn't be played).
      */
     fun cue(cue: Cue): Cued = synchronized(lock) {
-        val target = cue.frame.roundToLong().coerceAtLeast(0L)
+        val target = cue.frame.roundToLong()
         // Frames before what's kept can't be played any more: it starts that much later, still on the grid (the
-        // gate moves by as long as they'd have taken).
+        // gate moves by as long as they'd have taken). The same when the wanted point is before the first frame
+        // written: a jump lands on the start of a decoded block, up to 0.1 s past where it was sent (0.52.0-dev:
+        // the next song came in that much early, heard as a trainwreck of 13 to 96 ms).
         val ratio = sampleRate.toDouble() * speed / cue.outRate
         // A cue whose moment the mixer is already past (its data came late) starts as far on as the stream would be.
         val late = if (renderedTo != Long.MIN_VALUE && renderedTo > cue.mixFrame) renderedTo - cue.mixFrame else 0L
         val wanted = target + late * ratio
-        val missing = (first - floor(wanted).toLong()).coerceAtLeast(0L)
-        readPos = max(wanted, first.toDouble())
+        val missing = (max(first, 0L) - floor(wanted).toLong()).coerceAtLeast(0L)
+        readPos = max(wanted, max(first, 0L).toDouble())
         val from = floor(readPos).toLong()
         if (from > end) {
             dropUntil = from
@@ -252,6 +254,19 @@ class DeckStream(
     /** Silent for good from mix frame [mix] on, at once (no fade): its sound carries on from another copy. */
     fun cutAt(mix: Long) {
         synchronized(lock) { cutAt = mix }
+    }
+
+    /** Silenced, or held back for a cue still ahead: what a fade does to a stream for a while. */
+    val held: Boolean get() = synchronized(lock) { cutAt != Long.MAX_VALUE || (gate != Long.MIN_VALUE && gate > renderedTo) }
+
+    /** Plays freely again: no cut, no cue (a fade that set them is gone). */
+    fun freeHold() {
+        synchronized(lock) {
+            cutAt = Long.MAX_VALUE
+            gate = Long.MIN_VALUE
+            holdGrid = false
+            dropUntil = 0
+        }
     }
 
     // ---- The mixer's side ----

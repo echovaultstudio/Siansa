@@ -128,6 +128,7 @@ internal class MixedCrossfader(
     /** Gets the next fade ready, cues it and starts it. Returns when to look again (ms), or 0 to stop looking. */
     private fun look(): Long {
         if (phase == Phase.FADING || !main.isPlaying) return 0
+        if (phase == Phase.IDLE) freeMain()
         if (phase == Phase.CUED) {
             // The tail takes over at its mix frame; once the mixer is past it, the next song is cued.
             if (engine.writtenMix > handoverMix) {
@@ -317,9 +318,12 @@ internal class MixedCrossfader(
             }
             if (settings().keepKey) AppLog.d("Crossfade", "Keep the key: not in the new audio engine yet; the pitch follows the speed")
         }
-        mainMix.cueNext(from * 1000, incomingMix, engine.outRate)
+        // Sent a little before its point: a jump lands on the start of a decoded block at or after where it's
+        // sent, so the point itself is then in what's decoded and the cue is exact.
+        val seekTo = (from - INCOMING_SEEK_BACK_MS).coerceAtLeast(0L)
+        mainMix.cueNext(from * 1000, incomingMix, engine.outRate, seekUs = seekTo * 1000)
         expectSeek = true
-        main.seekTo(incomingIndex, from)
+        main.seekTo(incomingIndex, seekTo)
         val inMs = ((incomingMix - engine.heardMix()) * 1000 / engine.outRate).toLong()
         AppLog.i(
             "Crossfade",
@@ -430,6 +434,18 @@ internal class MixedCrossfader(
 
     // ---- Ending ----
 
+    /**
+     * With no fade under way, the main player is never left silenced or held for a cue (a short song can end
+     * while its copy is silenced for a handover, and gapless, the songs after it would stay silent).
+     */
+    private fun freeMain() {
+        val stream = mainMix.current ?: return
+        if (stream.held) {
+            stream.freeHold()
+            AppLog.w("Crossfade", "The main player was left silenced by a fade that's gone; its sound is back")
+        }
+    }
+
     private fun disarm() {
         if (phase == Phase.FADING) return
         uncut()
@@ -437,6 +453,7 @@ internal class MixedCrossfader(
         outgoing = null
         plan = null
         phase = Phase.IDLE
+        freeMain()
     }
 
     /** The main player's stream sounds again, if a cue silenced it and the fade didn't go ahead. */
@@ -577,6 +594,8 @@ internal class MixedCrossfader(
         /** A tail not loaded this close to the handover is given up on. */
         const val GIVE_UP_BEFORE_MS = 300L
         const val CUED_POLL_MS = 20L
+        /** The next song is sent this far before its point (a jump lands up to a decoded block past it). */
+        const val INCOMING_SEEK_BACK_MS = 300L
         const val TICK_MS = 20L
         const val GIVE_UP_MS = 10_000L
         const val EASE_TICK_MS = 200L

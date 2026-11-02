@@ -130,10 +130,10 @@ class MixCore(val outRate: Int) {
          * Puts the song's time [mediaUs] of this deck's next stream (the one its player starts after a seek) at mix
          * frame [mixFrame] (issue #826).
          */
-        fun cueNext(mediaUs: Long, mixFrame: Long, outRate: Int) {
+        fun cueNext(mediaUs: Long, mixFrame: Long, outRate: Int, seekUs: Long = mediaUs) {
             lastCued = null
             nextCue = Triple(mediaUs, mixFrame, outRate)
-            expectSeek(mediaUs)
+            expectSeek(seekUs)
         }
 
         /** Puts the song's time [mediaUs] of the stream playing now at [mixFrame]. Null when there's none, or no mark. */
