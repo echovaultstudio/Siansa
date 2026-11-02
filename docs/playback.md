@@ -118,8 +118,9 @@ step.
 It's experimental: downbeats are the hardest thing to hear in a recording, so when either song's bars aren't clear
 the songs are laid beat on beat instead, and a mix can land a beat off. The log says how each blend was planned and
 how far the next song was out of step. Behind the scenes, a second copy of the song going out plays silently for
-the last 8 seconds before a blend and is brought in step with the one you hear (a jump or two, then a slight nudge
-of speed), so it can take the song over without a hitch; a blend may start up to a bar late rather than out of
+the last 14 seconds before a blend and is brought in step with the one you hear (a jump or two, then a short nudge
+of speed, each judged only once the phone reports a real position, which takes a few seconds), so it can take the
+song over without a hitch; a blend may start up to a bar late rather than out of
 step. Songs the plugin measured before it measured beats keep their loudness and
 fades and get their beats when the plugin measures them again: see the **Beat grids** section on the plugin's settings page
 ([AudioMuse-AI](audiomuse.md)).

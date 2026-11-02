@@ -12,12 +12,14 @@ import kotlin.math.abs
  * 3 s it had, and most fades began with the tail 40 to 150 ms off, still at 0.75×.
  *
  * Both play at the same speed, so the gap between them is a constant, not a drift: it needs one measurement and
- * one jump, not a chase. After the tail starts (or jumps) its position isn't real for a moment ([SETTLE_MS]: a
- * newly started track reports where the buffer is, not what's heard), so nothing is judged until then. Then the
- * middle of a few readings is the gap; a jump to just ahead of the main player by [lead] closes it, and what's
- * left after that jump says what a jump costs on this phone, which the next one allows for ([learnedLead]). At
- * most [MAX_JUMPS] jumps; after them, and for anything under [JUMP_MS], the speed nudges it in step over a few
- * seconds ([nudge]): tiny, so a nudge can't overshoot by more than it corrects.
+ * one jump, not a chase. After the tail starts (or jumps) its position isn't real for a while ([SETTLE_MS]: for
+ * about 2.3 s a track just started reports where its buffer is, then snaps by 100 to 270 ms to what's heard;
+ * issue #813), so nothing is judged until then. Then the middle of a few readings is the gap; a jump to just ahead
+ * of the main player by [lead] closes it, and what's left after that jump says what a jump costs on this phone,
+ * which the next one allows for ([learnedLead]). At most [MAX_JUMPS] jumps; after them, and for anything under
+ * [JUMP_MS], a nudge: the tail runs [NUDGE_RATE] faster or slower for exactly as long as closes the gap, then
+ * back at the main player's speed, and is only judged again once that has shown ([nudgeFor]). Re-judging every
+ * 50 ms against a reading seconds old was what left the tail 20 to 50 ms off at the handover.
  */
 class TailSync(lead: Long = DEFAULT_LEAD_MS) {
     sealed interface Action {
@@ -37,6 +39,9 @@ class TailSync(lead: Long = DEFAULT_LEAD_MS) {
     private var jumps = 0
     /** The lead of the jump in flight, until its settled gap has been measured. */
     private var jumpLead: Long? = null
+    /** A nudge in flight: its speed factor and when it ends. */
+    private var nudgeFactor = 1f
+    private var nudgeUntil = 0L
 
     /** The tail just started playing silently at [now]. */
     fun primed(now: Long) {
@@ -44,6 +49,8 @@ class TailSync(lead: Long = DEFAULT_LEAD_MS) {
         recent.clear()
         jumps = 0
         jumpLead = null
+        nudgeFactor = 1f
+        nudgeUntil = 0L
     }
 
     val jumpsMade: Int get() = jumps
@@ -53,6 +60,7 @@ class TailSync(lead: Long = DEFAULT_LEAD_MS) {
      * [mainPositionMs] of the song.
      */
     fun step(now: Long, behindMs: Long, mainPositionMs: Long): Action {
+        if (now < nudgeUntil) return Action.Speed(nudgeFactor, behindMs)
         if (now < settledAt) return Action.Wait
         recent.addLast(behindMs)
         if (recent.size > READINGS) recent.removeFirst()
@@ -71,12 +79,18 @@ class TailSync(lead: Long = DEFAULT_LEAD_MS) {
             recent.clear()
             return Action.Jump(mainPositionMs + learnedLead, jumps)
         }
-        return Action.Speed(nudge(gap), gap)
+        if (abs(gap) <= IN_STEP_MS) return Action.Speed(1f, gap)
+        // Open loop: run faster or slower for just as long as closes the gap, then judge again once it has shown.
+        nudgeFactor = if (gap > 0) 1f + NUDGE_RATE else 1f - NUDGE_RATE
+        nudgeUntil = now + nudgeFor(gap)
+        settledAt = nudgeUntil + SETTLE_MS
+        recent.clear()
+        return Action.Speed(nudgeFactor, gap)
     }
 
     companion object {
-        /** After the tail starts or jumps, how long before its position is trusted. */
-        const val SETTLE_MS = 800L
+        /** After the tail starts, jumps or changes speed, how long before its position is trusted (issue #813). */
+        const val SETTLE_MS = 3_000L
         /** How many checks (50 ms apart) the gap is the middle of: one reading can be well off and back the next. */
         const val READINGS = 5
         /** Further off than this, the tail jumps (while it may); closer, the speed brings it in. */
@@ -87,13 +101,10 @@ class TailSync(lead: Long = DEFAULT_LEAD_MS) {
         const val MAX_LEAD_MS = 600L
         /** Within this, in step: no nudge. */
         const val IN_STEP_MS = 10L
-        /** A nudge brings the tail in step over about this long (it's silent, so a little quicker than the next
-         *  song's [BeatMatch.NUDGE_OVER_MS]), never more than [NUDGE_MAX] off the main player's speed. */
-        const val NUDGE_OVER_MS = 3_000f
-        const val NUDGE_MAX = 0.015f
+        /** How much faster or slower a nudge runs: the tail is silent, so nobody hears it. */
+        const val NUDGE_RATE = 0.03f
 
-        /** The speed that brings a tail [behindMs] behind in step: a touch faster when behind, slower when ahead. */
-        fun nudge(behindMs: Long): Float =
-            if (abs(behindMs) <= IN_STEP_MS) 1f else (1f + behindMs / NUDGE_OVER_MS).coerceIn(1f - NUDGE_MAX, 1f + NUDGE_MAX)
+        /** How long a nudge at [NUDGE_RATE] takes to close a gap of [behindMs] (either way): 66 ms takes 2.2 s. */
+        fun nudgeFor(behindMs: Long): Long = (abs(behindMs) / NUDGE_RATE).toLong()
     }
 }

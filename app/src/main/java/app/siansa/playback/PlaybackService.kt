@@ -695,7 +695,12 @@ class PlaybackService : MediaSessionService() {
             focusRescued = false
             restarted = false
             resetProgressWatch()
-            if (player.playWhenReady) armStartWatch()
+            // A song that ran straight on from the last (gapless) is playing already: nothing to wait for (issue #813:
+            // the timer then ran until the next start, and a seek minutes later logged "started 242386 ms after").
+            if (player.isPlaying) {
+                startRequestedAt = 0L
+                handler.removeCallbacks(startWatch)
+            } else if (player.playWhenReady) armStartWatch()
             val level = Levelling.decide(song, graph.settings.current, graph.profiles.cached(song.id))
             baseVolume = level.volume
             AppLog.i("Loudness", "Song ${song.id} levelled by ${level.source.name.lowercase()}: ${"%+.1f".format(level.gainDb)} dB (${level.why})")

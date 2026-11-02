@@ -726,7 +726,7 @@ internal class Crossfader(
         /** How often to look while a song plays. */
         const val LOOK_MS = 1_000L
         /** The tail is made ready this long before the longest possible fade. */
-        const val PREPARE_MS = 10_000L
+        const val PREPARE_MS = 16_000L
         /** A fade needs at least this long to get ready, or that song plays on without one. */
         const val MIN_PREPARE_MS = 1_500L
         /** Starting this close to the planned moment is on time. */
@@ -735,22 +735,22 @@ internal class Crossfader(
          *  sound like one through a comb while both play (issue #759). */
         const val HANDOVER_MS = 60L
         /** The tail starts playing, silent, this long before the fade, to be sounding and in step by then: its
-         *  position takes a moment to be real, and each jump another (issue #807, [TailSync.SETTLE_MS]). */
-        const val PREROLL_MS = 8_000L
+         *  position takes a while to be real, and each jump and nudge another (issues #807, #813, [TailSync.SETTLE_MS]). */
+        const val PREROLL_MS = 14_000L
         /** While the tail plays silently, how often its step is checked. */
         const val ALIGN_MS = 50L
         /** Volume steps during a fade: 50 a second. */
         const val TICK_MS = 20L
         /** How long after the old song has faded out to wait for the new one to start fading in. */
         const val GIVE_UP_MS = 10_000L
-        /** After a seek in a beat-matched blend, how long before the new song's position is trusted (issue #807:
-         *  for most of a second a track just started reports where its buffer is, not what's heard). */
-        const val SETTLE_MS = 800L
+        /** After a seek in a beat-matched blend, how long before the new song's position is trusted (issues #807,
+         *  #813: for about 2.3 s a track just started reports where its buffer is, then snaps to what's heard). */
+        const val SETTLE_MS = 3_000L
         /** How often the new song may be jumped into step in one blend (once more after a stall), and only this
          *  soon after it came in. */
         const val MAX_JUMPS = 1
         const val MAX_JUMPS_STALLED = 2
-        const val JUMP_WINDOW_MS = 3_000L
+        const val JUMP_WINDOW_MS = 4_500L
         /** The bass swap (issue #807) runs over this much of the blend from its start. */
         const val SWAP_FRACTION = 0.5f
         const val SWAP_FRACTION_PERCENT = 50

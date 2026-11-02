@@ -30,51 +30,60 @@ class CrossfadeHandoverTest {
     }
 
     @Test fun theTailWaitsForItsPositionToBeRealThenJumpsOnce() {
-        // Issue #807: the tail's position isn't real for most of a second after it starts; nothing is judged until then.
+        // Issue #807, #813: the tail's position isn't real for seconds after it starts; nothing is judged until then.
         val sync = TailSync()
         sync.primed(now = 0)
         assertEquals(TailSync.Action.Wait, sync.step(now = 500, behindMs = 200, mainPositionMs = 100_500))
+        assertEquals(TailSync.Action.Wait, sync.step(now = 2_500, behindMs = 200, mainPositionMs = 102_500))
         // Real, and five readings (one of them wild) say it's 80 ms behind: one jump, sent ahead by the phone's cost.
-        listOf(78L, 300L, 82L, 80L).forEach { assertEquals(TailSync.Action.Wait, sync.step(800, it, 101_000)) }
-        val jump = sync.step(1_000, 79, 101_000) as TailSync.Action.Jump
-        assertEquals(101_000 + TailSync.DEFAULT_LEAD_MS, jump.targetMs)
+        listOf(78L, 300L, 82L, 80L).forEach { assertEquals(TailSync.Action.Wait, sync.step(3_000, it, 103_000)) }
+        val jump = sync.step(3_200, 79, 103_200) as TailSync.Action.Jump
+        assertEquals(103_200 + TailSync.DEFAULT_LEAD_MS, jump.targetMs)
         assertEquals(1, jump.jumps)
         // Then it settles again. The jump went 100 ahead and left it 30 behind: a jump costs 130 ms on this phone.
-        assertEquals(TailSync.Action.Wait, sync.step(1_500, 30, 101_500))
-        repeat(4) { sync.step(1_800, 30, 101_800) }
-        val speed = sync.step(2_000, 30, 102_000) as TailSync.Action.Speed
+        assertEquals(TailSync.Action.Wait, sync.step(5_000, 30, 105_000))
+        repeat(4) { sync.step(6_200, 30, 106_200) }
+        val speed = sync.step(6_400, 30, 106_400) as TailSync.Action.Speed
         assertEquals(130L, sync.learnedLead)
         assertEquals(30L, speed.behindMs)
-        // 30 ms is under the jump threshold: a slight nudge brings it in, never a quarter faster as before.
-        assertEquals(1.01f, speed.factor, 0.0001f)
+        // 30 ms is under the jump threshold: a nudge, 3 % faster for exactly the second that makes up 30 ms.
+        assertEquals(1.03f, speed.factor, 0.0001f)
+        assertEquals(1_000L, TailSync.nudgeFor(30))
+        assertEquals(1.03f, (sync.step(7_000, 20, 107_000) as TailSync.Action.Speed).factor, 0.0001f)
+        // The nudge over: back at the main player's speed, and judged again only once that has shown.
+        assertEquals(TailSync.Action.Wait, sync.step(7_500, 5, 107_500))
+        assertEquals(TailSync.Action.Wait, sync.step(10_000, 5, 110_000))
+        repeat(4) { sync.step(10_500, 5, 110_500) }
+        assertEquals(TailSync.Action.Speed(1f, 5), sync.step(10_600, 5, 110_600))
         assertEquals(1, sync.jumpsMade)
     }
 
     @Test fun aSecondJumpUsesWhatTheFirstTaught() {
         val sync = TailSync(lead = 60)
         sync.primed(0)
-        repeat(4) { sync.step(900, 150, 100_900) }
-        val first = sync.step(1_000, 150, 101_000) as TailSync.Action.Jump
-        assertEquals(101_060L, first.targetMs)
+        repeat(4) { sync.step(3_000, 150, 103_000) }
+        val first = sync.step(3_100, 150, 103_100) as TailSync.Action.Jump
+        assertEquals(103_160L, first.targetMs)
         // Still 60 behind after settling: the jump cost 120, so the second one is sent 120 ahead.
-        repeat(4) { sync.step(1_900, 60, 101_900) }
-        val second = sync.step(2_000, 60, 102_000) as TailSync.Action.Jump
-        assertEquals(102_120L, second.targetMs)
+        repeat(4) { sync.step(6_200, 60, 106_200) }
+        val second = sync.step(6_300, 60, 106_300) as TailSync.Action.Jump
+        assertEquals(106_420L, second.targetMs)
         assertEquals(2, second.jumps)
-        // No third: from here the speed does it, even for a big gap.
-        repeat(4) { sync.step(2_900, 200, 102_900) }
-        val speed = sync.step(3_000, 200, 103_000) as TailSync.Action.Speed
-        assertEquals(1f + TailSync.NUDGE_MAX, speed.factor, 0.0001f)
+        // No third: from here a nudge does it, even for a big gap (200 ms takes 6.7 s at 3 %).
+        repeat(4) { sync.step(9_400, 200, 109_400) }
+        val speed = sync.step(9_500, 200, 109_500) as TailSync.Action.Speed
+        assertEquals(1f + TailSync.NUDGE_RATE, speed.factor, 0.0001f)
+        assertEquals(6_666L, TailSync.nudgeFor(200))
     }
 
-    @Test fun theNudgeIsSlightAndGoesBothWays() {
-        assertEquals(1f, TailSync.nudge(0), 0f)
-        assertEquals(1f, TailSync.nudge(10), 0f)
-        assertEquals(1f, TailSync.nudge(-10), 0f)
-        assertEquals(1.01f, TailSync.nudge(30), 0.0001f)
-        assertEquals(0.99f, TailSync.nudge(-30), 0.0001f)
-        assertEquals(1.015f, TailSync.nudge(200), 0.0001f)
-        assertEquals(0.985f, TailSync.nudge(-200), 0.0001f)
+    @Test fun aNudgeRunsSlowerWhenAhead() {
+        val sync = TailSync()
+        sync.primed(0)
+        repeat(4) { sync.step(3_000, -30, 103_000) }
+        val speed = sync.step(3_100, -30, 103_100) as TailSync.Action.Speed
+        assertEquals(0.97f, speed.factor, 0.0001f)
+        assertEquals(1_000L, TailSync.nudgeFor(-30))
+        assertEquals(0L, TailSync.nudgeFor(0))
     }
 
     @Test fun theLogSaysWhyThereIsNoFade() {
