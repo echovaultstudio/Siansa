@@ -75,7 +75,7 @@ plugin. Two songs that both keep a beat can clash at the changeover when their b
 like a bad DJ set. The Siansa plugin for AudioMuse measures the beat grid at each end of every song, so Siansa can
 blend them the way a DJ mixes:
 
-- **DJ radio** (the default): in DJ radio and DJ keep-playing, a song that keeps a beat blends into the next one the
+- **DJ radio**: in DJ radio and DJ keep-playing, a song that keeps a beat blends into the next one the
   way a DJ mixes. With plugin 0.4.0, which also finds the phrases (the 4 or 8 bars a song is built from), the
   blend goes **phrase on phrase**: it starts where a phrase of the song going out starts, the next song comes in on
   its first phrase, it lasts whole phrases (as many as the **Blend length** below allows: 8 bars gives one 8-bar
@@ -87,7 +87,8 @@ blend them the way a DJ mixes:
   seconds, in small steps too slight to hear. A shift of more than 4 % is kept to 8 bars, however long the Blend
   length, so the song is back at its own speed sooner.
 - **Everywhere**: the same in every smart crossfade.
-- **Off**: fades don't follow the beat.
+- **Off** (the default): fades don't follow the beat. On many phones a beat-matched blend still drifts out of step,
+  so it's off until you choose it; a new audio engine that keeps both songs exactly in step is being built.
 
 Whatever the setting, two songs that both keep a beat but can't be matched (tempos more than 8 % apart, counting
 double and half time as the same; a beat that isn't steady; a stream that can't jump to a point) get a short blend,

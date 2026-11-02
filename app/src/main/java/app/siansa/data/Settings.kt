@@ -201,7 +201,7 @@ data class AppSettings(
     /** The crossfade length; in smart mode, the longest a fade may be. */
     val crossfadeSeconds: Int = DEFAULT_CROSSFADE_SECONDS,
     /** Where smart crossfades are beat-matched like a DJ's (issue #646, experimental): off, DJ radio, everywhere. */
-    val beatMatch: BeatMatchMode = BeatMatchMode.DJ_RADIO,
+    val beatMatch: BeatMatchMode = BeatMatchMode.OFF,
     /** The old song rings out in a hall over the last bar of a beat-matched blend (issue #759). */
     val echoTail: Boolean = true,
     /** The bass swaps from the old song to the new over the first half of a beat-matched blend (issue #807). */
