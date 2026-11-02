@@ -3,6 +3,11 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [0.50.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.50.0beta) — 2026-11-02
+
+- [#806](https://github.com/echovaultstudio/Siansa/pull/806) Take songs out of the queue: swipe left, Remove from queue, Remove songs up to here (@Th3K1ngP1n)
+- [#808](https://github.com/echovaultstudio/Siansa/pull/808) Beat-matched blends: measured tail sync, one jump, DJ tempos, bass swap (@Th3K1ngP1n)
+
 ## [0.49.0beta](https://github.com/echovaultstudio/Siansa/releases/tag/v0.49.0beta) — 2026-11-01
 
 - [#790](https://github.com/echovaultstudio/Siansa/pull/790) Home: Cover rows as a look for every section in Arrange Home (@Th3K1ngP1n)
