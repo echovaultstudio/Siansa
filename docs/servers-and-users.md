@@ -87,6 +87,10 @@ in use: **Library sync**):
 Siansa shows your music as your server reads its tags, so tag your files the way your server asks
 (Navidrome's tagging guidelines, or Emby's music naming guide).
 
+- **Album pictures on Emby and Jellyfin:** an album with no picture of its own (the art is in the song files, not
+  in the album folder) shows its first song's picture, in lists as well as on its page. Siansa asks the server
+  about such albums' songs once, a few at a time, so a library with many of them takes a moment longer to sync the
+  first time.
 - **Several artists on a song:** tag each one (Navidrome: `ARTISTS`; Emby: separate them with `; `). Every
   artist gets a page, and the song shows up there.
 - **Compilations:** set the compilation tag (`COMPILATION=1`). An album by "Various Artists" (or "VA") counts as

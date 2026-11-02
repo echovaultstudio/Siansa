@@ -24,6 +24,9 @@ import app.siansa.data.SongDates
 import app.siansa.data.SongDatesCache
 import app.siansa.log.AppLog
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -268,7 +271,7 @@ class EmbyApi(
             "IncludeItemTypes" to "MusicAlbum", "SortBy" to sortBy, "SortOrder" to order,
             "StartIndex" to offset, "Limit" to size, "ParentId" to folderId,
             "Filters" to if (type == "recent") "IsPlayed" else if (type == "starred") "IsFavorite" else null,
-        ).map(::parseAlbum)
+        ).map(::parseAlbum).let { withSongCovers(it) }
     }
 
     override suspend fun album(id: String): AlbumDetail {
@@ -292,7 +295,7 @@ class EmbyApi(
         // album artist, with the rest (appearances) only when there are none of those.
         val albums = items("IncludeItemTypes" to "MusicAlbum", "ArtistIds" to id, "SortBy" to "ProductionYear,SortName")
         val own = albums.filter { a -> a.arr("AlbumArtists").any { it.str("Id") == id } }
-        return ArtistDetail(parseArtist(artist), own.ifEmpty { albums }.map(::parseAlbum))
+        return ArtistDetail(parseArtist(artist), withSongCovers(own.ifEmpty { albums }.map(::parseAlbum)))
     }
 
     override suspend fun artistInfo(id: String, includeNotPresent: Boolean): ArtistInfo {
@@ -378,7 +381,7 @@ class EmbyApi(
         val found = items("SearchTerm" to query, "IncludeItemTypes" to "Audio,MusicAlbum,MusicArtist", "Limit" to "60")
         return SearchResults(
             artists = found.filter { it.str("Type") == "MusicArtist" }.map(::parseArtist),
-            albums = found.filter { it.str("Type") == "MusicAlbum" }.map(::parseAlbum),
+            albums = withSongCovers(found.filter { it.str("Type") == "MusicAlbum" }.map(::parseAlbum)),
             songs = found.filter { it.str("Type") == "Audio" }.map(::parseSong),
         )
     }
@@ -508,7 +511,7 @@ class EmbyApi(
     override suspend fun unstarArtist(artistId: String) = favourite(artistId, false)
 
     override suspend fun starredAlbums(): List<Album> =
-        items("IncludeItemTypes" to "MusicAlbum", "Filters" to "IsFavorite", "SortBy" to "SortName").map(::parseAlbum)
+        withSongCovers(items("IncludeItemTypes" to "MusicAlbum", "Filters" to "IsFavorite", "SortBy" to "SortName").map(::parseAlbum))
 
     override suspend fun starredSongs(): List<Song> =
         items("IncludeItemTypes" to "Audio", "Filters" to "IsFavorite", "SortBy" to "SortName").map(::parseSong)
@@ -608,6 +611,37 @@ class EmbyApi(
         if (album.coverArt != null) album
         else album.copy(coverArt = songs.firstNotNullOfOrNull { s -> s.coverArt?.takeIf { it != album.id } })
 
+    /**
+     * Album id → the song cover found for it ("" when its songs have none either), so each album is asked about
+     * once while the app runs (issue #811).
+     */
+    private val songCovers = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /**
+     * Album lists (issue #811, beta report 80dcb26b): the same as [albumWithSongCover] for the albums of a list, which
+     * showed nothing where the album page and the player showed the song's art. Each album without a picture of
+     * its own is asked once for its first songs (a few at a time), and shows the first that has one; what was found
+     * is kept for the run, and the library keeps it between runs.
+     */
+    internal suspend fun withSongCovers(albums: List<Album>): List<Album> {
+        val missing = albums.filter { it.coverArt == null && !songCovers.containsKey(it.id) }.map { it.id }.distinct()
+        if (missing.isNotEmpty()) {
+            coroutineScope {
+                missing.chunked(LOOKUPS_AT_ONCE).forEach { chunk ->
+                    chunk.map { id -> async { songCovers[id] = runCatching { firstSongCover(id) }.getOrNull().orEmpty() } }.awaitAll()
+                }
+            }
+            val found = missing.count { songCovers[it]?.isNotEmpty() == true }
+            AppLog.d("Covers", "${if (jellyfin) "Jellyfin" else "Emby"}: $found of ${missing.size} album(s) without a picture of their own show a song's")
+        }
+        return albums.map { a -> if (a.coverArt != null) a else songCovers[a.id]?.takeIf { it.isNotEmpty() }?.let { a.copy(coverArt = it) } ?: a }
+    }
+
+    /** The first of an album's songs with a picture of its own, by id; null when none of the first few has one. */
+    private suspend fun firstSongCover(albumId: String): String? =
+        items("ParentId" to albumId, "IncludeItemTypes" to "Audio", "SortBy" to "SortName", "Limit" to SONGS_LOOKED_AT)
+            .firstNotNullOfOrNull { o -> o.str("Id")?.takeIf { hasImage(o) && it != albumId } }
+
     internal fun parseAlbum(o: JsonObject): Album {
         val albumArtist = o.arr("AlbumArtists").firstOrNull()
         val user = o.obj("UserData")
@@ -652,6 +686,9 @@ class EmbyApi(
     internal companion object {
         /** The extra fields Siansa reads on lists (Emby leaves most out unless asked). */
         const val FIELDS = "Genres,DateCreated,ProductionYear,ChildCount,ProviderIds,Overview,Container,AlbumArtist,ParentId,Studios"
+        /** How many albums without a picture are asked about their songs at once, and how many songs each (issue #811). */
+        const val LOOKUPS_AT_ONCE = 6
+        const val SONGS_LOOKED_AT = 3
 
         /** `{user}` once it has been through [enc] as a parameter value. */
         const val USER_ENCODED = "%7Buser%7D"
