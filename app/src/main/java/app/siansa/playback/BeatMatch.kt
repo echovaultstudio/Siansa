@@ -1,5 +1,6 @@
 package app.siansa.playback
 
+import androidx.media3.common.PlaybackParameters
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.ln
@@ -296,6 +297,17 @@ object BeatMatch {
      * and is heard as a flutter, so a nudge within [NUDGE_STEP] of the one playing is left as it is.
      */
     const val NUDGE_STEP = 0.0015f
+    /**
+     * How a player plays at [speed] during and after a blend (issue #816): resampled, so the pitch follows the
+     * speed like a DJ's pitch fader, unless the listener keeps the key (time-stretched, which can stutter on
+     * drums). The player's own speed ([baseSpeed], 1 for music) stays stretched: only the blend's shift moves the
+     * pitch, by at most 0.7 of a semitone at 4 %.
+     */
+    fun parameters(speed: Float, baseSpeed: Float, keepKey: Boolean): PlaybackParameters {
+        val pitch = if (keepKey || baseSpeed <= 0f) 1f else speed / baseSpeed
+        return PlaybackParameters(speed, pitch)
+    }
+
     fun worthChanging(playing: Float, wanted: Float): Boolean = abs(playing - wanted) >= NUDGE_STEP
 
     /**

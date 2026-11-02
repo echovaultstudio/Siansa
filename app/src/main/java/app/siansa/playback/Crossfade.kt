@@ -143,7 +143,7 @@ object Crossfade {
             if (mixed && rhythmic) {
                 // A continuous mix can't be laid on a beat, and a cut into or out of one is heard: a short blend (issue #807).
                 overlap = BeatMatch.CLASH_MS
-                why += " · a continuous mix, so a short blend"
+                why += " · a continuous mix, so a short blend" + notStraightOn(current, next)
             } else if (rhythmic && overlap > BeatMatch.CLASH_MS) {
                 // Both ends keep a beat that can't be laid on the other's: a long blend would clash, so a short one.
                 overlap = BeatMatch.CLASH_MS
@@ -209,6 +209,16 @@ object Crossfade {
     }
 
     private val MIX_MARKS = listOf("(mixed)", "[mixed]", "- mixed", "mixed by", "dj mix", "continuous mix", "continuous dj", "(mix cut)", "[mix cut]")
+
+    /**
+     * For the log (issue #816): why two tracks of a continuous mix are blended and not run straight on, when they
+     * look like they should. "" when they're not of one album.
+     */
+    fun notStraightOn(current: Song, next: Song): String {
+        if (current.albumId == null || current.albumId != next.albumId || runsStraightOn(current, next)) return ""
+        fun place(song: Song) = "track ${song.track ?: "?"}${song.disc?.let { " of disc $it" } ?: ""}"
+        return " (one album, but ${place(next)} doesn't follow ${place(current)}, so they don't run straight on)"
+    }
 
     /** The next song carries straight on from this one: same album, the next track on the same or next disc. */
     fun runsStraightOn(current: Song, next: Song): Boolean {

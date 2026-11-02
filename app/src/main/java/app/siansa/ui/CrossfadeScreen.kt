@@ -129,8 +129,9 @@ fun CrossfadeScreen(nav: NavController) {
                     (if (settings.bassSwap) " · bass swap" else "") + (if (settings.echoTail) " · echo" else "")
                 FoldSection("Beat-matched blends (experimental)", blendSummary, tag = "beat-matched-blends") {
                     BeatMatchSection(
-                        settings.beatMatch, settings.blendBars, settings.echoTail, settings.bassSwap,
+                        settings.beatMatch, settings.blendBars, settings.echoTail, settings.bassSwap, settings.keepKey,
                         graph.settings::setBeatMatch, graph.settings::setBlendBars, graph.settings::setEchoTail, graph.settings::setBassSwap,
+                        graph.settings::setKeepKey,
                     )
                 }
             }
@@ -157,17 +158,19 @@ private fun crossfadeHint(s: AppSettings): String = when (s.crossfade) {
     }
 }
 
-/** The beat-matched blends' choice, its hint, the echo at the end (issue #759) and the bass swap (issue #807), for the page and its screenshot. */
+/** The beat-matched blends' choice, its hint, the echo at the end (issue #759), the bass swap (issue #807) and keeping the key (issue #816), for the page and its screenshot. */
 @Composable
 internal fun BeatMatchSection(
     mode: BeatMatchMode,
     bars: Int,
     echo: Boolean,
     bassSwap: Boolean,
+    keepKey: Boolean,
     onMode: (BeatMatchMode) -> Unit,
     onBars: (Int) -> Unit,
     onEcho: (Boolean) -> Unit,
     onBassSwap: (Boolean) -> Unit,
+    onKeepKey: (Boolean) -> Unit,
 ) {
     BeatMatchRow(mode, onMode)
     Hint(beatMatchHint(mode))
@@ -183,6 +186,8 @@ internal fun BeatMatchSection(
         Hint("Over the first half of a blend the old song's bass is taken away as the new song's comes in, as a DJ does with the EQ, so two kick drums never play at once.")
         SwitchRow("Echo at the end", echo, onEcho)
         Hint("Over the last bar of a blend the old song rings out in a hall, as a DJ echoes a track out, so the join is softer. Phones without the effect play the blend plain.")
+        SwitchRow("Keep the key", keepKey, onKeepKey)
+        Hint("The next song plays a touch faster or slower to match. Off, its pitch moves with it, like a DJ's pitch fader: at most two thirds of a semitone. On, the key is kept by stretching the sound instead, which can stutter on drums.")
     }
 }
 

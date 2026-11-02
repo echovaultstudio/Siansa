@@ -206,6 +206,8 @@ data class AppSettings(
     val echoTail: Boolean = true,
     /** The bass swaps from the old song to the new over the first half of a beat-matched blend (issue #807). */
     val bassSwap: Boolean = true,
+    /** A beat-matched blend keeps the next song's key by time-stretching it (issue #816); off, the pitch follows the speed. */
+    val keepKey: Boolean = false,
     /** How many bars a beat-matched blend aims at, apart from the crossfade length (issue #759). */
     val blendBars: Int = DEFAULT_BLEND_BARS,
     /** The shape of a DJ mix (issue #649): what the energy does over the next songs. */
@@ -445,6 +447,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         beatMatch = BeatMatchMode.parse(prefs.getString("beat_match", null)),
         echoTail = prefs.getBoolean("echo_tail", true),
         bassSwap = prefs.getBoolean("bass_swap", true),
+        keepKey = prefs.getBoolean("keep_key", false),
         blendBars = prefs.getInt("blend_bars", AppSettings.DEFAULT_BLEND_BARS)
             .takeIf { it in AppSettings.BLEND_BAR_CHOICES } ?: AppSettings.DEFAULT_BLEND_BARS,
         mixShape = MixShape.parse(prefs.getString("mix_shape", null)),
@@ -728,6 +731,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setBassSwap(on: Boolean) {
         prefs.edit().putBoolean("bass_swap", on).apply()
         _state.value = _state.value.copy(bassSwap = on)
+    }
+
+    fun setKeepKey(on: Boolean) {
+        prefs.edit().putBoolean("keep_key", on).apply()
+        _state.value = _state.value.copy(keepKey = on)
     }
 
     /** The shape and surprise of a DJ mix (issue #649). */

@@ -457,4 +457,29 @@ class BeatMatchTest {
         // The same mix's next track runs straight on, gapless, as before.
         assertNull(Crossfade.plan(CrossfadeMode.SMART, 20_000, mixed.copy(track = 3), mixed.copy(id = "c", track = 4), 310_000, 300_000, profile("a", outro, null), profile("c", null, intro), beatMatch = true))
     }
+
+    @Test fun aBlendsSpeedIsResampledUnlessTheKeyIsKept() {
+        // Issue #816: time-stretching (made for speech) stutters on drums; the pitch follows the speed instead.
+        val resampled = BeatMatch.parameters(1.028f, 1f, keepKey = false)
+        assertEquals(1.028f, resampled.speed, 0f)
+        assertEquals(1.028f, resampled.pitch, 0f)
+        val kept = BeatMatch.parameters(1.028f, 1f, keepKey = true)
+        assertEquals(1.028f, kept.speed, 0f)
+        assertEquals(1f, kept.pitch, 0f)
+        // A player already at its own faster speed keeps that stretched: only the blend's shift moves the pitch.
+        val onTop = BeatMatch.parameters(1.2f * 1.03f, 1.2f, keepKey = false)
+        assertEquals(1.03f, onTop.pitch, 0.0001f)
+        assertEquals(1f, BeatMatch.parameters(1f, 1f, keepKey = false).pitch, 0f)
+    }
+
+    @Test fun theLogSaysWhyTwoTracksOfOneMixDidntRunStraightOn() {
+        // Issue #816: four "(Mixed)" tracks of one album were blended, and the log didn't say why they didn't count as consecutive.
+        val mixed = song.copy(title = "Remind Me Why (Mixed)", track = 3, disc = 1)
+        val skipped = Crossfade.plan(CrossfadeMode.SMART, 20_000, mixed, mixed.copy(id = "c", track = 5), 310_000, 300_000, profile("a", outro, null), profile("c", null, intro), beatMatch = true)!!
+        assertTrue(skipped.why, skipped.why.contains("one album, but track 5 of disc 1 doesn't follow track 3 of disc 1"))
+        val noNumbers = Crossfade.plan(CrossfadeMode.SMART, 20_000, mixed.copy(track = null, disc = null), mixed.copy(id = "c", track = null, disc = null), 310_000, 300_000, profile("a", outro, null), profile("c", null, intro), beatMatch = true)!!
+        assertTrue(noNumbers.why, noNumbers.why.contains("track ? doesn't follow track ?"))
+        val otherAlbum = Crossfade.plan(CrossfadeMode.SMART, 20_000, mixed, mixed.copy(id = "c", albumId = "al2"), 310_000, 300_000, profile("a", outro, null), profile("c", null, intro), beatMatch = true)!!
+        assertFalse(otherAlbum.why, otherAlbum.why.contains("one album"))
+    }
 }

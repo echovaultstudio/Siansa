@@ -58,8 +58,11 @@ object PlayerFactory {
 
         // Start playing after one second of audio, for a snappy start. After running dry mid-song, wait for
         // five seconds' worth so a slow connection gives fewer, longer stretches instead of constant stops.
+        // A minute is kept loaded ahead at all times (issue #816): the next song is only loaded once this one is,
+        // and a DJ blend starts 30 s before the end, so with loading paused until 15 s were left the next song
+        // began every blend with nothing loaded, up to 400 ms late and off the beat.
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(15_000, 60_000, 1_000, 5_000)
+            .setBufferDurationsMs(BUFFER_AHEAD_MS, BUFFER_AHEAD_MS, 1_000, 5_000)
             .build()
 
         // FFmpeg's decoders first (FLAC, ALAC, MP3, AAC...); the phone's own for the rest (Opus).
@@ -96,4 +99,7 @@ object PlayerFactory {
             .build()
         return Built(player, cacheFactory, equaliser.deck)
     }
+
+    /** How much of a song (and then of the next) is loaded ahead: a minute, more than the longest blend. */
+    const val BUFFER_AHEAD_MS = 60_000
 }

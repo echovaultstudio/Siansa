@@ -83,7 +83,7 @@ blend them the way a DJ mixes:
   at the end of a phrase: a short last part-phrase (less than half a phrase) isn't played, so both songs' phrases
   end together. Without phrases, the blend starts on a bar of the song going out, the next song starts on its first
   downbeat, and the blend is the Blend length in whole bars. Either way the next song plays a touch faster or slower (up
-  to 8 %, pitch kept) so its beats keep time with the old song's, then eases back to its own speed over about 25
+  to 8 %) so its beats keep time with the old song's, then eases back to its own speed over about 25
   seconds, in small steps too slight to hear. A shift of more than 4 % is kept to 8 bars, however long the Blend
   length, so the song is back at its own speed sooner.
 - **Everywhere**: the same in every smart crossfade.
@@ -105,6 +105,12 @@ never play at once, so a blend a few ms out of step is heard as a mix, not a fla
 
 **Echo at the end** (on by default): over the last bar of a blend the old song rings out in a hall, as a DJ
 echoes a track out, so the join is softer. A phone whose reverb can't be opened plays the blend plain.
+
+**Keep the key** (off by default): how the next song is sped up or slowed down. Off, the sound is resampled, like
+a record played a touch fast or slow or a DJ's pitch fader: every drum hit stays as it was, and the pitch moves with
+the speed, by at most two thirds of a semitone at 4 %, then glides back as the song eases to its own speed. On, the
+key is kept by stretching the sound in time instead; that joins small pieces of sound and can be heard as a stutter
+on drums. Outside a blend the song plays untouched either way.
 
 Tempos are counted the way a DJ counts: a beat the plugin read at half time (drum and bass at 87, house at 63)
 is doubled, so a blend's bars are real bars. Tracks of a continuous mix ("(Mixed)", "[Mixed]", a "DJ Mix" or
