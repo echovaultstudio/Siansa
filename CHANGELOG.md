@@ -3,6 +3,14 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 0.51.0beta — 2026-11-02
+
+### Fixed
+- **DJ blends stuttered or came in late.** The next song is now loaded a minute ahead, so it no longer starts a blend cold (it began up to 400 ms late and off the beat). A song sped up or slowed down for a blend is resampled, like a DJ's pitch fader, instead of stretched in time, which could stutter on drums.
+
+### Added
+- **Keep the key** (Settings › Crossfade and levelling › Beat-matched blends, off): keeps the next song's key through a blend by stretching the sound instead.
+
 ## 0.50.1beta — 2026-11-02
 
 ### Fixed
