@@ -195,4 +195,63 @@ class AudioEngineCoreTest {
         assertEquals(0.5f, out[999 * 2], 0.001f)
         assertEquals(0f, out[1_000 * 2], 0f)
     }
+
+    @Test fun backAtTheOutputsRateBetweenTwoSamplesStillPlays() {
+        // 0.52.0-dev: easing back to 1× after a blend left the song between two samples, and the mixer crashed.
+        val stream = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        stream.write(float(FloatArray(44_100 * 2 * 2) { 0.3f }))
+        stream.play()
+        stream.speed = 1.03f
+        val out = FloatArray(512)
+        var mix = 0L
+        repeat(50) { stream.render(out, 0, 256, mix, 44_100); mix += 256 }
+        stream.speed = 1f
+        repeat(50) { stream.render(out, 0, 256, mix, 44_100); mix += 256 }
+        assertEquals(0.3f, out[100], 0.01f)
+    }
+
+    @Test fun aSongTimeMisreadAfterASeekGoesByWhereThePlayerWasSent() {
+        // 0.52.0-dev: seeking near a song's end, the next song's time came out a whole song on; its sound all fell
+        // "before its cue" and the player waited for ever.
+        val notes = mutableListOf<String>()
+        val deck = MixCore.Deck("main").apply { note = { notes += it } }
+        deck.cueNext(0, 10_000, 44_100)
+        deck.flushed()
+        deck.mark(0, 240_000_000)
+        val stream = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        deck.add(stream)
+        assertEquals(0L, deck.lastCued!!.targetFrame)
+        assertEquals(1, notes.size)
+        stream.write(float(FloatArray(44_100 * 2) { 0.5f }))
+        assertTrue(stream.bufferedFrames > 40_000)
+
+        // Told after the first mark, it's corrected all the same; a mark close to where it was sent stays as read.
+        val late = MixCore.Deck("late")
+        late.flushed()
+        late.mark(0, 300_000_000)
+        late.expectSeek(120_000_000)
+        val s2 = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        late.add(s2)
+        assertEquals(0.0, late.frameOf(s2, 120_000_000)!!, 1e-6)
+        val close = MixCore.Deck("close")
+        close.expectSeek(60_000_000)
+        close.flushed()
+        close.mark(0, 60_050_000)
+        val s3 = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        close.add(s3)
+        assertEquals(0.0, close.frameOf(s3, 60_050_000)!!, 1e-6)
+    }
+
+    @Test fun aCueThatWouldThrowAwaySecondsOfSoundIsGivenUp() {
+        val stream = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        stream.cue(DeckStream.Cue(44_100.0 * 600, 5_000, 44_100))
+        repeat(50) { stream.write(float(FloatArray(4_410 * 2) { 0.2f })) }
+        assertTrue(stream.cueGivenUp)
+        assertTrue(stream.bufferedFrames > 40_000)
+        stream.play()
+        val out = FloatArray(512)
+        var mix = 0L
+        repeat(20) { stream.render(out, 0, 256, mix, 44_100); mix += 256 }
+        assertEquals(0.2f, out[200], 0.01f)
+    }
 }

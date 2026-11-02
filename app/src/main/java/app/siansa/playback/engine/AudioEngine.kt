@@ -46,12 +46,13 @@ class AudioEngine(context: Context) {
     @Volatile private var stampNanos = 0L
     @Volatile private var stampLive = false
     private val stamp = AudioTimestamp()
+    private var failures = 0
     private var blocksSinceStamp = 0
 
     /** The player output each stream belongs to, told when its stream first sounds. */
     internal val outputs = ConcurrentHashMap<DeckStream, DeckOutput>()
 
-    fun deck(name: String): MixCore.Deck = core.deck(name)
+    fun deck(name: String): MixCore.Deck = core.deck(name).also { d -> d.note = { AppLog.w("Engine", it) } }
 
     fun provider(deck: MixCore.Deck): MixerOutputProvider = MixerOutputProvider(this, deck)
 
@@ -110,7 +111,14 @@ class AudioEngine(context: Context) {
                 t.play()
                 trackPlaying = true
             }
-            val started = core.render(block, BLOCK, writtenMix)
+            val started = try {
+                core.render(block, BLOCK, writtenMix)
+            } catch (e: Throwable) {
+                // A fault in the mixing mustn't stop the music app: this block is silence, the next is tried again.
+                if (failures++ % 500 == 0) AppLog.e("Engine", "Mixing failed (${failures}×): ${e.stackTraceToString().lines().take(4).joinToString(" | ")}")
+                java.util.Arrays.fill(block, 0f)
+                emptyList()
+            }
             var off = 0
             var dead = false
             while (off < block.size && running) {

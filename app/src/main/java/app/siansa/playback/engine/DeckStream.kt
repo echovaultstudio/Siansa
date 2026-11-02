@@ -38,6 +38,11 @@ class DeckStream(
     private var first = 0L
     /** Frames below this are dropped as they arrive: a cue to a point further on than what's written. */
     private var dropUntil = 0L
+    /** Frames dropped for a cue: more than [MAX_DROP_MS] says the cue was wrong, and it's given up. */
+    private var dropped = 0L
+    /** A cue was given up (see [dropped]): told once in the log. */
+    @Volatile var cueGivenUp = false
+        private set
     /** Where the next output sample is read, in absolute frames (fractional between two). */
     private var readPos = 0.0
     /** Where this stream's first frame is in its deck's count of frames handed to the player's sink. */
@@ -98,9 +103,21 @@ class DeckStream(
         var at = buffer.position()
         // Frames behind where it's read from (a cue further on, or a stream keeping time with nothing to play) are
         // dropped as they arrive; the filter's history before that is kept.
-        val dropBelow = max(dropUntil, floor(readPos).toLong() - SincTable.HALF - 2)
+        var dropBelow = max(dropUntil, floor(readPos).toLong() - SincTable.HALF - 2)
         while (buffer.limit() - at >= frameBytes) {
             if (end < dropBelow) {
+                if (++dropped > sampleRate.toLong() * MAX_DROP_MS / 1_000 && !cueGivenUp) {
+                    // Seconds of sound thrown away waiting for a point that isn't coming: the cue was wrong
+                    // (the song's time misread). It plays from here instead of the player waiting for ever.
+                    cueGivenUp = true
+                    dropUntil = end
+                    dropBelow = end
+                    readPos = end.toDouble()
+                    first = end
+                    gate = Long.MIN_VALUE
+                    holdGrid = false
+                    continue
+                }
                 at += frameBytes
                 end++
                 first = end
@@ -227,6 +244,8 @@ class DeckStream(
         holdGrid = true
         envelope = 1.0
         announced = false
+        dropped = 0
+        cueGivenUp = false
         return Cued(target, missing)
     }
 
@@ -253,7 +272,9 @@ class DeckStream(
         renderedTo = mixStart + frames
 
         val step = 1.0 / (RAMP_MS * outRate / 1_000.0)
-        val table = if (ratio == 1.0) null else SincTable.forRatio(ratio)
+        // At the output's rate a stream is copied sample for sample; one left between two samples (by a speed
+        // change in a blend) is read through the filter like any other (0.52.0-dev crashed there).
+        val table = SincTable.forRatio(ratio)
         var gave = false
         for (i in 0 until frames) {
             val o = (offset + i) * 2
@@ -268,7 +289,7 @@ class DeckStream(
             if (envelope <= 0.0 && target <= 0.0) continue
             val whole = floor(readPos).toLong()
             val frac = readPos - whole
-            val exact = table == null && frac == 0.0
+            val exact = ratio == 1.0 && frac == 0.0
             val needed = if (exact) whole + 1 else whole + SincTable.HALF + 1
             if (end < needed && !ended) {
                 // Nothing to play yet: a cued stream keeps time, any other waits (its position stands still).
@@ -282,7 +303,7 @@ class DeckStream(
                 l = frameAt(whole, 0)
                 r = frameAt(whole, 1)
             } else {
-                table!!.fill(frac, weights)
+                table.fill(frac, weights)
                 l = 0.0
                 r = 0.0
                 val from = whole - SincTable.HALF + 1
@@ -333,6 +354,8 @@ class DeckStream(
         const val CAPACITY_MS = 1_500
         /** The fade around play, pause and release. */
         const val RAMP_MS = 5.0
+        /** More sound than this dropped waiting for a cued point means the cue was wrong. */
+        const val MAX_DROP_MS = 4_000
         /** Blocks remembered for positions: at 256 frames a block, about 2.7 s at 48 kHz. */
         const val CHECKPOINTS = 512
     }

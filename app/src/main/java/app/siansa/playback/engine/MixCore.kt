@@ -27,6 +27,13 @@ class MixCore(val outRate: Int) {
 
         private class Mark(val inputFrame: Long, val mediaUs: Long)
         private val marks = ArrayList<Mark>()
+        /** Where the player was sent by its last seek (µs of the song), to check the first mark after it against. */
+        private var expectUs: Long? = null
+        /** The next mark is the first after a flush; and the one that was, while it may still be corrected. */
+        private var afterFlush = true
+        private var flushMark: Mark? = null
+        /** Where the deck says what it corrected (the engine's log). */
+        @Volatile var note: (String) -> Unit = {}
         /** The input frame the buffer being handed over starts at: a stream made now starts there. */
         @Volatile internal var bufferStart = 0L
         /** A cue for the next stream this deck gets (after a seek): the song's time [mediaUs] at mix frame [mixFrame]. */
@@ -50,16 +57,56 @@ class MixCore(val outRate: Int) {
 
         /** The player's sink was flushed (a seek): the count starts again. */
         internal fun flushed() {
-            synchronized(marks) { marks.clear() }
+            synchronized(marks) {
+                marks.clear()
+                afterFlush = true
+                flushMark = null
+            }
             bufferStart = 0
         }
 
-        /** Input frame [inputFrame] (counted since the last flush) is the song's time [mediaUs]. */
+        /**
+         * Input frame [inputFrame] (counted since the last flush) is the song's time [mediaUs]. The first after a
+         * seek is checked against where the player was sent ([expectSeek]): when the player had already read into
+         * the next song before a seek there, Media3 doesn't pass that song's offset on, and the time comes out a whole
+         * song too far (0.52.0-dev: the next song waited for ever, its sound all "before its cue").
+         */
         internal fun mark(inputFrame: Long, mediaUs: Long) {
             synchronized(marks) {
+                var at = mediaUs
+                if (afterFlush) {
+                    afterFlush = false
+                    expectUs?.let { expected -> if (kotlin.math.abs(at - expected) > STALE_US) at = corrected(at, expected) }
+                    expectUs = null
+                }
                 if (marks.size >= MAX_MARKS) marks.removeAt(0)
-                marks.add(Mark(inputFrame, mediaUs))
+                val m = Mark(inputFrame, at)
+                if (marks.isEmpty()) flushMark = m
+                marks.add(m)
             }
+        }
+
+        /**
+         * The player was sent to the song's time [mediaUs] (a seek): the first mark after it is checked against that,
+         * now if it's already there, else when it comes.
+         */
+        fun expectSeek(mediaUs: Long) {
+            synchronized(marks) {
+                val m = flushMark
+                if (m != null && marks.size == 1 && marks[0] === m) {
+                    if (kotlin.math.abs(m.mediaUs - mediaUs) > STALE_US) {
+                        marks[0] = Mark(m.inputFrame, corrected(m.mediaUs, mediaUs))
+                        flushMark = marks[0]
+                    }
+                } else {
+                    expectUs = mediaUs
+                }
+            }
+        }
+
+        private fun corrected(read: Long, expected: Long): Long {
+            note("Deck $name: the song's time after a seek read ${read / 1000} ms, sent to ${expected / 1000} ms; going by where it was sent")
+            return expected
         }
 
         /**
@@ -86,6 +133,7 @@ class MixCore(val outRate: Int) {
         fun cueNext(mediaUs: Long, mixFrame: Long, outRate: Int) {
             lastCued = null
             nextCue = Triple(mediaUs, mixFrame, outRate)
+            expectSeek(mediaUs)
         }
 
         /** Puts the song's time [mediaUs] of the stream playing now at [mixFrame]. Null when there's none, or no mark. */
@@ -174,6 +222,8 @@ class MixCore(val outRate: Int) {
     companion object {
         /** Marks kept per deck: a few per song is plenty. */
         const val MAX_MARKS = 64
+        /** A first mark after a seek further than this from where the player was sent is misread. */
+        const val STALE_US = 1_500_000L
         /** The mix's ceiling: a little under full scale, as two songs at the top of a blend can add up past it. */
         const val CEILING = 0.98
     }

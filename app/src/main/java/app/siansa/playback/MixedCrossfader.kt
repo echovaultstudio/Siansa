@@ -356,6 +356,7 @@ internal class MixedCrossfader(
             if (beat != null && onNext && heardMix >= incomingMix && !tailDone) check(beat, tMix, heardMix)
             if (onNext && !lateLogged && heardMix >= incomingMix) {
                 lateLogged = true
+                if (mainMix.current?.cueGivenUp == true) AppLog.w("Crossfade", "The next song's cue was given up (seconds of its sound came before the point it was cued to); it plays from where it is")
                 mainMix.lastCued?.let { if (it.missingFrames > 0) AppLog.w("Crossfade", "The next song's start came ${it.missingFrames} frames late; it came in that far on, on the grid") }
             }
             val elapsed = SystemClock.elapsedRealtime() - startedAt
@@ -484,6 +485,8 @@ internal class MixedCrossfader(
 
     override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
         if (reason != Player.DISCONTINUITY_REASON_SEEK && reason != Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT) return
+        // Where the player was sent, so its deck can tell a misread song time after the seek.
+        mainMix.expectSeek(newPosition.positionMs * 1000)
         if (phase == Phase.FADING && expectSeek && newPosition.mediaItemIndex == incomingIndex) {
             expectSeek = false
             return
