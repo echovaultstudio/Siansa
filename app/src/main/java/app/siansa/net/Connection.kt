@@ -93,6 +93,11 @@ class Connection(
                 override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
                     if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) && _state.value.offline) changed()
                 }
+                // An app started in the background (after a crash, by a widget or the car) may be kept off the
+                // network until it comes to the front: the network didn't change, only whether Siansa may use it.
+                override fun onBlockedStatusChanged(network: Network, blocked: Boolean) {
+                    if (!blocked && _state.value.offline) changed()
+                }
             })
         }.onFailure { AppLog.w("Connection", "Can't follow network changes: ${it.javaClass.simpleName}") }
         check("start")
@@ -112,6 +117,18 @@ class Connection(
         // A check waiting minutes to look again mustn't keep the app offline now the network is back.
         checking?.cancel()
         check("network changed", attempt = 0)
+    }
+
+    /**
+     * The app came to the front: if it thinks it's offline, it looks again at once (issue #830: started in the
+     * background after a crash, it had no network then, and said "offline" until it was force-stopped).
+     */
+    fun cameToFront() {
+        if (!_state.value.offline) return
+        AppLog.i("Connection", "In front while offline: looking again")
+        checking?.cancel()
+        checking = null
+        changed()
     }
 
     /**
