@@ -40,6 +40,16 @@ import kotlin.math.max
  * when it landed well off (the seek takes a moment), tiny speed nudges otherwise. Afterwards it eases back to
  * its own speed over [BeatMatch.EASE_MS], too slowly to hear; a skip or a seek ends that at once.
  */
+/** What the playback service needs of a crossfader: the old two-AudioTrack one, or the mixer's (issue #826). */
+internal interface Fader {
+    /** How far the main player has faded in its song: 1 except during a fade. */
+    val level: Float
+    fun start()
+    fun release()
+    fun cancel(why: String)
+    fun profilesArrived(ids: Set<String>)
+}
+
 @OptIn(UnstableApi::class)
 internal class Crossfader(
     private val main: ExoPlayer,
@@ -58,10 +68,10 @@ internal class Crossfader(
     private val inDjRadio: () -> Boolean = { false },
     /** The main player's [level] changed: apply its volume again. */
     private val onLevel: () -> Unit,
-) : Player.Listener {
+) : Player.Listener, Fader {
 
     /** How far the main player has faded in its song: 1 except during a fade. */
-    var level = 1f
+    override var level = 1f
         private set
 
     private enum class Phase { IDLE, READY, FADING }
@@ -126,12 +136,12 @@ internal class Crossfader(
     private var echoSend = -1f
     private var echoUntil = 0L
 
-    fun start() {
+    override fun start() {
         main.addListener(this)
         poke()
     }
 
-    fun release() {
+    override fun release() {
         handler.removeCallbacks(watch)
         handler.removeCallbacks(fadeTick)
         stopEasing()
@@ -141,7 +151,7 @@ internal class Crossfader(
     }
 
     /** Stops a fade or a fade being prepared, leaving the main player at full level. */
-    fun cancel(why: String) {
+    override fun cancel(why: String) {
         when (phase) {
             Phase.FADING -> {
                 AppLog.i("Crossfade", "Fade stopped: $why")
@@ -734,7 +744,7 @@ internal class Crossfader(
      * Fade shapes arrived for [ids] (issue #796): a blend got ready before the next song's arrived is planned
      * again, so it can take that song's beat into account.
      */
-    fun profilesArrived(ids: Set<String>) {
+    override fun profilesArrived(ids: Set<String>) {
         val next = main.nextMediaItemIndex.takeIf { it != C.INDEX_UNSET }?.let { main.getMediaItemAt(it).mediaId } ?: return
         if (!Crossfade.planAgainForShape(phase == Phase.READY, plannedWithNext, primed, startAt - main.currentPosition, next in ids)) return
         AppLog.d("Crossfade", "The next song's fade shape arrived: planning the blend again")

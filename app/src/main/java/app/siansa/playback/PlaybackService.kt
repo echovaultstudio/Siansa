@@ -35,6 +35,8 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import app.siansa.AppGraph
+import app.siansa.BuildConfig
+import app.siansa.playback.engine.AudioEngine
 import app.siansa.MainActivity
 import app.siansa.SiansaApp
 import app.siansa.data.PlayEvent
@@ -84,7 +86,9 @@ class PlaybackService : MediaSessionService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var graph: AppGraph
     private var events: Events? = null
-    private var crossfader: Crossfader? = null
+    private var crossfader: Fader? = null
+    /** The new audio engine (issue #826), in Siansa Dev: one output every music player is mixed into. */
+    private var engine: AudioEngine? = null
     private var cacheFactory: CacheDataSource.Factory? = null
     private var precacheJob: Job? = null
     private var precacheWriter: CacheWriter? = null
@@ -99,7 +103,11 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         graph = (application as SiansaApp).graph
 
-        val built = PlayerFactory.build(this, graph, ::kbpsFor)
+        val mixer = if (BuildConfig.MIXER_ENGINE) AudioEngine(this) else null
+        engine = mixer
+        val mainMix = mixer?.deck("main")
+        val tailMix = mixer?.deck("tail")
+        val built = PlayerFactory.build(this, graph, ::kbpsFor, engine = mixer, mixDeck = mainMix)
         exo = built.player
         val player = ServerSeekPlayer(
             exo,
@@ -110,7 +118,23 @@ class PlaybackService : MediaSessionService() {
         cacheFactory = built.cacheFactory
         events = Events(player).also { player.addListener(it) }
         // Crossfades work on the ExoPlayer itself: only songs it can jump in (originals, downloads, the cache) fade.
-        crossfader = Crossfader(
+        crossfader = if (mixer != null && mainMix != null && tailMix != null) MixedCrossfader(
+            main = exo,
+            handler = handler,
+            engine = mixer,
+            mainMix = mainMix,
+            newTail = { PlayerFactory.build(this, graph, ::kbpsFor, handleAudioFocus = false, engine = mixer, mixDeck = tailMix) },
+            settings = { graph.settings.current },
+            profiles = graph.profiles,
+            levelOf = { song -> Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id)) },
+            sleepLevel = { sleepLevel },
+            allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true },
+            onLevel = { if (session?.player === phone) applyVolume(phone) },
+            inDjRadio = {
+                (graph.songRadio.seed.value != null && graph.songRadio.mode == ContinuousMode.DJ) ||
+                    graph.settings.current.continuousPlay == ContinuousMode.DJ
+            },
+        ).also { it.start() } else Crossfader(
             main = exo,
             handler = handler,
             newTail = { PlayerFactory.build(this, graph, ::kbpsFor, handleAudioFocus = false) },
@@ -625,6 +649,8 @@ class PlaybackService : MediaSessionService() {
         crossfader?.release()
         crossfader = null
         exo.release()
+        engine?.release()
+        engine = null
         books?.release()
         books = null
         session?.release()

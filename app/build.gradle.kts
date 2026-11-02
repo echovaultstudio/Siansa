@@ -27,6 +27,8 @@ android {
         versionCode = buildNumber
         versionName = appVersion
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // The new audio engine (issue #826): one output all players are mixed into. Only Siansa Dev has it so far.
+        buildConfigField("boolean", "MIXER_ENGINE", "false")
     }
 
     // The release key comes from outside the repository (public since #584): SIANSA_KEYSTORE (a path),
@@ -67,6 +69,7 @@ android {
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
             matchingFallbacks += "release"
+            buildConfigField("boolean", "MIXER_ENGINE", "true")
         }
     }
 
@@ -103,6 +106,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     // Lint errors fail the build (CI shows each with its file and line); warnings are reported only.

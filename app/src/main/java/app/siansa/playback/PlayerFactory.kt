@@ -18,6 +18,9 @@ import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import app.siansa.AppGraph
 import app.siansa.log.AppLog
+import app.siansa.playback.engine.AudioEngine
+import app.siansa.playback.engine.MixCore
+import app.siansa.playback.engine.MixSink
 
 /**
  * Builds the player exactly as the app uses it, so the playback service and the automated tests run
@@ -25,10 +28,28 @@ import app.siansa.log.AppLog
  */
 @OptIn(UnstableApi::class)
 object PlayerFactory {
-    class Built(val player: ExoPlayer, val cacheFactory: CacheDataSource.Factory, /** The player's bass swap (issue #807). */ val deck: DeckFilter)
+    class Built(
+        val player: ExoPlayer,
+        val cacheFactory: CacheDataSource.Factory,
+        /** The player's bass swap (issue #807): in its deck of the mixer when there is one, else in its equaliser. */
+        val deck: DeckFilter,
+        /** Its deck in the mixer (issue #826), when it plays through the [AudioEngine]. */
+        val mix: MixCore.Deck? = null,
+    )
 
     /** [kbpsFor] picks, per song id, Opus kbit/s or 0 for the original file. */
-    fun build(context: Context, graph: AppGraph, kbpsFor: (String) -> Int, handleAudioFocus: Boolean = true): Built {
+    /**
+     * With an [engine] and its [mixDeck] the player's sound goes to the mixer (issue #826) instead of an AudioTrack of
+     * its own: its speed is passed down to it, so it's read faster or slower there and counted exactly.
+     */
+    fun build(
+        context: Context,
+        graph: AppGraph,
+        kbpsFor: (String) -> Int,
+        handleAudioFocus: Boolean = true,
+        engine: AudioEngine? = null,
+        mixDeck: MixCore.Deck? = null,
+    ): Built {
         // Streams use their own HTTP queue and connections (graph.streamHttp), so covers and API calls never
         // hold them up, and report their size and arrival speed to StreamStats.
         val http = OkHttpDataSource.Factory(graph.streamHttp).setTransferListener(StreamStats.transferListener)
@@ -76,11 +97,23 @@ object PlayerFactory {
         val equaliser = EqualiserProcessor { graph.equaliser.state.value }
         val renderers = object : DefaultRenderersFactory(context) {
             override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioOutputPlaybackParams: Boolean): AudioSink =
-                DefaultAudioSink.Builder(context)
-                    .setEnableFloatOutput(enableFloatOutput)
-                    .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
-                    .setAudioProcessors(arrayOf(equaliser))
-                    .build()
+                if (engine != null && mixDeck != null) {
+                    MixSink(
+                        DefaultAudioSink.Builder(context)
+                            .setEnableFloatOutput(enableFloatOutput)
+                            .setEnableAudioOutputPlaybackParameters(true)
+                            .setAudioProcessors(arrayOf(equaliser))
+                            .setAudioOutputProvider(engine.provider(mixDeck))
+                            .build(),
+                        mixDeck,
+                    )
+                } else {
+                    DefaultAudioSink.Builder(context)
+                        .setEnableFloatOutput(enableFloatOutput)
+                        .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
+                        .setAudioProcessors(arrayOf(equaliser))
+                        .build()
+                }
         }.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
         AppLog.i("Player", "FFmpeg decoders " + if (FfmpegLibrary.isAvailable()) "ready (${FfmpegLibrary.getVersion()})" else "not available")
 
@@ -97,7 +130,7 @@ object PlayerFactory {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
-        return Built(player, cacheFactory, equaliser.deck)
+        return Built(player, cacheFactory, mixDeck?.filter ?: equaliser.deck, mixDeck)
     }
 
     /** How much of a song (and then of the next) is loaded ahead: a minute, more than the longest blend. */
