@@ -460,7 +460,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         .fillMaxSize()
                         .onSizeChanged { panelHeight = it.height.toFloat().coerceAtLeast(1f) }
                         .graphicsLayer { translationY = queueY }
-                        .background(Color(0xF2121212))
+                        .background(QUEUE_SHEET)
                         .nestedScroll(connection)
                         .pointerInput(Unit) {
                             // Drags on the parts that don't scroll (the handle and the heading).
@@ -803,6 +803,12 @@ internal fun nextRepeat(mode: Int): Int = when (mode) {
     else -> Player.REPEAT_MODE_OFF
 }
 
+/** The queue sheet's near-black, a little see-through. */
+private val QUEUE_SHEET = Color(0xF2121212)
+
+/** What a queued song swiped away covers the red strip with: the sheet's colour, solid, as its surface is see-through. */
+internal val QUEUE_ROW = Color(0xFF121212)
+
 @Composable
 private fun QueueView(state: PlayerState) {
     val graph = LocalGraph.current
@@ -846,8 +852,9 @@ private fun QueueView(state: PlayerState) {
                         onClick = { graph.player.skipTo(index) },
                         highlighted = playing,
                         swipeToQueue = false,
-                        // Swipe to queue in reverse: a red strip takes the song out.
+                        // Swipe to queue in reverse, left to right: a red strip takes the song out (issue #809).
                         swipeToRemove = { graph.player.removeFromQueue(index) },
+                        swipeRowColour = QUEUE_ROW,
                         subtitle = artistAndAlbum(song),
                         nowPlaying = playing,
                         autoAdded = index in state.auto,
