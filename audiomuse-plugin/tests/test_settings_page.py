@@ -162,6 +162,18 @@ class BeatGridsTest(unittest.TestCase):
         self.assertIn("Measure all 45,052 songs for their beats", page)
         self.assertIn('value="measure_beats">', page)
 
+    def test_the_bar_follows_the_check_for_where_the_beat_stops(self):
+        # 0.5.1: the bar stayed at 100 % while Measure all worked through the songs measured before 0.5.0.
+        c = status.beats_counts(45052, 45046, 0, 0)
+        c["until_waiting"] = 40000
+        running = status.beats(c, {"status": "running"})
+        self.assertEqual(running.label, "Measuring")
+        self.assertEqual(running.percent, 11)
+        self.assertIn("5,052 of 45,052 checked for where the beat stops", running.detail)
+        self.assertEqual(status.beats(c, {}).label, "Not complete")
+        c["until_waiting"] = 0
+        self.assertEqual(status.beats(c, {}).label, "Ready")
+
     def test_measuring_all_shows_stop_and_nothing_left_hides_the_offer(self):
         page = web.render_settings(self.state(beats_all=True, running=True), 40, "", 20)
         self.assertIn('value="stop_beats_all"', page)

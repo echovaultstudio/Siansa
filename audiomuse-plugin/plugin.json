@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.5.3",
+      "min_core_version": "3.6.4",
+      "changelog": "The Beat grids bar shows how far the check for where the beat stops has got, while Measure all works through the songs measured before 0.5.0. Before, it stayed full and said Ready.",
+      "imageUrl": ""
+    },
+    {
       "version": "0.5.2",
       "min_core_version": "3.6.4",
       "changelog": "Shorter texts on the settings page: each part says what it's for and how it runs in a few lines. Nothing else changes.",
