@@ -63,6 +63,12 @@ class DeckStream(
     @Volatile var volume = 1f
     /** The player's speed; the pitch follows (the stream is read faster or slower). */
     @Volatile var speed = 1f
+    /**
+     * The player's pitch (Media3's PlaybackParameters): as [speed], the stream is read faster or slower and the
+     * pitch follows; 1 at another speed keeps the key (Keep the key), by stretching the sound in time instead
+     * ([Stretch]). The pitch is moved by [pitch] and the time by [speed] / [pitch]. Not given (NaN), it follows the speed.
+     */
+    @Volatile var pitch = Float.NaN
 
     /** The gain the mixer last applied, where its next block's glide starts. */
     internal var gainNow = 1f
@@ -139,7 +145,7 @@ class DeckStream(
                 first = end
                 continue
             }
-            val keepFrom = max(first, floor(readPos).toLong() - SincTable.HALF - 2)
+            val keepFrom = max(first, floor(readPos).toLong() - KEEP_BEHIND)
             if (end - keepFrom >= capacity) break
             val l = sample(data, at, 0)
             val r = if (channels >= 2) sample(data, at, 1) else l
@@ -260,6 +266,7 @@ class DeckStream(
         }
         gate = max(cue.mixFrame, if (late > 0) renderedTo else Long.MIN_VALUE) + kotlin.math.ceil(missing / ratio).toLong()
         holdGrid = true
+        stretch.reset()
         envelope = 1.0
         announced = false
         dropped = 0
@@ -317,6 +324,9 @@ class DeckStream(
      */
     fun render(out: FloatArray, offset: Int, frames: Int, mixStart: Long, outRate: Int): Boolean = synchronized(lock) {
         val ratio = sampleRate.toDouble() * speed / outRate
+        // The rate the sound is read at for its pitch: the same as the ratio unless the key is kept.
+        val pitchRatio = pitch.let { if (it.isNaN()) ratio else sampleRate.toDouble() * it / outRate }
+        val stretchWanted = kotlin.math.abs(pitchRatio - ratio) > 1e-6
         lastRatio = ratio
         val slot = cpHead
         cpMix[slot] = mixStart
@@ -331,7 +341,7 @@ class DeckStream(
         var peak = 0.0
         // At the output's rate a stream is copied sample for sample; one left between two samples (by a speed
         // change in a blend) is read through the filter like any other (0.52.0-dev crashed there).
-        val table = SincTable.forRatio(ratio)
+        val table = SincTable.forRatio(if (stretchWanted) pitchRatio else ratio)
         var gave = false
         for (i in 0 until frames) {
             val o = (offset + i) * 2
@@ -346,8 +356,13 @@ class DeckStream(
             if (envelope <= 0.0 && target <= 0.0) continue
             val whole = floor(readPos).toLong()
             val frac = readPos - whole
-            val exact = ratio == 1.0 && frac == 0.0
-            val needed = if (exact) whole + 1 else whole + SincTable.HALF + 1
+            val stretching = stretchWanted || stretch.active
+            val exact = !stretching && ratio == 1.0 && frac == 0.0
+            val needed = when {
+                exact -> whole + 1
+                stretching -> whole + stretch.ahead(pitchRatio) + SincTable.HALF + 1
+                else -> whole + SincTable.HALF + 1
+            }
             if (end < needed && !ended) {
                 // Nothing to play yet: a cued stream keeps time, any other waits (its position stands still).
                 if (holdGrid) readPos += ratio
@@ -356,7 +371,11 @@ class DeckStream(
             if (ended && whole >= end) break
             var l: Double
             var r: Double
-            if (exact) {
+            if (stretching) {
+                stretch.next(readPos, pitchRatio, stretchWanted, table)
+                l = stretch.l
+                r = stretch.r
+            } else if (exact) {
                 l = frameAt(whole, 0)
                 r = frameAt(whole, 1)
             } else {
@@ -406,6 +425,172 @@ class DeckStream(
         return gave
     }
 
+    // ---- Keeping the key ----
+
+    private val stretch = Stretch()
+    private val grainWeights = DoubleArray(SincTable.TAPS)
+    private var readL = 0.0
+    private var readR = 0.0
+
+    /**
+     * The sound at fractional frame [pos], through [table]'s filter, into [readL] and [readR]; a whole frame read at
+     * the song's own rate ([plain]) is copied as it is.
+     */
+    private fun readAt(pos: Double, table: SincTable, plain: Boolean = false) {
+        val whole = floor(pos).toLong()
+        val frac = pos - whole
+        var l = 0.0
+        var r = 0.0
+        if (frac == 0.0 && plain) {
+            readL = frameAt(whole, 0)
+            readR = frameAt(whole, 1)
+            return
+        }
+        table.fill(frac, grainWeights)
+        val from = whole - SincTable.HALF + 1
+        if (from >= first && from >= 0 && from + SincTable.TAPS <= end) {
+            var idx = ((from % capacity) * 2).toInt()
+            val wrapAt = capacity * 2
+            for (k in 0 until SincTable.TAPS) {
+                val w = grainWeights[k]
+                l += w * ring[idx]
+                r += w * ring[idx + 1]
+                idx += 2
+                if (idx == wrapAt) idx = 0
+            }
+        } else {
+            for (k in 0 until SincTable.TAPS) {
+                val w = grainWeights[k]
+                l += w * frameAt(from + k, 0)
+                r += w * frameAt(from + k, 1)
+            }
+        }
+        readL = l
+        readR = r
+    }
+
+    /** The middle of the two channels at whole frame [frame], for lining grains up. */
+    private fun monoAt(frame: Long): Double = (frameAt(frame, 0) + frameAt(frame, 1)) * 0.5
+
+    /**
+     * Keep the key (issue #826): the sound stretched in time, its pitch kept, by overlapping short grains (WSOLA).
+     * Each grain is [GRAIN_MS] of the song read at the pitch's rate, a new one every half grain, laid where the song
+     * should be by now ([readPos], which moves on at the speed as always, so where the stream is and every cue stay
+     * exact) but nudged up to [SEEK_MS] either way to where it best continues the grain before, so the sound joins up
+     * without a stutter. Each grain fades in and out (a Hann window); two at a time add up to the sound at full level.
+     * It starts from the plain reading without a gap, and ends the same way when the speed is back at the pitch.
+     */
+    private inner class Stretch {
+        private val grainFrames = (GRAIN_MS * GRAIN_RATE / 1_000).let { it - it % 2 }
+        private val hop = grainFrames / 2
+        private val window = DoubleArray(grainFrames) { j -> 0.5 - 0.5 * kotlin.math.cos(2 * Math.PI * j / grainFrames) }
+        private val seek = (SEEK_MS * sampleRate / 1_000).toInt()
+        private val corr = (CORR_MS * sampleRate / 1_000).toInt()
+        // Two grains at most: where each starts (fractional frame of the song) and how far into it the output is.
+        private val start = DoubleArray(2)
+        private val age = IntArray(2) { -1 }
+        private var sinceGrain = 0
+        /** The latest grain's nudge was 0: it reads the song exactly where it should be. */
+        private var onTime = true
+        var l = 0.0
+        var r = 0.0
+        val active: Boolean get() = age[0] >= 0 || age[1] >= 0
+
+        private fun plain(pitchRatio: Double) = pitchRatio == 1.0
+
+        /** How far ahead of where it should be a grain may read, in frames. */
+        fun ahead(pitchRatio: Double): Long = (seek + grainFrames * maxOf(pitchRatio, 1.0) + corr).toLong()
+
+        fun reset() {
+            age[0] = -1
+            age[1] = -1
+        }
+
+        /** The next output frame, for the song where it should be at [nominal], read at [pitchRatio]. */
+        fun next(nominal: Double, pitchRatio: Double, wanted: Boolean, table: SincTable) {
+            if (!active) {
+                // From the plain reading: a grain halfway through, reading where the song is now, so nothing dips.
+                start[0] = nominal - hop * pitchRatio
+                age[0] = hop
+                sinceGrain = hop
+                onTime = true
+            }
+            if (sinceGrain >= hop) {
+                val latest = if (age[1] < 0 || (age[0] in 0 until age[1])) 0 else 1
+                val older = 1 - latest
+                // Back at the pitch: the newest grain reads exactly where it should, and once the one before has
+                // ended, the plain reading takes over from it seamlessly.
+                if (!wanted && onTime && age[older] < 0 && age[latest] >= hop) {
+                    reset()
+                    readAt(nominal, table)
+                    l = readL
+                    r = readR
+                    return
+                }
+                val natural = start[latest] + age[latest] * pitchRatio
+                val nudge = if (wanted) bestNudge(natural, nominal, pitchRatio) else 0
+                // The older grain has run its course: the new one takes its place.
+                // At the song's own rate a grain starts on a whole frame (a hundredth of a ms off at most) and is
+                // copied as it is, with no filter.
+                start[older] = (if (plain(pitchRatio)) kotlin.math.round(nominal) else nominal) + nudge
+                age[older] = 0
+                onTime = nudge == 0
+                sinceGrain = 0
+            }
+            var sl = 0.0
+            var sr = 0.0
+            for (g in 0..1) {
+                val a = age[g]
+                if (a < 0) continue
+                if (a >= grainFrames) {
+                    age[g] = -1
+                    continue
+                }
+                readAt(start[g] + a * pitchRatio, table, plain(pitchRatio))
+                val w = window[a]
+                sl += w * readL
+                sr += w * readR
+                age[g] = a + 1
+            }
+            sinceGrain++
+            l = sl
+            r = sr
+        }
+
+        /**
+         * Where, within [seek] frames of [nominal], the song best carries on from [natural] (where the grain before
+         * would go on reading): the most alike over [corr] frames, compared every few frames for speed.
+         */
+        private fun bestNudge(natural: Double, nominal: Double, pitchRatio: Double): Int {
+            val n0 = floor(natural).toLong()
+            val c0 = floor(nominal).toLong()
+            var best = 0
+            var bestScore = Double.NEGATIVE_INFINITY
+            var d = -seek
+            while (d <= seek) {
+                var dot = 0.0
+                var energy = 0.0
+                var j = 0
+                while (j < corr) {
+                    val step = (j * pitchRatio).toLong()
+                    val a = monoAt(n0 + step)
+                    val b = monoAt(c0 + d + step)
+                    dot += a * b
+                    energy += b * b
+                    j += CORR_STEP
+                }
+                val score = if (energy > 1e-12) dot / kotlin.math.sqrt(energy) else 0.0
+                // A tie goes to the smallest nudge, so a steady sound stays where it should be.
+                if (score > bestScore + 1e-9 || (kotlin.math.abs(score - bestScore) <= 1e-9 && kotlin.math.abs(d) < kotlin.math.abs(best))) {
+                    bestScore = score
+                    best = d
+                }
+                d += SEEK_STEP
+            }
+            return best
+        }
+    }
+
     private fun frameAt(frame: Long, channel: Int): Double {
         if (frame < first || frame >= end || frame < 0) return 0.0
         return ring[((frame % capacity) * 2).toInt() + channel].toDouble()
@@ -418,6 +603,16 @@ class DeckStream(
         /** How much a stream holds: enough for the player to stay ahead, short enough that a change of equaliser
          *  is heard soon (it's applied before the stream). */
         const val CAPACITY_MS = 1_500
+        /** Keep the key: each grain's length, how far a grain may be nudged to join up, and over how much it's compared. */
+        const val GRAIN_MS = 40
+        /** The output rate grains are counted at (the engine's). */
+        const val GRAIN_RATE = 44_100
+        const val SEEK_MS = 10
+        const val CORR_MS = 10
+        const val SEEK_STEP = 3
+        const val CORR_STEP = 8
+        /** Sound kept behind where the stream is read: the filter's half and what a grain may reach back to. */
+        const val KEEP_BEHIND = SincTable.HALF + 2 + 2_048L
         /** The fade around play, pause and release. */
         const val RAMP_MS = 5.0
         /** A song's sample louder than this is sound (−60 dBFS); a mix's quieter than this is silence (−100 dBFS). */
