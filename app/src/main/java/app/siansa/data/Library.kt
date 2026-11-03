@@ -663,7 +663,8 @@ class LibraryRepository(context: Context) {
         releaseTypes = releaseTypes.joinToString(TYPE_SEPARATOR), isCompilation = isCompilation,
         sortKey = normalizeKey(name), artistKey = normalizeKey(artist),
         // The same album in two libraries (a FLAC and a Dolby Atmos copy) stays two albums (issue #376).
-        groupKey = albumGroupKey(name, artist, folderId),
+        // An album of files on the phone (issue #352) stays apart from the server's copy, which may not play offline.
+        groupKey = albumGroupKey(name, artist, folderId ?: if (app.siansa.local.LocalIds.isLocal(id)) "phone" else null),
         signature = signature(),
         folderId = folderId,
         labels = markLabels(labels),

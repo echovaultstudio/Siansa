@@ -111,6 +111,7 @@ import app.siansa.data.mixScopeKey
 import app.siansa.local.LocalIds
 import app.siansa.local.LocalMusic
 import app.siansa.local.LocalSource
+import app.siansa.local.MusicBrainzApi
 import app.siansa.mix.PlayCountLog
 
 /** Everything the app shares, created once in [SiansaApp]. */
@@ -271,7 +272,7 @@ class AppGraph(val app: Application) {
     )
 
     /** MusicBrainz, for music files on the phone without MusicBrainz IDs in their tags (issue #352). */
-    val musicBrainz = app.siansa.local.MusicBrainzApi(http, app.siansa.local.MusicBrainzApi.userAgent(BuildConfig.VERSION_NAME))
+    val musicBrainz = MusicBrainzApi(http, MusicBrainzApi.userAgent(BuildConfig.VERSION_NAME))
     /** Music files on the phone (issue #352). */
     val localMusic: LocalMusic by lazy { LocalMusic(app, library, scope, musicBrainz) }
     /** A local song's requests that only a server can answer go to its server copy, through [source] (any user's). */
