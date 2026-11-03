@@ -291,14 +291,36 @@ class LibraryRepository(context: Context) {
      * [refs] (a song's artists) as the artists to offer: a name that's several artists in one is replaced by them
      * (issue #359), also when it isn't in the library's artist list (only a song's artist, never an album's).
      */
-    suspend fun expandArtists(refs: List<Artist>): List<Artist> {
+    suspend fun expandArtists(refs: List<Artist>, server: (suspend (String) -> List<Artist>)? = null): List<Artist> {
         val found = combinedArtists()
         val index = combinedIndex ?: CombinedArtists.Index(dao.artists().map { it.toArtist() }).also { combinedIndex = it }
         val extra = refs.filter { it.id !in found && artist(it.id) == null }
             .mapNotNull { ref -> CombinedArtists.of(ref, index)?.let { ref.id to it } }
+        var all = if (extra.isEmpty()) found else found + extra
+        // Names the library doesn't have are looked up on the server, once each (remembered until the next sync).
+        if (server != null) {
+            val wanted = refs.mapNotNull { all[it.id] }.filter { it.unknown.isNotEmpty() }
+            if (wanted.isNotEmpty()) {
+                val names = wanted.flatMap { it.unknown }.map { normalizeKey(it) to it }.distinctBy { it.first }
+                for ((key, name) in names) {
+                    if (serverArtists.containsKey(key)) continue
+                    serverArtists[key] = runCatching { server(name) }
+                        .onFailure { AppLog.d("Library", "Couldn't look up the artist \"$name\" on the server: ${it.message}") }
+                        .getOrNull() ?: continue
+                }
+                val resolved = wanted.associate { c -> c.combined.id to CombinedArtists.withServer(c, serverArtists) }
+                resolved.values.filter { it.unknown.isEmpty() || it != all[it.combined.id] }.takeIf { it.isNotEmpty() }?.let { list ->
+                    AppLog.d("Library", "Song artists with the server's: ${list.joinToString("; ") { c -> "${c.combined.name} → ${(c.parts.map { it.name } + c.unknown).joinToString(" | ")}" }}")
+                }
+                all = all + resolved
+            }
+        }
         if (extra.isNotEmpty()) AppLog.d("Library", "Song artists split: ${extra.joinToString("; ") { (_, c) -> "${c.combined.name} → ${(c.parts.map { it.name } + c.unknown).joinToString(" | ")}" }}")
-        return CombinedArtists.expand(refs, if (extra.isEmpty()) found else found + extra)
+        return CombinedArtists.expand(refs, all)
     }
+
+    /** Artists the music server has by name ([normalizeKey]), as looked up for joined names. */
+    private val serverArtists = java.util.concurrent.ConcurrentHashMap<String, List<Artist>>()
 
     /** The artist's albums, with those of names it's tagged in together with others (issue #359). */
     suspend fun albumsOf(artist: Artist): List<Album> {
@@ -441,6 +463,7 @@ class LibraryRepository(context: Context) {
 
     suspend fun replaceArtists(artists: List<Artist>) = db.withTransaction {
         combined = null
+        serverArtists.clear()
         dao.deleteAllArtists()
         artists.distinctBy { it.id }.chunked(CHUNK).forEach { chunk ->
             dao.forgetSources(chunk.map { it.id })
@@ -488,6 +511,7 @@ class LibraryRepository(context: Context) {
     /** Removes everything that came from [user]. */
     suspend fun removeSource(user: Int) {
         combined = null
+        serverArtists.clear()
         db.withTransaction {
             dao.deleteSongsOfSource(user)
             dao.deleteAlbumsOfSource(user)
@@ -505,6 +529,7 @@ class LibraryRepository(context: Context) {
      */
     suspend fun putSource(user: Int, music: GuestMusic): Int {
         combined = null
+        serverArtists.clear()
         val added = db.withTransaction {
             dao.deleteSongsOfSource(user)
             dao.deleteAlbumsOfSource(user)
@@ -561,6 +586,7 @@ class LibraryRepository(context: Context) {
         val merged = recomputePrimaries()
         putMeta(META_FOLDERS, if (every) "*" else chosen.sorted().joinToString(","))
         combined = null
+        serverArtists.clear()
         refreshStatus()
         bump()
         AppLog.i("Library", if (every) "Showing every library" else "Showing ${chosen.size} of ${all.size} libraries")

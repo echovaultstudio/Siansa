@@ -33,7 +33,11 @@ data class CombinedArtist(
 }
 
 object CombinedArtists {
-    /** Names that stand for no artist at all: an unreleased "ID", an unknown or various artists. */
+    /**
+     * Names that usually stand for no artist: an unreleased "ID", an unknown or various artists. Only left out when
+     * the music server has no artist by that name either; when it has one (MusicBrainz keeps "ID" as an artist for
+     * uncredited tracks in DJ mixes, and an artist may really be called that), it's offered like any other.
+     */
     private val PLACEHOLDERS = setOf("id", "ids", "unknown", "unknown artist", "various", "various artists", "va", "n a", "tba", "tbc")
         .map { normalizeKey(it) }.toSet()
 
@@ -76,8 +80,6 @@ object CombinedArtists {
         val parts = ArrayList<Artist>()
         val unknown = ArrayList<String>()
         for (name in names) {
-            // "ID" (a DJ's unreleased track), "Unknown"…: not an artist, so it needs no page and isn't offered.
-            if (normalizeKey(name) in PLACEHOLDERS) continue
             val matches = byKey[normalizeKey(name)].orEmpty().filter { it.id != artist.id }
             when (matches.size) {
                 0 -> unknown += name
@@ -89,6 +91,30 @@ object CombinedArtists {
         val safe = unknown.isEmpty() || parts.any { !it.mbid.isNullOrBlank() }
         if (!safe) return null
         return CombinedArtist(artist, parts.distinctBy { it.id }, unknown)
+    }
+
+    /**
+     * [c] with its names the library doesn't have looked up on the music server ([server]: the artists it has by
+     * each name, by [normalizeKey]): a name the server has exactly one artist for becomes that artist (Navidrome
+     * lists only album artists in the library, so an artist only ever on songs, "ID" on DJ mixes, wasn't found);
+     * a name it has none for is dropped when it stands for no artist ("ID", "Unknown"), else kept, and with it the
+     * joined name, so its songs can still be reached. Two artists by one name stay unknown: which is meant can't be
+     * told.
+     */
+    fun withServer(c: CombinedArtist, server: Map<String, List<Artist>>): CombinedArtist {
+        if (c.unknown.isEmpty()) return c
+        val parts = ArrayList(c.parts)
+        val unknown = ArrayList<String>()
+        for (name in c.unknown) {
+            val key = normalizeKey(name)
+            val found = server[key].orEmpty().filter { it.id != c.combined.id && normalizeKey(it.name) == key }.distinctBy { it.id }
+            when {
+                found.size == 1 -> parts += found.first()
+                found.isEmpty() && key in PLACEHOLDERS -> Unit
+                else -> unknown += name
+            }
+        }
+        return c.copy(parts = parts.distinctBy { it.id }, unknown = unknown)
     }
 
     /**

@@ -1,2 +1,2 @@
 ### Fixed
-- **Artists joined in one name were only split when they were album artists.** A name like "ID, Camo & Krooked" that's only ever a song's artist now offers its artists too. "ID" (an unreleased track) and "Unknown" aren't offered as artists.
+- **Artists joined in one name were only split when they were album artists.** A name like "ID, Camo & Krooked" that's only ever a song's artist now offers its artists too. A part your library doesn't list is found on your server (Navidrome, Emby or Jellyfin), so "ID" on DJ mixes goes to the server's ID artist with its other songs; "ID" or "Unknown" with no artist anywhere isn't offered.
