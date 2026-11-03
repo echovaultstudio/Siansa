@@ -156,6 +156,8 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
             "Navidrome ${if (s.navidromeReady) "set" else "not set"}, AudioMuse ${if (s.audioMuseReady) "set" else "not set"}, AI ${if (s.aiReady) "on" else "off"}",
             "quality Wi-Fi ${if (s.transcodeWifiKbps > 0) "Opus ${s.transcodeWifiKbps}" else "original"}, mobile ${if (s.transcodeMobileKbps > 0) "Opus ${s.transcodeMobileKbps}" else "original"}",
             "ReplayGain ${s.replayGain.label}",
+            // How songs blend, so a DJ session's log says what it was set to (0.52.0-dev).
+            "crossfade ${s.crossfade.name.lowercase()} ${s.crossfadeSeconds} s, beat-matched ${s.beatMatch.name.lowercase()}, ${s.blendBars} bars, bass swap ${if (s.bassSwap) "on" else "off"}",
             "song cache ${mb(s.songCacheMb)}, image cache ${mb(s.imageCacheMb)}",
             "animated covers ${if (s.animatedCovers) "on" else "off"}, download all covers ${if (s.coverDownload) (if (s.coverDownloadAnyWifi) "any Wi-Fi" else "home") else "off"}",
             "scrobbling: " + listOfNotNull("Navidrome".takeIf { s.scrobbleNavidrome }, "Last.fm".takeIf { s.lastFmReady }, "ListenBrainz/Koito".takeIf { s.listenBrainzReady }).joinToString(", ").ifEmpty { "off" },
