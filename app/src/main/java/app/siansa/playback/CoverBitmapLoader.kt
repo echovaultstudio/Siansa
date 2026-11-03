@@ -43,20 +43,28 @@ class CoverBitmapLoader(private val context: Context, private val scope: Corouti
         val future = SettableFuture.create<Bitmap>()
         scope.launch {
             try {
-                val id = uri.getQueryParameter("id")
-                val builder = ImageRequest.Builder(context).data(uri.toString()).allowHardware(false).size(512)
-                if (id != null) {
-                    // The same entries the lists use, so it's usually on the phone already.
-                    val key = "cover:${app.siansa.covers.CoverVersions.cacheId(id)}:${uri.getQueryParameter("size") ?: SMALL_COVER}"
-                    builder.diskCacheKey(key).memoryCacheKey("$key:notification")
-                }
-                val result = SingletonImageLoader.get(context).execute(builder.build())
-                if (result is SuccessResult) future.set(result.image.toBitmap())
-                else future.setException(IllegalStateException("Cover couldn't be loaded"))
+                future.set(loadCoverBitmap(context, uri))
             } catch (e: Exception) {
                 future.setException(e)
             }
         }
         return future
     }
+}
+
+/**
+ * A cover at most 512 pixels across, through the app's image cache: for the notification, and for the car's lists
+ * (issue #62). Throws when it can't be loaded.
+ */
+suspend fun loadCoverBitmap(context: Context, uri: Uri): Bitmap {
+    val id = uri.getQueryParameter("id")
+    val builder = ImageRequest.Builder(context).data(uri.toString()).allowHardware(false).size(512)
+    if (id != null) {
+        // The same entries the lists use, so it's usually on the phone already.
+        val key = "cover:${app.siansa.covers.CoverVersions.cacheId(id)}:${uri.getQueryParameter("size") ?: SMALL_COVER}"
+        builder.diskCacheKey(key).memoryCacheKey("$key:notification")
+    }
+    val result = SingletonImageLoader.get(context).execute(builder.build())
+    if (result is SuccessResult) return result.image.toBitmap()
+    throw IllegalStateException("Cover couldn't be loaded")
 }
