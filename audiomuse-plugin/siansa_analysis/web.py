@@ -5,7 +5,8 @@ API (JSON, for any logged-in user or API token):
 * ``GET api/health``: the plugin is there and working;
 * ``GET api/profiles?ids=a,b,…``: loudness and fade profiles of up to 500 songs (the layout Siansa reads), with
   the beat grid at each end (``intro_bpm``, ``intro_beat_ms``, ``intro_bar_ms``, ``intro_rhythm``,
-  ``intro_steady`` and the same for ``outro``) once a song has been measured for them;
+  ``intro_steady`` and the same for ``outro``) once a song has been measured for them, and ``beats_until_ms`` when
+  the beat stops well before the end (the last beat, ms from the start);
 * ``GET api/status``: how far each part is;
 * ``GET api/similar/albums?track_id=…``: albums that sound like the album of that song;
 * ``GET api/similar/artists?track_id=…`` or ``?artist=…``: artists that sound like that one.
@@ -44,6 +45,12 @@ def collect(db):
     similar_job = store.get_state("similar_job", {}, db) or {}
     built = store.get_state("similar_built", {}, db) or {}
     beat_counts = status.beats_counts(*store.beats_counts(db))
+    try:
+        beat_counts["until_waiting"] = store.until_waiting(db)
+    except Exception:  # the page shows without it
+        if db is not None:
+            db.rollback()
+        beat_counts["until_waiting"] = 0
     beats_job = store.get_state("beats_job", {}, db) or {}
     return {
         "inputs": inputs,
@@ -147,6 +154,8 @@ def profiles():
             out.append({"track_id": asked_id, **profile})
             if "intro_bpm" not in profile and "outro_bpm" not in profile:
                 no_beats.append(asked_id)  # measured before the beat tracker, maybe: its beats come first then
+            elif store.UNTIL_KEY not in profile:
+                no_beats.append(asked_id)  # measured before 0.5.0: checked for where its beat stops, as it's about to play
     if pending or no_beats:
         try:
             store.mark_wanted(db, {canonical.get(i, i) for i in pending + no_beats})
@@ -400,11 +409,14 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
   <div class="mx-head"><h3>3. Beat grids</h3>{_badge(b)}</div>
   {_meter(b, "Songs measured for their beats")}
   <p><strong>{escape(b.detail)}.</strong> {beat_counts['to_measure']:,} still to measure.</p>
+  {f"<p>{beat_counts['until_waiting']:,} songs measured before 0.5.0 still to be checked for where their beat stops: Measure all fills them in (only the beats are read again; everything measured stays in use meanwhile), otherwise each is checked when Siansa is about to play it.</p>" if beat_counts.get('until_waiting') else ""}
   {elsewhere_line}
   <p class="mx-help">The tempo, beats, bars and phrases at each end of a song, for beat-matched blends in
     Siansa's DJ radio (experimental): with the phrases (plugin 0.4.0: the 4 or 8 bars a song is built from, read
     over its last minute) the blends go phrase on phrase, as a DJ mixes. Plugin 0.4.2 reads the tempo of drum and
-    bass and other breakbeats right, where it often read two thirds of it. New songs get theirs with their volume
+    bass and other breakbeats right, where it often read two thirds of it; 0.5.0 also notes where the beat stops
+    before a beatless outro, so the next song can come in after the last beat (songs measured before are checked for
+    that only as the app is about to play them). New songs get theirs with their volume
     and fade profile. Songs measured before plugin 0.4.2 are read again (the sound isn't kept, only what was
     measured), a batch at a time after the profiles each 15 minutes, songs the app is about to play first.
     Their loudness, fades and earlier beat grids stay in use meanwhile; a song without its phrases blends bar on

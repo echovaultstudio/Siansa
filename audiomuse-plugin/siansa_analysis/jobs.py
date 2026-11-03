@@ -53,10 +53,17 @@ def profile_of(measurement):
     }
     try:
         intro, outro = measurement.beat_grids()
-        profile["beats"] = beats.fields(intro, outro)
+        try:
+            until = measurement.beats_until()
+        except Exception as e:  # the grids still count without it
+            logger.warning("siansa_analysis couldn't tell where the beat stops: %s", e)
+            until = None
+        profile["beats"] = beats.fields(intro, outro, until)
+        profile["beats"][store.UNTIL_KEY] = 1  # looked for where the beat stops (0.5.0), found or not
     except Exception as e:  # the loudness still counts; a song without a grid gets plain fades
         logger.warning("siansa_analysis couldn't find the beats: %s", e)
-        profile["beats"] = {}
+        # Tried: it isn't picked again and again for where the beat stops (Measure all would never end).
+        profile["beats"] = {store.UNTIL_KEY: 1}
     return profile
 
 
@@ -211,7 +218,7 @@ def measure_part(part, budget_seconds=None, batch=None):
         tried = set()
         stopped = halted = False
         while len(tried) < limit and not stopped:
-            rows = [r for r in store.songs_to_measure(db, min(25, limit - len(tried)) + len(tried), beats=spec["beats"])
+            rows = [r for r in store.songs_to_measure(db, min(25, limit - len(tried)) + len(tried), beats=spec["beats"], fill=all_on)
                     if r[0] not in tried]
             if not rows:
                 break
@@ -258,7 +265,7 @@ def measure_part(part, budget_seconds=None, batch=None):
                                                   "measured": measured, "failed": failed, "error": None}, db)
         seconds = round(time.monotonic() - started, 1)
         store.set_state("profiles_rate", status.next_rate(rate, measured + failed, seconds), db)
-        if all_on and not store.songs_to_measure(db, 1, beats=spec["beats"]):
+        if all_on and not store.songs_to_measure(db, 1, beats=spec["beats"], fill=True):
             store.set_state(spec["all"], {"on": False, "finished_at": now_iso()}, db)
             logger.info("siansa_analysis: every song is measured%s", " for its beats" if spec["beats"] else "")
         result = {"status": "idle", "finished_at": now_iso(), "measured": measured, "failed": failed,

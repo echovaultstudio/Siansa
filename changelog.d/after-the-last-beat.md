@@ -1,0 +1,2 @@
+### Added
+- **Smart crossfades blend after the last beat.** When a song ends in a beatless outro, the next song now comes in right after the last beat, and the outro plays out underneath it with its own fade, the way a DJ would mix it. There's no beat to clash with, so it works whatever the two tempos are. Needs version 0.5.0 of the Siansa plugin for AudioMuse-AI. It doesn't measure your library again: songs are checked as they come up in what you play.

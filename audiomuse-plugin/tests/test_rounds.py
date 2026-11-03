@@ -154,7 +154,7 @@ class MeasureRunTest(unittest.TestCase):
         store.unlock = lambda db, name: None
         store.get_state = lambda name, default=None, db=None: self.state.get(name, default)
         store.set_state = lambda name, value, db=None, commit=True: self.state.__setitem__(name, value)
-        store.songs_to_measure = lambda db, n, beats=False: [(i, i) for i in self.songs if i not in self.measured][:n]
+        store.songs_to_measure = lambda db, n, beats=False, fill=False: [(i, i) for i in self.songs if i not in self.measured][:n]
         store.save_profile = lambda db, item_id, profile: self.measured.append(item_id)
         jobs.get_db = lambda: None
         jobs._download = download

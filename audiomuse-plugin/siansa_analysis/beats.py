@@ -51,6 +51,11 @@ PHRASE_CONFIDENCE = 0.45  # below this the phrases aren't clear and only the bar
 PHRASE_SAMPLES = 3  # phrases a stretch must hold for a length to be tried: two is a coin toss on most music
 INTRO_PHRASE_SAMPLES = 2  # the start is shorter, and only its first phrase start matters, not the length
 PICKUP_BARS = 2  # an intro's first phrase may start this many bars in (a pickup), else at the first downbeat
+TAIL_WITHOUT_BEAT_SECONDS = 6.0  # a beatless end shorter than this isn't worth bringing the next song in over
+BEAT_GONE = 0.35  # a bar whose beats stand out less than this share of the beat's usual bar has no beat
+MIN_BEAT_BARS = 4  # bars with a beat the stretch must hold before a beatless end is reported
+UNTIL_WINDOW_SECONDS = 16.0  # the stretch the beat's grid is read from, looking for where the beat stops
+UNTIL_STEP_SECONDS = 4.0  # stepped back from the end by this much at a time
 DEBUG = False
 
 
@@ -417,6 +422,46 @@ def grid(samples, offset_ms, rate=RATE, from_end=False):
     return Grid(bpm, beat_ms, bar_ms, rhythm, steady, phrase_ms, phrase_bars)
 
 
+def beats_until(samples, offset_ms, g, rate=RATE):
+    """When the beat of grid ``g`` stops in a stretch of mono ``samples`` that starts ``offset_ms`` into the song (ms
+    from the start of the song, the last beat that still plays), or ``None`` when the beat goes on to within
+    :data:`TAIL_WITHOUT_BEAT_SECONDS` of the stretch's end (Siansa: a blend after the last beat brings the next song in
+    over a beatless outro, which then fades out under it). A bar has a beat while its beats stand out from what's
+    between them nearly as much as usual."""
+    if g is None or g.bpm <= 0:
+        return None
+    onset, _, _ = onset_envelope(samples, rate)
+    if onset.size == 0:
+        return None
+    period = 60_000.0 / g.bpm
+    end_ms = offset_ms + len(samples) * 1000.0 / rate
+    k0 = math.ceil((offset_ms - g.beat_ms) / period)
+    k1 = math.floor((end_ms - g.beat_ms) / period)
+    if k1 - k0 + 1 < BEATS_PER_BAR * (MIN_BEAT_BARS + 1):
+        return None
+    times = g.beat_ms + period * np.arange(k0, k1 + 1)
+    to_frame = lambda t: np.round(((t - offset_ms) * rate / 1000.0 - FRAME / 2) / HOP).astype(int)  # noqa: E731
+    frames = np.clip(to_frame(times), 0, onset.size - 1)
+    between = np.clip(to_frame(times + period / 2), 0, onset.size - 1)
+    hits, off = at_frames(onset, frames), at_frames(onset, between)
+    bars = hits.size // BEATS_PER_BAR
+    if bars < MIN_BEAT_BARS + 1:
+        return None
+    hit = hits[:bars * BEATS_PER_BAR].reshape(bars, BEATS_PER_BAR).mean(axis=1)
+    rest = off[:bars * BEATS_PER_BAR].reshape(bars, BEATS_PER_BAR).mean(axis=1)
+    strength = hit - rest
+    usual = float(np.percentile(strength, 75))
+    if usual <= 0:
+        return None
+    beaty = (strength >= BEAT_GONE * usual) & (hit >= ONSET_FLOOR * 0.5)
+    DEBUG and print("bar strengths", np.round(strength / usual, 2))
+    if beaty.sum() < MIN_BEAT_BARS:
+        return None
+    last_bar = int(np.flatnonzero(beaty)[-1])
+    last_beat = float(times[min(times.size - 1, last_bar * BEATS_PER_BAR + BEATS_PER_BAR - 1)])
+    return last_beat if end_ms - last_beat >= TAIL_WITHOUT_BEAT_SECONDS * 1000 else None
+
+
 def same_grid(a, b, bpm_tolerance=0.005, ms_tolerance=40.0):
     """Whether two grids of the same end agree: the same tempo (within half a percent) and the same downbeats."""
     if a.bar_ms is None or b.bar_ms is None or abs(a.bpm - b.bpm) > a.bpm * bpm_tolerance:
@@ -461,9 +506,40 @@ def ends(head, tail, tail_offset_frames, relative_levels, rate=RATE, seconds=SEC
     return intro, outro
 
 
-def fields(intro, outro):
-    """The profile fields for the two grids (empty when neither end has one)."""
+def end_without_beat(tail, tail_offset_frames, relative_levels, rate=RATE, outro_seconds=OUTRO_SECONDS):
+    """When the beat stops before the end of the song (ms from its start; see :func:`beats_until`), from the last
+    :data:`OUTRO_SECONDS` of it before its dead air, or ``None`` when it beats to the end or has no beat. The grid is
+    read from the last stretch of :data:`UNTIL_WINDOW_SECONDS` where the beat still plays."""
+    if tail is None or not tail.size:
+        return None
+    chunk_ms = 100
+    levels = np.asarray(relative_levels, dtype=np.float64) if len(relative_levels) else np.zeros(0)
+    loud = np.flatnonzero(levels > SILENT_DB) if levels.size else np.zeros(0, dtype=int)
+    end_ms = (int(loud[-1]) + 1) * chunk_ms if loud.size else None
+    end = tail.size if end_ms is None else int(np.clip(end_ms * rate / 1000 - tail_offset_frames, rate * 8, tail.size))
+    m = int(outro_seconds * rate)
+    start = max(0, end - m)
+    offset_ms = (tail_offset_frames + start) * 1000.0 / rate
+    whole = tail[start:end]
+    # The beat's grid from the last stretch that has one, stepping back from the end: a stretch that runs past
+    # where the beat stops reads the tempo wrong, one inside it reads it right.
+    n = int(UNTIL_WINDOW_SECONDS * rate)
+    step = int(UNTIL_STEP_SECONDS * rate)
+    piece_end = end
+    while piece_end - n >= start:
+        g = grid(tail[piece_end - n:piece_end], (tail_offset_frames + piece_end - n) * 1000.0 / rate, rate, from_end=True)
+        if g is not None and g.rhythm >= 0.3 and g.steady >= 0.5:
+            return beats_until(whole, offset_ms, g, rate)
+        piece_end -= step
+    return None
+
+
+def fields(intro, outro, until_ms=None):
+    """The profile fields for the two grids (empty when neither end has one), and ``beats_until_ms`` when the beat
+    stops before the end (:func:`end_without_beat`)."""
     out = {}
+    if until_ms is not None:
+        out["beats_until_ms"] = round(until_ms, 1)
     if intro is not None:
         out.update(intro.as_dict("intro"))
     if outro is not None:

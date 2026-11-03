@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.5.0",
+      "min_core_version": "3.6.4",
+      "changelog": "Notes where a song's beat stops when it ends in a beatless outro (6 seconds or more without a beat before its dead air), so Siansa can bring the next song in after the last beat and let the outro, with its own fade, play out under it. Nothing is measured again across the library for it: new songs get it with their profile, and songs measured before are checked only when Siansa asks for them, as they're about to play, a few at a time.",
+      "imageUrl": ""
+    },
+    {
       "version": "0.4.2",
       "min_core_version": "3.6.4",
       "changelog": "Reads the tempo of drum and bass and other breakbeats right. A break repeats every beat, every one and a half and every two, and the tempo often came out at two thirds (113 BPM for 170), with the beats off the music, so Siansa never beat-matched them. Now the tempos related to the one found (double, half, one and a half, two thirds, four thirds, three quarters, and the strongest repeats) are each tried, and another is used only when its beats clearly sit better on the music; four-to-the-floor keeps its tempo. Every song's beat grids are measured again in the background, songs the app is about to play first.",

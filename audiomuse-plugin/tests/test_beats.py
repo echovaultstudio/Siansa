@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 
 import support  # noqa: F401
-from siansa_analysis import beats, jobs, loudness
+from siansa_analysis import beats, jobs, loudness, store
 
 RATE = 48_000
 
@@ -235,6 +235,48 @@ class EndsTest(unittest.TestCase):
         fields = jobs.profile_of(m)["beats"]
         self.assertTrue(fields.get("intro_rhythm", 0) < 0.2)
         self.assertTrue(fields.get("outro_rhythm", 0) < 0.2)
+
+
+class BeatsUntilTest(unittest.TestCase):
+    """Where the beat stops before the end (Siansa: the next song comes in after the last beat, over the outro)."""
+
+    def song(self, beats_seconds, tail_seconds, bpm=124.0):
+        t = np.arange(int((beats_seconds + tail_seconds) * RATE)) / RATE
+        pad = (0.12 * (np.sin(2 * np.pi * 220 * t) + np.sin(2 * np.pi * 277 * t))).astype(np.float32)
+        song = pad.copy()
+        song[:int(beats_seconds * RATE)] += drums(bpm, beats_seconds, first=0.0, seed=5)
+        return song
+
+    def test_a_beatless_outro_says_where_the_beat_stopped(self):
+        # Drums at 124 for 50 s, then 20 s of the pad alone.
+        m = loudness.measure_array(self.song(50.0, 20.0), RATE)
+        until = m.beats_until()
+        self.assertIsNotNone(until)
+        self.assertAlmostEqual(until, 50_000, delta=2_500)
+        self.assertEqual(jobs.profile_of(m)["beats"]["beats_until_ms"], round(until, 1))
+
+    def test_a_long_beatless_outro_is_found_from_the_minute(self):
+        # The last 40 s have no beat: the last half minute holds none, the minute's start does.
+        m = loudness.measure_array(self.song(45.0, 40.0), RATE)
+        until = m.beats_until()
+        self.assertIsNotNone(until)
+        self.assertAlmostEqual(until, 45_000, delta=2_500)
+
+    def test_a_song_that_beats_to_the_end_has_none(self):
+        m = loudness.measure_array(self.song(70.0, 0.0), RATE)
+        self.assertIsNone(m.beats_until())
+        beats_fields = jobs.profile_of(m)["beats"]
+        self.assertNotIn("beats_until_ms", beats_fields)
+        # Looked for, found or not: a song measured by 0.5.0 is never asked for again for it.
+        self.assertEqual(beats_fields[store.UNTIL_KEY], 1)
+
+    def test_a_short_beatless_end_isnt_worth_it(self):
+        m = loudness.measure_array(self.song(66.0, 3.0), RATE)
+        self.assertIsNone(m.beats_until())
+
+    def test_a_song_without_a_beat_has_none(self):
+        m = loudness.measure_array(self.song(0.0, 60.0), RATE)
+        self.assertIsNone(m.beats_until())
 
 
 if __name__ == "__main__":

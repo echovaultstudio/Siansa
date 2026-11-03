@@ -104,6 +104,11 @@ data class TrackProfile(
     val intro: BeatEnd? = null,
     /** The beat grid at the end. */
     val outro: BeatEnd? = null,
+    /**
+     * Where the beat stops, well before the end (ms from the start: the last beat), when the song ends in a beatless
+     * outro (plugin 0.5.0); null when it beats to the end, has no beat, or wasn't measured for it.
+     */
+    val beatsUntilMs: Long? = null,
 ) {
     /** How long after the start the song first gets up to [db] (relative), or null if it never does. */
     fun reachesAfterMs(db: Int): Long? = startRamp.firstOrNull { it.db >= db }?.ms
@@ -188,6 +193,7 @@ object PluginProfiles {
             durationMs = p.int("duration_ms")?.toLong() ?: 0,
             intro = beatEnd(p, "intro"),
             outro = beatEnd(p, "outro"),
+            beatsUntilMs = p.dbl("beats_until_ms")?.takeIf { it.isFinite() && it > 0 }?.toLong(),
         )
     }
 
