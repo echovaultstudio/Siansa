@@ -114,18 +114,9 @@ on beat.
 up to about 200 Hz) while the new song's, held back at first, is let in, as a DJ does with the EQ: two kick drums
 never play at once, so a blend a few ms out of step is heard as a mix, not a flam.
 
-**Echo at the end** (on by default): over the last bar of a blend more and more of the old song goes to an echo,
-as a DJ echoes a track out, so the join is softer. Its last beats then repeat on the beat after it's gone, each
-repeat fainter, thinner and darker, for a few seconds. Skipping or stopping during a blend stops the echo too. (Siansa
-Dev's new audio engine makes the echo itself; the released app uses the phone's hall reverb, and plays the blend
-plain on a phone whose reverb can't be opened.)
-
-**Keep the key** (off by default): how the next song is sped up or slowed down. Off, the sound is resampled, like
-a record played a touch fast or slow or a DJ's pitch fader: every drum hit stays as it was, and the pitch moves with
-the speed, by at most two thirds of a semitone at 4 %, then glides back as the song eases to its own speed. On, the
-key is kept by stretching the sound in time instead: it's played as short overlapping pieces (40 ms), each lined up
-with the one before so they join without a stutter, as DJ software's key lock does. Outside a blend the song plays
-untouched either way.
+Echo at the end and Keep the key are off for now and not shown in Settings: the blends play plain, and the next
+song's pitch moves with its speed (by at most two thirds of a semitone at 4 %, like a DJ's pitch fader), then glides
+back as it eases to its own speed.
 
 Tempos are counted the way a DJ counts: a beat the plugin read at half time (drum and bass at 87, house at 63)
 is doubled, so a blend's bars are real bars. Tracks of a continuous mix ("(Mixed)", "[Mixed]", a "DJ Mix" or

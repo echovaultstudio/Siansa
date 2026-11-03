@@ -282,6 +282,11 @@ data class AppSettings(
         val CROSSFADE_SECONDS = 1..30
         /** A beat-matched blend's length: 8 bars is about 15 s at 128 BPM (issue #759). */
         const val DEFAULT_BLEND_BARS = 8
+        /**
+         * Echo at the end and Keep the key: hidden and off for now (owner, 0.52.0-dev), the blends plain without them;
+         * the audio engine keeps both, for later.
+         */
+        const val BLEND_EXTRAS = false
         val BLEND_BAR_CHOICES = listOf(4, 8, 16)
         const val DEFAULT_WIND_DOWN_SONGS = 20
         val WIND_DOWN_CHOICES = listOf(10, 20, 30)
@@ -445,9 +450,9 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .takeIf { it in AppSettings.WIND_DOWN_CHOICES } ?: AppSettings.DEFAULT_WIND_DOWN_SONGS,
         crossfadeSeconds = prefs.getInt("crossfade_s", AppSettings.DEFAULT_CROSSFADE_SECONDS).coerceIn(AppSettings.CROSSFADE_SECONDS),
         beatMatch = BeatMatchMode.parse(prefs.getString("beat_match", null)),
-        echoTail = prefs.getBoolean("echo_tail", true),
+        echoTail = AppSettings.BLEND_EXTRAS && prefs.getBoolean("echo_tail", true),
         bassSwap = prefs.getBoolean("bass_swap", true),
-        keepKey = prefs.getBoolean("keep_key", false),
+        keepKey = AppSettings.BLEND_EXTRAS && prefs.getBoolean("keep_key", false),
         blendBars = prefs.getInt("blend_bars", AppSettings.DEFAULT_BLEND_BARS)
             .takeIf { it in AppSettings.BLEND_BAR_CHOICES } ?: AppSettings.DEFAULT_BLEND_BARS,
         mixShape = MixShape.parse(prefs.getString("mix_shape", null)),
