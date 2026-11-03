@@ -72,6 +72,14 @@ class KeepTheKeyTest {
         assertEquals(457.6, frequency(x, 20_000, 40_000), 2.0)
     }
 
+    @Test fun aSpeedWithNoPitchGivenMovesThePitch() {
+        val stream = DeckStream(rate, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        stream.write(tone(440.0, 3.0))
+        stream.play()
+        stream.speed = 1.04f
+        assertEquals(457.6, frequency(play(stream, 120), 10_000, 30_000), 2.0)
+    }
+
     @Test fun itStartsAndEndsWithoutAClick() {
         val stream = DeckStream(rate, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
         stream.write(tone(440.0, 3.0))

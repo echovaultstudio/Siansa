@@ -66,9 +66,9 @@ class DeckStream(
     /**
      * The player's pitch (Media3's PlaybackParameters): as [speed], the stream is read faster or slower and the
      * pitch follows; 1 at another speed keeps the key (Keep the key), by stretching the sound in time instead
-     * ([Stretch]). The pitch is moved by [pitch] and the time by [speed] / [pitch].
+     * ([Stretch]). The pitch is moved by [pitch] and the time by [speed] / [pitch]. Not given (NaN), it follows the speed.
      */
-    @Volatile var pitch = 1f
+    @Volatile var pitch = Float.NaN
 
     /** The gain the mixer last applied, where its next block's glide starts. */
     internal var gainNow = 1f
@@ -325,7 +325,7 @@ class DeckStream(
     fun render(out: FloatArray, offset: Int, frames: Int, mixStart: Long, outRate: Int): Boolean = synchronized(lock) {
         val ratio = sampleRate.toDouble() * speed / outRate
         // The rate the sound is read at for its pitch: the same as the ratio unless the key is kept.
-        val pitchRatio = sampleRate.toDouble() * pitch / outRate
+        val pitchRatio = pitch.let { if (it.isNaN()) ratio else sampleRate.toDouble() * it / outRate }
         val stretchWanted = kotlin.math.abs(pitchRatio - ratio) > 1e-6
         lastRatio = ratio
         val slot = cpHead
