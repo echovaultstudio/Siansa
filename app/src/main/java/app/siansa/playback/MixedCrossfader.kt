@@ -15,6 +15,7 @@ import app.siansa.log.AppLog
 import app.siansa.playback.engine.AudioEngine
 import app.siansa.playback.engine.DeckStream
 import app.siansa.playback.engine.MixCore
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
 
@@ -253,6 +254,17 @@ internal class MixedCrossfader(
             disarm()
             return
         }
+        // What the clock says against what the player says: far apart, the song's time is misread on one of them, and
+        // a handover by it would silence the song at the wrong moment. No fade then, rather than a gap.
+        val speedNow = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
+        val byClockMs = ((gate - engine.heardMix()) * 1000 / engine.outRate).toLong()
+        val byPlayerMs = ((handoverAt - main.currentPosition) / speedNow).toLong()
+        if (abs(byClockMs - byPlayerMs) > DISAGREE_MS) {
+            AppLog.w("Crossfade", "The handover of ${item.mediaId} would be in $byClockMs ms by the mixer's clock but $byPlayerMs ms by the player; playing on without a crossfade")
+            skipped = item.mediaId
+            disarm()
+            return
+        }
         baseSpeed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
         t.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, settings().keepKey)
         val cued = tMix.cueNow(handoverAt * 1000, gate, engine.outRate)
@@ -351,12 +363,16 @@ internal class MixedCrossfader(
             val beat = planned.beat
             if (beat != null && settings().bassSwap) swapBass(out, tMix)
             val onNext = main.currentMediaItemIndex == incomingIndex
-            val heard = if (onNext && heardMix >= incomingMix) {
-                (mainMix.mediaUsAt(heardMix)?.let { it / 1000 } ?: main.currentPosition) - incomingFrom
-            } else 0L
+            // How long the next song has been heard, on the mixer's own clock: never a song time that can be misread,
+            // so the fade-in can't stay at nothing (0.52.0-dev).
+            val heard = if (onNext && heardMix >= incomingMix) ((heardMix - incomingMix) * 1000 / engine.outRate).toLong() else 0L
             val fadedIn = (heard.toFloat() / planned.fadeInMs).coerceIn(0f, 1f)
             level = Crossfade.fadeIn(fadedIn)
             onLevel()
+            fallbackReason(onNext, heardMix)?.let { why ->
+                fallBack(why)
+                return
+            }
             if (beat != null && onNext && heardMix >= incomingMix && !tailDone) check(beat, tMix, heardMix)
             if (onNext && !lateLogged && heardMix >= incomingMix) {
                 lateLogged = true
@@ -370,6 +386,47 @@ internal class MixedCrossfader(
             }
             handler.postDelayed(this, TICK_MS)
         }
+    }
+
+    /**
+     * Why the blend can't go on as planned, or null when it can: its cue was given up, or the next song is still
+     * silent well after it was due. Then the default: the next song plays on its own, at full level ([fallBack]).
+     */
+    private fun fallbackReason(onNext: Boolean, heardMix: Double): String? {
+        val stream = mainMix.current ?: return null
+        if (stream.cueGivenUp) return "its cue was given up (the next song's time was misread)"
+        val dueFor = (heardMix - incomingMix) * 1000 / engine.outRate
+        if (onNext && dueFor > SILENT_AFTER_DUE_MS && stream.stuckMs(engine.outRate) > SILENT_AFTER_DUE_MS) {
+            return "the next song was still silent ${dueFor.toLong()} ms after it was due (${stream.describe()})"
+        }
+        return null
+    }
+
+    /**
+     * The default when a blend can't be made (issue #826): the next song plays from where it is, at full level, and
+     * the old song fades out over [FALLBACK_FADE_MS]. Never a song shown playing with no sound.
+     */
+    private fun fallBack(why: String) {
+        AppLog.w("Crossfade", "The blend couldn't be made: $why; the next song plays on its own")
+        mainMix.current?.freeHold()
+        level = 1f
+        onLevel()
+        val t = tail
+        val from = t?.volume ?: 0f
+        val began = SystemClock.elapsedRealtime()
+        handler.removeCallbacks(fadeTick)
+        handler.post(object : Runnable {
+            override fun run() {
+                if (phase != Phase.FADING || tail !== t) return
+                val done = (SystemClock.elapsedRealtime() - began).toFloat() / FALLBACK_FADE_MS
+                if (done >= 1f || t == null) {
+                    finish()
+                    return
+                }
+                t.volume = from * (1f - done)
+                handler.postDelayed(this, TICK_MS)
+            }
+        })
     }
 
     /** How far apart the two songs' beats are, from where each is on the one clock: it should be under a ms. */
@@ -439,10 +496,19 @@ internal class MixedCrossfader(
      * while its copy is silenced for a handover, and gapless, the songs after it would stay silent).
      */
     private fun freeMain() {
+        if (level != 1f) {
+            level = 1f
+            onLevel()
+            AppLog.w("Crossfade", "The main player was left turned down by a fade that's gone; back at full level")
+        }
         val stream = mainMix.current ?: return
         if (stream.held) {
+            AppLog.w("Crossfade", "The main player was left silenced by a fade that's gone; its sound is back (${stream.describe()})")
             stream.freeHold()
-            AppLog.w("Crossfade", "The main player was left silenced by a fade that's gone; its sound is back")
+        } else if (main.isPlaying && stream.stuckMs(engine.outRate) > STUCK_MS) {
+            // Playing, sound waiting, none given, with no fade under way: whatever holds it, it plays again.
+            AppLog.w("Crossfade", "The main player was playing without sound for ${stream.stuckMs(engine.outRate)} ms (${stream.describe()}); freed")
+            stream.freeHold()
         }
     }
 
@@ -594,6 +660,14 @@ internal class MixedCrossfader(
         /** A tail not loaded this close to the handover is given up on. */
         const val GIVE_UP_BEFORE_MS = 300L
         const val CUED_POLL_MS = 20L
+        /** The mixer's clock and the player's position may disagree by this much about a handover, no more. */
+        const val DISAGREE_MS = 1_500L
+        /** The next song still silent this long after it was due: the blend is dropped for the default. */
+        const val SILENT_AFTER_DUE_MS = 1_500.0
+        /** How quickly the old song fades out when a blend is dropped. */
+        const val FALLBACK_FADE_MS = 1_000L
+        /** With no fade under way, the main player silent this long with sound waiting is freed. */
+        const val STUCK_MS = 2_000L
         /** The next song is sent this far before its point (a jump lands up to a decoded block past it). */
         const val INCOMING_SEEK_BACK_MS = 300L
         const val TICK_MS = 20L

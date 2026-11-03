@@ -225,14 +225,7 @@ class AudioEngineCoreTest {
         stream.write(float(FloatArray(44_100 * 2) { 0.5f }))
         assertTrue(stream.bufferedFrames > 40_000)
 
-        // Told after the first mark, it's corrected all the same; a mark close to where it was sent stays as read.
-        val late = MixCore.Deck("late")
-        late.flushed()
-        late.mark(0, 300_000_000)
-        late.expectSeek(120_000_000)
-        val s2 = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
-        late.add(s2)
-        assertEquals(0.0, late.frameOf(s2, 120_000_000)!!, 1e-6)
+        // A mark close to where it was sent stays as read.
         val close = MixCore.Deck("close")
         close.expectSeek(60_000_000)
         close.flushed()
@@ -240,6 +233,23 @@ class AudioEngineCoreTest {
         val s3 = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
         close.add(s3)
         assertEquals(0.0, close.frameOf(s3, 60_050_000)!!, 1e-6)
+    }
+
+    @Test fun aSeekReportedBeforeThePlayerFlushesLeavesTheSongBeforeItAlone() {
+        // 0.52.0-dev (3 November): the seek's report came before the player had flushed, and the song playing then
+        // had its time "corrected" to where the next one was sent. Its cue was given up and it faded in from nothing.
+        val deck = MixCore.Deck("main")
+        deck.flushed()
+        deck.mark(0, 339_905_000)  // the song playing, rightly read
+        val old = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        deck.add(old)
+        deck.cueNext(0, 10_000, 44_100)  // the fade sends the player to the next song's start
+        assertEquals(0.0, deck.frameOf(old, 339_905_000)!!, 1e-6)  // the song before it is left as it was
+        deck.flushed()
+        deck.mark(0, 220_000_000)  // the next song's time misread a song on
+        val next = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        deck.add(next)
+        assertEquals(0L, deck.lastCued!!.targetFrame)  // corrected to where it was sent, and cued there
     }
 
     @Test fun aCueThatWouldThrowAwaySecondsOfSoundIsGivenUp() {
@@ -290,5 +300,21 @@ class AudioEngineCoreTest {
         var mix = 256L
         repeat(10) { stream.render(out, 0, 256, mix, 44_100); mix += 256 }
         assertEquals(0.4f, out[400], 0.01f)
+    }
+
+    @Test fun aStreamPlayingWithSoundWaitingButNoneGivenCountsAsStuck() {
+        // The watchdog's reading (issue #826): never a song shown playing with no sound for long.
+        val stream = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        stream.write(float(FloatArray(44_100 * 2) { 0.3f }))
+        stream.play()
+        stream.cutAt(0)
+        val out = FloatArray(512)
+        var mix = 0L
+        repeat(400) { stream.render(out, 0, 256, mix, 44_100); mix += 256 }
+        assertTrue(stream.stuckMs(44_100) > 2_000)
+        stream.freeHold()
+        repeat(5) { stream.render(out, 0, 256, mix, 44_100); mix += 256 }
+        assertEquals(0L, stream.stuckMs(44_100))
+        assertEquals(0.3f, out[300], 0.01f)
     }
 }

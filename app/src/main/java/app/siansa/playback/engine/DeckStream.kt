@@ -68,6 +68,13 @@ class DeckStream(
     internal var gainNow = 1f
     /** The short fade in and out around play, pause and release, so none of them clicks (0..1). */
     private var envelope = 0.0
+    /**
+     * Blocks in a row in which the stream was playing with sound waiting but gave none (held by a cut or a cue):
+     * what a stream stuck silent looks like ([stuckMs]).
+     */
+    private var blockedBlocks = 0
+    private var blockedFrames = 0L
+
     /** Set when the stream first sounds after [play]: Media3 is told then (onPositionAdvancing). */
     private var announced = false
     internal var becameAudible = false
@@ -256,6 +263,16 @@ class DeckStream(
         synchronized(lock) { cutAt = mix }
     }
 
+    /** How long (ms of the output) this stream has been playing with sound waiting and given none. */
+    fun stuckMs(outRate: Int): Long = synchronized(lock) { blockedFrames * 1000 / outRate }
+
+    /** For the log, when a stream is found stuck: what holds it. */
+    fun describe(): String = synchronized(lock) {
+        "playing $playing, read ${floor(readPos).toLong()}, written $end, gate ${if (gate == Long.MIN_VALUE) "none" else gate.toString()}, " +
+            "cut ${if (cutAt == Long.MAX_VALUE) "none" else cutAt.toString()}, rendered to $renderedTo, volume $volume, " +
+            "fade-in ${"%.2f".format(java.util.Locale.ROOT, envelope)}, cue given up $cueGivenUp"
+    }
+
     /** Silenced, or held back for a cue still ahead: what a fade does to a stream for a while. */
     val held: Boolean get() = synchronized(lock) { cutAt != Long.MAX_VALUE || (gate != Long.MIN_VALUE && gate > renderedTo) }
 
@@ -266,6 +283,8 @@ class DeckStream(
             gate = Long.MIN_VALUE
             holdGrid = false
             dropUntil = 0
+            blockedBlocks = 0
+            blockedFrames = 0
         }
     }
 
@@ -285,6 +304,7 @@ class DeckStream(
         cpHead = (cpHead + 1) % CHECKPOINTS
         if (cpCount < CHECKPOINTS) cpCount++
         renderedTo = mixStart + frames
+        val waiting = end > floor(readPos).toLong() + 1
 
         val step = 1.0 / (RAMP_MS * outRate / 1_000.0)
         // At the output's rate a stream is copied sample for sample; one left between two samples (by a speed
@@ -351,6 +371,13 @@ class DeckStream(
                 announced = true
                 becameAudible = true
             }
+        }
+        if (gave || !playing || !waiting) {
+            blockedBlocks = 0
+            blockedFrames = 0
+        } else {
+            blockedBlocks++
+            blockedFrames += frames
         }
         return gave
     }

@@ -27,11 +27,16 @@ class MixCore(val outRate: Int) {
 
         private class Mark(val inputFrame: Long, val mediaUs: Long)
         private val marks = ArrayList<Mark>()
-        /** Where the player was sent by its last seek (µs of the song), to check the first mark after it against. */
+        /**
+         * Where the player was sent by its last seek (µs of the song), to check the first mark after the next flush
+         * against, and until when that holds ([EXPECT_FOR_NS]). Never a mark already there: the seek's report can come
+         * before the player has flushed, and the mark there is then the song before it (0.52.0-dev: "correcting" those
+         * put songs' times a song off, their cues were given up and they faded in from nothing, silent).
+         */
         private var expectUs: Long? = null
-        /** The next mark is the first after a flush; and the one that was, while it may still be corrected. */
+        private var expectUntil = 0L
+        /** The next mark is the first after a flush. */
         private var afterFlush = true
-        private var flushMark: Mark? = null
         /** Where the deck says what it corrected (the engine's log). */
         @Volatile var note: (String) -> Unit = {}
         /** The input frame the buffer being handed over starts at: a stream made now starts there. */
@@ -60,7 +65,6 @@ class MixCore(val outRate: Int) {
             synchronized(marks) {
                 marks.clear()
                 afterFlush = true
-                flushMark = null
             }
             bufferStart = 0
         }
@@ -76,31 +80,24 @@ class MixCore(val outRate: Int) {
                 var at = mediaUs
                 if (afterFlush) {
                     afterFlush = false
-                    expectUs?.let { expected -> if (kotlin.math.abs(at - expected) > STALE_US) at = corrected(at, expected) }
+                    val expected = expectUs
+                    if (expected != null && System.nanoTime() <= expectUntil && kotlin.math.abs(at - expected) > STALE_US) at = corrected(at, expected)
                     expectUs = null
                 }
                 if (marks.size >= MAX_MARKS) marks.removeAt(0)
-                val m = Mark(inputFrame, at)
-                if (marks.isEmpty()) flushMark = m
-                marks.add(m)
+                marks.add(Mark(inputFrame, at))
             }
         }
 
         /**
-         * The player was sent to the song's time [mediaUs] (a seek): the first mark after it is checked against that,
-         * now if it's already there, else when it comes.
+         * The player is being sent to the song's time [mediaUs] (a seek): the first mark after the next flush, within a
+         * moment, is checked against that. Called before the seek where it can be (a fade's own jump), so it's never
+         * late for it.
          */
         fun expectSeek(mediaUs: Long) {
             synchronized(marks) {
-                val m = flushMark
-                if (m != null && marks.size == 1 && marks[0] === m) {
-                    if (kotlin.math.abs(m.mediaUs - mediaUs) > STALE_US) {
-                        marks[0] = Mark(m.inputFrame, corrected(m.mediaUs, mediaUs))
-                        flushMark = marks[0]
-                    }
-                } else {
-                    expectUs = mediaUs
-                }
+                expectUs = mediaUs
+                expectUntil = System.nanoTime() + EXPECT_FOR_NS
             }
         }
 
@@ -224,6 +221,8 @@ class MixCore(val outRate: Int) {
         const val MAX_MARKS = 64
         /** A first mark after a seek further than this from where the player was sent is misread. */
         const val STALE_US = 1_500_000L
+        /** How long a seek's expectation waits for its flush: a seek is flushed within milliseconds. */
+        const val EXPECT_FOR_NS = 1_500_000_000L
         /** The mix's ceiling: a little under full scale, as two songs at the top of a blend can add up past it. */
         const val CEILING = 0.98
     }
