@@ -238,7 +238,7 @@ object Users {
         val name = UserFiles.nameFor(id, server, byUser, byServer)
         val kind = SourceKind.parse(settings.getString("source_kind", null))
         return UserEntry(
-            id, UserFiles.label(user, address, name), connected = user.isNotBlank() && address.isNotBlank(),
+            id, UserFiles.label(user, address, name), connected = address.isNotBlank() && (user.isNotBlank() || settings.getString("nd_api_key", "").orEmpty().isNotBlank()),
             emby = kind.embyLike,
             server = server, serverName = name, user = user, kind = kind,
         )

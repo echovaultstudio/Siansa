@@ -11,7 +11,7 @@ The Subsonic API (`/rest/…`, version 1.16.1, JSON), with OpenSubsonic extensio
 
 | Purpose | Calls |
 |---|---|
-| Connect and check | `ping`, `getOpenSubsonicExtensions`, `getMusicFolders`, `getScanStatus` |
+| Connect and check | `ping`, `getOpenSubsonicExtensions`, `getMusicFolders`, `getScanStatus`, `tokenInfo` (with an API key) |
 | Library sync and browsing | `getArtists`, `getArtist`, `getArtistInfo2`, `getAlbum`, `getAlbumList2`, `getSong`, `search3`, `getTopSongs`, `getRandomSongs`, `getStarred2` |
 | Playback | `stream` (original with `format=raw`, or Opus with `format=opus&maxBitRate=…`), `getCoverArt` |
 | Lyrics | `getLyricsBySongId` (with word timings when the server has them), `getLyrics` |
@@ -19,7 +19,8 @@ The Subsonic API (`/rest/…`, version 1.16.1, JSON), with OpenSubsonic extensio
 | Playlists | `getPlaylists`, `getPlaylist`, `createPlaylist`, `updatePlaylist` |
 | Similar music | `getSimilarSongs`, `getSimilarSongs2`, and `getSonicSimilarTracks` / `findSonicPath` when the AudioMuse-AI Navidrome plugin is installed |
 
-Siansa logs in with a salted token (`u`, `t`, `s`), never the plain password.
+Siansa logs in with a salted token (`u`, `t`, `s`), never the plain password. With an API key, on a server that
+lists the `apiKeyAuthentication` extension, every request sends `apiKey` instead, and no `u`, `t` or `s`.
 
 ### Emby
 

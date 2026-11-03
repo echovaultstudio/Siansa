@@ -18,7 +18,13 @@
 - **Server behind a login page?** If a reverse proxy asks for its own login before your server, tap **Add a proxy
   login** and enter that user name and password too. With Jellyfin this works up to Jellyfin 10.11: Jellyfin 12
   only takes its login in the same place the proxy's goes.
-- Passwords are stored encrypted with Android's keystore, and never written to the log or to backups.
+- **API key** (OpenSubsonic servers): if your server gives you an API key, enter it instead of the user name and
+  password. Siansa uses it once the server says it takes API keys (the OpenSubsonic `apiKeyAuthentication`
+  extension); every request then sends the key and no user name or password. **Test** and **Save** check the key:
+  if your server doesn't take API keys, they say so, and you can clear the key and use your user name and password.
+  With only a key, the user name fills itself in from the server. Changing a playlist's picture still needs the
+  user name and password.
+- Passwords and API keys are stored encrypted with Android's keystore, and never written to the log or to backups.
 
 ## Several users
 

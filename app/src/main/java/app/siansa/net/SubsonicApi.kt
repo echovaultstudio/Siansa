@@ -46,6 +46,9 @@ import java.security.SecureRandom
  *   players, the cast receiver and the image cache hold on to them (their cache keys leave the login out).
  * - When Navidrome refuses token login for the user (error 41 or 42, e.g. LDAP or reverse-proxy users), the
  *   password is sent hex-encoded instead (`p=enc:…`), as the spec says to retry with another method.
+ * - With an API key (issue #493) and a server that lists `apiKeyAuthentication`, every request sends `apiKey`
+ *   and no `u`/`t`/`s`, as the extension asks. Without a password there's no other way, so the key is sent then too;
+ *   a server that doesn't take keys gets a plain message instead of a request ([NO_API_KEYS]).
  * - Long requests (playlists with many songs) go as a form POST when the server has `formPost`.
  * - Navidrome's error codes become plain messages ([SubsonicErrors]).
  */
@@ -85,15 +88,17 @@ class SubsonicApi(
         return md5(password + salt).also { mediaToken = password to it }
     }
 
-    /** The login parameters: u plus t and s, or p=enc: when this server refused tokens. */
-    private fun auth(s: AppSettings, salt: String): String = buildString {
-        append("u=").append(enc(s.navidromeUser))
-        if (loginKey(s) in passwordLogin) {
-            append("&p=enc:").append(s.navidromePassword.toByteArray(Charsets.UTF_8).toHex())
-        } else {
-            append("&t=").append(token(s.navidromePassword, salt)).append("&s=").append(salt)
-        }
-        append("&v=1.16.1&c=siansa&f=json")
+    private fun serverKey(s: AppSettings) = s.navidromeUrl.trimEnd('/')
+
+    /** Whether this login's server takes API keys: null until its extensions are known. */
+    private fun keySupport(s: AppSettings): Boolean? = known[serverKey(s)]?.let { takesKeys(it) }
+
+    private fun method(s: AppSettings): AuthMethod = authMethod(s, keySupport(s), loginKey(s) in passwordLogin)
+
+    /** The login parameters ([authQuery]): the API key, u plus t and s, or p=enc: when this server refused tokens. */
+    private fun auth(s: AppSettings, salt: String): String {
+        val m = method(s)
+        return authQuery(s, m, salt, if (m == AuthMethod.TOKEN) token(s.navidromePassword, salt) else "")
     }
 
     private fun query(params: Map<String, String?>, repeated: List<Pair<String, String>>): String = buildString {
@@ -126,13 +131,16 @@ class SubsonicApi(
      * The OpenSubsonic extensions this server has, by name with their versions; empty for a plain Subsonic
      * server or when it couldn't be asked (then nothing optional is used).
      */
-    suspend fun extensions(): Map<String, List<Int>> {
-        val s = settings()
-        val key = s.navidromeUrl.trimEnd('/')
+    suspend fun extensions(): Map<String, List<Int>> = extensionsOf(settings())
+
+    private suspend fun extensionsOf(s: AppSettings): Map<String, List<Int>> {
+        val key = serverKey(s)
         known[key]?.let { return it }
         val found = try {
-            parseExtensions(call("getOpenSubsonicExtensions"))
+            parseExtensions(call(EXTENSIONS, login = s))
         } catch (e: ApiException) {
+            // A server that takes keys but not this one (44): the key is wrong, not the server.
+            if (e.code == 44) throw e
             // Navidrome answered, but without the list: a plain Subsonic server.
             AppLog.w("Server", "No OpenSubsonic extensions: ${e.message}")
             emptyMap()
@@ -149,35 +157,51 @@ class SubsonicApi(
 
     override suspend fun hasSonicMatch(): Boolean = supports("sonicSimilarity")
 
+    /** Whether the server takes API keys (issue #493): it lists `apiKeyAuthentication`. */
+    suspend fun takesApiKey(): Boolean = takesKeys(extensions())
+
+    /** Whose API key this is (the extension's `tokenInfo`), or null when the server doesn't say. */
+    suspend fun keyUser(): String? = call("tokenInfo").obj("tokenInfo")?.str("username")?.takeIf { it.isNotBlank() }
+
     // ---- Calls ----
 
     private suspend fun call(
         endpoint: String,
         params: Map<String, String?> = emptyMap(),
         repeated: List<Pair<String, String>> = emptyList(),
+        // The login to use; by default the one for the item asked about ([loginOf]).
+        login: AppSettings? = null,
     ): JsonObject {
-        if (settings().navidromeUrl.isBlank()) throw ApiException("Your server isn't set up yet")
+        val s = login ?: loginOf(params)
+        if (s.navidromeUrl.isBlank()) throw ApiException("Your server isn't set up yet")
+        if (endpoint != EXTENSIONS && s.hasApiKey) {
+            // An API key is only sent once the server is known to take it (issue #493).
+            val takes = keySupport(s) ?: takesKeys(extensionsOf(s))
+            if (!takes && s.navidromePassword.isEmpty()) {
+                AppLog.w("Server", "The server doesn't list apiKeyAuthentication, and there's no password")
+                throw ApiException(NO_API_KEYS, 42)
+            }
+        }
         // A long list of songs as a form POST, so the address doesn't get too long for proxies.
-        val post = repeated.size > POST_OVER && endpoint != "getOpenSubsonicExtensions" && supports("formPost")
+        val post = repeated.size > POST_OVER && endpoint != EXTENSIONS && supports("formPost")
         return try {
-            send(endpoint, params, repeated, post)
+            send(endpoint, s, params, repeated, post)
         } catch (e: ApiException) {
-            val s = loginOf(params)
-            if (e.code != 41 && e.code != 42 || loginKey(s) in passwordLogin) throw e
+            if (e.code != 41 && e.code != 42 || method(s) != AuthMethod.TOKEN) throw e
             // Token login refused for this user: the spec's next method is the (hex-encoded) password.
             AppLog.w("Server", "Navidrome refused token login (error ${e.code}); sending the password instead")
             passwordLogin += loginKey(s)
-            send(endpoint, params, repeated, post)
+            send(endpoint, s, params, repeated, post)
         }
     }
 
     private suspend fun send(
         endpoint: String,
+        s: AppSettings,
         params: Map<String, String?>,
         repeated: List<Pair<String, String>>,
         post: Boolean,
     ): JsonObject = withContext(Dispatchers.IO) {
-        val s = loginOf(params)
         val base = s.navidromeUrl.trimEnd('/') + "/rest/" + endpoint
         // A new salt for every call, as the spec asks.
         val fields = auth(s, newSalt()) + query(params, repeated)
@@ -601,6 +625,41 @@ class SubsonicApi(
         /** More repeated parameters than this (songs in a playlist call) go as a form POST when possible. */
         const val POST_OVER = 20
 
+        const val EXTENSIONS = "getOpenSubsonicExtensions"
+        const val API_KEY_EXTENSION = "apiKeyAuthentication"
+
+        /** Said when there's only an API key and the server doesn't take keys (issue #493). */
+        const val NO_API_KEYS = "Your server doesn't take API keys. Clear the API key and use your username and password."
+
+        /** Whether these extensions include API keys (version 1, the only one so far). */
+        fun takesKeys(extensions: Map<String, List<Int>>): Boolean = extensions[API_KEY_EXTENSION]?.contains(1) == true
+
+        /**
+         * How a request logs in (issue #493): the API key when the server takes it, or when there's no password to
+         * send instead ([keySupported] null: not known yet); otherwise the token, or the password when this server
+         * refused tokens ([passwordOnly]).
+         */
+        fun authMethod(s: AppSettings, keySupported: Boolean?, passwordOnly: Boolean): AuthMethod = when {
+            s.hasApiKey && (keySupported == true || s.navidromePassword.isEmpty()) -> AuthMethod.API_KEY
+            passwordOnly -> AuthMethod.PASSWORD
+            else -> AuthMethod.TOKEN
+        }
+
+        /**
+         * The login parameters for [method]: `apiKey` alone (the extension forbids `u` with it), `u` with `t` and
+         * `s` ([token] is md5(password + salt)), or `u` with the hex-encoded password. Then version, client and format.
+         */
+        fun authQuery(s: AppSettings, method: AuthMethod, salt: String, token: String): String = buildString {
+            when (method) {
+                AuthMethod.API_KEY -> append("apiKey=").append(enc(s.navidromeApiKey.trim()))
+                AuthMethod.PASSWORD -> append("u=").append(enc(s.navidromeUser))
+                    .append("&p=enc:").append(s.navidromePassword.toByteArray(Charsets.UTF_8).toHex())
+                AuthMethod.TOKEN -> append("u=").append(enc(s.navidromeUser))
+                    .append("&t=").append(token).append("&s=").append(salt)
+            }
+            append("&v=1.16.1&c=siansa&f=json")
+        }
+
         /** `openSubsonicExtensions: [{name, versions: [1, 2]}]` as name → versions. */
         fun parseExtensions(root: JsonObject): Map<String, List<Int>> =
             root.arr("openSubsonicExtensions").mapNotNull { e ->
@@ -635,3 +694,6 @@ class SubsonicApi(
             .trim()
     }
 }
+
+/** How a request to an OpenSubsonic server logs in (issue #493). */
+enum class AuthMethod { API_KEY, TOKEN, PASSWORD }

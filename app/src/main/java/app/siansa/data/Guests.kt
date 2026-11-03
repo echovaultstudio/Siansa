@@ -314,7 +314,7 @@ class Guests(
 
     private suspend fun load(user: Int, force: Boolean): Int? {
         val s = settingsOf(user).current
-        if (s.navidromeUrl.isBlank() || s.navidromeUser.isBlank()) throw IllegalStateException("This user isn't connected yet")
+        if (s.navidromeUrl.isBlank() || s.navidromeUser.isBlank() && !s.hasApiKey) throw IllegalStateException("This user isn't connected yet")
         val api = apiOf(user)
         val all = api.musicFolders()
         val chosen = all.filter { it.id in s.syncFolders }

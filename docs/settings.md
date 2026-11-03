@@ -23,7 +23,7 @@ to fold it open; they start folded. **Save** (at the top, or in any open card) k
 **Servers**
 
 - **Each music server login** (a "user": its own library, history and settings). The one in use has its address,
-  user name, password, an optional proxy login, its **Name shown in Siansa**, its **Server name in AudioMuse** and
+  user name, password or an API key (OpenSubsonic), an optional proxy login, its **Name shown in Siansa**, its **Server name in AudioMuse** and
   its **Library sync**. Another one has **Switch to it** (Siansa restarts) and **Remove**. See
   [Servers, users and libraries](servers-and-users.md).
 - **Audiobookshelf**: address, API token or user name and password, and **Scan for new books**. See

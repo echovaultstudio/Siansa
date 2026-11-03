@@ -49,6 +49,10 @@ import app.siansa.ui.BeatMatchSection
 import app.siansa.net.SourceKind
 import app.siansa.ui.Hint
 import app.siansa.ui.NewServerButtons
+import app.siansa.ui.ApiKeyField
+import app.siansa.ui.TestRow
+import app.siansa.data.AppSettings
+import app.siansa.net.SubsonicApi
 import app.siansa.ui.ServerKindChips
 import app.siansa.ui.MenuRow
 import androidx.compose.material.icons.Icons
@@ -294,6 +298,13 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     ServerKindChips(SourceKind.JELLYFIN) {}
                     Hint(SourceKind.JELLYFIN.detail)
                     NewServerButtons(onSave = {}, onCancel = {})
+                }
+            },
+            // The OpenSubsonic API key on the server form (issue #493), with Test saying plainly the server doesn't take keys.
+            Scene("server_api_key") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    ApiKeyField(AppSettings(navidromeApiKey = "a-very-long-api-key-from-the-server-0123456789")) {}
+                    TestRow("✗ " + SubsonicApi.NO_API_KEYS) {}
                 }
             },
             // Beat-matched blends with the echo switch (issue #759).
