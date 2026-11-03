@@ -186,7 +186,10 @@ Home with its switch in Settings.
 
 - **Mood radios** are AudioMuse-AI sound searches, kept varied.
 - **Genre radios** take songs of that genre from your synced library.
-- **Artist radios** start from an artist and add artists like them.
+- **Artist radios** start with a few of the artist's songs. With AudioMuse-AI set up, the rest are songs that
+  sound like the artist (AudioMuse blends a dozen of their songs), with one of their own every fourth song. Without
+  it, they're your music server's similar songs (Navidrome's come from Last.fm or other agents it has); if the
+  server has none, the artist's own songs. The same from Home and from an artist's page.
 
 ## Your Library
 
