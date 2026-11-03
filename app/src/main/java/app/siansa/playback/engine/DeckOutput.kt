@@ -10,6 +10,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
 import androidx.media3.exoplayer.audio.AudioOutput
 import androidx.media3.exoplayer.audio.AudioOutputProvider
+import app.siansa.log.AppLog
 import java.nio.ByteBuffer
 import java.util.concurrent.CopyOnWriteArraySet
 
@@ -40,7 +41,12 @@ class DeckOutput(
     init {
         deck.add(stream)
         engine.outputs[stream] = this
+        // Each output's life in the log (0.52.0-dev: songs played back to back came out silent): whether Media3 keeps
+        // one output across a change of song or makes a new one, and what the new one starts as.
+        AppLog.d("Engine", "Deck ${deck.name}: new output ${id()}, ${config.sampleRate} Hz, ${if (config.encoding == C.ENCODING_PCM_FLOAT) "float" else "16-bit"}, $channels ch · ${stream.describe()}")
     }
+
+    private fun id() = Integer.toHexString(System.identityHashCode(this))
 
     /** The mixer first played this stream's sound since it was told to play: Media3 is told the position moves. */
     internal fun advancing() {
@@ -66,9 +72,13 @@ class DeckOutput(
         stream.pause()
     }
 
-    override fun stop() = stream.endOfStream()
+    override fun stop() {
+        AppLog.d("Engine", "Deck ${deck.name}: output ${id()} told to play out what it has · ${stream.describe()}")
+        stream.endOfStream()
+    }
 
     override fun release() {
+        AppLog.d("Engine", "Deck ${deck.name}: output ${id()} released")
         stream.release()
         engine.outputs.remove(stream)
         listeners.forEach { it.onReleased() }

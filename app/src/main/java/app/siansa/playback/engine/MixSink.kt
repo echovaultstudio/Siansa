@@ -31,6 +31,7 @@ class MixSink(sink: AudioSink, private val deck: MixCore.Deck) : ForwardingAudio
             Util.getPcmFrameSize(inputFormat.pcmEncoding, inputFormat.channelCount)
         } else 0
         encoding = inputFormat.pcmEncoding
+        app.siansa.log.AppLog.d("Engine", "Deck ${deck.name}: player's sound is now ${inputFormat.sampleRate} Hz, ${inputFormat.channelCount} ch, encoding ${inputFormat.pcmEncoding}")
         super.configure(inputFormat, specifiedBufferSize, outputChannels)
     }
 
