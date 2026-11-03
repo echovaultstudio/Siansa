@@ -8,7 +8,9 @@ package app.siansa.data
  * name only when it's safe:
  *
  * - The combined artist has no MusicBrainz ID of its own: one that has is a real artist ("Earth, Wind & Fire",
- *   "Crosby, Stills, Nash & Young") and is never split.
+ *   "Crosby, Stills, Nash & Young") and is never split. Unless that ID is another library artist's: Navidrome gives
+ *   a name tagged with several artists' IDs the first of them ("ID, Camo & Krooked" got Camo & Krooked's), so the
+ *   ID says which artist it is, not that the whole name is one.
  * - Its name splits where names are joined (",", "&", "feat."…; see [splitArtists]) into at least two parts,
  *   keeping a part whole when it's one library artist ("Chase & Status").
  * - Every part found in the library is exactly one artist. Two library artists with the same name are two
@@ -34,16 +36,24 @@ object CombinedArtists {
     /** The combined artists among [artists], by the combined artist's id. */
     fun find(artists: List<Artist>): Map<String, CombinedArtist> {
         val byKey = artists.groupBy { normalizeKey(it.name) }
+        val byMbid = artists.filter { !it.mbid.isNullOrBlank() }.groupBy { it.mbid!!.lowercase() }
         val out = LinkedHashMap<String, CombinedArtist>()
         for (artist in artists) {
-            check(artist, byKey)?.let { out[artist.id] = it }
+            check(artist, byKey, byMbid)?.let { out[artist.id] = it }
         }
         return out
     }
 
+    /** Whether [artist]'s MusicBrainz ID is its own: no other library artist (by another name) has it. */
+    private fun ownMbid(artist: Artist, byMbid: Map<String, List<Artist>>): Boolean {
+        val id = artist.mbid?.takeIf { it.isNotBlank() }?.lowercase() ?: return false
+        val key = normalizeKey(artist.name)
+        return byMbid[id].orEmpty().none { it.id != artist.id && normalizeKey(it.name) != key }
+    }
+
     /** [artist] as a [CombinedArtist] when it's safe to split, else null. */
-    internal fun check(artist: Artist, byKey: Map<String, List<Artist>>): CombinedArtist? {
-        if (!artist.mbid.isNullOrBlank()) return null
+    internal fun check(artist: Artist, byKey: Map<String, List<Artist>>, byMbid: Map<String, List<Artist>> = emptyMap()): CombinedArtist? {
+        if (ownMbid(artist, byMbid)) return null
         val ownKey = normalizeKey(artist.name)
         val names = splitArtists(artist.name) { name -> normalizeKey(name).let { it != ownKey && byKey.containsKey(it) } }
         if (names.size < 2) return null
@@ -61,6 +71,28 @@ object CombinedArtists {
         val safe = unknown.isEmpty() || parts.any { !it.mbid.isNullOrBlank() }
         if (!safe) return null
         return CombinedArtist(artist, parts.distinctBy { it.id }, unknown)
+    }
+
+    /**
+     * For the log: why [artist], whose name looks like several artists, is kept as one ([find] didn't split it), or
+     * null when its name doesn't split at all.
+     */
+    fun whyKept(artist: Artist, artists: List<Artist>): String? {
+        val byKey = artists.groupBy { normalizeKey(it.name) }
+        val byMbid = artists.filter { !it.mbid.isNullOrBlank() }.groupBy { it.mbid!!.lowercase() }
+        val ownKey = normalizeKey(artist.name)
+        val names = splitArtists(artist.name) { name -> normalizeKey(name).let { it != ownKey && byKey.containsKey(it) } }
+        if (names.size < 2) return null
+        if (ownMbid(artist, byMbid)) return "it has its own MusicBrainz ID"
+        val matches = names.map { n -> byKey[normalizeKey(n)].orEmpty().filter { it.id != artist.id } }
+        if (matches.any { it.size > 1 }) return "a name in it belongs to more than one artist"
+        val known = matches.filter { it.size == 1 }.map { it.first() }
+        if (known.isEmpty()) return "none of ${names.joinToString(" | ")} is an artist in the library"
+        if (known.none { !it.mbid.isNullOrBlank() }) {
+            val unknown = names.filterIndexed { i, _ -> matches[i].isEmpty() }
+            return "${unknown.joinToString(" | ")} isn't in the library, and none of ${known.joinToString(" | ") { it.name }} has a MusicBrainz ID"
+        }
+        return null
     }
 
     /**

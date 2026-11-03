@@ -25,6 +25,8 @@ import java.util.Locale
 
 private val MARKS = Regex("\\p{M}+")
 private val NON_WORD = Regex("[^\\p{L}\\p{N}]+")
+/** A name with a join in it (", ", " & ", " feat"…): it may be several artists in one. */
+private val JOINED = Regex(",\\s|\\s&\\s|\\s(feat|ft|vs|x)\\.?\\s", RegexOption.IGNORE_CASE)
 
 /**
  * Whether every one of [terms] (from [normalizeKey]) is in [key], as it is or with its spaces left out: a name's
@@ -265,7 +267,12 @@ class LibraryRepository(context: Context) {
      */
     suspend fun combinedArtists(all: List<Artist>? = null): Map<String, CombinedArtist> {
         combined?.let { return it }
-        val found = CombinedArtists.find(all ?: dao.artists().map { it.toArtist() })
+        val artists = all ?: dao.artists().map { it.toArtist() }
+        val found = CombinedArtists.find(artists)
+        // Names that look like several artists but stay one, and why, so a wrong one can be traced (0.52.0-dev).
+        val kept = artists.asSequence().filter { it.id !in found && JOINED.containsMatchIn(it.name) }
+            .mapNotNull { a -> CombinedArtists.whyKept(a, artists)?.let { "${a.name} (${it})" } }.take(5).toList()
+        if (kept.isNotEmpty()) AppLog.d("Library", "Kept as one artist: ${kept.joinToString("; ")}")
         if (found.isNotEmpty()) {
             AppLog.i(
                 "Library",
