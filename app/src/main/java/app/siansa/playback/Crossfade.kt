@@ -160,8 +160,8 @@ object Crossfade {
             afterLastBeat(currentProfile, currentDurationMs, nextDurationMs)?.let { return it }
         }
         // Where the plugin found no bars or phrases, a track made on a grid has them assumed from its first beat (issue #820).
-        val outro = currentProfile?.outro?.let { BeatMatch.assumedGrid(currentProfile.intro, it) }
-        val intro = nextProfile?.intro?.let { BeatMatch.assumedIntro(it) }
+        val outro = currentProfile?.outro?.let { BeatMatch.assumedGrid(currentProfile.intro?.let(BeatMatch::gridded), BeatMatch.gridded(it)) }
+        val intro = nextProfile?.intro?.let { BeatMatch.assumedIntro(BeatMatch.gridded(it)) }
         // Both ends keep a beat (steady or not): unless laid beat on beat, a long blend clashes (issue #796).
         val rhythmic = mode == CrossfadeMode.SMART && BeatMatch.wouldClash(outro, intro)
         // Beat-matched (issue #646): a DJ blend over whole bars, beat on beat, when both ends have a steady beat;

@@ -556,4 +556,39 @@ class BeatMatchTest {
         assertEquals(500L, beat.incomingStartMs)
         assertTrue(plan.beatNote, plan.beatNote!!.contains("assumed"))
     }
+
+    @Test fun aGridTrackReadALittleUnsteadyIsBeatMatched() {
+        // 0.52.0-dev, a DJ session: house read at 121.9 and 124.1 BPM, steady 0.34 to 0.38, was never matched and got a
+        // join of a few seconds. Taken as a grid's, its tempo is the whole number and it counts as steady.
+        val out = BeatEnd(bpm = 124.1, beatMs = 300_000.0, barMs = 300_000.0, rhythm = 0.85f, steady = 0.36f)
+        val inn = BeatEnd(bpm = 121.9, beatMs = 1_000.0, barMs = 1_000.0, rhythm = 0.9f, steady = 0.34f)
+        assertFalse(out.matchable)
+        val g = BeatMatch.gridded(out)
+        assertTrue(g.grid)
+        assertEquals(124.0, g.bpm, 0.0)
+        assertTrue(g.matchable)
+        assertTrue(BeatMatch.bothRhythmic(g, BeatMatch.gridded(inn)))
+        assertTrue(g.describe().contains("124.0 BPM (taken as a grid's)"))
+    }
+
+    @Test fun onlyNearlyWholeTempoAndNearlySteadyBeatsAreTakenAsAGrid() {
+        val end = BeatEnd(bpm = 170.6, beatMs = 0.0, barMs = null, rhythm = 0.8f, steady = 0.38f)
+        assertFalse(BeatMatch.gridded(end).grid)  // 0.6 off a whole number: a real reading, not a grid's
+        assertFalse(BeatMatch.gridded(end.copy(bpm = 170.0, steady = 0.2f)).grid)  // a tempo that wanders
+        assertTrue(BeatMatch.gridded(end.copy(bpm = 170.1)).grid)
+        // Steady already: left as it was.
+        assertEquals(124.1, BeatMatch.gridded(end.copy(bpm = 124.1, steady = 0.8f)).bpm, 0.0)
+    }
+
+    @Test fun aSmartBlendBetweenTwoGridTracksIsBeatMatched() {
+        val a = Song("a", "A", albumId = "A")
+        val b = Song("b", "B", albumId = "B")
+        val out = BeatEnd(bpm = 124.1, beatMs = 300_000.0, barMs = 300_000.0, rhythm = 0.85f, steady = 0.36f)
+        val inn = BeatEnd(bpm = 121.9, beatMs = 1_000.0, barMs = 1_000.0, rhythm = 0.9f, steady = 0.34f)
+        val current = TrackProfile("a", -9.0, emptyList(), emptyList(), outro = out)
+        val next = TrackProfile("b", -9.0, emptyList(), emptyList(), intro = inn)
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 30_000, a, b, 310_000, 300_000, current, next, beatMatch = true, blendBars = 16)!!
+        assertNotNull(plan.beat)
+        assertEquals(124.0 / 122.0, plan.beat!!.speed.toDouble(), 1e-4)
+    }
 }

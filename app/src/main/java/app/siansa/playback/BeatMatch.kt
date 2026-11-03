@@ -88,7 +88,22 @@ object BeatMatch {
      * assumes, so they're known even where the plugin couldn't hear them.
      */
     fun onAGrid(end: BeatEnd): Boolean =
-        end.bpm > 0 && abs(end.bpm - end.bpm.roundToLong()) <= GRID_BPM_TOLERANCE && end.steady >= MIN_STEADY
+        end.bpm > 0 && abs(end.bpm - end.bpm.roundToLong()) <= GRID_BPM_TOLERANCE && (end.steady >= MIN_STEADY || end.grid)
+
+    /**
+     * [end] taken as a track made on a grid (0.52.0-dev): a tempo read within [GRID_SNAP_BPM] of a whole number, with
+     * a beat that keeps to it within about 14 ms ([GRID_MIN_STEADY]), is that whole number, and its beat counts as
+     * steady. House and drum and bass read 0.34 to 0.38 steady (beats 12 ms off a straight line, the plugin's reading
+     * of busy drums, not a wandering tempo) and 121.9 or 124.1 BPM, so they were never beat-matched and got a join of
+     * a few seconds. The new audio engine keeps both songs on one clock and checks the beats through the blend, so
+     * the old, stricter bar (two players drifting apart) isn't needed for them. Unchanged otherwise.
+     */
+    fun gridded(end: BeatEnd): BeatEnd {
+        if (end.grid || end.bpm <= 0 || end.steady >= MIN_STEADY || end.steady < GRID_MIN_STEADY) return end
+        val whole = end.bpm.roundToLong()
+        if (abs(end.bpm - whole) > GRID_SNAP_BPM) return end
+        return end.copy(bpm = whole.toDouble(), grid = true)
+    }
 
     /**
      * The end of a song going out with its bars and 8-bar phrases assumed from the song's grid (issue #820), when
@@ -127,6 +142,9 @@ object BeatMatch {
 
     /** A tempo this close to a whole number of BPM, steady, is a grid's (issue #820). */
     const val GRID_BPM_TOLERANCE = 0.05
+    /** A tempo read this close to a whole number, its beat [GRID_MIN_STEADY] steady, is taken as a grid's ([gridded]). */
+    const val GRID_SNAP_BPM = 0.15
+    const val GRID_MIN_STEADY = 0.3f
     /** The end's beat must be this close to a whole number of beats from the first for the grid to be assumed. */
     const val GRID_BEAT_TOLERANCE = 0.3
     /** Phrases assumed of a track on a grid: 8 bars, the common unit of house and techno. */
