@@ -8,6 +8,7 @@ import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService.LibraryParams
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
+import androidx.media3.session.SessionError
 import app.siansa.AppGraph
 import app.siansa.log.AppLog
 import app.siansa.playback.SongRegistry
@@ -33,13 +34,13 @@ class CarSessionCallback(private val graph: AppGraph, private val tree: CarTree)
 
     override fun onGetLibraryRoot(session: MediaLibrarySession, browser: MediaSession.ControllerInfo, params: LibraryParams?): ListenableFuture<LibraryResult<MediaItem>> {
         // "Recent" roots are Android's own resume suggestions, which aren't offered.
-        if (params?.isRecent == true) return Futures.immediateFuture(LibraryResult.ofError(LibraryResult.RESULT_ERROR_NOT_SUPPORTED))
+        if (params?.isRecent == true) return Futures.immediateFuture(LibraryResult.ofError(SessionError.ERROR_NOT_SUPPORTED))
         AppLog.i("Car", "${browser.packageName} opened the music to browse")
         return Futures.immediateFuture(LibraryResult.ofItem(tree.root(), params))
     }
 
     override fun onGetItem(session: MediaLibrarySession, browser: MediaSession.ControllerInfo, mediaId: String): ListenableFuture<LibraryResult<MediaItem>> =
-        async("Item $mediaId", onError = { LibraryResult.ofError(LibraryResult.RESULT_ERROR_UNKNOWN) }) { tree.item(mediaId)?.let { LibraryResult.ofItem(it, null) } ?: LibraryResult.ofError(LibraryResult.RESULT_ERROR_BAD_VALUE) }
+        async("Item $mediaId", onError = { LibraryResult.ofError(SessionError.ERROR_UNKNOWN) }) { tree.item(mediaId)?.let { LibraryResult.ofItem(it, null) } ?: LibraryResult.ofError(SessionError.ERROR_BAD_VALUE) }
 
     override fun onGetChildren(
         session: MediaLibrarySession,
@@ -48,8 +49,8 @@ class CarSessionCallback(private val graph: AppGraph, private val tree: CarTree)
         page: Int,
         pageSize: Int,
         params: LibraryParams?,
-    ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = async("List $parentId", onError = { LibraryResult.ofError(LibraryResult.RESULT_ERROR_IO) }) {
-        val items = tree.children(parentId) ?: return@async LibraryResult.ofError(LibraryResult.RESULT_ERROR_BAD_VALUE)
+    ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = async("List $parentId", onError = { LibraryResult.ofError(SessionError.ERROR_IO) }) {
+        val items = tree.children(parentId) ?: return@async LibraryResult.ofError(SessionError.ERROR_BAD_VALUE)
         AppLog.d("Car", "List $parentId: ${items.size} items (page $page)")
         LibraryResult.ofItemList(CarTree.page(items, page, pageSize), params)
     }
@@ -74,7 +75,7 @@ class CarSessionCallback(private val graph: AppGraph, private val tree: CarTree)
         page: Int,
         pageSize: Int,
         params: LibraryParams?,
-    ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = async("Search \"$query\"", onError = { LibraryResult.ofError(LibraryResult.RESULT_ERROR_IO) }) {
+    ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = async("Search \"$query\"", onError = { LibraryResult.ofError(SessionError.ERROR_IO) }) {
         val found = searches[query] ?: tree.search(query).also { searches[query] = it }
         LibraryResult.ofItemList(CarTree.page(found, page, pageSize), params)
     }
