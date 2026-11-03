@@ -22,7 +22,7 @@ class StreamLinksTest {
     }
 
     @Test fun anM3uWithoutHeaderAndRelativeLinesIsReadAgainstItsAddress() {
-        val m3u = "﻿live/stream.mp3\r\nhttps://other.example.org/a.aac\r\n"
+        val m3u = "\uFEFFlive/stream.mp3\r\nhttps://other.example.org/a.aac\r\n"
         assertEquals(
             listOf("https://radio.example.com/lists/live/stream.mp3", "https://other.example.org/a.aac"),
             StreamLinks.parseM3u(m3u, "https://radio.example.com/lists/station.m3u"),

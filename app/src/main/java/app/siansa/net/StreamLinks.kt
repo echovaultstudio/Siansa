@@ -59,7 +59,7 @@ object StreamLinks {
     fun typeOf(url: String, contentType: String?, head: String): Type {
         val type = contentType?.substringBefore(';')?.trim()?.lowercase().orEmpty()
         val path = url.toHttpUrlOrNull()?.encodedPath?.lowercase() ?: url.lowercase().substringBefore('?')
-        val start = head.trimStart('﻿', ' ', '\n', '\r', '\t')
+        val start = head.trimStart('\uFEFF', ' ', '\n', '\r', '\t')
         return when {
             start.isNotEmpty() && isFeed(start) -> Type.FEED
             start.isNotEmpty() && start.startsWith("[playlist]", ignoreCase = true) -> Type.PLS
@@ -87,7 +87,7 @@ object StreamLinks {
     private fun looksLikeText(text: String): Boolean = text.none { it == '\u0000' }
 
     private fun lines(text: String): List<String> =
-        text.removePrefix("﻿").lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
+        text.removePrefix("\uFEFF").lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
 
     private fun plsEntries(text: String, key: String): List<String> =
         lines(text).mapNotNull { line ->

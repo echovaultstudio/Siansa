@@ -36,7 +36,7 @@ object PodcastFeeds {
                 runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
                 runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
             }
-            factory.newDocumentBuilder().parse(InputSource(StringReader(xml.trimStart('﻿', ' ', '\n', '\r', '\t'))))
+            factory.newDocumentBuilder().parse(InputSource(StringReader(xml.trimStart('\uFEFF', ' ', '\n', '\r', '\t'))))
         }.getOrNull() ?: return null
         val channel = doc.getElementsByTagNameNS("*", "channel").item(0) as? Element
             ?: doc.getElementsByTagName("channel").item(0) as? Element
