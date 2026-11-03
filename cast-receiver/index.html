@@ -8,11 +8,13 @@
 <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 <style>
   :root {
-    --amber: #FFB547; --violet: #B69CFF; --plum: #110D1C; --plum-raised: #1C1630;
-    --text: #EDE7F6; --muted: #B9B0CC;
+    /* Siansa's colours, as the app's icon and siansa.app: black, frost and amber. The same page serves Siansa and
+       Siansa Dev, so it never takes the Dev build's purple. */
+    --page: #000000; --raised: #12171C; --text: #EEF2F5; --muted: #AFC2D3; --frost: #9DB4C8;
+    --amber: #FFB547; --mid-top: #FFE7C4; --mid-bottom: #E8A55A;
   }
   * { box-sizing: border-box; margin: 0; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--plum); color: var(--text);
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--page); color: var(--text);
     font-family: "Google Sans", Roboto, "Helvetica Neue", Arial, sans-serif; }
   .screen { position: absolute; inset: 0; transition: opacity .6s ease; }
   .hidden { opacity: 0; pointer-events: none; }
@@ -20,9 +22,12 @@
   /* Splash: shown when the TV connects and while nothing is loaded. */
   /* Sizes are in vh, so the page looks the same on TVs that draw it at 1280x720 and at 1920x1080. */
   #splash { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.6vh;
-    background: var(--plum); }
-  .icon { width: 24vh; height: 17.6vh; }
-  .logo { font-size: 6.7vh; font-weight: 700; letter-spacing: -.1vh; }
+    background: var(--page); }
+  .icon { width: 30vh; height: 30vh; }
+  .logo { font-size: 6.7vh; font-weight: 750; letter-spacing: -.17vh; }
+  /* The wordmark: Siansa with its S in the amber of the icon's middle bar, as on siansa.app. */
+  .logo .s { background: linear-gradient(180deg, var(--mid-top), var(--mid-bottom)); -webkit-background-clip: text;
+    background-clip: text; color: transparent; }
   #splash-note { font-size: 2.8vh; color: var(--muted); }
 
   /* Now playing */
@@ -31,7 +36,7 @@
   /* Kept inside the TV's safe area (5% at each edge), where some TVs cut the picture. */
   #player { display: flex; align-items: center; gap: 7.4vh; padding: 5vh 11vh; }
   #cover { position: relative; width: 52vh; height: 52vh; flex: none; border-radius: 2.2vh;
-    background: var(--plum-raised) center/cover; box-shadow: 0 2.8vh 7.4vh rgba(0,0,0,.6); }
+    background: var(--raised) center/cover; box-shadow: 0 2.8vh 7.4vh rgba(0,0,0,.6); }
   #cover.none { background-image: none; }
   #info { position: relative; flex: 1; min-width: 0; }
   #device { font-size: 2vh; letter-spacing: .3vh; color: var(--amber); text-transform: uppercase; margin-bottom: 2.2vh; }
@@ -40,16 +45,16 @@
   #artist { font-size: 3.5vh; margin-top: 1.7vh; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #album { font-size: 2.8vh; margin-top: .7vh; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #bar { margin-top: 5.2vh; height: .74vh; border-radius: .37vh; background: rgba(255,255,255,.18); overflow: hidden; }
-  #fill { height: 100%; width: 0; background: var(--amber); }
+  #fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--mid-bottom), var(--amber)); }
   #times { display: flex; justify-content: space-between; font-size: 2.2vh; color: var(--muted); margin-top: 1.1vh; }
-  .paused #fill { background: var(--violet); }
+  .paused #fill { background: var(--frost); }
   .paused #cover { filter: brightness(.7); }
 
   #controls { display: flex; align-items: center; gap: 3.7vh; margin-top: 3.7vh; }
   .btn { width: 8.9vh; height: 8.9vh; border-radius: 50%; border: .28vh solid transparent; background: rgba(255,255,255,.1);
     display: flex; align-items: center; justify-content: center; transition: transform .15s, border-color .15s, background .15s; }
   .btn svg { width: 4.4vh; height: 4.4vh; fill: var(--text); }
-  .btn.main { width: 11.9vh; height: 11.9vh; background: var(--amber); }
+  .btn.main { width: 11.9vh; height: 11.9vh; background: linear-gradient(180deg, var(--mid-top), var(--mid-bottom)); }
   .btn.main svg { width: 5.9vh; height: 5.9vh; fill: #2A1700; }
   .btn.focus { border-color: var(--text); transform: scale(1.12); }
   #hint { font-size: 2vh; color: var(--muted); margin-top: 2.6vh; }
@@ -60,15 +65,33 @@
 </head>
 <body>
 <div id="splash" class="screen">
-  <!-- Same as the phone app's launch screen: the launcher icon's sound bars on plum. -->
-  <svg class="icon" viewBox="27 34 58 42">
-    <path fill="#B9A4FF" d="M33,62a3,3 0 0,1 6,0v8a3,3 0 0,1 -6,0z"/>
-    <path fill="#C9B8FF" d="M43,50a3,3 0 0,1 6,0v20a3,3 0 0,1 -6,0z"/>
-    <path fill="#FFD38A" d="M53,40a3,3 0 0,1 6,0v30a3,3 0 0,1 -6,0z"/>
-    <path fill="#C9B8FF" d="M63,48a3,3 0 0,1 6,0v22a3,3 0 0,1 -6,0z"/>
-    <path fill="#B9A4FF" d="M73,58a3,3 0 0,1 6,0v12a3,3 0 0,1 -6,0z"/>
+  <!-- Siansa's icon (docs/brand/siansa-mark.svg, as the launcher icon): sound bars and their reflection between the
+       double half circles, on the page's black. -->
+  <svg class="icon" viewBox="18 18 72 72" aria-hidden="true">
+    <defs>
+      <linearGradient id="arcIn" x1="0" y1="36.98" x2="0" y2="71.02" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#AFC2D3" stop-opacity=".303"/><stop offset=".5" stop-color="#AFC2D3" stop-opacity=".55"/><stop offset="1" stop-color="#AFC2D3" stop-opacity=".303"/></linearGradient>
+      <linearGradient id="arcOut" x1="0" y1="31.06" x2="0" y2="76.94" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#AFC2D3" stop-opacity=".132"/><stop offset=".5" stop-color="#AFC2D3" stop-opacity=".24"/><stop offset="1" stop-color="#AFC2D3" stop-opacity=".132"/></linearGradient>
+      <linearGradient id="reflectFrost" x1="0" y1="62.5" x2="0" y2="76.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#9DB4C8" stop-opacity=".46"/><stop offset=".35" stop-color="#B5C7D6" stop-opacity=".207"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+      <linearGradient id="reflectAmber" x1="0" y1="62.5" x2="0" y2="76.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#E8A55A" stop-opacity=".46"/><stop offset=".35" stop-color="#F0BC80" stop-opacity=".207"/><stop offset="1" stop-color="#FFE7C4" stop-opacity="0"/></linearGradient>
+      <linearGradient id="barFrost" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#9DB4C8"/></linearGradient>
+      <linearGradient id="barAmber" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE7C4"/><stop offset="1" stop-color="#E8A55A"/></linearGradient>
+    </defs>
+    <path d="M38.46,36.98A24.42,24.42 0 0,0 38.46,71.02" fill="none" stroke="url(#arcIn)" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M69.54,36.98A24.42,24.42 0 0,1 69.54,71.02" fill="none" stroke="url(#arcIn)" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M32.54,31.06A32.56,32.56 0 0,0 32.54,76.94" fill="none" stroke="url(#arcOut)" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M75.46,31.06A32.56,32.56 0 0,1 75.46,76.94" fill="none" stroke="url(#arcOut)" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M40,69.5v-5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#reflectFrost)"/>
+    <path d="M46,74.5v-10a2,2 0 0,1 4,0v10a2,2 0 0,1 -4,0z" fill="url(#reflectFrost)"/>
+    <path d="M52,74.5v-10a2,2 0 0,1 4,0v10a2,2 0 0,1 -4,0z" fill="url(#reflectAmber)"/>
+    <path d="M58,74.5v-10a2,2 0 0,1 4,0v10a2,2 0 0,1 -4,0z" fill="url(#reflectFrost)"/>
+    <path d="M64,69.5v-5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#reflectFrost)"/>
+    <path d="M40,54.5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#barFrost)"/>
+    <path d="M46,47.5a2,2 0 0,1 4,0v12a2,2 0 0,1 -4,0z" fill="url(#barFrost)"/>
+    <path d="M52,39.5a2,2 0 0,1 4,0v20a2,2 0 0,1 -4,0z" fill="url(#barAmber)"/>
+    <path d="M58,47.5a2,2 0 0,1 4,0v12a2,2 0 0,1 -4,0z" fill="url(#barFrost)"/>
+    <path d="M64,54.5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#barFrost)"/>
   </svg>
-  <div class="logo">Siansa</div>
+  <div class="logo"><span class="s">S</span>iansa</div>
   <div id="splash-note">Connecting…</div>
 </div>
 
