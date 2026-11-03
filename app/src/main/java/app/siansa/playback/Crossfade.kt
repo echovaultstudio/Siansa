@@ -46,6 +46,13 @@ data class FadePlan(
  * Without ramps, smart mode falls back to the fixed length (still keeping album runs gapless).
  */
 object Crossfade {
+    /**
+     * Whether a song may blend into the next: never when either is a radio station or a podcast episode (issue #353).
+     * A live stream has no end to fade out of, and talk shouldn't be faded or beat-matched.
+     */
+    fun blends(fromId: String, toId: String): Boolean =
+        !app.siansa.data.OutsideMedia.isOutside(fromId) && !app.siansa.data.OutsideMedia.isOutside(toId)
+
     /** The level (dB below the song's own loudness) that counts as "quiet" for the ramps. */
     const val QUIET_DB = -18
 

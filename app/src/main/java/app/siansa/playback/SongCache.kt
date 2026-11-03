@@ -8,6 +8,7 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.CacheDataSource
 import app.siansa.data.AppSettings
+import app.siansa.data.OutsideMedia
 
 /**
  * Cache keys leave out the per-session login token in stream URLs, so a song cached yesterday is
@@ -55,6 +56,13 @@ class CachingSwitchDataSource(
     }
 
     override fun open(dataSpec: DataSpec): Long {
+        // A radio station or podcast episode (issue #353) never goes through the song cache: a live stream has no
+        // end. Its mark is taken off here, the last step before the request.
+        val url = dataSpec.uri.toString()
+        if (OutsideMedia.isMarked(url)) {
+            active = direct
+            return direct.open(dataSpec.withUri(Uri.parse(OutsideMedia.unmarked(url))))
+        }
         val source = if (goesThroughCache(dataSpec.uri.getQueryParameter("format"), useCache())) cached else direct
         active = source
         return source.open(dataSpec)

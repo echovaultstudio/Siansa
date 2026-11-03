@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -72,6 +73,23 @@ class SpacingLibraryTest : SpacingCheck() {
         val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Singles")), useUnmergedTree = true).getBoundsInRoot()
         val title = compose.onNodeWithText("Discography").getBoundsInRoot()
         assertEven("Release-type chips", chip.top - (song.bottom - 6.dp), title.top - chip.bottom)
+    }
+
+    /** Your Stations (issue #353): a station's row has the same room above and below its picture, with its ⋮ menu. */
+    @Test fun stationRowIsEvenlyPadded() {
+        compose.setContent {
+            SiansaTheme {
+                Column {
+                    app.siansa.ui.StationRow(
+                        "Radio Paradise", "Radio · stream.example.com", null, Icons.Rounded.Radio, "own-1",
+                        playing = false, onClick = {}, onRemove = {},
+                    )
+                }
+            }
+        }
+        val row = compose.onNodeWithTag("stationRow").getBoundsInRoot()
+        val cover = compose.onNodeWithTag("stationCover", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Station row", cover.top - row.top, row.bottom - cover.bottom)
     }
 
     /** Downloads: Pause sits on the same line as the totals, centred with them, not squeezed into the buttons. */

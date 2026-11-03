@@ -71,6 +71,7 @@ Same page. **Off**, a **fixed** length (1–30 seconds, 6 by default), or **Smar
   crossfade length: up to half a minute of outro (then the last half minute of it), and never more than a third of
   either song.
 - Songs that run straight on within one album aren't faded, so they stay gapless.
+- Radio stations and podcast episodes ([Your Stations](stations.md)) are never faded into or out of.
 - Without the plugin's measurements, Smart uses the fixed length. When the song going out keeps a beat but the
   next song hasn't been measured, the blend is short instead, so the two beats don't clash for the whole length.
 

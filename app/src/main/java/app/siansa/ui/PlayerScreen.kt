@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.data.OutsideMedia
 import androidx.compose.ui.graphics.vector.ImageVector
 
 import androidx.compose.material.icons.rounded.AddCircle
@@ -336,7 +337,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
                             song?.let { graph.favorites.toggle(it) }
                         }
-                        SeekBar(state)
+                        // A radio station has no seek bar, only that it's live (issue #353).
+                        if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state)
                         Controls(state)
                         // The lyrics bottom left (greyed out when the song has none), where the music plays in
                         // the middle (with the TV, speaker or headphones' name), and the queue bottom right: tap
@@ -386,7 +388,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
             ) {
                 LyricsScreen(song, tint, onClose = { lyricsOpen = false }, menu = { menuOpen = true }) {
                     Column {
-                        SeekBar(state)
+                        if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state)
                         Controls(state)
                     }
                 }
@@ -600,6 +602,8 @@ private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart:
                 modifier = Modifier.clickable(enabled = song?.artistId != null || song?.artists?.isNotEmpty() == true, onClick = onArtist),
             )
         }
+        // A radio station or podcast episode isn't on the music server, so it can't be liked (issue #353).
+        if (song != null && OutsideMedia.isOutside(song.id)) return@Row
         IconButton(onClick = onHeart, enabled = song != null) {
             Icon(
                 if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,

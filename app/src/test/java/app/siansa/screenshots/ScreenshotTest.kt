@@ -54,6 +54,8 @@ import app.siansa.ui.MenuRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.Podcasts
+import androidx.compose.material.icons.rounded.Radio
 import app.siansa.ui.FoldSection
 import app.siansa.ui.SwitchRow
 import app.siansa.ui.TuningRow
@@ -355,6 +357,33 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         app.siansa.ui.PageLink("Cards", "Made for you and your own cards", "c") {}
                     }
                 }
+            },
+            // Your Stations (issue #353): server and phone stations and a podcast, one playing, long names cut off.
+            Scene("stations_list") {
+                Column {
+                    app.siansa.ui.StationRow("Radio Paradise", "Radio", null, Icons.Rounded.Radio, "server-1", playing = true, onClick = {})
+                    app.siansa.ui.StationRow("Unbelievably Long Community Radio Station Name for Rainy Evenings", "Radio · stream.example.com", null, Icons.Rounded.Radio, "own-2", playing = false, onClick = {}, onRemove = {})
+                    app.siansa.ui.StationRow("Rocket Hour", "Podcast · Ada Lovelace · 479 episodes", null, Icons.Rounded.Podcasts, "pod-3", playing = false, onClick = {}, onRemove = {})
+                }
+            },
+            // A podcast's page (issue #353): its header and episodes, one playing, a long title on two lines.
+            Scene("podcast_page") {
+                Column {
+                    app.siansa.ui.PodcastHeader("The Extraordinarily Long Chronicles of Wandering Mapmakers", "Ada Lovelace and Friends", null, "pod-1", 479)
+                    app.siansa.ui.EpisodeRow("Ep. 479 · Exploring the Dopamine Chamber with Uncharacteristically Long Words", "5 Mar 2024 · 58 min", playing = true) {}
+                    app.siansa.ui.EpisodeRow("Ep. 478 · Short one", "4 Mar 2024 · 1 h 2 min", playing = false) {}
+                }
+            },
+            // Adding a link to Your Stations (issue #353): the fields with their hint, then with an error.
+            Scene("add_station") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.AddStationFields("https://somafm.com/groovesalad.pls", "", busy = false, error = null, onLink = {}, onName = {}, onDone = {})
+                    app.siansa.ui.AddStationFields("https://example.com/", "Mine", busy = false, error = "That link isn't a radio stream or a podcast feed", onLink = {}, onName = {}, onDone = {})
+                }
+            },
+            // Now playing for a live station (issue #353): no seek bar, only that it's live.
+            Scene("player_live") {
+                OnPlayer { Box(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium)) { app.siansa.ui.LiveBar() } }
             },
             // Custom card editor: a rule (issue #663).
             Scene("card_rule") {

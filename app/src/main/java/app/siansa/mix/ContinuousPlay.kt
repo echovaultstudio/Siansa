@@ -236,7 +236,8 @@ class ContinuousPlay(private val graph: AppGraph) {
                         sleepFinishing = graph.sleepTimer.state.value?.finishing == true,
                     )
                     val last = snapshot.last
-                    if (!due || last == null || job?.isActive == true) return@collect
+                    // Nothing is added after a radio station or podcast episode (issue #353): there's nothing like it to find.
+                    if (!due || last == null || job?.isActive == true || app.siansa.data.OutsideMedia.isOutside(last.id)) return@collect
                     job = graph.scope.launch { topUp(mode, last) }
                 }
         }

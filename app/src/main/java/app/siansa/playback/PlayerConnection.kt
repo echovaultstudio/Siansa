@@ -373,7 +373,10 @@ class PlayerConnection(
         val c = controller ?: return
         val queue = (0 until c.mediaItemCount).map { c.getMediaItemAt(it).toSong() }
         val index = c.currentMediaItemIndex
-        val current = queue.getOrNull(index)
+        // A radio station shows what its stream says it's playing, with the station's name under it (issue #353).
+        val streamTitle = c.sessionExtras.takeIf { it.getString(StreamQuality.EXTRA_SONG_ID) == queue.getOrNull(index)?.id }
+            ?.getString(StreamQuality.EXTRA_STREAM_TITLE)
+        val current = queue.getOrNull(index)?.let { app.siansa.data.OutsideMedia.nowOnAir(it, streamTitle) }
         val duration = songDurationMs(c.duration, current?.durationSec ?: 0)
         _state.value = PlayerState(
             current = current,

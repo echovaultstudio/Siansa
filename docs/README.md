@@ -20,6 +20,7 @@ the hood, and what to do when something goes wrong.
 - [Playback](playback.md): quality, cache, downloads, levelling, crossfades, equaliser, lyrics, sleep timer, casting.
 - [Your listening](your-listening.md): your month and year, Time Machine, sonic fingerprint, scrobbling.
 - [Audiobooks and podcasts](books.md): Audiobookshelf, the Books panel and chips, the book player.
+- [Your Stations](stations.md): internet radio from your server and your own links, and podcasts by their feed.
 - [AI features](ai.md): what the optional AI does, what it's sent, and the Situation panel.
 - [Settings](settings.md): every settings page, one by one.
 

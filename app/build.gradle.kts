@@ -144,6 +144,8 @@ dependencies {
 
     // Media3 stays on the version the FFmpeg decoder below is built for (Jellyfin's build); update both together.
     implementation("androidx.media3:media3-exoplayer:1.9.0")
+    // HLS radio streams (issue #353), the same Media3 version as the rest.
+    implementation("androidx.media3:media3-exoplayer-hls:1.9.0")
     implementation("androidx.media3:media3-session:1.9.0")
     implementation("androidx.media3:media3-datasource-okhttp:1.9.0")
     implementation("androidx.media3:media3-database:1.9.0")

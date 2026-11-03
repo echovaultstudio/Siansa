@@ -18,6 +18,7 @@ The Subsonic API (`/rest/…`, version 1.16.1, JSON), with OpenSubsonic extensio
 | Favourites and plays | `star`, `unstar`, `scrobble` |
 | Playlists | `getPlaylists`, `getPlaylist`, `createPlaylist`, `updatePlaylist` |
 | Similar music | `getSimilarSongs`, `getSimilarSongs2`, and `getSonicSimilarTracks` / `findSonicPath` when the AudioMuse-AI Navidrome plugin is installed |
+| Radio stations | `getInternetRadioStations` (read only, for [Your Stations](stations.md)) |
 
 Siansa logs in with a salted token (`u`, `t`, `s`), never the plain password.
 
@@ -78,3 +79,4 @@ its own server.
 | ListenBrainz / Koito | Connected | Plays, now playing; top artists and songs |
 | Open-Meteo | Weather in Use the moment on | Your location rounded to about 10 km |
 | Deezer (`api.deezer.com`) | Artists you might like | Artist names only |
+| Radio stations and podcast feeds you add, and your server's radio stations | You add a link, open a podcast, or play a station or episode | A normal web request to that address (your IP address and "Siansa (Android)" as the app); nothing about you or your music |
