@@ -52,6 +52,8 @@ jobs:
           SIANSA_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
           SIANSA_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIANSA_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          # Siansa's own TV screen while casting (issue #114): the Cast app id, a repository variable (not a secret).
+          CAST_RECEIVER_ID: ${{ vars.CAST_RECEIVER_ID }}
         run: gradle :app:testDebugUnitTest :app:assembleDev --continue --stacktrace
 
       - name: Publish the APK
