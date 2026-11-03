@@ -159,6 +159,18 @@ object BeatMatch {
      */
     fun beatDriven(end: BeatEnd?): Boolean = end != null && end.bpm > 0 && end.rhythm >= MIN_RHYTHM
 
+    /** No beat at all at this end (the plugin found none, or barely one): a long blend over it can't clash. */
+    fun beatless(end: BeatEnd?): Boolean = end == null || end.bpm <= 0 || end.rhythm < SOME_BEAT
+
+    /** Some beat at this end, if not beat-driven: two of them laid on each other out of step still clash. */
+    fun someBeat(end: BeatEnd?): Boolean = !beatless(end)
+
+    /**
+     * Below this [BeatEnd.rhythm] an end has no beat to speak of; from it to [MIN_RHYTHM] it has some (a house remix's
+     * outro read 0.46: 0.52.0-dev).
+     */
+    const val SOME_BEAT = 0.25f
+
     /** Both ends keep a beat, steady or not: an unmatched blend between them clashes, so it's kept short. */
     fun wouldClash(outgoing: BeatEnd?, incoming: BeatEnd?): Boolean = beatDriven(outgoing) && beatDriven(incoming)
 
