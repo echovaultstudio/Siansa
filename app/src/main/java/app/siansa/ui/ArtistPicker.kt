@@ -1,6 +1,5 @@
 package app.siansa.ui
 
-import app.siansa.data.CombinedArtists
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -113,7 +112,7 @@ fun ArtistCircle(artist: Artist, modifier: Modifier) {
 
 /** The artist with [id], or the artists it names when it's several artists in one name (issue #359). */
 internal suspend fun artistsNamedBy(graph: AppGraph, id: String, name: String): List<Artist> =
-    CombinedArtists.expand(listOf(graph.library.artist(id) ?: Artist(id, name)), graph.library.combinedArtists())
+    graph.library.expandArtists(listOf(graph.library.artist(id) ?: Artist(id, name)))
 
 /** Every artist on the song, as artists in the library where possible. */
 private suspend fun artistsOf(graph: AppGraph, song: Song): List<Artist> {
@@ -125,9 +124,8 @@ private suspend fun artistsOf(graph: AppGraph, song: Song): List<Artist> {
             .onFailure { AppLog.w("Artist", "Couldn't load the artists of ${song.id}: ${it.message}") }
             .getOrDefault(emptyList())
     }
-    val combined = graph.library.combinedArtists()
     // A name that's several artists in one (tagged without the server's separator) offers each of them (issue #359).
-    val found = CombinedArtists.expand(refs.map { ref -> graph.library.artist(ref.id) ?: Artist(ref.id, ref.name) }, combined)
+    val found = graph.library.expandArtists(refs.map { ref -> graph.library.artist(ref.id) ?: Artist(ref.id, ref.name) })
     AppLog.d("Artist", "Song ${song.id}: ${found.size} artists from Navidrome's list")
     if (found.isNotEmpty()) return found
 
@@ -139,5 +137,5 @@ private suspend fun artistsOf(graph: AppGraph, song: Song): List<Artist> {
         .distinctBy { it.id }
     if (byName.size > 1) return byName
     val single = song.artistId?.let { graph.library.artist(it) ?: Artist(it, song.artist) }
-    return CombinedArtists.expand(listOfNotNull(single ?: byName.firstOrNull()), combined)
+    return graph.library.expandArtists(listOfNotNull(single ?: byName.firstOrNull()))
 }

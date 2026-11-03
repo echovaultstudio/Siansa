@@ -35,14 +35,26 @@ data class CombinedArtist(
 object CombinedArtists {
     /** The combined artists among [artists], by the combined artist's id. */
     fun find(artists: List<Artist>): Map<String, CombinedArtist> {
-        val byKey = artists.groupBy { normalizeKey(it.name) }
-        val byMbid = artists.filter { !it.mbid.isNullOrBlank() }.groupBy { it.mbid!!.lowercase() }
+        val index = Index(artists)
         val out = LinkedHashMap<String, CombinedArtist>()
         for (artist in artists) {
-            check(artist, byKey, byMbid)?.let { out[artist.id] = it }
+            check(artist, index.byKey, index.byMbid)?.let { out[artist.id] = it }
         }
         return out
     }
+
+    /** The library's artists by name and by MusicBrainz ID, to check names against. */
+    class Index(artists: List<Artist>) {
+        val byKey: Map<String, List<Artist>> = artists.groupBy { normalizeKey(it.name) }
+        val byMbid: Map<String, List<Artist>> = artists.filter { !it.mbid.isNullOrBlank() }.groupBy { it.mbid!!.lowercase() }
+    }
+
+    /**
+     * [artist] as a [CombinedArtist] when it's safe to split, checked against the library [index]: for a song's
+     * artist that isn't in the library's artist list (Navidrome lists album artists there, so "ID, Camo & Krooked",
+     * only ever a song's artist, was never checked: 0.52.0-dev).
+     */
+    fun of(artist: Artist, index: Index): CombinedArtist? = check(artist, index.byKey, index.byMbid)
 
     /** Whether [artist]'s MusicBrainz ID is its own: no other library artist (by another name) has it. */
     private fun ownMbid(artist: Artist, byMbid: Map<String, List<Artist>>): Boolean {
