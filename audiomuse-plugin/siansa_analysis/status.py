@@ -154,6 +154,9 @@ def beats(counts, job):
         detail += f", {failed:,} couldn't be read yet"
     if songs == 0:
         return Status("Waiting for profiles", WORKING, 0, "Songs get their beat grids with their volume and fade profile")
+    until = counts.get("until_waiting", 0)
+    if counts["to_measure"] == 0 and until and running:
+        return Status("Measuring", WORKING, 100, detail)
     if counts["to_measure"] == 0:
         return Status("Ready", READY, 100, detail)
     if running:

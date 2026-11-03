@@ -358,7 +358,10 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
                        if beats_left else "")
     if not beats_batch_size and not beats_all and beat_counts["to_measure"]:
         beats_left_line = '<p class="mx-help">Songs per run is 0: songs are measured for their beats only when you press a button here (and new songs as AudioMuse analyses them).</p>'
-    beats_all_block = _all_block("beats", beat_counts["to_measure"], busy, beats_all, " for their beats",
+    # Songs measured before 0.5.0 wait to be checked for where their beat stops: they count for the buttons too
+    # (0.5.0 showed the beat grids as done, with no Measure all).
+    beats_open = beat_counts["to_measure"] + beat_counts.get("until_waiting", 0)
+    beats_all_block = _all_block("beats", beats_open, busy, beats_all, " for their beats",
                                  " Their loudness and fades stay in use meanwhile.", rounds, last_round, all_minutes)
     beats_error = beats_job.get("error")
     beats_failures = ""
@@ -416,7 +419,7 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
     over its last minute) the blends go phrase on phrase, as a DJ mixes. Plugin 0.4.2 reads the tempo of drum and
     bass and other breakbeats right, where it often read two thirds of it; 0.5.0 also notes where the beat stops
     before a beatless outro, so the next song can come in after the last beat (songs measured before are checked for
-    that only as the app is about to play them). New songs get theirs with their volume
+    that as the app is about to play them, or all of them with Measure all). New songs get theirs with their volume
     and fade profile. Songs measured before plugin 0.4.2 are read again (the sound isn't kept, only what was
     measured), a batch at a time after the profiles each 15 minutes, songs the app is about to play first.
     Their loudness, fades and earlier beat grids stay in use meanwhile; a song without its phrases blends bar on
@@ -429,7 +432,7 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
   <form method="post" class="mx-actions">
     <label>Songs per run <input name="beats_batch_size" value="{beats_batch_size}" inputmode="numeric"></label>
     <button type="submit" name="action" value="save_beats">Save</button>
-    <button type="submit" name="action" value="measure_beats"{busy if beat_counts['to_measure'] else " disabled"}>Measure a batch now</button>
+    <button type="submit" name="action" value="measure_beats"{busy if beats_open else " disabled"}>Measure a batch now</button>
   </form>
   {beats_all_block}
 </section>

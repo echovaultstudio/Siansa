@@ -182,12 +182,13 @@ def measure_missing(budget_seconds=None, batch=None):
     return measure_part("profiles", budget_seconds, batch)
 
 
-def measure_beats(budget_seconds=None, batch=None):
-    """Measures songs again for their beat grids, a round at a time (see :func:`measure_part`)."""
-    return measure_part("beats", budget_seconds, batch)
+def measure_beats(budget_seconds=None, batch=None, fill=False):
+    """Measures songs again for their beat grids, a round at a time (see :func:`measure_part`); with ``fill`` (a
+    batch asked for by hand), songs measured before 0.5.0 are checked for where their beat stops too."""
+    return measure_part("beats", budget_seconds, batch, fill)
 
 
-def measure_part(part, budget_seconds=None, batch=None):
+def measure_part(part, budget_seconds=None, batch=None, fill=False):
     """Measures the songs ``part`` still needs ("profiles" or "beats"), a round at a time.
 
     A normal round measures one batch (that part's "Songs per run" setting) within
@@ -218,7 +219,7 @@ def measure_part(part, budget_seconds=None, batch=None):
         tried = set()
         stopped = halted = False
         while len(tried) < limit and not stopped:
-            rows = [r for r in store.songs_to_measure(db, min(25, limit - len(tried)) + len(tried), beats=spec["beats"], fill=all_on)
+            rows = [r for r in store.songs_to_measure(db, min(25, limit - len(tried)) + len(tried), beats=spec["beats"], fill=all_on or fill)
                     if r[0] not in tried]
             if not rows:
                 break
@@ -455,7 +456,7 @@ def prepare_now():
 
 
 def beats_now():
-    return measure_beats()
+    return measure_beats(fill=True)
 
 
 def rebuild_now():
