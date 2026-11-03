@@ -148,6 +148,8 @@ def profiles():
             out.append({"track_id": asked_id, **profile})
             if "intro_bpm" not in profile and "outro_bpm" not in profile:
                 no_beats.append(asked_id)  # measured before the beat tracker, maybe: its beats come first then
+            elif store.UNTIL_KEY not in profile:
+                no_beats.append(asked_id)  # measured before 0.5.0: checked for where its beat stops, as it's about to play
     if pending or no_beats:
         try:
             store.mark_wanted(db, {canonical.get(i, i) for i in pending + no_beats})
@@ -406,8 +408,9 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
     Siansa's DJ radio (experimental): with the phrases (plugin 0.4.0: the 4 or 8 bars a song is built from, read
     over its last minute) the blends go phrase on phrase, as a DJ mixes. Plugin 0.4.2 reads the tempo of drum and
     bass and other breakbeats right, where it often read two thirds of it; 0.5.0 also notes where the beat stops
-    before a beatless outro, so the next song can come in after the last beat. New songs get theirs with their volume
-    and fade profile. Songs measured before plugin 0.5.0 are read again (the sound isn't kept, only what was
+    before a beatless outro, so the next song can come in after the last beat (songs measured before are checked for
+    that only as the app is about to play them). New songs get theirs with their volume
+    and fade profile. Songs measured before plugin 0.4.2 are read again (the sound isn't kept, only what was
     measured), a batch at a time after the profiles each 15 minutes, songs the app is about to play first.
     Their loudness, fades and earlier beat grids stay in use meanwhile; a song without its phrases blends bar on
     bar, one without its grid the plain way. Songs per run can be any number: a round stops when its time is up (4

@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 
 import support  # noqa: F401
-from siansa_analysis import beats, jobs, loudness
+from siansa_analysis import beats, jobs, loudness, store
 
 RATE = 48_000
 
@@ -265,7 +265,10 @@ class BeatsUntilTest(unittest.TestCase):
     def test_a_song_that_beats_to_the_end_has_none(self):
         m = loudness.measure_array(self.song(70.0, 0.0), RATE)
         self.assertIsNone(m.beats_until())
-        self.assertNotIn("beats_until_ms", jobs.profile_of(m)["beats"])
+        beats_fields = jobs.profile_of(m)["beats"]
+        self.assertNotIn("beats_until_ms", beats_fields)
+        # Looked for, found or not: a song measured by 0.5.0 is never asked for again for it.
+        self.assertEqual(beats_fields[store.UNTIL_KEY], 1)
 
     def test_a_short_beatless_end_isnt_worth_it(self):
         m = loudness.measure_array(self.song(66.0, 3.0), RATE)

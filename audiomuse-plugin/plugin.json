@@ -8,7 +8,7 @@
     {
       "version": "0.5.0",
       "min_core_version": "3.6.4",
-      "changelog": "Notes where a song's beat stops when it ends in a beatless outro (6 seconds or more without a beat before its dead air), so Siansa can bring the next song in after the last beat and let the outro, with its own fade, play out under it. Every song's beat grids are measured again in the background, songs the app is about to play first; the loudness, fades and earlier grids stay in use meanwhile.",
+      "changelog": "Notes where a song's beat stops when it ends in a beatless outro (6 seconds or more without a beat before its dead air), so Siansa can bring the next song in after the last beat and let the outro, with its own fade, play out under it. Nothing is measured again across the library for it: new songs get it with their profile, and songs measured before are checked only when Siansa asks for them, as they're about to play, a few at a time.",
       "imageUrl": ""
     },
     {

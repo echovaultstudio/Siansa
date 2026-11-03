@@ -18,7 +18,10 @@ ANALYZER_VERSION = 1
 # The beat grids (Siansa issue #646) have a version of their own: a profile measured before them keeps its
 # loudness and ramps (so levelling and SmoothFade go on working) and is measured again, in the background, for
 # its beats. Raise this to measure every song's beats again.
-BEATS_VERSION = 4  # 2: the phrases (Siansa issue #757); 3: related tempos (Siansa issue #802); 4: where the beat stops
+BEATS_VERSION = 3  # 2: the phrases (Siansa issue #757); 3: related tempos (Siansa issue #802)
+# Where the beat stops (0.5.0) isn't worth reading the whole library again for: a song measured before it is checked
+# for it only when the app asks for it (it's about to play), a few at a time, and every new song gets it anyway.
+UNTIL_KEY = "beats_until_checked"
 RETRY_HOURS = (1, 6, 24, 72)  # wait after the 1st, 2nd, 3rd, later failure
 
 
@@ -460,7 +463,9 @@ def songs_to_measure(db, limit, beats=False):
     cur = db.cursor()
     if beats:
         # Songs that failed come back once their wait is over; songs waiting their first try come first.
-        where = """p.status='ready' AND p.analyzer_version = %s AND p.beats_version <> %s
+        # Also asked-for songs measured before 0.5.0 looked for where the beat stops: only those, never the rest.
+        where = f"""p.status='ready' AND p.analyzer_version = %s
+                AND (p.beats_version <> %s OR (w.item_id IS NOT NULL AND NOT (COALESCE(p.beats, '{{}}'::jsonb) ? '{UNTIL_KEY}')))
                 AND (p.beats_retry_after IS NULL OR p.beats_retry_after <= now())"""
         params = (ANALYZER_VERSION, BEATS_VERSION)
     else:

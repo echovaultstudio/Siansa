@@ -83,7 +83,8 @@ far are kept.
 
 From 0.5.0 the plugin also notes where a song's beat stops when it ends in a beatless outro, so Siansa can bring the
 next song in after the last beat and let the outro play out under it (see [Playback › Crossfade](playback.md#crossfade)).
-Updating measures every song's beat grids again in the background, songs Siansa is about to play first.
+Nothing is measured again across your library for it: new songs get it with their profile, and songs measured
+before are checked only when Siansa asks for them, as they come up in what you play, a few at a time.
 
 From 0.4.2 the tempo of drum and bass and other breakbeats is read right. It often came out at two thirds (113 BPM for
 170), with the beats off the music, so those songs were never beat-matched. Updating measures every song's beat

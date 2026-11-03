@@ -59,6 +59,7 @@ def profile_of(measurement):
             logger.warning("siansa_analysis couldn't tell where the beat stops: %s", e)
             until = None
         profile["beats"] = beats.fields(intro, outro, until)
+        profile["beats"][store.UNTIL_KEY] = 1  # looked for where the beat stops (0.5.0), found or not
     except Exception as e:  # the loudness still counts; a song without a grid gets plain fades
         logger.warning("siansa_analysis couldn't find the beats: %s", e)
         profile["beats"] = {}
