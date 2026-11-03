@@ -189,7 +189,8 @@ Home with its switch in Settings.
 - **Artist radios** start with a few of the artist's songs. With AudioMuse-AI set up, the rest are songs that
   sound like the artist (AudioMuse blends a dozen of their songs), with one of their own every fourth song. Without
   it, they're your music server's similar songs (Navidrome's come from Last.fm or other agents it has); if the
-  server has none, the artist's own songs. The same from Home and from an artist's page.
+  server has none, the artist's own songs. The same from Home and from an artist's page. In the queue, the songs
+  AudioMuse-AI picked carry its mark, as a song radio's do.
 
 ## Your Library
 

@@ -140,7 +140,8 @@ class PlayerConnection(
     fun pause() = withController { c -> if (c.isPlaying) c.pause() }
 
     /** Plays [songs] from [startIndex]; [startMs] starts that song part-way (a mix carried on, issue #269). */
-    fun play(songs: List<Song>, startIndex: Int = 0, shuffle: Boolean = false, startMs: Long = 0L) {
+    /** [picked]: songs among them AudioMuse picked (an artist radio's sound-alikes), marked in the queue (issue #337). */
+    fun play(songs: List<Song>, startIndex: Int = 0, shuffle: Boolean = false, startMs: Long = 0L, picked: Set<String> = emptySet()) {
         if (songs.isEmpty()) return
         val why = limited()
         if (why != null) {
@@ -155,15 +156,15 @@ class PlayerConnection(
                 return playNow(pick.songs, pick.start, shuffle)
             }
         }
-        playNow(songs, startIndex, shuffle, startMs)
+        playNow(songs, startIndex, shuffle, startMs, picked)
     }
 
-    private fun playNow(songs: List<Song>, startIndex: Int, shuffle: Boolean, startMs: Long = 0L) {
+    private fun playNow(songs: List<Song>, startIndex: Int, shuffle: Boolean, startMs: Long = 0L, picked: Set<String> = emptySet()) {
         queueGeneration++
         onPlayStarted()
         onNewQueue?.invoke()
         SongRegistry.register(songs)
-        val items = songs.map { it.toMediaItem(api) }
+        val items = songs.map { it.toMediaItem(api, auto = it.id in picked) }
         val start = if (shuffle) Random.nextInt(songs.size) else startIndex.coerceIn(0, songs.size - 1)
         withController { c ->
             c.shuffleModeEnabled = shuffle
@@ -263,6 +264,13 @@ class PlayerConnection(
         if (songs.isEmpty()) return
         SongRegistry.register(songs)
         withController { c -> c.addMediaItems(songs.map { it.toMediaItem(api, auto = auto) }) }
+    }
+
+    /** Adds [songs], marking those AudioMuse [picked] (an artist radio's sound-alikes) as the queue does a radio's. */
+    fun addAll(songs: List<Song>, picked: Set<String>) {
+        if (songs.isEmpty()) return
+        SongRegistry.register(songs)
+        withController { c -> c.addMediaItems(songs.map { it.toMediaItem(api, auto = it.id in picked) }) }
     }
 
     /**

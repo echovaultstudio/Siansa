@@ -221,7 +221,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                     Spacer(Modifier.height(Space.Medium))
                     PlayButtonRow {
                         OutlinedButton(onClick = {
-                            launch.progressive("${p.artist.name} radio", { graph.radios.artistStart(p.artist) }) {
+                            launch.progressivePicks("${p.artist.name} radio", { graph.radios.artistStart(p.artist) }) {
                                 graph.radios.artistMore(p.artist, it)
                             }
                         }) {

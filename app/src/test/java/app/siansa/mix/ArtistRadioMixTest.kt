@@ -34,4 +34,12 @@ class ArtistRadioMixTest {
         assertTrue(songs.first().artist == "A")
         assertEquals(4, songs.count { it.artist == "Mat Zo" })
     }
+
+    @Test fun audioMusesPicksAreMarkedAndTheArtistsOwnSongsArent() {
+        val own = own(3)
+        val songs = ArtistRadioMix.mix(own, alike("A", "B", "C", "D"), emptySet(), 7)
+        val picked = ArtistRadioMix.picked(songs, own)
+        assertEquals(setOf("a0", "a1", "a2", "a3"), picked)
+        assertTrue(songs.filter { it.artist == "Mat Zo" }.none { it.id in picked })
+    }
 }
