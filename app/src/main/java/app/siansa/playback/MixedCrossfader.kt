@@ -329,7 +329,7 @@ internal class MixedCrossfader(
                 echoNoted = true
                 AppLog.d("Crossfade", "Echo at the end: not in the new audio engine yet")
             }
-            if (settings().keepKey) AppLog.d("Crossfade", "Keep the key: not in the new audio engine yet; the pitch follows the speed")
+            if (settings().keepKey && beat.speed != 1f) AppLog.d("Crossfade", "Keep the key: the next song is stretched in time, its pitch kept")
         }
         // Sent a little before its point: a jump lands on the start of a decoded block at or after where it's
         // sent, so the point itself is then in what's decoded and the cue is exact.

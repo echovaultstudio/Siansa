@@ -110,8 +110,9 @@ echoes a track out, so the join is softer. A phone whose reverb can't be opened 
 **Keep the key** (off by default): how the next song is sped up or slowed down. Off, the sound is resampled, like
 a record played a touch fast or slow or a DJ's pitch fader: every drum hit stays as it was, and the pitch moves with
 the speed, by at most two thirds of a semitone at 4 %, then glides back as the song eases to its own speed. On, the
-key is kept by stretching the sound in time instead; that joins small pieces of sound and can be heard as a stutter
-on drums. Outside a blend the song plays untouched either way.
+key is kept by stretching the sound in time instead: it's played as short overlapping pieces (40 ms), each lined up
+with the one before so they join without a stutter, as DJ software's key lock does. Outside a blend the song plays
+untouched either way.
 
 Tempos are counted the way a DJ counts: a beat the plugin read at half time (drum and bass at 87, house at 63)
 is doubled, so a blend's bars are real bars. Tracks of a continuous mix ("(Mixed)", "[Mixed]", a "DJ Mix" or

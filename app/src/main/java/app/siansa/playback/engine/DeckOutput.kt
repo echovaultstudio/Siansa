@@ -113,6 +113,7 @@ class DeckOutput(
     override fun setPlaybackParameters(playbackParams: PlaybackParameters) {
         parameters = playbackParams
         stream.speed = playbackParams.speed
+        stream.pitch = playbackParams.pitch
     }
 
     override fun setOffloadDelayPadding(delayInFrames: Int, paddingInFrames: Int) = Unit
