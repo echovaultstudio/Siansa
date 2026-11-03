@@ -685,6 +685,8 @@ internal class MixedCrossfader(
         const val FALLBACK_FADE_MS = 1_000L
         /** With no fade under way, the main player silent this long with sound waiting is freed. */
         const val STUCK_MS = 2_000L
+        /** How long a song may have sound with none reaching the output, outside a fade, before it starts again. */
+        const val MUTED_MS = 3_000L
         /** The next song is sent this far before its point (a jump lands up to a decoded block past it). */
         const val INCOMING_SEEK_BACK_MS = 300L
         const val TICK_MS = 20L
