@@ -509,8 +509,25 @@ internal class MixedCrossfader(
             // Playing, sound waiting, none given, with no fade under way: whatever holds it, it plays again.
             AppLog.w("Crossfade", "The main player was playing without sound for ${stream.stuckMs(engine.outRate)} ms (${stream.describe()}); freed")
             stream.freeHold()
+        } else if (main.isPlaying && sleepLevel() > 0.99f && stream.mutedMs(engine.outRate) > MUTED_MS) {
+            // The song has sound but the mix puts out none, with no fade and no sleep timer turning it down: whatever
+            // silences it is logged in full, then the song starts again where it is (once a song, so it can't loop).
+            val song = main.currentMediaItem?.mediaId
+            AppLog.w(
+                "Crossfade",
+                "The song has sound but none reaches the output for ${stream.mutedMs(engine.outRate)} ms: ${stream.describe()}, " +
+                    "player volume ${main.volume}, level $level, ${mainMix.filter.describe()}, ${engine.status()}",
+            )
+            if (song != null && song != restartedSong) {
+                restartedSong = song
+                AppLog.w("Crossfade", "Starting the song again where it is, so it plays with sound")
+                main.seekTo(main.currentPosition)
+            }
         }
     }
+
+    /** The song last started again for having no sound: once a song. */
+    private var restartedSong: String? = null
 
     private fun disarm() {
         if (phase == Phase.FADING) return

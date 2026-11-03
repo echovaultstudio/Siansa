@@ -317,4 +317,53 @@ class AudioEngineCoreTest {
         assertEquals(0L, stream.stuckMs(44_100))
         assertEquals(0.3f, out[300], 0.01f)
     }
+
+    @Test fun aSongWithSoundThatTheMixSilencesCountsAsMuted() {
+        // 0.52.0-dev (Djrum, Waxcap): a song shown playing, with sound, but none of it reaching the output.
+        val core = MixCore(44_100)
+        val deck = core.deck("main")
+        val stream = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        stream.write(float(FloatArray(44_100 * 2 * 4) { 0.3f }))
+        stream.play()
+        deck.add(stream)
+        val out = FloatArray(512)
+        var mix = 0L
+        stream.volume = 0f
+        repeat(400) { core.render(out, 256, mix); mix += 256 }
+        assertTrue(stream.mutedMs(44_100) > 2_000)
+        assertTrue(stream.describe().contains("in -10 dB"))
+        stream.volume = 1f
+        repeat(5) { core.render(out, 256, mix); mix += 256 }
+        assertEquals(0L, stream.mutedMs(44_100))
+    }
+
+    @Test fun aQuietPartOfASongIsNotMuted() {
+        val core = MixCore(44_100)
+        val deck = core.deck("main")
+        val stream = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        stream.write(float(FloatArray(44_100 * 2 * 4)))
+        stream.play()
+        deck.add(stream)
+        val out = FloatArray(512)
+        var mix = 0L
+        repeat(400) { core.render(out, 256, mix); mix += 256 }
+        assertEquals(0L, stream.mutedMs(44_100))
+    }
+
+    @Test fun aBrokenSampleDoesNotSilenceTheDeck() {
+        val core = MixCore(44_100)
+        val deck = core.deck("main")
+        deck.filter.lowCutHz = 200.0
+        val stream = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        stream.write(float(FloatArray(44_100 * 2 * 2) { if (it == 1_000) Float.NaN else 0.3f }))
+        stream.play()
+        deck.add(stream)
+        val out = FloatArray(512)
+        var mix = 0L
+        repeat(100) { core.render(out, 256, mix); mix += 256 }
+        assertTrue(out.all { it.isFinite() })
+        deck.filter.lowCutHz = 0.0
+        repeat(200) { core.render(out, 256, mix); mix += 256 }
+        assertTrue(out.any { it > 0.1f })
+    }
 }

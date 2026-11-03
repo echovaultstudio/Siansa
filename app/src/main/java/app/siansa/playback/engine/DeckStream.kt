@@ -74,6 +74,15 @@ class DeckStream(
      */
     private var blockedBlocks = 0
     private var blockedFrames = 0L
+    /**
+     * The loudest sample read from the song in the last block (before any fade or volume), and what the mixer made of
+     * it ([noteOut]): sound in, silence out, for long ([mutedMs]), is a song shown playing with no sound.
+     */
+    @Volatile var inPeak = 0.0
+        private set
+    @Volatile var outPeak = 0.0
+        private set
+    private var mutedFrames = 0L
 
     /** Set when the stream first sounds after [play]: Media3 is told then (onPositionAdvancing). */
     private var announced = false
@@ -263,6 +272,18 @@ class DeckStream(
         synchronized(lock) { cutAt = mix }
     }
 
+    /**
+     * The mixer's side of the meter: the loudest sample this stream put into the mix in its last block, after its
+     * volume and its deck's filter, for [frames] frames.
+     */
+    internal fun noteOut(peak: Double, frames: Int) {
+        outPeak = peak
+        if (inPeak > SOUND_PEAK && peak < SILENT_PEAK) mutedFrames += frames else mutedFrames = 0
+    }
+
+    /** How long (ms of the output) the song has had sound but the mixer has put out silence for it. */
+    fun mutedMs(outRate: Int): Long = mutedFrames * 1000 / outRate
+
     /** How long (ms of the output) this stream has been playing with sound waiting and given none. */
     fun stuckMs(outRate: Int): Long = synchronized(lock) { blockedFrames * 1000 / outRate }
 
@@ -270,7 +291,7 @@ class DeckStream(
     fun describe(): String = synchronized(lock) {
         "playing $playing, read ${floor(readPos).toLong()}, written $end, gate ${if (gate == Long.MIN_VALUE) "none" else gate.toString()}, " +
             "cut ${if (cutAt == Long.MAX_VALUE) "none" else cutAt.toString()}, rendered to $renderedTo, volume $volume, " +
-            "fade-in ${"%.2f".format(java.util.Locale.ROOT, envelope)}, cue given up $cueGivenUp"
+            "fade-in ${"%.2f".format(java.util.Locale.ROOT, envelope)}, gain $gainNow, in ${db(inPeak)}, out ${db(outPeak)}, cue given up $cueGivenUp"
     }
 
     /** Silenced, or held back for a cue still ahead: what a fade does to a stream for a while. */
@@ -307,6 +328,7 @@ class DeckStream(
         val waiting = end > floor(readPos).toLong() + 1
 
         val step = 1.0 / (RAMP_MS * outRate / 1_000.0)
+        var peak = 0.0
         // At the output's rate a stream is copied sample for sample; one left between two samples (by a speed
         // change in a blend) is read through the filter like any other (0.52.0-dev crashed there).
         val table = SincTable.forRatio(ratio)
@@ -361,6 +383,7 @@ class DeckStream(
                     }
                 }
             }
+            peak = maxOf(peak, kotlin.math.abs(l), kotlin.math.abs(r))
             envelope = if (target > envelope) minOf(target, envelope + step) else maxOf(target, envelope - step)
             out[o] = (l * envelope).toFloat()
             out[o + 1] = (r * envelope).toFloat()
@@ -372,6 +395,7 @@ class DeckStream(
                 becameAudible = true
             }
         }
+        inPeak = peak
         if (gave || !playing || !waiting) {
             blockedBlocks = 0
             blockedFrames = 0
@@ -396,6 +420,12 @@ class DeckStream(
         const val CAPACITY_MS = 1_500
         /** The fade around play, pause and release. */
         const val RAMP_MS = 5.0
+        /** A song's sample louder than this is sound (−60 dBFS); a mix's quieter than this is silence (−100 dBFS). */
+        const val SOUND_PEAK = 0.001
+        const val SILENT_PEAK = 0.00001
+
+        fun db(peak: Double): String = if (peak <= 0.0) "silent" else "%.0f dB".format(java.util.Locale.ROOT, 20 * kotlin.math.log10(peak))
+
         /** More sound than this dropped waiting for a cued point means the cue was wrong. */
         const val MAX_DROP_MS = 4_000
         /** Blocks remembered for positions: at 256 frames a block, about 2.7 s at 48 kHz. */

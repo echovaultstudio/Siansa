@@ -158,6 +158,7 @@ class MixCore(val outRate: Int) {
     private val limiter = PeakLimiter(outRate, 2, CEILING)
     private var scratch = FloatArray(0)
     private val frame = DoubleArray(2)
+    private var broken = 0
 
     /** How many frames the limiter holds back: what's heard is this much behind what's mixed. */
     val latencyFrames: Int get() = limiter.latencyFrames
@@ -184,6 +185,7 @@ class MixCore(val outRate: Int) {
                 }
                 if (!stream.render(scratch, 0, frames, mixStart, outRate)) {
                     stream.gainNow = stream.volume
+                    stream.noteOut(0.0, frames)
                     continue
                 }
                 if (stream.becameAudible) {
@@ -193,6 +195,7 @@ class MixCore(val outRate: Int) {
                 val g0 = stream.gainNow
                 val g1 = stream.volume
                 stream.gainNow = g1
+                var peak = 0.0
                 for (i in 0 until frames) {
                     val g = g0 + (g1 - g0) * (i + 1).toFloat() / frames
                     var l = (scratch[i * 2] * g).toDouble()
@@ -201,9 +204,19 @@ class MixCore(val outRate: Int) {
                         l = deck.filter.process(l, 0)
                         r = deck.filter.process(r, 1)
                     }
+                    if (!l.isFinite() || !r.isFinite()) {
+                        // A broken sample (from the song or the filter) would stick in the filter and silence the
+                        // deck for good: it's dropped and the filter starts clean.
+                        l = 0.0
+                        r = 0.0
+                        deck.filter.reset()
+                        if (broken++ % 10_000 == 0) deck.note("A broken sample in ${deck.name}'s sound (${broken}×); dropped, filter reset")
+                    }
+                    peak = maxOf(peak, kotlin.math.abs(l), kotlin.math.abs(r))
                     out[i * 2] += l.toFloat()
                     out[i * 2 + 1] += r.toFloat()
                 }
+                stream.noteOut(peak, frames)
             }
         }
         for (i in 0 until frames) {

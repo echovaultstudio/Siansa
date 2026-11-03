@@ -47,6 +47,10 @@ class AudioEngine(context: Context) {
     @Volatile private var stampLive = false
     private val stamp = AudioTimestamp()
     private var failures = 0
+    /** Where the output goes now (for the log), and how often it ran dry, as last seen. */
+    @Volatile private var route = "not open"
+    private var underruns = 0
+    private var underrunsLoggedAt = 0L
     private var blocksSinceStamp = 0
 
     /** The player output each stream belongs to, told when its stream first sounds. */
@@ -157,11 +161,35 @@ class AudioEngine(context: Context) {
         wakeLock.withLock { woken.await(IDLE_WAIT_MS, TimeUnit.MILLISECONDS) }
     }
 
+    /** The output for the log: playing or not, where to, dropouts, and how far behind the heard sound is. */
+    fun status(): String {
+        val t = track
+        val state = when (t?.playState) {
+            AudioTrack.PLAYSTATE_PLAYING -> "playing"
+            AudioTrack.PLAYSTATE_PAUSED -> "paused"
+            AudioTrack.PLAYSTATE_STOPPED -> "stopped"
+            null -> "not open"
+            else -> "state ${t.playState}"
+        }
+        val heard = heardMix()
+        return "output $state to $route, $underruns dropouts, ${((writtenMix - heard) * 1000 / outRate).toLong()} ms written ahead of what's heard"
+    }
+
     private fun takeStamp(t: AudioTrack) {
         if (t.getTimestamp(stamp)) {
             stampMix = trackBase + stamp.framePosition
             stampNanos = stamp.nanoTime
             stampLive = trackPlaying
+        }
+        // Dropouts (the output ran dry): logged, at most every 10 s, so a stutter shows in a report.
+        val count = t.underrunCount
+        if (count > underruns) {
+            val now = System.currentTimeMillis()
+            if (now - underrunsLoggedAt > 10_000) {
+                underrunsLoggedAt = now
+                AppLog.w("Engine", "The output ran dry ${count - underruns}× (${count} since it opened)")
+            }
+            underruns = count
         }
     }
 
@@ -191,11 +219,32 @@ class AudioEngine(context: Context) {
                 trackBase = writtenMix
                 stampMix = Long.MIN_VALUE
                 trackPlaying = false
-                AppLog.i("Engine", "Output open: $outRate Hz float stereo, buffer ${it.bufferSizeInFrames * 1000 / outRate} ms")
+                underruns = 0
+                route = deviceName(it.routedDevice)
+                // Where the sound goes (the phone, a car's Bluetooth, headphones): each change in the log.
+                it.addOnRoutingChangedListener({ router ->
+                    route = deviceName(router.routedDevice)
+                    AppLog.i("Engine", "Output now to $route")
+                }, null)
+                AppLog.i("Engine", "Output open: $outRate Hz float stereo, buffer ${it.bufferSizeInFrames * 1000 / outRate} ms, to $route")
             }
     } catch (e: Exception) {
         AppLog.e("Engine", "Couldn't open the output: ${e.message}")
         null
+    }
+
+    private fun deviceName(device: android.media.AudioDeviceInfo?): String {
+        if (device == null) return "the phone's default"
+        val kind = when (device.type) {
+            android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "Bluetooth"
+            android.media.AudioDeviceInfo.TYPE_BLE_HEADSET, android.media.AudioDeviceInfo.TYPE_BLE_SPEAKER -> "Bluetooth LE"
+            android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "the phone's speaker"
+            android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES, android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET -> "wired headphones"
+            android.media.AudioDeviceInfo.TYPE_USB_HEADSET, android.media.AudioDeviceInfo.TYPE_USB_DEVICE -> "USB audio"
+            else -> "device type ${device.type}"
+        }
+        val name = device.productName?.toString()?.takeIf { it.isNotBlank() }
+        return if (name != null) "$kind ($name)" else kind
     }
 
     private fun close() {
