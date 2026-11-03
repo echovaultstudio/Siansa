@@ -1,0 +1,4 @@
+### Changed
+- **Radio stations show their logo.** Siansa looks up each station's picture once (on Radio Browser, a free list of radio stations, or on the station's own website) and keeps it, so stations no longer all show the same radio icon. It shows in Your Library, in the player, in the notification and on the lock screen.
+- **Stations can be edited.** Tap ⋮ › Edit next to a station to change its name or link, or to give it a picture link of your own. For your server's stations you can set the picture.
+- **Stations and podcasts sit right in Your Library.** The Stations chip lists your radio stations straight away, without a separate Your Stations card, and podcasts you add by their RSS link are under the Podcasts chip with your other podcasts. Add them with + › Add station or Add podcast at the top of Your Library.

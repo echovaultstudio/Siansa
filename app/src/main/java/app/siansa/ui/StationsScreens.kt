@@ -20,11 +20,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Podcasts
-import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -74,8 +73,9 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 /*
- * Your Stations (issue #353): the music server's radio stations, then the stations and podcasts you added. A station
- * plays live in the player; a podcast opens its episodes.
+ * Your Stations (issue #353): radio stations (the music server's and those you add) under Your Library's Stations
+ * chip, podcast feeds you add under its Podcasts chip. A station plays live in the player; a podcast opens its
+ * episodes. Their dialogs, menus and the podcast page are here.
  */
 
 /** Plays [station] live, a server playlist link first looked into for its stream. */
@@ -103,96 +103,6 @@ internal fun podcastLine(feed: PodcastFeed): String = listOfNotNull(
 ).joinToString(" · ")
 
 @Composable
-fun StationsScreen(nav: NavController) {
-    val graph = LocalGraph.current
-    val launcher = rememberPlayLauncher()
-    val scope = rememberCoroutineScope()
-    val mine by graph.stations.state.collectAsStateWithLifecycle()
-    val playing by graph.player.state.collectAsStateWithLifecycle()
-    var server by remember { mutableStateOf<List<Station>?>(null) }
-    var adding by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        graph.stations.mine()
-        // The last list straight away, then the server's own.
-        server = graph.stations.knownServerStations()
-        if (!graph.connection.current.offline) server = graph.stations.serverStations()
-    }
-    Screen(
-        title = "Your Stations",
-        nav = nav,
-        actions = { IconButton(onClick = { adding = true }) { Icon(Icons.Rounded.Add, "Add a station or podcast") } },
-    ) { padding ->
-        val own = mine
-        if (own == null) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            return@Screen
-        }
-        val fromServer = server.orEmpty()
-        LazyColumn(Modifier.fillMaxSize().padding(padding).testTag("stationsList"), contentPadding = PaddingValues(bottom = Space.Section)) {
-            if (fromServer.isNotEmpty()) {
-                item { SectionTitle("From your server", top = Space.Small) }
-                items(fromServer, key = { it.id }) { st ->
-                    StationRow(
-                        title = st.name, subtitle = "Radio", cover = OutsideMedia.cover(st.image), icon = Icons.Rounded.Radio, seed = st.id,
-                        playing = playing.current?.id?.let { OutsideMedia.isLive(it) && it.endsWith(st.streamUrl) } == true,
-                        onClick = { scope.launch { playStation(graph, st) } },
-                    )
-                }
-            }
-            item { SectionTitle("Radio", top = if (fromServer.isEmpty()) Space.Small else LocalSectionGap.current) }
-            if (own.stations.isEmpty()) {
-                item { EmptyLine("Add a radio stream with +. Links to .m3u and .pls playlists work too.") }
-            }
-            items(own.stations, key = { it.id }) { st ->
-                StationRow(
-                    title = st.name, subtitle = "Radio · ${hostOf(st.link)}", cover = OutsideMedia.cover(st.image), icon = Icons.Rounded.Radio, seed = st.id,
-                    playing = playing.current?.id == OutsideMedia.LIVE + st.streamUrl,
-                    onClick = { scope.launch { playStation(graph, st) } },
-                    onRemove = {
-                        scope.launch {
-                            graph.stations.removeStation(st.id)
-                            launcher.notify("Removed ${st.name}")
-                        }
-                    },
-                )
-            }
-            item { SectionTitle("Podcasts") }
-            if (own.podcasts.isEmpty()) {
-                item { EmptyLine("Add a podcast with + and the link to its RSS feed.") }
-            }
-            items(own.podcasts, key = { it.id }) { feed ->
-                StationRow(
-                    title = feed.title, subtitle = podcastLine(feed), cover = OutsideMedia.cover(feed.image), icon = Icons.Rounded.Podcasts, seed = feed.id,
-                    playing = false,
-                    onClick = { nav.navigate("podcast/${feed.id}") },
-                    onRemove = {
-                        scope.launch {
-                            graph.stations.removePodcast(feed.id)
-                            launcher.notify("Removed ${feed.title}")
-                        }
-                    },
-                )
-            }
-        }
-    }
-    if (adding) {
-        AddStationDialog(
-            onDismiss = { adding = false },
-            onAdded = { added ->
-                adding = false
-                when (added) {
-                    is StationRepository.Added.Radio -> launcher.notify("Added ${added.station.name}")
-                    is StationRepository.Added.Podcast -> {
-                        launcher.notify("Added ${added.feed.title}")
-                        nav.navigate("podcast/${added.feed.id}")
-                    }
-                }
-            },
-        )
-    }
-}
-
-@Composable
 private fun EmptyLine(text: String) {
     Text(
         text,
@@ -202,14 +112,18 @@ private fun EmptyLine(text: String) {
     )
 }
 
-private fun hostOf(url: String): String = StationRepository.nameFrom(url)
+/** What the add dialog is opened for: only its title and hint differ, any link works in either. */
+enum class AddKind(val title: String, val hint: String) {
+    STATION("Add a radio station", "A radio stream, or a .m3u or .pls playlist that points at one. Kept on this phone."),
+    PODCAST("Add a podcast", "The link to the podcast's RSS feed. Kept on this phone."),
+}
 
 /**
  * A link to add: a radio stream, a playlist that points at one (.m3u, .m3u8, .pls), or a podcast's RSS feed. The
  * link is looked into before it's added, so a link that doesn't play says so here.
  */
 @Composable
-fun AddStationDialog(onDismiss: () -> Unit, onAdded: (StationRepository.Added) -> Unit) {
+fun AddStationDialog(kind: AddKind, onDismiss: () -> Unit, onAdded: (StationRepository.Added) -> Unit) {
     val graph = LocalGraph.current
     val scope = rememberCoroutineScope()
     var link by remember { mutableStateOf("") }
@@ -230,10 +144,10 @@ fun AddStationDialog(onDismiss: () -> Unit, onAdded: (StationRepository.Added) -
     }
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text("Add to Your Stations") },
+        title = { Text(kind.title) },
         text = {
             AddStationFields(
-                link = link, name = name, busy = busy, error = error,
+                link = link, name = name, busy = busy, error = error, hint = kind.hint,
                 onLink = { link = it; error = null }, onName = { name = it }, onDone = ::add,
             )
         },
@@ -242,16 +156,71 @@ fun AddStationDialog(onDismiss: () -> Unit, onAdded: (StationRepository.Added) -
     )
 }
 
-/** The add dialog's fields, apart from the dialog so they can be drawn in screenshots. */
+/**
+ * Editing a radio station (issue #353): the add dialog, filled in, with a picture link. A station added here can
+ * have its name, link and picture changed; one from the server only its picture (kept on this phone), as its name
+ * and link are the server's.
+ */
+@Composable
+fun EditStationDialog(station: Station, onDismiss: () -> Unit, onSaved: (String) -> Unit) {
+    val graph = LocalGraph.current
+    val scope = rememberCoroutineScope()
+    var link by remember { mutableStateOf(station.link) }
+    var name by remember { mutableStateOf(station.name) }
+    var picture by remember { mutableStateOf(station.pictureLink.orEmpty()) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val valid = StreamLinks.clean(link) != null
+    fun save() {
+        if (!valid || busy) return
+        busy = true
+        error = null
+        scope.launch {
+            val result = if (station.fromServer) graph.stations.editServerPicture(station, picture).map { station.name }
+            else graph.stations.editStation(station.id, link, name, picture).map { it.name }
+            result.onSuccess(onSaved).onFailure { error = it.message?.takeIf { m -> m.isNotBlank() } ?: "The station couldn't be saved" }
+            busy = false
+        }
+    }
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text("Edit station") },
+        text = {
+            AddStationFields(
+                link = link, name = name, busy = busy, error = error,
+                hint = editHint(station.fromServer),
+                picture = picture, onPicture = { picture = it; error = null },
+                fixed = station.fromServer,
+                onLink = { link = it; error = null }, onName = { name = it }, onDone = ::save,
+            )
+        },
+        confirmButton = { TextButton(onClick = ::save, enabled = valid && !busy) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancel") } },
+    )
+}
+
+/** The line under the edit dialog's fields. */
+internal fun editHint(fromServer: Boolean): String =
+    if (fromServer) "Name and link are your server's: change them there. Leave the picture link empty to find a picture by itself."
+    else "Leave the picture link empty to find a picture by itself."
+
+/**
+ * The add and edit dialogs' fields, apart from the dialog so they can be drawn in screenshots. [picture] adds a
+ * picture link field (editing); [fixed] shows the name and link without letting them change (a server station).
+ */
 @Composable
 internal fun AddStationFields(
     link: String,
     name: String,
     busy: Boolean,
     error: String?,
+    hint: String,
     onLink: (String) -> Unit,
     onName: (String) -> Unit,
     onDone: () -> Unit,
+    picture: String? = null,
+    onPicture: (String) -> Unit = {},
+    fixed: Boolean = false,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
         OutlinedTextField(
@@ -260,20 +229,33 @@ internal fun AddStationFields(
             label = { Text("Link") },
             placeholder = { Text("https://…") },
             singleLine = true,
-            enabled = !busy,
+            enabled = !busy && !fixed,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("stationLink"),
         )
         OutlinedTextField(
             value = name,
             onValueChange = onName,
-            label = { Text("Name (optional)") },
+            label = { Text(if (picture != null) "Name" else "Name (optional)") },
             singleLine = true,
-            enabled = !busy,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            enabled = !busy && !fixed,
+            keyboardOptions = KeyboardOptions(imeAction = if (picture != null) ImeAction.Next else ImeAction.Done),
             keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { onDone() }),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("stationName"),
         )
+        if (picture != null) {
+            OutlinedTextField(
+                value = picture,
+                onValueChange = onPicture,
+                label = { Text("Picture link (optional)") },
+                placeholder = { Text("Found by itself") },
+                singleLine = true,
+                enabled = !busy,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { onDone() }),
+                modifier = Modifier.fillMaxWidth().testTag("stationPicture"),
+            )
+        }
         when {
             busy -> Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -281,61 +263,31 @@ internal fun AddStationFields(
                 Hint("Checking the link…")
             }
             error != null -> Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            else -> Hint("A radio stream, a .m3u or .pls playlist, or a podcast's RSS feed. Kept on this phone.")
+            else -> Hint(hint)
         }
     }
 }
 
-/**
- * A station or podcast in a list: its picture (or a coloured tile with [icon]), its name and a line under it. Tap
- * plays or opens it; [onRemove] adds a ⋮ menu with Remove.
- */
+/** A station's or podcast's ⋮ menu in a list: Edit (stations) and Remove (what was added on this phone). */
 @Composable
-internal fun StationRow(
-    title: String,
-    subtitle: String,
-    cover: String?,
-    icon: ImageVector,
-    seed: String,
-    playing: Boolean,
-    onClick: () -> Unit,
-    onRemove: (() -> Unit)? = null,
-) {
+internal fun StationMenu(onEdit: (() -> Unit)?, onRemove: (() -> Unit)?) {
     var menu by remember { mutableStateOf(false) }
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick)
-            .padding(start = Space.Page, end = if (onRemove != null) Space.Tight else Space.Page, top = Space.Small, bottom = Space.Small)
-            .testTag("stationRow"),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        StationCover(cover, icon, seed, Modifier.size(56.dp).testTag("stationCover"))
-        Spacer(Modifier.width(Space.Medium))
-        Column(Modifier.weight(1f)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (playing) Accent else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        if (onRemove != null) {
-            Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Remove") },
-                        leadingIcon = { Icon(Icons.Rounded.Delete, null) },
-                        onClick = { menu = false; onRemove() },
-                    )
-                }
+    Box {
+        IconButton(onClick = { menu = true }, modifier = Modifier.testTag("stationMenu")) { Icon(Icons.Rounded.MoreVert, "More") }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            if (onEdit != null) {
+                DropdownMenuItem(
+                    text = { Text("Edit") },
+                    leadingIcon = { Icon(Icons.Rounded.Edit, null) },
+                    onClick = { menu = false; onEdit() },
+                )
+            }
+            if (onRemove != null) {
+                DropdownMenuItem(
+                    text = { Text("Remove") },
+                    leadingIcon = { Icon(Icons.Rounded.Delete, null) },
+                    onClick = { menu = false; onRemove() },
+                )
             }
         }
     }
@@ -407,7 +359,7 @@ fun PodcastScreen(nav: NavController, id: String) {
     ) { padding ->
         if (feed == null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                if (mine == null) CircularProgressIndicator() else EmptyLine("This podcast isn't in Your Stations any more.")
+                if (mine == null) CircularProgressIndicator() else EmptyLine("This podcast isn't in Your Library any more.")
             }
             return@Screen
         }

@@ -126,9 +126,12 @@ private enum class Kind(val label: String, val chip: Boolean = true) {
     FAVOURITES("Favourites"), PLAYLIST("Playlists"), MIX("Mixes"), MUSIC("Music"),
     ALBUM("Albums", chip = false), ARTIST("Artists", chip = false), SONG("Songs", chip = false),
     LISTENING("Your listening"),
-    /** Your Stations (issue #353): internet radio and podcast feeds. */
+    /** Radio stations (issue #353): the music server's and those added on this phone. */
     STATIONS("Stations"),
-    /** Audiobookshelf's (issue #521): chips only while a server is set up. */
+    /**
+     * Audiobookshelf's (issue #521): Books only while a server is set up. Podcasts also holds the podcast feeds added
+     * on this phone (issue #353), so it shows whenever there's a podcast.
+     */
     BOOKS("Books"), PODCASTS("Podcasts"),
 }
 
@@ -161,10 +164,10 @@ private data class Entry(
     val alwaysPinned: Boolean = false,
     /** Shown under the Favourites chip (issues #275, #289): the Favourite albums card and Liked songs. */
     val favourite: Boolean = false,
-    /** Only under its own chip (or a search), not in the full list: each station and podcast (issue #353). */
-    val chipOnly: Boolean = false,
-    /** A radio station, played on a tap instead of opening a page (issue #353). */
+    /** A radio station, played on a tap instead of opening a page, with Edit in its ⋮ menu (issue #353). */
     val station: app.siansa.data.Station? = null,
+    /** A podcast feed added on this phone, with Remove in its ⋮ menu (issue #353). */
+    val feed: app.siansa.data.PodcastFeed? = null,
     /** An icon on a generated cover. */
     val icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
 )
@@ -218,9 +221,10 @@ fun YourLibraryScreen(nav: NavController) {
     // Built again when the connection comes back, for what only Navidrome has.
     val connection by graph.connection.state.collectAsStateWithLifecycle()
     val online = !connection.offline
-    // Built again when a station or podcast is added or removed (issue #353).
+    // Built again when a station or podcast is added, changed or removed, or a station's picture is found (issue #353).
     val ownStations by graph.stations.state.collectAsStateWithLifecycle()
-    val data by produceState<Load<LibraryData>>(Load.Loading, version, mixes?.size, settings.navidromeUser, favouriteIds, favouriteArtistIds, online, ownStations) {
+    val stationPictures by graph.stations.pictures.collectAsStateWithLifecycle()
+    val data by produceState<Load<LibraryData>>(Load.Loading, version, mixes?.size, settings.navidromeUser, favouriteIds, favouriteArtistIds, online, ownStations, stationPictures) {
         val me = settings.navidromeUser
         value = loadLibrary(graph, me)
         if (refreshFromServer(graph, me)) value = loadLibrary(graph, me)
@@ -243,7 +247,7 @@ fun YourLibraryScreen(nav: NavController) {
                 when {
                     // Songs only under Music.
                     it.kind == Kind.SONG -> selectedKind == Kind.MUSIC && (musicPart == null || musicPart == Kind.SONG)
-                    selectedKind == null -> !it.chipOnly || query.isNotBlank()
+                    selectedKind == null -> true
                     selectedKind == Kind.MUSIC -> it.kind in MUSIC_PARTS && (musicPart == null || it.kind == musicPart)
                     else -> it.kind == selectedKind || (it.alwaysPinned && selectedKind == Kind.PLAYLIST && it.heart) ||
                         (selectedKind == Kind.FAVOURITES && it.favourite)
@@ -295,6 +299,9 @@ fun YourLibraryScreen(nav: NavController) {
     var naming by remember { mutableStateOf(false) }
     var creating by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
+    // Your Stations (issue #353): adding a station or podcast, and editing a station.
+    var adding by remember { mutableStateOf<AddKind?>(null) }
+    var editing by remember { mutableStateOf<app.siansa.data.Station?>(null) }
 
     fun togglePin(e: Entry) {
         if (e.alwaysPinned) return
@@ -316,7 +323,28 @@ fun YourLibraryScreen(nav: NavController) {
             onDownloads = { nav.navigate("downloads") },
             onNewPlaylist = { naming = true },
             onImportPlaylists = { importing = true },
+            onAddStation = { adding = AddKind.STATION },
+            onAddPodcast = { adding = AddKind.PODCAST },
         )
+        adding?.let { addKind ->
+            AddStationDialog(
+                kind = addKind,
+                onDismiss = { adding = null },
+                onAdded = { added ->
+                    adding = null
+                    when (added) {
+                        is app.siansa.data.StationRepository.Added.Radio -> launcher.notify("Added ${added.station.name}")
+                        is app.siansa.data.StationRepository.Added.Podcast -> {
+                            launcher.notify("Added ${added.feed.title}")
+                            nav.navigate("podcast/${added.feed.id}")
+                        }
+                    }
+                },
+            )
+        }
+        editing?.let { st ->
+            EditStationDialog(st, onDismiss = { editing = null }, onSaved = { name -> editing = null; launcher.notify("Saved $name") })
+        }
         if (importing) {
             ImportPlaylistsDialog { message ->
                 importing = false
@@ -360,7 +388,14 @@ fun YourLibraryScreen(nav: NavController) {
             )
         }
         FilterRow(
-            chips = LibraryChips.order(chipOrder, Kind.entries.filter { it.chip && (booksReady || (it != Kind.BOOKS && it != Kind.PODCASTS)) }.map { it.name }).map { Kind.valueOf(it) },
+            chips = LibraryChips.order(chipOrder, Kind.entries.filter { k ->
+                k.chip && when (k) {
+                    Kind.BOOKS -> booksReady
+                    // Audiobookshelf's podcasts and the feeds added on this phone (issue #353).
+                    Kind.PODCASTS -> booksReady || all?.entries?.any { it.kind == Kind.PODCASTS } == true
+                    else -> true
+                }
+            }.map { it.name }).map { Kind.valueOf(it) },
             selected = selectedKind,
             sub = sub,
             subFilters = when (selectedKind) {
@@ -438,12 +473,19 @@ fun YourLibraryScreen(nav: NavController) {
                         LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(end = if (sideBar) AlphabetBarWidth else 0.dp, bottom = bottomBarPadding(Space.Page))) {
                             item { sortBar() }
                             items(shown, key = { it.key }) { e ->
-                                RowEntry(e, pinned = e.alwaysPinned || e.key in pinned, held = held == e.key, onClick = { open(e) }, onHold = { held = e.key }, onTogglePin = { togglePin(e) })
+                                RowEntry(
+                                    e, pinned = e.alwaysPinned || e.key in pinned, held = held == e.key, onClick = { open(e) }, onHold = { held = e.key }, onTogglePin = { togglePin(e) },
+                                    menu = stationMenu(e, onEdit = { editing = it }, onRemoved = { launcher.notify("Removed $it") }),
+                                )
                             }
                             if (shown.isEmpty()) {
                                 item {
                                     Text(
-                                        if (query.isNotBlank()) "Nothing in your library matches “$query”." else "Nothing here yet.",
+                                        when {
+                                            query.isNotBlank() -> "Nothing in your library matches “$query”."
+                                            selectedKind == Kind.STATIONS -> "No radio stations yet. Add one with + › Add station at the top."
+                                            else -> "Nothing here yet."
+                                        },
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.padding(Space.Page),
@@ -531,6 +573,8 @@ private fun LibraryHeader(
     onDownloads: () -> Unit,
     onNewPlaylist: () -> Unit,
     onImportPlaylists: () -> Unit,
+    onAddStation: () -> Unit,
+    onAddPodcast: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(
@@ -564,6 +608,16 @@ private fun LibraryHeader(
                     text = { Text("Import from your server") },
                     leadingIcon = { Icon(Icons.Rounded.CloudDownload, null) },
                     onClick = { menu = false; onImportPlaylists() },
+                )
+                DropdownMenuItem(
+                    text = { Text("Add station") },
+                    leadingIcon = { Icon(Icons.Rounded.Radio, null) },
+                    onClick = { menu = false; onAddStation() },
+                )
+                DropdownMenuItem(
+                    text = { Text("Add podcast") },
+                    leadingIcon = { Icon(Icons.Rounded.Podcasts, null) },
+                    onClick = { menu = false; onAddPodcast() },
                 )
                 DropdownMenuItem(
                     text = { Text("Mix from a sound description") },
@@ -770,16 +824,26 @@ private fun Subtitle(e: Entry, pinned: Boolean, modifier: Modifier = Modifier) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun RowEntry(e: Entry, pinned: Boolean, held: Boolean, onClick: () -> Unit, onHold: () -> Unit, onTogglePin: () -> Unit) = LongerHold {
+private fun RowEntry(
+    e: Entry,
+    pinned: Boolean,
+    held: Boolean,
+    onClick: () -> Unit,
+    onHold: () -> Unit,
+    onTogglePin: () -> Unit,
+    menu: (@Composable () -> Unit)? = null,
+) = LongerHold {
     Row(
         Modifier
             .fillMaxWidth()
+            .testTag("libraryRow")
             .background(if (held) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
             .holdToReveal(e, onClick, onHold)
-            .padding(horizontal = Space.Page, vertical = Space.Small),
+            // A ⋮ button brings its own room at the end.
+            .padding(start = Space.Page, end = if (menu != null && !held) Space.Tight else Space.Page, top = Space.Small, bottom = Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        EntryCover(e, Modifier.size(64.dp), big = false)
+        EntryCover(e, Modifier.size(64.dp).testTag("libraryRowCover"), big = false)
         Spacer(Modifier.width(Space.Medium))
         // Takes what's left, so a long title shortens to make room for the pin button.
         Column(Modifier.weight(1f)) {
@@ -790,8 +854,50 @@ private fun RowEntry(e: Entry, pinned: Boolean, held: Boolean, onClick: () -> Un
         if (held) {
             Spacer(Modifier.width(Space.Small))
             PinButton(pinned, onTogglePin)
+        } else if (menu != null) {
+            menu()
         }
     }
+}
+
+/**
+ * The ⋮ menu of a station or a podcast feed added on this phone (issue #353): Edit for stations (a server station's
+ * picture only), Remove for what was added here. Null for every other entry.
+ */
+@Composable
+private fun stationMenu(e: Entry, onEdit: (app.siansa.data.Station) -> Unit, onRemoved: (String) -> Unit): (@Composable () -> Unit)? {
+    val graph = LocalGraph.current
+    val scope = rememberCoroutineScope()
+    val station = e.station
+    val feed = e.feed
+    if (station != null) {
+        val menu: @Composable () -> Unit = {
+            StationMenu(
+                onEdit = { onEdit(station) },
+                onRemove = if (station.fromServer) null else {
+                    { scope.launch { graph.stations.removeStation(station.id); onRemoved(station.name) } }
+                },
+            )
+        }
+        return menu
+    }
+    if (feed != null) {
+        val menu: @Composable () -> Unit = {
+            StationMenu(onEdit = null, onRemove = { scope.launch { graph.stations.removePodcast(feed.id); onRemoved(feed.title) } })
+        }
+        return menu
+    }
+    return null
+}
+
+/** A station's row in Your Library with its ⋮ menu, for the spacing and screenshot tests (issue #353). */
+@Composable
+internal fun LibraryStationRowForTest(title: String, subtitle: String, seed: String, podcast: Boolean = false) {
+    val e = Entry(
+        key = seed, kind = if (podcast) Kind.PODCASTS else Kind.STATIONS, title = title, subtitle = subtitle, route = "",
+        gradient = tileColors(seed), icon = if (podcast) Icons.Rounded.Podcasts else Icons.Rounded.Radio,
+    )
+    RowEntry(e, pinned = false, held = false, onClick = {}, onHold = {}, onTogglePin = {}, menu = { StationMenu(onEdit = if (podcast) null else { {} }, onRemove = {}) })
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -936,6 +1042,8 @@ private suspend fun refreshFromServer(graph: app.siansa.AppGraph, me: String): B
         favourites.await()
         favouriteArtists.await()
         stations.await()
+        // Pictures of stations that have none looked for yet, in the background (issue #353).
+        graph.stations.findPicturesSoon()
         recent.await()?.also { lastRecent = me to it } != null
     }
     AppLog.d("Library", "Navidrome part of the library ${if (recentOk) "fetched" else "not reachable"} in ${System.currentTimeMillis() - started} ms")
@@ -970,29 +1078,13 @@ private fun bookEntry(book: app.siansa.data.Book, progress: app.siansa.data.Book
 }
 
 /**
- * Your Stations (issue #353): one card that opens the page, in the full list, and each station and podcast under the
- * Stations chip (and in searches): the server's stations, then those added on this phone.
+ * Your Stations (issue #353): each radio station under the Stations chip (the server's, then those added on this
+ * phone), and each podcast feed added on this phone under the Podcasts chip, with Audiobookshelf's.
  */
 private suspend fun stationEntries(graph: app.siansa.AppGraph): List<Entry> {
     val own = graph.stations.mine()
     val server = graph.stations.knownServerStations()
-    val radioIcon = Icons.Rounded.Radio
-    val podcastIcon = Icons.Rounded.Podcasts
-    val lastAdded = (own.stations.map { it.addedAt } + own.podcasts.map { it.addedAt }).maxOrNull() ?: 0L
-    val count = server.size + own.stations.size + own.podcasts.size
     val list = ArrayList<Entry>()
-    list += Entry(
-        key = "stations",
-        kind = Kind.STATIONS,
-        title = "Your Stations",
-        subtitle = "Radio and podcasts · " + if (count == 0) "add a link" else "$count",
-        route = "stations",
-        gradient = Color(0xFFB8336A) to Color(0xFF2B5FD6),
-        icon = radioIcon,
-        recentAt = lastAdded,
-        addedAt = lastAdded,
-        creator = "Siansa",
-    )
     (server + own.stations).forEach { st ->
         val image = app.siansa.data.OutsideMedia.cover(st.image)
         list += Entry(
@@ -1000,14 +1092,12 @@ private suspend fun stationEntries(graph: app.siansa.AppGraph): List<Entry> {
             kind = Kind.STATIONS,
             title = st.name,
             subtitle = stationLine(st),
-            route = "stations",
+            route = "",
             coverArt = image,
             gradient = if (image == null) tileColors(st.id) else null,
-            icon = radioIcon,
+            icon = Icons.Rounded.Radio,
             addedAt = st.addedAt,
             creator = st.name,
-            tags = setOf("Radio"),
-            chipOnly = true,
             station = st,
         )
     }
@@ -1015,18 +1105,18 @@ private suspend fun stationEntries(graph: app.siansa.AppGraph): List<Entry> {
         val image = app.siansa.data.OutsideMedia.cover(feed.image)
         list += Entry(
             key = "podcast-${feed.id}",
-            kind = Kind.STATIONS,
+            kind = Kind.PODCASTS,
             title = feed.title,
             subtitle = podcastLine(feed),
             route = "podcast/${feed.id}",
             coverArt = image,
             gradient = if (image == null) tileColors(feed.id) else null,
-            icon = podcastIcon,
+            icon = Icons.Rounded.Podcasts,
             addedAt = feed.addedAt,
             recentAt = feed.episodes.maxOfOrNull { it.publishedAt } ?: 0L,
             creator = feed.author,
-            tags = setOf("Podcasts"),
-            chipOnly = true,
+            tags = setOf("All"),
+            feed = feed,
         )
     }
     return list
@@ -1295,7 +1385,6 @@ private suspend fun buildLibrary(graph: app.siansa.AppGraph, me: String): Librar
         Kind.LISTENING to present(Kind.LISTENING, listOf("This month", "Last month", "This year", "This time last year")),
         Kind.BOOKS to present(Kind.BOOKS, listOf("Listening", "Not started", "Finished")),
         Kind.PODCASTS to present(Kind.PODCASTS, listOf("Listening", "New", "All")),
-        Kind.STATIONS to present(Kind.STATIONS, listOf("Radio", "Podcasts")),
     )
     return LibraryData(entries, subFilters)
 }

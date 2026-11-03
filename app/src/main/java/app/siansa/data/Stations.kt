@@ -17,10 +17,26 @@ data class Station(
     val streamUrl: String,
     val link: String = streamUrl,
     val homePage: String? = null,
-    /** A picture's web address, when there is one. */
+    /** A picture's web address, when there is one: the [pictureLink], or one found by itself (StationPictures). */
     val image: String? = null,
     val fromServer: Boolean = false,
     val addedAt: Long = 0,
+    /** A picture link entered when editing the station; null finds one by itself. */
+    val pictureLink: String? = null,
+    /** When its picture was looked for; 0 while it still needs looking for. */
+    val pictureCheckedAt: Long = 0,
+)
+
+/**
+ * The picture of one of the server's stations, kept on the phone by its stream address (the server has no place for
+ * one): what was found ([image], a [homePage] the server didn't give) or the [pictureLink] entered for it.
+ */
+@Serializable
+data class StationPicture(
+    val image: String? = null,
+    val homePage: String? = null,
+    val pictureLink: String? = null,
+    val checkedAt: Long = 0,
 )
 
 /** One podcast episode from a feed. [url] is its audio file (the RSS enclosure). */

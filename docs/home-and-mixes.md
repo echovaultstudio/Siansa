@@ -199,8 +199,10 @@ and **Stations**.
 
 - **Music** holds your albums, artists and songs; tap **Albums**, **Artists** or **Songs** under it to see one kind.
   **Songs** lists every song in the libraries you sync; tap one to play it and the songs after it.
-- **Stations** holds internet radio and podcasts ([Your Stations](stations.md)): each station and podcast, split into
-  **Radio** and **Podcasts**. Tap a station to play it live. In the full list there's one **Your Stations** card.
+- **Stations** lists your radio stations ([Your Stations](stations.md)): your server's and the ones you added, each
+  with its logo. Tap one to play it live; **⋮** has **Edit** and **Remove**. Podcasts you add by their RSS link are
+  under **Podcasts**, which shows whenever you have a podcast. Add either with **+ › Add station** or
+  **+ › Add podcast** at the top of Your Library.
 - **The chips come in the order you last opened them**, so the ones you use most are at the front. When more chips
   are hidden to the right, the row fades there with a **›** button that scrolls on.
 - **Each chip keeps its own sort** (Recents, Alphabetical, Most played…) until you change it, also after Siansa

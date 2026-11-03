@@ -1,19 +1,20 @@
 # Your Stations: radio and podcasts
 
-**Your Stations** keeps internet radio and podcasts in one place, under **Your Library**. Open it from the
-**Stations** chip, or from the **Your Stations** card in the list. Siansa works just the same if you never use it.
+**Your Stations** is internet radio and podcasts by their RSS feed, right in **Your Library**: radio stations
+under the **Stations** chip, podcasts under the **Podcasts** chip (with Audiobookshelf's, if you use it). They show
+in the full list too, and searching Your Library finds them. Siansa works just the same if you never use it.
 
 ## Radio from your server
 
-With Navidrome (or another OpenSubsonic server), the radio stations your server keeps come first, under **From your
-server**. In Navidrome you add them in its web page (**Radios**). Siansa only shows and plays them: change them on
-the server.
+With Navidrome (or another OpenSubsonic server), the radio stations your server keeps are under **Stations**, marked
+**From your server**. In Navidrome you add them in its web page (**Radios**). Siansa shows and plays them: change
+them on the server (only their picture can be set in Siansa, see below).
 
 Jellyfin and Emby don't have a list Siansa reads, so there you add your own stations (below).
 
 ## Adding your own
 
-Tap **+** at the top of Your Stations and paste a link:
+Tap **+** at the top of Your Library, then **Add station** or **Add podcast**, and paste a link:
 
 - **A radio stream**: the address that plays (for example `https://stream.example.com/live.mp3`).
 - **A playlist that points at one**: `.m3u`, `.m3u8` or `.pls` links, as many stations offer under "Listen". Siansa
@@ -24,7 +25,30 @@ You can give it a name; otherwise it's named from the playlist or feed, or after
 the link before adding it, so a link that doesn't play says so straight away.
 
 What you add is kept **on this phone only**, for the user in use. It never goes to your music server. To remove a
-station or podcast, tap **⋮ › Remove** next to it (or **⋮ › Remove podcast** on its page).
+station or podcast, tap **⋮ › Remove** next to it in Your Library (or **⋮ › Remove podcast** on its page).
+
+## Pictures
+
+Each radio station gets its logo by itself, looked up once and kept with the station, so it isn't fetched again:
+
+1. **Radio Browser** ([radio-browser.info](https://www.radio-browser.info)), a free, open list of radio stations,
+   is asked for the station by its address, then by its exact name.
+2. If that has no logo, the **station's website** (from your server, or from Radio Browser) is read for the logo
+   it names.
+
+If neither has one, the station keeps its coloured radio tile. The picture shows in Your Library, in the player, in
+the notification and on the lock screen. Without a connection nothing is looked up; it's tried again later.
+
+## Editing a station
+
+Tap **⋮ › Edit** next to a station to change it:
+
+- **Name** and **Link**: a new link is checked as when adding.
+- **Picture link**: the address of a picture to use instead. Leave it empty to have Siansa look for the logo again
+  (also a way to refresh it).
+
+For your server's stations only the picture can be set, and it's kept on this phone: change their name and link
+on the server.
 
 ## Listening
 
@@ -45,5 +69,5 @@ page (at most once an hour), or when you tap the refresh button.
 - Stations and episodes need a connection; they can't be downloaded.
 - Streams that play over HLS (`.m3u8` with segments) work. Very old Shoutcast servers that answer with `ICY 200 OK`
   instead of HTTP may not play.
-- Podcasts from Audiobookshelf stay where they are, under the **Podcasts** chip (see
-  [Audiobooks and podcasts](books.md)). Your Stations is for podcasts you add by their feed.
+- Podcasts from Audiobookshelf and those you add by their feed are both under the **Podcasts** chip. Audiobookshelf's
+  are kept on that server (see [Audiobooks and podcasts](books.md)); the ones you add stay on this phone.

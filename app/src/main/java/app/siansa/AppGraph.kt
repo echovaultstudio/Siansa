@@ -407,7 +407,14 @@ class AppGraph(val app: Application) {
     }
 
     /** Your Stations (issue #353): the server's radio stations and the stations and podcasts added on this phone. */
-    val stations = StationRepository(app.filesDir, http, { settings.current }) { subsonic.internetRadioStations() }
+    val stations = StationRepository(
+        app.filesDir,
+        http,
+        { settings.current },
+        app.siansa.net.WebStationPictures(http, "Siansa/" + (runCatching { app.packageManager.getPackageInfo(app.packageName, 0).versionName }.getOrNull() ?: "dev")),
+        scope,
+        online = { !connection.current.offline },
+    ) { subsonic.internetRadioStations() }
 
     /** Playlists kept only on this phone. */
     val localPlaylists = LocalPlaylists(app).also { local ->
