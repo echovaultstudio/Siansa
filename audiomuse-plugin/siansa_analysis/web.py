@@ -45,6 +45,12 @@ def collect(db):
     similar_job = store.get_state("similar_job", {}, db) or {}
     built = store.get_state("similar_built", {}, db) or {}
     beat_counts = status.beats_counts(*store.beats_counts(db))
+    try:
+        beat_counts["until_waiting"] = store.until_waiting(db)
+    except Exception:  # the page shows without it
+        if db is not None:
+            db.rollback()
+        beat_counts["until_waiting"] = 0
     beats_job = store.get_state("beats_job", {}, db) or {}
     return {
         "inputs": inputs,
@@ -403,6 +409,7 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
   <div class="mx-head"><h3>3. Beat grids</h3>{_badge(b)}</div>
   {_meter(b, "Songs measured for their beats")}
   <p><strong>{escape(b.detail)}.</strong> {beat_counts['to_measure']:,} still to measure.</p>
+  {f"<p>{beat_counts['until_waiting']:,} songs measured before 0.5.0 still to be checked for where their beat stops: Measure all fills them in (only the beats are read again; everything measured stays in use meanwhile), otherwise each is checked when Siansa is about to play it.</p>" if beat_counts.get('until_waiting') else ""}
   {elsewhere_line}
   <p class="mx-help">The tempo, beats, bars and phrases at each end of a song, for beat-matched blends in
     Siansa's DJ radio (experimental): with the phrases (plugin 0.4.0: the 4 or 8 bars a song is built from, read

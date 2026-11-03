@@ -452,6 +452,18 @@ def beats_counts(db):
     return int(done or 0), int(with_beat or 0), int(failed or 0), int(waiting or 0), int(elsewhere or 0)
 
 
+def until_waiting(db):
+    """Songs measured before 0.5.0 still to be checked for where their beat stops."""
+    cur = db.cursor()
+    cur.execute(f"""
+        SELECT count(*) FROM {table('profiles')} p JOIN score s USING (item_id)
+         WHERE p.status='ready' AND p.analyzer_version=%s AND p.beats_version=%s
+           AND NOT (COALESCE(p.beats, '{{}}'::jsonb) ? %s)""", (ANALYZER_VERSION, BEATS_VERSION, UNTIL_KEY))
+    n = cur.fetchone()[0]
+    cur.close()
+    return int(n or 0)
+
+
 def songs_to_measure(db, limit, beats=False, fill=False):
     """Up to ``limit`` songs to measure, newest first.
 
