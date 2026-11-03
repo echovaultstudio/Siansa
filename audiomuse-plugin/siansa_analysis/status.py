@@ -44,10 +44,10 @@ def all_round_text(all_minutes):
     """How measuring all runs, in words for the page."""
     minutes = all_round_minutes(all_minutes)
     if not minutes:
-        return ("It goes on without a break until every song is measured. Meanwhile AudioMuse waits with its own jobs "
-                "(analysis of new songs, clustering, scheduled tasks).")
-    return (f"It goes in rounds of {minutes} minutes every 15 until every song is measured. While a round runs, "
-            "AudioMuse waits with its own jobs (analysis, clustering, scheduled tasks); between rounds they run.")
+        return ("It runs without a break until every song is measured; AudioMuse waits with its own jobs meanwhile "
+                "(analysing new songs, clustering).")
+    return (f"It runs in rounds of {minutes} minutes every 15; AudioMuse waits with its own jobs during a round "
+            "and runs them in between.")
 
 
 def next_rate(rate, songs, seconds, keep=500):
