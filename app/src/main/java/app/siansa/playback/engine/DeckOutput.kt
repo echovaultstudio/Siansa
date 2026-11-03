@@ -133,16 +133,26 @@ class DeckOutput(
 class MixerOutputProvider(private val engine: AudioEngine, private val deck: MixCore.Deck) : AudioOutputProvider {
     override fun getFormatSupport(formatConfig: AudioOutputProvider.FormatConfig): AudioOutputProvider.FormatSupport {
         val format = formatConfig.format
-        val ok = MimeTypes.AUDIO_RAW == format.sampleMimeType &&
-            (format.pcmEncoding == C.ENCODING_PCM_16BIT || format.pcmEncoding == C.ENCODING_PCM_FLOAT) &&
-            format.channelCount in 1..8
-        return if (ok) {
-            AudioOutputProvider.FormatSupport.Builder()
-                .setFormatSupportLevel(AudioOutputProvider.FORMAT_SUPPORTED_DIRECTLY)
-                .build()
-        } else {
-            AudioOutputProvider.FormatSupport.UNSUPPORTED
+        if (MimeTypes.AUDIO_RAW != format.sampleMimeType || !Util.isEncodingLinearPcm(format.pcmEncoding) || format.channelCount !in 1..8) {
+            return AudioOutputProvider.FormatSupport.UNSUPPORTED
         }
+        // As Media3's own AudioTrack output answers: 16-bit as it is, float only where the sink asks for float
+        // output, anything else turned into 16-bit by the sink. Saying float went straight through made FFmpeg
+        // decode to float, a path the app doesn't otherwise use, and after a change of song back to back it handed
+        // over nothing but silence (0.52.0-dev: Waxcap, Passion, MPD, Rampage, Yeah!).
+        return AudioOutputProvider.FormatSupport.Builder()
+            .setFormatSupportLevel(supportLevel(format.pcmEncoding, formatConfig.enableHighResolutionPcmOutput))
+            .build()
+    }
+
+    companion object {
+        /** How a decoded encoding reaches the mixer: straight, or turned into 16-bit by the sink first. */
+        fun supportLevel(encoding: Int, highResolution: Boolean): Int =
+            if (encoding == C.ENCODING_PCM_16BIT || (highResolution && encoding == C.ENCODING_PCM_FLOAT)) {
+                AudioOutputProvider.FORMAT_SUPPORTED_DIRECTLY
+            } else {
+                AudioOutputProvider.FORMAT_SUPPORTED_WITH_TRANSCODING
+            }
     }
 
     override fun getOutputConfig(formatConfig: AudioOutputProvider.FormatConfig): AudioOutputProvider.OutputConfig {

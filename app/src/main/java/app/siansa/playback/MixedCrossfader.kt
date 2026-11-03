@@ -518,7 +518,12 @@ internal class MixedCrossfader(
         val fed = mainMix.feedingMs() > FED_MS
         val silent = engine.core.silentMs()
         val muted = stream?.mutedMs(engine.outRate) ?: 0
+        val sinceBackToBack = if (backToBackAt == 0L) Long.MAX_VALUE else (System.nanoTime() - backToBackAt) / 1_000_000
         when {
+            // Songs changed back to back and the player has handed over nothing but silence since: its decoder is
+            // made again (0.52.0-dev: FFmpeg handed over silence after such a change).
+            sinceBackToBack in MUTED_MS..BACK_TO_BACK_WATCH_MS && mainMix.feedingMs() == 0L && silent > MUTED_MS ->
+                recover("the songs changed back to back and the player has handed over only silence since", rebuild = true)
             fed && silent > MUTED_MS -> recover("the player hands over sound but the mix has gone out silent for $silent ms")
             muted > MUTED_MS -> recover("the song has sound but none of it reaches the mix for $muted ms")
             engine.stalledMs() > STALLED_MS -> recover("the output has played without moving on for ${engine.stalledMs()} ms")
@@ -529,7 +534,7 @@ internal class MixedCrossfader(
      * Puts sound that should be playing but isn't right, a step at a time and at most twice a song (so it can't
      * loop): first the song starts again where it is (a new stream), then the output is opened again.
      */
-    private fun recover(why: String) {
+    private fun recover(why: String, rebuild: Boolean = false) {
         val song = main.currentMediaItem?.mediaId
         if (song != recoverySong) {
             recoverySong = song
@@ -538,7 +543,16 @@ internal class MixedCrossfader(
         AppLog.w("Crossfade", "No sound: $why · song $song at ${main.currentPosition} ms, player volume ${main.volume}, level $level · ${engine.core.describe()} · ${engine.status()}")
         engine.core.resetSilence()
         when (recoverySteps++) {
-            0 -> {
+            0 -> if (rebuild) {
+                AppLog.w("Crossfade", "Making the player's decoder again and going on from where the song is")
+                val index = main.currentMediaItemIndex
+                val at = main.currentPosition
+                backToBackAt = 0L
+                main.stop()
+                main.seekTo(index, at)
+                main.prepare()
+                main.play()
+            } else {
                 AppLog.w("Crossfade", "Starting the song again where it is, so it plays with sound")
                 main.seekTo(main.currentPosition)
             }
@@ -549,6 +563,9 @@ internal class MixedCrossfader(
             else -> Unit
         }
     }
+
+    /** When (System.nanoTime()) the songs last changed on their own with no fade; 0 when the last change wasn't that. */
+    private var backToBackAt = 0L
 
     /** The song sound was last put right for, and how many steps it took (at most two a song). */
     private var recoverySong: String? = null
@@ -656,6 +673,7 @@ internal class MixedCrossfader(
         }
         stopEasing()
         skipped = null
+        backToBackAt = if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) System.nanoTime() else 0L
         handler.removeCallbacks(soundCheck)
         handler.postDelayed(soundCheck, SOUND_CHECK_MS)
         if ((phase == Phase.READY || phase == Phase.CUED) && mediaItem?.mediaId != outgoing) disarm()
@@ -726,6 +744,8 @@ internal class MixedCrossfader(
         const val STALLED_MS = 3_000L
         /** The player has handed over sound this long without a break: what it handed first should be heard by now. */
         const val FED_MS = 5_000L
+        /** How long after a change of songs back to back silence from the player is taken as the player's fault. */
+        const val BACK_TO_BACK_WATCH_MS = 15_000L
         /** How far into each song the mixer's state is logged. */
         const val SOUND_CHECK_MS = 4_000L
         /** The next song is sent this far before its point (a jump lands up to a decoded block past it). */
