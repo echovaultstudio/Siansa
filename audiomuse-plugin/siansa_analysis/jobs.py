@@ -53,7 +53,12 @@ def profile_of(measurement):
     }
     try:
         intro, outro = measurement.beat_grids()
-        profile["beats"] = beats.fields(intro, outro)
+        try:
+            until = measurement.beats_until()
+        except Exception as e:  # the grids still count without it
+            logger.warning("siansa_analysis couldn't tell where the beat stops: %s", e)
+            until = None
+        profile["beats"] = beats.fields(intro, outro, until)
     except Exception as e:  # the loudness still counts; a song without a grid gets plain fades
         logger.warning("siansa_analysis couldn't find the beats: %s", e)
         profile["beats"] = {}

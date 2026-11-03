@@ -102,6 +102,40 @@ object Crossfade {
 
     private fun seconds(ms: Long): String = "%.1f s".format(java.util.Locale.ROOT, ms / 1000.0)
 
+    /** A beatless end shorter than this is left to the other blends. */
+    const val AFTER_BEAT_MIN_MS = 6_000L
+    /** The longest blend after the last beat: a long ambient outro is joined for its last half minute. */
+    const val AFTER_BEAT_MAX_MS = 30_000L
+    /** The next song fades in over this, then plays at its own level over the outro. */
+    const val AFTER_BEAT_FADE_IN_MS = 2_000L
+
+    /**
+     * A blend after the last beat, or null when the song doesn't end in a beatless outro worth one: the next song
+     * comes in one beat after the last (so the last beat is heard whole), and the outro plays out under it to the
+     * end of its sound, fade and all; only the silence after it is left out. At most [AFTER_BEAT_MAX_MS] (then it
+     * comes in that long before the end) and a third of the shorter song.
+     */
+    fun afterLastBeat(profile: TrackProfile?, durationMs: Long, nextDurationMs: Long): FadePlan? {
+        val lastBeat = profile?.beatsUntilMs ?: return null
+        if (durationMs <= 0) return null
+        val silence = (profile.lastAtExactlyMs(SILENT_DB) ?: 0L).takeIf { it >= MIN_SILENCE_MS } ?: 0L
+        val soundEnds = durationMs - silence.coerceAtMost((durationMs * MAX_CUT_FRACTION).toLong())
+        val beat = profile.outro?.beatLengthMs?.toLong() ?: 0L
+        val comesIn = lastBeat + beat
+        val tail = soundEnds - comesIn
+        if (tail < AFTER_BEAT_MIN_MS) return null
+        val shortest = listOf(soundEnds, nextDurationMs).filter { it > 0 }.minOrNull() ?: return null
+        val overlap = minOf(tail, AFTER_BEAT_MAX_MS, shortest / 3)
+        if (overlap < AFTER_BEAT_MIN_MS) return null
+        val cut = durationMs - soundEnds
+        val why = "smart: after the last beat (${clockOf(lastBeat)}), over ${seconds(tail)} of beatless outro" +
+            (if (overlap < tail) ", its last ${seconds(overlap)}" else "") +
+            (if (cut > 0) " · left out the last ${seconds(cut)} of silence" else "")
+        return FadePlan(overlap, AFTER_BEAT_FADE_IN_MS.coerceAtMost(overlap), why, cut, beatNote = "the beat stops at ${clockOf(lastBeat)}, so no beat-matching is needed")
+    }
+
+    private fun clockOf(ms: Long): String = "%d:%02d".format(java.util.Locale.ROOT, ms / 60_000, ms / 1000 % 60)
+
     fun plan(
         mode: CrossfadeMode,
         maxMs: Long,
@@ -120,6 +154,11 @@ object Crossfade {
         // Smart: the dead air and the long fade-out at the end are left out first (issue #628); the blend is planned
         // from the song's new end.
         val (cut, cutWhy) = if (mode == CrossfadeMode.SMART) endCut(currentProfile, currentDurationMs, maxMs) else 0L to null
+        // A beatless outro (plugin 0.5.0): the next song comes in after the last beat, and the outro, with its own
+        // fade, plays out under it. Nothing to lay beat on beat, so no clash and no change of speed.
+        if (mode == CrossfadeMode.SMART && !continuousMix(current) && !continuousMix(next)) {
+            afterLastBeat(currentProfile, currentDurationMs, nextDurationMs)?.let { return it }
+        }
         // Where the plugin found no bars or phrases, a track made on a grid has them assumed from its first beat (issue #820).
         val outro = currentProfile?.outro?.let { BeatMatch.assumedGrid(currentProfile.intro, it) }
         val intro = nextProfile?.intro?.let { BeatMatch.assumedIntro(it) }

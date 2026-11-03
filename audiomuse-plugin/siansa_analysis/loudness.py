@@ -168,6 +168,12 @@ class Measurement:
 
         return beats.ends(self.head, self.tail, self.tail_offset, self.relative_levels(), self.rate)
 
+    def beats_until(self):
+        """When the beat stops before the song's end (ms), or ``None`` (:func:`beats.end_without_beat`)."""
+        from . import beats
+
+        return beats.end_without_beat(self.tail, self.tail_offset, self.relative_levels(), self.rate)
+
     def relative_levels(self):
         """Each 100 ms chunk's loudness minus the song's, in dB (``-inf`` for digital silence)."""
         if self.lufs is None:

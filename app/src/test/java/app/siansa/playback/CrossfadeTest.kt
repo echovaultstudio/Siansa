@@ -162,6 +162,40 @@ class CrossfadePlanTest {
         assertTrue(plan.fadeInMs <= plan.overlapMs)
     }
 
+    @Test fun aBeatlessOutroBlendsAfterTheLastBeat() {
+        // The beat stops at 3:40 of a 4:00 song at 120 BPM, then 18 s of outro and 2 s of silence: the next song
+        // comes in a beat after the last (3:40.5), over the outro to the end of its sound, fade and all.
+        val outro = BeatEnd(bpm = 120.0, beatMs = 219_500.0, barMs = null, rhythm = 0.9f, steady = 0.9f)
+        val current = TrackProfile("a1", -10.0, listOf(RampPoint(-18, 0)), listOf(RampPoint(-48, 2_000), RampPoint(-18, 2_100)), outro = outro, beatsUntilMs = 220_000)
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, b1, minutes4, minutes4, current, profile("b1", 0, 0), beatMatch = true)!!
+        assertEquals(17_500L, plan.overlapMs)
+        assertEquals(2_000L, plan.cutMs)
+        assertNull(plan.beat)
+        assertTrue(plan.why, plan.why.contains("after the last beat (3:40)"))
+    }
+
+    @Test fun aLongBeatlessOutroIsJoinedForItsLastHalfMinute() {
+        val current = TrackProfile("a1", -10.0, emptyList(), emptyList(), beatsUntilMs = 150_000)
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, b1, minutes4, minutes4, current, profile("b1", 0, 0))!!
+        assertEquals(Crossfade.AFTER_BEAT_MAX_MS, plan.overlapMs)
+        // Never more than a third of a short next song.
+        val short = Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, b1, minutes4, 60_000, current, profile("b1", 0, 0))!!
+        assertEquals(20_000L, short.overlapMs)
+    }
+
+    @Test fun aShortBeatlessEndIsLeftToTheOtherBlends() {
+        assertNull(Crossfade.afterLastBeat(TrackProfile("a1", -10.0, emptyList(), emptyList(), beatsUntilMs = 236_000), minutes4, minutes4))
+        // Within one album running straight on, it stays gapless.
+        assertNull(Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, a2, minutes4, minutes4, TrackProfile("a1", -10.0, emptyList(), emptyList(), beatsUntilMs = 150_000)))
+    }
+
+    @Test fun theLastBeatIsReadFromTheProfile() {
+        val body = kotlinx.serialization.json.Json.parseToJsonElement(
+            """{"schema_version":1,"profiles":[{"track_id":"x","ref_lufs":-9.0,"start_ramp":"","end_ramp":"","beats_until_ms":201234.5}]}""",
+        ) as JsonObject
+        assertEquals(201_234L, PluginProfiles.parse(body).single().beatsUntilMs)
+    }
+
     @Test fun aHardEndingIntoAHardHitPlaysBackToBack() {
         assertNull(Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, b1, minutes4, minutes4, profile("a1", 0, 100), profile("b1", 100, 0)))
     }

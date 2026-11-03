@@ -64,6 +64,12 @@ Same page. **Off**, a **fixed** length (1–30 seconds, 6 by default), or **Smar
   (at most the crossfade length of it), so the next song comes in while it's still fading. Only what runs to the very
   end counts: a silence or a quiet passage mid-song never starts the next song, a soft ending that stays at one low
   level is played, and nothing is left out before three quarters of the song. The log says what was left out.
+- **After the last beat**: when a song's beat stops well before its end (a beatless outro of 6 seconds or more,
+  measured by Siansa plugin 0.5.0), the next song comes in one beat after the last, and the outro plays out under it
+  to the end of its sound, its own fade-out and all; only the silence after it is left out. There's no beat to
+  clash with, so it needs no beat-matching and works however far apart the tempos are. It can be longer than the
+  crossfade length: up to half a minute of outro (then the last half minute of it), and never more than a third of
+  either song.
 - Songs that run straight on within one album aren't faded, so they stay gapless.
 - Without the plugin's measurements, Smart uses the fixed length. When the song going out keeps a beat but the
   next song hasn't been measured, the blend is short instead, so the two beats don't clash for the whole length.
