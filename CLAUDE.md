@@ -3,6 +3,16 @@
 Personal Android music player for Navidrome (Kotlin, Jetpack Compose, Media3, Coil 3, Room).
 Source: `app/src/main/java/app/siansa/`. Unit tests: `app/src/test/`. Emulator tests: `app/src/androidTest/`.
 
+## Until v1.0: work on `mixer`
+
+All work goes on the `mixer` branch until v1.0: the new audio engine (#826), every fix and every feature. Branch
+from `mixer` and open pull requests against `mixer`, not `main` (the owner decided, 0.52.0-dev). Each push to
+`mixer` builds Siansa Dev (`.github/workflows/dev-app.yml`) for the owner to test. `main` stays at 0.51.x with
+releases held (`.release-hold`); at v1.0 `mixer` goes to `main` in one pull request, the engine on for everyone.
+A pull request against `mixer` doesn't close its issue on merge (GitHub only does that on `main`): leave the issue
+open with a comment that the fix is in Siansa Dev; it closes when v1.0 reaches `main`. Only an urgent fix for the
+released app goes to `main`, and only when the owner asks.
+
 ## Every change
 
 - Build and test before opening a pull request: `gradle :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:assembleRelease :app:bundleRelease`.
