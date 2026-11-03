@@ -29,6 +29,9 @@ const val WIND_DOWN_QUERY = "calm slow quiet soft gentle peaceful relaxing sleep
 fun <T> evenly(items: List<T>, max: Int): List<T> =
     if (items.size <= max) items else List(max) { i -> items[i * items.size / max] }
 
+/** A radio's songs, and which of them AudioMuse picked ([picked], marked in the queue like a song radio's). */
+data class RadioSongs(val songs: List<Song>, val picked: Set<String> = emptySet())
+
 /** Builds radio queues. Every function returns songs ready to play, or throws with a readable reason. */
 class Radios(private val graph: AppGraph) {
 
@@ -92,7 +95,7 @@ class Radios(private val graph: AppGraph) {
      * it's set up, with the artist's own songs among them; otherwise the music server's similar songs (Navidrome's
      * from Last.fm and the like); otherwise the artist's own songs.
      */
-    suspend fun artistMore(artist: Artist, already: List<Song>): List<Song> {
+    suspend fun artistMore(artist: Artist, already: List<Song>): RadioSongs {
         AppLog.i("Radio", "Artist radio ${artist.id} ${artist.name}")
         val have = already.map { it.id }.toSet()
         val own = graph.library.songsOf(artist).shuffled()
@@ -104,7 +107,8 @@ class Radios(private val graph: AppGraph) {
                 val songs = ArtistRadioMix.mix(own, alike, have, 60)
                 val ownIds = own.map { it.id }.toSet()
                 AppLog.i("Radio", "Artist radio ${artist.name}: ${songs.size} songs, ${songs.count { it.id in ownIds }} of theirs, the rest sound like them (AudioMuse, from ${minOf(own.size, ArtistRadioMix.SEEDS)} of their songs)")
-                return songs
+                // AudioMuse's picks are marked in the queue; the artist's own songs aren't.
+                return RadioSongs(songs, ArtistRadioMix.picked(songs, own))
             }
         }
         val similar = runCatching { graph.source.artistRadio(artist.id, 60) }
@@ -112,10 +116,10 @@ class Radios(private val graph: AppGraph) {
             .getOrDefault(emptyList())
         if (similar.isNotEmpty()) {
             AppLog.i("Radio", "Artist radio ${artist.name}: the music server's similar songs (${similar.size})")
-            return varied(local(similar), 60).filter { it.id !in have }
+            return RadioSongs(varied(local(similar), 60).filter { it.id !in have })
         }
         AppLog.i("Radio", "Artist radio ${artist.name}: no similar songs anywhere; their own songs")
-        return own.filter { it.id !in have }.take(60)
+        return RadioSongs(own.filter { it.id !in have }.take(60))
     }
 
     /** Songs that sound like a blend of [own] (some of an artist's songs), from AudioMuse, best first. */

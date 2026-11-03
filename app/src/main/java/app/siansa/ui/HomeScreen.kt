@@ -515,7 +515,7 @@ fun HomeScreen(nav: NavController) {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "artist_radios", "Artist radios", recentArtists.valueOrNull().orEmpty().map { artist ->
                                 HomeItem(artist.id, "${artist.name} radio", "With similar artists", freshCovers[artist.id] ?: artist.coverArt, round = true, open = {
-                                    launch.progressive("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
+                                    launch.progressivePicks("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
                                 })
                             }, openAll = nav.openAll(app.siansa.ui.HomeSection.ArtistRadios))
                         } else Shelf("Artist radios", recentArtists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.ArtistRadios)) { artist ->
@@ -524,7 +524,7 @@ fun HomeScreen(nav: NavController) {
                                 subtitle = "With similar artists",
                                 coverArt = freshCovers[artist.id] ?: artist.coverArt,
                                 onClick = {
-                                    launch.progressive("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
+                                    launch.progressivePicks("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
                                 },
                                 modifier = Modifier.width(140.dp),
                                 round = true,

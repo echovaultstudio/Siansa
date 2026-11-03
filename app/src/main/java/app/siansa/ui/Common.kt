@@ -215,7 +215,11 @@ class PlayLauncher(
         }
     }
 
-    fun progressive(label: String, first: suspend () -> List<Song>, more: suspend (List<Song>) -> List<Song>) {
+    fun progressive(label: String, first: suspend () -> List<Song>, more: suspend (List<Song>) -> List<Song>) =
+        progressivePicks(label, first) { app.siansa.mix.RadioSongs(more(it)) }
+
+    /** As [progressive], with the songs AudioMuse picked among the later ones marked in the queue. */
+    fun progressivePicks(label: String, first: suspend () -> List<Song>, more: suspend (List<Song>) -> app.siansa.mix.RadioSongs) {
         scope.launch {
             val started = System.currentTimeMillis()
             val firstSongs = try {
@@ -231,14 +235,15 @@ class PlayLauncher(
             val generation = graph.player.queueGeneration
             AppLog.i("Radio", "$label started with ${firstSongs.size} songs in ${System.currentTimeMillis() - started}ms")
             appScope.launch {
-                val rest = runCatching { more(firstSongs) }
+                val batch = runCatching { more(firstSongs) }
                     .onFailure { AppLog.w("Radio", "$label: more songs failed: ${it.message}") }
-                    .getOrDefault(emptyList())
+                    .getOrDefault(app.siansa.mix.RadioSongs(emptyList()))
+                val rest = batch.songs
                 AppLog.i("Radio", "$label added ${rest.size} more after ${System.currentTimeMillis() - started}ms")
                 withContext(Dispatchers.Main) {
                     when (radioMore(firstSongs.isEmpty(), rest.isEmpty(), generation, graph.player.queueGeneration)) {
-                        RadioMore.PLAY -> graph.player.play(rest)
-                        RadioMore.ADD -> graph.player.addAll(rest)
+                        RadioMore.PLAY -> graph.player.play(rest, picked = batch.picked)
+                        RadioMore.ADD -> graph.player.addAll(rest, batch.picked)
                         RadioMore.DROP -> AppLog.i("Radio", "$label: ${rest.size} more songs dropped, something else plays now (or playback was stopped)")
                         RadioMore.NOTHING -> Unit
                     }

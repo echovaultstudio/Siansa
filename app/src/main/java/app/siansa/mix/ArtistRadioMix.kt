@@ -15,6 +15,12 @@ object ArtistRadioMix {
     /** At most this many songs of any one other artist. */
     const val PER_ARTIST = 3
 
+    /** Which of [songs] AudioMuse picked: all but the artist's [own], marked in the queue as a radio's picks are. */
+    fun picked(songs: List<Song>, own: List<Song>): Set<String> {
+        val mine = own.mapTo(HashSet()) { it.id }
+        return songs.mapNotNullTo(HashSet()) { s -> s.id.takeIf { it !in mine } }
+    }
+
     /**
      * [size] songs from [alike] (sound-alikes, best first) and [own] (the artist's songs), leaving out [already]
      * (what's queued) and repeats; the artist's own songs come in every [ownEvery]. When there's too little of
