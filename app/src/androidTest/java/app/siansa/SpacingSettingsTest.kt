@@ -218,6 +218,22 @@ class SpacingSettingsTest : SpacingCheck() {
         assertEven("Server type chips", chips.top - label.bottom, hint.top - chips.bottom)
     }
 
+    /** The server form's API key (issue #493): its hint sits evenly between the password and the key field. */
+    @Test fun apiKeyHintIsEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    Box(Modifier.testTag("password")) { app.siansa.ui.SecretField("Password", "") { } }
+                    app.siansa.ui.ApiKeyField(app.siansa.data.AppSettings()) { }
+                }
+            }
+        }
+        val password = compose.onNodeWithTag("password").getBoundsInRoot()
+        val hint = compose.onNodeWithText("API key, if your server gives you one", substring = true).getBoundsInRoot()
+        val key = compose.onNodeWithTag("apiKey").getBoundsInRoot()
+        assertEven("API key hint", hint.top - password.bottom, key.top - hint.bottom)
+    }
+
     /** Style › Phone's top bar (issue #681): its chips sit evenly between the heading and the hint. */
     @Test fun topBarChipsAreEvenlySpaced() {
         compose.setContent {

@@ -89,6 +89,11 @@ data class AppSettings(
     val navidromeUrl: String = "",
     val navidromeUser: String = "",
     val navidromePassword: String = "",
+    /**
+     * An OpenSubsonic API key (issue #493), instead of the username and password: with one, requests send `apiKey`
+     * and no `u`/`t`/`s`, once the server lists `apiKeyAuthentication`. Kept encrypted, like the password.
+     */
+    val navidromeApiKey: String = "",
     val proxyUser: String = "",
     val proxyPassword: String = "",
     val audioMuseUrl: String = "",
@@ -228,7 +233,10 @@ data class AppSettings(
     val fingerprintPassword: String get() = if (sourceKind == SourceKind.OPENSUBSONIC) navidromePassword else ""
 
     val navidromeReady: Boolean
-        get() = navidromeUrl.isNotBlank() && navidromeUser.isNotBlank() && navidromePassword.isNotBlank()
+        get() = navidromeUrl.isNotBlank() && (hasApiKey || navidromeUser.isNotBlank() && navidromePassword.isNotBlank())
+
+    /** An API key for an OpenSubsonic server (issue #493); Emby and Jellyfin have their own login. */
+    val hasApiKey: Boolean get() = sourceKind == SourceKind.OPENSUBSONIC && navidromeApiKey.isNotBlank()
     val audioMuseReady: Boolean
         get() = audioMuseUrl.isNotBlank()
     val aiReady: Boolean
@@ -241,6 +249,7 @@ data class AppSettings(
     fun withConnectionsFrom(page: AppSettings, kind: SourceKind = sourceKind): AppSettings = copy(
         sourceKind = kind,
         navidromeUrl = page.navidromeUrl, navidromeUser = page.navidromeUser, navidromePassword = page.navidromePassword,
+        navidromeApiKey = page.navidromeApiKey,
         proxyUser = page.proxyUser, proxyPassword = page.proxyPassword,
         audioMuseUrl = page.audioMuseUrl, audioMuseToken = page.audioMuseToken,
         audioMuseUser = page.audioMuseUser, audioMusePassword = page.audioMusePassword, audioMuseServer = page.audioMuseServer,
@@ -256,6 +265,7 @@ data class AppSettings(
      */
     fun withServerFrom(page: AppSettings): AppSettings = copy(
         navidromeUrl = page.navidromeUrl, navidromeUser = page.navidromeUser, navidromePassword = page.navidromePassword,
+        navidromeApiKey = page.navidromeApiKey,
         proxyUser = page.proxyUser, proxyPassword = page.proxyPassword, audioMuseServer = page.audioMuseServer,
     )
 
@@ -368,6 +378,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         navidromeUrl = prefs.getString("nd_url", "") ?: "",
         navidromeUser = prefs.getString("nd_user", "") ?: "",
         navidromePassword = secret("nd_pass"),
+        navidromeApiKey = secret("nd_api_key"),
         proxyUser = prefs.getString("proxy_user", "") ?: "",
         proxyPassword = secret("proxy_pass"),
         audioMuseUrl = shared.getString("am_url", "") ?: "",
@@ -477,6 +488,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         return input.copy(
             navidromeUrl = nd.url,
             navidromeUser = input.navidromeUser.trim(),
+            navidromeApiKey = input.navidromeApiKey.trim(),
             proxyUser = nd.user ?: input.proxyUser.trim(),
             proxyPassword = nd.password ?: input.proxyPassword,
             audioMuseUrl = am.url,
@@ -502,6 +514,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putString("nd_url", s.navidromeUrl)
             .putString("nd_user", s.navidromeUser)
             .putString("nd_pass", SecretBox.encrypt(s.navidromePassword))
+            .putString("nd_api_key", SecretBox.encrypt(s.navidromeApiKey))
             .putString("proxy_user", s.proxyUser)
             .putString("proxy_pass", SecretBox.encrypt(s.proxyPassword))
             .putBoolean("ai_titles", s.aiTitles)

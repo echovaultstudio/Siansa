@@ -10,6 +10,9 @@ few times, then use **Report a problem** there. See [Reporting problems](privacy
   Wi-Fi, or on your VPN when away from home?
 - Include the port (`:4533` for Navidrome, `:8096` for Emby) and `http://` or `https://`.
 - Behind a login page (Authelia, Authentik, a proxy's basic auth)? Add the **proxy login**.
+- "Your server doesn't take API keys": your server doesn't support OpenSubsonic API keys yet. Clear the **API key**
+  and use your user name and password. "Your server doesn't know this API key": the key is wrong or was revoked;
+  make a new one on your server.
 
 ## "Not found on Navidrome. It may have been removed."
 

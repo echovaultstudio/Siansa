@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -107,7 +108,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
 
     /** Keeps the server being added as another login; false (with [problem] set) when it can't be. */
     fun saveNew(): Boolean {
-        if (newServer.navidromeUrl.isBlank() || newServer.navidromeUser.isBlank()) {
+        if (newServer.navidromeUrl.isBlank() || newServer.navidromeUser.isBlank() && !newServer.hasApiKey) {
             problem = "New server: enter its address and username first"
             return false
         }
@@ -151,7 +152,29 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
         return true
     }
 
-    fun save() {
+    /**
+     * API keys checked with their servers before anything is kept (issue #493): false (with [problem] set) when a
+     * server doesn't take keys or doesn't know the key. A key's user fills an empty username.
+     */
+    suspend fun keysChecked(): Boolean {
+        val label = users.associate { it.id to it.label }
+        var step = "New server"
+        return try {
+            if (adding) newServer = keyChecked(graph, newServer, newServer.sourceKind, null)
+            for ((id, other) in others) {
+                step = label[id].orEmpty()
+                others = others + (id to keyChecked(graph, other, other.sourceKind, othersSaved[id]))
+            }
+            step = ""
+            draft = keyChecked(graph, draft, graph.settings.current.sourceKind, graph.settings.current)
+            true
+        } catch (e: ApiException) {
+            problem = if (step.isEmpty()) e.message else "$step: ${e.message}"
+            false
+        }
+    }
+
+    fun saveNow() {
         // A server being added, then the other logins: each save writes the shared AudioMuse and AI settings too, and
         // the page's own come last.
         if (adding && !saveNew()) return
@@ -177,6 +200,10 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
         }
         AppLog.i("Settings", "Connections saved · AI: ${if (now.aiReady) "${now.aiProvider.label} ${now.aiModel}" else "off"}")
         nav.popBackStack()
+    }
+
+    fun save() {
+        scope.launch { if (keysChecked()) saveNow() }
     }
 
     Screen(
@@ -221,7 +248,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                         }
                         Button(onClick = ::save, modifier = Modifier.fillMaxWidth().testTag("saveUser-${user.id}")) { Text("Save") }
                         Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                            Button(onClick = { if (saveOther(user)) Users.switchTo(context, user.id) }) { Text("Switch to it") }
+                            Button(onClick = { scope.launch { if (keysChecked() && saveOther(user)) Users.switchTo(context, user.id) } }) { Text("Switch to it") }
                             OutlinedButton(onClick = { removing = user }) { Text("Remove") }
                         }
                     }
@@ -250,7 +277,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 ) {
                     ServerKindChips(newServer.sourceKind) { newServer = newServer.copy(sourceKind = it); problem = null }
                     ServerFields(graph, newServer, { newServer = it; problem = null }, newName, { newName = it }, nav, inUse = false)
-                    NewServerButtons(onSave = { saveNew() }, onCancel = { adding = false; newServer = AppSettings(); newName = ""; problem = null })
+                    NewServerButtons(onSave = { scope.launch { if (keysChecked()) saveNew() } }, onCancel = { adding = false; newServer = AppSettings(); newName = ""; problem = null })
                 }
             } else {
                 Row(
@@ -403,6 +430,7 @@ private fun ServerFields(
     Field("Server address", draft.navidromeUrl, if (kind.embyLike) "192.168.1.10:8096" else "192.168.1.10:4533") { onChange(draft.copy(navidromeUrl = it)) }
     Field("Username", draft.navidromeUser, keyboard = KeyboardType.Text) { onChange(draft.copy(navidromeUser = it)) }
     SecretField("Password", draft.navidromePassword) { onChange(draft.copy(navidromePassword = it)) }
+    if (!kind.embyLike) ApiKeyField(draft, onChange)
     if (showProxy) {
         Hint("Only for a reverse proxy that asks for its own login before your server.")
         Field("Proxy username", draft.proxyUser, keyboard = KeyboardType.Text) { onChange(draft.copy(proxyUser = it)) }
@@ -411,10 +439,7 @@ private fun ServerFields(
         TextButton(onClick = { showProxy = true }) { Text("Server behind a login page? Add a proxy login") }
     }
     TestRow(result) {
-        test(graph, draft, scope, { result = it }) { s ->
-            val server = if (kind.embyLike) EmbyApi(graph.http, { s }, jellyfin = kind == SourceKind.JELLYFIN) else SubsonicApi(graph.http) { s }
-            "Connected to " + server.ping()
-        }
+        test(graph, draft, scope, { result = it }) { s -> testServer(graph, s, kind) }
     }
     Field("Name shown in Siansa", serverName, "Like Home or Kids", keyboard = KeyboardType.Text) { onServerName(it.replace("\n", " ").take(UserFiles.SERVER_NAME_MAX)) }
     Hint("Shown instead of the address, so two logins can be told apart. Leave empty to show the address.")
@@ -436,6 +461,69 @@ private fun ServerFields(
             Text(syncSummary(progress, library), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+}
+
+/** The OpenSubsonic API key (issue #493), with what it's for. */
+@Composable
+internal fun ApiKeyField(draft: AppSettings, onChange: (AppSettings) -> Unit) {
+    Hint("API key, if your server gives you one, instead of a username and password.")
+    Box(Modifier.testTag("apiKey")) { SecretField("API key", draft.navidromeApiKey) { onChange(draft.copy(navidromeApiKey = it)) } }
+}
+
+/**
+ * The music server's Test with what's typed: whether it answers, and with an API key (issue #493) whether the server
+ * takes keys and whose this one is.
+ */
+internal suspend fun testServer(graph: AppGraph, s: AppSettings, kind: SourceKind): String {
+    if (kind.embyLike) return "Connected to " + EmbyApi(graph.http, { s }, jellyfin = kind == SourceKind.JELLYFIN).ping()
+    val login = s.copy(sourceKind = kind)
+    val api = SubsonicApi(graph.http) { login }
+    val connected = "Connected to " + api.ping()
+    if (!login.hasApiKey) return connected
+    // With a password too, the ping logged in with it: say plainly that the key isn't used.
+    if (!api.takesApiKey()) throw ApiException(SubsonicApi.NO_API_KEYS, 42)
+    val who = try {
+        api.keyUser()
+    } catch (e: ApiException) {
+        null
+    }
+    AppLog.i("Settings", "Server test: the API key works" + (who?.let { " (user $it)" } ?: ""))
+    return "$connected with the API key" + (who?.let { " as $it" } ?: "")
+}
+
+/**
+ * A server login checked before it's saved (issue #493). With an API key that's new or changed since [saved]:
+ * refused with a plain message when the server doesn't take keys (42) or doesn't know this one (44), and an empty
+ * username gets the key's user. Unchanged without a key, or when the server can't be reached or answers otherwise
+ * (saving doesn't need the server).
+ */
+internal suspend fun keyChecked(graph: AppGraph, s: AppSettings, kind: SourceKind, saved: AppSettings?): AppSettings {
+    val login = graph.settings.clean(s).copy(sourceKind = kind)
+    if (!login.hasApiKey) return s
+    val same = saved != null && saved.navidromeApiKey == login.navidromeApiKey && saved.navidromeUrl == login.navidromeUrl
+    if (same && login.navidromeUser.isNotBlank()) return s
+    val api = SubsonicApi(graph.http) { login }
+    try {
+        api.ping()
+        if (!api.takesApiKey()) throw ApiException(SubsonicApi.NO_API_KEYS, 42)
+    } catch (e: ApiException) {
+        if (e.code == 42 || e.code == 44) throw e
+        AppLog.w("Settings", "API key not checked: ${e.message}")
+        return s
+    } catch (e: java.io.IOException) {
+        AppLog.w("Settings", "API key not checked, the server can't be reached: ${e.message}")
+        return s
+    }
+    if (login.navidromeUser.isNotBlank()) return s
+    val who = try {
+        api.keyUser()
+    } catch (e: ApiException) {
+        null
+    } catch (e: java.io.IOException) {
+        null
+    }
+    AppLog.i("Settings", "API key checked" + (who?.let { "; its user is $it" } ?: ""))
+    return if (who != null) s.copy(navidromeUser = who) else s
 }
 
 /** Audiobookshelf: its address and login, Test, and with an admin login a scan for new books. */

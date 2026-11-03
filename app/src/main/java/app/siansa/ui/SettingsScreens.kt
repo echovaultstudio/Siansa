@@ -54,8 +54,6 @@ import app.siansa.mix.audioMuseCheck
 import app.siansa.net.ApiException
 import app.siansa.net.AudioMuseApi
 import app.siansa.net.AudiobookshelfApi
-import app.siansa.net.SubsonicApi
-import app.siansa.net.EmbyApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.text.DateFormat
@@ -94,7 +92,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
         }
     }
 
-    fun save() {
+    fun saveNow() {
         try {
             // Only the connection fields come from this page; everything else keeps its current value.
             val d = draft
@@ -113,6 +111,19 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                 nav.navigate("sync") { popUpTo("home") }
             }
             !firstRun -> nav.popBackStack()
+        }
+    }
+
+    fun save() {
+        // An API key is checked with the server first (issue #493).
+        scope.launch {
+            try {
+                draft = keyChecked(graph, draft, kind, graph.settings.current.takeIf { !firstRun })
+            } catch (e: ApiException) {
+                problem = e.message
+                return@launch
+            }
+            saveNow()
         }
     }
 
@@ -149,6 +160,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
             Field("Server address", draft.navidromeUrl, if (kind.embyLike) "192.168.1.10:8096" else "192.168.1.10:4533") { draft = draft.copy(navidromeUrl = it) }
             Field("Username", draft.navidromeUser, keyboard = KeyboardType.Text) { draft = draft.copy(navidromeUser = it) }
             SecretField("Password", draft.navidromePassword) { draft = draft.copy(navidromePassword = it) }
+            if (!kind.embyLike) ApiKeyField(draft) { draft = it }
             if (showProxy) {
                 Hint("Only for a reverse proxy that asks for its own login before your server.")
                 Field("Proxy username", draft.proxyUser, keyboard = KeyboardType.Text) { draft = draft.copy(proxyUser = it) }
@@ -157,10 +169,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                 TextButton(onClick = { showProxy = true }) { Text("Server behind a login page? Add a proxy login") }
             }
             TestRow(navidromeTest) {
-                runTest({ navidromeTest = it }) { s ->
-                    val server = if (kind.embyLike) EmbyApi(graph.http, { s }, jellyfin = kind == SourceKind.JELLYFIN) else SubsonicApi(graph.http) { s }
-                    "Connected to " + server.ping()
-                }
+                runTest({ navidromeTest = it }) { s -> testServer(graph, s, kind) }
             }
             // Smart extras turned down on the first run (issue #113): only the server. They're here later in Settings.
             if (extras || !firstRun) {
