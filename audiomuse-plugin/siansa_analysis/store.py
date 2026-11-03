@@ -452,7 +452,7 @@ def beats_counts(db):
     return int(done or 0), int(with_beat or 0), int(failed or 0), int(waiting or 0), int(elsewhere or 0)
 
 
-def songs_to_measure(db, limit, beats=False):
+def songs_to_measure(db, limit, beats=False, fill=False):
     """Up to ``limit`` songs to measure, newest first.
 
     Without ``beats``, songs without a current volume and fade profile (none yet, an older analyser, or due to be
@@ -463,9 +463,11 @@ def songs_to_measure(db, limit, beats=False):
     cur = db.cursor()
     if beats:
         # Songs that failed come back once their wait is over; songs waiting their first try come first.
-        # Also asked-for songs measured before 0.5.0 looked for where the beat stops: only those, never the rest.
+        # Also songs measured before 0.5.0 looked for where the beat stops: asked-for ones always, the rest only with
+        # Measure all on (``fill``), when the owner chose to have the whole library done.
+        missing = f"NOT (COALESCE(p.beats, '{{}}'::jsonb) ? '{UNTIL_KEY}')"
         where = f"""p.status='ready' AND p.analyzer_version = %s
-                AND (p.beats_version <> %s OR (w.item_id IS NOT NULL AND NOT (COALESCE(p.beats, '{{}}'::jsonb) ? '{UNTIL_KEY}')))
+                AND (p.beats_version <> %s OR ({missing} AND {"TRUE" if fill else "w.item_id IS NOT NULL"}))
                 AND (p.beats_retry_after IS NULL OR p.beats_retry_after <= now())"""
         params = (ANALYZER_VERSION, BEATS_VERSION)
     else:

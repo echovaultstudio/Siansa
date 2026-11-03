@@ -217,7 +217,7 @@ def measure_part(part, budget_seconds=None, batch=None):
         tried = set()
         stopped = halted = False
         while len(tried) < limit and not stopped:
-            rows = [r for r in store.songs_to_measure(db, min(25, limit - len(tried)) + len(tried), beats=spec["beats"])
+            rows = [r for r in store.songs_to_measure(db, min(25, limit - len(tried)) + len(tried), beats=spec["beats"], fill=all_on)
                     if r[0] not in tried]
             if not rows:
                 break
@@ -264,7 +264,7 @@ def measure_part(part, budget_seconds=None, batch=None):
                                                   "measured": measured, "failed": failed, "error": None}, db)
         seconds = round(time.monotonic() - started, 1)
         store.set_state("profiles_rate", status.next_rate(rate, measured + failed, seconds), db)
-        if all_on and not store.songs_to_measure(db, 1, beats=spec["beats"]):
+        if all_on and not store.songs_to_measure(db, 1, beats=spec["beats"], fill=True):
             store.set_state(spec["all"], {"on": False, "finished_at": now_iso()}, db)
             logger.info("siansa_analysis: every song is measured%s", " for its beats" if spec["beats"] else "")
         result = {"status": "idle", "finished_at": now_iso(), "measured": measured, "failed": failed,
