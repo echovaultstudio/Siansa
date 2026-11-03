@@ -188,13 +188,18 @@ object Crossfade {
                 // Both ends keep a beat that can't be laid on the other's: a long blend would clash, so a short one.
                 overlap = BeatMatch.CLASH_MS
                 why += " · beats would clash, so a short blend"
-            } else if (beatMatch && !rhythmic && !mixed && overlap < maxMs) {
-                // A DJ blend where at most one end keeps a beat (0.52.0-dev: a beatless intro under a beat-driven
+            } else if (beatMatch && !rhythmic && !mixed && overlap < maxMs && (BeatMatch.beatless(outro) || BeatMatch.beatless(intro))) {
+                // A DJ blend where one end has no beat at all (0.52.0-dev: a beatless intro under a beat-driven
                 // outro got 3.3 s with 30 s set): nothing to clash with, so it runs the whole crossfade length, as a
                 // DJ brings a quiet intro in under the old song. The next song fades in over the first half of it.
                 overlap = maxMs
-                why += " · DJ: at most one end has a beat, nothing to clash, so the whole crossfade length"
+                why += " · DJ: one end has no beat, nothing to clash, so the whole crossfade length"
                 return@run FadePlan(overlap, maxOf(head, overlap / 2), why, cut)
+            } else if (beatMatch && !rhythmic && !mixed && overlap > BeatMatch.CLASH_MS && BeatMatch.someBeat(outro) && BeatMatch.someBeat(intro)) {
+                // Both ends have some beat, one just short of beat-driven (0.52.0-dev: a house remix's outro read
+                // 0.46 into Cubicolor's beat ran 30 s out of step): a long blend would clash, so a short one.
+                overlap = BeatMatch.CLASH_MS
+                why += " · DJ: both ends have some beat, so a short blend"
             }
             FadePlan(overlap, head.coerceIn(MIN_FADE_IN_MS, overlap.coerceAtLeast(MIN_FADE_IN_MS)), why, cut)
         } else if (mode == CrossfadeMode.SMART && BeatMatch.beatDriven(outro) && nextProfile == null) {

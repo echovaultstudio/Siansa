@@ -214,6 +214,21 @@ class CrossfadePlanTest {
         assertEquals(BeatMatch.CLASH_MS, Crossfade.plan(CrossfadeMode.SMART, 30_000, a1, b1, minutes4, minutes4, current, beaty, beatMatch = true)!!.overlapMs)
     }
 
+    @Test fun aDjBlendWithABeatJustShortOfBeatDrivenStaysShort() {
+        // 0.52.0-dev: Jon Hopkins (George Fitzgerald remix), outro read beat 0.46 steady 0.16, into Cubicolor
+        // (beat 0.87) got the whole 30 s, out of step. It has a beat, just not a steady one: a short blend.
+        val out = BeatEnd(bpm = 123.2, beatMs = 300_000.0, barMs = null, rhythm = 0.46f, steady = 0.16f)
+        val inn = BeatEnd(bpm = 121.0, beatMs = 500.0, barMs = 500.0, rhythm = 0.87f, steady = 0.88f)
+        val current = TrackProfile("a1", -10.0, listOf(RampPoint(-18, 0)), listOf(RampPoint(-18, 2_000)), outro = out)
+        val next = TrackProfile("b1", -10.0, listOf(RampPoint(-18, 0)), emptyList(), intro = inn)
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 30_000, a1, b1, minutes4, minutes4, current, next, beatMatch = true)!!
+        assertEquals(BeatMatch.CLASH_MS, plan.overlapMs)
+        assertTrue(plan.why, plan.why.contains("both ends have some beat"))
+        // Truly beatless (0.10): the whole length.
+        val ambient = current.copy(outro = out.copy(rhythm = 0.10f))
+        assertEquals(30_000L, Crossfade.plan(CrossfadeMode.SMART, 30_000, a1, b1, minutes4, minutes4, ambient, next, beatMatch = true)!!.overlapMs)
+    }
+
     @Test fun aHardEndingIntoAHardHitPlaysBackToBack() {
         assertNull(Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, b1, minutes4, minutes4, profile("a1", 0, 100), profile("b1", 100, 0)))
     }
