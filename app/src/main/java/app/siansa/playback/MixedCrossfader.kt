@@ -86,7 +86,6 @@ internal class MixedCrossfader(
     private var easingFrom = 0f
     private var easingSince = 0L
     private var easeChanges = 0
-    private var echoNoted = false
 
     override fun start() {
         main.addListener(this)
@@ -107,6 +106,8 @@ internal class MixedCrossfader(
         when (phase) {
             Phase.FADING -> {
                 AppLog.i("Crossfade", "Fade stopped: $why")
+                // Stopped or skipped: the echo stops with it rather than ringing over what comes next.
+                tailMix?.echo?.clear()
                 finish()
             }
             Phase.READY, Phase.CUED -> disarm()
@@ -325,9 +326,13 @@ internal class MixedCrossfader(
                 mainMix.filter.shelfDb = DeckFilter.SHELF_START_DB
                 AppLog.d("Crossfade", "Bass swap over the first ${SWAP_FRACTION_PERCENT} % of the blend: next song's bass held back ${-DeckFilter.SHELF_START_DB.toInt()} dB, old song's cut up to ${DeckFilter.LOW_CUT_HZ.toInt()} Hz")
             }
-            if (settings().echoTail && !echoNoted) {
-                echoNoted = true
-                AppLog.d("Crossfade", "Echo at the end: not in the new audio engine yet")
+            if (settings().echoTail) {
+                tailMix?.let { d ->
+                    val echo = engine.core.echoOf(d)
+                    echo.clear()
+                    echo.delayMs = beat.outgoing.beatLengthMs
+                    AppLog.d("Crossfade", "Echo at the end: over the old song's last bar, repeats a beat apart (${beat.outgoing.beatLengthMs.toInt()} ms)")
+                }
             }
             if (settings().keepKey) AppLog.d("Crossfade", "Keep the key: not in the new audio engine yet; the pitch follows the speed")
         }
@@ -363,6 +368,7 @@ internal class MixedCrossfader(
             t.volume = if (tailDone) 0f else tailBase * sleepLevel() * Crossfade.fadeOut(out)
             val beat = planned.beat
             if (beat != null && settings().bassSwap) swapBass(out, tMix)
+            if (beat != null && settings().echoTail) tMix.echo?.let { echoOut(it, planned, beat, tailMs, tailDone) }
             val onNext = main.currentMediaItemIndex == incomingIndex
             // How long the next song has been heard, on the mixer's own clock: never a song time that can be misread,
             // so the fade-in can't stay at nothing (0.52.0-dev).
@@ -620,7 +626,24 @@ internal class MixedCrossfader(
         poke()
     }
 
+    /**
+     * The echo at the end (issue #759): more and more of the old song goes to the echo over its last bar, before its
+     * volume, so its last beats repeat on the beat after it's gone; once it's done, nothing more is sent and the
+     * repeats die away by themselves.
+     */
+    private fun echoOut(echo: app.siansa.playback.engine.Echo, planned: FadePlan, beat: BeatMatch.Plan, tailMs: Long, tailDone: Boolean) {
+        if (tailDone) {
+            echo.send = 0f
+            return
+        }
+        val bar = beat.outgoing.beatLengthMs * BeatMatch.BEATS_PER_BAR
+        val left = planned.overlapMs - (tailMs - startAt)
+        echo.send = ((bar - left) / bar).toFloat().coerceIn(0f, 1f) * ECHO_SEND * tailBase * sleepLevel()
+    }
+
     private fun releaseTail() {
+        // The repeats ring out by themselves; nothing more goes in.
+        tailMix?.echo?.send = 0f
         mainMix.filter.reset()
         tailMix?.filter?.reset()
         tail?.let { t ->
@@ -740,6 +763,8 @@ internal class MixedCrossfader(
         const val STUCK_MS = 2_000L
         /** How long a song may have sound with none reaching the output, outside a fade, before it starts again. */
         const val MUTED_MS = 3_000L
+        /** How much of the old song goes to the echo by the end of its last bar (as the old engine's hall, #759). */
+        const val ECHO_SEND = 0.75f
         /** An output playing this long without its position moving on is stuck. */
         const val STALLED_MS = 3_000L
         /** The player has handed over sound this long without a break: what it handed first should be heard by now. */

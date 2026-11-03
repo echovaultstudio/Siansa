@@ -104,8 +104,11 @@ on beat.
 up to about 200 Hz) while the new song's, held back at first, is let in, as a DJ does with the EQ: two kick drums
 never play at once, so a blend a few ms out of step is heard as a mix, not a flam.
 
-**Echo at the end** (on by default): over the last bar of a blend the old song rings out in a hall, as a DJ
-echoes a track out, so the join is softer. A phone whose reverb can't be opened plays the blend plain.
+**Echo at the end** (on by default): over the last bar of a blend more and more of the old song goes to an echo,
+as a DJ echoes a track out, so the join is softer. Its last beats then repeat on the beat after it's gone, each
+repeat fainter, thinner and darker, for a few seconds. Skipping or stopping during a blend stops the echo too. (Siansa
+Dev's new audio engine makes the echo itself; the released app uses the phone's hall reverb, and plays the blend
+plain on a phone whose reverb can't be opened.)
 
 **Keep the key** (off by default): how the next song is sped up or slowed down. Off, the sound is resampled, like
 a record played a touch fast or slow or a DJ's pitch fader: every drum hit stays as it was, and the pitch moves with
