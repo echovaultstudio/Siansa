@@ -76,4 +76,19 @@ class CombinedArtistsTest {
         assertEquals(listOf("c"), CombinedArtists.containing(koffee, found).map { it.id })
         assertTrue(CombinedArtists.containing(combined, found).isEmpty())
     }
+
+    @Test fun aNameGivenOneOfItsArtistsMusicBrainzIdIsStillSplit() {
+        // 0.52.0-dev: "ID, Camo & Krooked" came from Navidrome with Camo & Krooked's ID, so it stayed one artist.
+        val ck = Artist("ck", "Camo & Krooked", mbid = "5a5f0c3e-8d3c-4e5c-9b8f-2b8a6d0a0c01")
+        val joined = Artist("j", "ID, Camo & Krooked", mbid = "5A5F0C3E-8D3C-4E5C-9B8F-2B8A6D0A0C01")
+        val c = CombinedArtists.find(listOf(ck, joined)).getValue("j")
+        assertEquals(listOf("ck"), c.parts.map { it.id })
+        assertEquals(listOf("ID"), c.unknown)
+    }
+
+    @Test fun aBandWithItsOwnMusicBrainzIdStaysWhole() {
+        val earth = Artist("e", "Earth, Wind & Fire", mbid = "535afeda-2538-435d-9dd1-5e10be586774")
+        val wind = Artist("w2", "Wind", mbid = "11111111-2222-3333-4444-555555555555")
+        assertTrue(CombinedArtists.find(listOf(earth, wind)).isEmpty())
+    }
 }
