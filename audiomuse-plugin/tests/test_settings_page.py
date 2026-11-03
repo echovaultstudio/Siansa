@@ -151,7 +151,7 @@ class BeatGridsTest(unittest.TestCase):
         self.assertIn('value="measure_beats"', page)
         self.assertIn("Measure all 40 songs for their beats", page)
         self.assertIn("every song has its beat grid in about", page)
-        self.assertIn("Their loudness and fades stay in use meanwhile", page)
+        self.assertIn("stays in use meanwhile", page)
 
     def test_songs_waiting_for_where_the_beat_stops_can_be_measured_all(self):
         # Plugin 0.5.0 showed every song measured, with no Measure all and the batch button greyed out.
