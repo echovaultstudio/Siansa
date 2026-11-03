@@ -11,10 +11,11 @@ instead: the same songs, with Google's plain screen ("Default Media Receiver", b
 ## Turning it on
 
 1. **Host the page.** Copy `index.html` to the website in `echovaultstudio/siansa-dev`, as
-   `deploy/site/cast/index.html`, so it's served at **https://siansa.app/cast/**. It must be HTTPS; Cast devices
+   `deploy/site/cast.html` (the site takes only flat files), so it's served at **https://siansa.app/cast.html**; the
+   Caddyfile there gives it its own Content-Security-Policy (Google's Cast library, covers and songs from any server). It must be HTTPS; Cast devices
    won't load a receiver over plain HTTP. Copy it again whenever it changes here.
 2. **Register it.** In the [Google Cast SDK Developer Console](https://cast.google.com/publish) (one-time fee):
-   **Add new application › Custom Receiver**, name **Siansa**, receiver URL `https://siansa.app/cast/`. The console
+   **Add new application › Custom Receiver**, name **Siansa**, receiver URL `https://siansa.app/cast.html`. The console
    gives an 8-character app id (for example `A1B2C3D4`).
 3. **Add a test TV.** While the app is unpublished, only registered devices can load it: **Add new device**, with
    the TV's serial number (Google TV: **Settings › System › About › Serial number**). Wait about 15 minutes, then
