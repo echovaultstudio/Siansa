@@ -185,7 +185,9 @@ internal class Crossfader(
         val duration = main.duration
         val nextIndex = main.nextMediaItemIndex
         val unwanted = s.crossfade == CrossfadeMode.OFF || !allowed() || main.repeatMode == Player.REPEAT_MODE_ONE ||
-            duration == C.TIME_UNSET || duration <= 0 || nextIndex == C.INDEX_UNSET || item.mediaId == skipped
+            duration == C.TIME_UNSET || duration <= 0 || nextIndex == C.INDEX_UNSET || item.mediaId == skipped ||
+            // Radio stations and podcast episodes (issue #353) never blend, into or out of anything.
+            !Crossfade.blends(item.mediaId, main.getMediaItemAt(nextIndex).mediaId)
         if (unwanted) {
             if (phase == Phase.READY) disarm()
             return LOOK_MS

@@ -17,6 +17,7 @@ import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import app.siansa.AppGraph
+import app.siansa.data.OutsideMedia
 import app.siansa.log.AppLog
 import app.siansa.playback.engine.AudioEngine
 import app.siansa.playback.engine.MixCore
@@ -67,13 +68,16 @@ object PlayerFactory {
         if (!songCacheOn(graph.settings.current)) AppLog.i("Cache", "Song cache is off: songs aren't kept after they play")
         // Each stream is pointed at the original file or an Opus conversion when it opens.
         val resolving = ResolvingDataSource.Factory(switching) { spec ->
-            val uri = spec.uri.toString().let { if (Streaming.RELOAD_PARAM in it) android.net.Uri.parse(Streaming.withoutReload(it)) else spec.uri }
-            val key = uri.getQueryParameter("id") ?: uri.toString()
-            spec.withUri(Streaming.rewrite(uri, kbpsFor(key)))
+            // A radio station or podcast episode (issue #353) plays from its own address as it is.
+            if (OutsideMedia.isMarked(spec.uri.toString())) spec else {
+                val uri = spec.uri.toString().let { if (Streaming.RELOAD_PARAM in it) android.net.Uri.parse(Streaming.withoutReload(it)) else spec.uri }
+                val key = uri.getQueryParameter("id") ?: uri.toString()
+                spec.withUri(Streaming.rewrite(uri, kbpsFor(key)))
+            }
         }
         // Songs downloaded for offline listening play from their file, with no network at all.
         val dataSource = ResolvingDataSource.Factory(DefaultDataSource.Factory(context, resolving)) { spec ->
-            val id = if (spec.uri.scheme == "http" || spec.uri.scheme == "https") spec.uri.getQueryParameter("id") else null
+            val id = if ((spec.uri.scheme == "http" || spec.uri.scheme == "https") && !OutsideMedia.isMarked(spec.uri.toString())) spec.uri.getQueryParameter("id") else null
             id?.let { graph.downloads.fileFor(it) }?.let { spec.withUri(android.net.Uri.fromFile(it)) } ?: spec
         }
 

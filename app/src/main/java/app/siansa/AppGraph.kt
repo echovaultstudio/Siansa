@@ -1,5 +1,7 @@
 package app.siansa
 
+import app.siansa.data.StationRepository
+import app.siansa.net.OutsideSource
 import app.siansa.playback.ActivePlayer
 import app.siansa.playback.MiniFor
 import app.siansa.mix.Dice
@@ -256,8 +258,17 @@ class AppGraph(val app: Application) {
         },
         // Another shown user's songs, albums and covers go to their own server, of whatever kind (issue #427);
         // a book's cover ("bk-…") to Audiobookshelf (issue #521), through the same cover cache as everything.
-        route = { id -> if (id != null && id.startsWith(Book.COVER_PREFIX)) bookCovers else guests.sourceFor(id) },
+        // A radio station's or podcast episode's id and a web cover (issue #353) to their own addresses.
+        route = { id ->
+            when {
+                id != null && id.startsWith(Book.COVER_PREFIX) -> bookCovers
+                OutsideSource.handles(id) -> outside
+                else -> guests.sourceFor(id)
+            }
+        },
     )
+    /** Stations and podcast episodes (issue #353): only ever asked about their own ids. */
+    private val outside: MusicSource by lazy { OutsideSource(subsonic) }
     /** Only [MusicSource.coverUrl] is ever asked of it: book cover ids are routed here and nowhere else. */
     private val bookCovers: MusicSource by lazy { BookCoverSource(audiobookshelf, subsonic) }
     // Users shown together share a music server, but AudioMuse reads each login as a server of its own: a shown
@@ -394,6 +405,9 @@ class AppGraph(val app: Application) {
             }
         }
     }
+
+    /** Your Stations (issue #353): the server's radio stations and the stations and podcasts added on this phone. */
+    val stations = StationRepository(app.filesDir, http, { settings.current }) { subsonic.internetRadioStations() }
 
     /** Playlists kept only on this phone. */
     val localPlaylists = LocalPlaylists(app).also { local ->

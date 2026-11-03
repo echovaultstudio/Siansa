@@ -52,6 +52,8 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.PushPin
+import androidx.compose.material.icons.rounded.Podcasts
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Sync
@@ -124,6 +126,8 @@ private enum class Kind(val label: String, val chip: Boolean = true) {
     FAVOURITES("Favourites"), PLAYLIST("Playlists"), MIX("Mixes"), MUSIC("Music"),
     ALBUM("Albums", chip = false), ARTIST("Artists", chip = false), SONG("Songs", chip = false),
     LISTENING("Your listening"),
+    /** Your Stations (issue #353): internet radio and podcast feeds. */
+    STATIONS("Stations"),
     /** Audiobookshelf's (issue #521): chips only while a server is set up. */
     BOOKS("Books"), PODCASTS("Podcasts"),
 }
@@ -157,6 +161,12 @@ private data class Entry(
     val alwaysPinned: Boolean = false,
     /** Shown under the Favourites chip (issues #275, #289): the Favourite albums card and Liked songs. */
     val favourite: Boolean = false,
+    /** Only under its own chip (or a search), not in the full list: each station and podcast (issue #353). */
+    val chipOnly: Boolean = false,
+    /** A radio station, played on a tap instead of opening a page (issue #353). */
+    val station: app.siansa.data.Station? = null,
+    /** An icon on a generated cover. */
+    val icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
 )
 
 private class LibraryData(val entries: List<Entry>, val subFilters: Map<Kind, List<String>>)
@@ -208,7 +218,9 @@ fun YourLibraryScreen(nav: NavController) {
     // Built again when the connection comes back, for what only Navidrome has.
     val connection by graph.connection.state.collectAsStateWithLifecycle()
     val online = !connection.offline
-    val data by produceState<Load<LibraryData>>(Load.Loading, version, mixes?.size, settings.navidromeUser, favouriteIds, favouriteArtistIds, online) {
+    // Built again when a station or podcast is added or removed (issue #353).
+    val ownStations by graph.stations.state.collectAsStateWithLifecycle()
+    val data by produceState<Load<LibraryData>>(Load.Loading, version, mixes?.size, settings.navidromeUser, favouriteIds, favouriteArtistIds, online, ownStations) {
         val me = settings.navidromeUser
         value = loadLibrary(graph, me)
         if (refreshFromServer(graph, me)) value = loadLibrary(graph, me)
@@ -231,7 +243,7 @@ fun YourLibraryScreen(nav: NavController) {
                 when {
                     // Songs only under Music.
                     it.kind == Kind.SONG -> selectedKind == Kind.MUSIC && (musicPart == null || musicPart == Kind.SONG)
-                    selectedKind == null -> true
+                    selectedKind == null -> !it.chipOnly || query.isNotBlank()
                     selectedKind == Kind.MUSIC -> it.kind in MUSIC_PARTS && (musicPart == null || it.kind == musicPart)
                     else -> it.kind == selectedKind || (it.alwaysPinned && selectedKind == Kind.PLAYLIST && it.heart) ||
                         (selectedKind == Kind.FAVOURITES && it.favourite)
@@ -384,6 +396,8 @@ fun YourLibraryScreen(nav: NavController) {
                             val queue = list.drop(at).take(SONG_QUEUE).mapNotNull { songs?.byKey?.get(it.key) }
                             if (queue.isNotEmpty()) graph.player.play(queue, 0)
                         }
+                        // A radio station plays live (issue #353).
+                        e.station != null -> scope.launch { playStation(graph, e.station) }
                         else -> nav.navigate(e.route)
                     }
                 }
@@ -729,6 +743,7 @@ private fun EntryCover(e: Entry, modifier: Modifier, big: Boolean) {
                     modifier = Modifier.padding(Space.Small),
                 )
                 e.kind == Kind.LISTENING -> Icon(Icons.AutoMirrored.Rounded.ShowChart, null, tint = Color.White)
+                e.icon != null -> Icon(e.icon, null, tint = Color.White, modifier = Modifier.size(if (big) 44.dp else 26.dp))
             }
         }
     } else {
@@ -915,9 +930,12 @@ private suspend fun refreshFromServer(graph: app.siansa.AppGraph, me: String): B
         val playlists = async { runCatching { graph.library.refreshPlaylists { graph.source.playlists() } } }
         val favourites = async { graph.favouriteAlbums.refresh() }
         val favouriteArtists = async { graph.favouriteArtists.refresh() }
+        // The server's radio stations (issue #353), kept for the next time the list is built.
+        val stations = async { graph.stations.serverStations() }
         playlists.await()
         favourites.await()
         favouriteArtists.await()
+        stations.await()
         recent.await()?.also { lastRecent = me to it } != null
     }
     AppLog.d("Library", "Navidrome part of the library ${if (recentOk) "fetched" else "not reachable"} in ${System.currentTimeMillis() - started} ms")
@@ -951,6 +969,69 @@ private fun bookEntry(book: app.siansa.data.Book, progress: app.siansa.data.Book
     )
 }
 
+/**
+ * Your Stations (issue #353): one card that opens the page, in the full list, and each station and podcast under the
+ * Stations chip (and in searches): the server's stations, then those added on this phone.
+ */
+private suspend fun stationEntries(graph: app.siansa.AppGraph): List<Entry> {
+    val own = graph.stations.mine()
+    val server = graph.stations.knownServerStations()
+    val radioIcon = Icons.Rounded.Radio
+    val podcastIcon = Icons.Rounded.Podcasts
+    val lastAdded = (own.stations.map { it.addedAt } + own.podcasts.map { it.addedAt }).maxOrNull() ?: 0L
+    val count = server.size + own.stations.size + own.podcasts.size
+    val list = ArrayList<Entry>()
+    list += Entry(
+        key = "stations",
+        kind = Kind.STATIONS,
+        title = "Your Stations",
+        subtitle = "Radio and podcasts · " + if (count == 0) "add a link" else "$count",
+        route = "stations",
+        gradient = Color(0xFFB8336A) to Color(0xFF2B5FD6),
+        icon = radioIcon,
+        recentAt = lastAdded,
+        addedAt = lastAdded,
+        creator = "Siansa",
+    )
+    (server + own.stations).forEach { st ->
+        val image = app.siansa.data.OutsideMedia.cover(st.image)
+        list += Entry(
+            key = "station-${st.id}",
+            kind = Kind.STATIONS,
+            title = st.name,
+            subtitle = stationLine(st),
+            route = "stations",
+            coverArt = image,
+            gradient = if (image == null) tileColors(st.id) else null,
+            icon = radioIcon,
+            addedAt = st.addedAt,
+            creator = st.name,
+            tags = setOf("Radio"),
+            chipOnly = true,
+            station = st,
+        )
+    }
+    own.podcasts.forEach { feed ->
+        val image = app.siansa.data.OutsideMedia.cover(feed.image)
+        list += Entry(
+            key = "podcast-${feed.id}",
+            kind = Kind.STATIONS,
+            title = feed.title,
+            subtitle = podcastLine(feed),
+            route = "podcast/${feed.id}",
+            coverArt = image,
+            gradient = if (image == null) tileColors(feed.id) else null,
+            icon = podcastIcon,
+            addedAt = feed.addedAt,
+            recentAt = feed.episodes.maxOfOrNull { it.publishedAt } ?: 0L,
+            creator = feed.author,
+            tags = setOf("Podcasts"),
+            chipOnly = true,
+        )
+    }
+    return list
+}
+
 private suspend fun buildLibrary(graph: app.siansa.AppGraph, me: String): LibraryData {
     val entries = ArrayList<Entry>()
     val now = LocalDate.now()
@@ -965,6 +1046,8 @@ private suspend fun buildLibrary(graph: app.siansa.AppGraph, me: String): Librar
                 .forEach { book -> entries += bookEntry(book, graph.books.progress.value[book.id]) }
         }
     }
+    stationEntries(graph).forEach { entries += it }
+
     // Favourite albums as Navidrome last sent them (refreshed in refreshFromServer), or the phone's copy (issue #275).
     val favouriteAlbums = graph.favouriteAlbums.albums
     // And favourite artists the same way (issue #397).
@@ -1212,6 +1295,7 @@ private suspend fun buildLibrary(graph: app.siansa.AppGraph, me: String): Librar
         Kind.LISTENING to present(Kind.LISTENING, listOf("This month", "Last month", "This year", "This time last year")),
         Kind.BOOKS to present(Kind.BOOKS, listOf("Listening", "Not started", "Finished")),
         Kind.PODCASTS to present(Kind.PODCASTS, listOf("Listening", "New", "All")),
+        Kind.STATIONS to present(Kind.STATIONS, listOf("Radio", "Podcasts")),
     )
     return LibraryData(entries, subFilters)
 }

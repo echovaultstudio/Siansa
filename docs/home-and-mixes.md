@@ -194,10 +194,13 @@ Home with its switch in Settings.
 
 ## Your Library
 
-The chips at the top narrow the list down: **Playlists**, **Music**, **Mixes**, **Favourites** and **Your listening**.
+The chips at the top narrow the list down: **Playlists**, **Music**, **Mixes**, **Favourites**, **Your listening**
+and **Stations**.
 
 - **Music** holds your albums, artists and songs; tap **Albums**, **Artists** or **Songs** under it to see one kind.
   **Songs** lists every song in the libraries you sync; tap one to play it and the songs after it.
+- **Stations** holds internet radio and podcasts ([Your Stations](stations.md)): each station and podcast, split into
+  **Radio** and **Podcasts**. Tap a station to play it live. In the full list there's one **Your Stations** card.
 - **The chips come in the order you last opened them**, so the ones you use most are at the front. When more chips
   are hidden to the right, the row fades there with a **›** button that scrolls on.
 - **Each chip keeps its own sort** (Recents, Alphabetical, Most played…) until you change it, also after Siansa

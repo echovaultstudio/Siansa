@@ -8,6 +8,8 @@ object StreamQuality {
     /** Session extras the playback service sends: the song they're about, and its Opus kbit/s (0 = original). */
     const val EXTRA_SONG_ID = "app.siansa.quality.song"
     const val EXTRA_KBPS = "app.siansa.quality.kbps"
+    /** What a radio station's stream says it's playing (issue #353), for the song in [EXTRA_SONG_ID]. */
+    const val EXTRA_STREAM_TITLE = "app.siansa.quality.streamTitle"
 
     /** A short name for an audio format from the player's MIME types, or null when it isn't known yet. */
     fun codecName(sampleMimeType: String?, containerMimeType: String? = null): String? {

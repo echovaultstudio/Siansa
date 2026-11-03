@@ -321,6 +321,9 @@ class SubsonicApi(
     override suspend fun playlists(): List<Playlist> =
         call("getPlaylists").obj("playlists")?.arr("playlist").orEmpty().map(::parsePlaylist)
 
+    /** The server's internet radio stations (issue #353): Navidrome keeps a list, set up in its web page. */
+    suspend fun internetRadioStations(): List<app.siansa.data.Station> = parseRadioStations(call("getInternetRadioStations"))
+
     override suspend fun playlist(id: String): PlaylistDetail {
         val p = call("getPlaylist", mapOf("id" to id)).obj("playlist") ?: throw ApiException("Playlist not found")
         return PlaylistDetail(parsePlaylist(p), p.arr("entry").map(::parseSong))
@@ -678,6 +681,24 @@ class SubsonicApi(
             "alphabeticalByArtist" -> albums.sortedBy { it.artist.lowercase() }
             else -> albums
         }
+
+        /**
+         * `internetRadioStations: {internetRadioStation: [{id, name, streamUrl, homePageUrl}]}` as stations (issue #353).
+         * Ones without a name or an http(s) stream are left out.
+         */
+        fun parseRadioStations(root: JsonObject): List<app.siansa.data.Station> =
+            root.obj("internetRadioStations")?.arr("internetRadioStation").orEmpty().mapNotNull { o ->
+                val stream = o.str("streamUrl")?.trim()?.takeIf { StreamLinks.isWeb(it) } ?: return@mapNotNull null
+                val name = o.str("name")?.trim()?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+                app.siansa.data.Station(
+                    id = "server-" + (o.str("id") ?: stream),
+                    name = name,
+                    streamUrl = stream,
+                    link = stream,
+                    homePage = o.str("homePageUrl")?.trim()?.takeIf { StreamLinks.isWeb(it) },
+                    fromServer = true,
+                )
+            }
 
         fun enc(value: String): String = URLEncoder.encode(value, "UTF-8")
         fun md5(value: String): String =

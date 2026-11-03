@@ -39,6 +39,7 @@ import app.siansa.BuildConfig
 import app.siansa.playback.engine.AudioEngine
 import app.siansa.MainActivity
 import app.siansa.SiansaApp
+import app.siansa.data.OutsideMedia
 import app.siansa.data.PlayEvent
 import app.siansa.data.Song
 import app.siansa.log.AppLog
@@ -111,7 +112,7 @@ class PlaybackService : MediaSessionService() {
         exo = built.player
         val player = ServerSeekPlayer(
             exo,
-            converted = { id -> graph.downloads.fileFor(id) == null && (chosenKbps[id] ?: Streaming.bitrate(this, graph.settings.current)) > 0 },
+            converted = { id -> !OutsideMedia.isOutside(id) && graph.downloads.fileFor(id) == null && (chosenKbps[id] ?: Streaming.bitrate(this, graph.settings.current)) > 0 },
             durationMsOf = { id -> SongRegistry.get(id)?.durationSec?.takeIf { it > 0 }?.let { it * 1000L } },
         )
         phone = player
@@ -265,7 +266,7 @@ class PlaybackService : MediaSessionService() {
         scope.launch { runCatching { graph.scrobbler.flush() } }
     }
 
-    private fun kbpsFor(songId: String): Int = chosenKbps.getOrPut(songId) {
+    private fun kbpsFor(songId: String): Int = if (OutsideMedia.isOutside(songId)) 0 else chosenKbps.getOrPut(songId) {
         // A file type the phone can't open is converted from the start (issue #354).
         SongRegistry.get(songId)?.suffix?.takeIf { Formats.mustConvert(it) }?.let { suffix ->
             val kbps = Streaming.bitrate(this, graph.settings.current).takeIf { it > 0 } ?: FALLBACK_KBPS
@@ -280,6 +281,9 @@ class PlaybackService : MediaSessionService() {
 
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
 
+    /** The title a radio station's stream last sent (ICY), with the station's id (issue #353). */
+    private var streamTitle: Pair<String, String>? = null
+
     /** Tells the app's screens what the current song streams as (Opus kbit/s, or 0 for the original file). */
     private fun publishQuality() {
         val s = session ?: return
@@ -288,6 +292,8 @@ class PlaybackService : MediaSessionService() {
         s.setSessionExtras(Bundle().apply {
             putString(StreamQuality.EXTRA_SONG_ID, id)
             putInt(StreamQuality.EXTRA_KBPS, kbps)
+            // What a radio station is playing now, from its stream (issue #353).
+            streamTitle?.takeIf { it.first == id }?.let { putString(StreamQuality.EXTRA_STREAM_TITLE, it.second) }
         })
     }
 
@@ -358,7 +364,7 @@ class PlaybackService : MediaSessionService() {
         val factory = cacheFactory ?: return
         val items = upcomingIndices(player, ahead).drop(1).map { player.getMediaItemAt(it) }.filter { item ->
             // Only originals are cached; downloaded songs are on the phone already.
-            item.localConfiguration?.uri != null && kbpsFor(item.mediaId) <= 0 && graph.downloads.fileFor(item.mediaId) == null
+            item.localConfiguration?.uri != null && !OutsideMedia.isOutside(item.mediaId) && kbpsFor(item.mediaId) <= 0 && graph.downloads.fileFor(item.mediaId) == null
         }
         if (items.isEmpty()) return
         // Only called once the current song has fully loaded, so they never share the connection; one at a time.
@@ -698,7 +704,8 @@ class PlaybackService : MediaSessionService() {
             handler.removeCallbacks(timelineTick)
             val started = startedAtMs
             val heard = listenedMs
-            scope.launch { runCatching { graph.history.finish(song.id, started, heard, song.durationSec) } }
+            // Radio and podcasts (issue #353) stay out of your listening history.
+            if (!OutsideMedia.isOutside(song.id)) scope.launch { runCatching { graph.history.finish(song.id, started, heard, song.durationSec) } }
             current = null
         }
 
@@ -737,11 +744,31 @@ class PlaybackService : MediaSessionService() {
             baseVolume = level.volume
             AppLog.i("Loudness", "Song ${song.id} levelled by ${level.source.name.lowercase()}: ${"%+.1f".format(level.gainDb)} dB (${level.why})")
             if (onPhone) applyVolume(player)
+            streamTitle = null
+            if (OutsideMedia.isOutside(song.id)) {
+                // A radio station or podcast episode (issue #353): no loudness profile, scrobble or history.
+                AppLog.i("Player", if (OutsideMedia.isLive(song.id)) "Live radio: no seeking, crossfades or scrobbling" else "Podcast episode: no crossfades or scrobbling")
+                publishQuality()
+                return
+            }
             fetchProfiles(song)
             graph.scrobbler.nowPlaying(song)
             scope.launch {
                 runCatching { graph.history.add(PlayEvent(song.id, song.title, song.artist, song.genre, System.currentTimeMillis())) }
             }
+        }
+
+        /** A radio stream's own title for what it's playing (ICY "StreamTitle"), shown under the station (issue #353). */
+        override fun onMetadata(metadata: androidx.media3.common.Metadata) {
+            val id = player.currentMediaItem?.mediaId ?: return
+            if (!OutsideMedia.isLive(id)) return
+            val title = (0 until metadata.length()).map { metadata.get(it) }
+                .filterIsInstance<androidx.media3.extractor.metadata.icy.IcyInfo>()
+                .firstNotNullOfOrNull { it.title?.trim()?.takeIf { t -> t.isNotEmpty() } } ?: return
+            if (streamTitle == id to title) return
+            streamTitle = id to title
+            AppLog.d("Player", "Station now playing \"$title\"")
+            publishQuality()
         }
 
         /** Levels the current song again, after a setting changed or its measured loudness arrived. */
@@ -819,6 +846,8 @@ class PlaybackService : MediaSessionService() {
             // onTracksChanged; this covers the ones that never get that far.
             if (!onPhone || !Formats.convertible(error.errorCode)) return
             val item = player.currentMediaItem ?: return
+            // Only the music server can convert: a station or episode (issue #353) can't be played another way.
+            if (OutsideMedia.isOutside(item.mediaId)) return
             if (chosenKbps[item.mediaId] == FALLBACK_KBPS) return
             if (graph.connection.current.offline) return
             AppLog.w("Audio", "The phone can't play ${item.mediaId} (${error.errorCodeName}); playing it as Opus $FALLBACK_KBPS kbit/s from Navidrome",
@@ -856,7 +885,7 @@ class PlaybackService : MediaSessionService() {
                 ))
                 return
             }
-            if (chosenKbps[item.mediaId] == FALLBACK_KBPS) {
+            if (chosenKbps[item.mediaId] == FALLBACK_KBPS || OutsideMedia.isOutside(item.mediaId)) {
                 AppLog.e("Audio", "Can't play ${item.mediaId} even as Opus: $desc", event = "playback.unsupported_format", fields = mapOf("song_id" to item.mediaId, "format" to desc))
                 return
             }

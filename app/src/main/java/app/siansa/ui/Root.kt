@@ -367,6 +367,9 @@ fun SiansaRoot() {
                 composable("discover/artists") { ArtistDiscoveryScreen(nav) }
                 composable("timemachine") { TimeMachineScreen(nav) }
                 composable("favourite-albums") { FavouriteAlbumsScreen(nav) }
+                // Your Stations (issue #353): radio and podcasts.
+                composable("stations") { StationsScreen(nav) }
+                composable("podcast/{id}") { PodcastScreen(nav, it.arguments?.getString("id").orEmpty()) }
                 composable("favourite-artists") { FavouriteArtistsScreen(nav) }
                 composable("fingerprint") { FingerprintScreen(nav) }
                 composable("song/{id}/details") { SongDetailsScreen(nav, it.arguments?.getString("id").orEmpty()) }

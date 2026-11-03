@@ -27,7 +27,8 @@ Both are panels in **Arrange Home**.
 
 ## In Your Library
 
-**Books** and **Podcasts** chips. Books sorts by **Recents** (last listened), **Title**, **Author**, **Series**
+**Books** and **Podcasts** chips (podcasts you add by their own feed are under **Stations**, see
+[Your Stations](stations.md)). Books sorts by **Recents** (last listened), **Title**, **Author**, **Series**
 and **Recently added**. Podcasts has **Listening**, **All** and **Subscriptions**.
 
 ## In Search
