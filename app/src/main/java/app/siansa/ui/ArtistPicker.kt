@@ -112,7 +112,7 @@ fun ArtistCircle(artist: Artist, modifier: Modifier) {
 
 /** The artist with [id], or the artists it names when it's several artists in one name (issue #359). */
 internal suspend fun artistsNamedBy(graph: AppGraph, id: String, name: String): List<Artist> =
-    graph.library.expandArtists(listOf(graph.library.artist(id) ?: Artist(id, name)))
+    graph.library.expandArtists(listOf(graph.library.artist(id) ?: Artist(id, name)), serverArtistsNamed(graph))
 
 /** Every artist on the song, as artists in the library where possible. */
 private suspend fun artistsOf(graph: AppGraph, song: Song): List<Artist> {
@@ -125,7 +125,7 @@ private suspend fun artistsOf(graph: AppGraph, song: Song): List<Artist> {
             .getOrDefault(emptyList())
     }
     // A name that's several artists in one (tagged without the server's separator) offers each of them (issue #359).
-    val found = graph.library.expandArtists(refs.map { ref -> graph.library.artist(ref.id) ?: Artist(ref.id, ref.name) })
+    val found = graph.library.expandArtists(refs.map { ref -> graph.library.artist(ref.id) ?: Artist(ref.id, ref.name) }, serverArtistsNamed(graph))
     AppLog.d("Artist", "Song ${song.id}: ${found.size} artists from Navidrome's list")
     if (found.isNotEmpty()) return found
 
@@ -137,5 +137,11 @@ private suspend fun artistsOf(graph: AppGraph, song: Song): List<Artist> {
         .distinctBy { it.id }
     if (byName.size > 1) return byName
     val single = song.artistId?.let { graph.library.artist(it) ?: Artist(it, song.artist) }
-    return graph.library.expandArtists(listOfNotNull(single ?: byName.firstOrNull()))
+    return graph.library.expandArtists(listOfNotNull(single ?: byName.firstOrNull()), serverArtistsNamed(graph))
+}
+
+/** The music server's artists named exactly [name] (by its search), for parts of a joined name the library lacks. */
+private fun serverArtistsNamed(graph: AppGraph): suspend (String) -> List<Artist> = { name ->
+    val key = normalizeKey(name)
+    graph.source.search(name).artists.filter { normalizeKey(it.name) == key }
 }
