@@ -303,7 +303,7 @@ class LibraryRepository(context: Context) {
             if (wanted.isNotEmpty()) {
                 val names = wanted.flatMap { it.unknown }.map { normalizeKey(it) to it }.distinctBy { it.first }
                 for ((key, name) in names) {
-                    if (key in serverArtists) continue
+                    if (serverArtists.containsKey(key)) continue
                     serverArtists[key] = runCatching { server(name) }
                         .onFailure { AppLog.d("Library", "Couldn't look up the artist \"$name\" on the server: ${it.message}") }
                         .getOrNull() ?: continue
