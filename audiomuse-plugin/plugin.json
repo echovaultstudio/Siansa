@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.5.4",
+      "min_core_version": "3.6.4",
+      "changelog": "A run stopped by AudioMuse-AI restarting (updating the plugin does that) no longer keeps the page on \"Measuring\" with its buttons off for up to 17 minutes: after 5 minutes without word from it, it counts as stopped and Measure all can be started again.",
+      "imageUrl": ""
+    },
+    {
       "version": "0.5.3",
       "min_core_version": "3.6.4",
       "changelog": "The Beat grids bar shows how far the check for where the beat stops has got, while Measure all works through the songs measured before 0.5.0. Before, it stayed full and said Ready.",

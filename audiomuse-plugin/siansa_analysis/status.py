@@ -197,10 +197,11 @@ def _utcnow():
 
 # ---- where the rounds are (Siansa issue #765) ---------------------------------------------------------------------
 
-# A job still "running" this long after its last word (it writes every 10 songs, and when it starts) has stopped:
-# the worker was restarted or the round was cut off. Its state is then shown as stopped, so the page doesn't wait
-# on it for ever and the buttons work again.
-STALE_SECONDS = ALL_ROUND_SECONDS + 5 * 60
+# A job still "running" this long after its last word (it writes every 10 songs or every minute, and when it starts;
+# one song takes at most 3 minutes) has stopped: the worker was restarted (a plugin update) or the round was cut off.
+# Its state is then shown as stopped, so the page doesn't wait on it and the buttons work again. It was a whole round
+# plus 5 minutes (17), which kept the page on "Measuring" that long after an update stopped the run (0.5.3).
+STALE_SECONDS = 5 * 60
 
 
 def _seconds_since(iso, now):
