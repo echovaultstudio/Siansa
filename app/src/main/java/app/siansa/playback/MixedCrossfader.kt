@@ -96,6 +96,7 @@ internal class MixedCrossfader(
     override fun release() {
         handler.removeCallbacks(watch)
         handler.removeCallbacks(fadeTick)
+        handler.removeCallbacks(soundCheck)
         stopEasing()
         main.removeListener(this)
         releaseTail()
@@ -501,33 +502,65 @@ internal class MixedCrossfader(
             onLevel()
             AppLog.w("Crossfade", "The main player was left turned down by a fade that's gone; back at full level")
         }
-        val stream = mainMix.current ?: return
-        if (stream.held) {
+        val stream = mainMix.current
+        if (stream != null && stream.held) {
             AppLog.w("Crossfade", "The main player was left silenced by a fade that's gone; its sound is back (${stream.describe()})")
             stream.freeHold()
-        } else if (main.isPlaying && stream.stuckMs(engine.outRate) > STUCK_MS) {
+        } else if (stream != null && main.isPlaying && stream.stuckMs(engine.outRate) > STUCK_MS) {
             // Playing, sound waiting, none given, with no fade under way: whatever holds it, it plays again.
             AppLog.w("Crossfade", "The main player was playing without sound for ${stream.stuckMs(engine.outRate)} ms (${stream.describe()}); freed")
             stream.freeHold()
-        } else if (main.isPlaying && sleepLevel() > 0.99f && stream.mutedMs(engine.outRate) > MUTED_MS) {
-            // The song has sound but the mix puts out none, with no fade and no sleep timer turning it down: whatever
-            // silences it is logged in full, then the song starts again where it is (once a song, so it can't loop).
-            val song = main.currentMediaItem?.mediaId
-            AppLog.w(
-                "Crossfade",
-                "The song has sound but none reaches the output for ${stream.mutedMs(engine.outRate)} ms: ${stream.describe()}, " +
-                    "player volume ${main.volume}, level $level, ${mainMix.filter.describe()}, ${engine.status()}",
-            )
-            if (song != null && song != restartedSong) {
-                restartedSong = song
-                AppLog.w("Crossfade", "Starting the song again where it is, so it plays with sound")
-                main.seekTo(main.currentPosition)
-            }
+        }
+        if (!main.isPlaying || sleepLevel() < 0.99f || main.volume < 0.01f) return
+        // The player hands over sound, but none goes out (0.52.0-dev: Djrum's Waxcap, Camo & Krooked's Passion, both
+        // right after a song that ended back to back): whatever holds it, it's logged in full and put right.
+        // Fed for longer than the stream holds plus the limit: a song that starts silent isn't taken for this.
+        val fed = mainMix.feedingMs() > FED_MS
+        val silent = engine.core.silentMs()
+        val muted = stream?.mutedMs(engine.outRate) ?: 0
+        when {
+            fed && silent > MUTED_MS -> recover("the player hands over sound but the mix has gone out silent for $silent ms")
+            muted > MUTED_MS -> recover("the song has sound but none of it reaches the mix for $muted ms")
+            engine.stalledMs() > STALLED_MS -> recover("the output has played without moving on for ${engine.stalledMs()} ms")
         }
     }
 
-    /** The song last started again for having no sound: once a song. */
-    private var restartedSong: String? = null
+    /**
+     * Puts sound that should be playing but isn't right, a step at a time and at most twice a song (so it can't
+     * loop): first the song starts again where it is (a new stream), then the output is opened again.
+     */
+    private fun recover(why: String) {
+        val song = main.currentMediaItem?.mediaId
+        if (song != recoverySong) {
+            recoverySong = song
+            recoverySteps = 0
+        }
+        AppLog.w("Crossfade", "No sound: $why · song $song at ${main.currentPosition} ms, player volume ${main.volume}, level $level · ${engine.core.describe()} · ${engine.status()}")
+        engine.core.resetSilence()
+        when (recoverySteps++) {
+            0 -> {
+                AppLog.w("Crossfade", "Starting the song again where it is, so it plays with sound")
+                main.seekTo(main.currentPosition)
+            }
+            1 -> {
+                AppLog.w("Crossfade", "Still no sound: opening the output again")
+                engine.reopen()
+            }
+            else -> Unit
+        }
+    }
+
+    /** The song sound was last put right for, and how many steps it took (at most two a song). */
+    private var recoverySong: String? = null
+    private var recoverySteps = 0
+
+    /** A few seconds into each song, what the mixer is doing, for the log: a silence shows up even if nothing caught it. */
+    private val soundCheck = Runnable {
+        if (main.isPlaying) {
+            val fed = mainMix.feedingMs() > 0
+            AppLog.d("Engine", "Sound check, ${main.currentMediaItem?.mediaId} at ${main.currentPosition} ms: player ${if (fed) "hands over sound" else "hands over silence"} · ${engine.core.describe()} · ${engine.status()}")
+        }
+    }
 
     private fun disarm() {
         if (phase == Phase.FADING) return
@@ -623,6 +656,8 @@ internal class MixedCrossfader(
         }
         stopEasing()
         skipped = null
+        handler.removeCallbacks(soundCheck)
+        handler.postDelayed(soundCheck, SOUND_CHECK_MS)
         if ((phase == Phase.READY || phase == Phase.CUED) && mediaItem?.mediaId != outgoing) disarm()
         poke()
     }
@@ -687,6 +722,12 @@ internal class MixedCrossfader(
         const val STUCK_MS = 2_000L
         /** How long a song may have sound with none reaching the output, outside a fade, before it starts again. */
         const val MUTED_MS = 3_000L
+        /** An output playing this long without its position moving on is stuck. */
+        const val STALLED_MS = 3_000L
+        /** The player has handed over sound this long without a break: what it handed first should be heard by now. */
+        const val FED_MS = 5_000L
+        /** How far into each song the mixer's state is logged. */
+        const val SOUND_CHECK_MS = 4_000L
         /** The next song is sent this far before its point (a jump lands up to a decoded block past it). */
         const val INCOMING_SEEK_BACK_MS = 300L
         const val TICK_MS = 20L

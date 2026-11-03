@@ -34,8 +34,8 @@ class AudioEngine(context: Context) {
     private val woken = wakeLock.newCondition()
     @Volatile private var running = true
     private var thread: Thread? = null
-    private var track: AudioTrack? = null
-    private var trackPlaying = false
+    @Volatile private var track: AudioTrack? = null
+    @Volatile private var trackPlaying = false
 
     /** Mix frames written to the output in all; the current AudioTrack's frame 0 is mix frame [trackBase]. */
     @Volatile var writtenMix = 0L
@@ -52,6 +52,10 @@ class AudioEngine(context: Context) {
     private var underruns = 0
     private var underrunsLoggedAt = 0L
     private var blocksSinceStamp = 0
+    // When the output's timestamp last moved on while it played: an output that plays but doesn't move is stuck.
+    private var stampFrame = -1L
+    @Volatile private var movedNs = 0L
+    @Volatile private var reopenWanted = false
 
     /** The player output each stream belongs to, told when its stream first sounds. */
     internal val outputs = ConcurrentHashMap<DeckStream, DeckOutput>()
@@ -107,6 +111,11 @@ class AudioEngine(context: Context) {
                 rest()
                 continue
             }
+            if (reopenWanted) {
+                reopenWanted = false
+                AppLog.w("Engine", "Opening the output again")
+                close()
+            }
             val t = track ?: open() ?: run {
                 Thread.sleep(RETRY_MS)
                 null
@@ -114,6 +123,7 @@ class AudioEngine(context: Context) {
             if (!trackPlaying) {
                 t.play()
                 trackPlaying = true
+                movedNs = System.nanoTime()
             }
             val started = try {
                 core.render(block, BLOCK, writtenMix)
@@ -125,7 +135,7 @@ class AudioEngine(context: Context) {
             }
             var off = 0
             var dead = false
-            while (off < block.size && running) {
+            while (off < block.size && running && !reopenWanted) {
                 val n = t.write(block, off, block.size - off, AudioTrack.WRITE_BLOCKING)
                 if (n < 0) {
                     AppLog.w("Engine", "Output write failed ($n); opening it again")
@@ -161,6 +171,17 @@ class AudioEngine(context: Context) {
         wakeLock.withLock { woken.await(IDLE_WAIT_MS, TimeUnit.MILLISECONDS) }
     }
 
+    /** How long (ms) the output has been playing without its position moving on. */
+    fun stalledMs(): Long = if (!trackPlaying || track == null) 0 else (System.nanoTime() - movedNs) / 1_000_000
+
+    /** Closes the output and opens it again (on the mixer's thread, between blocks). */
+    fun reopen() {
+        reopenWanted = true
+        // A write waiting on an output that's stuck returns once it's paused.
+        runCatching { track?.pause() }
+        wake()
+    }
+
     /** The output for the log: playing or not, where to, dropouts, and how far behind the heard sound is. */
     fun status(): String {
         val t = track
@@ -172,11 +193,19 @@ class AudioEngine(context: Context) {
             else -> "state ${t.playState}"
         }
         val heard = heardMix()
-        return "output $state to $route, $underruns dropouts, ${((writtenMix - heard) * 1000 / outRate).toLong()} ms written ahead of what's heard"
+        return "output $state to $route, $underruns dropouts, ${((writtenMix - heard) * 1000 / outRate).toLong()} ms written ahead of what's heard, " +
+            "position ${if (stalledMs() > 500) "still for ${stalledMs()} ms" else "moving"}"
     }
 
     private fun takeStamp(t: AudioTrack) {
-        if (t.getTimestamp(stamp)) {
+        val stamped = t.getTimestamp(stamp)
+        // Whether the output moved on: by its timestamp, or its play head where it gives none.
+        val at = if (stamped) stamp.framePosition else t.playbackHeadPosition.toLong() and 0xFFFFFFFFL
+        if (at != stampFrame) {
+            stampFrame = at
+            movedNs = System.nanoTime()
+        }
+        if (stamped) {
             stampMix = trackBase + stamp.framePosition
             stampNanos = stamp.nanoTime
             stampLive = trackPlaying
@@ -219,6 +248,7 @@ class AudioEngine(context: Context) {
                 trackBase = writtenMix
                 stampMix = Long.MIN_VALUE
                 trackPlaying = false
+                stampFrame = -1L
                 underruns = 0
                 route = deviceName(it.routedDevice)
                 // Where the sound goes (the phone, a car's Bluetooth, headphones): each change in the log.

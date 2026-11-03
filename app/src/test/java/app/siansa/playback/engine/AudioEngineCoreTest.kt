@@ -366,4 +366,35 @@ class AudioEngineCoreTest {
         repeat(200) { core.render(out, 256, mix); mix += 256 }
         assertTrue(out.any { it > 0.1f })
     }
+
+    @Test fun theMixCountsHowLongItHasGoneOutSilent() {
+        // 0.52.0-dev (Passion): the player handed over sound and none went out; the mix's own silence is the check.
+        val core = MixCore(44_100)
+        val deck = core.deck("main")
+        val out = FloatArray(512)
+        var mix = 0L
+        repeat(600) { core.render(out, 256, mix); mix += 256 }
+        assertTrue(core.silentMs() > 3_000)
+        assertTrue(core.describe().contains("main: no stream"))
+        val stream = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        stream.write(float(FloatArray(44_100 * 2) { 0.3f }))
+        stream.play()
+        deck.add(stream)
+        repeat(20) { core.render(out, 256, mix); mix += 256 }
+        assertEquals(0L, core.silentMs())
+        core.resetSilence()
+        assertEquals(0L, core.silentMs())
+    }
+
+    @Test fun aDeckKnowsHowLongItsPlayerHasHandedOverSound() {
+        val deck = MixCore.Deck("main")
+        assertEquals(0L, deck.feedingMs(10_000_000_000L))
+        // Sound every half second from 10 s to 13.5 s: 3.5 s of feeding.
+        for (i in 0..7) deck.handedSound(10_000_000_000L + i * 500_000_000L)
+        assertEquals(3_500L, deck.feedingMs(13_500_000_000L))
+        // A break of over a second: feeding starts again.
+        deck.handedSound(16_000_000_000L)
+        assertEquals(0L, deck.feedingMs(16_000_000_000L))
+        assertEquals(0L, deck.feedingMs(18_000_000_000L))
+    }
 }

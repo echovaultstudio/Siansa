@@ -37,6 +37,20 @@ class MixCore(val outRate: Int) {
         private var expectUntil = 0L
         /** The next mark is the first after a flush. */
         private var afterFlush = true
+        /** When (System.nanoTime()) the player last handed this deck sound (louder than −60 dBFS), and since when without a break. */
+        @Volatile var loudInNs = 0L
+            private set
+        @Volatile var loudSinceNs = 0L
+            private set
+
+        /** The player handed over sound just now ([now], System.nanoTime()). */
+        fun handedSound(now: Long) {
+            if (now - loudInNs > FED_GAP_NS) loudSinceNs = now
+            loudInNs = now
+        }
+
+        /** How long (ms) the player has been handing over sound without a break; 0 when it isn't now. */
+        fun feedingMs(now: Long = System.nanoTime()): Long = if (now - loudInNs > FED_GAP_NS) 0 else (now - loudSinceNs) / 1_000_000
         /** Where the deck says what it corrected (the engine's log). */
         @Volatile var note: (String) -> Unit = {}
         /** The input frame the buffer being handed over starts at: a stream made now starts there. */
@@ -159,6 +173,23 @@ class MixCore(val outRate: Int) {
     private var scratch = FloatArray(0)
     private val frame = DoubleArray(2)
     private var broken = 0
+    /** The loudest sample of the last block of the mix as it goes out, and how long (frames) it has been silent. */
+    @Volatile var outPeak = 0.0
+        private set
+    @Volatile private var silentFrames = 0L
+
+    /** How long (ms of the output) the mix has gone out silent (under −100 dBFS). */
+    fun silentMs(): Long = silentFrames * 1000 / outRate
+
+    /** Starts counting the mix's silence again (after something was done about it). */
+    fun resetSilence() {
+        silentFrames = 0
+    }
+
+    /** For the log: every deck's streams, and the mix as it goes out. */
+    fun describe(): String = decks.joinToString(" · ") { d ->
+        "${d.name}: " + if (d.streams.isEmpty()) "no stream" else d.streams.joinToString(" / ") { it.describe() }
+    } + " · mix out ${DeckStream.db(outPeak)}, silent ${silentMs()} ms"
 
     /** How many frames the limiter holds back: what's heard is this much behind what's mixed. */
     val latencyFrames: Int get() = limiter.latencyFrames
@@ -219,13 +250,17 @@ class MixCore(val outRate: Int) {
                 stream.noteOut(peak, frames)
             }
         }
+        var peak = 0.0
         for (i in 0 until frames) {
             frame[0] = out[i * 2].toDouble()
             frame[1] = out[i * 2 + 1].toDouble()
             limiter.process(frame)
             out[i * 2] = frame[0].toFloat()
             out[i * 2 + 1] = frame[1].toFloat()
+            peak = maxOf(peak, kotlin.math.abs(frame[0]), kotlin.math.abs(frame[1]))
         }
+        outPeak = peak
+        if (peak < DeckStream.SILENT_PEAK) silentFrames += frames else silentFrames = 0
         return started ?: emptyList()
     }
 
@@ -236,6 +271,8 @@ class MixCore(val outRate: Int) {
         const val STALE_US = 1_500_000L
         /** How long a seek's expectation waits for its flush: a seek is flushed within milliseconds. */
         const val EXPECT_FOR_NS = 1_500_000_000L
+        /** A player that handed over no sound for this long has stopped feeding its deck. */
+        const val FED_GAP_NS = 1_000_000_000L
         /** The mix's ceiling: a little under full scale, as two songs at the top of a blend can add up past it. */
         const val CEILING = 0.98
     }
