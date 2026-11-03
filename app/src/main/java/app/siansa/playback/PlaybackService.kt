@@ -181,6 +181,12 @@ class PlaybackService : MediaSessionService() {
                 }
             })
             .build()
+        // A late notification's foreground start, refused in the background, no longer crashes the app (0.52.0-dev).
+        setMediaNotificationProvider(
+            SafeNotificationProvider(androidx.media3.session.DefaultMediaNotificationProvider.Builder(applicationContext).build()) {
+                AppLog.w("Player", "Android would not put playback in the foreground from the background; it plays on, and the notification catches up on the next change")
+            },
+        )
         // Android may refuse to start the service in the foreground; the player waits instead of the app crashing (issue #602).
         setListener(object : Listener {
             override fun onForegroundServiceStartNotAllowedException() {
