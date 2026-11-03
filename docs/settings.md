@@ -28,7 +28,8 @@ to fold it open; they start folded. **Save** (at the top, or in any open card) k
   [Servers, users and libraries](servers-and-users.md).
 - **Audiobookshelf**: address, API token or user name and password, and **Scan for new books**. See
   [Audiobooks and podcasts](books.md).
-- **Add a music server**: another login on a server, or another server.
+- **Add a music server**: another login on a server, or another server. It's filled in on the page and added when
+  you save it, without restarting Siansa; switch to it from its card.
 
 **Services**
 

@@ -277,13 +277,17 @@ object Users {
         AppLog.i("Users", "Showing music of ${(ids + active).size} user(s)")
     }
 
-    /** Adds an empty user and switches to it, where the app asks for its Navidrome login. */
-    fun addAndSwitch(context: Context) {
+    /**
+     * Adds a user whose server [setUp] saves first (issue #828): no switch and no restart, so the music plays on, and
+     * nothing is added when [setUp] throws (a login that couldn't be kept). Returns the new user's id.
+     */
+    fun add(context: Context, setUp: (id: Int) -> Unit): Int {
         val ids = ids(context)
         val id = UserFiles.nextId(ids)
+        setUp(id)
         prefs(context).edit().putString(KEY_IDS, (ids + id).joinToString(",")).commit()
         AppLog.i("Users", "Added user ${id + 1}")
-        switchTo(context, id)
+        return id
     }
 
     /** Restarts the app as [id]. */

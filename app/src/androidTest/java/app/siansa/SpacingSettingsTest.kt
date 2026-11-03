@@ -202,6 +202,22 @@ class SpacingSettingsTest : SpacingCheck() {
         assertEven("Blend length chips", chips.top - label.bottom, hint.top - chips.bottom)
     }
 
+    /** A music server being added (issue #828): the server type chips sit evenly between their label and the hint. */
+    @Test fun newServerTypeChipsAreEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                Column(verticalArrangement = Arrangement.spacedBy(app.siansa.ui.Space.Small)) {
+                    app.siansa.ui.ServerKindChips(app.siansa.net.SourceKind.JELLYFIN) { }
+                    app.siansa.ui.Hint(app.siansa.net.SourceKind.JELLYFIN.detail)
+                }
+            }
+        }
+        val label = compose.onNodeWithText("Server type").getBoundsInRoot()
+        val chips = compose.onNodeWithTag("serverKinds").getBoundsInRoot()
+        val hint = compose.onNodeWithText(app.siansa.net.SourceKind.JELLYFIN.detail).getBoundsInRoot()
+        assertEven("Server type chips", chips.top - label.bottom, hint.top - chips.bottom)
+    }
+
     /** Style › Phone's top bar (issue #681): its chips sit evenly between the heading and the hint. */
     @Test fun topBarChipsAreEvenlySpaced() {
         compose.setContent {

@@ -46,6 +46,10 @@ import app.siansa.ui.MixShapeControls
 import app.siansa.ui.ProgressCard
 import app.siansa.playback.BeatMatchMode
 import app.siansa.ui.BeatMatchSection
+import app.siansa.net.SourceKind
+import app.siansa.ui.Hint
+import app.siansa.ui.NewServerButtons
+import app.siansa.ui.ServerKindChips
 import app.siansa.ui.MenuRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bedtime
@@ -282,6 +286,14 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 Column {
                     MenuRow(Icons.Rounded.Shuffle, "Shuffle: off") {}
                     MenuRow(Icons.Rounded.Bedtime, "Sleep at the end of the chapter, uncharacteristically", badge = "on") {}
+                }
+            },
+            // A music server being added (issue #828): its type, then Save or Cancel; nothing is added before Save.
+            Scene("new_server") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    ServerKindChips(SourceKind.JELLYFIN) {}
+                    Hint(SourceKind.JELLYFIN.detail)
+                    NewServerButtons(onSave = {}, onCancel = {})
                 }
             },
             // Beat-matched blends with the echo switch (issue #759).
