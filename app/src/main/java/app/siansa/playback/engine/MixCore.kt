@@ -23,6 +23,9 @@ class MixCore(val outRate: Int) {
      */
     class Deck(val name: String) {
         val filter = DeckFilter()
+        /** The echo at the end of a blend (the deck going out), once the engine made one for it ([MixCore.echoOf]). */
+        @Volatile var echo: Echo? = null
+            internal set
         internal val streams = CopyOnWriteArrayList<DeckStream>()
 
         private class Mark(val inputFrame: Long, val mediaUs: Long)
@@ -197,7 +200,12 @@ class MixCore(val outRate: Int) {
     fun deck(name: String): Deck = Deck(name).also { decks.add(it) }
 
     /** Anything playing or still fading: while nothing is, the output can rest. */
-    val active: Boolean get() = decks.any { d -> d.streams.any { it.audible } }
+    val active: Boolean get() = decks.any { d -> d.streams.any { it.audible } || d.echo?.ringing == true }
+
+    /** [deck]'s echo, made the first time it's wanted. */
+    fun echoOf(deck: Deck): Echo = deck.echo ?: Echo(outRate).also { deck.echo = it }
+
+    private var echoIn = FloatArray(0)
 
     /**
      * Mixes [frames] frames into [out] (stereo, interleaved) for mix frames from [mixStart]. Returns the streams that
@@ -207,8 +215,11 @@ class MixCore(val outRate: Int) {
         java.util.Arrays.fill(out, 0, frames * 2, 0f)
         if (scratch.size < frames * 2) scratch = FloatArray(frames * 2)
         var started: MutableList<DeckStream>? = null
+        if (echoIn.size < frames * 2) echoIn = FloatArray(frames * 2)
         for (deck in decks) {
             val filtering = deck.filter.prepare(outRate, 2)
+            val echo = deck.echo?.takeIf { it.ringing }
+            if (echo != null) java.util.Arrays.fill(echoIn, 0, frames * 2, 0f)
             for (stream in deck.streams) {
                 if (!stream.audible) {
                     if (stream.released) deck.streams.remove(stream)
@@ -223,6 +234,8 @@ class MixCore(val outRate: Int) {
                     stream.becameAudible = false
                     (started ?: mutableListOf<DeckStream>().also { started = it }).add(stream)
                 }
+                // The echo takes the song before its volume (a send before the fader): it rings on as the song goes.
+                if (echo != null) for (i in 0 until frames * 2) echoIn[i] += scratch[i]
                 val g0 = stream.gainNow
                 val g1 = stream.volume
                 stream.gainNow = g1
@@ -249,6 +262,7 @@ class MixCore(val outRate: Int) {
                 }
                 stream.noteOut(peak, frames)
             }
+            echo?.process(echoIn, out, frames)
         }
         var peak = 0.0
         for (i in 0 until frames) {
