@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.5.1",
+      "min_core_version": "3.6.4",
+      "changelog": "Measure all can now fill in where every song's beat stops. In 0.5.0 the Beat grids section counted songs measured before as done, so it offered no Measure all and its batch button was greyed out. Now it says how many songs still wait for the check, Measure all and Measure a batch now fill them in (only the beats are read again; everything measured stays in use meanwhile), and without them each song is still checked as Siansa is about to play it. Set Measure all to rounds so AudioMuse-AI's own jobs keep their turn.",
+      "imageUrl": ""
+    },
+    {
       "version": "0.5.0",
       "min_core_version": "3.6.4",
       "changelog": "Notes where a song's beat stops when it ends in a beatless outro (6 seconds or more without a beat before its dead air), so Siansa can bring the next song in after the last beat and let the outro, with its own fade, play out under it. Nothing is measured again across the library for it: new songs get it with their profile, and songs measured before are checked only when Siansa asks for them, as they're about to play, a few at a time.",

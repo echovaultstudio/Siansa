@@ -153,6 +153,15 @@ class BeatGridsTest(unittest.TestCase):
         self.assertIn("every song has its beat grid in about", page)
         self.assertIn("Their loudness and fades stay in use meanwhile", page)
 
+    def test_songs_waiting_for_where_the_beat_stops_can_be_measured_all(self):
+        # Plugin 0.5.0 showed every song measured, with no Measure all and the batch button greyed out.
+        state = self.state(waiting=0, failed=0)
+        state["beat_counts"]["until_waiting"] = 45052
+        page = web.render_settings(state, 40, "", 20)
+        self.assertIn("45,052 songs measured before 0.5.0 still to be checked", page)
+        self.assertIn("Measure all 45,052 songs for their beats", page)
+        self.assertIn('value="measure_beats">', page)
+
     def test_measuring_all_shows_stop_and_nothing_left_hides_the_offer(self):
         page = web.render_settings(self.state(beats_all=True, running=True), 40, "", 20)
         self.assertIn('value="stop_beats_all"', page)
