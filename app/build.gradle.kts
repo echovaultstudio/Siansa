@@ -29,6 +29,12 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The new audio engine (issue #826): one output all players are mixed into. Only Siansa Dev has it so far.
         buildConfigField("boolean", "MIXER_ENGINE", "false")
+        // Siansa's own TV screen while casting (issue #114, cast-receiver/): its Cast app id from the Google Cast
+        // console, from CAST_RECEIVER_ID (CI fills it from the repository variable) or siansa.castReceiverId in
+        // gradle.properties (for builds from source, such as F-Droid's). Empty: Google's standard TV screen.
+        val castReceiverId = (System.getenv("CAST_RECEIVER_ID")?.takeIf { it.isNotBlank() }
+            ?: providers.gradleProperty("siansa.castReceiverId").orNull).orEmpty().filter { it.isLetterOrDigit() }
+        buildConfigField("String", "CAST_RECEIVER_ID", "\"$castReceiverId\"")
     }
 
     // The release key comes from outside the repository (public since #584): SIANSA_KEYSTORE (a path),

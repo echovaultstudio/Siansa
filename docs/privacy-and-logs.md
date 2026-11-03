@@ -11,6 +11,9 @@ one gets is in [API › Other services](api.md#other-services).
 Your settings, passwords (encrypted with Android's keystore), history, downloads and caches stay on your phone.
 Uninstalling Siansa removes them.
 
+When you cast to a Chromecast or Google TV, the TV loads Siansa's TV screen from siansa.app (a page, nothing sent
+back) and Google's Cast library, then plays straight from your music server as the phone would.
+
 The full privacy policy: <https://siansa.app/privacy.html>
 
 ## The log

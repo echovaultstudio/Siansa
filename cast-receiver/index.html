@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <title>Siansa</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Siansa's TV screen while casting (issue #114). The only outside file is Google's Cast receiver library. -->
 <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 <style>
   :root {
@@ -16,38 +18,43 @@
   .hidden { opacity: 0; pointer-events: none; }
 
   /* Splash: shown when the TV connects and while nothing is loaded. */
-  #splash { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+  /* Sizes are in vh, so the page looks the same on TVs that draw it at 1280x720 and at 1920x1080. */
+  #splash { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.6vh;
     background: var(--plum); }
-  .icon { width: 260px; height: 190px; }
-  .logo { font-size: 72px; font-weight: 700; letter-spacing: -1px; }
-  #splash-note { font-size: 30px; color: var(--muted); }
+  .icon { width: 24vh; height: 17.6vh; }
+  .logo { font-size: 6.7vh; font-weight: 700; letter-spacing: -.1vh; }
+  #splash-note { font-size: 2.8vh; color: var(--muted); }
 
   /* Now playing */
-  #backdrop { position: absolute; inset: -60px; background-size: cover; background-position: center;
-    filter: blur(60px) brightness(.35) saturate(1.3); transition: background-image .8s ease; }
-  #player { display: flex; align-items: center; gap: 80px; padding: 0 120px; }
-  #cover { position: relative; width: 560px; height: 560px; flex: none; border-radius: 24px;
-    background: var(--plum-raised) center/cover; box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+  #backdrop { position: absolute; inset: -6vh; background-size: cover; background-position: center;
+    filter: blur(6vh) brightness(.35) saturate(1.3); transition: background-image .8s ease; }
+  /* Kept inside the TV's safe area (5% at each edge), where some TVs cut the picture. */
+  #player { display: flex; align-items: center; gap: 7.4vh; padding: 5vh 11vh; }
+  #cover { position: relative; width: 52vh; height: 52vh; flex: none; border-radius: 2.2vh;
+    background: var(--plum-raised) center/cover; box-shadow: 0 2.8vh 7.4vh rgba(0,0,0,.6); }
+  #cover.none { background-image: none; }
   #info { position: relative; flex: 1; min-width: 0; }
-  #device { font-size: 22px; letter-spacing: 3px; color: var(--amber); text-transform: uppercase; margin-bottom: 24px; }
-  #title { font-size: 72px; font-weight: 700; line-height: 1.1; overflow: hidden; display: -webkit-box;
-    -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  #artist { font-size: 38px; margin-top: 18px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #album { font-size: 30px; margin-top: 8px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #bar { margin-top: 56px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.18); overflow: hidden; }
+  #device { font-size: 2vh; letter-spacing: .3vh; color: var(--amber); text-transform: uppercase; margin-bottom: 2.2vh; }
+  #title { font-size: 6.7vh; font-weight: 700; line-height: 1.1; overflow: hidden; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+  #artist { font-size: 3.5vh; margin-top: 1.7vh; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #album { font-size: 2.8vh; margin-top: .7vh; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #bar { margin-top: 5.2vh; height: .74vh; border-radius: .37vh; background: rgba(255,255,255,.18); overflow: hidden; }
   #fill { height: 100%; width: 0; background: var(--amber); }
-  #times { display: flex; justify-content: space-between; font-size: 24px; color: var(--muted); margin-top: 12px; }
+  #times { display: flex; justify-content: space-between; font-size: 2.2vh; color: var(--muted); margin-top: 1.1vh; }
+  .paused #fill { background: var(--violet); }
+  .paused #cover { filter: brightness(.7); }
 
-  #controls { display: flex; align-items: center; gap: 40px; margin-top: 40px; }
-  .btn { width: 96px; height: 96px; border-radius: 50%; border: 3px solid transparent; background: rgba(255,255,255,.1);
+  #controls { display: flex; align-items: center; gap: 3.7vh; margin-top: 3.7vh; }
+  .btn { width: 8.9vh; height: 8.9vh; border-radius: 50%; border: .28vh solid transparent; background: rgba(255,255,255,.1);
     display: flex; align-items: center; justify-content: center; transition: transform .15s, border-color .15s, background .15s; }
-  .btn svg { width: 48px; height: 48px; fill: var(--text); }
-  .btn.main { width: 128px; height: 128px; background: var(--amber); }
-  .btn.main svg { width: 64px; height: 64px; fill: #2A1700; }
+  .btn svg { width: 4.4vh; height: 4.4vh; fill: var(--text); }
+  .btn.main { width: 11.9vh; height: 11.9vh; background: var(--amber); }
+  .btn.main svg { width: 5.9vh; height: 5.9vh; fill: #2A1700; }
   .btn.focus { border-color: var(--text); transform: scale(1.12); }
-  #hint { font-size: 22px; color: var(--muted); margin-top: 28px; }
-  #spinner { position: absolute; right: 24px; bottom: 24px; width: 48px; height: 48px; border-radius: 50%;
-    border: 5px solid rgba(255,255,255,.2); border-top-color: var(--amber); animation: spin 1s linear infinite; }
+  #hint { font-size: 2vh; color: var(--muted); margin-top: 2.6vh; }
+  #spinner { position: absolute; right: 2.2vh; bottom: 2.2vh; width: 4.4vh; height: 4.4vh; border-radius: 50%;
+    border: .46vh solid rgba(255,255,255,.2); border-top-color: var(--amber); animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -62,7 +69,7 @@
     <path fill="#B9A4FF" d="M73,58a3,3 0 0,1 6,0v12a3,3 0 0,1 -6,0z"/>
   </svg>
   <div class="logo">Siansa</div>
-  <div id="splash-note">Connected. Pick a song on your phone.</div>
+  <div id="splash-note">Connecting…</div>
 </div>
 
 <div id="now" class="screen hidden">
@@ -109,19 +116,35 @@ function showNow(show) {
   $('splash').classList.toggle('hidden', show);
 }
 
+// What the splash says: connecting, then waiting for a song, then the queue's end.
+let played = false;
+let failed = false;
+function note() {
+  if (failed) return 'This song couldn\u2019t play. Pick another on your phone.';
+  if (played) return 'Nothing playing. Pick a song on your phone.';
+  return 'Connected. Pick a song on your phone.';
+}
+
 function render() {
   const media = player.getMediaInformation();
   const state = player.getPlayerState();
   const S = cast.framework.messages.PlayerState;
-  if (!media || state === S.IDLE) { showNow(false); return; }
+  if (!media || state === S.IDLE) { $('splash-note').textContent = note(); showNow(false); return; }
+  played = true;
+  failed = false;
   showNow(true);
+  const paused = state === S.PAUSED;
+  $('now').classList.toggle('paused', paused);
+  $('device').textContent = paused ? 'Paused' : state === S.BUFFERING ? 'Loading' : 'Playing on this TV';
   const m = media.metadata || {};
   $('title').textContent = m.title || '';
   $('artist').textContent = m.artist || m.albumArtist || '';
   $('album').textContent = m.albumName || '';
   const art = m.images && m.images.length ? m.images[0].url : '';
-  const bg = art ? 'url("' + art.replace(/"/g, '%22') + '")' : 'none';
-  if ($('cover').style.backgroundImage !== bg) {
+  const bg = art ? 'url("' + art.replace(/["\\\n\r]/g, encodeURIComponent) + '")' : '';
+  $('cover').classList.toggle('none', !art);
+  if ($('cover').dataset.art !== art) {
+    $('cover').dataset.art = art;
     $('cover').style.backgroundImage = bg;
     $('backdrop').style.backgroundImage = bg;
   }
@@ -161,13 +184,22 @@ function act(name) {
   if (name === 'next') jump(1);
   if (name === 'prev') player.getCurrentTimeSec() > 5 ? player.seek(0) : jump(-1);
 }
+// On Google TV the remote's play/pause, next and previous reach the page through the TV's media controls, which
+// Cast turns into the same commands the phone sends (see supportedCommands below). Keys the TV hands the page
+// itself are handled here; older TVs give only key codes.
+const KEYS = { 37: 'ArrowLeft', 39: 'ArrowRight', 13: 'Enter', 179: 'MediaPlayPause', 176: 'MediaTrackNext',
+  177: 'MediaTrackPrevious', 415: 'MediaPlay', 19: 'MediaPause', 417: 'MediaTrackNext', 412: 'MediaTrackPrevious' };
 document.addEventListener('keydown', e => {
   if ($('now').classList.contains('hidden')) return;
-  switch (e.key) {
+  const key = e.key && e.key !== 'Unidentified' ? e.key : KEYS[e.keyCode];
+  const S = cast.framework.messages.PlayerState;
+  switch (key) {
     case 'ArrowLeft': setFocus(focus - 1); break;
     case 'ArrowRight': setFocus(focus + 1); break;
-    case 'Enter': act(buttons[focus].dataset.act); break;
+    case 'Enter': case ' ': act(buttons[focus].dataset.act); break;
     case 'MediaPlayPause': act('toggle'); break;
+    case 'MediaPlay': if (player.getPlayerState() === S.PAUSED) player.play(); break;
+    case 'MediaPause': player.pause(); break;
     case 'MediaTrackNext': act('next'); break;
     case 'MediaTrackPrevious': act('prev'); break;
     default: return;
@@ -212,7 +244,11 @@ player.addEventListener(E.ERROR, () => {
   const queue = player.getQueueManager();
   const items = queue && queue.getItems();
   const media = player.getMediaInformation();
-  if (originalsFail || retrying || !items || !items.length || !media || !media.customData || !media.customData.mp3Url) return;
+  if (originalsFail || retrying || !items || !items.length || !media || !media.customData || !media.customData.mp3Url) {
+    // Already MP3, or nothing to fall back to: say so on the splash instead of a silent screen.
+    if (!retrying) { failed = true; render(); }
+    return;
+  }
   originalsFail = true;
   retrying = true;
   const req = new M.LoadRequestData();
@@ -230,10 +266,13 @@ player.addEventListener(E.ERROR, () => {
   player.load(req).finally(() => { retrying = false; });
 });
 
+// Previous and next work on the queue the phone sends (the whole queue, with the next song loaded ahead).
 const options = new cast.framework.CastReceiverOptions();
+options.statusText = 'Siansa';
 options.supportedCommands = M.Command.ALL_BASIC_MEDIA | M.Command.QUEUE_NEXT | M.Command.QUEUE_PREV;
+// The splash says "Connecting…" until the TV has started the page, then waits for the phone's first song.
+context.addEventListener(cast.framework.system.EventType.READY, render);
 context.start(options);
-render();
 </script>
 </body>
 </html>

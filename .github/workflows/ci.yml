@@ -132,6 +132,8 @@ jobs:
           SIANSA_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIANSA_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           EVENT: ${{ github.event_name }}
+          # Siansa's own TV screen while casting (issue #114): the Cast app id, a repository variable (not a secret).
+          CAST_RECEIVER_ID: ${{ vars.CAST_RECEIVER_ID }}
         run: |
           set -o pipefail
           # Pull requests also compare the screenshot tests' pictures with the approved ones (issue #710). Only there:

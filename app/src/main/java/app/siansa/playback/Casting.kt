@@ -8,6 +8,7 @@ import androidx.media3.cast.MediaItemConverter
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.mediarouter.media.MediaRouteSelector
+import app.siansa.BuildConfig
 import app.siansa.data.Song
 import app.siansa.data.cover
 import app.siansa.log.AppLog
@@ -31,19 +32,47 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONObject
 import java.util.concurrent.Executors
 
-/** Google's standard TV app for audio and video, so siansa needs no TV app of its own. */
-private val RECEIVER_APP_ID = CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID
+/** The TV app that plays while casting: Siansa's own screen (issue #114) once registered, else Google's standard one. */
+private val RECEIVER_APP_ID = CastReceiver.pick(BuildConfig.CAST_RECEIVER_ID)
+
+/**
+ * Which Cast receiver (TV app) to use (issue #114). Siansa's own, `cast-receiver/index.html`, needs an app id from
+ * the Google Cast console, set at build time as CAST_RECEIVER_ID; without a valid one, Google's Default Media
+ * Receiver, which plays the same songs with its own plain screen.
+ */
+object CastReceiver {
+    /** Google's Default Media Receiver. */
+    const val DEFAULT: String = CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID
+
+    private val appId = Regex("[0-9A-F]{8}")
+
+    /** [configured] when it's a Cast app id (8 hex digits, any case, spaces around ignored), else [DEFAULT]. */
+    fun pick(configured: String?): String {
+        val id = configured.orEmpty().trim().uppercase()
+        return if (appId.matches(id)) id else DEFAULT
+    }
+
+    /** Whether [id] is Siansa's own TV screen rather than Google's. */
+    fun isOwn(id: String): Boolean = id != DEFAULT
+}
 
 /** Google Cast setup, named in the manifest. */
 class CastSetup : OptionsProvider {
-    override fun getCastOptions(context: Context): CastOptions =
-        CastOptions.Builder()
+    override fun getCastOptions(context: Context): CastOptions {
+        val configured = BuildConfig.CAST_RECEIVER_ID
+        when {
+            CastReceiver.isOwn(RECEIVER_APP_ID) -> AppLog.i("Cast", "Casting to Siansa's own TV screen (receiver $RECEIVER_APP_ID)")
+            configured.isNotBlank() -> AppLog.w("Cast", "CAST_RECEIVER_ID \"$configured\" isn't a Cast app id, so casting uses Google's standard TV screen")
+            else -> AppLog.i("Cast", "Casting to Google's standard TV screen (Default Media Receiver $RECEIVER_APP_ID)")
+        }
+        return CastOptions.Builder()
             .setReceiverApplicationId(RECEIVER_APP_ID)
             // siansa's own media session already gives the notification and lock-screen controls.
             .setCastMediaOptions(CastMediaOptions.Builder().setNotificationOptions(null).setMediaSessionEnabled(false).build())
             // Disconnecting stops the music on the TV too.
             .setStopReceiverApplicationWhenEndingSession(true)
             .build()
+    }
 
     override fun getAdditionalSessionProviders(context: Context): List<SessionProvider>? = null
 }

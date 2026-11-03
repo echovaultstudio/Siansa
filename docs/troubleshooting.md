@@ -80,3 +80,7 @@ closed. Siansa tries once more by itself; it's only a problem if the second try 
 
 The TV or speaker must be on the same Wi-Fi as the phone, and able to reach your music server's address. It plays
 straight from your server.
+
+If a Chromecast or Google TV shows Google's black **Default Media Receiver** screen instead of Siansa's, that copy of
+Siansa was built without Siansa's TV screen (it needs to be registered with Google first). Songs still play the same;
+use the phone for the controls. The log says which screen casting uses.
