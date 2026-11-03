@@ -83,7 +83,7 @@ class CombinedArtistsTest {
         val joined = Artist("j", "ID, Camo & Krooked", mbid = "5A5F0C3E-8D3C-4E5C-9B8F-2B8A6D0A0C01")
         val c = CombinedArtists.find(listOf(ck, joined)).getValue("j")
         assertEquals(listOf("ck"), c.parts.map { it.id })
-        assertEquals(listOf("ID"), c.unknown)
+        assertTrue(c.complete)
     }
 
     @Test fun aBandWithItsOwnMusicBrainzIdStaysWhole() {
@@ -100,7 +100,9 @@ class CombinedArtistsTest {
         val index = CombinedArtists.Index(listOf(ck, fred))
         val c = CombinedArtists.of(Artist("j", "ID, Camo & Krooked"), index)!!
         assertEquals(listOf("ck"), c.parts.map { it.id })
-        assertEquals(listOf("ID"), c.unknown)
-        assertEquals(listOf("ck", "j"), CombinedArtists.expand(listOf(Artist("j", "ID, Camo & Krooked")), mapOf("j" to c)).map { it.id })
+        // "ID" is an unreleased track's placeholder, not an artist: only Camo & Krooked is offered (0.52.0-dev showed
+        // the joined name too).
+        assertTrue(c.complete)
+        assertEquals(listOf("ck"), CombinedArtists.expand(listOf(Artist("j", "ID, Camo & Krooked")), mapOf("j" to c)).map { it.id })
     }
 }

@@ -33,6 +33,10 @@ data class CombinedArtist(
 }
 
 object CombinedArtists {
+    /** Names that stand for no artist at all: an unreleased "ID", an unknown or various artists. */
+    private val PLACEHOLDERS = setOf("id", "ids", "unknown", "unknown artist", "various", "various artists", "va", "n a", "tba", "tbc")
+        .map { normalizeKey(it) }.toSet()
+
     /** The combined artists among [artists], by the combined artist's id. */
     fun find(artists: List<Artist>): Map<String, CombinedArtist> {
         val index = Index(artists)
@@ -72,6 +76,8 @@ object CombinedArtists {
         val parts = ArrayList<Artist>()
         val unknown = ArrayList<String>()
         for (name in names) {
+            // "ID" (a DJ's unreleased track), "Unknown"…: not an artist, so it needs no page and isn't offered.
+            if (normalizeKey(name) in PLACEHOLDERS) continue
             val matches = byKey[normalizeKey(name)].orEmpty().filter { it.id != artist.id }
             when (matches.size) {
                 0 -> unknown += name
