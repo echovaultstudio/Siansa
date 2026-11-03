@@ -175,7 +175,7 @@ object Crossfade {
         var plan = if (matched != null) {
             // A phrase-on-phrase blend may let the song go at the end of its last phrase (issue #757).
             FadePlan(matched.overlapMs, matched.overlapMs, matched.why, cut + matched.cutMs, matched)
-        } else if (mode == CrossfadeMode.SMART && currentProfile != null && nextProfile != null) {
+        } else if (mode == CrossfadeMode.SMART && currentProfile != null && nextProfile != null) run {
             val tail = ((currentProfile.quietForLastMs(QUIET_DB) ?: 0L) - cut).coerceAtLeast(0L)
             val head = nextProfile.reachesAfterMs(QUIET_DB) ?: 0L
             var overlap = (tail + head).coerceAtMost(maxMs)
@@ -188,6 +188,13 @@ object Crossfade {
                 // Both ends keep a beat that can't be laid on the other's: a long blend would clash, so a short one.
                 overlap = BeatMatch.CLASH_MS
                 why += " · beats would clash, so a short blend"
+            } else if (beatMatch && !rhythmic && !mixed && overlap < maxMs) {
+                // A DJ blend where at most one end keeps a beat (0.52.0-dev: a beatless intro under a beat-driven
+                // outro got 3.3 s with 30 s set): nothing to clash with, so it runs the whole crossfade length, as a
+                // DJ brings a quiet intro in under the old song. The next song fades in over the first half of it.
+                overlap = maxMs
+                why += " · DJ: at most one end has a beat, nothing to clash, so the whole crossfade length"
+                return@run FadePlan(overlap, maxOf(head, overlap / 2), why, cut)
             }
             FadePlan(overlap, head.coerceIn(MIN_FADE_IN_MS, overlap.coerceAtLeast(MIN_FADE_IN_MS)), why, cut)
         } else if (mode == CrossfadeMode.SMART && BeatMatch.beatDriven(outro) && nextProfile == null) {

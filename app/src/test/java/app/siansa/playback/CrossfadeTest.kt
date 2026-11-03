@@ -196,6 +196,24 @@ class CrossfadePlanTest {
         assertEquals(201_234L, PluginProfiles.parse(body).single().beatsUntilMs)
     }
 
+    @Test fun aDjBlendWithABeatlessEndRunsTheWholeCrossfadeLength() {
+        // 0.52.0-dev, 16:51: a beat-driven outro (not steady enough to match) into a beatless intro got 3.3 s with
+        // 30 s set. In a DJ blend nothing can clash, so it runs the whole length; the next song fades in over half.
+        val out = BeatEnd(bpm = 124.6, beatMs = 230_000.0, barMs = null, rhythm = 0.85f, steady = 0.2f)
+        val inn = BeatEnd(bpm = 130.8, beatMs = 500.0, barMs = null, rhythm = 0.0f, steady = 0.0f)
+        val current = TrackProfile("a1", -10.0, listOf(RampPoint(-18, 0)), listOf(RampPoint(-18, 3_000)), outro = out)
+        val next = TrackProfile("b1", -10.0, listOf(RampPoint(-18, 300)), emptyList(), intro = inn)
+        val dj = Crossfade.plan(CrossfadeMode.SMART, 30_000, a1, b1, minutes4, minutes4, current, next, beatMatch = true)!!
+        assertEquals(30_000L, dj.overlapMs)
+        assertEquals(15_000L, dj.fadeInMs)
+        assertTrue(dj.why, dj.why.contains("nothing to clash"))
+        // Outside DJ blends it follows the songs' shapes as before.
+        assertEquals(3_300L, Crossfade.plan(CrossfadeMode.SMART, 30_000, a1, b1, minutes4, minutes4, current, next)!!.overlapMs)
+        // Two beats that can't be matched still get a short blend.
+        val beaty = next.copy(intro = inn.copy(rhythm = 0.9f))
+        assertEquals(BeatMatch.CLASH_MS, Crossfade.plan(CrossfadeMode.SMART, 30_000, a1, b1, minutes4, minutes4, current, beaty, beatMatch = true)!!.overlapMs)
+    }
+
     @Test fun aHardEndingIntoAHardHitPlaysBackToBack() {
         assertNull(Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, b1, minutes4, minutes4, profile("a1", 0, 100), profile("b1", 100, 0)))
     }
