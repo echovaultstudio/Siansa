@@ -108,6 +108,9 @@ import app.siansa.playback.StreamStats
 import java.io.File
 import java.util.concurrent.TimeUnit
 import app.siansa.data.mixScopeKey
+import app.siansa.local.LocalIds
+import app.siansa.local.LocalMusic
+import app.siansa.local.LocalSource
 import app.siansa.mix.PlayCountLog
 
 /** Everything the app shares, created once in [SiansaApp]. */
@@ -255,15 +258,32 @@ class AppGraph(val app: Application) {
             }
         },
         // Another shown user's songs, albums and covers go to their own server, of whatever kind (issue #427);
-        // a book's cover ("bk-…") to Audiobookshelf (issue #521), through the same cover cache as everything.
-        route = { id -> if (id != null && id.startsWith(Book.COVER_PREFIX)) bookCovers else guests.sourceFor(id) },
+        // a book's cover ("bk-…") to Audiobookshelf (issue #521), through the same cover cache as everything; music files
+        // on the phone to the phone (issue #352).
+        route = { id ->
+            when {
+                id == null -> null
+                LocalIds.isLocal(id) -> localSource
+                id.startsWith(Book.COVER_PREFIX) -> bookCovers
+                else -> guests.sourceFor(id)
+            }
+        },
     )
+
+    /** MusicBrainz, for music files on the phone without MusicBrainz IDs in their tags (issue #352). */
+    val musicBrainz = app.siansa.local.MusicBrainzApi(http, app.siansa.local.MusicBrainzApi.userAgent(BuildConfig.VERSION_NAME))
+    /** Music files on the phone (issue #352). */
+    val localMusic: LocalMusic by lazy { LocalMusic(app, library, scope, musicBrainz) }
+    /** A local song's requests that only a server can answer go to its server copy, through [source] (any user's). */
+    private val localSource: MusicSource by lazy { LocalSource(localMusic, library) { source } }
     /** Only [MusicSource.coverUrl] is ever asked of it: book cover ids are routed here and nowhere else. */
     private val bookCovers: MusicSource by lazy { BookCoverSource(audiobookshelf, subsonic) }
     // Users shown together share a music server, but AudioMuse reads each login as a server of its own: a shown
     // user's songs go to AudioMuse with that user's "Server name in AudioMuse" (issue #708).
     val audioMuse = AudioMuseApi(
         http,
+        // A file on the phone is known to AudioMuse by its server copy, when it has one (issue #352).
+        idFor = { id -> localMusic.serverIdOf(id) },
         serverFor = { ids ->
             val user = audioMuseUserFor(ids, { guests.ownerOf(it) }, Users.active, guests.shown.value, library.ownHidden.value)
             if (user == Users.active) settings.current.audioMuseServer else guests.settingsOf(user).current.audioMuseServer
@@ -280,7 +300,10 @@ class AppGraph(val app: Application) {
     /** Which mini player shows: the player started last (beta #45). */
     val activePlayer: ActivePlayer by lazy { ActivePlayer(scope, player.state, bookPlayer.state) }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
-    val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
+    val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current }).apply {
+        // A file on the phone uses its server copy's loudness and fades (issue #352).
+        alias = { id -> localMusic.serverIdOf(id) }
+    }
     /** The AI service that writes mix titles and sound searches (issue #665). */
     val ai = ChatApi(http) { settings.current }
     val deezer = DeezerApi(http)
@@ -316,6 +339,17 @@ class AppGraph(val app: Application) {
         }
     }
     val sync = LibrarySync(source, library, settings, scope)
+
+    init {
+        // Music files on the phone (issue #352): into the library at start, and matched again after each server sync,
+        // whose artists and songs they're matched to.
+        localMusic.start()
+        scope.launch(CoroutineName("local-after-sync")) {
+            sync.progress.map { it.phase }.distinctUntilChanged().collect { phase ->
+                if (phase == SyncPhase.DONE && localMusic.data.value.folders.isNotEmpty()) localMusic.rebuild("server sync")
+            }
+        }
+    }
 
     init {
         // Disc covers follow their album's cover version (issue #639): read again after the library loads and after
@@ -380,7 +414,8 @@ class AppGraph(val app: Application) {
     val player = PlayerConnection(app, source).apply {
         isOffline = { connection.current.offline }
         onlyDownloads = { settings.current.downloadedOnly }
-        isDownloaded = { downloads.isDownloaded(it) }
+        // Files on the phone play without a connection, like downloads (issue #352).
+        isDownloaded = { LocalIds.isLocal(it) || downloads.isDownloaded(it) }
         onPlayStarted = { activePlayer.choose(MiniFor.MUSIC); bookPlayer.pause() }
     }
     init {

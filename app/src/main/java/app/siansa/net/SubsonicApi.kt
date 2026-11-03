@@ -553,6 +553,8 @@ class SubsonicApi(
                 ArtistRef(artistId, a.str("name").orEmpty())
             },
             suffix = o.str("suffix")?.lowercase()?.takeIf { it.isNotBlank() },
+            // The recording's MusicBrainz ID, for matching music files on the phone (#352); "" when there's none.
+            mbid = o.str("musicBrainzId")?.trim()?.lowercase()?.takeIf { it.length == 36 },
         )
     }
 

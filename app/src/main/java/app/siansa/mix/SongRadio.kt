@@ -100,6 +100,12 @@ class SongRadio(private val graph: AppGraph) {
         val picked = if (mode == ContinuousMode.OFF) ContinuousMode.STEADY else mode
         graph.scope.launch {
             val started = System.currentTimeMillis()
+            // A file only on the phone (issue #352) isn't analysed by AudioMuse: say so, rather than "nothing found".
+            if (app.siansa.local.LocalIds.isLocal(song.id) && graph.localMusic.serverIdOf(song.id) == null) {
+                AppLog.i("SongRadio", "Not started: ${song.id} is only on the phone")
+                withContext(Dispatchers.Main) { onError(app.siansa.local.LocalSource.ONLY_ON_PHONE) }
+                return@launch
+            }
             val similar = runCatching { arrange(picked, song, find(song, 30)) }
                 .onFailure { AppLog.w("SongRadio", "Couldn't find similar songs: ${it.message}") }
                 .getOrDefault(emptyList())

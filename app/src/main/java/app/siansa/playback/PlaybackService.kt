@@ -358,7 +358,9 @@ class PlaybackService : MediaSessionService() {
         val factory = cacheFactory ?: return
         val items = upcomingIndices(player, ahead).drop(1).map { player.getMediaItemAt(it) }.filter { item ->
             // Only originals are cached; downloaded songs are on the phone already.
-            item.localConfiguration?.uri != null && kbpsFor(item.mediaId) <= 0 && graph.downloads.fileFor(item.mediaId) == null
+            // Files on the phone (issue #352) need no caching either.
+            item.localConfiguration?.uri != null && kbpsFor(item.mediaId) <= 0 && graph.downloads.fileFor(item.mediaId) == null &&
+                !app.siansa.local.LocalIds.isLocal(item.mediaId)
         }
         if (items.isEmpty()) return
         // Only called once the current song has fully loaded, so they never share the connection; one at a time.

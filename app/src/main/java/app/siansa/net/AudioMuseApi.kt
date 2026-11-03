@@ -81,8 +81,16 @@ class AudioMuseApi(
      * Without it, the settings' own name.
      */
     private val serverFor: ((ids: List<String>) -> String)? = null,
+    /**
+     * The id AudioMuse knows a song by (issue #352): a music file on the phone goes by its server copy's id, and has
+     * none (null) when it's only on the phone. Any other song keeps its own.
+     */
+    private val idFor: (String) -> String? = { it },
     private val settings: () -> AppSettings,
 ) {
+    /** [id] as AudioMuse knows it, or a plain message when it's a song only on the phone. */
+    private fun known(id: String): String = idFor(id) ?: throw ApiException(ONLY_ON_PHONE)
+
     private fun server(ids: List<String>): String =
         serverFor?.invoke(ids.filter { it.isNotBlank() }) ?: settings().audioMuseServer
     private val loginLock = Mutex()
@@ -252,7 +260,8 @@ class AudioMuseApi(
      * follow AudioMuse's own settings (SIMILARITY_ELIMINATE_DUPLICATES_DEFAULT, its mood default,
      * SIMILARITY_RADIUS_DEFAULT): Siansa only sends [sameMood] when the listener chose it (issue #208).
      */
-    suspend fun similarTracks(itemId: String, count: Int, sameMood: Boolean? = null): List<ClapHit> {
+    suspend fun similarTracks(songId: String, count: Int, sameMood: Boolean? = null): List<ClapHit> {
+        val itemId = known(songId)
         val url = apiUrl("api/similar_tracks")
             .addQueryParameter("item_id", itemId)
             .addQueryParameter("n", count.toString())
@@ -285,6 +294,13 @@ class AudioMuseApi(
      * The count, temperature and distances follow AudioMuse's own settings unless [count] is given.
      */
     suspend fun alchemy(blend: List<String>, avoid: List<String> = emptyList(), count: Int? = null): List<ClapHit> {
+        // Songs only on the phone (issue #352) are left out of the blend; with none left, there's nothing to blend.
+        val known = blend.mapNotNull(idFor).distinct()
+        if (known.isEmpty() && blend.isNotEmpty()) throw ApiException(ONLY_ON_PHONE)
+        return alchemyOf(known, avoid.mapNotNull(idFor).distinct(), count)
+    }
+
+    private suspend fun alchemyOf(blend: List<String>, avoid: List<String>, count: Int?): List<ClapHit> {
         val payload = buildJsonObject {
             put("items", kotlinx.serialization.json.buildJsonArray {
                 blend.forEach { id -> add(buildJsonObject { put("id", id); put("op", "ADD"); put("type", "song") }) }
@@ -334,13 +350,15 @@ class AudioMuseApi(
      * [lyrics] builds it in the lyrics' meaning (SemGrove) instead of the sound alone.
      */
     suspend fun findPath(
-        startId: String?,
-        endId: String?,
+        startSong: String?,
+        endSong: String?,
         length: Int,
         startMood: PathMood? = null,
         endMood: PathMood? = null,
         lyrics: Boolean = false,
     ): List<ClapHit> {
+        val startId = startSong?.let(::known)
+        val endId = endSong?.let(::known)
         val url = apiUrl("api/find_path")
             .apply {
                 startId?.let { addQueryParameter("start_song_id", it) }
@@ -377,7 +395,14 @@ class AudioMuseApi(
      * AudioMuse's analysis of songs (tempo, key, moods, genres) from its read-only export for apps
      * (`/api/sync`), at most 500 at a time, without the large sound data (issue #216).
      */
-    suspend fun features(ids: List<String>): List<TrackFeatures> = ids.distinct().chunked(SYNC_BATCH).flatMap { batch ->
+    suspend fun features(songs: List<String>): List<TrackFeatures> {
+        // Files on the phone (issue #352) get their server copy's analysis, under their own id; songs only on the phone none.
+        val asked = songs.distinct().mapNotNull { id -> idFor(id)?.let { it to id } }
+        val back = asked.groupBy({ it.first }, { it.second })
+        return featuresOf(asked.map { it.first }.distinct()).flatMap { f -> back[f.id].orEmpty().map { f.copy(id = it) } }
+    }
+
+    private suspend fun featuresOf(ids: List<String>): List<TrackFeatures> = ids.chunked(SYNC_BATCH).flatMap { batch ->
         val url = apiUrl("api/sync")
             .addQueryParameter("ids", batch.joinToString(","))
             .addQueryParameter("include_embeddings", "false")
@@ -397,6 +422,10 @@ class AudioMuseApi(
     }
 
     internal companion object {
+        /** Why AudioMuse can't use a song only on the phone (issue #352). */
+        const val ONLY_ON_PHONE = "This song is only on your phone, so AudioMuse hasn't analysed it. Mixes and radios " +
+            "use songs that are on your server too."
+
         /** AudioMuse's notes about concepts it couldn't use (an unknown term is dropped, not refused). */
         fun warningsOf(root: JsonObject): List<String> =
             (root["steering_warnings"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content }

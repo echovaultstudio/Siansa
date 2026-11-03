@@ -296,6 +296,40 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     NewServerButtons(onSave = {}, onCancel = {})
                 }
             },
+            // Settings › Servers and services › Files on this phone (issue #352): picked folders (a long one), how the
+            // scan stands, and the MusicBrainz switch.
+            Scene("local_music_settings") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    app.siansa.ui.LocalMusicContent(
+                        folders = listOf(
+                            app.siansa.local.LocalFolder("content://a", "Music"),
+                            app.siansa.local.LocalFolder("content://b", "Unbelievably/Long/Folder/Of/Bootlegs and live recordings (SD card)"),
+                        ),
+                        statusLine = app.siansa.ui.localStatusLine(app.siansa.local.LocalStatus(matched = 1180), 1204),
+                        scanning = false,
+                        musicBrainz = true,
+                        onAdd = {},
+                        onRemove = {},
+                        onScan = {},
+                        onMusicBrainz = {},
+                    )
+                }
+            },
+            // The phone's card in Home's Sources (issue #352), shown and hidden.
+            Scene("local_music_source") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    app.siansa.ui.SourceCard(
+                        name = "Files on this phone",
+                        status = app.siansa.ui.localSourceStatus(hidden = false, scanning = false, songs = 1204),
+                        shown = true, canToggle = true, syncing = false, libraries = emptyList(), onToggle = {}, onSync = {},
+                    )
+                    app.siansa.ui.SourceCard(
+                        name = "Files on this phone",
+                        status = app.siansa.ui.localSourceStatus(hidden = true, scanning = false, songs = 1204),
+                        shown = false, canToggle = true, syncing = false, libraries = emptyList(), onToggle = {}, onSync = {},
+                    )
+                }
+            },
             // Beat-matched blends with the echo switch (issue #759).
             Scene("crossfade_beat_match") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP)) { BeatMatchSection(BeatMatchMode.DJ_RADIO, bars = 8, echo = true, bassSwap = true, keepKey = false, onMode = {}, onBars = {}, onEcho = {}, onBassSwap = {}, onKeepKey = {}) }

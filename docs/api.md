@@ -78,3 +78,4 @@ its own server.
 | ListenBrainz / Koito | Connected | Plays, now playing; top artists and songs |
 | Open-Meteo | Weather in Use the moment on | Your location rounded to about 10 km |
 | Deezer (`api.deezer.com`) | Artists you might like | Artist names only |
+| MusicBrainz (`musicbrainz.org`) | Files on this phone with **Look up missing MusicBrainz IDs** on, for files without the IDs in their tags | Each such file's artist and title, once; at most one request a second, as `Siansa/<version> ( https://siansa.app )` |

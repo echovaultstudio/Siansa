@@ -366,6 +366,17 @@ class ProfileStoreTest {
         assertEquals(PluginProfiles.PATH + "?ids=c", asked.last())
     }
 
+    @Test fun aFileOnThePhoneUsesItsServerCopysProfile() = runBlocking {
+        // Issue #352: "lf-1" is the server's "a"; "lf-2" is only on the phone.
+        store.alias = { id -> when (id) { "lf-1" -> "a"; "lf-2" -> null; else -> id } }
+        val found = store.fetch(listOf("lf-1", "lf-2", "b"))
+        assertEquals(setOf("lf-1", "b"), found.keys)
+        assertEquals("lf-1", found.getValue("lf-1").trackId)
+        assertEquals(PluginProfiles.PATH + "?ids=a,b", asked.single())
+        assertEquals("lf-1", store.cached("lf-1")?.trackId)
+        assertEquals(null, store.cached("lf-2"))
+    }
+
     @Test fun songsNotAnalysedYetAreAskedForAgainLater() = runBlocking {
         store.fetch(listOf("unknown"))
         store.fetch(listOf("unknown"))

@@ -244,7 +244,8 @@ class Guests(
             }
             val guests = _shown.value - Users.active
             writing.withLock {
-                library.sourceUsers().filter { it !in guests }.forEach { gone ->
+                // Music files on the phone (#352) are kept in the same list, but aren't a user's.
+                library.sourceUsers().filter { it !in guests && it != app.siansa.local.LocalIds.SOURCE }.forEach { gone ->
                     AppLog.i("Sources", "User ${gone + 1} isn't shown any more; removing their music")
                     library.removeSource(gone)
                 }
@@ -370,7 +371,8 @@ class Guests(
     }
 
     private suspend fun reloadRoutes() {
-        val fresh = library.sources()
+        // Music files on the phone (#352) have a source of their own, not another user's server.
+        val fresh = library.sources().filterValues { it != app.siansa.local.LocalIds.SOURCE }
         routes.keys.retainAll(fresh.keys)
         routes.putAll(fresh)
     }

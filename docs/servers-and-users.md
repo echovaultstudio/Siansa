@@ -67,6 +67,35 @@ playlist on this phone takes anyone's. Playlists that can't take the songs are g
 **Scrobbling for other users**: in **Settings › Scrobbling and history › Users** you can turn a user off, so songs from their
 library aren't sent anywhere while you listen as you.
 
+## Files on this phone
+
+Music files on the phone can be shown next to your server's music (**Settings › Servers and services › Files on
+this phone**):
+
+- **Add a folder** opens Android's folder picker. Siansa can read only the folders you pick there; it doesn't ask
+  for access to all your files. **Remove** forgets a folder and its songs (nothing is deleted from the phone).
+- Siansa reads the files' tags: title, artists, album, album artist, track and disc, year, genre, length,
+  ReplayGain and the MusicBrainz IDs (MUSICBRAINZ_TRACKID, MUSICBRAINZ_ARTISTID, MUSICBRAINZ_ALBUMID, as Picard
+  writes them in FLAC, Ogg, Opus, MP3 and M4A). The album's picture comes from the file, or a cover.jpg or
+  folder.jpg next to it.
+- The songs are in Your Library, search, artists, albums and genre radios, and play from the file, without a
+  connection. Siansa looks for new and changed files every time it starts; **Scan again** looks now.
+- An artist the server has (same MusicBrainz ID, or else the same name) is the same artist: the phone's songs show
+  on their page. Several artists in one tag ("A feat. B") are split by their MusicBrainz IDs, or like the server's.
+- **Songs that are on your server too** (the same MusicBrainz recording, or the same title, artist and length) use
+  the server copy's AudioMuse-AI analysis: they can start a song radio, join mixes and use the Siansa plugin's
+  loudness and fades, and their plays count on the server. Settings shows how many match.
+- **Songs only on the phone** play normally, but AudioMuse-AI hasn't analysed them: they're left out of its mixes,
+  and a song radio from one says so.
+- **Look up missing MusicBrainz IDs** (on to start with): for files without them in their tags, Siansa asks
+  [MusicBrainz](https://musicbrainz.org) by artist and title (the length picks the right version), one song a
+  second, once per file, and keeps the answer on the phone. Turn it off to send nothing.
+- In Home's source filter, **Files on this phone** has its own card: the eye hides or shows them everywhere,
+  **Sync** scans the folders again.
+
+Not yet: files on the phone without any server, playing them on a Chromecast or DLNA device, playlists of their
+own, and lyrics from the files.
+
 ## Playlists on your server
 
 A playlist on your server opens straight away from the copy kept on the phone. While it's open, a turning cog at

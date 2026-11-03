@@ -304,8 +304,8 @@ object CoverDownload {
             graph.library.albums("name").forEach { it.coverArt?.let(::add) }
             graph.library.artists().forEach { add(it.coverArt ?: "ar-${it.id}") }
             graph.library.playlists().forEach { it.coverArt?.let(::add) }
-        }.distinctBy { CoverStore.canonical(it) }
-        val songCovers = songCoversToFetch(graph.library.songCoverIds(), main)
+        }.distinctBy { CoverStore.canonical(it) }.filterNot { app.siansa.local.LocalIds.isLocal(it) } // files' covers are on the phone (#352)
+        val songCovers = songCoversToFetch(graph.library.songCoverIds().filterNot { app.siansa.local.LocalIds.isLocal(it) }, main)
         val ids = main + songCovers
         AppLog.i("Covers", "Downloading covers: ${main.size} albums, artists and playlists and ${songCovers.size} song and disc covers to check")
         update { Progress(running = true, total = ids.size) }

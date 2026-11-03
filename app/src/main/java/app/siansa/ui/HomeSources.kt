@@ -99,7 +99,9 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
     // Audiobookshelf, listed with the music servers (issue #693).
     val bookSync by graph.books.sync.collectAsStateWithLifecycle()
     var watchingBooks by remember { mutableStateOf(false) }
-    val anySyncing = progress.running || guestStates.values.any { it.running } || bookSync.running
+    val localData by graph.localMusic.data.collectAsStateWithLifecycle()
+    val localStatus by graph.localMusic.status.collectAsStateWithLifecycle()
+    val anySyncing = progress.running || guestStates.values.any { it.running } || bookSync.running || localStatus.scanning
 
     fun syncAll() {
         val plan = syncAllPlan(
@@ -114,6 +116,8 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
             graph.sync.start(full = true)
         }
         plan.guests.forEach { graph.guests.sync(it, force = true) }
+        // Music files on the phone (issue #352) are read again too.
+        if (localData.folders.isNotEmpty() && !localData.hidden) graph.localMusic.scan()
         if (plan.books) {
             watchingBooks = true
             graph.scope.launch { graph.books.syncAll() }
@@ -231,6 +235,22 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                             }
                         }
                     },
+                )
+            }
+            // Music files on the phone (issue #352): shown or hidden with the eye; Sync reads the folders again.
+            if (localData.folders.isNotEmpty()) {
+                SourceCard(
+                    name = "Files on this phone",
+                    status = localSourceStatus(localData.hidden, localStatus.scanning, localData.tracks.size),
+                    shown = !localData.hidden,
+                    canToggle = true,
+                    syncing = localStatus.scanning,
+                    libraries = emptyList(),
+                    onToggle = { graph.localMusic.setHidden(!localData.hidden) },
+                    onSync = { graph.localMusic.scan() },
+                    progress = if (localStatus.scanning) {
+                        { SyncStrip(localStatusLine(localStatus, localData.tracks.size).orEmpty(), running = true, fraction = null, done = false, failed = false) }
+                    } else null,
                 )
             }
             // Audiobookshelf (issue #693): listed like a server, with Sync; its books aren't hidden from here.
@@ -451,6 +471,13 @@ internal fun SourceFilterButton(onClick: () -> Unit) {
     IconButton(onClick = onClick) {
         Icon(Icons.Rounded.FilterList, "Source filter and Arrange Home", tint = if (active) Accent else MaterialTheme.colorScheme.onSurface)
     }
+}
+
+/** The phone's card in Sources (issue #352): "Shown · 1,204 songs", "Hidden", "Reading files…". */
+internal fun localSourceStatus(hidden: Boolean, scanning: Boolean, songs: Int): String = when {
+    scanning -> "This phone · reading files…"
+    hidden -> "This phone · Hidden"
+    else -> "This phone · Shown · $songs ${if (songs == 1) "song" else "songs"}"
 }
 
 /** A user's card for the spacing check, with two libraries. */

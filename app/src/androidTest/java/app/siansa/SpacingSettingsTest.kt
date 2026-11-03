@@ -218,6 +218,28 @@ class SpacingSettingsTest : SpacingCheck() {
         assertEven("Server type chips", chips.top - label.bottom, hint.top - chips.bottom)
     }
 
+    /** Files on this phone (issue #352): the folders are one even gap apart, and the same gap above the scan line. */
+    @Test fun localFoldersAreEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    app.siansa.ui.LocalMusicContent(
+                        folders = listOf(app.siansa.local.LocalFolder("a", "Music"), app.siansa.local.LocalFolder("b", "Downloads/Albums")),
+                        statusLine = "Scan line",
+                        scanning = false,
+                        musicBrainz = true,
+                        onAdd = {}, onRemove = {}, onScan = {}, onMusicBrainz = {},
+                    )
+                }
+            }
+        }
+        val rows = compose.onAllNodesWithTag("local-folder")
+        val first = rows[0].getBoundsInRoot()
+        val second = rows[1].getBoundsInRoot()
+        val line = compose.onNodeWithText("Scan line").getBoundsInRoot()
+        assertEven("Local folders", second.top - first.bottom, line.top - second.bottom)
+    }
+
     /** Style › Phone's top bar (issue #681): its chips sit evenly between the heading and the hint. */
     @Test fun topBarChipsAreEvenlySpaced() {
         compose.setContent {

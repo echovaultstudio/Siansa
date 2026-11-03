@@ -126,6 +126,8 @@ object AnimatedCovers {
 
     /** What kind of cover this album has, or null when it couldn't be checked (try again later). */
     suspend fun kind(graph: AppGraph, albumCoverId: String): Kind? {
+        // A file's cover on the phone (issue #352) is a still picture, already here.
+        if (app.siansa.local.LocalIds.isLocal(albumCoverId)) return Kind.Still
         loadSaved(graph)
         val key = CoverStore.canonical(albumCoverId)
         known[key]?.let { return it }
@@ -173,6 +175,7 @@ object AnimatedCovers {
 
     /** Synchronous peek at what's already known, for places that can't wait. */
     fun knownKind(albumCoverId: String): Kind? {
+        if (app.siansa.local.LocalIds.isLocal(albumCoverId)) return Kind.Still
         val key = CoverStore.canonical(albumCoverId)
         return known[key] ?: if (CoverStore.has(key)) Kind.Local else null
     }

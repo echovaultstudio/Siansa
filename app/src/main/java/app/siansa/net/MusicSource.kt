@@ -21,7 +21,8 @@ enum class SourceKind(val label: String, val detail: String, val ready: Boolean)
     OPENSUBSONIC("OpenSubsonic", "Navidrome, Gonic, Airsonic, Ampache and other Subsonic servers", ready = true),
     JELLYFIN("Jellyfin", "Jellyfin Server 10.9 or later", ready = true),
     EMBY("Emby", "Emby Server", ready = true),
-    LOCAL("Files on this phone", "Coming soon", ready = false),
+    // Files on the phone come next to a server (issue #352), added in Settings › Servers and services; not on their own yet.
+    LOCAL("Files on this phone", "Add them next to a server, in Settings › Servers and services", ready = false),
     ;
 
     /**

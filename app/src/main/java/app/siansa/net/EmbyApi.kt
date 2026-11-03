@@ -599,6 +599,8 @@ class EmbyApi(
             starred = user?.bool("IsFavorite") == true,
             artists = artistItems,
             suffix = o.str("Container")?.lowercase()?.takeIf { it.isNotBlank() },
+            // The recording's MusicBrainz ID, for matching music files on the phone (#352).
+            mbid = o.obj("ProviderIds")?.let { it.str("MusicBrainzRecording") ?: it.str("MusicBrainzTrack") }?.trim()?.lowercase()?.takeIf { it.length == 36 },
         )
     }
 

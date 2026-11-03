@@ -553,6 +553,11 @@ class Downloads(
 
     /** Saves one song: the original file, or Opus when kbps > 0. Returns its size, or null when Navidrome refused it. */
     private suspend fun download(song: Song, kbps: Int): Long? {
+        // A music file on the phone (issue #352) is there already: nothing to download.
+        if (app.siansa.local.LocalIds.isLocal(song.id)) {
+            AppLog.i("Downloads", "Song ${song.id} is a file on this phone; not downloaded")
+            return null
+        }
         val target = File(dir, OfflinePlan.fileName(song.id))
         val part = File(dir, OfflinePlan.fileName(song.id) + PART)
         // The original file, or an Opus conversion by Navidrome when that's the chosen download quality.

@@ -39,6 +39,8 @@ data class Song(
     val artists: List<ArtistRef> = emptyList(),
     /** The file's type as Navidrome names it ("flac", "wma"…), when it sent one; not kept in the library. */
     val suffix: String? = null,
+    /** The recording's MusicBrainz ID (OpenSubsonic "musicBrainzId", a file's MUSICBRAINZ_TRACKID), for matching files on the phone (#352). */
+    val mbid: String? = null,
 )
 
 /** The song's cover, or its album's when Navidrome didn't send one with the song. */

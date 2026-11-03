@@ -497,6 +497,16 @@ class LibraryRepository(context: Context) {
         }
     }
 
+    // ---- Music files on the phone (issue #352) ----
+
+    /** The server's artists, without those only files on the phone name. */
+    suspend fun serverArtists(): List<Artist> = withContext(Dispatchers.IO) { dao.serverArtists().map { it.toArtist() } }
+
+    /** The server's songs, as much as matching files on the phone to them needs. */
+    suspend fun serverSongs(): List<app.siansa.local.ServerSong> = withContext(Dispatchers.IO) {
+        dao.serverSongRows().map { app.siansa.local.ServerSong(it.id, it.title, it.artist, it.durationSec, it.mbid) }
+    }
+
     // ---- Other users' music (issue #141) ----
 
     /** Which items come from which other user, for sending their requests with that user's login. */
@@ -629,7 +639,7 @@ class LibraryRepository(context: Context) {
 
     private fun SongEntity.toSong() = Song(
         id, title, artist, artistId, album, albumId, coverArt, durationSec, track, disc, year, genre,
-        trackGain, albumGain, trackPeak, albumPeak, starred, artists = Credits.decode(credits),
+        trackGain, albumGain, trackPeak, albumPeak, starred, artists = Credits.decode(credits), mbid = mbid,
     )
 
     private fun Song.toEntity() = SongEntity(
@@ -637,6 +647,7 @@ class LibraryRepository(context: Context) {
         trackGain, albumGain, trackPeak, albumPeak, starred,
         searchKey = normalizeKey("$title $artist $album ${artists.joinToString(" ") { it.name }}"),
         credits = Credits.encode(this),
+        mbid = mbid,
     )
 
     private fun AlbumEntity.toAlbum() = Album(

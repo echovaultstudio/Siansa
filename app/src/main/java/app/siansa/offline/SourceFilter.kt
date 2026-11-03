@@ -5,6 +5,7 @@ import app.siansa.data.Artist
 import app.siansa.data.Genre
 import app.siansa.data.Playlist
 import app.siansa.data.Song
+import app.siansa.local.LocalIds
 
 /**
  * "Only downloaded music" (issues #56 and #141): every list in the app narrowed down to what's on the phone,
@@ -12,11 +13,12 @@ import app.siansa.data.Song
  * their copies in other libraries, so an album shows whichever copy the songs came from.
  */
 class OnlyDownloaded(val shelf: OfflineShelf, val albumIds: Set<String> = shelf.albums) {
-    fun songs(list: List<Song>): List<Song> = list.filter { it.id in shelf.songs }
+    // Music files on the phone (issue #352) are on the phone, like downloads.
+    fun songs(list: List<Song>): List<Song> = list.filter { it.id in shelf.songs || LocalIds.isLocal(it.id) }
 
-    fun albums(list: List<Album>): List<Album> = list.filter { a -> a.allIds.any { it in albumIds } }
+    fun albums(list: List<Album>): List<Album> = list.filter { a -> a.allIds.any { it in albumIds || LocalIds.isLocal(it) } }
 
-    fun artists(list: List<Artist>): List<Artist> = list.filter { it.id in shelf.artists }
+    fun artists(list: List<Artist>): List<Artist> = list.filter { it.id in shelf.artists || LocalIds.isLocal(it.id) }
 
     fun playlists(list: List<Playlist>): List<Playlist> = list.filter { it.id in shelf.playlists }
 

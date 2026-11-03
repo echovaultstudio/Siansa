@@ -47,6 +47,8 @@ data class SongEntity(
      * featured or compilation artist is found and their page knows the song (beta testers #34).
      */
     @androidx.room.ColumnInfo(defaultValue = "") val credits: String = "",
+    /** The recording's MusicBrainz ID, for matching music files on the phone to the server's songs (#352). */
+    val mbid: String? = null,
 )
 
 /**
@@ -129,10 +131,20 @@ data class AlbumTypeRow(val releaseTypes: String, val isCompilation: Boolean)
 data class GenreRow(val name: String, val songCount: Int)
 /** Just what matching songs by title and artist needs (issue #186's time machine). */
 data class SongTitleRow(val id: String, val title: String, val artist: String)
+/** What matching a file on the phone to a server song needs (#352). */
+data class SongMatchRow(val id: String, val title: String, val artist: String, val durationSec: Int, val mbid: String?)
 
 @Dao
 interface LibraryDao {
     // Songs
+    /** The server's songs (everything but files on the phone), for matching those to them (#352). */
+    @Query("SELECT id, title, artist, durationSec, mbid FROM songs WHERE id NOT LIKE 'lf-%'")
+    suspend fun serverSongRows(): List<SongMatchRow>
+
+    /** The server's artists (everything but those only files on the phone name), for reusing them (#352). */
+    @Query("SELECT * FROM artists WHERE id NOT LIKE 'lf-%'")
+    suspend fun serverArtists(): List<ArtistEntity>
+
     @Query("SELECT * FROM songs WHERE id = :id")
     suspend fun song(id: String): SongEntity?
 
@@ -396,7 +408,7 @@ interface LibraryDao {
 
 @Database(
     entities = [SongEntity::class, AlbumEntity::class, ArtistEntity::class, PlaylistEntity::class, MetaEntity::class, SourceEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class LibraryDatabase : RoomDatabase() {
@@ -451,9 +463,20 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Version 7 keeps each song's MusicBrainz recording ID (#352), to match music files on the phone to the server's
+         * songs. Forgetting the albums' signatures makes the next sync fetch every song again, so the IDs fill in.
+         */
+        val ADD_SONG_MBID = object : androidx.room.migration.Migration(6, 7) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `songs` ADD COLUMN `mbid` TEXT")
+                db.execSQL("UPDATE `albums` SET `signature` = ''")
+            }
+        }
+
         fun open(context: Context): LibraryDatabase =
             Room.databaseBuilder(context, LibraryDatabase::class.java, app.siansa.data.Users.scoped(app.siansa.data.UserFiles.DATABASE))
-                .addMigrations(ADD_SOURCES, ADD_ARTIST_MBID, ADD_ALBUM_FOLDERS, ADD_SONG_CREDITS, ADD_ALBUM_LABELS)
+                .addMigrations(ADD_SOURCES, ADD_ARTIST_MBID, ADD_ALBUM_FOLDERS, ADD_SONG_CREDITS, ADD_ALBUM_LABELS, ADD_SONG_MBID)
                 // The library can always be synced again, so any other schema change simply starts fresh.
                 .fallbackToDestructiveMigration()
                 .build()

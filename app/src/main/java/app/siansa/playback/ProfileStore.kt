@@ -34,6 +34,12 @@ class ProfileStore(
     private var backOffUntil = 0L
     private val fetching = Mutex()
 
+    /**
+     * The id the plugin knows a song by (issue #352): a music file on the phone uses its server copy's profile, and
+     * has none (null) when it's only on the phone.
+     */
+    @Volatile var alias: (String) -> String? = { it }
+
     /** Why the last request failed, or null when it worked. */
     @Volatile var problem: String? = null
         private set
@@ -42,14 +48,16 @@ class ProfileStore(
     val active: Boolean get() = settings().let { it.loudnessSource == LoudnessSource.PLUGIN && it.audioMuseReady }
 
     /** The profile already fetched for [id], or null (none yet, or profiles aren't used). */
-    fun cached(id: String): TrackProfile? = if (!active) null else synchronized(lock) { cache[id] }
+    fun cached(id: String): TrackProfile? = if (!active) null else alias(id)?.let { known -> synchronized(lock) { cache[known] }?.let { if (known == id) it else it.copy(trackId = id) } }
 
     /**
      * Fetches the profiles of [ids] not already here, and returns all of [ids]' profiles that are known.
      * Never throws: a failure is logged, kept in [problem], and the songs simply have no profile.
      */
-    suspend fun fetch(ids: List<String>): Map<String, TrackProfile> {
-        if (!active || ids.isEmpty()) return emptyMap()
+    suspend fun fetch(songs: List<String>): Map<String, TrackProfile> {
+        if (!active || songs.isEmpty()) return emptyMap()
+        val asked = songs.mapNotNull { id -> alias(id)?.let { id to it } }
+        val ids = asked.map { it.second }
         fetching.withLock {
             val time = now()
             val need = synchronized(lock) {
@@ -63,7 +71,7 @@ class ProfileStore(
                 }
             }
         }
-        return synchronized(lock) { ids.mapNotNull { id -> cache[id]?.let { id to it } }.toMap() }
+        return synchronized(lock) { asked.mapNotNull { (song, id) -> cache[id]?.let { song to if (song == id) it else it.copy(trackId = song) } }.toMap() }
     }
 
     private suspend fun fetchBatch(batch: List<String>): Boolean {

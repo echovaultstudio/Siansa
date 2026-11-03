@@ -24,6 +24,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -79,7 +80,7 @@ import kotlinx.coroutines.launch
  * two. **Servers**: each music server login (a "user": its own library, history and settings), with its address,
  * login, its name in AudioMuse-AI and its library sync, then Audiobookshelf. **Services**: AudioMuse-AI and the AI
  * service that writes mix titles and sound searches. Each folds open with its arrow, folded to start with; [open]
- * ("server", "books", "audiomuse", "ai") opens one. One Save keeps every change on the page.
+ * ("server", "books", "local", "audiomuse", "ai") opens one. Files on this phone (issue #352) sit with the servers. One Save keeps every change on the page.
  */
 @Composable
 fun ConnectionsHub(nav: NavController, open: String? = null) {
@@ -237,6 +238,18 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
             ) {
                 AudiobookshelfFields(graph, draft) { draft = it; problem = null }
                 Button(onClick = ::save, modifier = Modifier.fillMaxWidth()) { Text("Save") }
+            }
+            // Music files on the phone (issue #352): saved as soon as a folder is added, no Save needed.
+            val localData by graph.localMusic.data.collectAsStateWithLifecycle()
+            FoldCard(
+                icon = Icons.Rounded.PhoneAndroid,
+                title = "Files on this phone",
+                subtitle = localLine(localData.folders.size, localData.tracks.size),
+                expanded = "local" in opened,
+                onToggle = { toggle("local") },
+                tag = "fold-local",
+            ) {
+                LocalMusicFields()
             }
             if (adding) {
                 FoldCard(
