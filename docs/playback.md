@@ -214,3 +214,40 @@ file**. It then gets your music as it is (for example FLAC) instead of MP3 320, 
 format; other songs still go as MP3 320. Better sound, and no tiny gap between songs, but it uses more Wi-Fi. The
 setting is kept for each device, shows which formats the device says it plays, and isn't offered when it only
 plays MP3. It applies from the next song.
+
+## Android Auto
+
+Siansa shows up in Android Auto as a music app. On the car's screen you can browse and play:
+
+- **Home**: your newest mix of each vibe, the mood radios (when AudioMuse-AI is set up) and **Recently played**,
+  the albums, playlists, mixes and artists you last played on the phone.
+- **Playlists**, **Albums** and **Artists**: each opens to its songs. An artist's songs are grouped by album.
+- **Search**, by typing (when parked) or by voice: "Play Radiohead on Siansa". A name that matches an artist or
+  album exactly plays that artist or album; otherwise the songs found play. "Play music on Siansa" plays your newest
+  mix.
+
+Picking a song plays its whole list from that song, the same as tapping it on the phone. Mood radios play straight
+away. Albums, playlists and mixes played from the car show up in **Recently played** on the phone's Home too.
+
+Very long lists show their first 1,000 entries in the car; search for anything further down. Covers are loaded by the
+phone and handed to the car, so the car never needs to reach your server.
+
+**Siansa not in Android Auto?** Android Auto only lists apps installed from Google Play, unless you allow others.
+Siansa from F-Droid, GitHub or Siansa Dev needs this once:
+
+1. On the phone, open Android Auto's settings (**Settings › Connected devices › Connection preferences › Android
+   Auto**, or search the phone's settings for "Android Auto").
+2. Scroll down and tap **Version** about ten times, until it asks to turn on developer settings. Say **OK**.
+3. Open the **⋮** menu at the top, then **Developer settings**, and turn on **Unknown sources**.
+4. Unplug and plug the phone in again (or restart the car's screen). Siansa now shows up among the music apps.
+
+**Trying it without a car.** Google's Desktop Head Unit shows a car screen on a computer:
+
+1. In Android Auto's **⋮** menu (with developer settings on, as above), choose **Start head unit server**.
+2. On the computer, in Android Studio, open **SDK Manager › SDK Tools** and install **Android Auto Desktop Head Unit
+   Emulator**.
+3. Connect the phone by USB with USB debugging on, then run `adb forward tcp:5277 tcp:5277` and start
+   `desktop-head-unit` from the SDK's `extras/google/auto` folder.
+4. On Samsung phones, turn off **Auto Blocker** while testing (it blocks USB commands), and back on afterwards.
+
+Google's guide: [Test with the Desktop Head Unit](https://developer.android.com/training/cars/testing/dhu).

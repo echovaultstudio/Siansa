@@ -87,3 +87,8 @@ straight from your server.
 If a Chromecast or Google TV shows Google's black **Default Media Receiver** screen instead of Siansa's, that copy of
 Siansa was built without Siansa's TV screen (it needs to be registered with Google first). Songs still play the same;
 use the phone for the controls. The log says which screen casting uses.
+
+## Siansa doesn't show up in Android Auto
+
+Android Auto hides apps that weren't installed from Google Play. Turn on **Unknown sources** in Android Auto's
+developer settings, as [Playback › Android Auto](playback.md#android-auto) shows, then connect the phone again.

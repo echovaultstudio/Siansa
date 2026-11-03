@@ -32,8 +32,12 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
+import app.siansa.car.CarCoverProvider
+import app.siansa.car.CarSessionCallback
+import app.siansa.car.CarTree
+import app.siansa.car.GraphCarLibrary
 import app.siansa.AppGraph
 import app.siansa.BuildConfig
 import app.siansa.playback.engine.AudioEngine
@@ -48,8 +52,6 @@ import app.siansa.log.Level
 import app.siansa.log.Trace
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.SessionManagerListener
-import com.google.common.util.concurrent.Futures
-import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -71,10 +73,11 @@ private const val TIMELINE_MS = 30_000L
 /**
  * Background playback with a media notification, lock-screen controls, ReplayGain, transcoding and scrobbling.
  * While casting, the media session drives a [RemoteCastPlayer] instead of the phone's own player.
+ * A library service, so Android Auto can browse the music and play from it (issue #62, see [CarTree]).
  */
 @OptIn(UnstableApi::class)
-class PlaybackService : MediaSessionService() {
-    private var session: MediaSession? = null
+class PlaybackService : MediaLibraryService() {
+    private var session: MediaLibrarySession? = null
     private lateinit var exo: ExoPlayer
     /** [exo] as the rest of the app sees it: converted songs seek on Navidrome (issue #162). */
     private lateinit var phone: ServerSeekPlayer
@@ -164,23 +167,11 @@ class PlaybackService : MediaSessionService() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        session = MediaSession.Builder(this, player)
+        // The app's queue changes, and Android Auto's browsing, search and playback (issue #62).
+        val car = CarTree(GraphCarLibrary(graph)) { cover -> CarCoverProvider.uriFor(this, cover) }
+        session = MediaLibrarySession.Builder(this, player, CarSessionCallback(graph, car))
             .setSessionActivity(openApp)
             .setBitmapLoader(CoverBitmapLoader(this, graph.scope))
-            .setCallback(object : MediaSession.Callback {
-                // Items arrive from the app's controller without their URI, so it's restored here.
-                override fun onAddMediaItems(
-                    mediaSession: MediaSession,
-                    controller: MediaSession.ControllerInfo,
-                    mediaItems: MutableList<MediaItem>,
-                ): ListenableFuture<MutableList<MediaItem>> {
-                    val resolved = mediaItems.map { item ->
-                        val uri = item.requestMetadata.mediaUri ?: Uri.parse(graph.source.streamUrl(item.mediaId))
-                        item.buildUpon().setUri(uri).build()
-                    }.toMutableList()
-                    return Futures.immediateFuture(resolved)
-                }
-            })
             .build()
         // A late notification's foreground start, refused in the background, no longer crashes the app (0.52.0-dev).
         setMediaNotificationProvider(
@@ -606,7 +597,7 @@ class PlaybackService : MediaSessionService() {
     /** The book session (issue #521), made when the first book controller connects. */
     private var books: BookSession? = null
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
         if (controllerInfo.connectionHints.getBoolean(BookSession.HINT_BOOKS, false)) {
             val b = books ?: BookSession(this, graph, pauseMusic = { session?.player?.pause() }).also {
                 books = it

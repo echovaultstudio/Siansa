@@ -17,7 +17,8 @@ the hood, and what to do when something goes wrong.
 
 - [Home and your mixes](home-and-mixes.md): today's mix, vibes, Made for you, radios, shortcuts.
 - [Discovery](discovery.md): song radio, Keep playing, similar music, Song path, Flow, the dice.
-- [Playback](playback.md): quality, cache, downloads, levelling, crossfades, equaliser, lyrics, sleep timer, casting.
+- [Playback](playback.md): quality, cache, downloads, levelling, crossfades, equaliser, lyrics, sleep timer, casting,
+  Android Auto.
 - [Your listening](your-listening.md): your month and year, Time Machine, sonic fingerprint, scrobbling.
 - [Audiobooks and podcasts](books.md): Audiobookshelf, the Books panel and chips, the book player.
 - [Your Stations](stations.md): internet radio from your server and your own links, and podcasts by their feed.

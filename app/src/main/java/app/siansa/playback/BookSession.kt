@@ -14,6 +14,7 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
 import app.siansa.AppGraph
 import app.siansa.MainActivity
@@ -43,7 +44,8 @@ class BookSession(private val service: PlaybackService, private val graph: AppGr
         )
         .build()
 
-    val session: MediaSession
+    /** A library session only because the service is one (issue #62); it offers nothing to browse. */
+    val session: MediaLibrarySession
 
     init {
         player.addListener(object : Player.Listener {
@@ -52,17 +54,16 @@ class BookSession(private val service: PlaybackService, private val graph: AppGr
             }
         })
         val openApp = PendingIntent.getActivity(service, 1, Intent(service, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        session = MediaSession.Builder(service, player)
+        session = MediaLibrarySession.Builder(service, player, object : MediaLibrarySession.Callback {
+            // Items arrive from the app's controller without their URI: the app sets it, so keep as sent.
+            override fun onAddMediaItems(
+                mediaSession: MediaSession,
+                controller: MediaSession.ControllerInfo,
+                mediaItems: MutableList<MediaItem>,
+            ): ListenableFuture<MutableList<MediaItem>> = Futures.immediateFuture(mediaItems)
+        })
             .setId(SESSION_ID)
             .setSessionActivity(openApp)
-            .setCallback(object : MediaSession.Callback {
-                // Items arrive from the app's controller without their URI: the app sets it, so keep as sent.
-                override fun onAddMediaItems(
-                    mediaSession: MediaSession,
-                    controller: MediaSession.ControllerInfo,
-                    mediaItems: MutableList<MediaItem>,
-                ): ListenableFuture<MutableList<MediaItem>> = Futures.immediateFuture(mediaItems)
-            })
             .build()
         AppLog.d("BookPlayer", "Book session ready")
     }
