@@ -91,4 +91,16 @@ class CombinedArtistsTest {
         val wind = Artist("w2", "Wind", mbid = "11111111-2222-3333-4444-555555555555")
         assertTrue(CombinedArtists.find(listOf(earth, wind)).isEmpty())
     }
+
+    @Test fun aSongsArtistOutsideTheArtistListIsSplitToo() {
+        // 0.52.0-dev: "ID, Camo & Krooked" is only ever a song's artist, so Navidrome's artist list (album artists)
+        // didn't have it and it was never checked.
+        val ck = Artist("ck", "Camo & Krooked", mbid = "5a5f0c3e-8d3c-4e5c-9b8f-2b8a6d0a0c01")
+        val fred = Artist("f", "Fred V")
+        val index = CombinedArtists.Index(listOf(ck, fred))
+        val c = CombinedArtists.of(Artist("j", "ID, Camo & Krooked"), index)!!
+        assertEquals(listOf("ck"), c.parts.map { it.id })
+        assertEquals(listOf("ID"), c.unknown)
+        assertEquals(listOf("ck", "j"), CombinedArtists.expand(listOf(Artist("j", "ID, Camo & Krooked")), mapOf("j" to c)).map { it.id })
+    }
 }

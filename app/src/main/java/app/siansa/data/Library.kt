@@ -281,7 +281,23 @@ class LibraryRepository(context: Context) {
             )
         }
         combined = found
+        combinedIndex = CombinedArtists.Index(artists)
         return found
+    }
+
+    @Volatile private var combinedIndex: CombinedArtists.Index? = null
+
+    /**
+     * [refs] (a song's artists) as the artists to offer: a name that's several artists in one is replaced by them
+     * (issue #359), also when it isn't in the library's artist list (only a song's artist, never an album's).
+     */
+    suspend fun expandArtists(refs: List<Artist>): List<Artist> {
+        val found = combinedArtists()
+        val index = combinedIndex ?: CombinedArtists.Index(dao.artists().map { it.toArtist() }).also { combinedIndex = it }
+        val extra = refs.filter { it.id !in found && artist(it.id) == null }
+            .mapNotNull { ref -> CombinedArtists.of(ref, index)?.let { ref.id to it } }
+        if (extra.isNotEmpty()) AppLog.d("Library", "Song artists split: ${extra.joinToString("; ") { (_, c) -> "${c.combined.name} → ${(c.parts.map { it.name } + c.unknown).joinToString(" | ")}" }}")
+        return CombinedArtists.expand(refs, if (extra.isEmpty()) found else found + extra)
     }
 
     /** The artist's albums, with those of names it's tagged in together with others (issue #359). */
