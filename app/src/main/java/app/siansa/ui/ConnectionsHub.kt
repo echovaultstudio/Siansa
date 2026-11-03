@@ -174,10 +174,6 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
         }
     }
 
-    fun save() {
-        scope.launch { if (keysChecked()) saveNow() }
-    }
-
     fun saveNow() {
         // A server being added, then the other logins: each save writes the shared AudioMuse and AI settings too, and
         // the page's own come last.
@@ -204,6 +200,10 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
         }
         AppLog.i("Settings", "Connections saved · AI: ${if (now.aiReady) "${now.aiProvider.label} ${now.aiModel}" else "off"}")
         nav.popBackStack()
+    }
+
+    fun save() {
+        scope.launch { if (keysChecked()) saveNow() }
     }
 
     Screen(

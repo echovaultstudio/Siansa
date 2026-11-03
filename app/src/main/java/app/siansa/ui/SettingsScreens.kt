@@ -92,19 +92,6 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
         }
     }
 
-    fun save() {
-        // An API key is checked with the server first (issue #493).
-        scope.launch {
-            try {
-                draft = keyChecked(graph, draft, kind, graph.settings.current.takeIf { !firstRun })
-            } catch (e: ApiException) {
-                problem = e.message
-                return@launch
-            }
-            saveNow()
-        }
-    }
-
     fun saveNow() {
         try {
             // Only the connection fields come from this page; everything else keeps its current value.
@@ -124,6 +111,19 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                 nav.navigate("sync") { popUpTo("home") }
             }
             !firstRun -> nav.popBackStack()
+        }
+    }
+
+    fun save() {
+        // An API key is checked with the server first (issue #493).
+        scope.launch {
+            try {
+                draft = keyChecked(graph, draft, kind, graph.settings.current.takeIf { !firstRun })
+            } catch (e: ApiException) {
+                problem = e.message
+                return@launch
+            }
+            saveNow()
         }
     }
 
