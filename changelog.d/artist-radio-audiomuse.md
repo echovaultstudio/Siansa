@@ -1,0 +1,2 @@
+### Changed
+- **Artist radios use AudioMuse-AI.** With AudioMuse-AI set up, an artist radio (from Home or an artist's page) plays songs that sound like the artist, with one of their own every fourth song. Before, it only used your music server's similar songs, and played just the artist's own songs when the server had none. Without AudioMuse-AI it still uses the server's similar songs.
