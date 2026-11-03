@@ -81,3 +81,5 @@ its own server.
 | Open-Meteo | Weather in Use the moment on | Your location rounded to about 10 km |
 | Deezer (`api.deezer.com`) | Artists you might like | Artist names only |
 | Radio stations and podcast feeds you add, and your server's radio stations | You add a link, open a podcast, or play a station or episode | A normal web request to that address (your IP address and "Siansa (Android)" as the app); nothing about you or your music |
+| Radio Browser (`all.api.radio-browser.info`, or one of its servers) | Once for each radio station without a picture | The station's stream address, then its name if that finds nothing ("Siansa/" and the app's version as the app) |
+| A radio station's website | Once for each radio station without a picture, when its address is known | A normal request for the page, and for the logo it names, to check it's a picture |

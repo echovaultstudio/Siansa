@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FavoriteBorder
-import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -75,21 +74,21 @@ class SpacingLibraryTest : SpacingCheck() {
         assertEven("Release-type chips", chip.top - (song.bottom - 6.dp), title.top - chip.bottom)
     }
 
-    /** Your Stations (issue #353): a station's row has the same room above and below its picture, with its ⋮ menu. */
+    /** Stations in Your Library (issue #353): a station's row has the same room above and below its picture, with its ⋮ menu. */
     @Test fun stationRowIsEvenlyPadded() {
         compose.setContent {
             SiansaTheme {
                 Column {
-                    app.siansa.ui.StationRow(
-                        "Radio Paradise", "Radio · stream.example.com", null, Icons.Rounded.Radio, "own-1",
-                        playing = false, onClick = {}, onRemove = {},
-                    )
+                    app.siansa.ui.LibraryStationRowForTest("Radio Paradise", "Radio · On this phone", "own-1")
                 }
             }
         }
-        val row = compose.onNodeWithTag("stationRow").getBoundsInRoot()
-        val cover = compose.onNodeWithTag("stationCover", useUnmergedTree = true).getBoundsInRoot()
+        val row = compose.onNodeWithTag("libraryRow").getBoundsInRoot()
+        val cover = compose.onNodeWithTag("libraryRowCover", useUnmergedTree = true).getBoundsInRoot()
+        val menu = compose.onNodeWithTag("stationMenu").getBoundsInRoot()
         assertEven("Station row", cover.top - row.top, row.bottom - cover.bottom)
+        // The ⋮ button sits centred with the picture.
+        assertEven("Station row's ⋮", menu.top - cover.top, cover.bottom - menu.bottom)
     }
 
     /** Downloads: Pause sits on the same line as the totals, centred with them, not squeezed into the buttons. */

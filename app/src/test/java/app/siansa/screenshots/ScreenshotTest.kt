@@ -58,8 +58,6 @@ import app.siansa.ui.MenuRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.Shuffle
-import androidx.compose.material.icons.rounded.Podcasts
-import androidx.compose.material.icons.rounded.Radio
 import app.siansa.ui.FoldSection
 import app.siansa.ui.SwitchRow
 import app.siansa.ui.TuningRow
@@ -369,12 +367,12 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // Your Stations (issue #353): server and phone stations and a podcast, one playing, long names cut off.
+            // Stations and podcast feeds in Your Library (issue #353): rows with their ⋮ menu, long names cut off.
             Scene("stations_list") {
                 Column {
-                    app.siansa.ui.StationRow("Radio Paradise", "Radio", null, Icons.Rounded.Radio, "server-1", playing = true, onClick = {})
-                    app.siansa.ui.StationRow("Unbelievably Long Community Radio Station Name for Rainy Evenings", "Radio · stream.example.com", null, Icons.Rounded.Radio, "own-2", playing = false, onClick = {}, onRemove = {})
-                    app.siansa.ui.StationRow("Rocket Hour", "Podcast · Ada Lovelace · 479 episodes", null, Icons.Rounded.Podcasts, "pod-3", playing = false, onClick = {}, onRemove = {})
+                    app.siansa.ui.LibraryStationRowForTest("Radio Paradise", "Radio · From your server", "server-1")
+                    app.siansa.ui.LibraryStationRowForTest("Unbelievably Long Community Radio Station Name for Rainy Evenings", "Radio · On this phone", "own-2")
+                    app.siansa.ui.LibraryStationRowForTest("Rocket Hour", "Podcast · Ada Lovelace · 479 episodes", "pod-3", podcast = true)
                 }
             },
             // A podcast's page (issue #353): its header and episodes, one playing, a long title on two lines.
@@ -385,11 +383,26 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.EpisodeRow("Ep. 478 · Short one", "4 Mar 2024 · 1 h 2 min", playing = false) {}
                 }
             },
-            // Adding a link to Your Stations (issue #353): the fields with their hint, then with an error.
+            // Adding a station or podcast (issue #353): the fields with their hint, then with an error.
             Scene("add_station") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
-                    app.siansa.ui.AddStationFields("https://somafm.com/groovesalad.pls", "", busy = false, error = null, onLink = {}, onName = {}, onDone = {})
-                    app.siansa.ui.AddStationFields("https://example.com/", "Mine", busy = false, error = "That link isn't a radio stream or a podcast feed", onLink = {}, onName = {}, onDone = {})
+                    app.siansa.ui.AddStationFields("https://somafm.com/groovesalad.pls", "", busy = false, error = null, hint = app.siansa.ui.AddKind.STATION.hint, onLink = {}, onName = {}, onDone = {})
+                    app.siansa.ui.AddStationFields("https://example.com/", "Mine", busy = false, error = "That link isn't a radio stream or a podcast feed", hint = app.siansa.ui.AddKind.PODCAST.hint, onLink = {}, onName = {}, onDone = {})
+                }
+            },
+            // Editing a station (issue #353): one added on this phone with long words and a picture link, then one from
+            // the server, whose name and link can't be changed here.
+            Scene("edit_station") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.AddStationFields(
+                        "http://mp3channels.webradio.rockantenne.de/heavy-metal-with-an-unbelievably-long-address", "Rock Antenne Heavy Metal Unbelievably Long Station Name",
+                        busy = false, error = null, hint = app.siansa.ui.editHint(false),
+                        picture = "https://www.rockantenne.de/logos/station-heavy-metal/apple-touch-icon.png", onLink = {}, onName = {}, onDone = {},
+                    )
+                    app.siansa.ui.AddStationFields(
+                        "https://stream.radioparadise.com/aac-320", "Radio Paradise", busy = false, error = null, hint = app.siansa.ui.editHint(true),
+                        picture = "", fixed = true, onLink = {}, onName = {}, onDone = {},
+                    )
                 }
             },
             // Now playing for a live station (issue #353): no seek bar, only that it's live.
