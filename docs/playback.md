@@ -96,6 +96,10 @@ blend them the way a DJ mixes:
 - **Off** (the default): fades don't follow the beat. On many phones a beat-matched blend still drifts out of step,
   so it's off until you choose it; a new audio engine that keeps both songs exactly in step is being built.
 
+In DJ radio (when beat-matched blends apply there), a blend where at most one end keeps a beat (a beatless
+intro, an ambient outro) runs the whole crossfade length: there's nothing to clash with, so the next song comes in
+under the old one as a DJ would, fading in over the first half.
+
 Whatever the setting, two songs that both keep a beat but can't be matched (tempos more than 8 % apart, counting
 double and half time as the same; a beat that isn't steady; a stream that can't jump to a point) get a short blend,
 so their beats clash only for a moment. A beatless ending or start keeps the smart blend as before.
