@@ -154,9 +154,13 @@ def beats(counts, job):
         detail += f", {failed:,} couldn't be read yet"
     if songs == 0:
         return Status("Waiting for profiles", WORKING, 0, "Songs get their beat grids with their volume and fade profile")
-    until = counts.get("until_waiting", 0)
-    if counts["to_measure"] == 0 and until and running:
-        return Status("Measuring", WORKING, 100, detail)
+    until = min(counts.get("until_waiting", 0), done)
+    if counts["to_measure"] == 0 and until:
+        # Every grid is there, but songs measured before 0.5.0 wait to be checked for where their beat stops: the bar
+        # shows that check's progress (0.5.1 showed 100 % while Measure all worked through them).
+        checked = done - until
+        detail += f"; {checked:,} of {done:,} checked for where the beat stops"
+        return Status("Measuring" if running else "Not complete", WORKING, percent(checked, done), detail)
     if counts["to_measure"] == 0:
         return Status("Ready", READY, 100, detail)
     if running:

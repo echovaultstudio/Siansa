@@ -352,7 +352,8 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
     left_line = f'<p class="mx-help">At this pace, every song is measured in {escape(left)}.</p>' if left else ""
     all_block = _all_block("profiles", counts["to_measure"], busy, measure_all, "", "", rounds, last_round, all_minutes)
     beats_all = bool(state.get("beats_all"))
-    beats_left = status.time_left(beat_counts["to_measure"], state.get("rate"), beats_all, max(beats_batch_size, 1), all_minutes) if (beats_batch_size or beats_all) else None
+    beats_waiting = beat_counts["to_measure"] + beat_counts.get("until_waiting", 0)
+    beats_left = status.time_left(beats_waiting, state.get("rate"), beats_all, max(beats_batch_size, 1), all_minutes) if (beats_batch_size or beats_all) else None
     beats_left_line = (f'<p class="mx-help">At this pace, every song has its beat grid in {escape(beats_left)}.</p>'
                        if beats_left else "")
     if not beats_batch_size and not beats_all and beat_counts["to_measure"]:
