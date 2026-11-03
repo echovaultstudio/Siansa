@@ -2,6 +2,8 @@ package app.siansa.car
 
 import android.app.Application
 import android.net.Uri
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaConstants
 import app.siansa.data.Album
 import app.siansa.data.Artist
@@ -26,6 +28,7 @@ import org.robolectric.annotation.Config
 /** Android Auto's browse tree (issue #62): its ids, its lists, and what picking something plays. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class)
+@OptIn(UnstableApi::class)
 class CarTreeTest {
     private fun song(id: String, album: String = "A", albumId: String = "al1") =
         Song(id = id, title = "Song $id", artist = "Artist", album = album, albumId = albumId, durationSec = 200)
