@@ -2,25 +2,32 @@ package app.siansa.playback
 
 import android.content.Context
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
 import androidx.media3.cast.MediaItemConverter
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.mediarouter.media.MediaRouteSelector
+import androidx.mediarouter.media.MediaRouter
 import app.siansa.BuildConfig
 import app.siansa.data.Song
 import app.siansa.data.cover
 import app.siansa.log.AppLog
 import app.siansa.net.MusicSource
+import com.google.android.gms.cast.CastDevice
 import com.google.android.gms.cast.CastMediaControlIntent
+import com.google.android.gms.cast.CastStatusCodes
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaMetadata
 import com.google.android.gms.cast.MediaQueueItem
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastOptions
+import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.CastState
 import com.google.android.gms.cast.framework.OptionsProvider
+import com.google.android.gms.cast.framework.SessionManagerListener
 import com.google.android.gms.cast.framework.SessionProvider
 import com.google.android.gms.cast.framework.media.CastMediaOptions
 import com.google.android.gms.common.ConnectionResult
@@ -32,7 +39,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONObject
 import java.util.concurrent.Executors
 
-/** The TV app that plays while casting: Siansa's own screen (issue #114) once registered, else Google's standard one. */
+/**
+ * The TV app that plays while casting: Siansa's own screen (issue #114) once registered, else Google's standard one.
+ * A TV that can't show Siansa's screen still gets Google's (see [CastScreens]).
+ */
 private val RECEIVER_APP_ID = CastReceiver.pick(BuildConfig.CAST_RECEIVER_ID)
 
 /**
@@ -56,12 +66,63 @@ object CastReceiver {
     fun isOwn(id: String): Boolean = id != DEFAULT
 }
 
+/**
+ * Which TV screen each Cast device gets (issue #114). Siansa's own where the TV can show it; Google's Default Media
+ * Receiver where it can't, so casting never goes away: while Siansa's Cast app is unpublished in the Cast console,
+ * only TVs registered there can load it, and any TV can fail to start it. A TV whose start of Siansa's screen failed
+ * is remembered (until the app restarts) and gets Google's screen from then on.
+ */
+class CastScreens(private val own: String) {
+    enum class Why {
+        /** Siansa's own screen. */
+        Own,
+        /** The app was built without its own screen's id. */
+        NoOwnScreen,
+        /** The TV isn't offered Siansa's screen (unpublished app, TV not registered). */
+        NotOffered,
+        /** Siansa's screen failed to start on this TV before. */
+        FailedBefore,
+    }
+
+    data class Choice(val appId: String, val why: Why)
+
+    private val needsDefault = HashSet<String>()
+
+    /** The screen for the TV [deviceId], when Cast lists Siansa's screen for it ([ownOffered]) or not. */
+    fun pick(deviceId: String?, ownOffered: Boolean): Choice = when {
+        !CastReceiver.isOwn(own) -> Choice(CastReceiver.DEFAULT, Why.NoOwnScreen)
+        deviceId != null && deviceId in needsDefault -> Choice(CastReceiver.DEFAULT, Why.FailedBefore)
+        !ownOffered -> Choice(CastReceiver.DEFAULT, Why.NotOffered)
+        else -> Choice(own, Why.Own)
+    }
+
+    /**
+     * Starting a cast with the screen [used] on the TV [deviceId] failed. True when it's worth trying again with
+     * Google's screen: Siansa's own failed (not cancelled by the user), and the TV is known. The TV then keeps
+     * Google's screen. Google's screen failing isn't retried: there's nothing left to fall back to.
+     */
+    fun startFailed(deviceId: String?, used: String?, cancelled: Boolean): Boolean {
+        if (cancelled || deviceId.isNullOrBlank() || used == null || !CastReceiver.isOwn(used) || used != own) return false
+        needsDefault += deviceId
+        return true
+    }
+
+    /** Words for the log. */
+    fun describe(choice: Choice): String = when (choice.why) {
+        Why.Own -> "Siansa's own TV screen (receiver ${choice.appId})"
+        Why.NoOwnScreen -> "Google's standard TV screen (no Siansa screen in this build)"
+        Why.NotOffered -> "Google's standard TV screen: this TV isn't offered Siansa's screen (unpublished Cast app, TV not registered)"
+        Why.FailedBefore -> "Google's standard TV screen: Siansa's screen failed to start on this TV before"
+    }
+}
+
 /** Google Cast setup, named in the manifest. */
 class CastSetup : OptionsProvider {
     override fun getCastOptions(context: Context): CastOptions {
         val configured = BuildConfig.CAST_RECEIVER_ID
         when {
-            CastReceiver.isOwn(RECEIVER_APP_ID) -> AppLog.i("Cast", "Casting to Siansa's own TV screen (receiver $RECEIVER_APP_ID)")
+            CastReceiver.isOwn(RECEIVER_APP_ID) ->
+                AppLog.i("Cast", "Casting to Siansa's own TV screen (receiver $RECEIVER_APP_ID) where the TV can show it, else Google's standard one")
             configured.isNotBlank() -> AppLog.w("Cast", "CAST_RECEIVER_ID \"$configured\" isn't a Cast app id, so casting uses Google's standard TV screen")
             else -> AppLog.i("Cast", "Casting to Google's standard TV screen (Default Media Receiver $RECEIVER_APP_ID)")
         }
@@ -95,10 +156,116 @@ object Cast {
     private val _status = MutableStateFlow(CastStatus())
     val status: StateFlow<CastStatus> = _status.asStateFlow()
 
-    /** Finds Cast devices that can play siansa. */
+    private val screens = CastScreens(RECEIVER_APP_ID)
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /** The TV last picked in the app, for when a failed start doesn't say which it was. */
+    private var lastPicked: String? = null
+
+    /**
+     * Finds every Cast device: those that can play Google's standard screen (all of them), and those offered
+     * Siansa's own, so a TV shows up whether or not it can show Siansa's screen (issue #114).
+     */
     val selector: MediaRouteSelector = MediaRouteSelector.Builder()
+        .addControlCategory(CastMediaControlIntent.categoryForCast(CastReceiver.DEFAULT))
         .addControlCategory(CastMediaControlIntent.categoryForCast(RECEIVER_APP_ID))
         .build()
+
+    /** Cast devices that are offered Siansa's own screen. */
+    private val ownSelector: MediaRouteSelector = MediaRouteSelector.Builder()
+        .addControlCategory(CastMediaControlIntent.categoryForCast(RECEIVER_APP_ID))
+        .build()
+
+    /** The Cast device behind [route], if it is one. */
+    fun deviceId(route: MediaRouter.RouteInfo): String? = CastDevice.getFromBundle(route.extras)?.deviceId
+
+    /**
+     * Casts to [route]: with Siansa's own TV screen where the TV is offered it, else Google's (issue #114).
+     * Main thread only.
+     */
+    fun select(route: MediaRouter.RouteInfo) {
+        val device = deviceId(route)
+        val choice = screens.pick(device, route.matchesSelector(ownSelector))
+        lastPicked = device
+        AppLog.i("Cast", "${route.name}: ${screens.describe(choice)}")
+        context?.let { use(it, choice.appId) }
+        route.select()
+    }
+
+    /** Sets which TV app the next cast starts. Changing it ends a cast in progress, so only when it differs. */
+    private fun use(c: CastContext, appId: String) {
+        if (c.castOptions.receiverApplicationId == appId) return
+        try {
+            c.setReceiverApplicationId(appId)
+        } catch (e: Exception) {
+            AppLog.w("Cast", "Couldn't switch the TV screen to $appId: ${e.message}")
+        }
+    }
+
+    /** Watches casts starting, to say which screen each TV got and to fall back to Google's when Siansa's fails. */
+    private fun watch(app: Context, c: CastContext) {
+        c.sessionManager.addSessionManagerListener(object : SessionManagerListener<CastSession> {
+            override fun onSessionStarted(session: CastSession, sessionId: String) {
+                val used = c.castOptions.receiverApplicationId
+                val screen = if (CastReceiver.isOwn(used)) "Siansa's own TV screen" else "Google's standard TV screen"
+                AppLog.i("Cast", "Casting to ${session.castDevice?.friendlyName ?: "a Cast device"} with $screen ($used)")
+            }
+            override fun onSessionStartFailed(session: CastSession, error: Int) {
+                val device = session.castDevice?.deviceId ?: lastPicked
+                val name = session.castDevice?.friendlyName ?: "the TV"
+                val used = c.castOptions.receiverApplicationId
+                val why = CastStatusCodes.getStatusCodeString(error)
+                if (device == null || !screens.startFailed(device, used, cancelled = error == CastStatusCodes.CANCELED)) {
+                    AppLog.w("Cast", "Casting to $name failed with receiver $used: $why")
+                    return
+                }
+                AppLog.w("Cast", "Siansa's TV screen didn't start on $name ($why): trying again with Google's standard TV screen")
+                use(c, CastReceiver.DEFAULT)
+                // Cast lets go of the TV first; then pick it again.
+                mainHandler.postDelayed({ reselect(app, device) }, RETRY_DELAY_MS)
+            }
+            override fun onSessionStarting(session: CastSession) {}
+            override fun onSessionEnding(session: CastSession) {}
+            override fun onSessionEnded(session: CastSession, error: Int) {}
+            override fun onSessionResuming(session: CastSession, sessionId: String) {}
+            override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {}
+            override fun onSessionResumeFailed(session: CastSession, error: Int) {}
+            override fun onSessionSuspended(session: CastSession, reason: Int) {}
+        }, CastSession::class.java)
+    }
+
+    /** Picks the TV [device] again once the router lists it, giving up after a while. Main thread. */
+    private fun reselect(app: Context, device: String) {
+        val router = MediaRouter.getInstance(app)
+        fun find() = router.routes.firstOrNull { !it.isDefault && it.isEnabled && deviceId(it) == device }
+        find()?.let { if (!it.isSelected) it.select(); return }
+        val search = MediaRouteSelector.Builder()
+            .addControlCategory(CastMediaControlIntent.categoryForCast(CastReceiver.DEFAULT))
+            .build()
+        val callback = object : MediaRouter.Callback() {
+            var done = false
+            fun check() {
+                if (done) return
+                val route = find() ?: return
+                done = true
+                router.removeCallback(this)
+                if (!route.isSelected) route.select()
+            }
+            override fun onRouteAdded(router: MediaRouter, route: MediaRouter.RouteInfo) = check()
+            override fun onRouteChanged(router: MediaRouter, route: MediaRouter.RouteInfo) = check()
+        }
+        router.addCallback(search, callback, MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY or MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN)
+        mainHandler.postDelayed({
+            if (!callback.done) {
+                callback.done = true
+                router.removeCallback(callback)
+                AppLog.w("Cast", "Couldn't find the TV again to cast with Google's standard screen; pick it again in Play on")
+            }
+        }, FIND_AGAIN_MS)
+    }
+
+    private const val RETRY_DELAY_MS = 1_000L
+    private const val FIND_AGAIN_MS = 15_000L
 
     /**
      * Starts Cast once, in the background, and calls [onReady] on the main thread when it's ready.
@@ -121,6 +288,7 @@ object Cast {
         CastContext.getSharedInstance(app, Executors.newSingleThreadExecutor())
             .addOnSuccessListener(main) { c ->
                 context = c
+                watch(app, c)
                 update(c)
                 c.addCastStateListener { update(c) }
                 val ready = waiting.toList()

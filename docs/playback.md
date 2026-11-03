@@ -203,7 +203,8 @@ pause for a few seconds between songs whichever way they get them.
 then the song's cover, title, artist and album with a progress bar, and whether it's paused. The TV remote's
 play/pause, next and previous buttons work, and so does the phone. When the queue ends, the TV says so and waits for
 the next song. A TV that can play your original files (for example FLAC) gets them instead of MP3 320; if it can't,
-it switches to MP3 320 by itself.
+it switches to MP3 320 by itself. A TV that can't show Siansa's screen still plays: it gets Google's plain screen
+instead, by itself.
 
 **Chromecast without gaps.** A Chromecast, Google TV or speaker with Chromecast built in gets the whole queue and is
 asked to load the next song about 20 seconds before the current one ends, so it can go straight on. Songs go as MP3,

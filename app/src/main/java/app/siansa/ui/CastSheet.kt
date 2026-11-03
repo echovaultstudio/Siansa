@@ -220,7 +220,7 @@ private fun CastSheet(onDismiss: () -> Unit) {
             targets.forEach { target ->
                 val connecting = status.connecting && target.selected
                 TargetRow(target.icon, target.name, if (connecting) "Connecting…" else target.detail ?: "Chromecast", selected = target.selected && !connecting && dlna == null) {
-                    if (!target.selected) target.route.select()
+                    if (!target.selected) Cast.select(target.route)
                     onDismiss()
                 }
             }
