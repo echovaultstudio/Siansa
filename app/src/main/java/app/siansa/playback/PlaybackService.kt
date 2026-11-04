@@ -74,6 +74,9 @@ private const val CAST_RESUME_WAIT_MS = 30_000L
 /** How long songs may take to get ready for the TV (their file types asked from the server) before they go anyway. */
 private const val CAST_PREP_MS = 3_000L
 
+/** A queue message this big is near Cast's 64 KB limit. */
+private const val CAST_MESSAGE_WARN_BYTES = 56 * 1024
+
 /** How often the phone checks it still sees the TV's queue, and asks the TV again at most. */
 private const val TV_QUEUE_CHECK_MS = 2_000L
 private const val TV_QUEUE_ASK_MS = 1_500L
@@ -649,8 +652,8 @@ class PlaybackService : MediaLibraryService() {
         override fun needs(items: List<MediaItem>): Boolean {
             val songs = items.map { it.toSong() }
             val quality = CastSettings.quality.value
-            val unknown = quality == CastQuality.Lossless && songs.any { CastFormats.suffixOf(it) == null }
-            if (!unknown) describe(songs, quality)
+            val unknown = quality == CastQuality.Lossless && CastFormats.worthAsking(songs).isNotEmpty()
+            if (!unknown) describe(items, songs, quality)
             return unknown
         }
 
@@ -659,15 +662,19 @@ class PlaybackService : MediaLibraryService() {
             mainScope.launch {
                 val learned = withTimeoutOrNull(CAST_PREP_MS) { withContext(Dispatchers.IO) { CastFormats.learn(graph.source, songs) } }
                 if (learned == null) AppLog.w("Cast", "The server didn't say the songs' file types within ${CAST_PREP_MS / 1000}s; those go as MP3")
-                describe(songs, CastSettings.quality.value)
+                describe(items, songs, CastSettings.quality.value)
                 done()
             }
         }
 
-        private fun describe(songs: List<Song>, quality: CastQuality) {
+        private fun describe(items: List<MediaItem>, songs: List<Song>, quality: CastQuality) {
             if (songs.isEmpty()) return
             val summary = CastFormats.summary(songs.map { CastFormats.suffixOf(it) }, quality, graph.source.streamUrl(songs.first().id))
-            AppLog.i("Cast", "To the TV: ${songs.size} songs, ${summary.describe(quality)}")
+            // About what the message to the TV weighs: Cast takes at most 64 KB (a 497-song queue never arrived, 0.52.0-dev).
+            val converter = CastItems(graph.source)
+            val bytes = runCatching { items.sumOf { converter.toMediaQueueItem(it).toJson().toString().length } }.getOrDefault(-1)
+            AppLog.i("Cast", "To the TV: ${songs.size} songs (${bytes / 1024} KB), ${summary.describe(quality)}")
+            if (bytes > CAST_MESSAGE_WARN_BYTES) AppLog.w("Cast", "That's near Cast's 64 KB limit for one message: the TV may not take it")
         }
     }
 
@@ -774,7 +781,8 @@ class PlaybackService : MediaLibraryService() {
             runCatching { queue.registerCallback(tvQueueCallback) }
             tvQueue = queue
         }
-        val phoneCount = tv.mediaItemCount
+        // What Media3 lists for the TV (the window sent, not the phone's whole queue) against what the TV lists.
+        val phoneCount = tv.tvSideCount
         val tvCount = queue.itemCount
         val stale = CastQueueCheck.stale(phoneCount, tvCount, client.mediaInfo != null)
         if (!stale) {

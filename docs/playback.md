@@ -267,8 +267,9 @@ an admin, open **Settings › Transcodings**, choose **Create**, and fill in:
 Navidrome only lets you edit transcodings when it runs with `ND_ENABLETRANSCODINGCONFIG=true`; set it, restart
 Navidrome, add the transcoding, then set it back. Navidrome needs `ffmpeg` (its Docker image has it).
 
-**Chromecast without gaps.** A Chromecast, Google TV or speaker with Chromecast built in gets the whole queue and is
-asked to load the next song about 20 seconds before the current one ends, so it can go straight on. Songs that go
+**Chromecast without gaps.** A Chromecast, Google TV or speaker with Chromecast built in gets the queue (a long
+queue a part at a time: the song playing, a few before it and the next 25, with more sent as it plays; the queue on
+the phone stays whole, and you can jump anywhere in it) and is asked to load the next song about 20 seconds before the current one ends, so it can go straight on. Songs that go
 as MP3 can leave a very short pause between songs that run into each other; FLAC usually doesn't.
 
 **Original files on DLNA.** Tap the cog beside a DLNA TV or speaker in **Play on** and turn on **Send the original
