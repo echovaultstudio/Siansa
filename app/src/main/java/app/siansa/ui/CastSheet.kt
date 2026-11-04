@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.mediarouter.media.MediaRouter
 import app.siansa.playback.Cast
+import com.google.android.gms.cast.CastDevice
 import app.siansa.playback.AudioOutput
 import app.siansa.BuildConfig
 import app.siansa.playback.CastMode
@@ -186,7 +187,23 @@ fun CastDeviceButton(tint: Color, modifier: Modifier = Modifier) {
     if (open) CastSheet(onDismiss = { open = false })
 }
 
-private class CastTarget(val route: MediaRouter.RouteInfo, val name: String, val detail: String?, val selected: Boolean, val icon: ImageVector)
+private class CastTarget(val route: MediaRouter.RouteInfo, val name: String, val detail: String, val selected: Boolean, val icon: ImageVector)
+
+/** What a Cast device in Play on is, for the line under its name (issue #114). */
+internal enum class CastKind(val detail: String) {
+    Tv("Chromecast"),
+    Speaker("Chromecast · speaker"),
+    Group("Chromecast · speaker group");
+
+    companion object {
+        /** A speaker group; a speaker (by the route, or sound but no picture); else a TV or Chromecast. */
+        fun of(group: Boolean, speakerRoute: Boolean, audioOnly: Boolean): CastKind = when {
+            group -> Group
+            speakerRoute || audioOnly -> Speaker
+            else -> Tv
+        }
+    }
+}
 
 /**
  * Lists the phone, every Cast device and every DLNA TV or speaker on the Wi-Fi; tapping one moves the
@@ -219,12 +236,20 @@ private fun CastSheet(onDismiss: () -> Unit) {
             targets = router.routes
                 .filter { !it.isDefault && !it.isBluetooth && it.isEnabled && it.matchesSelector(Cast.selector) }
                 .map { route ->
+                    val device = CastDevice.getFromBundle(route.extras)
+                    val kind = CastKind.of(
+                        group = device?.hasCapability(CastDevice.CAPABILITY_MULTIZONE_GROUP) == true,
+                        speakerRoute = route.deviceType == MediaRouter.RouteInfo.DEVICE_TYPE_SPEAKER,
+                        audioOnly = device != null && device.hasCapability(CastDevice.CAPABILITY_AUDIO_OUT) && !device.hasCapability(CastDevice.CAPABILITY_VIDEO_OUT),
+                    )
                     CastTarget(
                         route = route,
-                        name = route.name,
-                        detail = route.description?.takeIf { it.isNotBlank() },
+                        // The device's own name ("SHIELD"); never the route's description, which is what the TV is
+                        // showing ("Casting: Run Away") or its model ("SHIELD Android TV").
+                        name = device?.friendlyName?.takeIf { it.isNotBlank() } ?: route.name,
+                        detail = kind.detail,
                         selected = route.isSelected,
-                        icon = if (route.deviceType == MediaRouter.RouteInfo.DEVICE_TYPE_SPEAKER) Icons.Rounded.Speaker else Icons.Rounded.Tv,
+                        icon = if (kind == CastKind.Tv) Icons.Rounded.Tv else Icons.Rounded.Speaker,
                     )
                 }
         }
@@ -259,7 +284,7 @@ private fun CastSheet(onDismiss: () -> Unit) {
                 TargetRow(
                     target.icon,
                     target.name,
-                    if (connecting) "Connecting…" else target.detail ?: "Chromecast",
+                    if (connecting) "Connecting…" else target.detail,
                     selected = target.selected && !connecting && dlna == null,
                     onSettings = { castSettingsOf = target.name },
                 ) {
