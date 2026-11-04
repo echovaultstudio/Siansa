@@ -190,7 +190,7 @@ class CastGapless(
         stop(why)
     }
 
-    private val cut = Runnable { if (active) newStream("a skip") }
+    private val cut: Runnable = Runnable { if (active) newStream("a skip") }
 
     /**
      * Asks the TV for a new stream from the mix written so far: what it had in hand is dropped. The TV screen plays it
@@ -223,7 +223,7 @@ class CastGapless(
     }
 
     /** No word at all from the TV screen (an old page that doesn't know the phone's stream): the queue instead. */
-    private val connectTimeout = Runnable {
+    private val connectTimeout: Runnable = Runnable {
         if (!active) return@Runnable
         val c = clock ?: return@Runnable
         if (c.hasReport()) return@Runnable
@@ -339,7 +339,7 @@ class CastGapless(
         }
     }
 
-    private val nowLater = Runnable { sendNow() }
+    private val nowLater: Runnable = Runnable { sendNow() }
 
     private val tick = object : Runnable {
         var n = 0
