@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.5.5",
+      "min_core_version": "3.6.4",
+      "changelog": "Scheduled Tasks lists only the plugin's tick, with a short description of what it does. The two extra entries (measure_missing and rebuild_similar) are gone: they asked for a schedule nobody needed, and the settings page's Measure now and Build now buttons do the same as before.",
+      "imageUrl": ""
+    },
+    {
       "version": "0.5.4",
       "min_core_version": "3.6.4",
       "changelog": "A run stopped by AudioMuse-AI restarting (updating the plugin does that) no longer keeps the page on \"Measuring\" with its buttons off for up to 17 minutes: after 5 minutes without word from it, it counts as stopped and Measure all can be started again.",
