@@ -60,6 +60,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -69,6 +70,13 @@ import java.util.Collections
 private const val FALLBACK_KBPS = 320
 /** How long music stays on a TV that Cast lost touch with, waiting for it to come back (issue #114). */
 private const val CAST_RESUME_WAIT_MS = 30_000L
+
+/** How long songs may take to get ready for the TV (their file types asked from the server) before they go anyway. */
+private const val CAST_PREP_MS = 3_000L
+
+/** How often the phone checks it still sees the TV's queue, and asks the TV again at most. */
+private const val TV_QUEUE_CHECK_MS = 2_000L
+private const val TV_QUEUE_ASK_MS = 1_500L
 /** How often a server with a playback timeline (Emby) hears where the playing song is (issue #113). */
 private const val TIMELINE_MS = 30_000L
 
@@ -209,7 +217,7 @@ class PlaybackService : MediaLibraryService() {
             if (session == null) return@whenReady
             CastSettings.load(this)
             val remote = RemoteCastPlayer.Builder(this).setMediaItemConverter(CastItems(graph.source)).build()
-            val tv = CastQueuePlayer(remote)
+            val tv = CastQueuePlayer(remote, castPrep)
             castRemote = remote
             castPlayer = tv
             gapless = engine?.let { mixer ->
@@ -262,6 +270,10 @@ class PlaybackService : MediaLibraryService() {
                 }
             }, CastSession::class.java)
             if (remote.isCastSessionAvailable) castStarted(tv, cast)
+            // How it plays, changed in the cog while casting: the cast switches over (issue #114).
+            mainScope.launch {
+                CastSettings.mode.collect { mode -> castModeChanged(mode, tv, cast) }
+            }
         }
 
         // DLNA (TVs and speakers without Chromecast): follows the device picked in the app.
@@ -577,6 +589,7 @@ class PlaybackService : MediaLibraryService() {
      */
     private fun castStarted(tv: Player, cast: com.google.android.gms.cast.framework.CastContext) {
         if (session?.player === tv || gapless?.active == true) return
+        AppLog.i("Cast", "How it plays: ${CastSettings.mode.value.label}" + if (CastSettings.mode.value == CastMode.Queue) "" else ", trying it")
         if (CastSettings.mode.value == CastMode.Gapless) {
             val castSession = cast.sessionManager.currentCastSession
             val g = gapless
@@ -587,6 +600,71 @@ class PlaybackService : MediaLibraryService() {
             }
         }
         moveTo(tv)
+    }
+
+    /**
+     * "How it plays" changed under the cog (issue #114). While a cast is on, it switches at once: from the TV playing
+     * the queue to gapless, the phone takes the queue back from the TV (song and place) and streams it; from gapless
+     * to the queue, the TV gets the phone's queue. Either way the phone keeps its player: the owner's first try left the
+     * TV playing the queue with no player on the phone (0.52.0-dev).
+     */
+    private fun castModeChanged(mode: CastMode, tv: CastQueuePlayer, cast: com.google.android.gms.cast.framework.CastContext) {
+        val g = gapless
+        when {
+            mode == CastMode.Gapless && session?.player === tv -> {
+                val castSession = cast.sessionManager.currentCastSession ?: return
+                if (g == null) {
+                    AppLog.w("Cast", "Gapless through this phone needs the new audio engine, which this build doesn't have: the TV keeps playing the queue")
+                    return
+                }
+                val playing = tv.playWhenReady
+                AppLog.i("Cast", "How it plays changed to gapless during the cast: the phone takes the queue back from the TV and streams it")
+                moveTo(phone)
+                if (g.start(castSession)) {
+                    if (playing) phone.play()
+                } else {
+                    AppLog.w("Cast", "Gapless didn't start (see above): the TV plays the queue again")
+                    graph.player.notice("Gapless through this phone didn't start, so the TV plays the queue.")
+                    moveTo(tv)
+                }
+            }
+            mode == CastMode.Queue && g?.active == true -> {
+                AppLog.i("Cast", "How it plays changed to the TV playing the queue during the cast: the TV gets the phone's queue")
+                // The TV gets the queue first (the phone's player stops), then the mix comes back to the phone, silent.
+                moveTo(tv)
+                g.stop("switched to the TV playing the queue")
+            }
+        }
+    }
+
+    /**
+     * Gets songs ready for the TV (issue #114): in lossless quality, the file types the library doesn't keep are asked
+     * from the server first, so each song goes as it is or as FLAC rather than as MP3. At most [CAST_PREP_MS].
+     */
+    private val castPrep = object : CastQueuePlayer.Prep {
+        override fun needs(items: List<MediaItem>): Boolean {
+            val songs = items.map { it.toSong() }
+            val quality = CastSettings.quality.value
+            val unknown = quality == CastQuality.Lossless && songs.any { CastFormats.suffixOf(it) == null }
+            if (!unknown) describe(songs, quality)
+            return unknown
+        }
+
+        override fun run(items: List<MediaItem>, done: () -> Unit) {
+            val songs = items.map { it.toSong() }
+            mainScope.launch {
+                val learned = withTimeoutOrNull(CAST_PREP_MS) { withContext(Dispatchers.IO) { CastFormats.learn(graph.source, songs) } }
+                if (learned == null) AppLog.w("Cast", "The server didn't say the songs' file types within ${CAST_PREP_MS / 1000}s; those go as MP3")
+                describe(songs, CastSettings.quality.value)
+                done()
+            }
+        }
+
+        private fun describe(songs: List<Song>, quality: CastQuality) {
+            if (songs.isEmpty()) return
+            val summary = CastFormats.summary(songs.map { CastFormats.suffixOf(it) }, quality, graph.source.streamUrl(songs.first().id))
+            AppLog.i("Cast", "To the TV: ${songs.size} songs, ${summary.describe(quality)}")
+        }
     }
 
     /**
@@ -655,6 +733,57 @@ class PlaybackService : MediaLibraryService() {
         }
         events?.attach(target)
         session.player = target
+        handler.removeCallbacks(tvQueueTick)
+        if (target === castPlayer) handler.postDelayed(tvQueueTick, TV_QUEUE_CHECK_MS)
+    }
+
+    /** The TV's queue list the phone follows, and when it last asked the TV for news because of it. */
+    private var tvQueue: com.google.android.gms.cast.framework.media.MediaQueue? = null
+    private var tvQueueAskedAt = 0L
+    private var tvQueueStale = false
+
+    private val tvQueueCallback = object : com.google.android.gms.cast.framework.media.MediaQueue.Callback() {
+        override fun mediaQueueChanged() { handler.post { checkTvQueue() } }
+        override fun itemsReloaded() { handler.post { checkTvQueue() } }
+    }
+
+    /** While the TV plays the queue: looks at whether the phone still sees it, every few seconds. */
+    private val tvQueueTick = object : Runnable {
+        override fun run() {
+            if (castPlayer == null || session?.player !== castPlayer) return
+            checkTvQueue()
+            handler.postDelayed(this, TV_QUEUE_CHECK_MS)
+        }
+    }
+
+    /**
+     * Asks the TV for its news again when the phone's view of its queue is out of date ([CastQueueCheck]), so the
+     * phone never shows no music while the TV plays (issue #114). Main thread.
+     */
+    private fun checkTvQueue() {
+        val tv = castPlayer ?: return
+        if (session?.player !== tv) return
+        val client = Cast.currentSession()?.remoteMediaClient ?: return
+        val queue = client.mediaQueue
+        if (queue !== tvQueue) {
+            runCatching { tvQueue?.unregisterCallback(tvQueueCallback) }
+            runCatching { queue.registerCallback(tvQueueCallback) }
+            tvQueue = queue
+        }
+        val phoneCount = tv.mediaItemCount
+        val tvCount = queue.itemCount
+        val stale = CastQueueCheck.stale(phoneCount, tvCount, client.mediaInfo != null)
+        if (!stale) {
+            if (tvQueueStale) AppLog.i("Cast", "The phone sees the TV's queue again: $phoneCount songs")
+            tvQueueStale = false
+            return
+        }
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - tvQueueAskedAt < TV_QUEUE_ASK_MS) return
+        if (!tvQueueStale) AppLog.w("Cast", "The TV lists $tvCount songs but the phone sees $phoneCount; asking the TV again")
+        tvQueueStale = true
+        tvQueueAskedAt = now
+        runCatching { client.requestStatus() }.onFailure { AppLog.d("Cast", "Couldn't ask the TV: ${it.message}") }
     }
 
     private fun spotOf(player: Player): CastSpot<MediaItem> {
@@ -670,9 +799,14 @@ class PlaybackService : MediaLibraryService() {
         val live = spotOf(tv)
         val stopped = StopCasting.requested
         StopCasting.requested = false
-        val picked = CastHandBack.afterEnd(live, castSaved, stopped) { it.mediaId }
+        val known = (tv as? CastQueuePlayer)?.lastKnown()
+        val picked = CastHandBack.afterEnd(live, castSaved, stopped, known) { it.mediaId }
         if (stopped) AppLog.i("Cast", "Stopped with hold to stop: nothing comes back to the phone")
-        if (picked !== live) AppLog.w("Cast", "The TV forgot the queue while stopping; using the one saved as casting ended")
+        when {
+            picked === live -> {}
+            picked === castSaved -> AppLog.w("Cast", "The TV forgot the queue while stopping; using the one saved as casting ended")
+            else -> AppLog.w("Cast", "The TV forgot the queue while stopping; using the one the phone last saw on the TV (${picked.items.size} songs, song ${picked.index + 1} at ${picked.positionMs / 1000}s)")
+        }
         val spot = CastHandBack.withoutNameless(picked) { it.mediaId }
         if (spot.items.size != picked.items.size) {
             AppLog.w("Cast", "Left out ${picked.items.size - spot.items.size} of the TV's ${picked.items.size} songs: neither the TV nor the phone's copy could name them")
@@ -776,6 +910,8 @@ class PlaybackService : MediaLibraryService() {
         events?.finishCurrent()
         handler.removeCallbacks(castGone)
         handler.removeCallbacks(castGaveUp)
+        handler.removeCallbacks(tvQueueTick)
+        runCatching { tvQueue?.unregisterCallback(tvQueueCallback) }
         gapless?.stop("playback closed")
         gapless = null
         castRemote?.setSessionAvailabilityListener(null)

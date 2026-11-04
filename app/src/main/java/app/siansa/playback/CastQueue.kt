@@ -9,6 +9,7 @@ import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import app.siansa.log.AppLog
 import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
 
 /**
  * Siansa's own copy of the queue it sent to the TV (issue #114), to name the songs the TV doesn't. Cast only tells
@@ -105,9 +106,32 @@ data class CastQueueFill(val songs: Int, val fromTv: Int, val fromPhone: Int, va
  * real songs. Main thread, like the player it wraps.
  */
 @OptIn(UnstableApi::class)
-class CastQueuePlayer(tv: Player) : ForwardingSimpleBasePlayer(tv) {
+class CastQueuePlayer(tv: Player, private val prep: Prep? = null) : ForwardingSimpleBasePlayer(tv) {
+    /**
+     * Gets songs ready before they go to the TV (issue #114): their file types, asked from the server, so "Lossless"
+     * can send each as it is or as FLAC. Until [run] says it's [done] (on the main thread), the phone shows the new
+     * queue as it will be.
+     */
+    interface Prep {
+        /** Whether [items] need getting ready; when not, it says in the log how they go. */
+        fun needs(items: List<MediaItem>): Boolean
+        fun run(items: List<MediaItem>, done: () -> Unit)
+    }
+
     private val copy = CastQueueCopy<MediaItem> { it.mediaId }
     private var lastFill: CastQueueFill? = null
+
+    /** The TV's queue as the phone last saw it with songs in it, for bringing the music back (issue #114). */
+    private var known: CastSpot<MediaItem>? = null
+    private var knownPlaying = false
+    private var knownAt = 0L
+
+    /**
+     * Where the music was on the TV when the phone last saw its queue, moved on by the time since while it played:
+     * when casting ends and the TV forgot its queue first (Back on the TV's remote), the music comes back from here.
+     */
+    fun lastKnown(nowMs: Long = android.os.SystemClock.elapsedRealtime()): CastSpot<MediaItem>? =
+        known?.let { CastHandBack.movedOn(it, knownPlaying, nowMs - knownAt) }
 
     override fun getState(): SimpleBasePlayer.State {
         val state = super.getState()
@@ -122,6 +146,10 @@ class CastQueuePlayer(tv: Player) : ForwardingSimpleBasePlayer(tv) {
             items += window.mediaItem
         }
         val filled = copy.fill(uids, items)
+        val index = state.currentMediaItemIndex.coerceIn(0, filled.size - 1)
+        known = CastSpot(filled, index, runCatching { state.contentPositionMsSupplier.get() }.getOrDefault(0L).coerceAtLeast(0L))
+        knownPlaying = state.playWhenReady && state.playbackState == Player.STATE_READY
+        knownAt = android.os.SystemClock.elapsedRealtime()
         val fill = CastQueueFill.of(items, filled) { it.mediaId }
         if (fill != lastFill && (fill.fromPhone > 0 || fill.unknown > 0)) {
             AppLog.d("Cast", "The TV's queue: ${fill.songs} songs, ${fill.fromTv} named by the TV, ${fill.fromPhone} from the phone's copy, ${fill.unknown} unknown")
@@ -136,12 +164,25 @@ class CastQueuePlayer(tv: Player) : ForwardingSimpleBasePlayer(tv) {
 
     override fun handleSetMediaItems(mediaItems: List<MediaItem>, startIndex: Int, startPositionMs: Long): ListenableFuture<*> {
         copy.set(mediaItems)
-        return super.handleSetMediaItems(mediaItems, startIndex, startPositionMs)
+        return afterPrep(mediaItems) { setNow(mediaItems, startIndex, startPositionMs) }
     }
 
     override fun handleAddMediaItems(index: Int, mediaItems: List<MediaItem>): ListenableFuture<*> {
         copy.add(index, mediaItems)
-        return super.handleAddMediaItems(index, mediaItems)
+        return afterPrep(mediaItems) { addNow(index, mediaItems) }
+    }
+
+    private fun setNow(items: List<MediaItem>, start: Int, positionMs: Long) = super.handleSetMediaItems(items, start, positionMs)
+
+    private fun addNow(index: Int, items: List<MediaItem>) = super.handleAddMediaItems(index, items)
+
+    /** [send] the songs to the TV once they're ready ([prep]); straight away when there's nothing to get ready. */
+    private fun afterPrep(items: List<MediaItem>, send: () -> ListenableFuture<*>): ListenableFuture<*> {
+        val p = prep
+        if (p == null || !p.needs(items)) return send()
+        val result = SettableFuture.create<Any?>()
+        p.run(items) { result.setFuture(send()) }
+        return result
     }
 
     override fun handleMoveMediaItems(fromIndex: Int, toIndex: Int, newIndex: Int): ListenableFuture<*> {
@@ -178,4 +219,15 @@ private class NamedTimeline(private val inner: Timeline, private val items: List
     override fun getIndexOfPeriod(uid: Any): Int = inner.getIndexOfPeriod(uid)
 
     override fun getUidOfPeriod(periodIndex: Int): Any = inner.getUidOfPeriod(periodIndex)
+}
+
+/**
+ * Whether the phone's view of the TV's queue is out of date (issue #114): the TV lists songs but the phone sees
+ * another number, or the TV plays something while the phone sees no queue at all. Media3 reads the TV's queue only
+ * when the TV sends news, and after a new queue the list of songs can arrive just after that news: the phone then
+ * showed no queue (and no mini player) while the TV played on (0.52.0-dev). Asking the TV for its news again fixes it.
+ */
+object CastQueueCheck {
+    fun stale(phoneCount: Int, tvCount: Int, tvHasMedia: Boolean): Boolean =
+        (tvCount > 0 && phoneCount != tvCount) || (phoneCount == 0 && tvHasMedia)
 }

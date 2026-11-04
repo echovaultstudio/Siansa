@@ -220,8 +220,10 @@ Chromecast:
   song this way, it switches to MP3 320 by itself, and so do the songs of the same kind after it.
 - **MP3 320**: every song is converted to MP3 320 kbit/s by your server. Uses less Wi-Fi.
 
-It applies to music you start playing after you change it. Converting to FLAC needs Navidrome (or another Subsonic
-server) with a **flac** transcoding; with Jellyfin and Emby, those files go as MP3 320.
+It applies to music you start playing after you change it. Siansa asks your server for each song's file type just
+before the songs go to the TV (the library doesn't keep it), which can take a moment for a long queue. Converting to
+FLAC needs Navidrome (or another Subsonic server) with a **flac** transcoding; with Jellyfin and Emby, those files go
+as MP3 320.
 
 **Gapless through this phone.** With Siansa's new audio engine (in Siansa Dev for now), the cog beside a Chromecast
 also has **How it plays**:
@@ -246,7 +248,9 @@ the song starts the stream again from there, with a short gap. Use the TV's remo
 - A VPN on the phone is fine: the stream goes over the Wi-Fi. A VPN set to block everything outside it may stop the
   TV from reaching the phone; the TV then plays the queue.
 
-It applies from the next time you cast.
+Changing it during a cast switches over at once, from the same song and place: to gapless, the phone takes the
+queue back from the TV and streams it; to the queue, the TV gets the phone's queue. If gapless can't start, the TV
+keeps playing the queue and a short note says so.
 
 **Adding the FLAC conversion to Navidrome.** Recent Navidrome versions come with it (**Settings › Transcodings**
 lists **flac audio**). If yours doesn't, ALAC songs fall back to MP3 320 on the TV. To add it, sign in to Navidrome as
