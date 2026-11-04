@@ -603,6 +603,7 @@ class PlaybackService : MediaLibraryService() {
                 g.start(castSession) -> return
             }
         }
+        if (phone.mediaItemCount == 0) AppLog.i("Cast", "Nothing playing yet: the TV shows Siansa's screen, and music goes there when it starts")
         moveTo(tv)
     }
 

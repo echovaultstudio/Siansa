@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <title>Siansa</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- Siansa's TV screen while casting (issue #114). The only outside file is Google's Cast receiver library. -->
-<script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+<!-- Siansa's TV screen while casting (issue #114). The only outside file is Google's Cast receiver library, loaded at
+     the end of the page so the splash shows as soon as the TV opens the page, not once the library has arrived. -->
 <style>
   :root {
     /* Siansa's colours, as the app's icon and siansa.app: black, frost and amber. The same page serves Siansa and
@@ -39,6 +39,9 @@
   #cover { position: relative; width: 58vh; height: 58vh; flex: none; border-radius: 1.6vh; overflow: hidden;
     background: var(--raised) center/cover; box-shadow: 0 3vh 8vh rgba(0,0,0,.55); }
   #cover.none { background-image: none; }
+  /* A song without a cover: Siansa's icon on the raised square. */
+  #cover .ph { display: none; position: absolute; left: 22%; top: 22%; width: 56%; height: 56%; opacity: .9; }
+  #cover.none .ph { display: block; }
   #info { position: relative; flex: 1; min-width: 0; }
   #title { font-size: 7vh; font-weight: 700; line-height: 1.08; letter-spacing: -.12vh; overflow: hidden;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
@@ -137,6 +140,7 @@
   </svg><div class="logo"><span class="s">S</span>iansa</div></div>
 </div>
 <audio id="audio"></audio>
+<script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 <!-- The phone's own stream while casting gaplessly (issue #114): played here, not through Google's Cast player, which
      never got past 0 s with an endless stream on a SHIELD (0.52.0-dev). -->
 <audio id="live" preload="auto"></audio>
@@ -150,6 +154,8 @@ const ICONS = {
   back: '<path d="M11 18V6l-8.5 6 8.5 6zm.5-6 8.5 6V6l-8.5 6z"/>',
 };
 const $ = id => document.getElementById(id);
+// The cover's placeholder: Siansa's icon, as on the splash.
+(() => { const ph = document.querySelector('#splash .icon').cloneNode(true); ph.setAttribute('class', 'ph'); $('cover').insertBefore(ph, $('cover').firstChild); })();
 
 const context = cast.framework.CastReceiverContext.getInstance();
 
@@ -216,7 +222,8 @@ function render() {
   const media = player.getMediaInformation();
   const state = player.getPlayerState();
   const S = cast.framework.messages.PlayerState;
-  const phone = !!(live && liveNow && liveNow.title !== undefined);
+  // The phone's song, once it has one: while it has none (cast started with nothing playing), the splash.
+  const phone = !!(live && liveNow && liveNow.title);
   if (!phone && (live || !media || state === S.IDLE)) { $('splash-note').textContent = note(); showNow(false); return; }
   played = true;
   failed = false;
@@ -761,7 +768,12 @@ options.customNamespaces = { [LOG_NS]: cast.framework.system.MessageType.STRING,
 options.supportedCommands = M.Command.ALL_BASIC_MEDIA | M.Command.QUEUE_NEXT | M.Command.QUEUE_PREV;
 options.disableIdleTimeout = true;
 // The splash says "Connecting…" until the TV has started the page, then waits for the phone's first song.
-context.addEventListener(cast.framework.system.EventType.READY, render);
+const pageAt = Date.now();
+context.addEventListener(cast.framework.system.EventType.READY, () => {
+  render();
+  tvlog('TV screen ready ' + (Date.now() - pageAt) + ' ms after the page opened: ' +
+    ($('now').classList.contains('hidden') ? 'the splash ("' + $('splash-note').textContent + '")' : 'now playing'));
+});
 context.start(options);
 </script>
 </body>

@@ -58,6 +58,8 @@ import app.siansa.ui.ServerKindChips
 import app.siansa.ui.MenuRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material.icons.rounded.Speaker
+import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material.icons.rounded.Shuffle
 import app.siansa.ui.FoldSection
 import app.siansa.ui.SwitchRow
@@ -284,6 +286,14 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     DlnaSettingsContent(
                         DlnaDevice("uuid:jbl", "JBL BAR 800MK2", null, "http://speaker/transport", null, formats = setOf("audio/mpeg", "audio/flac", "audio/wav")),
                     )
+                }
+            },
+            // Play on's rows (issue #114): a Cast device's own name with what it is under it, never what the TV shows.
+            Scene("cast_play_on_rows") {
+                Column {
+                    app.siansa.ui.TargetRow(Icons.Rounded.Tv, "Living Room SHIELD with an uncharacteristically long name", app.siansa.ui.CastKind.Tv.detail, selected = true, onSettings = {}) {}
+                    app.siansa.ui.TargetRow(Icons.Rounded.Speaker, "Kitchen and living room speakers", app.siansa.ui.CastKind.Group.detail, selected = false, onSettings = {}) {}
+                    app.siansa.ui.TargetRow(Icons.Rounded.Speaker, "JBL BAR 800MK2", "DLNA · JBL", selected = false, onSettings = {}) {}
                 }
             },
             // The Chromecast settings behind the cog in Play on (issue #114): sound quality, lossless by default.
