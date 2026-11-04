@@ -98,6 +98,32 @@ fun CastButton(tint: Color = LocalContentColor.current) {
 }
 
 /**
+ * Whether Home shows its cast button: while something is cast or connecting, and when Cast or a known DLNA
+ * TV or speaker is around. Nothing found, no button, so Home stays as it was.
+ */
+internal fun homeCastShown(status: CastStatus, dlnaFound: Int, dlnaSelected: Boolean, dlnaConnecting: Boolean): Boolean =
+    status.device != null || status.connecting || dlnaSelected || dlnaConnecting || status.devicesFound || dlnaFound > 0
+
+/**
+ * Home's cast button: [CastButton], shown only when there's something to play on ([homeCastShown]). Cast's own
+ * device list is kept by Google Play services, free to read; DLNA asks the speakers it knew before, once, when
+ * Home opens. Neither runs anything in the background.
+ */
+@Composable
+fun HomeCastButton() {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        Cast.whenReady(context) { }
+        Dlna.checkKnown(context)
+    }
+    val status by Cast.status.collectAsStateWithLifecycle()
+    val dlnaDevices by Dlna.devices.collectAsStateWithLifecycle()
+    val dlna by Dlna.selected.collectAsStateWithLifecycle()
+    val dlnaConnecting by Dlna.connecting.collectAsStateWithLifecycle()
+    if (homeCastShown(status, dlnaDevices.size, dlna != null, dlnaConnecting)) CastButton(MaterialTheme.colorScheme.onSurface)
+}
+
+/**
  * The text next to the device button in now playing: the TV or speaker's name while casting,
  * "Connecting…" while it connects, the Bluetooth or wired headphones the phone plays through,
  * and nothing on the phone's own speaker.

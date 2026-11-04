@@ -1,6 +1,11 @@
 # Home and your mixes
 
 Home is built from sections you can reorder and hide (**Arrange Home**, from the filter button at the top of Home).
+
+Next to the filter button, a **cast button** shows when there's a TV or speaker to play on: a Chromecast, Google TV
+or Cast speaker on your Wi-Fi, or a DLNA TV or speaker Siansa found before. It turns amber while something plays
+there. Finding them costs nothing in the background: Google Play services keeps the Cast list itself, and Siansa
+asks the DLNA ones it knows once, when Home opens.
 Its **Spacing** slider sets the gap between every section at once, from Tight to Airy; **Reset** puts the order,
 the hidden sections, the spacing and the looks back.
 
