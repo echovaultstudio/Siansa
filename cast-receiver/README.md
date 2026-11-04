@@ -50,10 +50,14 @@ An id that isn't 8 hex digits is ignored (the log says so), and casting goes on 
 
 ## Remote control
 
-On Google TV the remote's play/pause, next and previous go through the TV's media controls, which the Cast
-library turns into the same commands the phone sends; the page allows queue next and previous for them. When the
-TV hands key presses to the page itself, left and right move between the three buttons and OK presses one.
-Previous on the screen goes back to the start of the song after its first 5 seconds, else to the song before.
+The screen has no buttons: the cover, the song, a thin line for where it is, and Siansa in the corner. On the
+remote, **left** is the previous song, **right** the next and **OK** plays or pauses; the media keys do what they
+say. A sign over the cover shows what a press did, and pause stays on the cover while paused. Previous goes back to
+the start of the song after its first 5 seconds, else to the song before.
+
+Google TV also turns left and right into "seek a few seconds" commands of its own. The page takes a relative seek
+as previous or next, and drops any seek that comes with a left or right press, so a press never jumps around in the
+song. Seeks from the phone (always to a point in the song) work as before.
 
 ## Original quality
 
