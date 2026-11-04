@@ -46,7 +46,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Downloads every album, artist and playlist cover ahead of time, like Symfonium's automatic image
+ * Downloads every album, artist and playlist cover ahead of time, as an automatic image
  * cache: in the background, after a library sync and once a day, only on Wi-Fi and (unless set
  * otherwise) only when the phone is on the same local network as Navidrome, so it never uses mobile data
  * or a slow link from outside. Covers already on the phone are skipped, so later runs only fetch new ones.

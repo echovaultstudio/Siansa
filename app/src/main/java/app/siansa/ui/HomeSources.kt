@@ -68,7 +68,7 @@ import app.siansa.log.AppLog
 
 /*
  * The source filter (issues #56, #124 and #141), under Sources in the panel behind Home's top-right buttons,
- * laid out like Symfonium's: only downloaded music, and a card per user with an eye to show or hide their
+ * laid out as: only downloaded music, and a card per user with an eye to show or hide their
  * music, a Sync button and their libraries to tick. What's hidden is hidden everywhere in the app.
  */
 
@@ -333,7 +333,7 @@ internal fun SourceCard(
     }
 }
 
-/** A library to tick on or off, like Symfonium's: a tick and the name in a rounded box. */
+/** A library to tick on or off: a tick and the name in a rounded box. */
 @Composable
 private fun LibraryChip(name: String, on: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(10.dp)
