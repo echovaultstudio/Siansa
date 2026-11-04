@@ -18,6 +18,8 @@ class TvClock(private val rate: Int) {
     private var atNanos = 0L
     private var reported = false
     private var furthest = 0.0
+    /** When the TV's time last moved on (or the stream was asked for): standing still is counted from here. */
+    private var movedNanos = 0L
 
     /** The TV was asked for stream [n] from mix frame [fromFrame]: until it says otherwise, it's heard there. */
     @Synchronized fun started(n: Int, fromFrame: Long, nanos: Long) {
@@ -28,6 +30,7 @@ class TvClock(private val rate: Int) {
         reported = false
         furthest = 0.0
         atNanos = nanos
+        movedNanos = nanos
     }
 
     /**
@@ -36,6 +39,7 @@ class TvClock(private val rate: Int) {
      */
     @Synchronized fun report(n: Int, timeSec: Double, moving: Boolean, nanos: Long): Boolean {
         if (n != stream || timeSec.isNaN() || timeSec < 0) return false
+        if (moving || timeSec > time + MOVED_SEC) movedNanos = nanos
         time = timeSec
         if (timeSec > furthest) furthest = timeSec
         playing = moving
@@ -51,19 +55,21 @@ class TvClock(private val rate: Int) {
     }
 
     /**
-     * What the mixer paces itself by: [heard], except when the TV has stood still for over [STALL_MS] (waiting for data,
-     * or not yet started): then it counts on from there by the phone's clock, up to [STALL_EXTRA_MS] more, so the TV
-     * always gets data to start or carry on with and the two can't wait for each other. Chrome buffers by bytes, not
-     * by time: a stream that slowed to a trickle could leave it waiting for more than the mixer would send.
+     * What the mixer paces itself by: [heard], with more on top while the TV isn't moving, so the TV always gets the
+     * data it waits for and the two can't wait for each other:
+     * - before the stream has started, [START_EXTRA_MS] straight away: a TV may want several seconds in hand before it
+     *   starts (the owner's SHIELD sat at "readyState 1" with 0.6 to 1.4 s of data, 0.52.0-dev);
+     * - once started, after it has stood still for [STALL_MS] (waiting for data), up to [STALL_EXTRA_MS] more.
+     * Standing still is counted from when the TV's time last moved, not from its last report: it reports twice a
+     * second whether it moves or not, which kept the allowance from ever applying (0.52.0-dev).
      */
     @Synchronized fun paceHeard(nanos: Long): Double {
         val base = heard(nanos)
         if (playing) return base
-        val stillMs = (nanos - atNanos) / 1_000_000 - STALL_MS
+        if (!started()) return base + START_EXTRA_MS * rate / 1000.0
+        val stillMs = (nanos - movedNanos) / 1_000_000 - STALL_MS
         if (stillMs <= 0) return base
-        // Before the stream has got anywhere, more: a TV may want more in hand to start than to carry on.
-        val most = if (started()) STALL_EXTRA_MS else START_EXTRA_MS
-        return base + minOf(stillMs, most) * rate / 1000.0
+        return base + minOf(stillMs, STALL_EXTRA_MS) * rate / 1000.0
     }
 
     /** Whether the TV has got anywhere in its current stream (past [STARTED_SEC]). */
@@ -84,8 +90,10 @@ class TvClock(private val rate: Int) {
         const val STALL_MS = 1_000L
         /** And then the mixer goes on this far (ms) at most without hearing from it. */
         const val STALL_EXTRA_MS = 3_000L
-        /** The same before the stream has started at all. */
-        const val START_EXTRA_MS = 6_000L
+        /** What the mixer may write ahead beyond [heard] before the stream has started at all. */
+        const val START_EXTRA_MS = 6_500L
+        /** The TV's time moving on by this much counts as moving. */
+        const val MOVED_SEC = 0.01
         /** How far into a stream counts as started. */
         const val STARTED_SEC = 0.3
     }

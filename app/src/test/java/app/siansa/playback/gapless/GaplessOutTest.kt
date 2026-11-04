@@ -12,7 +12,7 @@ class GaplessOutTest {
     @Test fun eachBlockGoesIntoTheRingFromItsMixFrame() {
         val ring = PcmRing(2, rate)
         val clock = TvClock(rate)
-        val out = GaplessOut(ring, clock, rate, leadMs = 1_500, name = "TV", sleep = { error("no wait so far ahead") }, now = { 0L })
+        val out = GaplessOut(ring, clock, rate, baseLeadMs = 1_500, name = "TV", sleep = { error("no wait so far ahead") }, now = { 0L })
         val block = FloatArray(512) { if (it % 2 == 0) 0.5f else -0.5f }
         assertTrue(out.write(block, 256, 10_240))
         assertEquals(10_240L, ring.origin)
@@ -37,7 +37,7 @@ class GaplessOutTest {
         var slept = 0L
         clock.started(1, 0, 0)
         clock.report(1, 0.0, moving = true, nanos = 0)
-        val out = GaplessOut(ring, clock, rate, leadMs = 1_000, name = "TV", sleep = { ms -> slept += ms; t += ms * 1_000_000 }, now = { t })
+        val out = GaplessOut(ring, clock, rate, baseLeadMs = 1_000, name = "TV", sleep = { ms -> slept += ms; t += ms * 1_000_000 }, now = { t })
         val block = FloatArray(512)
         var at = 0L
         // Two seconds of mix: the first second goes at once, the rest as the TV plays.
@@ -53,5 +53,17 @@ class GaplessOutTest {
         val out = GaplessOut(ring, TvClock(rate), rate, 1_500, "TV", sleep = {}, now = { 0L })
         out.stopped = true
         assertFalse(out.write(FloatArray(512), 256, 0))
+    }
+
+    @Test fun theLeadForCuesIsWhatIsWrittenAheadNow() {
+        val ring = PcmRing(2, rate * 10)
+        val clock = TvClock(rate)
+        clock.started(1, 0, 0)
+        val out = GaplessOut(ring, clock, rate, baseLeadMs = 1_500, name = "TV", sleep = {}, now = { 0L })
+        assertEquals(1_500L, out.leadMs)
+        // Before the TV starts it gets several seconds: cues are set that much further ahead.
+        var at = 0L
+        while (at < rate * 5L) { out.write(FloatArray(512), 256, at); at += 256 }
+        assertTrue(out.leadMs in 5_000L..5_300L)
     }
 }

@@ -40,20 +40,29 @@ class TvClockTest {
         assertFalse(c.report(2, Double.NaN, true, s))
     }
 
-    @Test fun aTvStandingStillGetsMoreDataSoNeitherWaitsForTheOther() {
+    @Test fun beforeTheStreamStartsTheTvGetsSeveralSecondsAtOnce() {
         val c = TvClock(rate)
         c.started(1, 0, 0)
-        // Not yet a second: as heard.
-        assertEquals(0.0, c.paceHeard(s / 2), 0.0)
-        // Then on by the clock: before the stream has started, up to six seconds more.
-        assertEquals(0.5 * rate, c.paceHeard(s + s / 2), 1.0)
-        assertEquals(TvClock.START_EXTRA_MS / 1000.0 * rate, c.paceHeard(60 * s), 1.0)
-        // Once it has got going, three.
-        c.report(1, 2.0, moving = false, nanos = 60 * s)
-        assertEquals(2.0 * rate + TvClock.STALL_EXTRA_MS / 1000.0 * rate, c.paceHeard(120 * s), 1.0)
-        // Playing: as heard.
-        c.report(1, 1.0, true, 60 * s)
-        assertEquals(c.heard(61 * s), c.paceHeard(61 * s), 0.0)
+        assertEquals(TvClock.START_EXTRA_MS / 1000.0 * rate, c.paceHeard(0), 1.0)
+        // The TV reports twice a second that it stands at 0 (0.52.0-dev, the SHIELD): still the whole allowance.
+        for (i in 1..20) c.report(1, 0.0, moving = false, nanos = i * s / 2)
+        assertEquals(TvClock.START_EXTRA_MS / 1000.0 * rate, c.paceHeard(10 * s), 1.0)
+    }
+
+    @Test fun onceStartedATvStandingStillGetsMoreEvenThoughItKeepsReporting() {
+        val c = TvClock(rate)
+        c.started(1, 0, 0)
+        c.report(1, 2.0, moving = true, nanos = s)
+        // It stops moving at 2 s (waiting for data) and keeps saying so twice a second.
+        c.report(1, 2.0, moving = false, nanos = s + s / 2)
+        assertEquals(2.0 * rate, c.paceHeard(s + s / 2), 1.0)
+        for (i in 4..20) c.report(1, 2.0, moving = false, nanos = i * s / 2)
+        // Still since 1 s: from 2 s on by the clock, up to three seconds more.
+        assertEquals(2.0 * rate + 0.5 * rate, c.paceHeard(2 * s + s / 2), 1.0)
+        assertEquals(2.0 * rate + TvClock.STALL_EXTRA_MS / 1000.0 * rate, c.paceHeard(10 * s), 1.0)
+        // Moving again: as heard.
+        c.report(1, 2.5, moving = true, nanos = 11 * s)
+        assertEquals(c.heard(11 * s), c.paceHeard(11 * s), 0.0)
     }
 
     @Test fun theMixerWritesUpToTheLeadAheadThenWaits() {
