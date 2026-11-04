@@ -97,7 +97,7 @@ sections, which are hidden, their looks and the spacing) are behind the button a
 - **Themes**: Auto (follows your phone, including its dark-mode schedule), Light or Dark; **Pure black** when dark
   (saves battery on OLED screens); a colour scheme, or **Your colour** (pick one colour and Siansa makes the rest,
   in light and dark), or colours from your wallpaper; and the accent colour for selected items and buttons. Siansa
-  starts on **Mono** colours with the **Amber** accent. **Pages and cards** sets the colour behind everything
+  starts on its own **Siansa** colours, with the accent matching them (**Match theme**, Siansa's amber). **Pages and cards** sets the colour behind everything
   (pages, cards, menus and sheets): **Grey** to start with, like Spotify, **Warm grey**, **Blue grey**, or **Match
   theme** for the colour scheme's own tinted backgrounds. Album, artist and now playing pages keep their colours from
   the cover.

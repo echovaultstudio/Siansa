@@ -97,6 +97,8 @@ class SongRadio(private val graph: AppGraph) {
      */
     fun start(song: Song, mode: ContinuousMode = ContinuousMode.STEADY, onError: (String) -> Unit = {}) {
         stop()
+        // Each new radio starts as Steady vibes with no surprises; a shape picked for the last one doesn't carry over.
+        if (graph.settings.resetMixShape()) AppLog.i("SongRadio", "Mix shape back to Steady vibes, no surprises, for the new radio")
         val picked = if (mode == ContinuousMode.OFF) ContinuousMode.STEADY else mode
         graph.scope.launch {
             val started = System.currentTimeMillis()
