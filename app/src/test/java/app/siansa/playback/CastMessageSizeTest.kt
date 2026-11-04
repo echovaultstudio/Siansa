@@ -1,5 +1,6 @@
 package app.siansa.playback
 
+import android.app.Application
 import app.siansa.data.AppSettings
 import app.siansa.data.Song
 import app.siansa.net.SubsonicApi
@@ -8,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * The window of the queue the TV gets fits in one Cast message (issue #114): Cast's limit is 64 KB, and a 497-song
@@ -15,6 +17,7 @@ import org.robolectric.RobolectricTestRunner
  * originals' addresses for lossless.
  */
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], application = Application::class)
 class CastMessageSizeTest {
     private val api = SubsonicApi(OkHttpClient()) {
         AppSettings(navidromeUrl = "http://192.168.100.106:30043", navidromeUser = "someone.with.a.long.name", navidromePassword = "a long password of forty characters!!")
