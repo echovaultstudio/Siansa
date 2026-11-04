@@ -116,8 +116,8 @@ class CastGapless(
         stream = 0
         errors = 0
         tvKey = castSession.castDevice?.deviceId
-        // The format that played on this TV before (this app run), else FLAC.
-        tries = StreamTries(tvKey?.let { workingFormat[it] } ?: StreamFormat.Flac)
+        // The way that played on this TV before (this app run), else the first.
+        tries = StreamTries(tvKey?.let { workingWay[it] } ?: StreamWay.ORDER.first())
         onActive(true)
         val o = GaplessOut(r, c, AudioEngine.OUTPUT_RATE, LEAD_MS, "$tvName (gapless cast)")
         out = o
@@ -202,16 +202,17 @@ class CastGapless(
         val srv = server ?: return
         val c = clock ?: return
         val r = ring ?: return
-        val format = tries?.format ?: StreamFormat.Flac
+        val way = tries?.way ?: StreamWay.ORDER.first()
+        val format = way.format
         stream++
         // The first stream starts with the mixer's next block (nothing is in the ring yet); later ones where the new music does.
         val from = if (r.end == 0L && r.origin == 0L) engine.writtenMix else r.end
         srv.expect(stream)
         c.started(stream, from, System.nanoTime())
         val url = srv.url(host, stream, from, format)
-        AppLog.i(TAG, "Stream $stream for $tvName ($why), ${format.label}, from mix frame $from")
+        AppLog.i(TAG, "Stream $stream for $tvName ($why), ${way.label}, from mix frame $from")
         try {
-            s.sendMessage(GaplessMessages.NAMESPACE, GaplessMessages.start(stream, url, format))
+            s.sendMessage(GaplessMessages.NAMESPACE, GaplessMessages.start(stream, url, way))
         } catch (e: Exception) {
             AppLog.w(TAG, "Couldn't ask $tvName for stream $stream: ${e.message}")
         }
@@ -254,11 +255,11 @@ class CastGapless(
     /** Stream [stream] went nowhere (or failed) for [what]: try the other format, or give up for the queue. */
     private fun noProgress(what: String) {
         val t = tries ?: return
-        val failed = t.format
+        val failed = t.way
         when (val next = t.failed()) {
             is StreamTries.Next.Retry -> {
-                AppLog.w(TAG, "$tvName $what as ${failed.label}; trying ${next.format.label}")
-                newStream("${next.format.label} instead of ${failed.label}")
+                AppLog.w(TAG, "$tvName $what as ${failed.label}; trying ${next.way.label}")
+                newStream("${next.way.label} instead")
             }
             StreamTries.Next.GiveUp -> {
                 val why = "$tvName $what (tried ${t.triedLabels()})"
@@ -304,8 +305,8 @@ class CastGapless(
         if (!active || n != stream) return
         val t = tries ?: return
         val first = t.worked()
-        tvKey?.let { workingFormat[it] = t.format }
-        if (first) AppLog.i(TAG, "$tvName plays the phone's stream as ${t.format.label}: ${engine.status()}")
+        tvKey?.let { workingWay[it] = t.way }
+        if (first) AppLog.i(TAG, "$tvName plays the phone's stream as ${t.way.label}: ${engine.status()}")
     }
 
     private fun error(m: GaplessMessages.FromTv.Error) {
@@ -450,10 +451,10 @@ class CastGapless(
         const val JUMP_WINDOW_MS = 1_000L
         const val CONNECT_TIMEOUT_MS = 15_000L
         /** How long a stream may take to get going on the TV before the next format is tried. */
-        const val START_WAIT_MS = 8_000L
+        const val START_WAIT_MS = 6_000L
 
-        /** The format each TV (by Cast device id) played, for this app run. */
-        private val workingFormat = java.util.concurrent.ConcurrentHashMap<String, StreamFormat>()
+        /** The way each TV (by Cast device id) played the stream, for this app run. */
+        private val workingWay = java.util.concurrent.ConcurrentHashMap<String, StreamWay>()
         const val TICK_MS = 5_000L
         const val STATUS_EVERY_MS = 30_000L
         const val MAX_ERRORS = 3

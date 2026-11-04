@@ -244,9 +244,10 @@ the song starts the stream again from there, with a short gap. Use the TV's remo
 - It keeps the phone awake and its Wi-Fi busy while it casts, so it uses more battery than letting the TV play the
   queue. Plug the phone in for long listening.
 - It needs Siansa's own TV screen. A TV that gets Google's plain screen plays the queue instead. If the TV doesn't
-  start the phone's stream within a few seconds, Siansa tries it as WAV (plain, uncompressed sound) instead of FLAC;
-  if that doesn't start either, the TV plays the queue itself and a short note says so. The log says which format
-  played.
+  start the phone's stream within a few seconds, Siansa tries another way: the TV screen plays it through Google's
+  Cast player first, then in a player of its own, then as WAV (plain, uncompressed sound) instead of FLAC. If none
+  starts, the TV plays the queue itself and a short note says so. The log says which way played, and the TV keeps it
+  until Siansa restarts.
 - Headphones or Bluetooth going away while the phone casts gaplessly don't pause the music: the sound is on the TV.
 - A VPN on the phone is fine: the stream goes over the Wi-Fi. A VPN set to block everything outside it may stop the
   TV from reaching the phone; the TV then plays the queue.

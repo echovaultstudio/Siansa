@@ -46,14 +46,16 @@ object GaplessMessages {
     }.toString()
 
     /**
-     * Starts stream [n] at [url] in the TV screen's own audio element (not through Google's Cast player, which never got
-     * past 0 s with it on a SHIELD, 0.52.0-dev). [format] is for the TV's log.
+     * Starts stream [n] at [url] on the TV screen, the [way] asked: the page loads it into Google's Cast player itself
+     * (buffered, length unknown) or plays it in its own audio element. Either way the phone never sends a LOAD for it.
      */
-    fun start(n: Int, url: String, format: StreamFormat): String = buildJsonObject {
+    fun start(n: Int, url: String, way: StreamWay): String = buildJsonObject {
         put("type", "start")
         put("stream", n)
         put("url", url)
-        put("format", format.key)
+        put("format", way.format.key)
+        put("mime", way.format.mime)
+        put("player", way.player)
     }.toString()
 
     /** Stops the phone's stream on the TV. */

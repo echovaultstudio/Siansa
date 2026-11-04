@@ -6,31 +6,44 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * When the TV's stream gets nowhere (issue #114; 0.52.0-dev: asked for again every 6 s, for ever, in silence): the
- * other format once, then the queue.
+ * Which way the TV plays the phone's stream, and when to give up (issue #114; 0.52.0-dev: asked for again every 6 s,
+ * for ever, in silence): each way once, then the queue.
  */
 class StreamTriesTest {
-    @Test fun flacThenWavThenGiveUp() {
-        val t = StreamTries(StreamFormat.Flac)
-        assertEquals(StreamTries.Next.Retry(StreamFormat.Wav), t.failed())
+    private val castFlac = StreamWay(StreamFormat.Flac, throughCast = true)
+    private val ownFlac = StreamWay(StreamFormat.Flac, throughCast = false)
+    private val ownWav = StreamWay(StreamFormat.Wav, throughCast = false)
+
+    @Test fun googlesPlayerFirstAsSymfoniumPlaysOnTheShieldThenTheOwnPlayerThenWav() {
+        assertEquals(listOf(castFlac, ownFlac, ownWav), StreamWay.ORDER)
+        val t = StreamTries()
+        assertEquals(castFlac, t.way)
+        assertEquals(StreamTries.Next.Retry(ownFlac), t.failed())
+        assertEquals(StreamTries.Next.Retry(ownWav), t.failed())
         assertEquals(StreamFormat.Wav, t.format)
         assertEquals(StreamTries.Next.GiveUp, t.failed())
-        assertEquals("FLAC and WAV", t.triedLabels())
+        assertTrue(t.triedLabels().contains("through Google's player"))
     }
 
-    @Test fun aFormatThatPlayedStartsTheCountAgain() {
-        val t = StreamTries(StreamFormat.Flac)
+    @Test fun aWayThatPlayedStartsTheCountAgain() {
+        val t = StreamTries()
         t.failed()
         assertTrue(t.worked())
         assertFalse(t.worked())
-        // WAV played; later its stream went nowhere: FLAC once more, then give up.
-        assertEquals(StreamTries.Next.Retry(StreamFormat.Flac), t.failed())
+        // The own player played; later its stream went nowhere: the other two once more, then give up.
+        assertEquals(StreamTries.Next.Retry(castFlac), t.failed())
+        assertEquals(StreamTries.Next.Retry(ownWav), t.failed())
         assertEquals(StreamTries.Next.GiveUp, t.failed())
     }
 
-    @Test fun startsWithTheFormatThatPlayedBefore() {
-        val t = StreamTries(StreamFormat.Wav)
-        assertEquals(StreamFormat.Wav, t.format)
-        assertEquals(StreamTries.Next.Retry(StreamFormat.Flac), t.failed())
+    @Test fun startsWithTheWayThatPlayedBefore() {
+        val t = StreamTries(ownWav)
+        assertEquals(ownWav, t.way)
+        assertEquals(StreamTries.Next.Retry(castFlac), t.failed())
+    }
+
+    @Test fun theTvPageIsToldWhichPlayer() {
+        assertEquals("cast", castFlac.player)
+        assertEquals("element", ownWav.player)
     }
 }
