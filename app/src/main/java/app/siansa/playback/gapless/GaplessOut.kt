@@ -11,14 +11,25 @@ class GaplessOut(
     private val ring: PcmRing,
     private val clock: TvClock,
     private val rate: Int,
-    override val leadMs: Long,
+    /** The lead the mixer keeps once the TV plays. */
+    private val baseLeadMs: Long,
     private val name: String,
     private val sleep: (Long) -> Unit = { Thread.sleep(it) },
     private val now: () -> Long = System::nanoTime,
 ) : MixOut {
     private val dither = Dither()
     private var pcm = ShortArray(0)
-    private val leadFrames = leadMs * rate / 1000
+    private val leadFrames = baseLeadMs * rate / 1000
+
+    /** The mix frame after the last one written. */
+    @Volatile private var written = 0L
+
+    /**
+     * How far (ms) the mix is written ahead of what the TV plays now: [baseLeadMs] once it plays steadily, more while it
+     * starts or catches up. Cues (crossfades) are set this much further ahead, so they're never behind what was sent.
+     */
+    override val leadMs: Long
+        get() = maxOf(baseLeadMs, ((written - clock.heard(now())) * 1000 / rate).toLong() + LEAD_MARGIN_MS)
 
     /** Set to end: the next write says no and the mix goes back to the phone. */
     @Volatile var stopped = false
@@ -38,6 +49,7 @@ class GaplessOut(
         dither.convert(block, 0, pcm, 0, samples)
         ring.write(pcm, frames)
         val written = at + frames
+        this.written = written
         while (!stopped) {
             val wait = Pacer.waitMs(written, clock.paceHeard(now()), leadFrames, rate)
             if (wait <= 0) break
@@ -49,4 +61,9 @@ class GaplessOut(
     override fun heard(nanos: Long): Double = clock.heard(nanos)
 
     override fun describe(): String = name
+
+    companion object {
+        /** A little more than measured, for what's written while a cue is set. */
+        const val LEAD_MARGIN_MS = 200L
+    }
 }

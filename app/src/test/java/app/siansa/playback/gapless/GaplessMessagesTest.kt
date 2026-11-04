@@ -26,11 +26,16 @@ class GaplessMessagesTest {
     }
 
     @Test fun theTvScreenIsToldToStartAndStopThePhonesStream() {
-        val o = Json.parseToJsonElement(GaplessMessages.start(4, "http://192.168.1.56:4000/live/k/4.wav?from=9", StreamFormat.Wav)).jsonObject
+        val o = Json.parseToJsonElement(GaplessMessages.start(4, "http://192.168.1.56:4000/live/k/4.wav?from=9", StreamWay(StreamFormat.Wav, throughCast = false))).jsonObject
         assertEquals("start", o["type"]!!.jsonPrimitive.content)
         assertEquals(4L, o["stream"]!!.jsonPrimitive.long)
         assertEquals("http://192.168.1.56:4000/live/k/4.wav?from=9", o["url"]!!.jsonPrimitive.content)
         assertEquals("wav", o["format"]!!.jsonPrimitive.content)
+        assertEquals("audio/wav", o["mime"]!!.jsonPrimitive.content)
+        assertEquals("element", o["player"]!!.jsonPrimitive.content)
+        val cast = Json.parseToJsonElement(GaplessMessages.start(5, "http://x/5.flac", StreamWay(StreamFormat.Flac, throughCast = true))).jsonObject
+        assertEquals("cast", cast["player"]!!.jsonPrimitive.content)
+        assertEquals("audio/flac", cast["mime"]!!.jsonPrimitive.content)
         assertEquals("stop", Json.parseToJsonElement(GaplessMessages.stop()).jsonObject["type"]!!.jsonPrimitive.content)
     }
 

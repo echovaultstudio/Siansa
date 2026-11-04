@@ -193,7 +193,9 @@ as you fall asleep. Without a timer, Wind down queues a number of calm songs (**
 The device button in now playing shows TVs and speakers on the same Wi-Fi: Chromecast and Google TV, and DLNA
 ones (most smart TVs, Sonos, AV receivers). They play straight from your server: a Chromecast gets your music
 lossless (see **Chromecast sound quality** below), a DLNA one MP3 320 kbit/s unless you ask for the original files.
-Stopping the cast brings the music back to the phone, paused.
+Stopping the cast brings the music back to the phone, paused. In **Play on**, each Chromecast shows its own name with
+"Chromecast" under it ("Chromecast · speaker" or "Chromecast · speaker group" for speakers and groups); DLNA ones show
+"DLNA" and their model.
 
 **Out of reach.** When the phone leaves the Wi-Fi a DLNA TV or speaker is on (you leave the house), the music comes
 back to the phone, paused, within a few seconds. A device that stops answering on the same Wi-Fi is let go after
@@ -205,8 +207,9 @@ that support it go straight on to the next song. Devices that don't get the next
 with a short gap. How well a device does this is up to the device: some speakers (the JBL Bar 800, for example)
 pause for a few seconds between songs whichever way they get them.
 
-**The TV screen.** Casting to a Chromecast or Google TV shows Siansa on the TV: a Siansa screen while it connects,
-then the song's cover, title, artist and album with a progress bar, and whether it's paused. The TV remote's
+**The TV screen.** Casting to a Chromecast or Google TV shows Siansa on the TV: a Siansa screen while it connects
+(also when you pick the TV before playing anything: it then says "Connected. Pick a song on your phone.", and the
+music goes to the TV when you start it), then the song's cover (Siansa's icon for a song without one), title, artist and album with a progress bar, and whether it's paused. The TV remote's
 play/pause, next and previous buttons work, and so does the phone. When the queue ends, the TV says so and waits for
 the next song. A TV that can't show Siansa's screen still plays: it gets Google's plain screen instead (always as MP3
 320), by itself, and the next time you cast, Siansa tries its own screen again.
@@ -244,9 +247,10 @@ the song starts the stream again from there, with a short gap. Use the TV's remo
 - It keeps the phone awake and its Wi-Fi busy while it casts, so it uses more battery than letting the TV play the
   queue. Plug the phone in for long listening.
 - It needs Siansa's own TV screen. A TV that gets Google's plain screen plays the queue instead. If the TV doesn't
-  start the phone's stream within a few seconds, Siansa tries it as WAV (plain, uncompressed sound) instead of FLAC;
-  if that doesn't start either, the TV plays the queue itself and a short note says so. The log says which format
-  played.
+  start the phone's stream within a few seconds, Siansa tries another way: the TV screen plays it through Google's
+  Cast player first, then in a player of its own, then as WAV (plain, uncompressed sound) instead of FLAC. If none
+  starts, the TV plays the queue itself and a short note says so. The log says which way played, and the TV keeps it
+  until Siansa restarts.
 - Headphones or Bluetooth going away while the phone casts gaplessly don't pause the music: the sound is on the TV.
 - A VPN on the phone is fine: the stream goes over the Wi-Fi. A VPN set to block everything outside it may stop the
   TV from reaching the phone; the TV then plays the queue.

@@ -163,6 +163,22 @@ object Cast {
     /** The TV last picked in the app, for when a failed start doesn't say which it was. */
     private var lastPicked: String? = null
 
+    /** When a TV was last picked in Play on (elapsedRealtime), to say in the log how long casting took to start. */
+    @Volatile private var pickedAt = 0L
+
+    private fun sincePicked(): String {
+        val ms = android.os.SystemClock.elapsedRealtime() - pickedAt
+        return if (pickedAt > 0 && ms in 0..60_000) ", ${ms} ms after it was picked" else ""
+    }
+
+    /** When this phone last ended a cast (elapsedRealtime), to tell that from the TV ending it. */
+    @Volatile private var endedHereAt = -ENDED_HERE_MS
+
+    /** Whether a cast that ended [sinceAskedMs] after the phone asked to end it was ended by the phone. */
+    fun endedFromPhone(sinceAskedMs: Long): Boolean = sinceAskedMs in 0..ENDED_HERE_MS
+
+    private const val ENDED_HERE_MS = 5_000L
+
     /**
      * Finds every Cast device: those that can play Google's standard screen (all of them), and those offered
      * Siansa's own, so a TV shows up whether or not it can show Siansa's screen (issue #114).
@@ -188,6 +204,7 @@ object Cast {
         val device = deviceId(route)
         val choice = screens.pick(route.matchesSelector(ownSelector))
         lastPicked = device
+        pickedAt = android.os.SystemClock.elapsedRealtime()
         AppLog.i("Cast", "${route.name}: ${screens.describe(choice)}")
         context?.let { use(it, choice.appId) }
         route.select()
@@ -209,7 +226,7 @@ object Cast {
             override fun onSessionStarted(session: CastSession, sessionId: String) {
                 val used = c.castOptions.receiverApplicationId
                 val screen = if (CastReceiver.isOwn(used)) "Siansa's own TV screen" else "Google's standard TV screen"
-                AppLog.i("Cast", "Casting to ${session.castDevice?.friendlyName ?: "a Cast device"} with $screen ($used)")
+                AppLog.i("Cast", "Casting to ${session.castDevice?.friendlyName ?: "a Cast device"} with $screen ($used)" + sincePicked())
                 listenToTv(session)
             }
             override fun onSessionStartFailed(session: CastSession, error: Int) {
@@ -226,10 +243,19 @@ object Cast {
                 // Cast lets go of the TV first; then pick it again.
                 mainHandler.postDelayed({ reselect(app, device) }, RETRY_DELAY_MS)
             }
-            override fun onSessionStarting(session: CastSession) {}
+            override fun onSessionStarting(session: CastSession) {
+                AppLog.i("Cast", "Starting the cast to ${session.castDevice?.friendlyName ?: "the TV"}: the TV opens its screen" + sincePicked())
+            }
             override fun onSessionEnding(session: CastSession) {}
             override fun onSessionEnded(session: CastSession, error: Int) {
-                if (error != CastStatusCodes.SUCCESS) AppLog.w("Cast", "Casting ended: ${CastStatusCodes.getStatusCodeString(error)}")
+                if (error == CastStatusCodes.SUCCESS) return
+                // Ending the cast from the phone (Play on › This phone, hold to stop) ends it with a code too: 2161
+                // (0.52.0-dev), which isn't the TV failing.
+                if (endedFromPhone(android.os.SystemClock.elapsedRealtime() - endedHereAt)) {
+                    AppLog.i("Cast", "Casting ended from this phone (Cast code $error)")
+                } else {
+                    AppLog.w("Cast", "Casting ended: ${CastStatusCodes.getStatusCodeString(error)}")
+                }
             }
             override fun onSessionResuming(session: CastSession, sessionId: String) {}
             override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
@@ -346,6 +372,7 @@ object Cast {
 
     /** Stops casting; the music comes back to the phone, paused. */
     fun disconnect() {
+        endedHereAt = android.os.SystemClock.elapsedRealtime()
         context?.sessionManager?.endCurrentSession(true)
     }
 

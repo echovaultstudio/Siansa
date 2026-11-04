@@ -49,36 +49,62 @@ object WavHeader {
 }
 
 /**
- * Which format the TV gets its stream in, and when to give up (issue #114): each format is tried once without the
- * stream getting anywhere, then the TV plays the queue instead. A format that played starts the count again.
+ * How the TV screen plays the phone's stream (issue #114): through Google's Cast player, loaded by the page as a
+ * buffered stream of unknown length (what Symfonium does on the owner's SHIELD, where it plays), or in the page's own
+ * audio element; in FLAC or WAV.
  */
-class StreamTries(first: StreamFormat) {
+data class StreamWay(val format: StreamFormat, val throughCast: Boolean) {
+    val label: String get() = format.label + if (throughCast) " through Google's player" else " in the page's own player"
+
+    /** For the TV page's 'start' message. */
+    val player: String get() = if (throughCast) "cast" else "element"
+
+    companion object {
+        /**
+         * The order they're tried in: Google's player first, as it's what plays on the SHIELD for Symfonium (its
+         * earlier failure here was the phone sending too little, now fixed); then the page's own player; WAV last.
+         */
+        val ORDER = listOf(
+            StreamWay(StreamFormat.Flac, throughCast = true),
+            StreamWay(StreamFormat.Flac, throughCast = false),
+            StreamWay(StreamFormat.Wav, throughCast = false),
+        )
+    }
+}
+
+/**
+ * Which way the TV gets its stream, and when to give up (issue #114): each way is tried once without the stream
+ * getting anywhere, in [StreamWay.ORDER] from [first], then the TV plays the queue instead. A way that played starts
+ * the count again.
+ */
+class StreamTries(first: StreamWay = StreamWay.ORDER.first()) {
     sealed class Next {
-        data class Retry(val format: StreamFormat) : Next()
+        data class Retry(val way: StreamWay) : Next()
         data object GiveUp : Next()
     }
 
-    var format: StreamFormat = first
+    var way: StreamWay = first
         private set
+    val format: StreamFormat get() = way.format
     private val tried = linkedSetOf(first)
     private var everWorked = false
 
-    /** The stream went nowhere in [format]: the next one to try, or give up. */
+    /** The stream went nowhere this [way]: the next one to try, or give up. */
     fun failed(): Next {
-        val other = StreamFormat.entries.firstOrNull { it !in tried } ?: return Next.GiveUp
+        val other = StreamWay.ORDER.firstOrNull { it !in tried } ?: return Next.GiveUp
         tried += other
-        format = other
+        way = other
         return Next.Retry(other)
     }
 
-    /** The stream got going in [format]. True the first time. */
+    /** The stream got going this [way]. True the first time. */
     fun worked(): Boolean {
         tried.clear()
-        tried += format
+        tried += way
         val first = !everWorked
         everWorked = true
         return first
     }
 
-    fun triedLabels(): String = tried.joinToString(" and ") { it.label }
+    fun triedLabels(): String = tried.joinToString(", ") { it.label }
 }
