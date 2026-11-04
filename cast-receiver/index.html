@@ -143,6 +143,8 @@ const ICONS = {
   pause: '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>',
   next: '<path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>',
   prev: '<path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>',
+  forward: '<path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/>',
+  back: '<path d="M11 18V6l-8.5 6 8.5 6zm.5-6 8.5 6V6l-8.5 6z"/>',
 };
 const $ = id => document.getElementById(id);
 
@@ -222,11 +224,13 @@ const E = cast.framework.events.EventType;
   .forEach(t => player.addEventListener(t, render));
 setInterval(tick, 500);
 
-// The remote: left = previous song, right = next song, OK = play/pause, and the media keys as they say.
-// Google TV also turns left and right into "seek a few seconds" commands of its own (relative seeks). Those are
-// taken as previous and next too, and one press that arrives both ways counts once.
+// The remote: a press of left or right goes to the previous or next song, holding it winds back or forward
+// through the song (faster the longer it's held), OK plays and pauses, and the media keys do what they say.
+// A press is told from a hold by the key repeating: a held key sends repeats after about half a second. A press
+// acts when the key is let go, or 600 ms after it if the TV never says so.
 let lastAct = 0;
-let arrowAt = 0;
+let arrowAt = 0;  // the last left or right, from a key or from the TV's seeks
+let keyAt = 0;    // the last left or right that reached the page as a key
 function jump(by) {
   const req = new cast.framework.messages.QueueUpdateRequestData();
   req.jump = by;
@@ -244,22 +248,68 @@ function act(name) {
   // Previous goes back to the start of the song after its first 5 seconds, else to the song before.
   if (name === 'prev') { sign('prev'); player.getCurrentTimeSec() > 5 ? player.seek(0) : jump(-1); }
 }
+
+// Winding: steps of 5 s, then 10 s after two seconds held, then 20 s after five.
+let windStart = 0;
+let windAt = 0;
+function wind(dir) {
+  const now = Date.now();
+  if (!windStart) windStart = now;
+  if (now - windAt < 200) return;
+  windAt = now;
+  const held = now - windStart;
+  const step = held > 5000 ? 20 : held > 2000 ? 10 : 5;
+  const dur = player.getDurationSec();
+  let to = player.getCurrentTimeSec() + dir * step;
+  to = Math.max(0, dur > 0 ? Math.min(dur - 1, to) : to);
+  sign(dir < 0 ? 'back' : 'forward');
+  player.seek(to);
+  tick();
+}
+
+// One arrow at a time: which way, whether it's being held, and the timer that settles a press.
+let arrow = 0;
+let holding = false;
+let settle = 0;
+function arrowDone() {
+  clearTimeout(settle);
+  if (arrow && !holding) act(arrow < 0 ? 'prev' : 'next');
+  arrow = 0;
+  holding = false;
+  windStart = 0;
+}
+function arrowDown(dir, repeat) {
+  arrowAt = Date.now();
+  if (dir !== arrow) { if (arrow) arrowDone(); arrow = dir; holding = false; }
+  else if (repeat || holding) { holding = true; wind(dir); }
+  clearTimeout(settle);
+  // No key-up from some TVs: a press settles 600 ms after the last key event.
+  settle = setTimeout(arrowDone, 600);
+}
+
 const KEYS = { 37: 'ArrowLeft', 39: 'ArrowRight', 13: 'Enter', 179: 'MediaPlayPause', 176: 'MediaTrackNext',
   177: 'MediaTrackPrevious', 415: 'MediaPlay', 19: 'MediaPause', 417: 'MediaTrackNext', 412: 'MediaTrackPrevious' };
+const keyOf = e => e.key && e.key !== 'Unidentified' ? e.key : KEYS[e.keyCode];
 document.addEventListener('keydown', e => {
   if ($('now').classList.contains('hidden')) return;
-  const key = e.key && e.key !== 'Unidentified' ? e.key : KEYS[e.keyCode];
-  switch (key) {
-    case 'ArrowLeft': arrowAt = Date.now(); act('prev'); break;
-    case 'ArrowRight': arrowAt = Date.now(); act('next'); break;
-    case 'MediaTrackPrevious': case 'MediaRewind': act('prev'); break;
-    case 'MediaTrackNext': case 'MediaFastForward': act('next'); break;
+  switch (keyOf(e)) {
+    case 'ArrowLeft': keyAt = Date.now(); arrowDown(-1, e.repeat); break;
+    case 'ArrowRight': keyAt = Date.now(); arrowDown(1, e.repeat); break;
+    case 'MediaTrackPrevious': act('prev'); break;
+    case 'MediaTrackNext': act('next'); break;
+    case 'MediaRewind': wind(-1); break;
+    case 'MediaFastForward': wind(1); break;
     case 'Enter': case ' ': case 'MediaPlayPause': act('toggle'); break;
     case 'MediaPlay': act('play'); break;
     case 'MediaPause': act('pause'); break;
     default: return;
   }
   e.preventDefault();
+});
+document.addEventListener('keyup', e => {
+  const key = keyOf(e);
+  if ((key === 'ArrowLeft' && arrow < 0) || (key === 'ArrowRight' && arrow > 0)) { arrowAt = Date.now(); arrowDone(); }
+  if (key === 'MediaRewind' || key === 'MediaFastForward') windStart = 0;
 });
 
 // Original quality: siansa sends an MP3 320 stream plus the original file's address in customData.
@@ -324,9 +374,17 @@ player.addEventListener(E.ERROR, () => {
 // A relative seek ("a few seconds back or forward") comes from the TV's own remote handling, never from Siansa,
 // which always seeks to a point in the song: take it as previous or next instead.
 // A seek that arrives together with a left or right press is the TV's too, so it's dropped.
+// They're handled like the keys: one on its own is a press (previous or next), several in a row are a hold
+// (winding through the song).
 player.setMessageInterceptor(M.MessageType.SEEK, req => {
   const relative = typeof req.relativeTime === 'number' && typeof req.currentTime !== 'number';
-  if (relative) { act(req.relativeTime < 0 ? 'prev' : 'next'); return null; }
+  if (relative) {
+    // When the keys reach the page too, they already count: the TV's seek is dropped.
+    // A second one the same way while the first is still settling is a hold.
+    const dir = req.relativeTime < 0 ? -1 : 1;
+    if (Date.now() - keyAt >= 1500) arrowDown(dir, arrow === dir);
+    return null;
+  }
   if (Date.now() - arrowAt < 1500) return null;
   return req;
 });
