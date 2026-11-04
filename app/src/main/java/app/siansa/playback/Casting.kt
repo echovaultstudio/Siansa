@@ -163,6 +163,14 @@ object Cast {
     /** The TV last picked in the app, for when a failed start doesn't say which it was. */
     private var lastPicked: String? = null
 
+    /** When this phone last ended a cast (elapsedRealtime), to tell that from the TV ending it. */
+    @Volatile private var endedHereAt = -ENDED_HERE_MS
+
+    /** Whether a cast that ended [sinceAskedMs] after the phone asked to end it was ended by the phone. */
+    fun endedFromPhone(sinceAskedMs: Long): Boolean = sinceAskedMs in 0..ENDED_HERE_MS
+
+    private const val ENDED_HERE_MS = 5_000L
+
     /**
      * Finds every Cast device: those that can play Google's standard screen (all of them), and those offered
      * Siansa's own, so a TV shows up whether or not it can show Siansa's screen (issue #114).
@@ -229,7 +237,14 @@ object Cast {
             override fun onSessionStarting(session: CastSession) {}
             override fun onSessionEnding(session: CastSession) {}
             override fun onSessionEnded(session: CastSession, error: Int) {
-                if (error != CastStatusCodes.SUCCESS) AppLog.w("Cast", "Casting ended: ${CastStatusCodes.getStatusCodeString(error)}")
+                if (error == CastStatusCodes.SUCCESS) return
+                // Ending the cast from the phone (Play on › This phone, hold to stop) ends it with a code too: 2161
+                // (0.52.0-dev), which isn't the TV failing.
+                if (endedFromPhone(android.os.SystemClock.elapsedRealtime() - endedHereAt)) {
+                    AppLog.i("Cast", "Casting ended from this phone (Cast code $error)")
+                } else {
+                    AppLog.w("Cast", "Casting ended: ${CastStatusCodes.getStatusCodeString(error)}")
+                }
             }
             override fun onSessionResuming(session: CastSession, sessionId: String) {}
             override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
@@ -346,6 +361,7 @@ object Cast {
 
     /** Stops casting; the music comes back to the phone, paused. */
     fun disconnect() {
+        endedHereAt = android.os.SystemClock.elapsedRealtime()
         context?.sessionManager?.endCurrentSession(true)
     }
 
