@@ -204,6 +204,7 @@ class PlaybackService : MediaLibraryService() {
         // Casting: playback moves to the TV when a Cast session starts and back when it ends.
         Cast.whenReady(this) { cast ->
             if (session == null) return@whenReady
+            CastSettings.load(this)
             val remote = RemoteCastPlayer.Builder(this).setMediaItemConverter(CastItems(graph.source)).build()
             val tv = CastQueuePlayer(remote)
             castRemote = remote
@@ -560,7 +561,8 @@ class PlaybackService : MediaLibraryService() {
         AppLog.i(
             "Cast",
             (if (toCast) "Playing on ${(target as? DlnaPlayer)?.name ?: Cast.deviceName() ?: "a Cast device"}" else "Cast ended; music back on the phone, paused") +
-                " (${items.size} songs, song ${index + 1} at ${position / 1000}s)",
+                " (${items.size} songs, song ${index + 1} at ${position / 1000}s" +
+                (if (target === castPlayer) ", ${CastSettings.quality.value.label}" else "") + ")",
         )
         precacheWriter?.cancel()
         precacheJob?.cancel()

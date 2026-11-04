@@ -191,8 +191,9 @@ as you fall asleep. Without a timer, Wind down queues a number of calm songs (**
 ## Casting (Chromecast and DLNA)
 
 The device button in now playing shows TVs and speakers on the same Wi-Fi: Chromecast and Google TV, and DLNA
-ones (most smart TVs, Sonos, AV receivers). They play straight from your server, as MP3 320 kbit/s, so every device
-can play them. Stopping the cast brings the music back to the phone, paused.
+ones (most smart TVs, Sonos, AV receivers). They play straight from your server: a Chromecast gets your music
+lossless (see **Chromecast sound quality** below), a DLNA one MP3 320 kbit/s unless you ask for the original files.
+Stopping the cast brings the music back to the phone, paused.
 
 **Out of reach.** When the phone leaves the Wi-Fi a DLNA TV or speaker is on (you leave the house), the music comes
 back to the phone, paused, within a few seconds. A device that stops answering on the same Wi-Fi is let go after
@@ -207,14 +208,36 @@ pause for a few seconds between songs whichever way they get them.
 **The TV screen.** Casting to a Chromecast or Google TV shows Siansa on the TV: a Siansa screen while it connects,
 then the song's cover, title, artist and album with a progress bar, and whether it's paused. The TV remote's
 play/pause, next and previous buttons work, and so does the phone. When the queue ends, the TV says so and waits for
-the next song. Original FLAC, MP3, Ogg, WAV and AAC files go to the TV as they are instead of MP3 320; if the TV
-can't play one, it switches to MP3 320 by itself. Other files, such as Apple Lossless (ALAC) and every .m4a, always go
-as MP3 320, as Chromecast and Google TV can't play them. A TV that can't show Siansa's screen still plays: it gets
-Google's plain screen instead, by itself, and the next time you cast, Siansa tries its own screen again.
+the next song. A TV that can't show Siansa's screen still plays: it gets Google's plain screen instead (always as MP3
+320), by itself, and the next time you cast, Siansa tries its own screen again.
+
+**Chromecast sound quality.** Tap the cog beside a Chromecast in **Play on** and pick **Sound quality**, for every
+Chromecast:
+
+- **Lossless** (the default): FLAC, MP3, Ogg, WAV and AAC files go to the TV as they are. Lossless files the TV
+  can't play, such as Apple Lossless (ALAC) and other .m4a files, Monkey's Audio, WavPack, AIFF and DSD, are
+  converted to FLAC by your server on the way. Other files (WMA, for example) go as MP3 320. If the TV can't play a
+  song this way, it switches to MP3 320 by itself, and so do the songs of the same kind after it.
+- **MP3 320**: every song is converted to MP3 320 kbit/s by your server. Uses less Wi-Fi.
+
+It applies to music you start playing after you change it. Converting to FLAC needs Navidrome (or another Subsonic
+server) with a **flac** transcoding; with Jellyfin and Emby, those files go as MP3 320.
+
+**Adding the FLAC conversion to Navidrome.** Recent Navidrome versions come with it (**Settings › Transcodings**
+lists **flac audio**). If yours doesn't, ALAC songs fall back to MP3 320 on the TV. To add it, sign in to Navidrome as
+an admin, open **Settings › Transcodings**, choose **Create**, and fill in:
+
+- **Name**: `flac audio`
+- **Target format**: `flac`
+- **Default bit rate**: `0` (FLAC has none)
+- **Command**: `ffmpeg -ss %t -i %s -map 0:a:0 -v 0 -c:a flac -f flac -`
+
+Navidrome only lets you edit transcodings when it runs with `ND_ENABLETRANSCODINGCONFIG=true`; set it, restart
+Navidrome, add the transcoding, then set it back. Navidrome needs `ffmpeg` (its Docker image has it).
 
 **Chromecast without gaps.** A Chromecast, Google TV or speaker with Chromecast built in gets the whole queue and is
-asked to load the next song about 20 seconds before the current one ends, so it can go straight on. Songs go as MP3,
-which can leave a very short pause between songs that run into each other.
+asked to load the next song about 20 seconds before the current one ends, so it can go straight on. Songs that go
+as MP3 can leave a very short pause between songs that run into each other; FLAC usually doesn't.
 
 **Original files on DLNA.** Tap the cog beside a DLNA TV or speaker in **Play on** and turn on **Send the original
 file**. It then gets your music as it is (for example FLAC) instead of MP3 320, whenever it says it plays that
