@@ -54,7 +54,7 @@ jobs:
           SIANSA_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           # Siansa's own TV screen while casting (issue #114): the Cast app id, a repository variable (not a secret).
           CAST_RECEIVER_ID: ${{ vars.CAST_RECEIVER_ID }}
-        run: gradle :app:testDebugUnitTest :app:assembleDev --continue --stacktrace
+        run: gradle :app:testDebugUnitTest :app:assembleDev :tv:assembleDev --continue --stacktrace
 
       - name: Publish the APK
         env:
@@ -64,10 +64,16 @@ jobs:
           short=$(git rev-parse --short HEAD)
           apk="siansa-dev-$short.apk"
           cp "$(ls app/build/outputs/apk/dev/*.apk | head -1)" "$apk"
+          # Siansa TV Dev (issue #860): the TV app from the same commit, installed next to Siansa TV as app.siansa.tv.dev.
+          tv_apk="siansa-tv-dev-$short.apk"
+          cp "$(ls tv/build/outputs/apk/dev/*.apk | head -1)" "$tv_apk"
           notes="Siansa Dev, built from \`mixer\` at $short on $(date -u '+%Y-%m-%d %H:%M') UTC.
 
           The test build of the new audio engine. It installs next to Siansa (purple icon) and keeps its own settings,
           library and sign-ins. Not for F-Droid or Google Play.
+
+          $tv_apk is Siansa for Android TV (issue #860), for a TV or Google TV box: it installs next to the phone app's
+          builds and never over them.
 
           Latest change: $(git log -1 --format=%s)"
           git tag -f dev-latest
@@ -81,5 +87,5 @@ jobs:
           else
             gh release create dev-latest --title "Siansa Dev ($short)" --notes "$notes" --prerelease --latest=false
           fi
-          gh release upload dev-latest "$apk" --clobber
+          gh release upload dev-latest "$apk" "$tv_apk" --clobber
           echo "::notice::Siansa Dev $short: $(gh release view dev-latest --json url -q .url)"

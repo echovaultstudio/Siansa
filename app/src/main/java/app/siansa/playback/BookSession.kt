@@ -17,7 +17,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
 import app.siansa.AppGraph
-import app.siansa.MainActivity
+import app.siansa.AppEntry
 import app.siansa.log.AppLog
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -53,7 +53,7 @@ class BookSession(private val service: PlaybackService, private val graph: AppGr
                 if (isPlaying) pauseMusic()
             }
         })
-        val openApp = PendingIntent.getActivity(service, 1, Intent(service, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val openApp = PendingIntent.getActivity(service, 1, AppEntry.intent(service), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         session = MediaLibrarySession.Builder(service, player, object : MediaLibrarySession.Callback {
             // Items arrive from the app's controller without their URI: the app sets it, so keep as sent.
             override fun onAddMediaItems(

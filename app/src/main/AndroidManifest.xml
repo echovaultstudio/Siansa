@@ -37,6 +37,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Signing in the TV app (issue #860): the page its QR code opens hands the TV's address and key to Siansa. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="siansa" android:host="pair" />
+            </intent-filter>
         </activity>
 
         <!-- Lets the Logs page hand the log file to another app (mail, chat) for sharing. -->

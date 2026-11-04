@@ -17,6 +17,9 @@ Uninstalling Siansa removes them.
 When you cast to a Chromecast or Google TV, the TV loads Siansa's TV screen from siansa.app (a page, nothing sent
 back) and Google's Cast library, then plays straight from your music server as the phone would.
 
+Signing in [Siansa on your TV](tv.md) from your phone sends the TV your server address and login over your home
+network, sealed with a key that's only in the QR code on the TV's screen. Nothing goes anywhere else.
+
 The full privacy policy: <https://siansa.app/privacy.html>
 
 ## The log

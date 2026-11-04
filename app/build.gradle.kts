@@ -29,6 +29,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The new audio engine (issue #826): one output all players are mixed into. Only Siansa Dev has it so far.
         buildConfigField("boolean", "MIXER_ENGINE", "false")
+        // The TV app (issue #860, the tv module) builds the same code with this on; the phone app never does.
+        buildConfigField("boolean", "TV_APP", "false")
         // Siansa's own TV screen while casting (issue #114, cast-receiver/): its Cast app id from the Google Cast
         // console, from CAST_RECEIVER_ID (CI fills it from the repository variable) or siansa.castReceiverId in
         // gradle.properties (for builds from source, such as F-Droid's). Empty: Google's standard TV screen.

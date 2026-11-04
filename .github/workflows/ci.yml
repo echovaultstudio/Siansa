@@ -139,7 +139,7 @@ jobs:
           # Pull requests also compare the screenshot tests' pictures with the approved ones (issue #710). Only there:
           # they're recorded on GitHub's runners (screenshots.yml), and another machine may draw a pixel differently.
           VERIFY=""; [ "$EVENT" = "pull_request" ] && VERIFY="-Proborazzi.test.verify=true"
-          gradle :app:testDebugUnitTest $VERIFY :app:compileDebugAndroidTestKotlin :app:lintDebug :app:assembleRelease :app:bundleRelease --continue --stacktrace 2>&1 | tee gradle-build.txt
+          gradle :app:testDebugUnitTest $VERIFY :app:compileDebugAndroidTestKotlin :app:lintDebug :app:assembleRelease :app:bundleRelease :tv:testDebugUnitTest :tv:lintDebug :tv:assembleRelease --continue --stacktrace 2>&1 | tee gradle-build.txt
 
       - name: Test and lint results
         if: always()

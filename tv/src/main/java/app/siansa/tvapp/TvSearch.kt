@@ -1,0 +1,104 @@
+package app.siansa.tvapp
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.siansa.data.SearchResults
+import app.siansa.ui.LocalGraph
+import app.siansa.ui.Space
+import kotlinx.coroutines.delay
+
+/**
+ * Search the library (issue #860): typed with the TV's on-screen keyboard, or spoken through its microphone button,
+ * or arriving from Google TV's own search. Results come from the library on the TV, as the phone's do.
+ */
+@Composable
+fun TvSearch(fromSystem: String?, onDone: () -> Unit, open: (TvPage) -> Unit) {
+    val graph = LocalGraph.current
+    val player by graph.player.state.collectAsStateWithLifecycle()
+    var query by rememberSaveable { mutableStateOf(fromSystem.orEmpty()) }
+    val field = remember { FocusRequester() }
+    LaunchedEffect(fromSystem) {
+        if (fromSystem != null) {
+            query = fromSystem
+            onDone()
+        }
+    }
+    LaunchedEffect(Unit) { runCatching { field.requestFocus() } }
+    val results by produceState<SearchResults?>(null, query) {
+        val terms = query.trim()
+        if (terms.length < MIN_LETTERS) { value = null; return@produceState }
+        delay(TYPING_PAUSE_MS)
+        value = runCatching { graph.library.search(terms) }.getOrNull()
+    }
+
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Rounded.Search, null) },
+            placeholder = { Text("Songs, albums or artists") },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { }),
+            modifier = Modifier.padding(horizontal = TV_EDGE).fillMaxWidth(SEARCH_WIDTH).focusRequester(field),
+        )
+        val found = results
+        when {
+            query.trim().length < MIN_LETTERS -> EmptyNote("Type or say what you're looking for.")
+            found == null -> Unit
+            found.artists.isEmpty() && found.albums.isEmpty() && found.songs.isEmpty() -> EmptyNote("Nothing found for \"${query.trim()}\".")
+            else -> LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = Space.Large),
+                verticalArrangement = Arrangement.spacedBy(Space.Section),
+            ) {
+                if (found.artists.isNotEmpty()) item("artists") {
+                    TvItemRow(TvRow("Artists", found.artists.take(RESULTS).map { TvItem.OfArtist(it) }), open)
+                }
+                if (found.albums.isNotEmpty()) item("albums") {
+                    TvItemRow(TvRow("Albums", found.albums.take(RESULTS).map { TvItem.OfAlbum(it) }), open)
+                }
+                if (found.songs.isNotEmpty()) item("songs") {
+                    val songs = found.songs.take(RESULTS)
+                    Column(Modifier.padding(horizontal = TV_EDGE), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                        Text("Songs", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = Space.Page))
+                        songs.forEachIndexed { i, song ->
+                            SongRow(i + 1, song, playing = player.current?.id == song.id) { graph.player.play(songs, startIndex = i) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private const val MIN_LETTERS = 2
+private const val TYPING_PAUSE_MS = 250L
+private const val RESULTS = 30
+private const val SEARCH_WIDTH = 0.6f

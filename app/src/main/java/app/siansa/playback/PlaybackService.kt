@@ -30,6 +30,7 @@ import androidx.media3.decoder.ffmpeg.FfmpegLibrary
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaLibraryService
@@ -42,7 +43,7 @@ import app.siansa.AppGraph
 import app.siansa.BuildConfig
 import app.siansa.playback.engine.AudioEngine
 import app.siansa.playback.gapless.CastGapless
-import app.siansa.MainActivity
+import app.siansa.AppEntry
 import app.siansa.SiansaApp
 import app.siansa.data.OutsideMedia
 import app.siansa.data.PlayEvent
@@ -128,7 +129,7 @@ class PlaybackService : MediaLibraryService() {
         engine = mixer
         val mainMix = mixer?.deck("main")
         val tailMix = mixer?.deck("tail")
-        val built = PlayerFactory.build(this, graph, ::kbpsFor, engine = mixer, mixDeck = mainMix)
+        val built = PlayerFactory.build(this, graph, ::kbpsFor, engine = mixer, mixDeck = mainMix, passthrough = BuildConfig.TV_APP)
         exo = built.player
         val player = ServerSeekPlayer(
             exo,
@@ -149,7 +150,8 @@ class PlaybackService : MediaLibraryService() {
             profiles = graph.profiles,
             levelOf = { song -> Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id)) },
             sleepLevel = { sleepLevel },
-            allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true },
+            // A Dolby or DTS song going to the receiver as a bitstream can't be mixed (issue #860): no blend into or out of it.
+            allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true && !passthroughNearby() },
             onLevel = { if (session?.player === phone) applyVolume(phone) },
             inDjRadio = {
                 (graph.songRadio.seed.value != null && graph.songRadio.mode == ContinuousMode.DJ) ||
@@ -164,7 +166,8 @@ class PlaybackService : MediaLibraryService() {
             mainDeck = built.deck,
             levelOf = { song -> Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id)) },
             sleepLevel = { sleepLevel },
-            allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true },
+            // A Dolby or DTS song going to the receiver as a bitstream can't be mixed (issue #860): no blend into or out of it.
+            allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true && !passthroughNearby() },
             onLevel = { if (session?.player === phone) applyVolume(phone) },
             inDjRadio = {
                 (graph.songRadio.seed.value != null && graph.songRadio.mode == ContinuousMode.DJ) ||
@@ -176,12 +179,19 @@ class PlaybackService : MediaLibraryService() {
             override fun onAudioDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
                 AppLog.i("Audio", "Decoder $decoderName")
             }
+            // A song sent to the receiver unchanged (issue #860): noted, so it never blends with its neighbours.
+            override fun onAudioTrackInitialized(eventTime: AnalyticsListener.EventTime, audioTrackConfig: AudioSink.AudioTrackConfig) {
+                if (androidx.media3.common.util.Util.isEncodingLinearPcm(audioTrackConfig.encoding)) return
+                val id = exo.currentMediaItem?.mediaId ?: return
+                Passthrough.played.add(id)
+                AppLog.i("Audio", "Song $id: ${Passthrough.name(exo.audioFormat?.sampleMimeType)} sent to the receiver unchanged (passthrough)")
+            }
         })
 
         val openApp = PendingIntent.getActivity(
             this,
             0,
-            Intent(this, MainActivity::class.java),
+            AppEntry.intent(this),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         // The app's queue changes, and Android Auto's browsing, search and playback (issue #62).
@@ -311,12 +321,25 @@ class PlaybackService : MediaLibraryService() {
         scope.launch { runCatching { graph.scrobbler.flush() } }
     }
 
+    /** Whether the song playing or the next one goes to the receiver as a bitstream (issue #860, TV app only). */
+    private fun passthroughNearby(): Boolean {
+        val mode = graph.settings.current.audioPassthrough
+        if (!BuildConfig.TV_APP || mode == PassthroughMode.OFF) return false
+        val next = exo.nextMediaItemIndex.takeIf { it != C.INDEX_UNSET }?.let { exo.getMediaItemAt(it).mediaId }
+        return listOfNotNull(exo.currentMediaItem?.mediaId, next).any { id -> Passthrough.involves(mode, id, SongRegistry.get(id)?.suffix) }
+    }
+
     private fun kbpsFor(songId: String): Int = if (OutsideMedia.isOutside(songId)) 0 else chosenKbps.getOrPut(songId) {
         // A file type the phone can't open is converted from the start (issue #354).
         SongRegistry.get(songId)?.suffix?.takeIf { Formats.mustConvert(it) }?.let { suffix ->
             val kbps = Streaming.bitrate(this, graph.settings.current).takeIf { it > 0 } ?: FALLBACK_KBPS
             AppLog.i("Stream", "Song $songId: Opus $kbps kbit/s, as the phone can't open .$suffix files")
             return@getOrPut kbps
+        }
+        // A Dolby or DTS file always streams untouched while passthrough is on (issue #860): Opus can't go to the receiver.
+        SongRegistry.get(songId)?.suffix?.takeIf { Passthrough.keepsOriginal(graph.settings.current.audioPassthrough, it) }?.let { suffix ->
+            AppLog.i("Stream", "Song $songId: original .$suffix, for audio passthrough")
+            return@getOrPut 0
         }
         // Otherwise only what's chosen in Settings → Playback: Siansa never switches quality on its own.
         Streaming.bitrate(this, graph.settings.current).also {

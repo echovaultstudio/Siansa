@@ -24,3 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "siansa"
 include(":app")
+// Siansa for Android TV (issue #860): an app of its own, built from the phone app's code plus its TV screens.
+include(":tv")
