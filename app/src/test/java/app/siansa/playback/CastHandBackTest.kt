@@ -47,4 +47,26 @@ class CastHandBackTest {
     @Test fun nothingLeftMeansAnEmptyQueue() {
         assertEquals(CastSpot(emptyList<String>(), 0, 0L), CastHandBack.withoutNameless(CastSpot(listOf("", ""), 0, 7_000L), id))
     }
+
+    @Test fun backOnTheTvsRemoteBringsBackTheQueueThePhoneLastSaw() {
+        // 0.52.0-dev: Back closed the TV screen; the TV's queue and the one saved as casting ended were both empty,
+        // and "0 songs, song 1 at 0s" came back.
+        val empty = CastSpot(emptyList<String>(), 0, 0L)
+        val known = CastSpot(listOf("a", "b", "c"), 2, 61_000L)
+        assertSame(known, CastHandBack.pick(empty, empty, id, known))
+        assertSame(known, CastHandBack.afterEnd(empty, null, stopped = false, known = known, id = id))
+        // What was saved as casting ended still comes first, and hold to stop still clears.
+        assertSame(saved, CastHandBack.pick(empty, saved, id, known))
+        assertEquals(empty, CastHandBack.afterEnd(empty, null, stopped = true, known = known, id = id))
+        // An intact queue on the TV is taken as it is.
+        val live = CastSpot(listOf("x"), 0, 1L)
+        assertSame(live, CastHandBack.pick(live, empty, id, known))
+    }
+
+    @Test fun theQueueLastSeenMovesOnByTheTimeItPlayedSince() {
+        val known = CastSpot(listOf("a"), 0, 10_000L)
+        assertEquals(15_000L, CastHandBack.movedOn(known, playing = true, sinceMs = 5_000).positionMs)
+        assertEquals(10_000L, CastHandBack.movedOn(known, playing = false, sinceMs = 5_000).positionMs)
+        assertEquals(10_000L, CastHandBack.movedOn(known, playing = true, sinceMs = -3).positionMs)
+    }
 }

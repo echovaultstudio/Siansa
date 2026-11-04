@@ -330,8 +330,8 @@ internal fun ChromecastSettingsContent(gapless: Boolean = BuildConfig.MIXER_ENGI
             ) { CastSettings.setQuality(option) }
         }
         Text(
-            if (throughPhone) "Gapless through this phone is always lossless. For every Chromecast, from the next time you cast."
-            else if (gapless) "For every Chromecast. Sound quality applies to music you start playing after this; how it plays, from the next time you cast."
+            if (throughPhone) "Gapless through this phone is always lossless. For every Chromecast; changing how it plays switches a cast at once."
+            else if (gapless) "For every Chromecast. Sound quality applies to music you start playing after this; changing how it plays switches a cast at once."
             else "For every Chromecast. Applies to music you start playing after this.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -17,7 +17,11 @@ import kotlin.math.pow
 /** Songs currently queued, by id, so the player and the screens share the full song details. */
 object SongRegistry {
     private val songs = ConcurrentHashMap<String, Song>()
-    fun register(list: List<Song>) = list.forEach { songs[it.id] = it }
+    fun register(list: List<Song>) {
+        // The library keeps no file types: a song registered from it keeps the type known from the server (issue #114).
+        list.forEach { s -> songs[s.id] = if (s.suffix == null) songs[s.id]?.suffix?.let { s.copy(suffix = it) } ?: s else s }
+        CastFormats.record(list)
+    }
     fun get(id: String): Song? = songs[id]
 }
 

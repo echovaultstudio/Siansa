@@ -336,6 +336,9 @@ object Cast {
 
     fun deviceName(): String? = context?.sessionManager?.currentCastSession?.castDevice?.friendlyName
 
+    /** The Cast session in progress, if any. */
+    fun currentSession(): CastSession? = context?.sessionManager?.currentCastSession
+
     /** Stops casting; the music comes back to the phone, paused. */
     fun disconnect() {
         context?.sessionManager?.endCurrentSession(true)
@@ -427,7 +430,7 @@ class CastItems(private val api: MusicSource) : MediaItemConverter {
         val custom = JSONObject().put(SONG_ID, mediaItem.mediaId)
         // In lossless quality Siansa's TV screen plays the original file instead where every Cast device can (FLAC and
         // so on), or the server's FLAC conversion of it (ALAC…), and falls back to the MP3 below when it can't.
-        CastOriginals.source(song.suffix, CastSettings.quality.value, api.streamUrl(mediaItem.mediaId))?.let { source ->
+        CastOriginals.source(CastFormats.suffixOf(song), CastSettings.quality.value, api.streamUrl(mediaItem.mediaId))?.let { source ->
             custom.put(ORIGINAL_URL, source.url).put(ORIGINAL_TYPE, source.type)
             if (source.converted) custom.put(CONVERTED, true)
         }
@@ -491,20 +494,30 @@ object StopCasting {
 /** Bringing the music back from the TV to the phone. */
 object CastHandBack {
     /**
-     * The TV's queue as it is now, unless the TV already forgot songs while it was stopping (an empty queue,
-     * or songs it can no longer name): then the spot [saved] just before casting ended.
+     * The TV's queue as it is now, unless the TV already forgot songs while it was stopping (an empty queue, or songs
+     * it can no longer name): then the spot [saved] just before casting ended, else the queue the phone last saw on
+     * the TV ([known]): Back on the TV's remote closed Siansa's TV screen and the queue came back empty (0.52.0-dev).
      */
-    fun <T> pick(live: CastSpot<T>, saved: CastSpot<T>?, id: (T) -> String): CastSpot<T> {
-        val lost = live.items.isEmpty() || live.items.any { id(it).isBlank() }
-        return if (lost && saved != null && saved.items.isNotEmpty()) saved else live
+    fun <T> pick(live: CastSpot<T>, saved: CastSpot<T>?, id: (T) -> String, known: CastSpot<T>? = null): CastSpot<T> {
+        fun lost(spot: CastSpot<T>?) = spot == null || spot.items.isEmpty() || spot.items.any { id(it).isBlank() }
+        if (!lost(live)) return live
+        return when {
+            saved != null && saved.items.isNotEmpty() -> saved
+            known != null && known.items.isNotEmpty() -> known
+            else -> live
+        }
     }
 
     /**
      * What comes back to the phone: nothing after hold to stop ([stopped], issue #491), so the cleared queue stays
      * cleared even when the TV still listed it as casting ended; otherwise [pick].
      */
-    fun <T> afterEnd(live: CastSpot<T>, saved: CastSpot<T>?, stopped: Boolean, id: (T) -> String): CastSpot<T> =
-        if (stopped) CastSpot(emptyList(), 0, 0L) else pick(live, saved, id)
+    fun <T> afterEnd(live: CastSpot<T>, saved: CastSpot<T>?, stopped: Boolean, known: CastSpot<T>? = null, id: (T) -> String): CastSpot<T> =
+        if (stopped) CastSpot(emptyList(), 0, 0L) else pick(live, saved, id, known)
+
+    /** [spot] as seen [sinceMs] ago, moved on by that time when it was [playing]. */
+    fun <T> movedOn(spot: CastSpot<T>, playing: Boolean, sinceMs: Long): CastSpot<T> =
+        if (playing && sinceMs > 0) spot.copy(positionMs = spot.positionMs + sinceMs) else spot
 
     /** Leaves out songs with no id, which the phone couldn't play, keeping the same song current. */
     fun <T> withoutNameless(spot: CastSpot<T>, id: (T) -> String): CastSpot<T> {
