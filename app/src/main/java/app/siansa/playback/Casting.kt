@@ -141,6 +141,11 @@ data class CastStatus(
     val connecting: Boolean = false,
     /** The TV or speaker playing, when casting. */
     val device: String? = null,
+    /**
+     * Whether Cast sees any TV or speaker on the network. Google Play services keeps this up to date by itself
+     * (passive discovery), so reading it costs Siansa nothing.
+     */
+    val devicesFound: Boolean = false,
 )
 
 /** Google Cast for the whole app: one shared [CastContext], and whether and where we're casting. */
@@ -347,6 +352,7 @@ object Cast {
             available = true,
             connecting = state == CastState.CONNECTING,
             device = if (state == CastState.CONNECTED) deviceName() ?: "TV" else null,
+            devicesFound = state != CastState.NO_DEVICES_AVAILABLE,
         )
     }
 }

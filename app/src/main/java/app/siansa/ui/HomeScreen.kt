@@ -271,6 +271,8 @@ fun HomeScreen(nav: NavController) {
             HomeHeader(greeting(), Modifier.statusBarsPadding()) {
                 // Left of the source filter and Arrange (issue #347).
                 DiceButton()
+                // Between the dice and the filter, only when there's a TV or speaker to play on (or one is playing).
+                HomeCastButton()
                 SourceFilterButton { arranging = true }
             }
         }
