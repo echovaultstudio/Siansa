@@ -1,0 +1,52 @@
+package app.siansa.playback.gapless
+
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** What the phone and the TV screen say to each other while casting gaplessly (issue #114; cast-receiver/index.html). */
+class GaplessMessagesTest {
+    @Test fun nowPlayingForTheTv() {
+        val text = GaplessMessages.now(GaplessMessages.Now("Teardrop", "Massive Attack", "Mezzanine", "http://nd/cover?id=1", 61_000, 330_000, true))
+        val o = Json.parseToJsonElement(text).jsonObject
+        assertEquals("now", o["type"]!!.jsonPrimitive.content)
+        assertEquals("Teardrop", o["title"]!!.jsonPrimitive.content)
+        assertEquals("http://nd/cover?id=1", o["cover"]!!.jsonPrimitive.content)
+        assertEquals(61_000L, o["positionMs"]!!.jsonPrimitive.long)
+        assertEquals(330_000L, o["durationMs"]!!.jsonPrimitive.long)
+        assertEquals(true, o["playing"]!!.jsonPrimitive.boolean)
+        val none = Json.parseToJsonElement(GaplessMessages.now(GaplessMessages.Now("", "", "", null, -5, -1, false))).jsonObject
+        assertTrue("cover" !in none)
+        assertEquals(0L, none["positionMs"]!!.jsonPrimitive.long)
+    }
+
+    @Test fun theLoadMarksThePhonesStream() {
+        val o = Json.parseToJsonElement(GaplessMessages.loadData(4)).jsonObject
+        assertEquals(true, o["siansaLive"]!!.jsonPrimitive.boolean)
+        assertEquals(4L, o["stream"]!!.jsonPrimitive.long)
+    }
+
+    @Test fun whatTheTvSays() {
+        assertEquals(GaplessMessages.FromTv.Clock(3, 12.5, true), GaplessMessages.parse("""{"type":"clock","stream":3,"time":12.5,"moving":true}"""))
+        assertEquals(GaplessMessages.FromTv.Clock(3, 0.0, false), GaplessMessages.parse("""{"type":"clock","stream":3,"time":0}"""))
+        assertEquals(GaplessMessages.FromTv.Command("next", null), GaplessMessages.parse("""{"type":"command","action":"next"}"""))
+        assertEquals(GaplessMessages.FromTv.Command("seek", 71_000), GaplessMessages.parse("""{"type":"command","action":"seek","toMs":71000}"""))
+        assertEquals(GaplessMessages.FromTv.Error(3, "905", "net"), GaplessMessages.parse("""{"type":"error","stream":3,"code":"905","message":"net"}"""))
+    }
+
+    @Test fun anythingElseIsLeftAlone() {
+        listOf(
+            "not json",
+            """{"type":"command","action":"format the disk"}""",
+            """{"type":"clock","stream":3,"time":-1}""",
+            """{"type":"clock","time":2}""",
+            """{"type":"hello"}""",
+            "[1,2]",
+        ).forEach { assertTrue(it, GaplessMessages.parse(it) is GaplessMessages.FromTv.Other) }
+    }
+}

@@ -86,3 +86,12 @@ class CastQualityTest {
         assertNull(CastOriginals.flacUrl("https://m.example/rest/getCoverArt?id=1"))
     }
 }
+
+/** How a Chromecast plays (issue #114): the queue by itself unless gapless through this phone is picked. */
+class CastModeTest {
+    @Test fun aNewInstallCastsTheWayItAlwaysDid() {
+        assertEquals(CastMode.Queue, CastMode.of(null))
+        assertEquals(CastMode.Queue, CastMode.of("whatever"))
+        CastMode.entries.forEach { assertEquals(it, CastMode.of(it.key)) }
+    }
+}

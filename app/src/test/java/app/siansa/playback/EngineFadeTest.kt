@@ -15,6 +15,12 @@ class EngineFadeTest {
         assertEquals(300_000L, EngineFade.handoverAt(300_000, 299_500))
     }
 
+    @Test fun castingGaplesslyTheHandoverIsSetFurtherAheadByTheTvsLead() {
+        // The mix is written 1.5 s further ahead of what's heard (issue #114): never sooner than that more from now.
+        assertEquals(297_500L, EngineFade.handoverAt(300_000, 200_000, extraLeadMs = 1_500))
+        assertEquals(299_000L, EngineFade.handoverAt(300_000, 296_000, extraLeadMs = 1_500))
+    }
+
     @Test fun theNextSongComesInOnItsDownbeatWithTheBlendsStartOrAtItsStartWithTheFade() {
         val beat = BeatMatch.plan(outro, intro, 310_000, 16_000)!!
         val plan = FadePlan(beat.overlapMs, beat.overlapMs, beat.why, 0, beat)
