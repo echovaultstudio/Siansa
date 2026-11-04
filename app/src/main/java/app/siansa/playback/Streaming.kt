@@ -95,6 +95,16 @@ object Streaming {
     const val CAST_KBPS = 320
     const val CAST_MIME = "audio/mpeg"
 
+    /**
+     * The Opus 320 conversion for a TV or speaker (issue #114): Navidrome's "opus audio" profile, Opus in Ogg, which
+     * Chromecast and Google TV play (Symfonium plays it on the owner's SHIELD) and many DLNA devices that list Ogg.
+     * Without an estimated length: Opus is variable, so an estimate would leave the device waiting at the end for data
+     * that never comes.
+     */
+    fun forCastOpus(uri: Uri): Uri = convert(uri, "opus", CAST_KBPS, estimateLength = false)
+
+    const val CAST_OPUS_MIME = "audio/ogg"
+
     private fun convert(uri: Uri, format: String, kbps: Int, estimateLength: Boolean): Uri {
         if (kbps <= 0 || uri.path?.endsWith("/rest/stream") != true) return uri
         // Swap the "raw" (original) request for a conversion.

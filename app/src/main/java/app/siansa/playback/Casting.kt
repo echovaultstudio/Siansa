@@ -460,12 +460,12 @@ object CastOriginals {
     const val FLAC = "audio/flac"
 }
 
-/** What the TV plays instead of the MP3: [url], of MIME [type]; [converted] when the server converts it (to FLAC). */
+/** What the TV plays instead of a lossy stream: [url], of MIME [type]; [converted] when the server converts it (to FLAC). */
 data class CastSource(val url: String, val type: String, val converted: Boolean)
 
 /**
- * Turns queue songs into what the TV plays and back. The TV fetches each song from Navidrome
- * itself, converted to MP3 so any Cast device can play it, with the cover at TV size.
+ * Turns queue songs into what the TV plays and back. The TV fetches each song from Navidrome itself: the original
+ * (lossless quality), else Opus 320, else MP3 320 for Cast devices that can't play Opus, with the cover at TV size.
  */
 @OptIn(UnstableApi::class)
 class CastItems(private val api: MusicSource) : MediaItemConverter {
@@ -477,7 +477,7 @@ class CastItems(private val api: MusicSource) : MediaItemConverter {
         val custom = JSONObject().put(SONG_ID, mediaItem.mediaId)
         entry?.let { custom.put(TvPlayer.ENTRY_KEY, it) }
         // In lossless quality Siansa's TV screen plays the original file instead where every Cast device can (FLAC and
-        // so on), or the server's FLAC conversion of it (ALAC…), and falls back to the MP3 below when it can't.
+        // so on), or the server's FLAC conversion of it (ALAC…), and falls back to Opus, then MP3, when it can't.
         CastOriginals.source(CastFormats.suffixOf(song), CastSettings.quality.value, api.streamUrl(mediaItem.mediaId))?.let { source ->
             custom.put(ORIGINAL_URL, source.url).put(ORIGINAL_TYPE, source.type)
             if (source.converted) custom.put(CONVERTED, true)
@@ -489,9 +489,15 @@ class CastItems(private val api: MusicSource) : MediaItemConverter {
             song.track?.let { putInt(MediaMetadata.KEY_TRACK_NUMBER, it) }
             song.cover?.let { addImage(WebImage(Uri.parse(api.coverUrl(it, TV_COVER)))) }
         }
+        // The lossy stream the TV falls back to: Opus 320 (MP3 320 in that quality, or where the server can't convert),
+        // with MP3 320 after it for TVs that can't play Opus (Siansa's TV screen goes original → Opus → MP3).
+        val raw = Uri.parse(api.streamUrl(mediaItem.mediaId))
+        val mp3 = Streaming.forCast(raw).toString()
+        val opus = Streaming.forCastOpus(raw).toString().takeIf { CastSettings.quality.value != CastQuality.Mp3 && it != raw.toString() }
+        if (opus != null) custom.put(OPUS_URL, opus).put(MP3_URL, mp3)
         val info = MediaInfo.Builder(mediaItem.mediaId)
-            .setContentUrl(Streaming.forCast(Uri.parse(api.streamUrl(mediaItem.mediaId))).toString())
-            .setContentType(Streaming.CAST_MIME)
+            .setContentUrl(opus ?: mp3)
+            .setContentType(if (opus != null) Streaming.CAST_OPUS_MIME else Streaming.CAST_MIME)
             .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
             .setMetadata(metadata)
             .apply { if (song.durationSec > 0) setStreamDuration(song.durationSec * 1000L) }
@@ -518,6 +524,9 @@ class CastItems(private val api: MusicSource) : MediaItemConverter {
         const val SONG_ID = "siansaSongId"
         const val ORIGINAL_URL = "originalUrl"
         const val ORIGINAL_TYPE = "originalType"
+        /** The Opus and MP3 addresses, for the TV screen's fallbacks. */
+        const val OPUS_URL = "opusUrl"
+        const val MP3_URL = "mp3Url"
         /** The original is the server's conversion (to FLAC), so the TV screen can tell its failures apart. */
         const val CONVERTED = "converted"
         const val TV_COVER = 800

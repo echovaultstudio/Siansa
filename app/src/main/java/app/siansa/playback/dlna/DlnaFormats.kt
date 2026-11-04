@@ -64,6 +64,13 @@ internal object DlnaFormats {
     fun names(formats: Set<String>?): List<String> =
         NAMES.filter { (mime, _) -> accepts(formats, mime) && !(formats.orEmpty().any { it.endsWith("/*") || it == "*" }) }.map { it.second }
 
+    /**
+     * Whether a song that has to be converted goes to the device as Opus in Ogg rather than MP3 320 (issue #114): when it
+     * lists Ogg or Opus. Ogg can mean Vorbis only, so a device that then fails to play Opus gets MP3 for the rest of the
+     * app's run ([Dlna.opusFailed]).
+     */
+    fun takesOpus(formats: Set<String>?): Boolean = accepts(formats, "audio/opus") || accepts(formats, "audio/ogg")
+
     /** Whether the device plays anything besides MP3, so sending the original file can make a difference. */
     fun playsMoreThanMp3(formats: Set<String>?): Boolean =
         !formats.isNullOrEmpty() && (names(formats) - "MP3").isNotEmpty() || formats.orEmpty().any { it == "*" || it.endsWith("/*") }

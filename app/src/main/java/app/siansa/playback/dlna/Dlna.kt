@@ -252,6 +252,9 @@ object Dlna {
 
     private val types = java.util.concurrent.ConcurrentHashMap<String, String>()
 
+    /** Devices (by id) that failed to play Opus this app run: they get MP3 320 instead (issue #114). */
+    val opusFailed: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
     private const val PREFS = "dlna"
     private const val KNOWN = "known_locations"
     private const val ORIGINAL = "original_files"
