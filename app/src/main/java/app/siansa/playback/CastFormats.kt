@@ -17,6 +17,8 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object CastFormats {
     private val known = ConcurrentHashMap<String, String>()
+    private val askedSongs: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val askedAlbums: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     /** Remembers the file types the songs came with. */
     fun record(songs: Collection<Song>) {
@@ -24,7 +26,7 @@ object CastFormats {
     }
 
     fun record(id: String, suffix: String) {
-        if (known.size > MAX_KNOWN) known.clear()
+        if (known.size > MAX_KNOWN) { known.clear(); askedSongs.clear(); askedAlbums.clear() }
         known[id] = suffix.trim().lowercase()
     }
 
@@ -46,10 +48,19 @@ object CastFormats {
     }
 
     /** Asks the server for the file types of [songs] it doesn't know yet. Returns how many it learned. */
+    /**
+     * Songs whose type isn't known and hasn't been asked for yet: a song the server didn't answer for isn't asked again
+     * each time the queue moves on (0.52.0-dev: 40 songs asked again on every send of a 497-song queue).
+     */
+    fun worthAsking(songs: List<Song>): List<Song> =
+        songs.filter { suffixOf(it) == null && it.id !in askedSongs && (it.albumId == null || it.albumId !in askedAlbums) }.distinctBy { it.id }
+
     suspend fun learn(api: MusicSource, songs: List<Song>): Int {
-        val unknown = songs.filter { suffixOf(it) == null }.distinctBy { it.id }
+        val unknown = worthAsking(songs)
         if (unknown.isEmpty()) return 0
         val ask = plan(unknown)
+        askedAlbums += ask.albums
+        askedSongs += ask.songs
         val t0 = System.currentTimeMillis()
         coroutineScope {
             ask.albums.map { id -> async { runCatching { api.album(id).songs }.getOrNull().orEmpty() } }.awaitAll().forEach(::record)
