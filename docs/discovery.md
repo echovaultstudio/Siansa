@@ -38,8 +38,8 @@ stray further.
 
 **Surprises** (None, A few, Some, Lots): at None every song is a close neighbour of the last in tempo and how
 alike it is; the further right, the further a song may stray, though its key still has to go with the last
-song's, so a surprise still mixes in. The shape and surprises also apply to Keep playing in DJ mode, and are kept
-in Settings. Energy and brightness come from AudioMuse-AI's analysis; a song it hasn't analysed counts as
+song's, so a surprise still mixes in. It starts at None. The shape and surprises also apply to Keep playing in DJ
+mode, and are kept in Settings; each new song radio starts again from Steady vibes with no surprises. Energy and brightness come from AudioMuse-AI's analysis; a song it hasn't analysed counts as
 middling.
 
 Without AudioMuse-AI, song radio uses Navidrome's similar songs, or Emby's Instant Mix.

@@ -31,15 +31,20 @@ enum class TopBarStyle(val label: String, val hint: String) {
 /** "Your colour" starts as a teal until someone picks their own (issue #148). */
 const val DEFAULT_THEME_SEED: Int = 0xFF0E9AA7.toInt()
 
-/** A fresh install's theme (issue #728): Mono colours with the Amber accent, to match the black icon (#726). */
-const val DEFAULT_THEME_COLOURS = "MONO"
-const val DEFAULT_THEME_SELECTION = "AMBER"
+/**
+ * A fresh install's theme (the owner, 0.52.0-dev; issue #728 had Mono with Amber): Siansa's own colours, grey pages and
+ * cards, and the accent matching the theme, which is Siansa's amber.
+ */
+const val DEFAULT_THEME_COLOURS = "SIANSA"
+const val DEFAULT_THEME_SELECTION = "THEME"
+const val DEFAULT_SURFACE_COLOUR = "GREY"
 
 /**
- * The accent when none was saved (issue #728): Amber on a fresh install, where no colours were saved either. Someone who
- * already picked their colours ([savedColours]) keeps "Match theme", the accent they've had until now.
+ * The accent when none was saved: "Match theme", on a fresh install and for someone who picked their colours
+ * ([savedColours]) but never an accent alike.
  */
-internal fun defaultSelectionFor(savedColours: String?): String = if (savedColours == null) DEFAULT_THEME_SELECTION else "THEME"
+@Suppress("UNUSED_PARAMETER")
+internal fun defaultSelectionFor(savedColours: String?): String = DEFAULT_THEME_SELECTION
 
 /**
  * Home's Today's mix (issue #776). It's built from the vibe covering the hour (Mixes and vibes), and each
@@ -191,7 +196,7 @@ data class AppSettings(
     /** The accent colour, by name ("AMBER", "THEME"…), issues #313, #728. */
     val themeSelection: String = DEFAULT_THEME_SELECTION,
     /** Pages, cards, sheets and menus, by name ("GREY", "WARM", "COOL", "THEME"), issue #761. */
-    val surfaceColour: String = "GREY",
+    val surfaceColour: String = DEFAULT_SURFACE_COLOUR,
     /** Where song loudness and fade shapes come from (issue #60): ReplayGain tags, or the Siansa plugin. */
     val loudnessSource: LoudnessSource = LoudnessSource.TAGS,
     /** The loudness, in LUFS, that measured levelling brings songs towards. */
@@ -216,7 +221,7 @@ data class AppSettings(
     /** How many bars a beat-matched blend aims at, apart from the crossfade length (issue #759). */
     val blendBars: Int = DEFAULT_BLEND_BARS,
     /** The shape of a DJ mix (issue #649): what the energy does over the next songs. */
-    val mixShape: MixShape = MixShape.STEADY,
+    val mixShape: MixShape = DEFAULT_MIX_SHAPE,
     /** How far a DJ mix may stray from the last song, 0 (close neighbours only) to 100 (adventurous). */
     val mixSurprise: Int = DEFAULT_MIX_SURPRISE,
     /** Home's Today's mix (issue #776): whether it's made by itself, and tuning over the vibe's own. */
@@ -286,8 +291,12 @@ data class AppSettings(
         /** Close to what ReplayGain tags aim for, so switching where loudness comes from doesn't change the overall level. */
         const val DEFAULT_LOUDNESS_TARGET = -18
         const val DEFAULT_CROSSFADE_SECONDS = 6
-        /** A DJ mix strays a little by default (issue #649). */
-        const val DEFAULT_MIX_SURPRISE = 20
+        /**
+         * A mix stays where it is by default: Steady vibes with no surprises (the owner, 0.52.0-dev; it was 20 % since
+         * issue #649). Each new song radio starts from it again ([SettingsRepository.resetMixShape]).
+         */
+        const val DEFAULT_MIX_SURPRISE = 0
+        val DEFAULT_MIX_SHAPE = MixShape.STEADY
         /** Up to 30 s for long, slow fades (issue #759; it was 12). Beat-matched blends have their own length in bars. */
         val CROSSFADE_SECONDS = 1..30
         /** A beat-matched blend's length: 8 bars is about 15 s at 128 BPM (issue #759). */
@@ -451,7 +460,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         pureBlack = prefs.getBoolean("pure_black", false),
         themeSeed = prefs.getInt("theme_seed", DEFAULT_THEME_SEED),
         themeSelection = prefs.getString("theme_selection", null) ?: defaultSelectionFor(prefs.getString("theme_colours", null)),
-        surfaceColour = prefs.getString("surface_colour", null) ?: "GREY",
+        surfaceColour = prefs.getString("surface_colour", null) ?: DEFAULT_SURFACE_COLOUR,
         loudnessSource = LoudnessSource.parse(prefs.getString("loudness_source", null)),
         loudnessTarget = prefs.getInt("loudness_target", AppSettings.DEFAULT_LOUDNESS_TARGET),
         crossfade = CrossfadeMode.parse(prefs.getString("crossfade", null)),
@@ -782,6 +791,14 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putInt("daily_repeat_days", d.repeatDays ?: -1)
             .apply()
         _state.value = _state.value.copy(dailyMix = d)
+    }
+
+    /** Back to Steady vibes with no surprises, as each new song radio starts. True when it changed anything. */
+    fun resetMixShape(): Boolean {
+        val s = _state.value
+        if (s.mixShape == AppSettings.DEFAULT_MIX_SHAPE && s.mixSurprise == AppSettings.DEFAULT_MIX_SURPRISE) return false
+        setMixShape(AppSettings.DEFAULT_MIX_SHAPE, AppSettings.DEFAULT_MIX_SURPRISE)
+        return true
     }
 
     fun setMixShape(shape: MixShape = _state.value.mixShape, surprise: Int = _state.value.mixSurprise) {
