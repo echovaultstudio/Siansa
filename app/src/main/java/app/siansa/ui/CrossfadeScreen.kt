@@ -120,6 +120,7 @@ fun CrossfadeScreen(nav: NavController) {
                     CrossfadeLengthRow(settings.crossfadeSeconds, smart = settings.crossfade == CrossfadeMode.SMART) {
                         graph.settings.setCrossfade(seconds = it)
                     }
+                    crossfadeLengthHint(settings)?.let { Hint(it) }
                     Hint("Only on this phone: on a TV or speaker, songs play back to back. Not used with Repeat one, or while the sleep timer lets a song finish.")
                 }
             }
@@ -147,6 +148,15 @@ private fun levellingHint(s: AppSettings): String = when {
         "Each song is levelled one way only: by the plugin's measurement, or by its ReplayGain tags until the plugin has measured it."
     else -> "Uses the songs' ReplayGain tags (${s.replayGain.label.lowercase()})."
 }
+
+/**
+ * What the length means with Smart on: a ceiling, not the length of every fade (the owner, 0.52.0-dev: "do we still
+ * need the fade length?"). Null when the mode's own hint already says it.
+ */
+internal fun crossfadeLengthHint(s: AppSettings): String? =
+    if (s.crossfade != CrossfadeMode.SMART || s.loudnessSource != LoudnessSource.PLUGIN) null
+    else "The longest a fade can be. Most are shorter: the songs decide. The full length is used for songs not measured yet" +
+        if (s.beatMatch != BeatMatchMode.OFF) " and for a quiet intro without a beat in DJ blends." else "."
 
 private fun crossfadeHint(s: AppSettings): String = when (s.crossfade) {
     CrossfadeMode.OFF -> "Songs play back to back, with no gap."

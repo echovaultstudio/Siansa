@@ -60,6 +60,9 @@ Same page. **Off**, a **fixed** length (1–30 seconds, 6 by default), or **Smar
 
 - Smart crossfades follow how songs end and start, measured by the Siansa plugin. A long fade-out starts blending
   early, a hard ending doesn't blend at all. A slow intro fades in slowly, a hard hit comes in at once.
+- With Smart, the length (**Up to**) is the longest a fade can be, not the length of every fade: most are shorter,
+  as the songs decide. The full length is used for songs the plugin hasn't measured yet, and in DJ blends for a
+  quiet intro without a beat. The setting says so under the slider.
 - Silence at the end of a song is left out: the next song comes straight in. A long fade-out is cut once it's quiet
   (at most the crossfade length of it), so the next song comes in while it's still fading. Only what runs to the very
   end counts: a silence or a quiet passage mid-song never starts the next song, a soft ending that stays at one low
