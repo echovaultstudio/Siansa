@@ -231,6 +231,10 @@ class PlaybackService : MediaLibraryService() {
                         phone.pause()
                         graph.player.notice("Casting ended: ${why}. The music is paused on the phone.")
                     },
+                    // The sound goes to the TV: headphones or Bluetooth going away mustn't pause it (0.52.0-dev: the
+                    // owner's headphones disconnecting paused the gapless cast).
+                    onActive = { on -> exo.setHandleAudioBecomingNoisy(!on) },
+                    notice = { graph.player.notice(it) },
                 )
             }
             phone.onUserJump = { gapless?.userJumped() }
@@ -1284,6 +1288,12 @@ class PlaybackService : MediaLibraryService() {
             override fun run() {
                 if (!player.playWhenReady || !onPhone) return
                 handler.postDelayed(this, 1_000)
+                // Casting gaplessly, the position is the TV's: it stands still until the TV plays, which CastGapless
+                // looks after. Reloading the song here asked the TV for a new stream every 6 s (0.52.0-dev).
+                if (gapless?.active == true) {
+                    watchedPosition = -1
+                    return
+                }
                 val state = player.playbackState
                 val now = SystemClock.elapsedRealtime()
                 val position = player.currentPosition

@@ -17,6 +17,7 @@ class TvClock(private val rate: Int) {
     private var playing = false
     private var atNanos = 0L
     private var reported = false
+    private var furthest = 0.0
 
     /** The TV was asked for stream [n] from mix frame [fromFrame]: until it says otherwise, it's heard there. */
     @Synchronized fun started(n: Int, fromFrame: Long, nanos: Long) {
@@ -25,6 +26,7 @@ class TvClock(private val rate: Int) {
         time = 0.0
         playing = false
         reported = false
+        furthest = 0.0
         atNanos = nanos
     }
 
@@ -35,6 +37,7 @@ class TvClock(private val rate: Int) {
     @Synchronized fun report(n: Int, timeSec: Double, moving: Boolean, nanos: Long): Boolean {
         if (n != stream || timeSec.isNaN() || timeSec < 0) return false
         time = timeSec
+        if (timeSec > furthest) furthest = timeSec
         playing = moving
         atNanos = nanos
         reported = true
@@ -58,8 +61,13 @@ class TvClock(private val rate: Int) {
         if (playing) return base
         val stillMs = (nanos - atNanos) / 1_000_000 - STALL_MS
         if (stillMs <= 0) return base
-        return base + minOf(stillMs, STALL_EXTRA_MS) * rate / 1000.0
+        // Before the stream has got anywhere, more: a TV may want more in hand to start than to carry on.
+        val most = if (started()) STALL_EXTRA_MS else START_EXTRA_MS
+        return base + minOf(stillMs, most) * rate / 1000.0
     }
+
+    /** Whether the TV has got anywhere in its current stream (past [STARTED_SEC]). */
+    @Synchronized fun started(): Boolean = furthest >= STARTED_SEC
 
     /** Whether the TV has reported on the stream it was last asked for. */
     @Synchronized fun hasReport(): Boolean = reported
@@ -76,6 +84,10 @@ class TvClock(private val rate: Int) {
         const val STALL_MS = 1_000L
         /** And then the mixer goes on this far (ms) at most without hearing from it. */
         const val STALL_EXTRA_MS = 3_000L
+        /** The same before the stream has started at all. */
+        const val START_EXTRA_MS = 6_000L
+        /** How far into a stream counts as started. */
+        const val STARTED_SEC = 0.3
     }
 }
 

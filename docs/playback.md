@@ -232,7 +232,7 @@ also has **How it plays**:
   only sends it the queue, and is free to do other things or leave the Wi-Fi.
 - **Gapless through this phone**: the phone plays the music itself, with everything it does on its own speaker:
   crossfades, DJ blends, levelling and the equaliser, songs running into each other without a gap. Instead of its
-  speaker, it sends the sound to the TV over the Wi-Fi as one lossless stream (FLAC, 16-bit, about 1.4 Mbit/s).
+  speaker, it sends the sound to the TV over the Wi-Fi as one lossless stream (FLAC or WAV, 16-bit, about 1.4 Mbit/s).
   The TV shows the song, its cover and where it is, a second or so behind the phone so it matches what you hear.
 
 In gapless mode the phone's controls, notification and lock screen work as usual, and so does the TV remote (left
@@ -243,8 +243,11 @@ the song starts the stream again from there, with a short gap. Use the TV's remo
   there and waits, paused, on the phone.
 - It keeps the phone awake and its Wi-Fi busy while it casts, so it uses more battery than letting the TV play the
   queue. Plug the phone in for long listening.
-- It needs Siansa's own TV screen. A TV that gets Google's plain screen plays the queue instead, and so does a TV
-  that can't play the phone's stream; the log says why.
+- It needs Siansa's own TV screen. A TV that gets Google's plain screen plays the queue instead. If the TV doesn't
+  start the phone's stream within a few seconds, Siansa tries it as WAV (plain, uncompressed sound) instead of FLAC;
+  if that doesn't start either, the TV plays the queue itself and a short note says so. The log says which format
+  played.
+- Headphones or Bluetooth going away while the phone casts gaplessly don't pause the music: the sound is on the TV.
 - A VPN on the phone is fine: the stream goes over the Wi-Fi. A VPN set to block everything outside it may stop the
   TV from reaching the phone; the TV then plays the queue.
 

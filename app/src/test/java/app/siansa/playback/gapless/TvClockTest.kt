@@ -45,9 +45,12 @@ class TvClockTest {
         c.started(1, 0, 0)
         // Not yet a second: as heard.
         assertEquals(0.0, c.paceHeard(s / 2), 0.0)
-        // Then on by the clock, up to three seconds more.
+        // Then on by the clock: before the stream has started, up to six seconds more.
         assertEquals(0.5 * rate, c.paceHeard(s + s / 2), 1.0)
-        assertEquals(TvClock.STALL_EXTRA_MS / 1000.0 * rate, c.paceHeard(60 * s), 1.0)
+        assertEquals(TvClock.START_EXTRA_MS / 1000.0 * rate, c.paceHeard(60 * s), 1.0)
+        // Once it has got going, three.
+        c.report(1, 2.0, moving = false, nanos = 60 * s)
+        assertEquals(2.0 * rate + TvClock.STALL_EXTRA_MS / 1000.0 * rate, c.paceHeard(120 * s), 1.0)
         // Playing: as heard.
         c.report(1, 1.0, true, 60 * s)
         assertEquals(c.heard(61 * s), c.paceHeard(61 * s), 0.0)
@@ -61,5 +64,18 @@ class TvClockTest {
         assertEquals(10L, Pacer.waitMs(written = lead + rate / 100, heard = 0.0, leadFrames = lead, rate = rate))
         // Never long: it looks again soon, to stop or to follow a skip.
         assertEquals(Pacer.MAX_WAIT_MS, Pacer.waitMs(written = lead * 10, heard = 0.0, leadFrames = lead, rate = rate))
+    }
+
+    @Test fun aStreamHasStartedOnceItGetsPastAMoment() {
+        val c = TvClock(rate)
+        c.started(1, 0, 0)
+        assertFalse(c.started())
+        c.report(1, 0.0, moving = true, nanos = s)
+        assertFalse(c.started())
+        c.report(1, 0.4, moving = true, nanos = 2 * s)
+        assertTrue(c.started())
+        // A new stream starts the count again.
+        c.started(2, 1000, 3 * s)
+        assertFalse(c.started())
     }
 }

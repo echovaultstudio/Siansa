@@ -16,16 +16,12 @@ import kotlinx.serialization.json.put
  * #114), as JSON on [NAMESPACE]. The TV only plays the phone's stream, so it learns the song from the phone; the phone
  * learns from the TV where the stream is and what its remote asks for.
  *
- * Phone to TV: `now` (the song, where it is, playing or paused).
+ * Phone to TV: `start` (play stream n from its address), `stop`, `now` (the song, where it is, playing or paused).
  * TV to phone: `clock` (stream n's time and whether it moves), `command` (the remote: next, prev, toggle, play,
  * pause, seek to a point of the song), `error` (stream n can't play).
  */
 object GaplessMessages {
     const val NAMESPACE = "urn:x-cast:app.siansa.live"
-
-    /** Marks the TV's stream as the phone's own (LOAD customData), so the TV screen plays it as the live mix. */
-    const val LIVE_KEY = "siansaLive"
-    const val STREAM_KEY = "stream"
 
     /** What the TV shows for the song now playing on the phone. */
     data class Now(
@@ -49,11 +45,19 @@ object GaplessMessages {
         put("playing", n.playing)
     }.toString()
 
-    /** The LOAD request's customData for stream [n]. */
-    fun loadData(n: Int): String = buildJsonObject {
-        put(LIVE_KEY, true)
-        put(STREAM_KEY, n)
+    /**
+     * Starts stream [n] at [url] in the TV screen's own audio element (not through Google's Cast player, which never got
+     * past 0 s with it on a SHIELD, 0.52.0-dev). [format] is for the TV's log.
+     */
+    fun start(n: Int, url: String, format: StreamFormat): String = buildJsonObject {
+        put("type", "start")
+        put("stream", n)
+        put("url", url)
+        put("format", format.key)
     }.toString()
+
+    /** Stops the phone's stream on the TV. */
+    fun stop(): String = buildJsonObject { put("type", "stop") }.toString()
 
     sealed class FromTv {
         /** Stream [stream] is at [timeSec] and is [moving] (playing, not waiting for data). */

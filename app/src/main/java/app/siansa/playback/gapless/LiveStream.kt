@@ -85,7 +85,7 @@ class PcmRing(val channels: Int, val capacityFrames: Int) {
 
 /**
  * The phone's small web server for gapless casting (issue #114): serves the mix as one endless FLAC stream to the TV,
- * at `http://<phone>:<port>/live/<key>/<n>.flac?from=<mix frame>`. The random [key] keeps other devices on the Wi-Fi
+ * at `http://<phone>:<port>/live/<key>/<n>.flac?from=<mix frame>` (or `.wav`, [StreamFormat]). The random [key] keeps other devices on the Wi-Fi
  * from listening in; [n] counts the streams the TV was asked to play, and a newer one ends the one before (the TV
  * starts again after a skip). Each stream starts at the mix frame it was asked for, so it begins with the music that
  * follows the skip, and is encoded on its own, numbered from 0, as a fresh FLAC stream.
@@ -141,7 +141,8 @@ class LiveServer(
     }
 
     /** The address of stream [n], starting at mix frame [from], as the TV fetches it from [host]. */
-    fun url(host: String, n: Int, from: Long): String = "http://${hostForUrl(host)}:$port/live/$key/$n.flac?from=$from"
+    fun url(host: String, n: Int, from: Long, format: StreamFormat = StreamFormat.Flac): String =
+        "http://${hostForUrl(host)}:$port/live/$key/$n.${format.key}?from=$from"
 
     /** Marks stream [n] as the newest before the TV is asked for it, so the one playing ends as soon as it connects. */
     fun expect(n: Int) {
@@ -200,17 +201,17 @@ class LiveServer(
             // An older stream still open ends now: the TV moved on to this one.
             clients.keys.filter { it < n }.forEach { old -> clients.remove(old)?.let { runCatching { it.close() } } }
             clients.put(n, socket)?.let { if (it !== socket) runCatching { it.close() } }
-            out.write(Http.head(200, "OK", "audio/flac"))
+            out.write(Http.head(200, "OK", route.format.mime))
             if (request.method == "HEAD") {
                 out.flush()
                 return
             }
             val from = maxOf(route.from ?: ring.end, ring.start)
             log.connected(n, from, who)
-            log.info("Stream $n to $who from mix frame $from (asked ${route.from ?: "now"}), FLAC ${sampleRate} Hz 16-bit ${ring.channels} ch" +
+            log.info("Stream $n to $who from mix frame $from (asked ${route.from ?: "now"}), ${route.format.label} ${sampleRate} Hz 16-bit ${ring.channels} ch" +
                 (request.range?.let { ", the TV asked for bytes $it" } ?: ""))
             socket.soTimeout = 0
-            stream(n, from, out)
+            stream(n, from, out, route.format)
         } catch (e: SocketException) {
             if (running && n >= 0 && n == newest.get()) log.info("Stream $n to $who closed: ${e.message}")
         } catch (e: Exception) {
@@ -221,10 +222,10 @@ class LiveServer(
         }
     }
 
-    private fun stream(n: Int, from: Long, out: OutputStream) {
-        // Uncompressed frames: a steady byte rate, as Chrome on the TV buffers by bytes (see CastGapless).
+    private fun stream(n: Int, from: Long, out: OutputStream, format: StreamFormat) {
+        // Uncompressed FLAC frames: a steady byte rate, as Chrome on the TV buffers by bytes (see CastGapless).
         val encoder = FlacEncoder(sampleRate, ring.channels, compress = false)
-        out.write(encoder.header())
+        out.write(if (format == StreamFormat.Wav) WavHeader.of(sampleRate, ring.channels) else encoder.header())
         out.flush()
         val pcm = ShortArray(FlacEncoder.MAX_BLOCK * ring.channels)
         var at = from
@@ -243,7 +244,7 @@ class LiveServer(
             if (held < FlacEncoder.MIN_BLOCK) continue
             val frames = ring.read(at, pcm, FlacEncoder.MAX_BLOCK)
             if (frames <= 0) continue
-            val bytes = encoder.frame(pcm, frames)
+            val bytes = if (format == StreamFormat.Wav) WavHeader.samples(pcm, frames, ring.channels) else encoder.frame(pcm, frames)
             val t0 = System.nanoTime()
             out.write(bytes)
             out.flush()
@@ -274,7 +275,7 @@ class LiveServer(
 /** Just enough HTTP/1.1 for the stream server. */
 internal object Http {
     data class Request(val method: String, val path: String, val range: String?)
-    data class Route(val stream: Int, val from: Long?)
+    data class Route(val stream: Int, val from: Long?, val format: StreamFormat = StreamFormat.Flac)
 
     private const val MAX_LINE = 8_192
 
@@ -304,14 +305,14 @@ internal object Http {
         return null
     }
 
-    /** `/live/<key>/<n>.flac?from=<frame>` with the right key, else null. */
+    /** `/live/<key>/<n>.flac?from=<frame>` (or `.wav`) with the right key, else null. */
     fun route(path: String, key: String): Route? {
         val bare = path.substringBefore('?')
         val query = path.substringAfter('?', "")
-        val m = Regex("""/live/([0-9a-f]+)/(\d{1,9})\.flac""").matchEntire(bare) ?: return null
+        val m = Regex("""/live/([0-9a-f]+)/(\d{1,9})\.(flac|wav)""").matchEntire(bare) ?: return null
         if (!constantTimeEquals(m.groupValues[1], key)) return null
         val from = query.split('&').firstOrNull { it.startsWith("from=") }?.removePrefix("from=")?.toLongOrNull()?.takeIf { it >= 0 }
-        return Route(m.groupValues[2].toInt(), from)
+        return Route(m.groupValues[2].toInt(), from, StreamFormat.of(m.groupValues[3]) ?: StreamFormat.Flac)
     }
 
     /** The path with the key hidden, for the log. */
