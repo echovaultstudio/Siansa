@@ -34,10 +34,10 @@ class CastMessageSizeTest {
 
     @Test fun theWindowIsFarUnderCastsLimit() {
         val items = CastItems(api)
-        val window = (0 until CastWindow.BEHIND + CastWindow.AHEAD + 1).map { song(it).toMediaItem(api) }
+        val window = (0 until TvWindow.BEHIND + TvWindow.AHEAD + 1).map { song(it).toMediaItem(api) }
         val bytes = window.sumOf { items.toMediaQueueItem(it).toJson().toString().toByteArray().size }
         println("Cast queue window: ${window.size} songs, $bytes bytes")
-        assertTrue("$bytes bytes for ${window.size} songs", bytes < 48_000)
+        assertTrue("$bytes bytes for ${window.size} songs", bytes < 16_000)
         // And why it's needed: a 497-song queue would be several times the limit.
         val one = items.toMediaQueueItem(song(1).toMediaItem(api)).toJson().toString().length
         assertTrue("$one bytes a song", one * 497 > 64 * 1024)

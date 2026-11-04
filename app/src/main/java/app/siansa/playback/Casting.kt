@@ -163,6 +163,10 @@ object Cast {
     /** The TV last picked in the app, for when a failed start doesn't say which it was. */
     private var lastPicked: String? = null
 
+    /** The TV screen's last log line, and when (elapsedRealtime). */
+    @Volatile private var lastTvLine: String? = null
+    @Volatile private var lastTvLineAt = 0L
+
     /** When a TV was last picked in Play on (elapsedRealtime), to say in the log how long casting took to start. */
     @Volatile private var pickedAt = 0L
 
@@ -272,7 +276,12 @@ object Cast {
                     1 -> "Google Play services let go"
                     else -> "reason $reason"
                 }
-                AppLog.w("Cast", "Lost touch with ${session.castDevice?.friendlyName ?: "the TV"} ($why)")
+                // What the TV screen last said, to tell a crash of it from the network (0.52.0-dev: "reason 2274" on the
+                // SHIELD a few seconds after a 37-song queue).
+                val last = lastTvLine?.let { line ->
+                    "; the TV screen last said, ${(android.os.SystemClock.elapsedRealtime() - lastTvLineAt) / 1000} s before: \"$line\""
+                }.orEmpty()
+                AppLog.w("Cast", "Lost touch with ${session.castDevice?.friendlyName ?: "the TV"} ($why, code $reason)$last")
             }
         }, CastSession::class.java)
     }
@@ -285,6 +294,8 @@ object Cast {
         try {
             session.setMessageReceivedCallbacks(TV_LOG_NAMESPACE) { _, _, message ->
                 AppLog.i("CastTV", message.take(TV_LOG_MAX))
+                lastTvLine = message.take(TV_LOG_MAX)
+                lastTvLineAt = android.os.SystemClock.elapsedRealtime()
             }
         } catch (e: Exception) {
             AppLog.d("Cast", "The TV's own log isn't available: ${e.message}")
@@ -458,9 +469,13 @@ data class CastSource(val url: String, val type: String, val converted: Boolean)
  */
 @OptIn(UnstableApi::class)
 class CastItems(private val api: MusicSource) : MediaItemConverter {
-    override fun toMediaQueueItem(mediaItem: MediaItem): MediaQueueItem {
+    override fun toMediaQueueItem(mediaItem: MediaItem): MediaQueueItem = toMediaQueueItem(mediaItem, null)
+
+    /** As above, marked with the phone's key for its queue [entry] ([TvPlayer]), which the TV reports back. */
+    fun toMediaQueueItem(mediaItem: MediaItem, entry: Long?): MediaQueueItem {
         val song = mediaItem.toSong()
         val custom = JSONObject().put(SONG_ID, mediaItem.mediaId)
+        entry?.let { custom.put(TvPlayer.ENTRY_KEY, it) }
         // In lossless quality Siansa's TV screen plays the original file instead where every Cast device can (FLAC and
         // so on), or the server's FLAC conversion of it (ALAC…), and falls back to the MP3 below when it can't.
         CastOriginals.source(CastFormats.suffixOf(song), CastSettings.quality.value, api.streamUrl(mediaItem.mediaId))?.let { source ->

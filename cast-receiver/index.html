@@ -181,8 +181,23 @@ function liveSend(obj) {
   try { context.sendCustomMessage(LIVE_NS, undefined, obj); } catch (e) { /* the phone isn't listening yet */ }
 }
 
+// How much memory the page uses (Chrome's own figure, where it gives one), for the log: at each queue and when it
+// grows, to tell a TV screen that ran out of memory (the SHIELD's closed a few seconds after a 37-song queue,
+// 0.52.0-dev).
+let heapLogged = 0;
+function heap(why) {
+  const m = window.performance && performance.memory;
+  if (!m) return;
+  const mb = Math.round(m.usedJSHeapSize / 1048576);
+  if (why || mb - heapLogged >= 16) {
+    heapLogged = mb;
+    tvlog('memory ' + mb + ' of ' + Math.round(m.jsHeapSizeLimit / 1048576) + ' MB' + (why ? ' (' + why + ')' : ''));
+  }
+}
+setInterval(() => heap(), 30000);
+
 // A mistake in this page is logged rather than lost.
-window.addEventListener('error', e => tvlog('page error: ' + (e.message || e.type)));
+window.addEventListener('error', e => tvlog('page error: ' + (e.message || e.type) + (e.filename ? ' at ' + String(e.filename).split('/').pop() + ':' + e.lineno : '')));
 window.addEventListener('unhandledrejection', e => tvlog('page error: ' + (e.reason && e.reason.message || e.reason)));
 const player = context.getPlayerManager();
 player.setMediaElement($('audio'));
@@ -437,6 +452,7 @@ function useMp3(media) {
 
 player.setMessageInterceptor(M.MessageType.LOAD, req => {
   idleSince = Date.now();
+  heap('a load');
   // The page's own load of the phone's stream into Google's player.
   if (req.media && req.media.customData && req.media.customData.siansaLive) return req;
   if (live) stopLive('the queue is loading');
