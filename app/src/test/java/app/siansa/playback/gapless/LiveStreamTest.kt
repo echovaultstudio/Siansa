@@ -145,8 +145,44 @@ class LiveStreamTest {
         assertEquals(Http.Route(3, null), Http.route("/live/abcdef0123/3.flac?from=-4", key))
         assertNull(Http.route("/live/abcdef0124/3.flac", key))
         assertNull(Http.route("/live/abcdef0123/x.flac", key))
+        assertEquals(Http.Route(5, 7L, StreamFormat.Wav), Http.route("/live/abcdef0123/5.wav?from=7", key))
+        assertEquals(StreamFormat.Flac, Http.route("/live/abcdef0123/5.flac", key)?.format)
+        assertNull(Http.route("/live/abcdef0123/5.mp3", key))
         assertEquals("/live/…/3.flac", Http.redactPath("/live/abcdef0123/3.flac", key))
         assertEquals("[fe80::1]", LiveServer.hostForUrl("fe80::1"))
         assertEquals(32, LiveServer.newKey().length)
+    }
+
+    @Test fun theWavStreamIsAnEndlessHeaderThenTheSamples() {
+        val ring = PcmRing(2, 44_100 * 10)
+        ring.write(block(8192, 0), 8192)
+        val srv = server(ring)
+        assertTrue(srv.url("10.0.0.2", 1, 0, StreamFormat.Wav).endsWith("/1.wav?from=0"))
+        val (head, body) = get(srv.port, "/live/00112233445566778899aabbccddeeff/1.wav?from=0")
+        assertTrue(head, head.contains("Content-Type: audio/wav"))
+        val data = DataInputStream(body)
+        val header = ByteArray(44).also { data.readFully(it) }
+        assertArrayEquals(WavHeader.of(44_100, 2), header)
+        val pcm = ByteArray(4096 * 4).also { data.readFully(it) }
+        val expected = block(4096, 0)
+        for (i in 0 until 4096 * 2) {
+            val v = (pcm[2 * i].toInt() and 0xFF) or (pcm[2 * i + 1].toInt() shl 8)
+            assertEquals("sample $i", expected[i], v.toShort())
+        }
+    }
+
+    @Test fun theWavHeaderSaysPcmAndNoLength() {
+        val h = java.nio.ByteBuffer.wrap(WavHeader.of(44_100, 2)).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        assertEquals("RIFF", String(h.array(), 0, 4, Charsets.US_ASCII))
+        assertEquals(-1, h.getInt(4))
+        assertEquals("WAVEfmt ", String(h.array(), 8, 8, Charsets.US_ASCII))
+        assertEquals(1, h.getShort(20).toInt())
+        assertEquals(2, h.getShort(22).toInt())
+        assertEquals(44_100, h.getInt(24))
+        assertEquals(44_100 * 4, h.getInt(28))
+        assertEquals(4, h.getShort(32).toInt())
+        assertEquals(16, h.getShort(34).toInt())
+        assertEquals("data", String(h.array(), 36, 4, Charsets.US_ASCII))
+        assertEquals(-1, h.getInt(40))
     }
 }

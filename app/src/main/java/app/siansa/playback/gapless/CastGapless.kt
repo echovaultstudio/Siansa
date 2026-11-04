@@ -21,18 +21,14 @@ import app.siansa.playback.CastReceiver
 import app.siansa.playback.dlna.LanWatch
 import app.siansa.playback.engine.AudioEngine
 import app.siansa.playback.toSong
-import com.google.android.gms.cast.MediaInfo
-import com.google.android.gms.cast.MediaLoadRequestData
-import com.google.android.gms.cast.MediaMetadata
 import com.google.android.gms.cast.framework.CastSession
-import com.google.android.gms.common.images.WebImage
-import org.json.JSONObject
 import java.net.InetAddress
 
 /**
  * Gapless casting (issue #114): the phone keeps playing the queue on its own players and mixer, with every crossfade,
  * DJ blend and levelling as on the phone, and instead of its speaker sends the mix to Siansa's TV screen as one
- * endless lossless stream (FLAC) from a small web server on the phone. The TV only plays that stream and shows what
+ * endless lossless stream (FLAC, or WAV where a TV won't start FLAC) from a small web server on the phone, played by the
+ * TV screen in an audio element of its own (not Google's Cast player). The TV only plays that stream and shows what
  * the phone tells it; its remote's keys come back here as commands. The phone's own controls, notification and lock
  * screen work as usual, as the phone is still the player.
  *
@@ -57,6 +53,10 @@ class CastGapless(
     private val onFallback: (String) -> Unit,
     /** Gapless casting ends (the phone left the Wi-Fi): the service pauses the music (before this lets go of the mix). */
     private val onEnd: (String) -> Unit,
+    /** Gapless casting started (true) or ended: the phone's own output isn't used meanwhile. */
+    private val onActive: (Boolean) -> Unit = {},
+    /** A short note on the phone's screen. */
+    private val notice: (String) -> Unit = {},
 ) {
     private val main = Handler(Looper.getMainLooper())
     private var session: CastSession? = null
@@ -66,13 +66,14 @@ class CastGapless(
     private var out: GaplessOut? = null
     private var host: String = ""
     private var stream = 0
-    private var everPlayed = false
     private var errors = 0
     private var lastJumpAt = 0L
     private var wake: PowerManager.WakeLock? = null
     private var wifi: WifiManager.WifiLock? = null
     private var lanWatch: LanWatch? = null
     private var tvName = "the TV"
+    private var tvKey: String? = null
+    private var tries: StreamTries? = null
 
     /** Whether the phone is casting gaplessly now. */
     val active: Boolean get() = session != null
@@ -106,15 +107,18 @@ class CastGapless(
             return false
         }
         AppLog.i(TAG, "Casting gaplessly to $tvName (at ${tvIp ?: "?"}) from ${choice.address}, ${choice.why} (${choice.network.name}), " +
-            "FLAC ${AudioEngine.OUTPUT_RATE} Hz 16-bit, ${LEAD_MS} ms ahead of the TV")
+            "${AudioEngine.OUTPUT_RATE} Hz 16-bit, ${LEAD_MS} ms ahead of the TV")
         session = castSession
         ring = r
         clock = c
         server = s
         host = choice.address
         stream = 0
-        everPlayed = false
         errors = 0
+        tvKey = castSession.castDevice?.deviceId
+        // The format that played on this TV before (this app run), else FLAC.
+        tries = StreamTries(tvKey?.let { workingFormat[it] } ?: StreamFormat.Flac)
+        onActive(true)
         val o = GaplessOut(r, c, AudioEngine.OUTPUT_RATE, LEAD_MS, "$tvName (gapless cast)")
         out = o
         hold()
@@ -148,7 +152,11 @@ class CastGapless(
         main.removeCallbacks(tick)
         main.removeCallbacks(cut)
         main.removeCallbacks(connectTimeout)
+        main.removeCallbacks(startCheck)
+        main.removeCallbacks(startCheckAgain)
         player.removeListener(listener)
+        // The TV screen stops the phone's stream (a queue the phone hands it stops it too).
+        runCatching { session?.sendMessage(GaplessMessages.NAMESPACE, GaplessMessages.stop()) }
         runCatching { session?.removeMessageReceivedCallbacks(GaplessMessages.NAMESPACE) }
         out?.stopped = true
         engine.routeTo(null)
@@ -161,6 +169,8 @@ class CastGapless(
         ring = null
         clock = null
         out = null
+        tries = null
+        onActive(false)
     }
 
     /**
@@ -182,46 +192,81 @@ class CastGapless(
 
     private val cut = Runnable { if (active) newStream("a skip") }
 
-    /** Asks the TV for a new stream from the mix written so far: what it had in hand is dropped. */
+    /**
+     * Asks the TV for a new stream from the mix written so far: what it had in hand is dropped. The TV screen plays it
+     * in its own audio element, started by a message: Google's Cast player, given it as a LOAD, never got past 0 s on
+     * a SHIELD (0.52.0-dev).
+     */
     private fun newStream(why: String) {
         val s = session ?: return
         val srv = server ?: return
         val c = clock ?: return
         val r = ring ?: return
+        val format = tries?.format ?: StreamFormat.Flac
         stream++
         // The first stream starts with the mixer's next block (nothing is in the ring yet); later ones where the new music does.
         val from = if (r.end == 0L && r.origin == 0L) engine.writtenMix else r.end
         srv.expect(stream)
         c.started(stream, from, System.nanoTime())
-        val url = srv.url(host, stream, from)
-        AppLog.i(TAG, "Stream $stream for $tvName ($why), from mix frame $from")
-        val info = MediaInfo.Builder(url)
-            .setContentUrl(url)
-            .setContentType(FLAC)
-            .setStreamType(MediaInfo.STREAM_TYPE_LIVE)
-            .setMetadata(metadata())
-            .setCustomData(JSONObject(GaplessMessages.loadData(stream)))
-            .build()
-        val request = MediaLoadRequestData.Builder().setMediaInfo(info).setAutoplay(true).build()
+        val url = srv.url(host, stream, from, format)
+        AppLog.i(TAG, "Stream $stream for $tvName ($why), ${format.label}, from mix frame $from")
         try {
-            s.remoteMediaClient?.load(request)?.setResultCallback { result ->
-                if (!result.status.isSuccess) AppLog.w(TAG, "$tvName didn't take stream $stream: ${result.status.statusCode} ${result.status.statusMessage.orEmpty()}")
-            } ?: AppLog.w(TAG, "No media channel to $tvName for stream $stream")
+            s.sendMessage(GaplessMessages.NAMESPACE, GaplessMessages.start(stream, url, format))
         } catch (e: Exception) {
             AppLog.w(TAG, "Couldn't ask $tvName for stream $stream: ${e.message}")
         }
         main.removeCallbacks(connectTimeout)
         main.postDelayed(connectTimeout, CONNECT_TIMEOUT_MS)
+        main.removeCallbacks(startCheck)
+        main.postDelayed(startCheck, START_WAIT_MS)
         sendNow()
     }
 
+    /** No word at all from the TV screen (an old page that doesn't know the phone's stream): the queue instead. */
     private val connectTimeout = Runnable {
         if (!active) return@Runnable
         val c = clock ?: return@Runnable
         if (c.hasReport()) return@Runnable
-        val why = "$tvName didn't start the phone's stream within ${CONNECT_TIMEOUT_MS / 1000} s"
+        val why = "$tvName didn't answer about the phone's stream within ${CONNECT_TIMEOUT_MS / 1000} s (its TV screen may be an old one)"
         AppLog.w(TAG, "$why; the TV plays the queue instead")
         fallBack(why)
+    }
+
+    /**
+     * The TV hasn't got anywhere in the stream a while after it was asked for it, though the music plays on the phone:
+     * the other format next ([StreamTries]), and after that the queue, so nobody sits in silence. (0.52.0-dev: the
+     * stream was asked for again every 6 s, for ever, without a sound.)
+     */
+    private val startCheck = Runnable {
+        if (!active) return@Runnable
+        val c = clock ?: return@Runnable
+        if (c.started()) return@Runnable
+        if (!player.playWhenReady) {
+            // Paused before it started: looked at again once it plays.
+            main.postDelayed(startCheckAgain, START_WAIT_MS)
+            return@Runnable
+        }
+        noProgress("didn't get past 0 s of stream $stream within ${START_WAIT_MS / 1000} s")
+    }
+
+    private val startCheckAgain = Runnable { main.post(startCheck) }
+
+    /** Stream [stream] went nowhere (or failed) for [what]: try the other format, or give up for the queue. */
+    private fun noProgress(what: String) {
+        val t = tries ?: return
+        val failed = t.format
+        when (val next = t.failed()) {
+            is StreamTries.Next.Retry -> {
+                AppLog.w(TAG, "$tvName $what as ${failed.label}; trying ${next.format.label}")
+                newStream("${next.format.label} instead of ${failed.label}")
+            }
+            StreamTries.Next.GiveUp -> {
+                val why = "$tvName $what (tried ${t.triedLabels()})"
+                AppLog.w(TAG, "$why: giving up gapless; the TV plays the queue instead")
+                notice("$tvName couldn't play the sound from this phone, so it plays the queue itself.")
+                fallBack(why)
+            }
+        }
     }
 
     private fun onMessage(text: String) {
@@ -229,9 +274,10 @@ class CastGapless(
             is GaplessMessages.FromTv.Clock -> {
                 val c = clock ?: return
                 val first = !c.hasReport() && m.stream == c.currentStream()
+                val wasStarted = c.started()
                 if (!c.report(m.stream, m.timeSec, m.moving, System.nanoTime())) return
-                if (m.moving) everPlayed = true
-                if (first) main.post { AppLog.i(TAG, "$tvName plays stream ${m.stream}: ${engine.status()}") }
+                if (first) main.post { AppLog.i(TAG, "$tvName answers about stream ${m.stream}: ${engine.status()}") }
+                if (!wasStarted && c.started()) main.post { streamStarted(m.stream) }
             }
             is GaplessMessages.FromTv.Command -> main.post { command(m) }
             is GaplessMessages.FromTv.Error -> main.post { error(m) }
@@ -253,15 +299,28 @@ class CastGapless(
         }
     }
 
+    /** Stream [n] got going on the TV: the format that works is kept for this TV, and said in the log. */
+    private fun streamStarted(n: Int) {
+        if (!active || n != stream) return
+        val t = tries ?: return
+        val first = t.worked()
+        tvKey?.let { workingFormat[it] = t.format }
+        if (first) AppLog.i(TAG, "$tvName plays the phone's stream as ${t.format.label}: ${engine.status()}")
+    }
+
     private fun error(m: GaplessMessages.FromTv.Error) {
         if (!active || m.stream != stream) return
         errors++
         AppLog.w(TAG, "$tvName couldn't play stream ${m.stream}: ${m.code} ${m.message}")
-        if (!everPlayed || errors > MAX_ERRORS) {
-            val why = if (!everPlayed) "$tvName couldn't play the phone's stream (${m.code})" else "$tvName kept failing to play the phone's stream"
-            fallBack(why)
-        } else {
-            newStream("after an error")
+        main.removeCallbacks(startCheck)
+        when {
+            clock?.started() != true -> noProgress("couldn't play stream ${m.stream} (error ${m.code})")
+            errors > MAX_ERRORS -> {
+                val why = "$tvName kept failing to play the phone's stream"
+                notice("$tvName couldn't play the sound from this phone, so it plays the queue itself.")
+                fallBack(why)
+            }
+            else -> newStream("after an error")
         }
     }
 
@@ -320,15 +379,6 @@ class CastGapless(
         } catch (e: Exception) {
             AppLog.d(TAG, "Couldn't tell the TV what plays: ${e.message}")
         }
-    }
-
-    /** The Cast description of the stream: the song playing as it starts (the TV screen shows the phone's news). */
-    private fun metadata(): MediaMetadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
-        val song = player.currentMediaItem?.toSong() ?: return@apply
-        putString(MediaMetadata.KEY_TITLE, song.title)
-        putString(MediaMetadata.KEY_ARTIST, song.artist)
-        putString(MediaMetadata.KEY_ALBUM_TITLE, song.album)
-        song.cover?.let { c -> runCatching { addImage(WebImage(android.net.Uri.parse(source().coverUrl(c, TV_COVER)))) } }
     }
 
     private val serverLog = object : LiveServer.Log {
@@ -395,11 +445,15 @@ class CastGapless(
         const val LEAD_MS = 1_500L
         /** The mix kept for streams started again (after a skip): far more than the lead. */
         const val RING_SECONDS = 10
-        const val FLAC = "audio/flac"
         const val TV_COVER = 800
         const val CUT_DELAY_MS = 80L
         const val JUMP_WINDOW_MS = 1_000L
         const val CONNECT_TIMEOUT_MS = 15_000L
+        /** How long a stream may take to get going on the TV before the next format is tried. */
+        const val START_WAIT_MS = 8_000L
+
+        /** The format each TV (by Cast device id) played, for this app run. */
+        private val workingFormat = java.util.concurrent.ConcurrentHashMap<String, StreamFormat>()
         const val TICK_MS = 5_000L
         const val STATUS_EVERY_MS = 30_000L
         const val MAX_ERRORS = 3
