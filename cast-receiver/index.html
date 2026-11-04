@@ -254,12 +254,15 @@ function act(name) {
   if (name === 'pause') player.pause();
   if (name === 'next') { sign('next'); jump(1); }
   // Previous goes back to the start of the song after its first 5 seconds, else to the song before.
-  if (name === 'prev') { sign('prev'); player.getCurrentTimeSec() > 5 ? player.seek(0) : jump(-1); }
+  if (name === 'prev') { sign('prev'); player.getCurrentTimeSec() > 5 ? seekTo(0) : jump(-1); }
 }
 
 // Winding: steps of 5 s, then 10 s after two seconds held, then 20 s after five.
 let windStart = 0;
 let windAt = 0;
+let windTo = null;   // where the last step went: the player's time lags behind a seek
+let ownSeekAt = 0;   // the page's own seeks pass the seek interceptor below
+function seekTo(sec) { ownSeekAt = Date.now(); player.seek(sec); }
 function wind(dir) {
   const now = Date.now();
   if (!windStart) windStart = now;
@@ -268,32 +271,52 @@ function wind(dir) {
   const held = now - windStart;
   const step = held > 5000 ? 20 : held > 2000 ? 10 : 5;
   const dur = player.getDurationSec();
-  let to = player.getCurrentTimeSec() + dir * step;
+  let to = (windTo !== null ? windTo : player.getCurrentTimeSec()) + dir * step;
   to = Math.max(0, dur > 0 ? Math.min(dur - 1, to) : to);
   sign(dir < 0 ? 'back' : 'forward');
   tvlog('winds to ' + Math.round(to) + ' s');
-  player.seek(to);
+  windTo = to;
+  seekTo(to);
   tick();
 }
 
 // One arrow at a time: which way, whether it's being held, and the timer that settles a press.
+// A hold is a second key-down the same way before the key comes up: Google TV repeats the key-down while it's held
+// without marking it as a repeat (0.52.0-dev, the owner's SHIELD), so the repeat flag alone isn't enough.
 let arrow = 0;
 let holding = false;
 let settle = 0;
 function arrowDone() {
   clearTimeout(settle);
   if (arrow && !holding) act(arrow < 0 ? 'prev' : 'next');
+  if (holding) tvlog('stopped winding');
   arrow = 0;
   holding = false;
   windStart = 0;
+  windTo = null;
 }
 function arrowDown(dir, repeat) {
   arrowAt = Date.now();
-  if (dir !== arrow) { if (arrow) arrowDone(); arrow = dir; holding = false; }
-  else if (repeat || holding) { holding = true; wind(dir); }
+  if (dir !== arrow) { if (arrow) arrowDone(); arrow = dir; holding = false; if (repeat) { holding = true; wind(dir); } }
+  else { holding = true; wind(dir); }
   clearTimeout(settle);
   // No key-up from some TVs: a press settles 600 ms after the last key event.
   settle = setTimeout(arrowDone, 600);
+}
+
+// OK and the play/pause keys: Google TV plays or pauses by itself as well (a PLAY or PAUSE request a few ms after the
+// key), so doing it here too paused and played again at once. The page waits a moment and only acts when the TV
+// didn't.
+let pending = 0;
+function later(name) {
+  clearTimeout(pending);
+  pending = setTimeout(() => { pending = 0; act(name); }, 350);
+}
+function tvDidIt() {
+  if (!pending) return;
+  clearTimeout(pending);
+  pending = 0;
+  tvlog('the TV played or paused itself');
 }
 
 const KEYS = { 37: 'ArrowLeft', 39: 'ArrowRight', 13: 'Enter', 179: 'MediaPlayPause', 176: 'MediaTrackNext',
@@ -309,9 +332,9 @@ document.addEventListener('keydown', e => {
     case 'MediaTrackNext': act('next'); break;
     case 'MediaRewind': wind(-1); break;
     case 'MediaFastForward': wind(1); break;
-    case 'Enter': case ' ': case 'MediaPlayPause': act('toggle'); break;
-    case 'MediaPlay': act('play'); break;
-    case 'MediaPause': act('pause'); break;
+    case 'Enter': case ' ': case 'MediaPlayPause': later('toggle'); break;
+    case 'MediaPlay': later('play'); break;
+    case 'MediaPause': later('pause'); break;
     default: return;
   }
   e.preventDefault();
@@ -388,6 +411,7 @@ player.addEventListener(E.ERROR, () => {
 // They're handled like the keys: one on its own is a press (previous or next), several in a row are a hold
 // (winding through the song).
 player.setMessageInterceptor(M.MessageType.SEEK, req => {
+  if (Date.now() - ownSeekAt < 200) return req;
   tvlog('seek from ' + (req.senderId || 'the TV') + ': to ' + req.currentTime + ', by ' + req.relativeTime + ', at ' + Math.round(player.getCurrentTimeSec()) + ' s');
   const relative = typeof req.relativeTime === 'number' && typeof req.currentTime !== 'number';
   if (relative) {
@@ -403,7 +427,11 @@ player.setMessageInterceptor(M.MessageType.SEEK, req => {
 
 // Other commands, only logged: to see what the TV's remote sends besides keys and seeks.
 [M.MessageType.PLAY, M.MessageType.PAUSE, M.MessageType.QUEUE_UPDATE, M.MessageType.STOP].forEach(type =>
-  player.setMessageInterceptor(type, req => { tvlog(type + ' from ' + (req.senderId || 'the TV') + (req.jump ? ', jump ' + req.jump : '')); return req; }));
+  player.setMessageInterceptor(type, req => {
+    tvlog(type + ' from ' + (req.senderId || 'the TV') + (req.jump ? ', jump ' + req.jump : ''));
+    if (type === M.MessageType.PLAY || type === M.MessageType.PAUSE) tvDidIt();
+    return req;
+  }));
 
 // Previous and next work on the queue the phone sends (the whole queue, with the next song loaded ahead).
 const options = new cast.framework.CastReceiverOptions();
