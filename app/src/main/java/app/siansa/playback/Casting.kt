@@ -354,8 +354,9 @@ object Cast {
 /**
  * Which songs Siansa's TV screen may play as their original file rather than the MP3 (issue #114). Only file types
  * every Cast device plays: FLAC, MP3, Ogg (Vorbis, Opus), WAV and AAC. An .m4a or .mp4 can hold AAC or ALAC, and
- * Navidrome only says the file type, so those, ALAC and anything unknown get the MP3: an ALAC original ended the
- * cast on a SHIELD (0.52.0-dev, Apple Music Live albums).
+ * Navidrome only says the file type, so those and ALAC are never sent as they are: an ALAC original ended the cast on
+ * a SHIELD (0.52.0-dev, Apple Music Live albums). In lossless quality ([CastQuality]) the server converts them, and
+ * other lossless files Cast can't play, to FLAC; anything else gets the MP3.
  */
 object CastOriginals {
     private val types = mapOf(
@@ -368,9 +369,52 @@ object CastOriginals {
         "aac" to "audio/aac",
     )
 
+    /**
+     * Files Cast devices can't play that hold lossless audio, or may (.m4a and .mp4 are AAC or ALAC; only the file type
+     * is known): with [CastQuality.Lossless] the server converts these to FLAC. Lossy ones Cast can't play (WMA,
+     * Musepack…) still go as the MP3.
+     */
+    private val toFlac = setOf("m4a", "mp4", "m4b", "alac", "ape", "wv", "aif", "aiff", "aifc", "dsf", "dff", "tta", "tak", "shn", "ofr")
+
+    private fun clean(suffix: String?) = suffix?.trim()?.lowercase()?.removePrefix(".")
+
     /** The MIME type to play a file of type [suffix] as it is on a Cast device, or null when it gets the MP3. */
-    fun typeOf(suffix: String?): String? = types[suffix?.trim()?.lowercase()?.removePrefix(".")]
+    fun typeOf(suffix: String?): String? = types[clean(suffix)]
+
+    /** Whether a file of type [suffix] is converted to FLAC for the TV in lossless quality. */
+    fun convertsToFlac(suffix: String?): Boolean = clean(suffix) in toFlac
+
+    /**
+     * What Siansa's TV screen plays instead of the MP3 for a song of type [suffix] whose original is at [streamUrl]
+     * (issue #114), or null when it plays the MP3: always with [CastQuality.Mp3]; in lossless, the original where every
+     * Cast device plays its type, else the server's FLAC conversion of it (Navidrome and other Subsonic servers only;
+     * Jellyfin and Emby addresses get the MP3, as before).
+     */
+    fun source(suffix: String?, quality: CastQuality, streamUrl: String): CastSource? {
+        if (quality != CastQuality.Lossless) return null
+        typeOf(suffix)?.let { return CastSource(streamUrl, it, converted = false) }
+        if (!convertsToFlac(suffix)) return null
+        return flacUrl(streamUrl)?.let { CastSource(it, FLAC, converted = true) }
+    }
+
+    /**
+     * A Subsonic stream address asking for the song as FLAC (format=flac, replacing format=raw), or null for any other
+     * address. No maxBitRate (FLAC has none) and no estimated length: an estimate would be wrong for FLAC, and the TV
+     * would wait at the song's end for data that never comes.
+     */
+    fun flacUrl(streamUrl: String): String? {
+        val path = streamUrl.substringBefore('?').substringBefore('#')
+        if (!path.endsWith("/rest/stream") && !path.endsWith("/rest/stream.view")) return null
+        val format = Regex("""([?&])format=[^&#]*""")
+        if (format.containsMatchIn(streamUrl)) return format.replace(streamUrl) { it.groupValues[1] + "format=flac" }
+        return streamUrl + (if ('?' in streamUrl) "&" else "?") + "format=flac"
+    }
+
+    const val FLAC = "audio/flac"
 }
+
+/** What the TV plays instead of the MP3: [url], of MIME [type]; [converted] when the server converts it (to FLAC). */
+data class CastSource(val url: String, val type: String, val converted: Boolean)
 
 /**
  * Turns queue songs into what the TV plays and back. The TV fetches each song from Navidrome
@@ -380,11 +424,13 @@ object CastOriginals {
 class CastItems(private val api: MusicSource) : MediaItemConverter {
     override fun toMediaQueueItem(mediaItem: MediaItem): MediaQueueItem {
         val song = mediaItem.toSong()
-        val originalType = CastOriginals.typeOf(song.suffix)
         val custom = JSONObject().put(SONG_ID, mediaItem.mediaId)
-        // Siansa's TV screen plays the original file instead where every Cast device can (FLAC and so on), and falls
-        // back to the MP3 below when it can't; other files only ever go as the MP3.
-        if (originalType != null) custom.put(ORIGINAL_URL, api.streamUrl(mediaItem.mediaId)).put(ORIGINAL_TYPE, originalType)
+        // In lossless quality Siansa's TV screen plays the original file instead where every Cast device can (FLAC and
+        // so on), or the server's FLAC conversion of it (ALAC…), and falls back to the MP3 below when it can't.
+        CastOriginals.source(song.suffix, CastSettings.quality.value, api.streamUrl(mediaItem.mediaId))?.let { source ->
+            custom.put(ORIGINAL_URL, source.url).put(ORIGINAL_TYPE, source.type)
+            if (source.converted) custom.put(CONVERTED, true)
+        }
         val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
             putString(MediaMetadata.KEY_TITLE, song.title)
             putString(MediaMetadata.KEY_ARTIST, song.artist)
@@ -421,6 +467,8 @@ class CastItems(private val api: MusicSource) : MediaItemConverter {
         const val SONG_ID = "siansaSongId"
         const val ORIGINAL_URL = "originalUrl"
         const val ORIGINAL_TYPE = "originalType"
+        /** The original is the server's conversion (to FLAC), so the TV screen can tell its failures apart. */
+        const val CONVERTED = "converted"
         const val TV_COVER = 800
     }
 }

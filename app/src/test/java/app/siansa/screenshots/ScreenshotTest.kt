@@ -38,6 +38,7 @@ import app.siansa.mix.RuleOp
 import app.siansa.playback.dlna.DlnaDevice
 import app.siansa.ui.ArrangeList
 import app.siansa.ui.BottomTabs
+import app.siansa.ui.ChromecastSettingsContent
 import app.siansa.ui.DlnaSettingsContent
 import app.siansa.ui.GradientTile
 import app.siansa.ui.HomeItem
@@ -283,6 +284,12 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     DlnaSettingsContent(
                         DlnaDevice("uuid:jbl", "JBL BAR 800MK2", null, "http://speaker/transport", null, formats = setOf("audio/mpeg", "audio/flac", "audio/wav")),
                     )
+                }
+            },
+            // The Chromecast settings behind the cog in Play on (issue #114): sound quality, lossless by default.
+            Scene("cast_chromecast_settings") {
+                Column(Modifier.padding(Space.Section)) {
+                    ChromecastSettingsContent()
                 }
             },
             // Menu rows (issue #778): no badge on shuffle, a word badge where one says something.

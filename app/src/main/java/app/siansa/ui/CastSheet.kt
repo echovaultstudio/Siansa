@@ -49,6 +49,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.mediarouter.media.MediaRouter
 import app.siansa.playback.Cast
 import app.siansa.playback.AudioOutput
+import app.siansa.playback.CastQuality
+import app.siansa.playback.CastSettings
 import app.siansa.playback.CastStatus
 import app.siansa.playback.OutputDevice
 import app.siansa.playback.dlna.Dlna
@@ -58,6 +60,7 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 
@@ -169,10 +172,13 @@ private fun CastSheet(onDismiss: () -> Unit) {
     val dlnaConnecting by Dlna.connecting.collectAsStateWithLifecycle()
     // The DLNA device whose settings are open (the cog beside it).
     var settingsOf by remember { mutableStateOf<DlnaDevice?>(null) }
+    // The Chromecast whose cog was tapped: its settings are shared by every Chromecast.
+    var castSettingsOf by remember { mutableStateOf<String?>(null) }
 
     // DLNA devices are searched for only while the sheet is open.
     DisposableEffect(Unit) {
         Dlna.startSearch(context)
+        CastSettings.load(context)
         onDispose { Dlna.stopSearch() }
     }
 
@@ -219,7 +225,13 @@ private fun CastSheet(onDismiss: () -> Unit) {
             }
             targets.forEach { target ->
                 val connecting = status.connecting && target.selected
-                TargetRow(target.icon, target.name, if (connecting) "Connecting…" else target.detail ?: "Chromecast", selected = target.selected && !connecting && dlna == null) {
+                TargetRow(
+                    target.icon,
+                    target.name,
+                    if (connecting) "Connecting…" else target.detail ?: "Chromecast",
+                    selected = target.selected && !connecting && dlna == null,
+                    onSettings = { castSettingsOf = target.name },
+                ) {
                     if (!target.selected) Cast.select(target.route)
                     onDismiss()
                 }
@@ -250,7 +262,7 @@ private fun CastSheet(onDismiss: () -> Unit) {
                 }
             }
             Text(
-                "TVs and speakers show up when they're on the same Wi-Fi as this phone: Chromecast and Google TV, and DLNA ones (most smart TVs, Sonos, AV receivers). They play straight from your server, as MP3 320 kbit/s. A DLNA one can get your original files instead: tap the cog beside it.",
+                "TVs and speakers show up when they're on the same Wi-Fi as this phone: Chromecast and Google TV, and DLNA ones (most smart TVs, Sonos, AV receivers). They play straight from your server. Tap the cog beside one for its sound quality.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Space.Section, vertical = Space.Medium),
@@ -258,6 +270,53 @@ private fun CastSheet(onDismiss: () -> Unit) {
         }
     }
     settingsOf?.let { device -> DlnaDeviceSettings(device) { settingsOf = null } }
+    castSettingsOf?.let { name -> ChromecastSettings(name) { castSettingsOf = null } }
+}
+
+/** The Chromecast settings (the cog beside a Chromecast in Play on, issue #114), shared by every Chromecast. */
+@Composable
+private fun ChromecastSettings(name: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        text = { ChromecastSettingsContent() },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+    )
+}
+
+/** What the Chromecast settings show, in their own function so the screenshot tests can draw them. */
+@Composable
+internal fun ChromecastSettingsContent() {
+    val quality by CastSettings.quality.collectAsStateWithLifecycle()
+    Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+        Text("Sound quality", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        CastQuality.entries.forEach { option ->
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(Space.Small))
+                    .clickable { CastSettings.setQuality(option) }.testTag("castQuality-${option.key}"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Space.Small),
+            ) {
+                RadioButton(selected = quality == option, onClick = { CastSettings.setQuality(option) })
+                Column(Modifier.weight(1f)) {
+                    Text(option.label, style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        when (option) {
+                            CastQuality.Lossless -> "Your music as it is. Files the TV can't play, such as Apple Lossless, are turned into FLAC by your server."
+                            CastQuality.Mp3 -> "Everything as MP3. Uses less Wi-Fi, and works with any server."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        Text(
+            "For every Chromecast. Applies to music you start playing after this.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 /**
