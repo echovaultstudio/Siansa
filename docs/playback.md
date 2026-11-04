@@ -99,7 +99,9 @@ blend them the way a DJ mixes:
 
 In DJ radio (when beat-matched blends apply there), a blend where one end has no beat at all (a beatless
 intro, an ambient outro) runs the whole crossfade length: there's nothing to clash with, so the next song comes in
-under the old one as a DJ would, fading in over the first half.
+under the old one as a DJ would, fading in over the first half. A song going out without a beat only gets that
+when it winds down (quiet for its last 6 seconds or more); one that's still loud to its end, and two beatless songs
+that are both loud where they meet, get a short blend of about 6 seconds, so the song isn't cut short.
 
 Whatever the setting, two songs that both keep a beat but can't be matched (tempos more than 8 % apart, counting
 double and half time as the same; a beat that isn't steady; a stream that can't jump to a point) get a short blend,

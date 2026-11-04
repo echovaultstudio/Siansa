@@ -56,6 +56,23 @@ object Crossfade {
     /** The level (dB below the song's own loudness) that counts as "quiet" for the ramps. */
     const val QUIET_DB = -18
 
+    /** A song's end or start that stays quiet at least this long counts as a quiet one for a long DJ blend. */
+    const val QUIET_END_MS = 6_000L
+
+    /** The blend when a beatless end isn't a quiet one: long enough to be a blend, short enough not to cut the song. */
+    const val BEATLESS_LOUD_MS = 6_000L
+
+    /**
+     * Whether a DJ blend with a beatless end runs the whole crossfade length: a beatless intro slides in under the
+     * old song, as a DJ would; but a beatless song going out only gets that when it winds down (a quiet tail of
+     * [QUIET_END_MS] or more), and two beatless songs only when one of them is quiet there.
+     */
+    fun beatlessRunsLong(outBeatless: Boolean, inBeatless: Boolean, tailMs: Long, headMs: Long): Boolean = when {
+        inBeatless && !outBeatless -> true
+        outBeatless && !inBeatless -> tailMs >= QUIET_END_MS
+        else -> tailMs >= QUIET_END_MS || headMs >= QUIET_END_MS
+    }
+
     /** Shorter overlaps than this just play the songs back to back. */
     const val MIN_OVERLAP_MS = 300L
 
@@ -196,12 +213,19 @@ object Crossfade {
                 overlap = BeatMatch.CLASH_MS
                 why += " · beats would clash, so a short blend"
             } else if (beatMatch && !rhythmic && !mixed && overlap < maxMs && (BeatMatch.beatless(outro) || BeatMatch.beatless(intro))) {
-                // A DJ blend where one end has no beat at all (0.52.0-dev: a beatless intro under a beat-driven
-                // outro got 3.3 s with 30 s set): nothing to clash with, so it runs the whole crossfade length, as a
-                // DJ brings a quiet intro in under the old song. The next song fades in over the first half of it.
-                overlap = maxMs
-                why += " · DJ: one end has no beat, nothing to clash, so the whole crossfade length"
-                return@run FadePlan(overlap, maxOf(head, overlap / 2), why, cut)
+                if (beatlessRunsLong(BeatMatch.beatless(outro), BeatMatch.beatless(intro), tail, head)) {
+                    // A DJ blend where one end has no beat at all (0.52.0-dev: a beatless intro under a beat-driven
+                    // outro got 3.3 s with 30 s set): nothing to clash with, so it runs the whole crossfade length, as
+                    // a DJ brings a quiet intro in under the old song. The next song fades in over the first half of it.
+                    overlap = maxMs
+                    why += " · DJ: one end has no beat, nothing to clash, so the whole crossfade length"
+                    return@run FadePlan(overlap, maxOf(head, overlap / 2), why, cut)
+                }
+                // The beatless end is the old song's, still going full on to its end (0.52.0-dev: a 30 s blend began
+                // 32 s before the end of a loud song without a steady beat, and the next song's beat ran over it;
+                // two folk songs overlapped for 15 s): no clash, but a long blend cuts the song short. A short one.
+                overlap = overlap.coerceAtLeast(BEATLESS_LOUD_MS).coerceAtMost(maxMs)
+                why += " · DJ: no beat to clash, but the song going out is still going, so a short blend"
             } else if (beatMatch && !rhythmic && !mixed && overlap > BeatMatch.CLASH_MS && BeatMatch.someBeat(outro) && BeatMatch.someBeat(intro)) {
                 // Both ends have some beat, one just short of beat-driven (0.52.0-dev: a house remix's outro read
                 // 0.46 into Cubicolor's beat ran 30 s out of step): a long blend would clash, so a short one.

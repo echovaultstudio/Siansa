@@ -224,9 +224,36 @@ class CrossfadePlanTest {
         val plan = Crossfade.plan(CrossfadeMode.SMART, 30_000, a1, b1, minutes4, minutes4, current, next, beatMatch = true)!!
         assertEquals(BeatMatch.CLASH_MS, plan.overlapMs)
         assertTrue(plan.why, plan.why.contains("both ends have some beat"))
-        // Truly beatless (0.10): the whole length.
-        val ambient = current.copy(outro = out.copy(rhythm = 0.10f))
+        // Truly beatless (0.10) and winding down: the whole length.
+        val ambient = current.copy(outro = out.copy(rhythm = 0.10f), endRamp = listOf(RampPoint(-18, 8_000)))
         assertEquals(30_000L, Crossfade.plan(CrossfadeMode.SMART, 30_000, a1, b1, minutes4, minutes4, ambient, next, beatMatch = true)!!.overlapMs)
+    }
+
+    @Test fun aLoudBeatlessEndingGetsAShortBlendNotTheWholeLength() {
+        // 0.52.0-dev, morning drive: a song with no steady beat (0.10) but loud to its end (1.9 s tail) into a
+        // beat-driven intro got the whole 30 s, starting at 3:00 of 3:32, the next song's beat over the old song.
+        val out = BeatEnd(bpm = 161.1, beatMs = 200_000.0, barMs = null, rhythm = 0.10f, steady = 0.0f)
+        val inn = BeatEnd(bpm = 116.0, beatMs = 500.0, barMs = 500.0, rhythm = 0.65f, steady = 0.46f)
+        val current = TrackProfile("a1", -10.0, listOf(RampPoint(-18, 0)), listOf(RampPoint(-18, 1_900)), outro = out)
+        val next = TrackProfile("b1", -10.0, listOf(RampPoint(-18, 1_500)), emptyList(), intro = inn)
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 30_000, a1, b1, minutes4, minutes4, current, next, beatMatch = true)!!
+        assertEquals(Crossfade.BEATLESS_LOUD_MS, plan.overlapMs)
+        assertTrue(plan.why, plan.why.contains("still going, so a short blend"))
+        // Two beatless folk songs, loud at both ends (0.4 s each), got 15 s over each other: short too.
+        val folkOut = current.copy(outro = out.copy(rhythm = 0.19f), endRamp = listOf(RampPoint(-18, 400)))
+        val folkIn = next.copy(intro = inn.copy(rhythm = 0.23f, steady = 0.0f), startRamp = listOf(RampPoint(-18, 400)))
+        assertEquals(Crossfade.BEATLESS_LOUD_MS, Crossfade.plan(CrossfadeMode.SMART, 15_000, a1, b1, minutes4, minutes4, folkOut, folkIn, beatMatch = true)!!.overlapMs)
+    }
+
+    @Test fun whichBeatlessBlendsRunTheWholeLength() {
+        // A beatless intro under a song that has a beat: always.
+        assertTrue(Crossfade.beatlessRunsLong(outBeatless = false, inBeatless = true, tailMs = 0, headMs = 0))
+        // A beatless song going out: only when it winds down.
+        assertFalse(Crossfade.beatlessRunsLong(outBeatless = true, inBeatless = false, tailMs = 1_900, headMs = 1_500))
+        assertTrue(Crossfade.beatlessRunsLong(outBeatless = true, inBeatless = false, tailMs = 6_000, headMs = 0))
+        // Both beatless: when one of them is quiet there.
+        assertFalse(Crossfade.beatlessRunsLong(outBeatless = true, inBeatless = true, tailMs = 400, headMs = 400))
+        assertTrue(Crossfade.beatlessRunsLong(outBeatless = true, inBeatless = true, tailMs = 400, headMs = 7_000))
     }
 
     @Test fun aHardEndingIntoAHardHitPlaysBackToBack() {
