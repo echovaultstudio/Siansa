@@ -66,6 +66,8 @@ import java.io.InterruptedIOException
 import java.util.Collections
 
 private const val FALLBACK_KBPS = 320
+/** How long music stays on a TV that Cast lost touch with, waiting for it to come back (issue #114). */
+private const val CAST_RESUME_WAIT_MS = 30_000L
 /** How often a server with a playback timeline (Emby) hears where the playing song is (issue #113). */
 private const val TIMELINE_MS = 30_000L
 
@@ -81,7 +83,11 @@ class PlaybackService : MediaLibraryService() {
     private lateinit var exo: ExoPlayer
     /** [exo] as the rest of the app sees it: converted songs seek on Navidrome (issue #162). */
     private lateinit var phone: ServerSeekPlayer
-    private var castPlayer: RemoteCastPlayer? = null
+    private var castRemote: RemoteCastPlayer? = null
+    /** [castRemote] as the app sees it: songs Cast leaves blank named from the queue sent (issue #114). */
+    private var castPlayer: CastQueuePlayer? = null
+    /** The phone lost touch with the TV for a moment (Cast suspended the session); it may come back (issue #114). */
+    private var castSuspended = false
     private var dlnaPlayer: DlnaPlayer? = null
     /** Follows the Wi-Fi while music plays on a DLNA device, to bring it back the moment the phone leaves (issue #624). */
     private var lanWatch: LanWatch? = null
@@ -199,31 +205,43 @@ class PlaybackService : MediaLibraryService() {
         Cast.whenReady(this) { cast ->
             if (session == null) return@whenReady
             val remote = RemoteCastPlayer.Builder(this).setMediaItemConverter(CastItems(graph.source)).build()
-            castPlayer = remote
+            val tv = CastQueuePlayer(remote)
+            castRemote = remote
+            castPlayer = tv
             remote.setSessionAvailabilityListener(object : SessionAvailabilityListener {
                 override fun onCastSessionAvailable() {
-                    moveTo(remote)
+                    handler.removeCallbacks(castGaveUp)
+                    if (session?.player === tv) return // back in touch after a moment away: the music never left the TV
+                    moveTo(tv)
                     // Only one place plays at a time: a TV picked through DLNA lets go.
                     Dlna.select(null)
                 }
                 override fun onCastSessionUnavailable() {
-                    if (session?.player === remote) moveTo(phone)
+                    // Media3 says this for a session that ended and for one only suspended; which it was, the
+                    // session listener below hears just after. Decide once it has.
+                    handler.post(castGone)
                 }
             })
             cast.sessionManager.addSessionManagerListener(object : SessionManagerListener<CastSession> {
                 override fun onSessionEnding(castSession: CastSession) {
-                    if (session?.player === remote) castSaved = spotOf(remote)
+                    if (session?.player === tv) castSaved = spotOf(tv)
                 }
                 override fun onSessionStarting(castSession: CastSession) { castSaved = null }
                 override fun onSessionStarted(castSession: CastSession, sessionId: String) {}
                 override fun onSessionStartFailed(castSession: CastSession, error: Int) {}
-                override fun onSessionEnded(castSession: CastSession, error: Int) {}
+                override fun onSessionEnded(castSession: CastSession, error: Int) { castEnded() }
                 override fun onSessionResuming(castSession: CastSession, sessionId: String) {}
-                override fun onSessionResumed(castSession: CastSession, wasSuspended: Boolean) {}
-                override fun onSessionResumeFailed(castSession: CastSession, error: Int) {}
-                override fun onSessionSuspended(castSession: CastSession, reason: Int) {}
+                override fun onSessionResumed(castSession: CastSession, wasSuspended: Boolean) {
+                    castSuspended = false
+                    handler.removeCallbacks(castGaveUp)
+                }
+                override fun onSessionResumeFailed(castSession: CastSession, error: Int) { castEnded() }
+                override fun onSessionSuspended(castSession: CastSession, reason: Int) {
+                    castSuspended = true
+                    if (session?.player === tv) castSaved = spotOf(tv)
+                }
             }, CastSession::class.java)
-            if (remote.isCastSessionAvailable) moveTo(remote)
+            if (remote.isCastSessionAvailable) moveTo(tv)
         }
 
         // DLNA (TVs and speakers without Chromecast): follows the device picked in the app.
@@ -484,6 +502,40 @@ class PlaybackService : MediaLibraryService() {
     }
 
     /**
+     * Cast let go of the TV. A session that's only suspended (the phone's network dropped for a moment, as when a VPN
+     * reconnects) usually comes back within seconds with the music still playing there, so the music stays with the
+     * TV for [CAST_RESUME_WAIT_MS] instead of moving to the phone and straight back, which loaded the queue on the TV
+     * again (0.52.0-dev). An ended session brings it back to the phone.
+     */
+    private val castGone = Runnable {
+        val tv = castPlayer ?: return@Runnable
+        if (session?.player !== tv) return@Runnable
+        if (castSuspended) {
+            AppLog.i("Cast", "Lost touch with the TV for a moment; the music stays there while Cast reconnects")
+            handler.removeCallbacks(castGaveUp)
+            handler.postDelayed(castGaveUp, CAST_RESUME_WAIT_MS)
+        } else {
+            moveTo(phone)
+        }
+    }
+
+    /** The TV didn't come back after a moment away: the music comes back to the phone. */
+    private val castGaveUp = Runnable {
+        castSuspended = false
+        val tv = castPlayer ?: return@Runnable
+        if (session?.player !== tv || castRemote?.isCastSessionAvailable == true) return@Runnable
+        AppLog.w("Cast", "The TV didn't come back within ${CAST_RESUME_WAIT_MS / 1000}s")
+        moveTo(phone)
+    }
+
+    /** The Cast session ended (also after being suspended, when Media3 says nothing more): back to the phone. */
+    private fun castEnded() {
+        castSuspended = false
+        handler.removeCallbacks(castGaveUp)
+        if (castPlayer != null && session?.player === castPlayer) moveTo(phone)
+    }
+
+    /**
      * Moves the queue, song and position between the phone and a Cast device. Music moving to a TV
      * keeps playing; music coming back to the phone waits paused, rather than suddenly playing out loud.
      */
@@ -500,7 +552,10 @@ class PlaybackService : MediaLibraryService() {
         }
         if (toCast) StopCasting.requested = false
         castSaved = null
-        val (items, index, position) = spot
+        // A song with no id can't play anywhere: it would only be "Now playing" nothing (issue #114).
+        val named = CastHandBack.withoutNameless(spot) { it.mediaId }
+        if (named.items.size != spot.items.size) AppLog.w("Cast", "Left out ${spot.items.size - named.items.size} songs nobody could name")
+        val (items, index, position) = named
         val play = toCast && from.playWhenReady
         AppLog.i(
             "Cast",
@@ -546,6 +601,9 @@ class PlaybackService : MediaLibraryService() {
         if (stopped) AppLog.i("Cast", "Stopped with hold to stop: nothing comes back to the phone")
         if (picked !== live) AppLog.w("Cast", "The TV forgot the queue while stopping; using the one saved as casting ended")
         val spot = CastHandBack.withoutNameless(picked) { it.mediaId }
+        if (spot.items.size != picked.items.size) {
+            AppLog.w("Cast", "Left out ${picked.items.size - spot.items.size} of the TV's ${picked.items.size} songs: neither the TV nor the phone's copy could name them")
+        }
         return spot.copy(items = spot.items.map(::playableOnPhone))
     }
 
@@ -643,7 +701,9 @@ class PlaybackService : MediaLibraryService() {
         events?.stopWatches()
         precacheWriter?.cancel()
         events?.finishCurrent()
-        castPlayer?.setSessionAvailabilityListener(null)
+        handler.removeCallbacks(castGone)
+        handler.removeCallbacks(castGaveUp)
+        castRemote?.setSessionAvailabilityListener(null)
         castPlayer?.release()
         lanWatch?.stop()
         lanWatch = null
