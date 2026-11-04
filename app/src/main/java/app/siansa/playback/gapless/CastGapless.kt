@@ -237,7 +237,7 @@ class CastGapless(
      * the other format next ([StreamTries]), and after that the queue, so nobody sits in silence. (0.52.0-dev: the
      * stream was asked for again every 6 s, for ever, without a sound.)
      */
-    private val startCheck = Runnable {
+    private val startCheck: Runnable = Runnable {
         if (!active) return@Runnable
         val c = clock ?: return@Runnable
         if (c.started()) return@Runnable
@@ -249,7 +249,7 @@ class CastGapless(
         noProgress("didn't get past 0 s of stream $stream within ${START_WAIT_MS / 1000} s")
     }
 
-    private val startCheckAgain = Runnable { main.post(startCheck) }
+    private val startCheckAgain: Runnable = Runnable { main.post(startCheck) }
 
     /** Stream [stream] went nowhere (or failed) for [what]: try the other format, or give up for the queue. */
     private fun noProgress(what: String) {
