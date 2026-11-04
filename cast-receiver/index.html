@@ -18,55 +18,58 @@
     font-family: "Google Sans", Roboto, "Helvetica Neue", Arial, sans-serif; }
   .screen { position: absolute; inset: 0; transition: opacity .6s ease; }
   .hidden { opacity: 0; pointer-events: none; }
+  /* Sizes are in vh, so the page looks the same on TVs that draw it at 1280x720 and at 1920x1080. Everything stays
+     inside the TV's safe area (5% at each edge), where some TVs cut the picture. */
 
   /* Splash: shown when the TV connects and while nothing is loaded. */
-  /* Sizes are in vh, so the page looks the same on TVs that draw it at 1280x720 and at 1920x1080. */
-  #splash { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.6vh;
-    background: var(--page); }
+  #splash { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.6vh; }
   .icon { width: 30vh; height: 30vh; }
   .logo { font-size: 6.7vh; font-weight: 750; letter-spacing: -.17vh; }
   /* The wordmark: Siansa with its S in the amber of the icon's middle bar, as on siansa.app. */
-  .logo .s { background: linear-gradient(180deg, var(--mid-top), var(--mid-bottom)); -webkit-background-clip: text;
+  .s { background: linear-gradient(180deg, var(--mid-top), var(--mid-bottom)); -webkit-background-clip: text;
     background-clip: text; color: transparent; }
   #splash-note { font-size: 2.8vh; color: var(--muted); }
 
-  /* Now playing */
-  #backdrop { position: absolute; inset: -6vh; background-size: cover; background-position: center;
-    filter: blur(6vh) brightness(.35) saturate(1.3); transition: background-image .8s ease; }
-  /* Kept inside the TV's safe area (5% at each edge), where some TVs cut the picture. */
-  #player { display: flex; align-items: center; gap: 7.4vh; padding: 5vh 11vh; }
-  #cover { position: relative; width: 52vh; height: 52vh; flex: none; border-radius: 2.2vh;
-    background: var(--raised) center/cover; box-shadow: 0 2.8vh 7.4vh rgba(0,0,0,.6); }
+  /* Now playing: the cover, the song, a thin line for where it is. No buttons: the remote's left and right go to
+     the previous and next song, OK plays and pauses. */
+  #backdrop { position: absolute; inset: -8vh; background-size: cover; background-position: center;
+    filter: blur(8vh) brightness(.28) saturate(1.2); transition: background-image .8s ease; }
+  #shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.15), rgba(0,0,0,.55)); }
+  #player { display: flex; align-items: center; gap: 8vh; padding: 0 11vh; }
+  #cover { position: relative; width: 58vh; height: 58vh; flex: none; border-radius: 1.6vh; overflow: hidden;
+    background: var(--raised) center/cover; box-shadow: 0 3vh 8vh rgba(0,0,0,.55); }
   #cover.none { background-image: none; }
   #info { position: relative; flex: 1; min-width: 0; }
-  #device { font-size: 2vh; letter-spacing: .3vh; color: var(--amber); text-transform: uppercase; margin-bottom: 2.2vh; }
-  #title { font-size: 6.7vh; font-weight: 700; line-height: 1.1; overflow: hidden; display: -webkit-box;
-    -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
-  #artist { font-size: 3.5vh; margin-top: 1.7vh; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #album { font-size: 2.8vh; margin-top: .7vh; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #bar { margin-top: 5.2vh; height: .74vh; border-radius: .37vh; background: rgba(255,255,255,.18); overflow: hidden; }
-  #fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--mid-bottom), var(--amber)); }
-  #times { display: flex; justify-content: space-between; font-size: 2.2vh; color: var(--muted); margin-top: 1.1vh; }
+  #title { font-size: 7vh; font-weight: 700; line-height: 1.08; letter-spacing: -.12vh; overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+  #artist { font-size: 3.6vh; margin-top: 2vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #album { font-size: 2.6vh; margin-top: .8vh; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #bar { margin-top: 6vh; height: .5vh; border-radius: .25vh; background: rgba(255,255,255,.16); overflow: hidden; }
+  #fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--mid-bottom), var(--amber)); transition: width .5s linear; }
+  #times { display: flex; justify-content: space-between; font-size: 2vh; color: var(--muted); margin-top: 1.2vh;
+    font-variant-numeric: tabular-nums; }
+  /* Paused: the cover darkens under the pause sign (an overlay, so the sign itself stays bright). */
+  #cover::after { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,.45); opacity: 0; transition: opacity .4s ease; }
+  .paused #cover::after { opacity: 1; }
   .paused #fill { background: var(--frost); }
-  .paused #cover { filter: brightness(.7); }
 
-  #controls { display: flex; align-items: center; gap: 3.7vh; margin-top: 3.7vh; }
-  .btn { width: 8.9vh; height: 8.9vh; border-radius: 50%; border: .28vh solid transparent; background: rgba(255,255,255,.1);
-    display: flex; align-items: center; justify-content: center; transition: transform .15s, border-color .15s, background .15s; }
-  .btn svg { width: 4.4vh; height: 4.4vh; fill: var(--text); }
-  .btn.main { width: 11.9vh; height: 11.9vh; background: linear-gradient(180deg, var(--mid-top), var(--mid-bottom)); }
-  .btn.main svg { width: 5.9vh; height: 5.9vh; fill: #2A1700; }
-  .btn.focus { border-color: var(--text); transform: scale(1.12); }
-  #hint { font-size: 2vh; color: var(--muted); margin-top: 2.6vh; }
+  /* What the remote just did (pause, play, previous, next), shown briefly over the cover; paused stays. */
+  #sign { position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; }
+  #sign svg { width: 13vh; height: 13vh; fill: var(--text); filter: drop-shadow(0 .6vh 2vh rgba(0,0,0,.6)); }
+  #sign { opacity: 0; transition: opacity .3s ease; }
+  #sign.on { opacity: 1; }
   #spinner { position: absolute; right: 2.2vh; bottom: 2.2vh; width: 4.4vh; height: 4.4vh; border-radius: 50%;
     border: .46vh solid rgba(255,255,255,.2); border-top-color: var(--amber); animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Siansa in the corner, quietly. */
+  #brand { position: absolute; right: 7vh; bottom: 5vh; display: flex; align-items: center; gap: 1vh; opacity: .75; }
+  #brand .icon { width: 6.4vh; height: 6.4vh; }
+  #brand .logo { font-size: 3vh; }
 </style>
 </head>
 <body>
 <div id="splash" class="screen">
-  <!-- Siansa's icon (docs/brand/siansa-mark.svg, as the launcher icon): sound bars and their reflection between the
-       double half circles, on the page's black. -->
   <svg class="icon" viewBox="18 18 72 72" aria-hidden="true">
     <defs>
       <linearGradient id="arcIn" x1="0" y1="36.98" x2="0" y2="71.02" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#AFC2D3" stop-opacity=".303"/><stop offset=".5" stop-color="#AFC2D3" stop-opacity=".55"/><stop offset="1" stop-color="#AFC2D3" stop-opacity=".303"/></linearGradient>
@@ -97,31 +100,50 @@
 
 <div id="now" class="screen hidden">
   <div id="backdrop"></div>
+  <div id="shade"></div>
   <div id="player" class="screen">
-    <div id="cover"><div id="spinner" class="hidden"></div></div>
+    <div id="cover"><div id="sign"><svg id="sign-icon" viewBox="0 0 24 24"></svg></div><div id="spinner" class="hidden"></div></div>
     <div id="info">
-      <div id="device">Playing on this TV</div>
       <div id="title"></div>
       <div id="artist"></div>
       <div id="album"></div>
       <div id="bar"><div id="fill"></div></div>
       <div id="times"><span id="pos">0:00</span><span id="dur">0:00</span></div>
-      <div id="controls">
-        <div class="btn" data-act="prev"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></div>
-        <div class="btn main focus" data-act="toggle"><svg id="toggle-icon" viewBox="0 0 24 24"></svg></div>
-        <div class="btn" data-act="next"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></div>
-      </div>
-      <div id="hint">Use the arrows and OK on your remote, or control it from your phone.</div>
     </div>
   </div>
+  <div id="brand">  <svg class="icon" viewBox="18 18 72 72" aria-hidden="true">
+    <defs>
+      <linearGradient id="arcIn2" x1="0" y1="36.98" x2="0" y2="71.02" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#AFC2D3" stop-opacity=".303"/><stop offset=".5" stop-color="#AFC2D3" stop-opacity=".55"/><stop offset="1" stop-color="#AFC2D3" stop-opacity=".303"/></linearGradient>
+      <linearGradient id="arcOut2" x1="0" y1="31.06" x2="0" y2="76.94" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#AFC2D3" stop-opacity=".132"/><stop offset=".5" stop-color="#AFC2D3" stop-opacity=".24"/><stop offset="1" stop-color="#AFC2D3" stop-opacity=".132"/></linearGradient>
+      <linearGradient id="reflectFrost2" x1="0" y1="62.5" x2="0" y2="76.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#9DB4C8" stop-opacity=".46"/><stop offset=".35" stop-color="#B5C7D6" stop-opacity=".207"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+      <linearGradient id="reflectAmber2" x1="0" y1="62.5" x2="0" y2="76.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#E8A55A" stop-opacity=".46"/><stop offset=".35" stop-color="#F0BC80" stop-opacity=".207"/><stop offset="1" stop-color="#FFE7C4" stop-opacity="0"/></linearGradient>
+      <linearGradient id="barFrost2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#9DB4C8"/></linearGradient>
+      <linearGradient id="barAmber2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE7C4"/><stop offset="1" stop-color="#E8A55A"/></linearGradient>
+    </defs>
+    <path d="M38.46,36.98A24.42,24.42 0 0,0 38.46,71.02" fill="none" stroke="url(#arcIn2)" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M69.54,36.98A24.42,24.42 0 0,1 69.54,71.02" fill="none" stroke="url(#arcIn2)" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M32.54,31.06A32.56,32.56 0 0,0 32.54,76.94" fill="none" stroke="url(#arcOut2)" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M75.46,31.06A32.56,32.56 0 0,1 75.46,76.94" fill="none" stroke="url(#arcOut2)" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M40,69.5v-5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#reflectFrost2)"/>
+    <path d="M46,74.5v-10a2,2 0 0,1 4,0v10a2,2 0 0,1 -4,0z" fill="url(#reflectFrost2)"/>
+    <path d="M52,74.5v-10a2,2 0 0,1 4,0v10a2,2 0 0,1 -4,0z" fill="url(#reflectAmber2)"/>
+    <path d="M58,74.5v-10a2,2 0 0,1 4,0v10a2,2 0 0,1 -4,0z" fill="url(#reflectFrost2)"/>
+    <path d="M64,69.5v-5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#reflectFrost2)"/>
+    <path d="M40,54.5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#barFrost2)"/>
+    <path d="M46,47.5a2,2 0 0,1 4,0v12a2,2 0 0,1 -4,0z" fill="url(#barFrost2)"/>
+    <path d="M52,39.5a2,2 0 0,1 4,0v20a2,2 0 0,1 -4,0z" fill="url(#barAmber2)"/>
+    <path d="M58,47.5a2,2 0 0,1 4,0v12a2,2 0 0,1 -4,0z" fill="url(#barFrost2)"/>
+    <path d="M64,54.5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#barFrost2)"/>
+  </svg><div class="logo"><span class="s">S</span>iansa</div></div>
 </div>
-
-<!-- CAF plays through this element; the page draws its own controls. -->
 <audio id="audio"></audio>
-
 <script>
-const PLAY = '<path d="M8 5v14l11-7z"/>';
-const PAUSE = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+const ICONS = {
+  play: '<path d="M8 5v14l11-7z"/>',
+  pause: '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>',
+  next: '<path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>',
+  prev: '<path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>',
+};
 const $ = id => document.getElementById(id);
 
 const context = cast.framework.CastReceiverContext.getInstance();
@@ -148,6 +170,17 @@ function note() {
   return 'Connected. Pick a song on your phone.';
 }
 
+// A sign over the cover: what the remote just did. Paused keeps its sign; the others fade after a moment.
+let signTimer = 0;
+function sign(name, stay) {
+  clearTimeout(signTimer);
+  $('sign-icon').innerHTML = ICONS[name];
+  $('sign').classList.add('on');
+  if (!stay) signTimer = setTimeout(() => {
+    if ($('now').classList.contains('paused')) sign('pause', true); else $('sign').classList.remove('on');
+  }, 900);
+}
+
 function render() {
   const media = player.getMediaInformation();
   const state = player.getPlayerState();
@@ -157,8 +190,10 @@ function render() {
   failed = false;
   showNow(true);
   const paused = state === S.PAUSED;
+  const was = $('now').classList.contains('paused');
   $('now').classList.toggle('paused', paused);
-  $('device').textContent = paused ? 'Paused' : state === S.BUFFERING ? 'Loading' : 'Playing on this TV';
+  if (paused && !was) sign('pause', true);
+  if (!paused && was) sign('play');
   const m = media.metadata || {};
   $('title').textContent = m.title || '';
   $('artist').textContent = m.artist || m.albumArtist || '';
@@ -171,7 +206,6 @@ function render() {
     $('cover').style.backgroundImage = bg;
     $('backdrop').style.backgroundImage = bg;
   }
-  $('toggle-icon').innerHTML = state === S.PLAYING || state === S.BUFFERING ? PAUSE : PLAY;
   $('spinner').classList.toggle('hidden', state !== S.BUFFERING);
 }
 
@@ -188,43 +222,41 @@ const E = cast.framework.events.EventType;
   .forEach(t => player.addEventListener(t, render));
 setInterval(tick, 500);
 
-// Remote control: left/right move between buttons, OK presses the focused one,
-// media keys (play/pause, next, previous) work directly.
-const buttons = [...document.querySelectorAll('.btn')];
-let focus = 1;
-function setFocus(i) {
-  focus = Math.max(0, Math.min(buttons.length - 1, i));
-  buttons.forEach((b, j) => b.classList.toggle('focus', j === focus));
-}
+// The remote: left = previous song, right = next song, OK = play/pause, and the media keys as they say.
+// Google TV also turns left and right into "seek a few seconds" commands of its own (relative seeks). Those are
+// taken as previous and next too, and one press that arrives both ways counts once.
+let lastAct = 0;
+let arrowAt = 0;
 function jump(by) {
   const req = new cast.framework.messages.QueueUpdateRequestData();
   req.jump = by;
   player.sendLocalMediaRequest(req);
 }
 function act(name) {
+  const now = Date.now();
+  if (now - lastAct < 600) return;
+  lastAct = now;
   const S = cast.framework.messages.PlayerState;
-  if (name === 'toggle') player.getPlayerState() === S.PAUSED ? player.play() : player.pause();
-  if (name === 'next') jump(1);
-  if (name === 'prev') player.getCurrentTimeSec() > 5 ? player.seek(0) : jump(-1);
+  if (name === 'toggle') name = player.getPlayerState() === S.PAUSED ? 'play' : 'pause';
+  if (name === 'play') player.play();
+  if (name === 'pause') player.pause();
+  if (name === 'next') { sign('next'); jump(1); }
+  // Previous goes back to the start of the song after its first 5 seconds, else to the song before.
+  if (name === 'prev') { sign('prev'); player.getCurrentTimeSec() > 5 ? player.seek(0) : jump(-1); }
 }
-// On Google TV the remote's play/pause, next and previous reach the page through the TV's media controls, which
-// Cast turns into the same commands the phone sends (see supportedCommands below). Keys the TV hands the page
-// itself are handled here; older TVs give only key codes.
 const KEYS = { 37: 'ArrowLeft', 39: 'ArrowRight', 13: 'Enter', 179: 'MediaPlayPause', 176: 'MediaTrackNext',
   177: 'MediaTrackPrevious', 415: 'MediaPlay', 19: 'MediaPause', 417: 'MediaTrackNext', 412: 'MediaTrackPrevious' };
 document.addEventListener('keydown', e => {
   if ($('now').classList.contains('hidden')) return;
   const key = e.key && e.key !== 'Unidentified' ? e.key : KEYS[e.keyCode];
-  const S = cast.framework.messages.PlayerState;
   switch (key) {
-    case 'ArrowLeft': setFocus(focus - 1); break;
-    case 'ArrowRight': setFocus(focus + 1); break;
-    case 'Enter': case ' ': act(buttons[focus].dataset.act); break;
-    case 'MediaPlayPause': act('toggle'); break;
-    case 'MediaPlay': if (player.getPlayerState() === S.PAUSED) player.play(); break;
-    case 'MediaPause': player.pause(); break;
-    case 'MediaTrackNext': act('next'); break;
-    case 'MediaTrackPrevious': act('prev'); break;
+    case 'ArrowLeft': arrowAt = Date.now(); act('prev'); break;
+    case 'ArrowRight': arrowAt = Date.now(); act('next'); break;
+    case 'MediaTrackPrevious': case 'MediaRewind': act('prev'); break;
+    case 'MediaTrackNext': case 'MediaFastForward': act('next'); break;
+    case 'Enter': case ' ': case 'MediaPlayPause': act('toggle'); break;
+    case 'MediaPlay': act('play'); break;
+    case 'MediaPause': act('pause'); break;
     default: return;
   }
   e.preventDefault();
@@ -287,6 +319,16 @@ player.addEventListener(E.ERROR, () => {
   req.queueData.startIndex = Math.max(0, queue.getCurrentItemIndex());
   req.media = req.queueData.items[req.queueData.startIndex].media;
   player.load(req).finally(() => { retrying = false; });
+});
+
+// A relative seek ("a few seconds back or forward") comes from the TV's own remote handling, never from Siansa,
+// which always seeks to a point in the song: take it as previous or next instead.
+// A seek that arrives together with a left or right press is the TV's too, so it's dropped.
+player.setMessageInterceptor(M.MessageType.SEEK, req => {
+  const relative = typeof req.relativeTime === 'number' && typeof req.currentTime !== 'number';
+  if (relative) { act(req.relativeTime < 0 ? 'prev' : 'next'); return null; }
+  if (Date.now() - arrowAt < 1500) return null;
+  return req;
 });
 
 // Previous and next work on the queue the phone sends (the whole queue, with the next song loaded ahead).
