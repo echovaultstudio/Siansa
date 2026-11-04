@@ -368,7 +368,7 @@ fun Cover(
 
 /**
  * Loads the covers just beyond what's on screen into memory while a list scrolls, so they're ready
- * (drawn in the same frame) when they come into view, as Symfonium and Glide-based apps do.
+ * (drawn in the same frame) when they come into view, as Glide-based apps do.
  */
 @Composable
 fun PrefetchCovers(firstVisible: Int, visibleCount: Int, covers: List<String?>, size: Int, ahead: Int = 24) {

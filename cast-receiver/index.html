@@ -418,36 +418,72 @@ document.addEventListener('keyup', e => {
   if (key === 'MediaRewind' || key === 'MediaFastForward') { windStart = 0; windDone(); windTo = null; }
 });
 
-// Lossless quality: Siansa sends an MP3 320 stream, plus in customData the address and type of the original file for
-// files every Cast device plays (FLAC, MP3, Ogg, WAV, AAC), or of the server's FLAC conversion for lossless files
-// it can't (ALAC, .m4a, Monkey's Audio…; marked "converted"). The TV plays that. If it can't, the queue reloads as MP3,
-// and later songs of the same kind (originals, or conversions) go straight to MP3. A conversion that fails usually
-// means the server has no FLAC conversion: older Navidrome sends the ALAC file itself then, which the TV can't play.
-// In MP3 320 quality nothing else is sent, and every song plays as MP3.
+// What each song plays as. Siansa sends the song's lossy stream (Opus 320 in Ogg, or MP3 320) as its address, and in
+// customData: the MP3 320 address when the lossy one is Opus (mp3Url, with opusUrl naming the Opus one), and for
+// lossless quality the original file's address and type for files every Cast device plays (FLAC, MP3, Ogg, WAV, AAC),
+// or of the server's FLAC conversion for lossless files it can't (ALAC, .m4a, Monkey's Audio…; marked "converted").
+// The TV plays the best it has: the original (or conversion), else Opus, else MP3. When a kind fails to play, the queue
+// loads again from where it was with that kind dropped, and later songs skip it too: originals → Opus → MP3 (a few
+// older Cast devices lack Opus; a failed FLAC conversion usually means the server has no "flac" transcoding).
 const M = cast.framework.messages;
-let originalsFail = false;
-let convertedFail = false;
+const failedKinds = { original: false, converted: false, opus: false };
 let retrying = false;
 
-const isConverted = media => !!(media && media.customData && media.customData.converted);
-const kindFailed = media => isConverted(media) ? convertedFail : originalsFail;
+const KIND_NAMES = { original: 'original files', converted: 'FLAC conversions', opus: 'Opus', mp3: 'MP3' };
 
-// Returns whether the song goes as its original (or the server's FLAC conversion).
-function useOriginal(media) {
+// Remembers what the phone sent, once: the lossy address it came with, and the MP3 one.
+function sent(media) {
   const c = media && media.customData;
-  if (!c || !c.originalUrl || kindFailed(media)) return false;
-  if (!c.mp3Url) c.mp3Url = media.contentUrl || media.contentId;
-  media.contentUrl = c.originalUrl;
-  media.contentType = c.originalType || 'audio/*';
-  return true;
+  if (!c) return null;
+  if (!c.baseUrl) {
+    c.baseUrl = media.contentUrl || media.contentId;
+    c.baseType = media.contentType || 'audio/mpeg';
+  }
+  // From an older Siansa: the lossy address is the MP3.
+  if (!c.mp3Url && !c.opusUrl) c.mp3Url = c.baseUrl;
+  return c;
 }
 
-function useMp3(media) {
+// What the song plays as now.
+function kindOf(media) {
   const c = media && media.customData;
-  if (!c || !c.mp3Url) return media;
-  media.contentUrl = c.mp3Url;
-  media.contentType = 'audio/mpeg';
-  return media;
+  const url = media && (media.contentUrl || media.contentId);
+  if (!c) return 'mp3';
+  if (c.originalUrl && url === c.originalUrl) return c.converted ? 'converted' : 'original';
+  if (c.opusUrl && url === c.opusUrl) return 'opus';
+  return 'mp3';
+}
+
+// Sets the song to the best kind that hasn't failed; returns that kind.
+function pick(media) {
+  const c = sent(media);
+  if (!c) return 'mp3';
+  if (c.originalUrl && !failedKinds[c.converted ? 'converted' : 'original']) {
+    media.contentUrl = c.originalUrl;
+    media.contentType = c.originalType || 'audio/*';
+    return c.converted ? 'converted' : 'original';
+  }
+  if (c.opusUrl && !failedKinds.opus) {
+    media.contentUrl = c.opusUrl;
+    media.contentType = 'audio/ogg';
+    return 'opus';
+  }
+  if (c.mp3Url) {
+    media.contentUrl = c.mp3Url;
+    media.contentType = 'audio/mpeg';
+  }
+  return 'mp3';
+}
+
+function counts(items) {
+  const n = { original: 0, converted: 0, opus: 0, mp3: 0 };
+  items.forEach(i => { n[pick(i.media)]++; });
+  return n.original + ' as their original file, ' + n.converted + ' converted to FLAC by the server, ' + n.opus + ' as Opus, ' + n.mp3 + ' as MP3';
+}
+
+function failedNote() {
+  const f = Object.keys(failedKinds).filter(k => failedKinds[k]).map(k => KIND_NAMES[k]);
+  return f.length ? ' (' + f.join(', ') + ' failed before: skipped)' : '';
 }
 
 player.setMessageInterceptor(M.MessageType.LOAD, req => {
@@ -458,24 +494,17 @@ player.setMessageInterceptor(M.MessageType.LOAD, req => {
   if (live) stopLive('the queue is loading');
   try {
     const items = req.queueData && req.queueData.items || [];
-    const originals = items.filter(i => useOriginal(i.media));
-    const converted = originals.filter(i => isConverted(i.media)).length;
-    useOriginal(req.media);
+    const said = counts(items);
+    if (req.media) pick(req.media);
     tvlog('load from ' + (req.senderId || 'the TV') + ': ' + items.length + ' songs, starting at ' +
-      ((req.queueData && req.queueData.startIndex || 0) + 1) + ', ' + (originals.length - converted) +
-      ' as their original file, ' + converted + ' converted to FLAC by the server' +
-      (originalsFail ? ' (originals failed before: MP3 instead)' : '') +
-      (convertedFail ? ' (FLAC conversions failed before: MP3 instead)' : ''));
+      ((req.queueData && req.queueData.startIndex || 0) + 1) + ', ' + said + failedNote());
   } catch (e) { tvlog('load: ' + e.message); }
   return req;
 });
 player.setMessageInterceptor(M.MessageType.QUEUE_INSERT, req => {
   try {
     const items = req.items || [];
-    const originals = items.filter(i => useOriginal(i.media));
-    const converted = originals.filter(i => isConverted(i.media)).length;
-    tvlog('queue insert: ' + items.length + ' songs, ' + (originals.length - converted) + ' as their original file, ' +
-      converted + ' converted to FLAC');
+    tvlog('queue insert: ' + items.length + ' songs, ' + counts(items));
   } catch (e) { tvlog('queue insert: ' + e.message); }
   return req;
 });
@@ -486,56 +515,56 @@ function songOf(media) {
     (c.converted ? ', converted by the server' : '') + ')';
 }
 
-// A song that can't play: the queue loads again from where it was, with that song and every other of its kind
-// (originals, or the server's FLAC conversions) as MP3; once that kind is MP3, the splash says so. Nothing here may
-// throw or leave the page waiting: the session must carry on either way.
+// A song that can't play: the queue loads again from where it was, with that kind dropped for every song; once a song
+// is down to MP3, the splash says so. Nothing here may throw or leave the page waiting: the session must carry on.
 player.addEventListener(E.ERROR, event => {
   if (live && live.cast) {
-    tvlog('Google\u2019s player: error ' + (event && event.detailedErrorCode) + ' on the phone\u2019s stream ' + live.stream + ': ' + liveState());
+    tvlog('Google’s player: error ' + (event && event.detailedErrorCode) + ' on the phone’s stream ' + live.stream + ': ' + liveState());
     liveSend({ type: 'error', stream: live.stream, code: String(event && event.detailedErrorCode), message: String(event && event.reason || '') });
     return;
   }
   let media = null;
+  let kind = 'mp3';
   try {
     media = player.getMediaInformation();
+    kind = kindOf(media);
     tvlog('media error ' + (event && event.detailedErrorCode) + (event && event.reason ? ' (' + event.reason + ')' : '') +
-      ' on ' + songOf(media) + (retrying ? ', while loading again as MP3' : ''));
-    if (isConverted(media) && !convertedFail) tvlog('the server\u2019s FLAC conversion didn\u2019t play: does it have a "flac" transcoding? Playing these as MP3');
+      ' on ' + songOf(media) + ' as ' + KIND_NAMES[kind] + (retrying ? ', while loading again' : ''));
+    if (kind === 'converted') tvlog('the server’s FLAC conversion didn’t play: does it have a "flac" transcoding?');
   } catch (e) { tvlog('media error: ' + e.message); }
   try {
     const queue = player.getQueueManager();
     const items = queue && queue.getItems();
-    const converted = isConverted(media);
-    if (retrying || !items || !items.length || !media || !media.customData || !media.customData.mp3Url || kindFailed(media)) {
+    if (retrying || kind === 'mp3' || !items || !items.length || !media || !media.customData) {
       // Already MP3, or nothing to fall back to: say so on the splash instead of a silent screen.
       if (!retrying) { failed = true; render(); }
       return;
     }
+    failedKinds[kind] = true;
     const req = new M.LoadRequestData();
     req.autoplay = true;
     req.currentTime = player.getCurrentTimeSec() || 0;
     req.queueData = new M.QueueData();
     req.queueData.items = items.filter(i => i && i.media).map(i => {
       const item = new M.QueueItem();
-      // Only the failed kind goes as MP3; the other keeps playing as it was.
-      item.media = isConverted(i.media) === converted ? useMp3(i.media) : i.media;
+      item.media = i.media;
+      pick(item.media);
       item.customData = i.customData;
       return item;
     });
     if (!req.queueData.items.length) { failed = true; render(); return; }
     req.queueData.startIndex = Math.min(Math.max(0, queue.getCurrentItemIndex()), req.queueData.items.length - 1);
     req.media = req.queueData.items[req.queueData.startIndex].media;
-    if (converted) convertedFail = true; else originalsFail = true;
     retrying = true;
-    tvlog('playing the queue with ' + (converted ? 'FLAC conversions' : 'originals') + ' as MP3 instead: ' + req.queueData.items.length + ' songs, from song ' +
-      (req.queueData.startIndex + 1) + ' at ' + Math.round(req.currentTime) + ' s');
+    tvlog('playing the queue without ' + KIND_NAMES[kind] + ' (now ' + KIND_NAMES[kindOf(req.media)] + '): ' + req.queueData.items.length +
+      ' songs, from song ' + (req.queueData.startIndex + 1) + ' at ' + Math.round(req.currentTime) + ' s');
     Promise.resolve(player.load(req))
-      .catch(e => { tvlog('loading as MP3 failed: ' + (e && (e.message || e.type) || e)); failed = true; render(); })
+      .catch(e => { tvlog('loading again failed: ' + (e && (e.message || e.type) || e)); failed = true; render(); })
       .finally(() => { retrying = false; });
   } catch (e) {
     retrying = false;
     failed = true;
-    tvlog('falling back to MP3 failed: ' + e.message);
+    tvlog('falling back failed: ' + e.message);
     try { render(); } catch (e2) { /* the splash stays as it was */ }
   }
 });
@@ -656,7 +685,7 @@ function startLive(m) {
   idleSince = Date.now();
   tvlog('plays the phone\u2019s stream ' + live.stream + ' (' + live.format + (live.cast ? ', through Google\u2019s player' : ', in its own player') + ')');
   if (live.cast) {
-    // As Symfonium does on the SHIELD: a buffered stream of unknown length, loaded into Google's player.
+    // Known to play on the SHIELD: a buffered stream of unknown length, loaded into Google's player.
     const req = new M.LoadRequestData();
     const info = new M.MediaInformation();
     info.contentId = m.url;

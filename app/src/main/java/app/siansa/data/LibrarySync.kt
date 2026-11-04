@@ -56,7 +56,7 @@ data class SyncProgress(
 }
 
 /**
- * Keeps the phone's library in step with Navidrome, like Symfonium:
+ * Keeps the phone's library in step with Navidrome, fetching only what changed:
  * - nothing to do when Navidrome hasn't scanned since the last sync (only hearts, play counts and playlists refresh);
  * - otherwise the album list is compared and only new or changed albums have their songs fetched;
  * - a full sync, or a first one, fetches every song page by page.

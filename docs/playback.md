@@ -192,7 +192,8 @@ as you fall asleep. Without a timer, Wind down queues a number of calm songs (**
 
 The device button in now playing shows TVs and speakers on the same Wi-Fi: Chromecast and Google TV, and DLNA
 ones (most smart TVs, Sonos, AV receivers). They play straight from your server: a Chromecast gets your music
-lossless (see **Chromecast sound quality** below), a DLNA one MP3 320 kbit/s unless you ask for the original files.
+lossless (see **Chromecast sound quality** below), a DLNA one Opus 320 kbit/s if it lists Ogg among the formats it
+plays, otherwise MP3 320, unless you ask for the original files.
 Stopping the cast brings the music back to the phone, paused. In **Play on**, each Chromecast shows its own name with
 "Chromecast" under it ("Chromecast · speaker" or "Chromecast · speaker group" for speakers and groups); DLNA ones show
 "DLNA" and their model.
@@ -222,14 +223,17 @@ Chromecast:
 
 - **Lossless** (the default): FLAC, MP3, Ogg, WAV and AAC files go to the TV as they are. Lossless files the TV
   can't play, such as Apple Lossless (ALAC) and other .m4a files, Monkey's Audio, WavPack, AIFF and DSD, are
-  converted to FLAC by your server on the way. Other files (WMA, for example) go as MP3 320. If the TV can't play a
-  song this way, it switches to MP3 320 by itself, and so do the songs of the same kind after it.
-- **MP3 320**: every song is converted to MP3 320 kbit/s by your server. Uses less Wi-Fi.
+  converted to FLAC by your server on the way. Other files (WMA, for example) go as Opus 320. If the TV can't play a
+  song this way, it switches to Opus by itself, then to MP3 320 if Opus doesn't play either, and so do the songs of
+  the same kind after it.
+- **Opus**: every song is converted to Opus 320 kbit/s by your server. Uses less Wi-Fi.
+- **MP3 320**: every song is converted to MP3 320 kbit/s by your server, for older TVs and speakers that can't play
+  Opus.
 
 It applies to music you start playing after you change it. Siansa asks your server for each song's file type just
 before the songs go to the TV (the library doesn't keep it), which can take a moment for a long queue. Converting to
-FLAC needs Navidrome (or another Subsonic server) with a **flac** transcoding; with Jellyfin and Emby, those files go
-as MP3 320.
+FLAC needs Navidrome (or another Subsonic server) with a **flac** transcoding, and Opus its **opus** transcoding (both
+come with Navidrome); with Jellyfin and Emby, those files go as MP3 320.
 
 **Gapless through this phone.** With Siansa's new audio engine (in Siansa Dev for now), the cog beside a Chromecast
 also has **How it plays**:
@@ -281,10 +285,14 @@ the queue on the phone as usual. Songs that go as MP3 can leave a very short pau
 other; FLAC usually doesn't.
 
 **Original files on DLNA.** Tap the cog beside a DLNA TV or speaker in **Play on** and turn on **Send the original
-file**. It then gets your music as it is (for example FLAC) instead of MP3 320, whenever it says it plays that
-format; other songs still go as MP3 320. Better sound, and no tiny gap between songs, but it uses more Wi-Fi. The
+file**. It then gets your music as it is (for example FLAC) instead of converted, whenever it says it plays that
+format; other songs are still converted. Better sound, and no tiny gap between songs, but it uses more Wi-Fi. The
 setting is kept for each device, shows which formats the device says it plays, and isn't offered when it only
 plays MP3. It applies from the next song.
+
+**Opus on DLNA.** Songs converted for a DLNA TV or speaker go as Opus 320 kbit/s (in Ogg) when the device lists Ogg or
+Opus among the formats it plays, and as MP3 320 when it doesn't. If it doesn't start an Opus song after all, Siansa
+sends that song again as MP3 320, and that device gets MP3 until you restart the app.
 
 ## Android Auto
 

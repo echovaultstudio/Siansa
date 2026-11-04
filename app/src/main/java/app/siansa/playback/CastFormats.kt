@@ -81,7 +81,7 @@ object CastFormats {
     /** How a queue goes to the TV, for the log: as they are, converted to FLAC, as MP3, and of no known type. */
     data class Summary(val asIs: Int, val flac: Int, val mp3: Int, val unknownType: Int) {
         fun describe(quality: CastQuality): String =
-            "${quality.label}: $asIs as they are, $flac as FLAC from the server, $mp3 as MP3" +
+            "${quality.label}: $asIs as they are, $flac as FLAC from the server, $mp3 as ${if (quality == CastQuality.Mp3) "MP3" else "Opus"}" +
                 if (unknownType > 0) " ($unknownType of unknown file type)" else ""
     }
 

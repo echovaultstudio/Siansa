@@ -146,7 +146,7 @@ data class AppSettings(
     val scrobblePercent: Int = 50,
     /**
      * Users on this phone whose songs aren't scrobbled (issue #356): playing music from their library, shown with
-     * yours, sends nothing to Navidrome, Last.fm or ListenBrainz, as Symfonium's "scrobble as advertisement" does.
+     * yours, sends nothing to Navidrome, Last.fm or ListenBrainz.
      */
     val scrobbleOffUsers: Set<Int> = emptySet(),
     val lastFmEnabled: Boolean = false,

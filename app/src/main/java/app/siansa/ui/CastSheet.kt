@@ -372,8 +372,9 @@ internal fun ChromecastSettingsContent(gapless: Boolean = BuildConfig.MIXER_ENGI
             SettingChoice(
                 label = option.label,
                 detail = when (option) {
-                    CastQuality.Lossless -> "Your music as it is. Files the TV can't play, such as Apple Lossless, are turned into FLAC by your server."
-                    CastQuality.Mp3 -> "Everything as MP3. Uses less Wi-Fi, and works with any server."
+                    CastQuality.Lossless -> "Your music as it is. Files the TV can't play, such as Apple Lossless, are turned into FLAC by your server, the rest into Opus."
+                    CastQuality.Opus -> "Everything as Opus 320. Uses less Wi-Fi."
+                    CastQuality.Mp3 -> "Everything as MP3 320, for older TVs and speakers that can't play Opus."
                 },
                 selected = quality == option,
                 enabled = !throughPhone,
@@ -447,7 +448,7 @@ internal fun DlnaSettingsContent(device: DlnaDevice) {
         }
         Text(
             if (possible) {
-                "Plays your music as it is (for example FLAC) instead of MP3 320, when it can play that format. " +
+                "Plays your music as it is (for example FLAC) instead of converted (Opus or MP3 320), when it can play that format. " +
                     "Better sound, and songs follow without even a tiny gap. Uses more Wi-Fi. Changes from the next song."
             } else {
                 "It didn't say it plays anything but MP3, so it gets MP3 320."

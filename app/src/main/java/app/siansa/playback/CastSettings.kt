@@ -11,11 +11,14 @@ import kotlinx.coroutines.flow.asStateFlow
 enum class CastQuality(val key: String, val label: String) {
     /**
      * Songs as they are where the TV plays their format; others (ALAC, Monkey's Audio, WavPack, DSD…) converted to
-     * FLAC by the server. The default, as casting has sent originals since #869.
+     * FLAC by the server, and what can't go lossless as Opus 320. The default, as casting has sent originals since #869.
      */
     Lossless("lossless", "Lossless"),
 
-    /** Every song converted to MP3 320 by the server, as before #869: works with any server and TV. */
+    /** Every song converted to Opus 320 by the server: smaller than lossless, sounds the same to most ears. */
+    Opus("opus", "Opus"),
+
+    /** Every song converted to MP3 320 by the server, as before #869: for older Cast devices that can't play Opus. */
     Mp3("mp3", "MP3 320");
 
     companion object {
