@@ -1,0 +1,84 @@
+name: Siansa TV Dev
+
+# Siansa TV Dev (issue #860): a test build of the TV app only, for an Android TV or Google TV box. It installs as
+# app.siansa.tv.dev, next to any other Siansa build, and is published only here, as the APK of the pre-release
+# "tv-dev-latest" on GitHub: never to F-Droid or Google Play, never as a release of Siansa (the release history skips
+# pre-releases), and apart from Siansa Dev (dev-app.yml), which it leaves alone. Built from the TV app's branch until it's
+# merged, then from mixer; each push replaces the APK.
+on:
+  push:
+    branches: [mixer, claude/android-tv-860]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tv-dev
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and publish Siansa TV Dev
+    # The same runner as the other builds: your own when the RUNS_ON variable names it, else GitHub's.
+    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.14.3"
+
+      # Signed with Siansa's key, so a later Siansa TV Dev installs over the last one.
+      - name: Signing key
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "::error::No signing key (SIGNING_KEYSTORE_BASE64): an unsigned APK can't be installed."
+            exit 1
+          fi
+          printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/siansa.keystore"
+          echo "SIANSA_KEYSTORE=$RUNNER_TEMP/siansa.keystore" >> "$GITHUB_ENV"
+
+      - name: Unit tests and build
+        env:
+          SIANSA_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+          SIANSA_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIANSA_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          CAST_RECEIVER_ID: ${{ vars.CAST_RECEIVER_ID }}
+        run: gradle :tv:testDebugUnitTest :tv:assembleDev --continue --stacktrace
+
+      - name: Publish the APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          short=$(git rev-parse --short HEAD)
+          apk="siansa-tv-dev-$short.apk"
+          cp "$(ls tv/build/outputs/apk/dev/*.apk | head -1)" "$apk"
+          notes="Siansa TV Dev, built from \`${GITHUB_REF_NAME}\` at $short on $(date -u '+%Y-%m-%d %H:%M') UTC.
+
+          The test build of Siansa for Android TV and Google TV (issue #860). Install it on the TV or Google TV box (for
+          example with Downloader or adb install). It installs as its own app, next to any other Siansa build, and keeps
+          its own settings, library and sign-in. Not for F-Droid or Google Play.
+
+          Latest change: $(git log -1 --format=%s)"
+          git tag -f tv-dev-latest
+          git push -f origin tv-dev-latest
+          if gh release view tv-dev-latest > /dev/null 2>&1; then
+            # The previous APK goes, so there's only ever one to pick.
+            for old in $(gh release view tv-dev-latest --json assets -q '.assets[].name'); do
+              gh release delete-asset tv-dev-latest "$old" -y
+            done
+            gh release edit tv-dev-latest --title "Siansa TV Dev ($short)" --notes "$notes" --prerelease --latest=false
+          else
+            gh release create tv-dev-latest --title "Siansa TV Dev ($short)" --notes "$notes" --prerelease --latest=false
+          fi
+          gh release upload tv-dev-latest "$apk" --clobber
+          echo "::notice::Siansa TV Dev $short: $(gh release view tv-dev-latest --json url -q .url)"
