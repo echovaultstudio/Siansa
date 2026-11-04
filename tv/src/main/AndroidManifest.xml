@@ -14,6 +14,9 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- The echo at the end of a beat-matched blend: a reverb on the output mix (issue #759). -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- The shared queue code vibrates on a swipe (ui/Common.kt). A TV has no vibrator, so it never does here, but Lint
+         asks for the permission wherever Vibrator.vibrate is called. It needs no hardware. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
