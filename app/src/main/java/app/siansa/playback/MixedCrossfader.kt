@@ -187,7 +187,7 @@ internal class MixedCrossfader(
                 return LOOK_MS
             }
             val at = duration - planned.cutMs - planned.overlapMs
-            val handover = EngineFade.handoverAt(at, position)
+            val handover = EngineFade.handoverAt(at, position, engine.extraLeadMs)
             if (handover - position < MIN_PREPARE_MS) {
                 AppLog.d("Crossfade", "Too close to the end of ${current.id} to get a fade ready")
                 skipped = item.mediaId
@@ -197,7 +197,8 @@ internal class MixedCrossfader(
             arm(item, planned, at, handover)
         }
         val speed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
-        val untilCue = ((handoverAt - CUE_AHEAD_MS - position) / speed).toLong()
+        // Casting gaplessly, the mix is written further ahead of what's heard (the TV's lead): cued that much sooner.
+        val untilCue = ((handoverAt - CUE_AHEAD_MS - engine.extraLeadMs - position) / speed).toLong()
         if (untilCue <= 0) {
             cueTail()
             return if (phase == Phase.CUED) CUED_POLL_MS else LOOK_MS
@@ -794,9 +795,12 @@ internal object EngineFade {
     /** And never sooner than this from now. */
     const val MIN_LEAD_MS = 1_500L
 
-    /** Where (ms of the old song) the tail takes the old song over, for a fade starting at [startAtMs] heard at [positionMs]. */
-    fun handoverAt(startAtMs: Long, positionMs: Long): Long =
-        (startAtMs - LEAD_MS).coerceAtLeast(positionMs + MIN_LEAD_MS).coerceAtMost(startAtMs)
+    /**
+     * Where (ms of the old song) the tail takes the old song over, for a fade starting at [startAtMs] heard at [positionMs].
+     * [extraLeadMs]: how much further than usual the mix is written ahead of what's heard (casting gaplessly, issue #114).
+     */
+    fun handoverAt(startAtMs: Long, positionMs: Long, extraLeadMs: Long = 0L): Long =
+        (startAtMs - LEAD_MS).coerceAtLeast(positionMs + MIN_LEAD_MS + extraLeadMs).coerceAtMost(startAtMs)
 
     /**
      * Where the next song comes in (ms of its own) and the point of the old song it comes in with (ms): its first

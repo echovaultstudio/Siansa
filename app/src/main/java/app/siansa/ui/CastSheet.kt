@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -49,6 +52,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.mediarouter.media.MediaRouter
 import app.siansa.playback.Cast
 import app.siansa.playback.AudioOutput
+import app.siansa.BuildConfig
+import app.siansa.playback.CastMode
 import app.siansa.playback.CastQuality
 import app.siansa.playback.CastSettings
 import app.siansa.playback.CastStatus
@@ -262,7 +267,7 @@ private fun CastSheet(onDismiss: () -> Unit) {
                 }
             }
             Text(
-                "TVs and speakers show up when they're on the same Wi-Fi as this phone: Chromecast and Google TV, and DLNA ones (most smart TVs, Sonos, AV receivers). They play straight from your server. Tap the cog beside one for its sound quality.",
+                "TVs and speakers show up when they're on the same Wi-Fi as this phone: Chromecast and Google TV, and DLNA ones (most smart TVs, Sonos, AV receivers). They play straight from your server. Tap the cog beside one for its settings.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Space.Section, vertical = Space.Medium),
@@ -279,88 +284,82 @@ private fun ChromecastSettings(name: String, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        text = { ChromecastSettingsContent() },
+        text = { Column(Modifier.verticalScroll(rememberScrollState())) { ChromecastSettingsContent() } },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
     )
 }
 
-/** What the Chromecast settings show, in their own function so the screenshot tests can draw them. */
+/**
+ * What the Chromecast settings show, in their own function so the screenshot tests can draw them: how the TV plays
+ * (the queue itself, or gapless through this phone, issue #114; only with the new audio engine, [gapless]) and the
+ * sound quality of the queue.
+ */
 @Composable
-internal fun ChromecastSettingsContent() {
+internal fun ChromecastSettingsContent(gapless: Boolean = BuildConfig.MIXER_ENGINE) {
     val quality by CastSettings.quality.collectAsStateWithLifecycle()
+    val mode by CastSettings.mode.collectAsStateWithLifecycle()
+    val throughPhone = gapless && mode == CastMode.Gapless
     Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+        if (gapless) {
+            Text("How it plays", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            CastMode.entries.forEach { option ->
+                SettingChoice(
+                    label = option.label,
+                    detail = when (option) {
+                        CastMode.Queue -> "The TV gets each song from your server by itself. Your phone is free."
+                        CastMode.Gapless -> "This phone plays, with its crossfades and DJ blends, and sends the sound to the TV, lossless. " +
+                            "Keep the phone on this Wi-Fi with Siansa running; it uses more battery."
+                    },
+                    selected = mode == option,
+                    tag = "castMode-${option.key}",
+                ) { CastSettings.setMode(option) }
+            }
+            Spacer(Modifier.height(Space.Small))
+        }
         Text("Sound quality", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         CastQuality.entries.forEach { option ->
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(Space.Small))
-                    .clickable { CastSettings.setQuality(option) }.testTag("castQuality-${option.key}"),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Space.Small),
-            ) {
-                RadioButton(selected = quality == option, onClick = { CastSettings.setQuality(option) })
-                Column(Modifier.weight(1f)) {
-                    Text(option.label, style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        when (option) {
-                            CastQuality.Lossless -> "Your music as it is. Files the TV can't play, such as Apple Lossless, are turned into FLAC by your server."
-                            CastQuality.Mp3 -> "Everything as MP3. Uses less Wi-Fi, and works with any server."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            SettingChoice(
+                label = option.label,
+                detail = when (option) {
+                    CastQuality.Lossless -> "Your music as it is. Files the TV can't play, such as Apple Lossless, are turned into FLAC by your server."
+                    CastQuality.Mp3 -> "Everything as MP3. Uses less Wi-Fi, and works with any server."
+                },
+                selected = quality == option,
+                enabled = !throughPhone,
+                tag = "castQuality-${option.key}",
+            ) { CastSettings.setQuality(option) }
         }
         Text(
-            "For every Chromecast. Applies to music you start playing after this.",
+            if (throughPhone) "Gapless through this phone is always lossless. For every Chromecast, from the next time you cast."
+            else if (gapless) "For every Chromecast. Sound quality applies to music you start playing after this; how it plays, from the next time you cast."
+            else "For every Chromecast. Applies to music you start playing after this.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
-/**
- * A DLNA TV or speaker's settings (the cog beside it, beta testers #23): whether it gets the original file
- * (FLAC, WAV…) instead of MP3 320, for the formats it says it plays. Lossless, and no encoder gap between songs.
- */
+/** One choice of a setting: a radio button, its name and a line on what it does. */
 @Composable
-private fun DlnaDeviceSettings(device: DlnaDevice, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(device.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        text = { DlnaSettingsContent(device) },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
-    )
-}
-
-/** What a DLNA TV or speaker's settings show, in their own function so the screenshot tests can draw them. */
-@Composable
-internal fun DlnaSettingsContent(device: DlnaDevice) {
-    val original by Dlna.original.collectAsStateWithLifecycle()
-    val possible = DlnaFormats.playsMoreThanMp3(device.formats)
-    val on = device.id in original && possible
-    val names = DlnaFormats.names(device.formats)
-    Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-        Row(
-            Modifier.fillMaxWidth().clickable(enabled = possible) { Dlna.setOriginal(device, !on) }.testTag("dlnaOriginal"),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Space.Medium),
-        ) {
-            Text("Send the original file", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            Switch(checked = on, enabled = possible, onCheckedChange = { Dlna.setOriginal(device, it) })
-        }
-        Text(
-            if (possible) {
-                "Plays your music as it is (for example FLAC) instead of MP3 320, when it can play that format. " +
-                    "Better sound, and songs follow without even a tiny gap. Uses more Wi-Fi. Changes from the next song."
-            } else {
-                "It didn't say it plays anything but MP3, so it gets MP3 320."
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (names.isNotEmpty()) {
-            Text("It plays: ${names.joinToString(", ")}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun SettingChoice(label: String, detail: String, selected: Boolean, tag: String, enabled: Boolean = true, onPick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(Space.Small))
+            .clickable(enabled = enabled, onClick = onPick).testTag(tag),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+    ) {
+        RadioButton(selected = selected, enabled = enabled, onClick = onPick)
+        Column(Modifier.weight(1f)) {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+            )
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.38f),
+            )
         }
     }
 }
