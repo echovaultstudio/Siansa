@@ -69,7 +69,7 @@ class DlnaFormatsTest {
     }
 
     @Test fun devicesThatListOggOrOpusGetOpusOthersMp3() {
-        // The JBL Bar 800's own list (from Symfonium's log, issue #114).
+        // The JBL Bar 800's own list (from its UPnP protocol info, issue #114).
         val jbl = setOf("audio/aac", "audio/ac3", "audio/ape", "audio/flac", "audio/m4a", "audio/mp3", "audio/mpeg", "audio/ogg",
             "audio/vnd.dlna.adts", "audio/wav", "audio/wma", "audio/x-ape", "audio/x-ms-wma", "audio/x-wav")
         assertTrue(DlnaFormats.takesOpus(jbl))

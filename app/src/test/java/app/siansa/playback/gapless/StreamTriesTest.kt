@@ -14,7 +14,7 @@ class StreamTriesTest {
     private val ownFlac = StreamWay(StreamFormat.Flac, throughCast = false)
     private val ownWav = StreamWay(StreamFormat.Wav, throughCast = false)
 
-    @Test fun googlesPlayerFirstAsSymfoniumPlaysOnTheShieldThenTheOwnPlayerThenWav() {
+    @Test fun googlesPlayerFirstThenTheOwnPlayerThenWav() {
         assertEquals(listOf(castFlac, ownFlac, ownWav), StreamWay.ORDER)
         val t = StreamTries()
         assertEquals(castFlac, t.way)

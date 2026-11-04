@@ -685,7 +685,7 @@ function startLive(m) {
   idleSince = Date.now();
   tvlog('plays the phone\u2019s stream ' + live.stream + ' (' + live.format + (live.cast ? ', through Google\u2019s player' : ', in its own player') + ')');
   if (live.cast) {
-    // As Symfonium does on the SHIELD: a buffered stream of unknown length, loaded into Google's player.
+    // Known to play on the SHIELD: a buffered stream of unknown length, loaded into Google's player.
     const req = new M.LoadRequestData();
     const info = new M.MediaInformation();
     info.contentId = m.url;

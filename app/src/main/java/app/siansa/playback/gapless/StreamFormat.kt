@@ -50,7 +50,7 @@ object WavHeader {
 
 /**
  * How the TV screen plays the phone's stream (issue #114): through Google's Cast player, loaded by the page as a
- * buffered stream of unknown length (what Symfonium does on the owner's SHIELD, where it plays), or in the page's own
+ * buffered stream of unknown length (known to play on the owner's SHIELD), or in the page's own
  * audio element; in FLAC or WAV.
  */
 data class StreamWay(val format: StreamFormat, val throughCast: Boolean) {
@@ -61,8 +61,9 @@ data class StreamWay(val format: StreamFormat, val throughCast: Boolean) {
 
     companion object {
         /**
-         * The order they're tried in: Google's player first, as it's what plays on the SHIELD for Symfonium (its
-         * earlier failure here was the phone sending too little, now fixed); then the page's own player; WAV last.
+         * The order they're tried in: Google's player first, as a buffered stream like this is known to play on the
+         * SHIELD (its earlier failure here was the phone sending too little, now fixed); then the page's own player;
+         * WAV last.
          */
         val ORDER = listOf(
             StreamWay(StreamFormat.Flac, throughCast = true),
