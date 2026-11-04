@@ -69,8 +69,9 @@ object CastReceiver {
 /**
  * Which TV screen each Cast device gets (issue #114). Siansa's own where the TV can show it; Google's Default Media
  * Receiver where it can't, so casting never goes away: while Siansa's Cast app is unpublished in the Cast console,
- * only TVs registered there can load it, and any TV can fail to start it. A TV whose start of Siansa's screen failed
- * is remembered (until the app restarts) and gets Google's screen from then on.
+ * only TVs registered there can load it, and any TV can fail to start it. A failed start of Siansa's screen is tried
+ * once more with Google's, straight away; the next cast the user starts tries Siansa's screen again, as a TV that was
+ * still restarting its Cast app (APPLICATION_NOT_FOUND right after a session ended, 0.52.0-dev) can show it then.
  */
 class CastScreens(private val own: String) {
     enum class Why {
@@ -80,39 +81,34 @@ class CastScreens(private val own: String) {
         NoOwnScreen,
         /** The TV isn't offered Siansa's screen (unpublished app, TV not registered). */
         NotOffered,
-        /** Siansa's screen failed to start on this TV before. */
-        FailedBefore,
     }
 
     data class Choice(val appId: String, val why: Why)
 
-    private val needsDefault = HashSet<String>()
-
-    /** The screen for the TV [deviceId], when Cast lists Siansa's screen for it ([ownOffered]) or not. */
-    fun pick(deviceId: String?, ownOffered: Boolean): Choice = when {
+    /**
+     * The screen for a TV, when Cast lists Siansa's screen for it ([ownOffered]) or not. A cast the user starts
+     * always tries Siansa's screen where it's offered, even on a TV where it failed to start before.
+     */
+    fun pick(ownOffered: Boolean): Choice = when {
         !CastReceiver.isOwn(own) -> Choice(CastReceiver.DEFAULT, Why.NoOwnScreen)
-        deviceId != null && deviceId in needsDefault -> Choice(CastReceiver.DEFAULT, Why.FailedBefore)
         !ownOffered -> Choice(CastReceiver.DEFAULT, Why.NotOffered)
         else -> Choice(own, Why.Own)
     }
 
     /**
      * Starting a cast with the screen [used] on the TV [deviceId] failed. True when it's worth trying again with
-     * Google's screen: Siansa's own failed (not cancelled by the user), and the TV is known. The TV then keeps
-     * Google's screen. Google's screen failing isn't retried: there's nothing left to fall back to.
+     * Google's screen: Siansa's own failed (not cancelled by the user), and the TV is known. Only that one retry uses
+     * Google's screen; nothing is remembered. Google's screen failing isn't retried: there's nothing left to fall
+     * back to.
      */
-    fun startFailed(deviceId: String?, used: String?, cancelled: Boolean): Boolean {
-        if (cancelled || deviceId.isNullOrBlank() || used == null || !CastReceiver.isOwn(used) || used != own) return false
-        needsDefault += deviceId
-        return true
-    }
+    fun startFailed(deviceId: String?, used: String?, cancelled: Boolean): Boolean =
+        !cancelled && !deviceId.isNullOrBlank() && used != null && CastReceiver.isOwn(used) && used == own
 
     /** Words for the log. */
     fun describe(choice: Choice): String = when (choice.why) {
         Why.Own -> "Siansa's own TV screen (receiver ${choice.appId})"
         Why.NoOwnScreen -> "Google's standard TV screen (no Siansa screen in this build)"
         Why.NotOffered -> "Google's standard TV screen: this TV isn't offered Siansa's screen (unpublished Cast app, TV not registered)"
-        Why.FailedBefore -> "Google's standard TV screen: Siansa's screen failed to start on this TV before"
     }
 }
 
@@ -185,7 +181,7 @@ object Cast {
      */
     fun select(route: MediaRouter.RouteInfo) {
         val device = deviceId(route)
-        val choice = screens.pick(device, route.matchesSelector(ownSelector))
+        val choice = screens.pick(route.matchesSelector(ownSelector))
         lastPicked = device
         AppLog.i("Cast", "${route.name}: ${screens.describe(choice)}")
         context?.let { use(it, choice.appId) }
@@ -227,11 +223,26 @@ object Cast {
             }
             override fun onSessionStarting(session: CastSession) {}
             override fun onSessionEnding(session: CastSession) {}
-            override fun onSessionEnded(session: CastSession, error: Int) {}
+            override fun onSessionEnded(session: CastSession, error: Int) {
+                if (error != CastStatusCodes.SUCCESS) AppLog.w("Cast", "Casting ended: ${CastStatusCodes.getStatusCodeString(error)}")
+            }
             override fun onSessionResuming(session: CastSession, sessionId: String) {}
-            override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) { listenToTv(session) }
-            override fun onSessionResumeFailed(session: CastSession, error: Int) {}
-            override fun onSessionSuspended(session: CastSession, reason: Int) {}
+            override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
+                AppLog.i("Cast", "Back in touch with ${session.castDevice?.friendlyName ?: "the TV"}" + if (wasSuspended) " after a moment away" else "")
+                listenToTv(session)
+            }
+            override fun onSessionResumeFailed(session: CastSession, error: Int) {
+                AppLog.w("Cast", "Couldn't get back in touch with the TV: ${CastStatusCodes.getStatusCodeString(error)}")
+            }
+            override fun onSessionSuspended(session: CastSession, reason: Int) {
+                // Cast's reasons are GoogleApiClient's: 1 service disconnected, 2 network lost.
+                val why = when (reason) {
+                    2 -> "the phone's network dropped"
+                    1 -> "Google Play services let go"
+                    else -> "reason $reason"
+                }
+                AppLog.w("Cast", "Lost touch with ${session.castDevice?.friendlyName ?: "the TV"} ($why)")
+            }
         }, CastSession::class.java)
     }
 
@@ -341,6 +352,27 @@ object Cast {
 }
 
 /**
+ * Which songs Siansa's TV screen may play as their original file rather than the MP3 (issue #114). Only file types
+ * every Cast device plays: FLAC, MP3, Ogg (Vorbis, Opus), WAV and AAC. An .m4a or .mp4 can hold AAC or ALAC, and
+ * Navidrome only says the file type, so those, ALAC and anything unknown get the MP3: an ALAC original ended the
+ * cast on a SHIELD (0.52.0-dev, Apple Music Live albums).
+ */
+object CastOriginals {
+    private val types = mapOf(
+        "flac" to "audio/flac",
+        "mp3" to "audio/mpeg",
+        "ogg" to "audio/ogg",
+        "oga" to "audio/ogg",
+        "opus" to "audio/ogg",
+        "wav" to "audio/wav",
+        "aac" to "audio/aac",
+    )
+
+    /** The MIME type to play a file of type [suffix] as it is on a Cast device, or null when it gets the MP3. */
+    fun typeOf(suffix: String?): String? = types[suffix?.trim()?.lowercase()?.removePrefix(".")]
+}
+
+/**
  * Turns queue songs into what the TV plays and back. The TV fetches each song from Navidrome
  * itself, converted to MP3 so any Cast device can play it, with the cover at TV size.
  */
@@ -348,6 +380,11 @@ object Cast {
 class CastItems(private val api: MusicSource) : MediaItemConverter {
     override fun toMediaQueueItem(mediaItem: MediaItem): MediaQueueItem {
         val song = mediaItem.toSong()
+        val originalType = CastOriginals.typeOf(song.suffix)
+        val custom = JSONObject().put(SONG_ID, mediaItem.mediaId)
+        // Siansa's TV screen plays the original file instead where every Cast device can (FLAC and so on), and falls
+        // back to the MP3 below when it can't; other files only ever go as the MP3.
+        if (originalType != null) custom.put(ORIGINAL_URL, api.streamUrl(mediaItem.mediaId)).put(ORIGINAL_TYPE, originalType)
         val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
             putString(MediaMetadata.KEY_TITLE, song.title)
             putString(MediaMetadata.KEY_ARTIST, song.artist)
@@ -361,9 +398,7 @@ class CastItems(private val api: MusicSource) : MediaItemConverter {
             .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
             .setMetadata(metadata)
             .apply { if (song.durationSec > 0) setStreamDuration(song.durationSec * 1000L) }
-            // The siansa TV app plays the original file instead when the TV can (FLAC and so on),
-            // and falls back to the MP3 above when it can't.
-            .setCustomData(JSONObject().put(SONG_ID, mediaItem.mediaId).put(ORIGINAL_URL, api.streamUrl(mediaItem.mediaId)))
+            .setCustomData(custom)
             .build()
         // The TV loads the next song ahead (issue #689), so it can go straight on instead of fetching it once this one ends.
         return MediaQueueItem.Builder(info).setAutoplay(true).setPreloadTime(CAST_PRELOAD_SECONDS).build()
@@ -385,6 +420,7 @@ class CastItems(private val api: MusicSource) : MediaItemConverter {
     private companion object {
         const val SONG_ID = "siansaSongId"
         const val ORIGINAL_URL = "originalUrl"
+        const val ORIGINAL_TYPE = "originalType"
         const val TV_COVER = 800
     }
 }

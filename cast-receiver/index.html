@@ -150,12 +150,15 @@ const $ = id => document.getElementById(id);
 
 const context = cast.framework.CastReceiverContext.getInstance();
 
-// What the remote does here goes to the phone's log ("CastTV"), for tracing remote problems: the keys the page
-// gets, the TV's own seeks, and what the page made of them.
+// What happens here goes to the phone's log ("CastTV"), for tracing problems: the keys the page gets, the TV's own
+// seeks and what the page made of them, the queues loaded, and songs that fail to play.
 const LOG_NS = 'urn:x-cast:app.siansa.log';
 function tvlog(text) {
   try { context.sendCustomMessage(LOG_NS, undefined, String(text)); } catch (e) { /* no phone listening yet */ }
 }
+// A mistake in this page is logged rather than lost.
+window.addEventListener('error', e => tvlog('page error: ' + (e.message || e.type)));
+window.addEventListener('unhandledrejection', e => tvlog('page error: ' + (e.reason && e.reason.message || e.reason)));
 const player = context.getPlayerManager();
 player.setMediaElement($('audio'));
 
@@ -346,19 +349,21 @@ document.addEventListener('keyup', e => {
   if (key === 'MediaRewind' || key === 'MediaFastForward') windStart = 0;
 });
 
-// Original quality: siansa sends an MP3 320 stream plus the original file's address in customData.
-// The TV plays the original (FLAC and so on). If it can't, the queue reloads as MP3 and later
-// songs go straight to MP3.
+// Original quality: Siansa sends an MP3 320 stream, plus the original file's address and type in customData for
+// files every Cast device plays (FLAC, MP3, Ogg, WAV, AAC; never ALAC or .m4a). The TV plays the original. If it
+// can't, the queue reloads as MP3 and later songs go straight to MP3.
 const M = cast.framework.messages;
 let originalsFail = false;
 let retrying = false;
 
+// Returns whether the song goes as its original.
 function useOriginal(media) {
   const c = media && media.customData;
-  if (originalsFail || !c || !c.originalUrl) return;
+  if (originalsFail || !c || !c.originalUrl) return false;
   if (!c.mp3Url) c.mp3Url = media.contentUrl || media.contentId;
   media.contentUrl = c.originalUrl;
   media.contentType = c.originalType || 'audio/*';
+  return true;
 }
 
 function useMp3(media) {
@@ -370,39 +375,73 @@ function useMp3(media) {
 }
 
 player.setMessageInterceptor(M.MessageType.LOAD, req => {
-  useOriginal(req.media);
-  if (req.queueData && req.queueData.items) req.queueData.items.forEach(i => useOriginal(i.media));
+  try {
+    const items = req.queueData && req.queueData.items || [];
+    const originals = items.filter(i => useOriginal(i.media)).length;
+    useOriginal(req.media);
+    tvlog('load from ' + (req.senderId || 'the TV') + ': ' + items.length + ' songs, starting at ' +
+      ((req.queueData && req.queueData.startIndex || 0) + 1) + ', ' + originals + ' as their original file' +
+      (originalsFail ? ' (originals failed before: MP3 only)' : ''));
+  } catch (e) { tvlog('load: ' + e.message); }
   return req;
 });
 player.setMessageInterceptor(M.MessageType.QUEUE_INSERT, req => {
-  (req.items || []).forEach(i => useOriginal(i.media));
+  try {
+    const items = req.items || [];
+    const originals = items.filter(i => useOriginal(i.media)).length;
+    tvlog('queue insert: ' + items.length + ' songs, ' + originals + ' as their original file');
+  } catch (e) { tvlog('queue insert: ' + e.message); }
   return req;
 });
 
-player.addEventListener(E.ERROR, () => {
-  const queue = player.getQueueManager();
-  const items = queue && queue.getItems();
-  const media = player.getMediaInformation();
-  if (originalsFail || retrying || !items || !items.length || !media || !media.customData || !media.customData.mp3Url) {
-    // Already MP3, or nothing to fall back to: say so on the splash instead of a silent screen.
-    if (!retrying) { failed = true; render(); }
-    return;
+function songOf(media) {
+  const c = media && media.customData || {};
+  return (c.siansaSongId || media && media.contentId || '?') + ' (' + (media && media.contentType || '?') + ')';
+}
+
+// A song that can't play: once, the whole queue loads again as MP3 from where it was; after that, the splash says
+// so. Nothing here may throw or leave the page waiting: the session must carry on either way.
+player.addEventListener(E.ERROR, event => {
+  let media = null;
+  try {
+    media = player.getMediaInformation();
+    tvlog('media error ' + (event && event.detailedErrorCode) + (event && event.reason ? ' (' + event.reason + ')' : '') +
+      ' on ' + songOf(media) + (retrying ? ', while loading again as MP3' : ''));
+  } catch (e) { tvlog('media error: ' + e.message); }
+  try {
+    const queue = player.getQueueManager();
+    const items = queue && queue.getItems();
+    if (originalsFail || retrying || !items || !items.length || !media || !media.customData || !media.customData.mp3Url) {
+      // Already MP3, or nothing to fall back to: say so on the splash instead of a silent screen.
+      if (!retrying) { failed = true; render(); }
+      return;
+    }
+    const req = new M.LoadRequestData();
+    req.autoplay = true;
+    req.currentTime = player.getCurrentTimeSec() || 0;
+    req.queueData = new M.QueueData();
+    req.queueData.items = items.filter(i => i && i.media).map(i => {
+      const item = new M.QueueItem();
+      item.media = useMp3(i.media);
+      item.customData = i.customData;
+      return item;
+    });
+    if (!req.queueData.items.length) { failed = true; render(); return; }
+    req.queueData.startIndex = Math.min(Math.max(0, queue.getCurrentItemIndex()), req.queueData.items.length - 1);
+    req.media = req.queueData.items[req.queueData.startIndex].media;
+    originalsFail = true;
+    retrying = true;
+    tvlog('playing the queue as MP3 instead: ' + req.queueData.items.length + ' songs, from song ' +
+      (req.queueData.startIndex + 1) + ' at ' + Math.round(req.currentTime) + ' s');
+    Promise.resolve(player.load(req))
+      .catch(e => { tvlog('loading as MP3 failed: ' + (e && (e.message || e.type) || e)); failed = true; render(); })
+      .finally(() => { retrying = false; });
+  } catch (e) {
+    retrying = false;
+    failed = true;
+    tvlog('falling back to MP3 failed: ' + e.message);
+    try { render(); } catch (e2) { /* the splash stays as it was */ }
   }
-  originalsFail = true;
-  retrying = true;
-  const req = new M.LoadRequestData();
-  req.autoplay = true;
-  req.currentTime = player.getCurrentTimeSec() || 0;
-  req.queueData = new M.QueueData();
-  req.queueData.items = items.map(i => {
-    const item = new M.QueueItem();
-    item.media = useMp3(i.media);
-    item.customData = i.customData;
-    return item;
-  });
-  req.queueData.startIndex = Math.max(0, queue.getCurrentItemIndex());
-  req.media = req.queueData.items[req.queueData.startIndex].media;
-  player.load(req).finally(() => { retrying = false; });
 });
 
 // A relative seek ("a few seconds back or forward") comes from the TV's own remote handling, never from Siansa,

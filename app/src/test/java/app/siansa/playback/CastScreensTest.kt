@@ -11,38 +11,46 @@ class CastScreensTest {
     private val own = "14717CD8"
 
     @Test fun aTvOfferedSiansasScreenGetsIt() {
-        assertEquals(CastScreens.Choice(own, Why.Own), CastScreens(own).pick("tv-1", ownOffered = true))
+        assertEquals(CastScreens.Choice(own, Why.Own), CastScreens(own).pick(ownOffered = true))
     }
 
     @Test fun aTvNotOfferedSiansasScreenGetsGooglesSoCastingStillWorks() {
         // Unpublished Cast app, TV not registered: Cast doesn't list Siansa's screen for it.
-        assertEquals(CastScreens.Choice(CastReceiver.DEFAULT, Why.NotOffered), CastScreens(own).pick("shield", ownOffered = false))
+        assertEquals(CastScreens.Choice(CastReceiver.DEFAULT, Why.NotOffered), CastScreens(own).pick(ownOffered = false))
     }
 
     @Test fun aBuildWithoutItsOwnScreenAlwaysUsesGooglesScreen() {
         val screens = CastScreens(CastReceiver.DEFAULT)
-        assertEquals(CastScreens.Choice(CastReceiver.DEFAULT, Why.NoOwnScreen), screens.pick("tv-1", ownOffered = true))
+        assertEquals(CastScreens.Choice(CastReceiver.DEFAULT, Why.NoOwnScreen), screens.pick(ownOffered = true))
         assertFalse(screens.startFailed("tv-1", CastReceiver.DEFAULT, cancelled = false))
     }
 
-    @Test fun whenSiansasScreenFailsToStartTheTvGetsGooglesFromThenOn() {
+    @Test fun whenSiansasScreenFailsToStartOnlyTheRetryUsesGooglesScreen() {
+        val screens = CastScreens(own)
+        // The failed start is tried once more, with Google's screen.
+        assertTrue(screens.startFailed("tv-1", own, cancelled = false))
+        // The next cast the user starts tries Siansa's screen again (0.52.0-dev: a SHIELD restarting its Cast app
+        // said APPLICATION_NOT_FOUND once, and kept Google's screen until the app restarted).
+        assertEquals(CastScreens.Choice(own, Why.Own), screens.pick(ownOffered = true))
+    }
+
+    @Test fun aTvWhereSiansasScreenFailsAgainIsRetriedWithGooglesEachTime() {
         val screens = CastScreens(own)
         assertTrue(screens.startFailed("tv-1", own, cancelled = false))
-        assertEquals(CastScreens.Choice(CastReceiver.DEFAULT, Why.FailedBefore), screens.pick("tv-1", ownOffered = true))
-        // Other TVs still get Siansa's screen.
-        assertEquals(CastScreens.Choice(own, Why.Own), screens.pick("tv-2", ownOffered = true))
+        assertEquals(Why.Own, screens.pick(ownOffered = true).why)
+        assertTrue(screens.startFailed("tv-1", own, cancelled = false))
     }
 
     @Test fun googlesScreenFailingIsntRetried() {
         val screens = CastScreens(own)
         assertFalse(screens.startFailed("tv-1", CastReceiver.DEFAULT, cancelled = false))
-        assertEquals(Why.Own, screens.pick("tv-1", ownOffered = true).why)
+        assertEquals(Why.Own, screens.pick(ownOffered = true).why)
     }
 
     @Test fun cancellingTheCastIsntAFailure() {
         val screens = CastScreens(own)
         assertFalse(screens.startFailed("tv-1", own, cancelled = true))
-        assertEquals(Why.Own, screens.pick("tv-1", ownOffered = true).why)
+        assertEquals(Why.Own, screens.pick(ownOffered = true).why)
     }
 
     @Test fun anUnknownTvIsntRetried() {
@@ -59,14 +67,14 @@ class CastScreensTest {
         assertFalse(screens.startFailed("tv-1", CastReceiver.DEFAULT, cancelled = false))
     }
 
-    @Test fun anUnknownDeviceIdStillGetsAScreen() {
-        assertEquals(Why.Own, CastScreens(own).pick(null, ownOffered = true).why)
-        assertEquals(Why.NotOffered, CastScreens(own).pick(null, ownOffered = false).why)
+    @Test fun theScreenDependsOnlyOnWhetherSiansasIsOffered() {
+        assertEquals(Why.Own, CastScreens(own).pick(ownOffered = true).why)
+        assertEquals(Why.NotOffered, CastScreens(own).pick(ownOffered = false).why)
     }
 
     @Test fun theLogSaysWhy() {
         val screens = CastScreens(own)
-        assertTrue(screens.describe(screens.pick("tv", true)).contains(own))
-        assertTrue(screens.describe(screens.pick("tv", false)).contains("Google"))
+        assertTrue(screens.describe(screens.pick(true)).contains(own))
+        assertTrue(screens.describe(screens.pick(false)).contains("Google"))
     }
 }
