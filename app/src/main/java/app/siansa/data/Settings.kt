@@ -226,6 +226,8 @@ data class AppSettings(
     val mixSurprise: Int = DEFAULT_MIX_SURPRISE,
     /** Home's Today's mix (issue #776): whether it's made by itself, and tuning over the vibe's own. */
     val dailyMix: DailyMix = DailyMix(),
+    /** The TV app's audio passthrough (issue #860): Dolby and DTS music sent unchanged to the receiver. Phones ignore it. */
+    val audioPassthrough: app.siansa.playback.PassthroughMode = app.siansa.playback.PassthroughMode.OFF,
 ) {
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
@@ -477,6 +479,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .takeIf { it in AppSettings.BLEND_BAR_CHOICES } ?: AppSettings.DEFAULT_BLEND_BARS,
         mixShape = MixShape.parse(prefs.getString("mix_shape", null)),
         mixSurprise = prefs.getInt("mix_surprise", AppSettings.DEFAULT_MIX_SURPRISE).coerceIn(0, 100),
+        audioPassthrough = app.siansa.playback.PassthroughMode.parse(prefs.getString("audio_passthrough", null)),
         dailyMix = DailyMix(
             autoUpdate = prefs.getBoolean("daily_auto", true),
             length = prefs.getInt("daily_length", -1).takeIf { it > 0 },
@@ -616,6 +619,12 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setAnimatedCovers(on: Boolean) {
         prefs.edit().putBoolean("animated_covers", on).apply()
         _state.value = _state.value.copy(animatedCovers = on)
+    }
+
+    /** The TV app's audio passthrough (issue #860); applies from the next song. */
+    fun setAudioPassthrough(mode: app.siansa.playback.PassthroughMode) {
+        prefs.edit().putString("audio_passthrough", mode.name).apply()
+        _state.value = _state.value.copy(audioPassthrough = mode)
     }
 
     fun setLogging(on: Boolean) {

@@ -1,6 +1,8 @@
 package app.siansa
 
+import android.content.Intent
 import android.graphics.Color
+import app.siansa.pairing.PhonePairing
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -39,6 +41,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val graph = (application as SiansaApp).graph
         graph.player.connect()
+        // Signing in the TV app from its QR code (issue #860).
+        PhonePairing.handle(this, graph, intent)
         setContent {
             val settings by graph.settings.state.collectAsStateWithLifecycle()
             val choice = themeChoiceOf(settings)
@@ -74,5 +78,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        PhonePairing.handle(this, (application as SiansaApp).graph, intent)
     }
 }

@@ -25,6 +25,7 @@ request, and says which page in its description.
 | AI, the moment | [AI features](ai.md) |
 | Audiobooks, podcasts, Audiobookshelf | [Audiobooks and podcasts](books.md) |
 | Internet radio, podcast feeds, Your Stations | [Your Stations](stations.md) |
+| The TV app, audio passthrough | [Siansa on your TV](tv.md) |
 | Any settings page | [Settings](settings.md) |
 | How something is worked out | [How it works](how-it-works.md) |
 | Something users run into | [Troubleshooting](troubleshooting.md) |

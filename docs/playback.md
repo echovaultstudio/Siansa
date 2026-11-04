@@ -197,6 +197,9 @@ Stopping the cast brings the music back to the phone, paused. In **Play on**, ea
 "Chromecast" under it ("Chromecast · speaker" or "Chromecast · speaker group" for speakers and groups); DLNA ones show
 "DLNA" and their model.
 
+On an Android TV or Google TV, [Siansa's TV app](tv.md) can also play from your server on its own, and send Dolby
+and DTS music unchanged to your AV receiver (audio passthrough).
+
 **Out of reach.** When the phone leaves the Wi-Fi a DLNA TV or speaker is on (you leave the house), the music comes
 back to the phone, paused, within a few seconds. A device that stops answering on the same Wi-Fi is let go after
 about 15 seconds. A short note says which device was lost. The device itself plays from your server, so it may

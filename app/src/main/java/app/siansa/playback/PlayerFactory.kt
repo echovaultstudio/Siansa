@@ -13,7 +13,11 @@ import androidx.media3.decoder.ffmpeg.FfmpegLibrary
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import android.os.Handler
+import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.audio.AudioRendererEventListener
 import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import app.siansa.AppGraph
@@ -50,6 +54,8 @@ object PlayerFactory {
         handleAudioFocus: Boolean = true,
         engine: AudioEngine? = null,
         mixDeck: MixCore.Deck? = null,
+        /** The TV app's main player (issue #860): Dolby and DTS songs may go to the receiver as a bitstream. */
+        passthrough: Boolean = false,
     ): Built {
         // Streams use their own HTTP queue and connections (graph.streamHttp), so covers and API calls never
         // hold them up, and report their size and arrival speed to StreamStats.
@@ -118,6 +124,24 @@ object PlayerFactory {
                         .setAudioProcessors(arrayOf(equaliser))
                         .build()
                 }
+
+            // Passthrough (issue #860) goes first, so it takes the Dolby and DTS songs the receiver can decode before
+            // FFmpeg would; it refuses everything else, which goes on to the usual renderers below.
+            override fun buildAudioRenderers(
+                context: Context,
+                extensionRendererMode: Int,
+                mediaCodecSelector: MediaCodecSelector,
+                enableDecoderFallback: Boolean,
+                audioSink: AudioSink,
+                eventHandler: Handler,
+                eventListener: AudioRendererEventListener,
+                out: ArrayList<Renderer>,
+            ) {
+                if (passthrough) {
+                    out.add(PassthroughRenderer.create(context, mediaCodecSelector, eventHandler, eventListener) { graph.settings.current.audioPassthrough })
+                }
+                super.buildAudioRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, audioSink, eventHandler, eventListener, out)
+            }
         }.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
         AppLog.i("Player", "FFmpeg decoders " + if (FfmpegLibrary.isAvailable()) "ready (${FfmpegLibrary.getVersion()})" else "not available")
 
