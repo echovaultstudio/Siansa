@@ -1,5 +1,6 @@
 package app.siansa.playback
 
+import android.app.Application
 import android.net.Uri
 import app.siansa.data.AppSettings
 import app.siansa.data.Song
@@ -12,12 +13,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * Songs converted for a Cast TV go as Opus 320 in Ogg (issue #114: Navidrome's Opus plays on the owner's SHIELD), with
  * MP3 320 after it for TVs that can't play Opus; MP3 320 quality sends only MP3.
  */
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], application = Application::class)
 class CastOpusTest {
     private val api = SubsonicApi(OkHttpClient()) { AppSettings(navidromeUrl = "http://nd.example:4533", navidromeUser = "me", navidromePassword = "pw") }
     private val song = Song(id = "s1", title = "Song", albumId = "a1", suffix = "wma", durationSec = 200)
