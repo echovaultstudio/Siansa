@@ -149,6 +149,13 @@ const ICONS = {
 const $ = id => document.getElementById(id);
 
 const context = cast.framework.CastReceiverContext.getInstance();
+
+// What the remote does here goes to the phone's log ("CastTV"), for tracing remote problems: the keys the page
+// gets, the TV's own seeks, and what the page made of them.
+const LOG_NS = 'urn:x-cast:app.siansa.log';
+function tvlog(text) {
+  try { context.sendCustomMessage(LOG_NS, undefined, String(text)); } catch (e) { /* no phone listening yet */ }
+}
 const player = context.getPlayerManager();
 player.setMediaElement($('audio'));
 
@@ -238,7 +245,8 @@ function jump(by) {
 }
 function act(name) {
   const now = Date.now();
-  if (now - lastAct < 600) return;
+  if (now - lastAct < 600) { tvlog('ignored ' + name + ' (just did one)'); return; }
+  tvlog('does ' + name);
   lastAct = now;
   const S = cast.framework.messages.PlayerState;
   if (name === 'toggle') name = player.getPlayerState() === S.PAUSED ? 'play' : 'pause';
@@ -263,6 +271,7 @@ function wind(dir) {
   let to = player.getCurrentTimeSec() + dir * step;
   to = Math.max(0, dur > 0 ? Math.min(dur - 1, to) : to);
   sign(dir < 0 ? 'back' : 'forward');
+  tvlog('winds to ' + Math.round(to) + ' s');
   player.seek(to);
   tick();
 }
@@ -291,6 +300,7 @@ const KEYS = { 37: 'ArrowLeft', 39: 'ArrowRight', 13: 'Enter', 179: 'MediaPlayPa
   177: 'MediaTrackPrevious', 415: 'MediaPlay', 19: 'MediaPause', 417: 'MediaTrackNext', 412: 'MediaTrackPrevious' };
 const keyOf = e => e.key && e.key !== 'Unidentified' ? e.key : KEYS[e.keyCode];
 document.addEventListener('keydown', e => {
+  tvlog('key down ' + e.key + ' (' + e.keyCode + ')' + (e.repeat ? ' repeat' : ''));
   if ($('now').classList.contains('hidden')) return;
   switch (keyOf(e)) {
     case 'ArrowLeft': keyAt = Date.now(); arrowDown(-1, e.repeat); break;
@@ -307,6 +317,7 @@ document.addEventListener('keydown', e => {
   e.preventDefault();
 });
 document.addEventListener('keyup', e => {
+  tvlog('key up ' + e.key + ' (' + e.keyCode + ')');
   const key = keyOf(e);
   if ((key === 'ArrowLeft' && arrow < 0) || (key === 'ArrowRight' && arrow > 0)) { arrowAt = Date.now(); arrowDone(); }
   if (key === 'MediaRewind' || key === 'MediaFastForward') windStart = 0;
@@ -377,6 +388,7 @@ player.addEventListener(E.ERROR, () => {
 // They're handled like the keys: one on its own is a press (previous or next), several in a row are a hold
 // (winding through the song).
 player.setMessageInterceptor(M.MessageType.SEEK, req => {
+  tvlog('seek from ' + (req.senderId || 'the TV') + ': to ' + req.currentTime + ', by ' + req.relativeTime + ', at ' + Math.round(player.getCurrentTimeSec()) + ' s');
   const relative = typeof req.relativeTime === 'number' && typeof req.currentTime !== 'number';
   if (relative) {
     // When the keys reach the page too, they already count: the TV's seek is dropped.
@@ -389,9 +401,14 @@ player.setMessageInterceptor(M.MessageType.SEEK, req => {
   return req;
 });
 
+// Other commands, only logged: to see what the TV's remote sends besides keys and seeks.
+[M.MessageType.PLAY, M.MessageType.PAUSE, M.MessageType.QUEUE_UPDATE, M.MessageType.STOP].forEach(type =>
+  player.setMessageInterceptor(type, req => { tvlog(type + ' from ' + (req.senderId || 'the TV') + (req.jump ? ', jump ' + req.jump : '')); return req; }));
+
 // Previous and next work on the queue the phone sends (the whole queue, with the next song loaded ahead).
 const options = new cast.framework.CastReceiverOptions();
 options.statusText = 'Siansa';
+options.customNamespaces = { [LOG_NS]: cast.framework.system.MessageType.STRING };
 options.supportedCommands = M.Command.ALL_BASIC_MEDIA | M.Command.QUEUE_NEXT | M.Command.QUEUE_PREV;
 // The splash says "Connecting…" until the TV has started the page, then waits for the phone's first song.
 context.addEventListener(cast.framework.system.EventType.READY, render);

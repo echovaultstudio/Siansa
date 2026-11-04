@@ -209,6 +209,7 @@ object Cast {
                 val used = c.castOptions.receiverApplicationId
                 val screen = if (CastReceiver.isOwn(used)) "Siansa's own TV screen" else "Google's standard TV screen"
                 AppLog.i("Cast", "Casting to ${session.castDevice?.friendlyName ?: "a Cast device"} with $screen ($used)")
+                listenToTv(session)
             }
             override fun onSessionStartFailed(session: CastSession, error: Int) {
                 val device = session.castDevice?.deviceId ?: lastPicked
@@ -228,10 +229,24 @@ object Cast {
             override fun onSessionEnding(session: CastSession) {}
             override fun onSessionEnded(session: CastSession, error: Int) {}
             override fun onSessionResuming(session: CastSession, sessionId: String) {}
-            override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {}
+            override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) { listenToTv(session) }
             override fun onSessionResumeFailed(session: CastSession, error: Int) {}
             override fun onSessionSuspended(session: CastSession, reason: Int) {}
         }, CastSession::class.java)
+    }
+
+    /**
+     * Siansa's TV screen reports what the remote does there (keys, the TV's own seeks, and what the page made of
+     * them) on [TV_LOG_NAMESPACE]; written to the log as "CastTV", for tracing remote problems (issue #114).
+     */
+    private fun listenToTv(session: CastSession) {
+        try {
+            session.setMessageReceivedCallbacks(TV_LOG_NAMESPACE) { _, _, message ->
+                AppLog.i("CastTV", message.take(TV_LOG_MAX))
+            }
+        } catch (e: Exception) {
+            AppLog.d("Cast", "The TV's own log isn't available: ${e.message}")
+        }
     }
 
     /** Picks the TV [device] again once the router lists it, giving up after a while. Main thread. */
@@ -263,6 +278,12 @@ object Cast {
             }
         }, FIND_AGAIN_MS)
     }
+
+    /** Where Siansa's TV screen sends its log lines (cast-receiver/index.html). */
+
+    const val TV_LOG_NAMESPACE = "urn:x-cast:app.siansa.log"
+
+    private const val TV_LOG_MAX = 300
 
     private const val RETRY_DELAY_MS = 1_000L
     private const val FIND_AGAIN_MS = 15_000L
