@@ -237,14 +237,14 @@ class CastQueuePlayer(private val tv: Player, private val prep: Prep? = null) : 
         val wasEmpty = window.size == 0
         val local = window.insert(index, mediaItems.map(::Entry))
         if (wasEmpty && window.size > 0) return sendWindow(0, 0L, "songs added to an empty queue")
-        if (local == null) return Futures.immediateVoidFuture<Any>()
+        if (local == null) return Futures.immediateVoidFuture()
         copy.add(local, mediaItems)
         return afterPrep(mediaItems) { addNow(local, mediaItems) }
     }
 
     override fun handleRemoveMediaItems(fromIndex: Int, toIndex: Int): ListenableFuture<*> {
         val currentFull = currentFullIndex()
-        val local = window.remove(fromIndex, toIndex) ?: return Futures.immediateVoidFuture<Any>()
+        val local = window.remove(fromIndex, toIndex) ?: return Futures.immediateVoidFuture()
         if (window.size == 0 && window.full.isNotEmpty()) {
             // Everything the TV held is gone: it gets the songs after them.
             window.reset(fromIndex)
@@ -285,7 +285,7 @@ class CastQueuePlayer(private val tv: Player, private val prep: Prep? = null) : 
             handleRemoveMediaItems(fromIndex, toIndex)
             return handleAddMediaItems(fromIndex, mediaItems)
         }
-        val local = window.replace(fromIndex, toIndex, mediaItems.map(::Entry)) ?: return Futures.immediateVoidFuture<Any>()
+        val local = window.replace(fromIndex, toIndex, mediaItems.map(::Entry)) ?: return Futures.immediateVoidFuture()
         val part = mediaItems.subList(local.first + window.start - fromIndex, local.last + window.start - fromIndex + 1)
         copy.replace(local.first, local.last + 1, part)
         return super.handleReplaceMediaItems(local.first, local.last + 1, part)
