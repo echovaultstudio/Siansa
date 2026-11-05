@@ -221,8 +221,10 @@ internal class Crossfader(
                 beatMatch = beatMatch,
                 blendBars = s.blendBars,
             )
-            if (planned == null) {
-                val why = Crossfade.whyNoFade(s.crossfade, maxMs, current, next, profiles.cached(current.id), profiles.cached(next.id), beatMatch)
+            if (planned == null || planned.gapMs > 0) {
+                // A cold end's pause needs the new audio engine (issue #826): here the two songs play back to back.
+                val why = if (planned != null) "${planned.why}; played back to back (the pause needs the new audio engine)"
+                else Crossfade.whyNoFade(s.crossfade, maxMs, current, next, profiles.cached(current.id), profiles.cached(next.id), beatMatch)
                     ?: "one of them is too short to share a fade"
                 AppLog.d("Crossfade", "No fade from ${current.id} into ${next.id}: $why")
                 skipped = item.mediaId

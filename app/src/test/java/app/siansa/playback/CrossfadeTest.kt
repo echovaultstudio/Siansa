@@ -156,6 +156,43 @@ class CrossfadePlanTest {
         assertEquals(2_000L, plan.fadeInMs)
     }
 
+    @Test fun aHardEndingIntoAHardStartIsAColdEndWithAShortPause() {
+        // 0.52.0-dev, 09:19: a 400 ms tail into a 0 ms intro overlapped for 400 ms, two loud edges colliding.
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, profile("a1", 0, 400), profile("b1", 0, 0))!!
+        assertTrue(plan.why, plan.gapMs > 0)
+        // No overlap: the old song's own last 400 ms (its tail) play out, the next song comes in after them and the pause.
+        assertEquals(400L, plan.overlapMs)
+        assertEquals(Crossfade.MIN_FADE_IN_MS, plan.fadeInMs)
+        assertNull(plan.beat)
+        assertTrue(plan.why, plan.why.contains("hard ending into a hard start"))
+        // A song loud to its very last sound still fades over a moment, only so it can't click.
+        assertEquals(Crossfade.COLD_OUT_MS, Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, profile("a1", 0, 0), profile("b1", 100, 0))!!.overlapMs)
+    }
+
+    @Test fun onlyBothEdgesHardMakeAColdEnd() {
+        // A soft start under a hard ending, or a hard start after a soft ending, blends as before.
+        val softStart = Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, profile("a1", 0, 400), profile("b1", 1_400, 0))!!
+        assertEquals(0L, softStart.gapMs)
+        assertEquals(1_800L, softStart.overlapMs)
+        val softEnd = Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, profile("a1", 0, 3_000), profile("b1", 0, 0))!!
+        assertEquals(0L, softEnd.gapMs)
+        assertEquals(3_000L, softEnd.overlapMs)
+        // Just past the edges: a 1 s tail, a 300 ms intro.
+        assertNull(Crossfade.coldEnd(Crossfade.COLD_TAIL_MS, 0, 0, null, null))
+        assertNull(Crossfade.coldEnd(0, Crossfade.COLD_HEAD_MS, 0, null, null))
+        assertNotNull(Crossfade.coldEnd(Crossfade.COLD_TAIL_MS - 1, Crossfade.COLD_HEAD_MS - 1, 0, null, null))
+        // Within one album running straight on it stays gapless, and fixed or off are untouched.
+        assertNull(Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, a2, minutes4, minutes4, profile("a1", 0, 0), profile("a2", 0, 0)))
+        assertEquals(0L, Crossfade.plan(CrossfadeMode.FIXED, 6_000, a1, b1, minutes4, minutes4, profile("a1", 0, 0), profile("b1", 0, 0))!!.gapMs)
+    }
+
+    @Test fun aColdEndPausesLongerWhenTheTemposAreFarApart() {
+        assertEquals(Crossfade.COLD_GAP_MS, Crossfade.coldGap(120.0, 126.0))
+        assertEquals(Crossfade.COLD_GAP_FAR_MS, Crossfade.coldGap(145.0, 191.5))
+        assertEquals(Crossfade.COLD_GAP_FAR_MS, Crossfade.coldGap(null, 120.0))
+        assertTrue(Crossfade.COLD_GAP_MS < Crossfade.COLD_GAP_FAR_MS)
+    }
+
     @Test fun smartFadeIsNeverLongerThanTheSetting() {
         val plan = Crossfade.plan(CrossfadeMode.SMART, 4_000, a1, b1, minutes4, minutes4, profile("a1", 0, 9_000), profile("b1", 3_000, 0))!!
         assertEquals(4_000L, plan.overlapMs)
@@ -256,8 +293,11 @@ class CrossfadePlanTest {
         assertTrue(Crossfade.beatlessRunsLong(outBeatless = true, inBeatless = true, tailMs = 400, headMs = 7_000))
     }
 
-    @Test fun aHardEndingIntoAHardHitPlaysBackToBack() {
-        assertNull(Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, b1, minutes4, minutes4, profile("a1", 0, 100), profile("b1", 100, 0)))
+    @Test fun aHardEndingIntoAHardHitIsAColdEnd() {
+        // Once played straight back to back; now the old song's last sound, a short pause, then the next song.
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, b1, minutes4, minutes4, profile("a1", 0, 100), profile("b1", 100, 0))!!
+        assertEquals(Crossfade.COLD_GAP_FAR_MS, plan.gapMs)
+        assertEquals(100L, plan.overlapMs)
     }
 
     @Test fun aHardHitStillFadesInBriefly() {

@@ -35,6 +35,11 @@ data class FadePlan(
     val beat: BeatMatch.Plan? = null,
     /** In smart mode, what the plugin measured at both ends and why the blend wasn't beat-matched (issue #744). */
     val beatNote: String? = null,
+    /**
+     * A cold end (a hard ending into a hard start): no overlap. The old song plays to its last sound, then this long
+     * a pause, then the next song from its start. 0 for every other blend.
+     */
+    val gapMs: Long = 0L,
 )
 
 /**
@@ -42,6 +47,7 @@ data class FadePlan(
  * the time the next song takes to get going is how long they overlap, so:
  * - a long fade-out starts blending early, and a hard ending doesn't blend at all;
  * - a slow intro fades in slowly, and a hard hit comes in at once;
+ * - a hard ending into a hard start doesn't overlap at all: a short pause between them, as a radio DJ plays a cold end;
  * - songs that run straight on within one album (live albums, DJ mixes) aren't faded, so they stay gapless.
  * Without ramps, smart mode falls back to the fixed length (still keeping album runs gapless).
  */
@@ -75,6 +81,45 @@ object Crossfade {
 
     /** Shorter overlaps than this just play the songs back to back. */
     const val MIN_OVERLAP_MS = 300L
+
+    /** A song's end with a quiet tail shorter than this is a hard ending: loud to its last sound. */
+    const val COLD_TAIL_MS = 1_000L
+
+    /** A song's start that is loud within this long is a hard start: it hits at once. */
+    const val COLD_HEAD_MS = 300L
+
+    /** A cold end's pause between the two songs; [COLD_GAP_FAR_MS] when their tempos are far apart or unknown. */
+    const val COLD_GAP_MS = 400L
+    const val COLD_GAP_FAR_MS = 600L
+
+    /** The old song's last sound is faded over at least this long in a cold end, only so it can't click. */
+    const val COLD_OUT_MS = 50L
+
+    /**
+     * A cold end (0.52.0-dev: a loud math-rock ending laid half a second over a loud start sounded like a mistake): a
+     * hard ending (a quiet tail under [COLD_TAIL_MS]) into a hard start (loud within [COLD_HEAD_MS]). Two loud edges
+     * can't share an overlap, so none: the old song plays to its very last sound, a short pause, then the next song
+     * from its start, as a radio DJ plays a cold end. Both songs stay whole. Null when either edge is soft, so every
+     * other blend is as before.
+     */
+    fun coldEnd(tailMs: Long, headMs: Long, cutMs: Long, outBpm: Double?, inBpm: Double?): FadePlan? {
+        if (tailMs >= COLD_TAIL_MS || headMs >= COLD_HEAD_MS) return null
+        val gap = coldGap(outBpm, inBpm)
+        return FadePlan(
+            overlapMs = tailMs.coerceAtLeast(COLD_OUT_MS),
+            fadeInMs = MIN_FADE_IN_MS,
+            why = "smart: a hard ending into a hard start (${tailMs} ms tail + ${headMs} ms intro), so no overlap: the old song plays to its last sound, then a ${gap} ms pause",
+            cutMs = cutMs,
+            gapMs = gap,
+        )
+    }
+
+    /** A cold end's pause: a little longer when the tempos are far apart (more than 15 %) or unknown, a bigger change. */
+    fun coldGap(outBpm: Double?, inBpm: Double?): Long {
+        if (outBpm == null || inBpm == null || outBpm <= 0 || inBpm <= 0) return COLD_GAP_FAR_MS
+        val ratio = inBpm / outBpm
+        return if (ratio in 0.87..1.15) COLD_GAP_MS else COLD_GAP_FAR_MS
+    }
 
     /** The shortest fade-in, so even a hard hit doesn't click in. */
     const val MIN_FADE_IN_MS = 150L
@@ -196,6 +241,20 @@ object Crossfade {
         val matched = if (matchable && beatMatch && currentDurationMs > 0) {
             BeatMatch.plan(outro!!, intro!!, currentDurationMs - cut, BeatMatch.maxMsFor(outro, BeatMatch.barsFor(outro, intro, blendBars)))
         } else null
+        // A cold end: a hard ending into a hard start never overlaps (both songs' edges loud), unless it's laid beat on
+        // beat, or it's a DJ blend that brings a beatless song in under the other for the whole crossfade length.
+        if (mode == CrossfadeMode.SMART && matched == null && !mixed && currentProfile != null && nextProfile != null) {
+            val tail = ((currentProfile.quietForLastMs(QUIET_DB) ?: 0L) - cut).coerceAtLeast(0L)
+            val head = nextProfile.reachesAfterMs(QUIET_DB) ?: 0L
+            val djLong = beatMatch && !rhythmic && (BeatMatch.beatless(outro) || BeatMatch.beatless(intro)) &&
+                beatlessRunsLong(BeatMatch.beatless(outro), BeatMatch.beatless(intro), tail, head)
+            if (!djLong) {
+                coldEnd(tail, head, cut, outro?.bpm, intro?.bpm)?.let { cold ->
+                    val note = if (outro != null || intro != null) BeatMatch.note(outro, intro, beatMatch) else null
+                    return cold.copy(why = cold.why + (cutWhy?.let { " · $it" } ?: ""), beatNote = note)
+                }
+            }
+        }
         var plan = if (matched != null) {
             // A phrase-on-phrase blend may let the song go at the end of its last phrase (issue #757).
             FadePlan(matched.overlapMs, matched.overlapMs, matched.why, cut + matched.cutMs, matched)
