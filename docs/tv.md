@@ -30,13 +30,16 @@ Everything works with the remote's arrows and the centre button.
 - **Home**: Today's mix, Shuffle your library and Liked songs, then the rows of your phone's Home, in the same order
   and with the same rows hidden: Jump back in, Your mixes, Rediscover, Radios, Your playlists, Recently played, Artist
   radios, Recently added, Your genres and Random picks. A radio starts playing straight away.
-- **Library**: albums, artists, playlists and genres as covers, your liked songs, and Time machine.
-- **Albums, playlists and mixes**: Play, Shuffle, or pick a song to play from it. The button at the end of each song
-  has Play next, Add to queue, Like, Start song radio, and Go to album or artist.
+- **Library**: albums, artists, playlists and genres as covers, your liked songs, favourite albums and favourite
+  artists, and Time machine.
+- **Albums, playlists and mixes**: the cover and what it is at the top, with the artists, genre and label to open,
+  then Play, Shuffle and Add to favourites; down from them goes straight to the songs. The button at the end of each
+  song has Play next, Add to queue, Like, Start song radio, Similar songs, and Go to album or artist.
+- **Artists**: Play, Shuffle, Artist radio and Add to favourites, then their top songs, albums and similar artists.
 - **Search**: type with the on-screen keyboard or press the microphone button and say it. "Play … on Siansa" from
   Google TV's own search opens it too.
 - **Now playing**: the cover, the song and the controls, large enough to read from the sofa, with Like, Up next and a
-  sleep timer.
+  sleep timer. The artists and the album open their pages.
 - **Skipping within a song**: rewind and fast forward on the remote go back and forward 10 seconds anywhere in the
   app. On a remote without them, press up from the controls in Now playing to reach the progress bar, then left and
   right.
@@ -56,7 +59,9 @@ the phone:
 
 The TV has the settings that matter on a TV, each the same page as on the phone:
 
-- **Servers and services**, **Library sync**, **Mixes and vibes** and **Scrobbling and history**.
+- **Servers and users**: every server and user on the TV; pick one to switch (Siansa starts again as them). **Add a
+  server or user** signs in with the code on the TV, like the first time, and keeps its own library and settings.
+- **Servers and services** (AudioMuse, Last.fm and more), **Library sync**, **Mixes and vibes** and **Scrobbling and history**.
 - **Audio passthrough** (below), **Playback** (crossfades, DJ blends, levelling, the equaliser, keep playing) and
   **Streaming quality**.
 - **Colours**: the TV is always dark.

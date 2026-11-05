@@ -1,30 +1,32 @@
 package app.siansa.tvapp
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -47,35 +49,44 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.siansa.data.Album
 import app.siansa.data.Artist
+import app.siansa.data.ArtistRef
 import app.siansa.data.Song
 import app.siansa.data.cover
+import app.siansa.data.isFavouriteAlbum
 import app.siansa.log.AppLog
+import app.siansa.ui.AlbumTag
 import app.siansa.ui.Cover
 import app.siansa.ui.LARGE_COVER
 import app.siansa.ui.LocalGraph
 import app.siansa.ui.LocalNav
 import app.siansa.ui.LocalSnack
 import app.siansa.ui.Space
+import app.siansa.ui.albumTagRoute
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** The Library's lists. */
 private enum class Shelf(val label: String) {
-    ALBUMS("Albums"), ARTISTS("Artists"), PLAYLISTS("Playlists"), LIKED("Liked songs"), GENRES("Genres")
+    ALBUMS("Albums"), ARTISTS("Artists"), PLAYLISTS("Playlists"), LIKED("Liked songs"),
+    FAVOURITE_ALBUMS("Favourite albums"), FAVOURITE_ARTISTS("Favourite artists"), GENRES("Genres"),
 }
 
-/** Albums, artists, playlists and genres in grids of covers, and the liked songs as a list. */
+/** Albums, artists, playlists, favourites and genres in grids of covers, and the liked songs as a list. */
 @Composable
 fun TvLibrary() {
     val graph = LocalGraph.current
+    val nav = LocalNav.current
     val version by graph.library.version.collectAsStateWithLifecycle()
     val likes by graph.favorites.changes.collectAsStateWithLifecycle()
+    val favouriteAlbums by graph.favouriteAlbums.ids.collectAsStateWithLifecycle()
+    val favouriteArtists by graph.favouriteArtists.ids.collectAsStateWithLifecycle()
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
     var shelf by rememberSaveable { mutableStateOf(Shelf.ALBUMS) }
     var tiles by remember { mutableStateOf<List<TvItem>?>(null) }
     var liked by remember { mutableStateOf<List<Song>?>(null) }
     var shown by remember { mutableStateOf<Shelf?>(null) }
     // As on Home: read again once a sync has stopped changing the library for a moment, keeping what's shown meanwhile.
-    LaunchedEffect(shelf, version, likes) {
+    LaunchedEffect(shelf, version, likes, favouriteAlbums, favouriteArtists) {
         if (shown == shelf) delay(RELOAD_PAUSE_MS)
         runCatching {
             if (shelf == Shelf.LIKED) {
@@ -85,6 +96,9 @@ fun TvLibrary() {
                     Shelf.ALBUMS -> graph.library.albums("name").map { TvItem.OfAlbum(it) }
                     Shelf.ARTISTS -> graph.library.artists().map { TvItem.OfArtist(it) }
                     Shelf.PLAYLISTS -> graph.playlists.removed.visible(graph.library.playlists()).map { TvItem.OfPlaylist(it) }
+                    Shelf.FAVOURITE_ALBUMS -> graph.favouriteAlbums.refresh().filter { isFavouriteAlbum(it, favouriteAlbums) }
+                        .map { a -> graph.library.album(a.id) ?: a }.distinctBy { it.id }.map { TvItem.OfAlbum(it) }
+                    Shelf.FAVOURITE_ARTISTS -> graph.favouriteArtists.refresh().filter { it.id in favouriteArtists }.map { TvItem.OfArtist(it) }
                     Shelf.GENRES -> graph.library.genres(GENRES).map { TvItem.OfGenre(it) }
                     Shelf.LIKED -> emptyList()
                 }
@@ -92,27 +106,34 @@ fun TvLibrary() {
             shown = shelf
         }.onFailure { AppLog.w("Tv", "Couldn't read the library's ${shelf.label.lowercase()}: ${it.message}") }
     }
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
-        val settings by graph.settings.state.collectAsStateWithLifecycle()
-        val nav = LocalNav.current
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
         Row(
             Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = TV_EDGE, vertical = Space.Small),
             horizontalArrangement = Arrangement.spacedBy(Space.Small),
         ) {
-            for (s in Shelf.entries) TvButton(s.label, null, onClick = { shelf = s }, strong = s == shelf)
+            for (s in Shelf.entries) {
+                TvButton(s.label, null, onClick = { shelf = s }, strong = s == shelf, modifier = if (s == Shelf.ALBUMS) Modifier.initialFocus() else Modifier)
+            }
             // The phone's pages for these: your listening by year, and (with AudioMuse) the sound of your library.
             TvButton("Time machine", null, onClick = { nav.navigate("timemachine") })
             if (settings.audioMuseReady) TvButton("Your sound", null, onClick = { nav.navigate("fingerprint") })
         }
+        val empty = when (shelf) {
+            Shelf.FAVOURITE_ALBUMS -> "No favourite albums yet. Press the heart on an album's page to add it."
+            Shelf.FAVOURITE_ARTISTS -> "No favourite artists yet. Press the heart on an artist's page to add them."
+            else -> "Nothing here yet."
+        }
         when {
-            shown != shelf -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            shown != shelf -> Loading()
             shelf == Shelf.LIKED -> {
                 val songs = liked.orEmpty()
-                if (songs.isEmpty()) EmptyNote("Songs you like show here.") else SongList(songs, header = {
-                    PlayButtons(play = { songs }, note = "${songs.size} songs")
-                })
+                if (songs.isEmpty()) {
+                    EmptyNote("Songs you like show here. Like one from its actions or in Now playing.")
+                } else {
+                    SongList(songs, header = { PlayButtons(play = { songs }, note = "${songs.size} songs") })
+                }
             }
-            tiles.isNullOrEmpty() -> EmptyNote("Nothing here yet.")
+            tiles.isNullOrEmpty() -> EmptyNote(empty)
             else -> LazyVerticalGrid(
                 columns = GridCells.Adaptive(TILE_WIDTH),
                 modifier = Modifier.fillMaxSize(),
@@ -130,6 +151,8 @@ fun TvLibrary() {
 fun TvAlbum(id: String) {
     val graph = LocalGraph.current
     val nav = LocalNav.current
+    val favourites by graph.favouriteAlbums.ids.collectAsStateWithLifecycle()
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
     val detail by produceState<Pair<Album, List<Song>>?>(null, id) {
         value = runCatching {
             val album = graph.library.album(id)
@@ -138,15 +161,33 @@ fun TvAlbum(id: String) {
     }
     val d = detail ?: return Loading()
     val (album, songs) = d
-    val about = listOfNotNull(album.year?.toString(), "${songs.size} songs").joinToString(" · ")
-    val artistId = album.artistId
-    SongsPage(
-        album.name, album.artist, about, album.coverArt, songs,
+    val favourite = isFavouriteAlbum(album, favourites)
+    val total = songs.sumOf { it.durationSec } / 60
+    // Every artist on the album, each opening their page: the album's own, then the songs' (a compilation, features).
+    val artists = (listOfNotNull(album.artistId?.let { ArtistRef(it, album.artist) }) + songs.flatMap { it.artists })
+        .distinctBy { it.id }.take(MAX_ARTISTS)
+    CollectionPage(
+        title = album.name,
+        coverId = album.coverArt,
+        songs = songs,
         shortcut = Shortcut("album/$id", album.name, album.coverArt),
-        extra = if (artistId != null) {
-            { TvButton("Go to artist", null, onClick = { nav.navigate(TvRoutes.artist(artistId)) }) }
-        } else {
-            null
+        about = listOfNotNull(album.year?.toString(), "${songs.size} songs", "$total min".takeIf { total > 0 }).joinToString(" · "),
+        values = {
+            if (artists.isEmpty()) {
+                Text(album.artist, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            } else {
+                for (a in artists) TvChip(a.name, onClick = { nav.navigate(TvRoutes.artist(a.id)) }, strong = true)
+            }
+            album.genre?.takeIf { it.isNotBlank() }?.let { g -> TvChip(g, onClick = { nav.navigate(albumTagRoute(AlbumTag.GENRE, g)) }) }
+            album.labels.firstOrNull()?.let { l -> TvChip(l, onClick = { nav.navigate(albumTagRoute(AlbumTag.LABEL, l)) }) }
+        },
+        buttons = {
+            TvButton(
+                if (favourite) "Favourite" else "Add to favourites",
+                if (favourite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                onClick = { graph.favouriteAlbums.toggle(album) },
+            )
+            if (settings.audioMuseReady) TvButton("Similar albums", null, onClick = { nav.navigate("similar/albums/${android.net.Uri.encode(id)}") })
         },
     )
 }
@@ -159,7 +200,14 @@ fun TvPlaylist(id: String) {
     }
     val d = detail ?: return Loading()
     val cover = d.playlist.coverArt ?: d.songs.firstOrNull()?.cover
-    SongsPage(d.playlist.name, "Playlist", "${d.songs.size} songs", cover, d.songs, shortcut = Shortcut("playlist/$id", d.playlist.name, cover))
+    val total = d.songs.sumOf { it.durationSec } / 60
+    CollectionPage(
+        title = d.playlist.name,
+        coverId = cover,
+        songs = d.songs,
+        shortcut = Shortcut("playlist/$id", d.playlist.name, cover),
+        about = listOfNotNull("Playlist", "${d.songs.size} songs", "$total min".takeIf { total > 0 }).joinToString(" · "),
+    )
 }
 
 @Composable
@@ -168,84 +216,154 @@ fun TvMix(id: String) {
     val mix by produceState<app.siansa.data.Mix?>(null, id) { value = runCatching { graph.mixes.get(id) }.getOrNull() }
     val m = mix ?: return Loading()
     val cover = m.songs.firstOrNull()?.cover
-    SongsPage(m.title, m.description.ifBlank { "Mix" }, "${m.songs.size} songs", cover, m.songs, shortcut = Shortcut("mix/$id", m.title, cover))
+    CollectionPage(
+        title = m.title,
+        coverId = cover,
+        songs = m.songs,
+        shortcut = Shortcut("mix/$id", m.title, cover),
+        about = listOfNotNull(m.description.ifBlank { "Mix" }, "${m.songs.size} songs").joinToString(" · "),
+    )
 }
 
+/**
+ * An artist: their picture and buttons, then their top songs, their albums and similar artists, one under the other.
+ * Down from the buttons goes straight to the first song.
+ */
 @Composable
 fun TvArtist(id: String) {
     val graph = LocalGraph.current
+    val nav = LocalNav.current
     val play = rememberTvPlay()
-    val artist by produceState<Artist?>(null, id) { value = graph.library.artist(id) }
-    val albums by produceState<List<TvItem>?>(null, artist) {
-        value = artist?.let { a -> graph.library.albumsOf(a).map { TvItem.OfAlbum(it, it.year?.toString()) } }
+    val favourites by graph.favouriteArtists.ids.collectAsStateWithLifecycle()
+    val player by graph.player.state.collectAsStateWithLifecycle()
+    val artist by produceState<Artist?>(null, id) {
+        value = runCatching { graph.library.artist(id) ?: graph.source.artist(id).artist }
+            .onFailure { AppLog.w("Tv", "Couldn't open artist $id: ${it.message}") }.getOrNull()
+    }
+    val albums by produceState<List<Album>?>(null, artist) {
+        val a = artist ?: return@produceState
+        value = runCatching { graph.library.albumsOf(a).ifEmpty { graph.source.artist(a.id).albums } }.getOrDefault(emptyList())
+    }
+    val top by produceState<List<Song>>(emptyList(), artist) {
+        val a = artist ?: return@produceState
+        value = runCatching { graph.source.topSongs(a.name, TOP_SONGS) }.getOrDefault(emptyList())
+    }
+    val similar by produceState<List<Artist>>(emptyList(), artist) {
+        val a = artist ?: return@produceState
+        value = runCatching {
+            graph.source.artistInfo(a.id).similar.mapNotNull { s -> s.id?.let { Artist(id = it, name = s.name, coverArt = s.coverArt) } }
+        }.getOrDefault(emptyList())
     }
     val a = artist ?: return Loading()
-    val list = albums ?: return Loading()
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(TILE_WIDTH),
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = TV_EDGE, vertical = Space.Page),
-        horizontalArrangement = Arrangement.spacedBy(Space.Section),
-        verticalArrangement = Arrangement.spacedBy(Space.Section),
-    ) {
-        item(key = "header", span = { GridItemSpan(maxLineSpan) }) {
-            Column(verticalArrangement = Arrangement.spacedBy(Space.Page)) {
-                Text(a.name, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalAlignment = Alignment.CenterVertically) {
-                    PlayButtons(play = { graph.library.songsOf(a) }, note = null, shortcut = Shortcut("artist/$id", a.name, a.coverArt))
-                    TvButton("Artist radio", null, onClick = { play.artistRadio(a) })
-                    Text("${list.size} albums", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val favourite = a.id in favourites
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = Space.Large), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        item("header") {
+            Row(
+                Modifier.padding(start = TV_EDGE, end = TV_EDGE, bottom = Space.Page),
+                horizontalArrangement = Arrangement.spacedBy(Space.Large),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Cover(a.coverArt, LARGE_COVER, Modifier.size(HEADER_COVER), CircleShape)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    Text(a.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    albums?.let { Text("${it.size} albums", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    Row(Modifier.horizontalScroll(rememberScrollState()).padding(vertical = Space.Small), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        PlayButtons(play = { graph.library.songsOf(a).ifEmpty { top } }, note = null, shortcut = Shortcut("artist/$id", a.name, a.coverArt), focusFirst = true)
+                        TvButton("Artist radio", Icons.Rounded.Radio, onClick = { play.artistRadio(a) })
+                        TvButton(
+                            if (favourite) "Favourite" else "Add to favourites",
+                            if (favourite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                            onClick = { graph.favouriteArtists.toggle(a) },
+                        )
+                    }
                 }
             }
         }
-        items(list, key = { it.key }) { item -> TvItemTile(item) }
+        if (top.isNotEmpty()) {
+            item("top-title") { SectionTitle("Top songs") }
+            itemsIndexed(top.take(TOP_SHOWN), key = { i, s -> "top:$i:${s.id}" }) { i, song ->
+                Box(Modifier.padding(horizontal = TV_EDGE)) {
+                    SongRow(i + 1, song, playing = player.current?.id == song.id) { graph.player.play(top, startIndex = i) }
+                }
+            }
+        }
+        albums?.takeIf { it.isNotEmpty() }?.let { list ->
+            item("albums") {
+                Box(Modifier.padding(top = Space.Section)) {
+                    TvItemRow(TvRow("Albums", list.sortedByDescending { it.year ?: 0 }.map { TvItem.OfAlbum(it, it.year?.toString()) }))
+                }
+            }
+        }
+        if (similar.isNotEmpty()) {
+            item("similar") { Box(Modifier.padding(top = Space.Section)) { TvItemRow(TvRow("Similar artists", similar.map { TvItem.OfArtist(it) })) } }
+        }
+        item("appears") {
+            Row(Modifier.padding(start = TV_EDGE, end = TV_EDGE, top = Space.Section)) {
+                TvButton("Appears on", null, onClick = { nav.navigate("artist/${android.net.Uri.encode(a.id)}/appears-on") })
+            }
+        }
     }
 }
 
 /** What playing a page as a whole notes as played last (the phone's Home shortcuts, the TV's Jump back in). */
 data class Shortcut(val route: String, val title: String, val cover: String?)
 
-/** An album, playlist or mix: its cover and buttons on the left, its songs on the right. */
+/**
+ * An album, playlist or mix as one list: the cover with the title, what it is ([values]: artists and genre to open),
+ * Play, Shuffle and the page's own [buttons] at the top, then the songs. The remote starts on Play, and down goes
+ * straight to the first song.
+ */
 @Composable
-private fun SongsPage(
+private fun CollectionPage(
     title: String,
-    byline: String,
-    about: String,
     coverId: String?,
     songs: List<Song>,
     shortcut: Shortcut?,
-    extra: (@Composable () -> Unit)? = null,
+    about: String,
+    values: (@Composable () -> Unit)? = null,
+    buttons: (@Composable () -> Unit)? = null,
 ) {
-    Row(Modifier.fillMaxSize().padding(horizontal = TV_EDGE), horizontalArrangement = Arrangement.spacedBy(Space.Large)) {
-        Column(Modifier.width(SIDE_WIDTH), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
-            Cover(coverId, LARGE_COVER, Modifier.size(SIDE_WIDTH), RoundedCornerShape(Space.Medium))
-            Column(verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(byline, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(about, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val graph = LocalGraph.current
+    val player by graph.player.state.collectAsStateWithLifecycle()
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = Space.Large), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        item("header") {
+            Row(
+                Modifier.padding(start = TV_EDGE, end = TV_EDGE, bottom = Space.Page),
+                horizontalArrangement = Arrangement.spacedBy(Space.Large),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Cover(coverId, LARGE_COVER, Modifier.size(HEADER_COVER), RoundedCornerShape(Space.Medium))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    if (values != null) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) { values() }
+                    }
+                    Text(about, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(Modifier.horizontalScroll(rememberScrollState()).padding(vertical = Space.Small), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        PlayButtons(play = { songs }, note = null, shortcut = shortcut, focusFirst = true)
+                        buttons?.invoke()
+                    }
+                }
             }
-            PlayButtons(play = { songs }, note = null, shortcut = shortcut)
-            extra?.invoke()
         }
-        Box(Modifier.weight(1f)) {
-            if (songs.isEmpty()) EmptyNote("No songs here.") else SongList(songs, shortcut = shortcut, edge = false)
+        if (songs.isEmpty()) {
+            item("empty") {
+                Text("No songs here.", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = TV_EDGE))
+            }
         }
+        songRows(songs, player.current?.id, shortcut)
     }
 }
 
-/** Songs, one under the other: OK plays from that song, and the button at the end of each has its other actions. */
-@Composable
-fun SongList(songs: List<Song>, shortcut: Shortcut? = null, edge: Boolean = true, header: (@Composable () -> Unit)? = null) {
-    val graph = LocalGraph.current
-    val player by graph.player.state.collectAsStateWithLifecycle()
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = if (edge) TV_EDGE else 0.dp, end = if (edge) TV_EDGE else 0.dp, bottom = Space.Large),
-        verticalArrangement = Arrangement.spacedBy(Space.Tight),
-    ) {
-        if (header != null) item("header") { Box(Modifier.padding(bottom = Space.Page)) { header() } }
-        itemsIndexed(songs, key = { i, s -> "$i:${s.id}" }) { i, song ->
-            SongRow(i + 1, song, playing = player.current?.id == song.id) {
+/** The songs of a list, for a LazyColumn: OK plays from that song. */
+private fun LazyListScope.songRows(songs: List<Song>, playingId: String?, shortcut: Shortcut?) {
+    itemsIndexed(songs, key = { i, s -> "$i:${s.id}" }) { i, song ->
+        val graph = LocalGraph.current
+        Box(Modifier.padding(horizontal = TV_EDGE)) {
+            SongRow(i + 1, song, playing = playingId == song.id) {
                 graph.player.play(songs, startIndex = i)
                 shortcut?.let { s -> graph.scope.launch { graph.recentPlays.note(s.route, s.title, s.cover) } }
             }
@@ -253,9 +371,26 @@ fun SongList(songs: List<Song>, shortcut: Shortcut? = null, edge: Boolean = true
     }
 }
 
+/** Songs, one under the other, with an optional [header] above them. */
+@Composable
+fun SongList(songs: List<Song>, shortcut: Shortcut? = null, header: (@Composable () -> Unit)? = null) {
+    val graph = LocalGraph.current
+    val player by graph.player.state.collectAsStateWithLifecycle()
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = Space.Large), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        if (header != null) item("header") { Box(Modifier.padding(start = TV_EDGE, end = TV_EDGE, bottom = Space.Page)) { header() } }
+        songRows(songs, player.current?.id, shortcut)
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(start = TV_EDGE, end = TV_EDGE, top = Space.Page, bottom = Space.Small))
+}
+
 /** Play and Shuffle for a list of songs, read when pressed. */
 @Composable
-fun PlayButtons(play: suspend () -> List<Song>, note: String?, shortcut: Shortcut? = null) {
+fun PlayButtons(play: suspend () -> List<Song>, note: String?, shortcut: Shortcut? = null, focusFirst: Boolean = false) {
     val graph = LocalGraph.current
     val scope = rememberCoroutineScope()
     fun start(shuffle: Boolean) {
@@ -266,7 +401,7 @@ fun PlayButtons(play: suspend () -> List<Song>, note: String?, shortcut: Shortcu
         }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalAlignment = Alignment.CenterVertically) {
-        TvButton("Play", Icons.Rounded.PlayArrow, strong = true, onClick = { start(false) })
+        TvButton("Play", Icons.Rounded.PlayArrow, strong = true, onClick = { start(false) }, modifier = if (focusFirst) Modifier.initialFocus() else Modifier)
         TvButton("Shuffle", Icons.Rounded.Shuffle, onClick = { start(true) })
         if (note != null) Text(note, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -312,13 +447,13 @@ fun SongRow(number: Int, song: Song, playing: Boolean, onClick: () -> Unit) {
             Modifier.size(MORE_SIZE).tvFocus(CircleShape, onClick = { actions = true }),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.MoreVert, "More for ${song.title}", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Rounded.MoreVert, "More for ${song.title}", tint = MaterialTheme.colorScheme.onSurface)
         }
     }
     if (actions) SongActions(song, liked, onDismiss = { actions = false })
 }
 
-/** A song's other actions: play it next, add it to the queue, like it, start its radio, go to its album or artist. */
+/** A song's other actions: play it next, add it to the queue, like it, start its radio, go to its album or artists. */
 @Composable
 fun SongActions(song: Song, liked: Boolean, onDismiss: () -> Unit) {
     val graph = LocalGraph.current
@@ -334,8 +469,9 @@ fun SongActions(song: Song, liked: Boolean, onDismiss: () -> Unit) {
         add("Start song radio" to { app.siansa.ui.RadioChooser.song.value = song })
         // AudioMuse (or the server) finds songs that sound like it, on the phone's page for it.
         add("Similar songs" to { nav.navigate("similar/songs/${android.net.Uri.encode(song.id)}") })
-        song.albumId?.let { id -> add("Go to album" to { nav.navigate(TvRoutes.album(id)) }) }
-        song.artistId?.let { id -> add("Go to artist" to { nav.navigate(TvRoutes.artist(id)) }) }
+        song.albumId?.let { id -> add("Go to album: ${song.album}" to { nav.navigate(TvRoutes.album(id)) }) }
+        val artists = song.artists.ifEmpty { listOfNotNull(song.artistId?.let { ArtistRef(it, song.artist) }) }
+        for (a in artists.take(MAX_ARTISTS)) add("Go to artist: ${a.name}" to { nav.navigate(TvRoutes.artist(a.id)) })
     }
     TvChoices(song.title, choices, onDismiss)
 }
@@ -358,10 +494,13 @@ fun minutes(ms: Long): String {
     return "%d:%02d".format(java.util.Locale.ROOT, seconds / 60, seconds % 60)
 }
 
-private val SIDE_WIDTH = 300.dp
+private val HEADER_COVER = 180.dp
 private val NUMBER_WIDTH = 32.dp
 private val MORE_SIZE = 48.dp
 private val LIKED_ICON = 20.dp
 private const val ROW_GROW = 1.02f
 private const val GENRES = 200
+private const val TOP_SONGS = 10
+private const val TOP_SHOWN = 5
+private const val MAX_ARTISTS = 6
 private const val RELOAD_PAUSE_MS = 4_000L

@@ -24,6 +24,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -54,7 +56,7 @@ fun TvSignIn() {
         horizontalArrangement = Arrangement.spacedBy(Space.Large * 2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
             Text("Welcome to Siansa", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
             signInProblem?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.titleMedium) }
             if (!typing) {
@@ -62,6 +64,12 @@ fun TvSignIn() {
                 Step(2, "Tap \"Open in Siansa\", then \"Sign in\".")
                 Step(3, "Your TV signs in to the same server as your phone.")
                 TvButton("Type it in instead", Icons.Rounded.Keyboard, onClick = { typing = true })
+                // A server or user added from Settings that isn't wanted after all: back to one already signed in.
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val others = remember { app.siansa.data.Users.all(context).filter { it.id != app.siansa.data.Users.active && it.connected } }
+                for (u in others.take(MAX_OTHERS)) {
+                    TvButton("Use ${u.label} instead", null, onClick = { app.siansa.data.Users.switchTo(context, u.id) })
+                }
             } else {
                 TypedSignIn(onBack = { typing = false })
             }
@@ -210,5 +218,6 @@ private suspend fun tryLogin(graph: AppGraph, login: Pairing.Login): String? {
 }
 
 private val STEP_DOT = 36.dp
+private const val MAX_OTHERS = 3
 private val QR_SIZE = 340.dp
 private val FORM_WIDTH = 520.dp

@@ -101,8 +101,20 @@ fun TvNowPlaying() {
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (song != null) {
-                    Text(song.artist, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(song.album, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    // The song's artists and album, each opening its page.
+                    val nav = app.siansa.ui.LocalNav.current
+                    val artists = song.artists.ifEmpty { listOfNotNull(song.artistId?.let { app.siansa.data.ArtistRef(it, song.artist) }) }
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+                        verticalArrangement = Arrangement.spacedBy(Space.Small),
+                    ) {
+                        if (artists.isEmpty()) {
+                            Text(song.artist, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        for (a in artists.take(MAX_ARTISTS)) TvChip(a.name, onClick = { nav.navigate(TvRoutes.artist(a.id)) }, strong = true)
+                        val albumId = song.albumId
+                        if (albumId != null && song.album.isNotBlank()) TvChip(song.album, onClick = { nav.navigate(TvRoutes.album(albumId)) })
+                    }
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
@@ -233,6 +245,7 @@ private const val SEEK_MS = 10_000L
 private const val COVER_HEIGHT = 0.8f
 private const val ROW_GROW = 1.02f
 private const val QUEUE_SHOWN = 100
+private const val MAX_ARTISTS = 4
 private val SLEEP_MINUTES = listOf(15, 30, 45, 60, 90)
 private val PROGRESS_HEIGHT = 6.dp
 private val SEEKING_HEIGHT = 12.dp

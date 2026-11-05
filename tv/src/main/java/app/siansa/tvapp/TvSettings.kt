@@ -34,7 +34,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.siansa.data.Users
 import app.siansa.log.AppLog
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PersonAdd
 import app.siansa.playback.Passthrough
 import app.siansa.playback.PassthroughMode
 import app.siansa.playback.PassthroughRenderer
@@ -59,14 +63,39 @@ fun TvSettingsHub() {
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
     val library by graph.library.status.collectAsStateWithLifecycle()
     var confirmSignOut by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val users = remember { Users.all(context) }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = TV_EDGE).padding(top = Space.Small, bottom = Space.Large),
         verticalArrangement = Arrangement.spacedBy(Space.Section),
     ) {
-        Group("Music") {
-            TvSettingRow("Servers and services", "${AppLog.redact(settings.navidromeUrl)} · ${settings.navidromeUser.ifBlank { "API key" }}",
+        // Every server and user on this TV, as on the phone: OK switches (the app starts again as them). A new one signs
+        // in with the code on the TV, like the first time, and keeps its own library and settings.
+        Group("Servers and users") {
+            for (u in users) {
+                val active = u.id == Users.active
+                TvSettingRow(
+                    u.label,
+                    when {
+                        active -> "In use"
+                        u.connected -> "Switch to this"
+                        else -> "Not signed in yet: switch to sign in"
+                    },
+                    onClick = { if (!active) { AppLog.i("Tv", "Switching to user ${u.id + 1}"); Users.switchTo(context, u.id) } },
+                    icon = if (active) Icons.Rounded.CheckCircle else Icons.Rounded.Person,
+                    modifier = if (active) Modifier.initialFocus() else Modifier,
+                )
+            }
+            TvSettingRow("Add a server or user", "Sign in with the code on the TV, as the first time. Each keeps its own library.", onClick = {
+                val id = Users.add(context) { }
+                AppLog.i("Tv", "Added user ${id + 1} on the TV")
+                Users.switchTo(context, id)
+            }, icon = Icons.Rounded.PersonAdd)
+            TvSettingRow("Servers and services", "${AppLog.redact(settings.navidromeUrl)} · ${settings.navidromeUser.ifBlank { "API key" }} · AudioMuse, Last.fm and more",
                 onClick = { nav.navigate("settings/connections") }, icon = Icons.Rounded.Dns)
+        }
+        Group("Music") {
             TvSettingRow("Library sync", syncSummary(progress, library), onClick = { nav.navigate("sync") }, icon = Icons.Rounded.Sync)
             TvSettingRow("Mixes and vibes", "Your daily mixes and when they're made", onClick = { nav.navigate("vibes") }, icon = Icons.Rounded.Schedule)
             TvSettingRow("Scrobbling and history", "Last.fm, ListenBrainz and what you've played", onClick = { nav.navigate("settings/scrobbling") }, icon = Icons.Rounded.GraphicEq)

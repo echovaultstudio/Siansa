@@ -2,6 +2,10 @@
 - **More of Siansa on the TV.** The TV app's Home now has Today's mix, your mixes, radios, Rediscover, Jump back in and
   the other rows of your phone's Home, in the same order. The Library has liked songs and genres. Songs have Play next,
   Add to queue, Like and song radio. Now playing has Like, Up next and a sleep timer.
+- **Favourites on the TV**: favourite albums and artists in the Library, and a heart on album and artist pages.
+- **Artist pages on the TV**: top songs, albums and similar artists, with Play, Shuffle and Artist radio; artists,
+  genres and albums on other pages open them.
+- **Several servers and users on the TV**: switch between them, or add one, under Settings.
 - **Settings on the TV**: servers, library sync, playback, streaming quality, mixes, scrobbling, colours and help,
   the same pages as on the phone.
 - **AudioMuse on the TV**: Your sound and Discover for you among your mixes, sound radios, similar songs, and songs
@@ -12,7 +16,8 @@
   way the phone does.
 
 ### Fixed
-- Text on the TV that was too dark to read.
+- Text on the TV that was too dark to read, and buttons cut off at the bottom of album pages: an album's songs now
+  come straight after its buttons.
 - The TV's Home and Library jumping and losing the remote's place while the library synced.
 - 5.1 and 7.1 songs (Dolby or DTS decoded on the device, or multichannel FLAC) played without their centre and
   surround channels, often missing the vocals. They're now folded into stereo, on the phone too.

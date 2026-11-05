@@ -182,6 +182,32 @@ fun TvChoices(title: String, choices: List<Pair<String, () -> Unit>>, onDismiss:
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
 }
 
+/**
+ * Where the remote starts on a page: the main button (Play on an album, the first row of a list). Without it nothing has
+ * the focus when a page opens, and the first press only finds a place to start.
+ */
+@Composable
+fun Modifier.initialFocus(): Modifier {
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { requester.requestFocus() } }
+    return focusRequester(requester)
+}
+
+/** A small value that opens something: an artist's name, a genre. */
+@Composable
+fun TvChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, strong: Boolean = false) {
+    val shape = RoundedCornerShape(percent = 50)
+    Text(
+        text,
+        style = MaterialTheme.typography.titleMedium,
+        color = if (strong) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier.tvFocus(shape, onClick, grow = BUTTON_GROW).background(MaterialTheme.colorScheme.surfaceVariant, shape)
+            .padding(horizontal = Space.Page, vertical = Space.Tight),
+    )
+}
+
 /** The room at a TV page's left and right edges: TVs may cut off the edge of the picture (overscan). */
 val TV_EDGE = Space.Large
 

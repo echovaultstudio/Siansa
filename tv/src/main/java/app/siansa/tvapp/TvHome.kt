@@ -156,7 +156,7 @@ fun TvHome() {
     ) {
         item("quick") {
             Row(Modifier.padding(horizontal = TV_EDGE), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                TvButton("Today's mix", Icons.Rounded.AutoAwesome, strong = true, onClick = { play.todaysMix() })
+                TvButton("Today's mix", Icons.Rounded.AutoAwesome, strong = true, onClick = { play.todaysMix() }, modifier = Modifier.initialFocus())
                 TvButton("Shuffle your library", Icons.Rounded.Shuffle, onClick = { play.label("your library") { graph.library.randomSongs(SHUFFLE_SONGS) } })
                 TvButton("Liked songs", Icons.Rounded.Favorite, onClick = {
                     play.label("your liked songs", shuffle = true) { graph.favorites.mergeLiked(graph.library.starredSongs()) }
