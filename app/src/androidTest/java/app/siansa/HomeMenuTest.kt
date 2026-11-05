@@ -144,6 +144,13 @@ class HomeMenuTest {
         compose.onNodeWithText("Play on…").assertIsDisplayed()
         compose.onNodeWithText("Sources").assertIsDisplayed()
         compose.onNodeWithText("Arrange Home").assertIsDisplayed()
+        // The bubbles hang straight down from the button: each one's centre on the button's centre line.
+        val button = compose.onNodeWithTag("homeMenu").getBoundsInRoot()
+        for (tag in listOf("play_on", "sources", "arrange")) {
+            val bubble = compose.onNodeWithTag("homeMenuBubble-$tag", useUnmergedTree = true).getBoundsInRoot()
+            val off = ((bubble.left + bubble.right) / 2 - (button.left + button.right) / 2).value
+            assertTrue("Bubble $tag is ${off} dp off the button's centre line", kotlin.math.abs(off) <= 0.5f)
+        }
         compose.onNodeWithTag("homeMenu-arrange").performClick()
         compose.waitForIdle()
         assertEquals(listOf(HomeMenuItem.ARRANGE), picked)

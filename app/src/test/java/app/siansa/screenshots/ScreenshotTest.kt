@@ -315,7 +315,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // Home's menu (issue #872): Sources lit under the finger of a glide; and while casting, Play on… in the
+            // Home's menu (issue #872), its bubbles in line: Sources lit under the finger of a glide; and while casting, Play on… in the
             // accent colour with Stop, a long device name and a long Sources line cut off with "…".
             Scene("home_menu") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
