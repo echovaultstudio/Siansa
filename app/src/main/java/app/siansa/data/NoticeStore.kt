@@ -20,7 +20,7 @@ class NoticeStore(context: Context) {
 
     fun tap(kind: NoticeKind) {
         val taps = taps().toMutableMap().apply { this[kind] = (this[kind] ?: 0) + 1 }
-        prefs.edit().putString(KEY_TAPS, formatTaps(taps)).apply()
+        QuietWrites.save(prefs) { putString(KEY_TAPS, formatTaps(taps)) }
     }
 
     companion object {

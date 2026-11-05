@@ -1,5 +1,6 @@
 package app.siansa.mix
 
+import app.siansa.data.QuietWrites
 import android.content.Context
 import app.siansa.AppGraph
 import app.siansa.data.Mix
@@ -99,9 +100,11 @@ class MixResume(private val graph: AppGraph, context: Context) {
     }.toMap()
 
     private fun save(points: Map<String, ResumePoint>) {
-        prefs.edit().clear().apply {
+        // Saved as the music plays: off the main thread's way (QuietWrites), or a song's start waits for it.
+        QuietWrites.save(prefs) {
+            clear()
             points.forEach { (id, p) -> putString(id, "${p.songId}|${p.positionMs}|${p.durationMs}|${p.at}") }
-        }.apply()
+        }
     }
 
     private companion object {

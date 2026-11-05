@@ -86,7 +86,7 @@ object CoverMatch {
         val same = samePicture(a, b)
         val k = key(song, album)
         known[k] = same
-        prefs(graph).edit().putBoolean(k, same).apply()
+        app.siansa.data.QuietWrites.save(prefs(graph)) { putBoolean(k, same) }
         AppLog.i(
             "Cover",
             "Song cover ${CoverStore.canonical(song)} is ${if (same) "the album's picture" else "a picture of its own"} " +

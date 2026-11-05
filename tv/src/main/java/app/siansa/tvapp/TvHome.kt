@@ -1,5 +1,6 @@
 package app.siansa.tvapp
 
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -158,6 +159,10 @@ fun TvHome() {
         rows = homeRows(graph)
     }
     val play = rememberTvPlay()
+    val nav = LocalNav.current
+    // The phone's notices (issue #784): what needs you, what you're partway through, what's new; shown or hidden in
+    // Settings › Notices and Cards › Notices, as on the phone.
+    val notices = app.siansa.ui.rememberNotices(graph, settings, shown = app.siansa.data.HomeSection.NOTICES !in settings.homeHidden)
     val loaded = rows
     if (loaded == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -168,6 +173,23 @@ fun TvHome() {
         contentPadding = PaddingValues(top = Space.Small, bottom = Space.Large),
         verticalArrangement = Arrangement.spacedBy(Space.Section),
     ) {
+        if (notices.isNotEmpty()) {
+            item("notices") {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = TV_EDGE, vertical = Space.Small),
+                    horizontalArrangement = Arrangement.spacedBy(Space.Medium),
+                    modifier = Modifier.testTag("tvNotices"),
+                ) {
+                    items(notices, key = { it.key }) { notice ->
+                        TvButton(notice.text, app.siansa.ui.noticeIcon(notice.kind), onClick = {
+                            AppLog.i("Tv", "Notice opened: ${notice.kind.id}")
+                            graph.notices.tap(notice.kind)
+                            runCatching { nav.navigate(notice.route) }.onFailure { AppLog.w("Tv", "Couldn't open notice ${notice.route}: ${it.message}") }
+                        })
+                    }
+                }
+            }
+        }
         item("quick") {
             Row(Modifier.padding(horizontal = TV_EDGE), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                 TvButton("Today's mix", Icons.Rounded.AutoAwesome, strong = true, onClick = { play.todaysMix() }, modifier = Modifier.initialFocus())

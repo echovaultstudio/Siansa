@@ -121,7 +121,7 @@ object AnimatedCovers {
             Kind.Local -> "local"
             is Kind.Animated -> if (kind.size == 0) "local" else "anim:${kind.size}"
         }
-        prefs(graph).edit().putString(id, text).apply()
+        app.siansa.data.QuietWrites.save(prefs(graph)) { putString(id, text) }
     }
 
     /** What kind of cover this album has, or null when it couldn't be checked (try again later). */

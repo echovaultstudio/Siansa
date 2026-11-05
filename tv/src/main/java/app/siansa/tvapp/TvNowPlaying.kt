@@ -1,5 +1,8 @@
 package app.siansa.tvapp
 
+import androidx.compose.ui.platform.testTag
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.animateScrollBy
@@ -138,47 +141,62 @@ fun TvNowPlaying() {
                     }
                 }
                 ProgressBlock(progress, details(state.codec, state.transcodeKbps))
-                Row(horizontalArrangement = Arrangement.spacedBy(if (queue) Space.Page else Space.Section), verticalAlignment = Alignment.CenterVertically) {
-                    TvIconButton(Icons.Rounded.Shuffle, "Shuffle", onClick = { graph.player.toggleShuffle() }, on = state.shuffle)
-                    TvIconButton(Icons.Rounded.SkipPrevious, "Previous", onClick = { graph.player.previous() })
-                    TvIconButton(
-                        if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        if (state.isPlaying) "Pause" else "Play",
-                        onClick = { graph.player.togglePlay() },
-                        big = true,
-                        modifier = Modifier.focusRequester(playButton),
-                    )
-                    TvIconButton(Icons.Rounded.SkipNext, "Next", onClick = { graph.player.next() })
-                    TvIconButton(
-                        if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat, "Repeat",
-                        onClick = { graph.player.cycleRepeat() },
-                        on = state.repeatMode != Player.REPEAT_MODE_OFF,
-                    )
+                // Both rows of buttons on one grid (the owner: the five under the controls were off centre): every button
+                // in a slot as wide as Play, with the same gap, so each round button sits right under a control.
+                // Five slots of 76 dp fit beside the cover (448 dp on a 1080p TV) with 16 dp gaps, and beside Up next with 8.
+                val gap = if (queue) Space.Small else Space.Page
+                Row(Modifier.testTag("tvControls"), horizontalArrangement = Arrangement.spacedBy(gap), verticalAlignment = Alignment.CenterVertically) {
+                    ButtonSlot { TvIconButton(Icons.Rounded.Shuffle, "Shuffle", onClick = { graph.player.toggleShuffle() }, on = state.shuffle) }
+                    ButtonSlot { TvIconButton(Icons.Rounded.SkipPrevious, "Previous", onClick = { graph.player.previous() }) }
+                    ButtonSlot {
+                        TvIconButton(
+                            if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            if (state.isPlaying) "Pause" else "Play",
+                            onClick = { graph.player.togglePlay() },
+                            big = true,
+                            modifier = Modifier.focusRequester(playButton),
+                        )
+                    }
+                    ButtonSlot { TvIconButton(Icons.Rounded.SkipNext, "Next", onClick = { graph.player.next() }) }
+                    ButtonSlot {
+                        TvIconButton(
+                            if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat, "Repeat",
+                            onClick = { graph.player.cycleRepeat() },
+                            on = state.repeatMode != Player.REPEAT_MODE_OFF,
+                        )
+                    }
                 }
                 // The rest, as round buttons too; the one the remote is on says its name underneath.
                 val likeName = if (liked) "Liked" else "Like"
                 Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-                    // Wraps onto a second line when Up next or Lyrics leaves less room.
-                    androidx.compose.foundation.layout.FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(Space.Page),
-                        verticalArrangement = Arrangement.spacedBy(Space.Page),
-                    ) {
+                    // The same slots and gap as the controls above, so they line up column by column.
+                    Row(Modifier.testTag("tvActions"), horizontalArrangement = Arrangement.spacedBy(gap), verticalAlignment = Alignment.CenterVertically) {
                         fun Modifier.named(name: String) = onFocusChanged { f ->
                             if (f.isFocused) focusedName = name else if (focusedName == name) focusedName = null
                         }
-                        TvIconButton(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, likeName,
-                            onClick = { song?.let { graph.favorites.toggle(it) } }, on = liked, modifier = Modifier.named(LIKE))
-                        TvIconButton(Icons.Rounded.Lyrics, "Lyrics", onClick = { panel = if (panel == Panel.LYRICS) Panel.NONE else Panel.LYRICS },
-                            on = panel == Panel.LYRICS, modifier = Modifier.named("Lyrics"))
-                        TvIconButton(Icons.AutoMirrored.Rounded.QueueMusic, "Up next", onClick = { panel = if (panel == Panel.QUEUE) Panel.NONE else Panel.QUEUE },
-                            on = panel == Panel.QUEUE, modifier = Modifier.named("Up next"))
+                        ButtonSlot {
+                            TvIconButton(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, likeName,
+                                onClick = { song?.let { graph.favorites.toggle(it) } }, on = liked, modifier = Modifier.named(LIKE))
+                        }
+                        ButtonSlot {
+                            TvIconButton(Icons.Rounded.Lyrics, "Lyrics", onClick = { panel = if (panel == Panel.LYRICS) Panel.NONE else Panel.LYRICS },
+                                on = panel == Panel.LYRICS, modifier = Modifier.named("Lyrics"))
+                        }
+                        ButtonSlot {
+                            TvIconButton(Icons.AutoMirrored.Rounded.QueueMusic, "Up next", onClick = { panel = if (panel == Panel.QUEUE) Panel.NONE else Panel.QUEUE },
+                                on = panel == Panel.QUEUE, modifier = Modifier.named("Up next"))
+                        }
                         // A radio from this song: AudioMuse's songs that sound like it when set up, Steady or DJ as on the phone.
-                        TvIconButton(Icons.Rounded.Radio, "Song radio", onClick = { song?.let { app.siansa.ui.RadioChooser.song.value = it } },
-                            modifier = Modifier.named("Song radio"))
+                        ButtonSlot {
+                            TvIconButton(Icons.Rounded.Radio, "Song radio", onClick = { song?.let { app.siansa.ui.RadioChooser.song.value = it } },
+                                modifier = Modifier.named("Song radio"))
+                        }
                         // AudioMuse's song path from this song, queued after it once ready (as on the phone's player).
                         if (graph.settings.current.audioMuseReady) {
-                            TvIconButton(Icons.Rounded.AltRoute, "Song path", onClick = { song?.let { nav.openSongPath(it.id, fromNowPlaying = true) } },
-                                modifier = Modifier.named("Song path"))
+                            ButtonSlot {
+                                TvIconButton(Icons.Rounded.AltRoute, "Song path", onClick = { song?.let { nav.openSongPath(it.id, fromNowPlaying = true) } },
+                                    modifier = Modifier.named("Song path"))
+                            }
                         }
                     }
                     // Always there, so the page doesn't move as the name comes and goes.
@@ -192,7 +210,7 @@ fun TvNowPlaying() {
                 }
             }
             when (panel) {
-                Panel.QUEUE -> UpNext(state.queue, state.index)
+                Panel.QUEUE -> UpNext(state.queue, state.index, state.auto)
                 Panel.LYRICS -> LyricsPanel(song) { progress.value.positionMs }
                 Panel.NONE -> Unit
             }
@@ -329,9 +347,18 @@ private fun LyricsPanel(song: app.siansa.data.Song?, positionMs: () -> Long) {
     }
 }
 
-/** The songs after this one: OK plays from that song. */
+/** A button's place in Now playing's rows: as wide as Play, the button in its middle, so both rows line up. */
 @Composable
-private fun UpNext(queue: List<app.siansa.data.Song>, index: Int) {
+private fun ButtonSlot(content: @Composable () -> Unit) {
+    Box(Modifier.width(BUTTON_SLOT).testTag("tvButtonSlot"), contentAlignment = Alignment.Center) { content() }
+}
+
+/**
+ * The songs after this one: OK plays from that song. Songs Siansa added on its own (AudioMuse's radio, Keep playing)
+ * have the same star as on the phone's queue.
+ */
+@Composable
+private fun UpNext(queue: List<app.siansa.data.Song>, index: Int, auto: Set<Int> = emptySet()) {
     val graph = LocalGraph.current
     Column(Modifier.width(QUEUE_WIDTH).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
         Text("Up next", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
@@ -342,13 +369,22 @@ private fun UpNext(queue: List<app.siansa.data.Song>, index: Int) {
             LazyColumn(contentPadding = PaddingValues(bottom = Space.Large), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
                 itemsIndexed(after.take(QUEUE_SHOWN), key = { i, s -> "${index + 1 + i}:${s.id}" }) { i, song ->
                     val shape = RoundedCornerShape(Space.Small)
-                    Column(
+                    Row(
                         Modifier.fillMaxWidth().tvFocus(shape, onClick = { graph.player.skipTo(index + 1 + i) }, grow = ROW_GROW)
                             .background(MaterialTheme.colorScheme.background, shape).padding(horizontal = Space.Page, vertical = Space.Small),
-                        verticalArrangement = Arrangement.spacedBy(Space.Tight),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(song.title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(song.artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                            Text(song.title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(song.artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        if ((index + 1 + i) in auto) {
+                            Icon(
+                                Icons.Rounded.AutoAwesome, "Added automatically",
+                                Modifier.padding(start = Space.Small).size(AUTO_MARK).testTag("autoAdded"),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                     }
                 }
             }
@@ -374,6 +410,10 @@ private const val FOLLOW_AGAIN_MS = 4_000L
 private val LYRICS_RING = 2.dp
 private const val ROW_GROW = 1.02f
 private const val QUEUE_SHOWN = 100
+/** Each of Now playing's buttons sits in a slot this wide: Play's size, the largest. */
+private val BUTTON_SLOT = 76.dp
+/** The star on a song Siansa added on its own, a little larger than the phone's for the distance. */
+private val AUTO_MARK = 20.dp
 private const val MAX_ARTISTS = 3
 private val PROGRESS_HEIGHT = 6.dp
 private val SEEKING_HEIGHT = 12.dp
@@ -386,5 +426,5 @@ fun seekBy(graph: app.siansa.AppGraph, deltaMs: Long) {
 }
 
 private const val END_MARGIN_MS = 1_000L
-/** Leaves the controls room for all their buttons in a row beside it. */
-private val QUEUE_WIDTH = 380.dp
+/** Leaves the controls room for their five slots in a row beside it (5 × 76 dp and four 8 dp gaps). */
+private val QUEUE_WIDTH = 340.dp

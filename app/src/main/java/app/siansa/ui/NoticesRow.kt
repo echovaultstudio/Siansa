@@ -154,7 +154,7 @@ private fun NoticePillContent(icon: ImageVector, text: String) {
     }
 }
 
-private fun noticeIcon(kind: NoticeKind): ImageVector = when (kind) {
+internal fun noticeIcon(kind: NoticeKind): ImageVector = when (kind) {
     NoticeKind.NEEDS_YOU -> Icons.Rounded.Warning
     NoticeKind.CARRY_ON -> Icons.Rounded.PlayArrow
     NoticeKind.NEW_ALBUMS -> Icons.Rounded.Album

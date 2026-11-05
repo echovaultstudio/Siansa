@@ -115,7 +115,7 @@ object CoverStore {
             original.delete()
             stillFile(key).delete()
             versions.remove(key)
-            prefs().edit().remove("v:$key").apply()
+            app.siansa.data.QuietWrites.save(prefs()) { remove("v:$key") }
             return null
         }
         return Local(original, stillFile(key).takeIf { it.exists() })
@@ -197,7 +197,7 @@ object CoverStore {
         downloads.incrementAndGet()
         version(id).takeIf { it.isNotEmpty() && key == canonical(id) }?.let {
             versions[key] = it
-            prefs().edit().putString("v:$key", it).apply()
+            app.siansa.data.QuietWrites.save(prefs()) { putString("v:$key", it) }
         }
         AppLog.i(
             "Cover",
@@ -288,7 +288,7 @@ object CoverStore {
     private fun link(from: String, to: String) {
         if (from == to) return
         aliases[from] = to
-        prefs().edit().putString(from, to).apply()
+        app.siansa.data.QuietWrites.save(prefs()) { putString(from, to) }
     }
 
     private fun save(key: String, response: Response) {
