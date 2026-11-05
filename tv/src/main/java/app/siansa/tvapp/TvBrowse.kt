@@ -173,6 +173,7 @@ fun TvAlbum(id: String) {
         songs = songs,
         shortcut = Shortcut("album/$id", album.name, album.coverArt),
         about = listOfNotNull(album.year?.toString(), "${songs.size} songs", "$total min".takeIf { total > 0 }).joinToString(" · "),
+        animated = true,
         values = {
             if (artists.isEmpty()) {
                 Text(album.artist, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
@@ -202,6 +203,7 @@ fun TvPlaylist(id: String) {
     val nav = LocalNav.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val d = detail ?: return Loading()
+    // The playlist's own cover from the server (one picked for it, or the one Navidrome makes); a song's only without.
     val cover = d.playlist.coverArt ?: d.songs.firstOrNull()?.cover
     val total = d.songs.sumOf { it.durationSec } / 60
     CollectionPage(
@@ -210,6 +212,7 @@ fun TvPlaylist(id: String) {
         songs = d.songs,
         shortcut = Shortcut("playlist/$id", d.playlist.name, cover),
         about = listOfNotNull("Playlist", "${d.songs.size} songs", "$total min".takeIf { total > 0 }).joinToString(" · "),
+        note = d.playlist.comment?.takeIf { it.isNotBlank() },
         // AudioMuse's song alchemy: songs that blend the sound of this playlist's songs.
         buttons = if (settings.audioMuseReady) {
             { TvButton("Song alchemy", null, onClick = { nav.navigate("blend/${android.net.Uri.encode(id)}") }) }
@@ -332,6 +335,8 @@ private fun CollectionPage(
     about: String,
     values: (@Composable () -> Unit)? = null,
     buttons: (@Composable () -> Unit)? = null,
+    animated: Boolean = false,
+    note: String? = null,
 ) {
     val graph = LocalGraph.current
     val player by graph.player.state.collectAsStateWithLifecycle()
@@ -342,7 +347,12 @@ private fun CollectionPage(
                 horizontalArrangement = Arrangement.spacedBy(Space.Large),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Cover(coverId, LARGE_COVER, Modifier.size(HEADER_COVER), RoundedCornerShape(Space.Medium))
+                // An album's animated cover moves here, as on the phone's album page.
+                if (animated) {
+                    app.siansa.ui.BigCover(coverId, coverId, Modifier.size(HEADER_COVER), RoundedCornerShape(Space.Medium))
+                } else {
+                    Cover(coverId, LARGE_COVER, Modifier.size(HEADER_COVER), RoundedCornerShape(Space.Medium))
+                }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                     Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -350,6 +360,7 @@ private fun CollectionPage(
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) { values() }
                     }
                     Text(about, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    note?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                     Row(Modifier.horizontalScroll(rememberScrollState()).padding(vertical = Space.Small), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                         PlayButtons(play = { songs }, note = null, shortcut = shortcut, focusFirst = true)
                         buttons?.invoke()

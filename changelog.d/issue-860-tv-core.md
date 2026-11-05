@@ -10,6 +10,7 @@
 - **Lyrics and song radio in Now playing on the TV**, over the cover blurred as on the phone, and today's daily mixes
   on Home.
 - **AudioMuse's song path and song alchemy on the TV**.
+- **Animated covers on the TV**, in Now playing and on album pages, and playlists' own covers from the server.
 - **The TV opens Now playing when a song starts** (it can be switched off under Settings).
 - **Settings on the TV**: servers, library sync, playback, streaming quality, mixes, scrobbling, colours and help,
   the same pages as on the phone.

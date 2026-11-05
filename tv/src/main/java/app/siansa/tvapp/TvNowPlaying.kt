@@ -129,7 +129,9 @@ fun TvNowPlaying() {
             horizontalArrangement = Arrangement.spacedBy(Space.Large * 2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (!queue) Cover(song?.cover, LARGE_COVER, Modifier.size(COVER_SIZE), RoundedCornerShape(Space.Page))
+            // Animated covers move here as on the phone (Settings › Playback there: Animated covers), and a song's own
+        // picture shows when it has one.
+        if (!queue) app.siansa.ui.BigCover(song?.cover, song?.albumId, Modifier.size(COVER_SIZE), RoundedCornerShape(Space.Page))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
                 Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                     Text(

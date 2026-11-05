@@ -32,14 +32,15 @@ Everything works with the remote's arrows and the centre button.
   radios, Recently added, Your genres and Random picks. A radio starts playing straight away.
 - **Library**: albums, artists, playlists and genres as covers, your liked songs, favourite albums and favourite
   artists, and Time machine.
-- **Albums, playlists and mixes**: the cover and what it is at the top, with the artists, genre and label to open,
+- **Albums, playlists and mixes**: the cover (a playlist's own cover from the server) and what it is at the top, with the artists, genre and label to open,
   then Play, Shuffle and Add to favourites; down from them goes straight to the songs. The button at the end of each
   song has Play next, Add to queue, Like, Start song radio, Similar songs, and Go to album or artist.
 - **Artists**: Play, Shuffle, Artist radio and Add to favourites, then their top songs, albums and similar artists.
 - **Search**: type with the on-screen keyboard or press the microphone button and say it. "Play … on Siansa" from
   Google TV's own search opens it too.
 - **Now playing**: the cover, the song and the controls, large enough to read from the sofa, with Like, Up next and a
-  sleep timer, Lyrics (synced ones follow the song) and Song radio, over the cover blurred as on the phone. The artists
+  sleep timer, Lyrics (synced ones follow the song) and Song radio, over the cover blurred as on the phone. Animated
+  covers move here and on album pages, as on the phone. The artists
   and the album open their pages.
 - **Skipping within a song**: rewind and fast forward on the remote go back and forward 10 seconds anywhere in the
   app. On a remote without them, press up from the controls in Now playing to reach the progress bar, then left and
