@@ -21,6 +21,9 @@ class EngineFadeTest {
         assertEquals(beat.incomingStartMs to beat.startMs, EngineFade.incomingCue(plan, 294_000))
         val plain = FadePlan(6_000, 2_000, "fixed", 0)
         assertEquals(0L to 304_000L, EngineFade.incomingCue(plain, 304_000))
+        // A cold end: the next song's start a pause after the old song's last sound (its tail, from the fade's start).
+        val cold = FadePlan(400, 150, "cold", 0, gapMs = 600)
+        assertEquals(0L to 305_000L, EngineFade.incomingCue(cold, 304_000))
     }
 
     @Test fun theBeatErrorIsWhereTheNextSongIsLessWhereItShouldBe() {

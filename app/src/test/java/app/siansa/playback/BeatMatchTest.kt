@@ -112,8 +112,11 @@ class BeatMatchTest {
         assertEquals(plan.beat!!.overlapMs, plan.overlapMs)
         assertEquals(plan.overlapMs, plan.fadeInMs)
         assertTrue(plan.why, plan.why.startsWith("beat-matched"))
-        // A hard ending into a quick start, which smart mode alone plays back to back, still gets the DJ blend.
-        assertNull(Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 310_000, 300_000, profile("a", outro, null), profile("b", null, intro)))
+        // A hard ending into a hard start, which smart mode alone plays as a cold end (no overlap, a short pause),
+        // still gets the DJ blend.
+        val cold = Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 310_000, 300_000, profile("a", outro, null), profile("b", null, intro))!!
+        assertTrue(cold.why, cold.gapMs > 0)
+        assertNull(cold.beat)
     }
 
     @Test fun aBlendHasItsOwnLengthInBarsApartFromTheCrossfadeLength() {

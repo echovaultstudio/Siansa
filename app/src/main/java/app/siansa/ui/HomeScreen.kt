@@ -54,6 +54,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -71,6 +72,7 @@ import androidx.navigation.NavController
 import app.siansa.AppGraph
 import app.siansa.data.Album
 import app.siansa.data.HomeLook
+import app.siansa.data.HomeMenuItem
 import app.siansa.data.HomeSection
 import app.siansa.data.Artist
 import app.siansa.data.Mix
@@ -122,13 +124,15 @@ fun HomeScreen(nav: NavController) {
     val homeHidden = homeSettings.homeHidden
     // The Home settings panel, open on Sources (true) or Arrange (false); null while closed.
     var panel by remember { mutableStateOf<Boolean?>(null) }
-    // Home's menu (Play on…, Sources, Arrange Home) and the Play on sheet it opens.
+    // Home's menu (Roll the dice, Play on…, Sources, Arrange Home) and the Play on sheet it opens.
     val menu = rememberHomeMenuState()
     val menuInfo = rememberHomeMenuInfo()
+    val dice = rememberDice()
     var castOpen by remember { mutableStateOf(false) }
     fun pick(item: HomeMenuItem) {
-        AppLog.d("Home", "Menu: ${item.name.lowercase()}")
+        AppLog.d("Home", "Menu: ${item.id}")
         when (item) {
+            HomeMenuItem.DICE -> dice.roll()
             HomeMenuItem.PLAY_ON -> castOpen = true
             HomeMenuItem.SOURCES -> panel = true
             HomeMenuItem.ARRANGE -> panel = false
@@ -282,12 +286,23 @@ fun HomeScreen(nav: NavController) {
         state = listState,
         contentPadding = PaddingValues(bottom = if (keyboardOpen()) Space.Page else bottomBarPadding(Space.Section)),
     ) {
-        item {
-            // One menu button for Play on…, the source filter and arranging Home (issues #152, #872).
-            HomeHeader(greeting(), Modifier.statusBarsPadding()) {
-                // Left of the menu (issue #347).
-                DiceButton()
-                HomeMenuButton(menu, casting = menuInfo.playOn.active, filterActive = menuInfo.filterActive, onPick = ::pick)
+        item(key = "top") {
+            // The top of Home (issue #872): the notices, then one round menu button for the dice, Play on…, the
+            // source filter and arranging Home, in line with them. No greeting: the chips and the button are the header.
+            val notices = rememberNotices(graph, homeSettings, shown = HomeSection.NOTICES !in homeHidden)
+            HomeTopBar(
+                notices,
+                onOpen = { notice ->
+                    AppLog.i("Home", "Notice opened: ${notice.kind.id}")
+                    graph.notices.tap(notice.kind)
+                    nav.navigate(notice.route)
+                },
+                modifier = Modifier.statusBarsPadding().padding(top = Space.Medium),
+            ) {
+                HomeMenuButton(
+                    menu, casting = menuInfo.playOn.active, filterActive = menuInfo.filterActive, onPick = ::pick,
+                    rolling = dice.rolling, rolls = dice.rolls,
+                )
             }
         }
         item(key = "sources") { SourceChips { panel = true } }
@@ -301,7 +316,8 @@ fun HomeScreen(nav: NavController) {
             val look = homeSettings.homeLooks[section] ?: HomeLook.AS_IS
             when (section) {
                 // The chips row (issue #784); its kinds are set in Settings › Home › Notices.
-                HomeSection.NOTICES -> item(key = "notices") { NoticesRow(nav, graph, homeSettings) }
+                // The notices are the top of Home now (issue #872), not a section of their own.
+                HomeSection.NOTICES -> Unit
                 HomeSection.QUICK -> {
                     // Quick access, like the top grid in Spotify (issue #271): Liked songs always first, then what
                     // you played last; until there's enough of that, today's mixes, playlists and recent albums.
@@ -590,10 +606,7 @@ fun HomeScreen(nav: NavController) {
             }
         }
     }
-    HomeMenuOverlay(menu, menuInfo, onPick = ::pick, onStop = {
-        AppLog.i("Cast", "Stopped from Home's menu")
-        stopCasting()
-    })
+    HomeMenuOverlay(menu, menuInfo, homeSettings.homeMenu, onPick = ::pick)
     }
     }
     panel?.let { sources ->
@@ -668,16 +681,6 @@ private fun albumItem(album: Album, subtitle: String, play: (() -> Unit)? = null
 
 /** A row of albums played as one plays this many of them, in order. */
 private const val PLAY_ALBUMS = 10
-
-private fun greeting(): String {
-    val hour = LocalTime.now().hour
-    return when (hour) {
-        in 5..11 -> "Good morning"
-        in 12..16 -> "Good afternoon"
-        in 17..21 -> "Good evening"
-        else -> "Good night"
-    }
-}
 
 @Composable
 fun PlaylistTile(playlist: Playlist, onClick: () -> Unit) {
@@ -830,61 +833,53 @@ fun MixRow(mix: Mix, onClick: () -> Unit) {
     }
 }
 
-/** Roll the dice (issue #347): plays a song from your library you've never played, straight away. The die tumbles while it rolls. */
+/** Roll the dice (issue #347): whether it's rolling, how many rolls so far (for the die's tumble) and [roll]. */
+@Stable
+internal class DiceRoller {
+    var rolling by mutableStateOf(false)
+    var rolls by mutableIntStateOf(0)
+    internal var start: () -> Unit = {}
+
+    /** Plays a song from your library you've never played, straight away. Nothing while a roll is under way. */
+    fun roll() = start()
+}
+
+/** [DiceRoller] for Home's menu (issue #872): the die tumbles in the menu button while it rolls. */
 @Composable
-private fun DiceButton() {
+private fun rememberDice(): DiceRoller {
     val graph = LocalGraph.current
     val launch = rememberPlayLauncher()
     val scope = rememberCoroutineScope()
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-    var rolling by remember { mutableStateOf(false) }
-    var rolls by remember { mutableIntStateOf(0) }
-    IconButton(
-        onClick = {
-            if (rolling) return@IconButton
-            if (graph.connection.current.offline) {
-                launch.notify("You're offline: rolling the dice needs the server")
-                return@IconButton
-            }
-            rolling = true
-            rolls++
-            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-            scope.launch {
-                try {
-                    val song = graph.dice.roll()
-                    if (song == null) launch.notify("No songs you haven't played turned up")
-                    else {
-                        graph.player.play(listOf(song))
-                        launch.notify("Rolled: ${song.title}" + if (song.artist.isNotBlank()) " – ${song.artist}" else "")
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    AppLog.w("Dice", "Couldn't roll: ${e.message}")
-                    launch.notify("Couldn't roll the dice: ${e.message}")
-                } finally {
-                    rolling = false
+    val dice = remember { DiceRoller() }
+    dice.start = start@{
+        if (dice.rolling) return@start
+        if (graph.connection.current.offline) {
+            launch.notify("You're offline: rolling the dice needs the server")
+            return@start
+        }
+        dice.rolling = true
+        dice.rolls++
+        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+        scope.launch {
+            try {
+                val song = graph.dice.roll()
+                if (song == null) launch.notify("No songs you haven't played turned up")
+                else {
+                    graph.player.play(listOf(song))
+                    launch.notify("Rolled: ${song.title}" + if (song.artist.isNotBlank()) " – ${song.artist}" else "")
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("Dice", "Couldn't roll: ${e.message}")
+                launch.notify("Couldn't roll the dice: ${e.message}")
+            } finally {
+                dice.rolling = false
             }
-        },
-        modifier = Modifier.testTag("dice"),
-    ) {
-        RollingDie(
-            rolls, rolling, MaterialTheme.colorScheme.onSurface,
-            Modifier.semantics { contentDescription = if (rolling) "Rolling the dice…" else "Roll the dice: play a song you've never played" },
-        )
+        }
     }
-}
-
-@Composable
-internal fun HomeHeader(title: String, modifier: Modifier = Modifier, action: @Composable () -> Unit) {
-    Row(
-        modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Tight, top = Space.Medium),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-        action()
-    }
+    return dice
 }
 
 /**

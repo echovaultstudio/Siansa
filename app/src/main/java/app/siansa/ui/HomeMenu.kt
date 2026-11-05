@@ -5,36 +5,33 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Cast
 import androidx.compose.material.icons.rounded.CastConnected
 import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Reorder
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -55,6 +52,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -69,21 +67,22 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import app.siansa.data.HomeMenuItem
+import androidx.compose.material.icons.rounded.Casino
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.layout.heightIn
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.siansa.playback.Cast
 import app.siansa.playback.dlna.Dlna
 import kotlin.math.roundToInt
 
 /*
- * Home's menu (the button at the top right of Home): Play on…, Sources and Arrange Home, in a drop-down under the
+ * Home's menu (the round button at the end of the notices, at the top of Home): Roll the dice, Play on…, Sources and
+ * Arrange Home ([HomeMenuItem], in the order set in Settings › Style › Home Menu), as a column of bubbles under the
  * button. A tap opens it; pressing the button and sliding down picks a row as the finger lets go (a glide), with a
  * light tick as the finger passes from row to row.
  */
-
-/** The rows of Home's menu, top to bottom. */
-enum class HomeMenuItem { PLAY_ON, SOURCES, ARRANGE }
 
 /** A row's place on the screen, in the root's pixels. */
 data class MenuBounds(val left: Float, val top: Float, val right: Float, val bottom: Float) {
@@ -187,29 +186,39 @@ fun rememberHomeMenuInfo(): HomeMenuInfo {
     )
 }
 
-/** Ends casting from Home's menu (its Stop), back to this phone, as "This phone" in Play on does. */
-internal fun stopCasting() {
-    val status = Cast.status.value
-    if (status.device != null || status.connecting) Cast.disconnect()
-    Dlna.select(null)
-}
-
 /**
- * Home's menu button: the three lines, lit while the source filter hides something, with a small dot while
- * something is cast. A tap opens the menu; a press slid down glides through it ([HomeMenuState]). Once a press
- * starts here, the slide belongs to the menu, so Home doesn't scroll.
+ * Home's menu button: a circle the notice chips' height ([size]), so it sits in line with them, its three lines always
+ * in the accent colour. It has a thin ring in the accent colour while the source filter hides something, a small dot while
+ * something is cast, and shows the dice tumbling while a roll finds a song. A tap opens the menu; a press slid down
+ * glides through it ([HomeMenuState]). Once a press starts here, the slide belongs to the menu, so Home doesn't scroll.
  */
 @Composable
-fun HomeMenuButton(state: HomeMenuState, casting: Boolean, filterActive: Boolean, onPick: (HomeMenuItem) -> Unit, modifier: Modifier = Modifier) {
+fun HomeMenuButton(
+    state: HomeMenuState,
+    casting: Boolean,
+    filterActive: Boolean,
+    onPick: (HomeMenuItem) -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = MENU_CIRCLE,
+    rolling: Boolean = false,
+    rolls: Int = 0,
+) {
     val haptics = LocalHapticFeedback.current
     val pick by rememberUpdatedState(onPick)
     var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    val description = "Home menu: play on a TV or speaker, sources, arrange Home" + if (casting) ". Something is playing on a TV or speaker" else ""
+    val description = when {
+        rolling -> "Rolling the dice…"
+        else -> "Home menu: roll the dice, play on a TV or speaker, sources, arrange Home" +
+            (if (casting) ". Something is playing on a TV or speaker" else "") +
+            (if (filterActive) ". The source filter hides some music" else "")
+    }
     Box(
         modifier
-            .size(48.dp)
+            .size(size)
             .clip(CircleShape)
-            .background(if (state.open) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else Color.Transparent)
+            .background(if (state.open) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh)
+            // A ring, not a fill: the lines stay the accent colour and must show on it.
+            .then(if (filterActive) Modifier.border(1.5.dp, Accent, CircleShape) else Modifier)
             .onGloballyPositioned { coords = it; state.anchor = it.boundsInRoot() }
             .semantics {
                 contentDescription = description
@@ -258,13 +267,14 @@ fun HomeMenuButton(state: HomeMenuState, casting: Boolean, filterActive: Boolean
             .testTag("homeMenu"),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Rounded.FilterList, null, tint = if (filterActive) Accent else MaterialTheme.colorScheme.onSurface)
+        if (rolling) RollingDie(rolls, true, Accent, Modifier.size(MENU_ICON))
+        else Icon(Icons.Rounded.FilterList, null, Modifier.size(MENU_ICON), tint = Accent)
         if (casting) {
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
-                    .offset(x = (-11).dp, y = 11.dp) // spacing: exact (the dot on the icon's corner)
-                    .size(8.dp)
+                    .offset(x = (-6).dp, y = 6.dp) // spacing: exact (the dot on the circle's corner)
+                    .size(7.dp)
                     .clip(CircleShape)
                     .background(Accent)
                     .testTag("homeMenuCastDot"),
@@ -274,11 +284,11 @@ fun HomeMenuButton(state: HomeMenuState, casting: Boolean, filterActive: Boolean
 }
 
 /**
- * The open menu over Home: a dim layer (a tap on it closes the menu) and the drop-down under the button. Back
- * closes it too.
+ * The open menu over Home: a dim layer (a tap on it closes the menu) and the column of bubbles under the button, the
+ * button's size, each bubble's centre on the button's centre line. Back closes it too.
  */
 @Composable
-fun HomeMenuOverlay(state: HomeMenuState, info: HomeMenuInfo, onPick: (HomeMenuItem) -> Unit, onStop: () -> Unit) {
+fun HomeMenuOverlay(state: HomeMenuState, info: HomeMenuInfo, order: List<HomeMenuItem>, onPick: (HomeMenuItem) -> Unit) {
     androidx.activity.compose.BackHandler(enabled = state.open) { state.close() }
     var origin by remember { mutableStateOf(Offset.Zero) }
     val density = LocalDensity.current
@@ -292,33 +302,42 @@ fun HomeMenuOverlay(state: HomeMenuState, info: HomeMenuInfo, onPick: (HomeMenuI
             )
         }
         val anchor = state.anchor
-        val width = with(density) { MENU_WIDTH.toPx() }
+        val gap = with(density) { Space.Small.toPx() }
         val edge = with(density) { Space.Page.toPx() }
-        val gap = with(density) { Space.Tight.toPx() }
+        // The bubbles are the button's size, so the menu's right edge on the button's lines their centres up.
+        val bubble = anchor?.let { with(density) { it.height.toDp() } } ?: MENU_CIRCLE
+        // The room between rows counts half for the row on each side, so a glide never falls between two.
+        val reach = with(density) { Space.Tight.toPx() } / 2
         AnimatedVisibility(
             state.open && anchor != null,
             // Only a fade: a growing menu would report its rows smaller than they are to the glide.
             enter = fadeIn(tween(120)),
             exit = fadeOut(tween(100)),
-            modifier = Modifier.offset {
-                val a = anchor ?: return@offset IntOffset.Zero
-                IntOffset((a.right - width - origin.x).coerceAtLeast(edge).roundToInt(), (a.bottom + gap - origin.y).roundToInt())
+            modifier = Modifier.layout { measurable, constraints ->
+                // No wider than the room left of the button's right edge, keeping the page margin on the left.
+                val room = anchor?.let { (it.right - origin.x - edge).roundToInt() }?.coerceIn(0, constraints.maxWidth) ?: constraints.maxWidth
+                val menu = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0, maxWidth = room))
+                layout(constraints.maxWidth, constraints.maxHeight) {
+                    val a = anchor ?: return@layout
+                    menu.place((a.right - origin.x).roundToInt() - menu.width, (a.bottom + gap - origin.y).roundToInt())
+                }
             },
         ) {
-            Column {
+            Column(horizontalAlignment = Alignment.End) {
                 HomeMenuPanel(
                     info,
                     highlighted = state.highlighted,
                     onPick = { item -> state.close(); onPick(item) },
-                    onStop = onStop,
-                    onRowPlaced = { item, b -> state.rows[item] = b },
+                    order = order,
+                    bubble = bubble,
+                    onRowPlaced = { item, b -> state.rows[item] = MenuBounds(b.left, b.top - reach, b.right, b.bottom + reach) },
                 )
                 if (state.gliding && state.highlighted != null) {
                     Text(
                         "Let go to open",
                         style = MaterialTheme.typography.labelMedium,
                         color = Color.White,
-                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = Space.Medium)
+                        modifier = Modifier.padding(top = Space.Medium)
                             .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.6f))
                             .padding(horizontal = Space.Medium, vertical = Space.Tight),
                     )
@@ -328,102 +347,122 @@ fun HomeMenuOverlay(state: HomeMenuState, info: HomeMenuInfo, onPick: (HomeMenuI
     }
 }
 
-/** The drop-down's width, as in the design. */
-private val MENU_WIDTH = 272.dp
+/** The button's size when nothing measured it: the notice chips' height at the normal text size. */
+internal val MENU_CIRCLE = 36.dp
+
+/** A row of the menu: never shorter than this, so each is easy to hit even with a small bubble. */
+internal val MENU_ROW = 48.dp
+
+/** The icon in the button and in each bubble. */
+private val MENU_ICON = 20.dp
+
+/** The longest a bubble's label gets before it ends in "…". */
+private val MENU_LABEL_MAX = 224.dp
 
 /**
- * The drop-down itself: Play on… (a little taller, the main action), a line, then Sources and Arrange Home. While
- * something is cast, Play on… says where in the accent colour, with Stop at its end.
+ * The menu itself: a column of round bubbles in [order], each with its name in a label to its left. Every bubble is
+ * [bubble] wide (the button's size) and right-aligned, so their centres are on one line; every row is the same
+ * height, so they're evenly spaced; a lit bubble only changes colour. Each opens its usual menu (the TVs and
+ * speakers, the source filter, Arrange) or rolls the dice. Play on… is in the accent colour while something is cast,
+ * and Sources while the source filter hides something.
  */
 @Composable
 internal fun HomeMenuPanel(
     info: HomeMenuInfo,
     highlighted: HomeMenuItem?,
     onPick: (HomeMenuItem) -> Unit,
-    onStop: () -> Unit,
     modifier: Modifier = Modifier,
+    order: List<HomeMenuItem> = HomeMenuItem.default,
+    bubble: Dp = MENU_CIRCLE,
     onRowPlaced: (HomeMenuItem, MenuBounds) -> Unit = { _, _ -> },
 ) {
-    Surface(
-        modifier.width(MENU_WIDTH).testTag("homeMenuPanel"),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = 8.dp,
-        tonalElevation = 2.dp,
+    Column(
+        modifier.testTag("homeMenuPanel"),
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(Space.Tight),
     ) {
-        Column(Modifier.padding(Space.Small)) {
-            val playOn = info.playOn
-            HomeMenuRow(
-                HomeMenuItem.PLAY_ON,
-                if (playOn.active) Icons.Rounded.CastConnected else Icons.Rounded.Cast,
-                playOn.title, playOn.subtitle,
-                highlighted = highlighted == HomeMenuItem.PLAY_ON,
-                lit = playOn.active,
-                tall = true,
-                onPick = onPick, onRowPlaced = onRowPlaced,
-                onStop = onStop.takeIf { playOn.active },
-            )
-            HorizontalDivider(Modifier.padding(horizontal = Space.Medium, vertical = Space.Tight), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            HomeMenuRow(HomeMenuItem.SOURCES, Icons.Rounded.LibraryMusic, "Sources", info.sources, highlighted == HomeMenuItem.SOURCES, onPick = onPick, onRowPlaced = onRowPlaced)
-            HomeMenuRow(HomeMenuItem.ARRANGE, Icons.Rounded.Reorder, "Arrange Home", "Order and looks", highlighted == HomeMenuItem.ARRANGE, onPick = onPick, onRowPlaced = onRowPlaced)
+        val playOn = info.playOn
+        for (item in order) {
+            when (item) {
+                HomeMenuItem.DICE -> HomeMenuBubble(
+                    item, Icons.Rounded.Casino, "Roll the dice: play a song you've never played",
+                    highlighted = highlighted == item, bubble = bubble, onPick = onPick, onRowPlaced = onRowPlaced,
+                )
+                HomeMenuItem.PLAY_ON -> HomeMenuBubble(
+                    item, if (playOn.active) Icons.Rounded.CastConnected else Icons.Rounded.Cast,
+                    "Play on… ${playOn.title.takeIf { playOn.active } ?: ""}".trim(),
+                    highlighted = highlighted == item, lit = playOn.active, bubble = bubble, onPick = onPick, onRowPlaced = onRowPlaced,
+                )
+                HomeMenuItem.SOURCES -> HomeMenuBubble(
+                    item, Icons.Rounded.LibraryMusic, "Sources: ${info.sources}",
+                    highlighted = highlighted == item, lit = info.filterActive, bubble = bubble, onPick = onPick, onRowPlaced = onRowPlaced,
+                )
+                HomeMenuItem.ARRANGE -> HomeMenuBubble(
+                    item, Icons.Rounded.Reorder, "Arrange Home",
+                    highlighted = highlighted == item, bubble = bubble, onPick = onPick, onRowPlaced = onRowPlaced,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun HomeMenuRow(
+private fun HomeMenuBubble(
     item: HomeMenuItem,
     icon: ImageVector,
-    title: String,
-    subtitle: String,
+    /** What TalkBack reads: the name, and what's in use (where it's cast, what the source filter shows). */
+    spoken: String,
     highlighted: Boolean,
+    bubble: Dp,
     lit: Boolean = false,
-    tall: Boolean = false,
     onPick: (HomeMenuItem) -> Unit,
     onRowPlaced: (HomeMenuItem, MenuBounds) -> Unit,
-    /** Stop at the row's end instead of the arrow (Play on… while casting). */
-    onStop: (() -> Unit)? = null,
 ) {
-    val accent = highlighted || lit
+    val tag = item.id
     Row(
         Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (highlighted) Accent.copy(alpha = 0.16f) else Color.Transparent)
             .onGloballyPositioned { c -> c.boundsInRoot().let { onRowPlaced(item, MenuBounds(it.left, it.top, it.right, it.bottom)) } }
-            .clickable(role = Role.Button) { onPick(item) }
-            .padding(start = Space.Medium, end = if (onStop != null) Space.Tight else Space.Medium, top = if (tall) Space.Page else Space.Medium, bottom = if (tall) Space.Page else Space.Medium)
-            .testTag("homeMenu-${item.name.lowercase()}"),
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Button) { onPick(item) }
+            .semantics(mergeDescendants = true) { contentDescription = spoken }
+            // Every row the same height, so the bubbles stay evenly spaced at any font size.
+            .height(maxOf(MENU_ROW, bubble))
+            .testTag("homeMenu-$tag"),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.Small),
     ) {
-        Icon(icon, null, tint = if (accent) Accent else MaterialTheme.colorScheme.onSurface)
-        Spacer(Modifier.width(Space.Page))
-        Column(Modifier.weight(1f)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = if (accent) Accent else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shadowElevation = 4.dp,
+            // Weighted, so the Row measures the bubble first: a long name ends in "…", the bubble never shrinks or
+            // leaves the line. The label is the bubble's height, like the chips.
+            modifier = Modifier.weight(1f, fill = false).widthIn(max = MENU_LABEL_MAX).heightIn(min = bubble).testTag("homeMenuLabel-$tag"),
+        ) {
+            Box(Modifier.padding(horizontal = Space.Medium), contentAlignment = Alignment.Center) {
+                Text(
+                    item.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontSize = PILL_FONT,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (highlighted || lit) Accent else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
-        if (onStop != null) {
-            TextButton(
-                onClick = onStop,
-                contentPadding = PaddingValues(horizontal = Space.Medium),
-                modifier = Modifier.semantics { contentDescription = "Stop playing on the TV or speaker" }.testTag("homeMenuStop"),
-            ) { Text("Stop", color = Accent, fontWeight = FontWeight.SemiBold) }
-        } else {
-            Spacer(Modifier.width(Space.Small))
-            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Surface(
+            shape = CircleShape,
+            color = if (highlighted) Accent else MaterialTheme.colorScheme.surfaceContainerHighest,
+            shadowElevation = 6.dp,
+            modifier = Modifier.size(bubble).testTag("homeMenuBubble-$tag"),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, null, Modifier.size(MENU_ICON), tint = when {
+                    highlighted -> OnAccent
+                    lit -> Accent
+                    else -> MaterialTheme.colorScheme.onSurface
+                })
+            }
         }
     }
 }

@@ -61,6 +61,11 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.data.MiniButton
+import androidx.compose.material.icons.rounded.Reorder
+import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.FilterList
+import androidx.compose.material.icons.rounded.Casino
+import app.siansa.data.HomeMenuItem
 import app.siansa.data.NavTab
 import app.siansa.data.moved
 import app.siansa.log.AppLog
@@ -91,6 +96,7 @@ fun StyleScreen(nav: NavController) {
             HubRow(Icons.Rounded.PhoneAndroid, "Now Playing Style") { nav.navigate("settings/style/now-playing") }
             HubRow(Icons.Rounded.PlayCircle, "Mini Player") { nav.navigate("settings/style/mini-player") }
             HubRow(Icons.Rounded.Dashboard, "Nav Bar") { nav.navigate("settings/style/nav-bar") }
+            HubRow(Icons.Rounded.FilterList, "Home Menu") { nav.navigate("settings/style/home-menu") }
             Spacer(Modifier.height(Space.Section))
             TopBarChoice(settings.topBar) {
                 AppLog.i("Style", "Phone's top bar: ${it.name.lowercase()}")
@@ -237,6 +243,48 @@ fun NavBarStyleScreen(nav: NavController) {
     }
 }
 
+/**
+ * Home Menu (issue #872): the options in Home's menu, top to bottom as they hang under its button. Hold a row or grab
+ * its 6-dot handle to move it. All of them always show: each is the only way to it from Home.
+ */
+@Composable
+fun HomeMenuStyleScreen(nav: NavController) {
+    val graph = LocalGraph.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    val order = settings.homeMenu
+    fun save(items: List<HomeMenuItem>) {
+        AppLog.i("Style", "Home menu: ${HomeMenuItem.format(items)}")
+        graph.settings.setHomeMenu(items)
+    }
+    Screen(
+        title = "Home Menu",
+        nav = nav,
+        actions = { TextButton(onClick = { save(HomeMenuItem.default) }, enabled = order != HomeMenuItem.default) { Text("Reset") } },
+    ) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
+            StyleHint("The round button at the top of Home. Hold a row and drag it: top to bottom as they open under the button.")
+            ArrangeList(
+                order = order,
+                shown = order.toSet(),
+                label = { it.label },
+                icon = { it.icon() },
+                key = { it.id },
+                canHide = { false },
+                canShowMore = false,
+                onChange = { items, _ -> save(items) },
+                eyes = false,
+            )
+        }
+    }
+}
+
+internal fun HomeMenuItem.icon(): ImageVector = when (this) {
+    HomeMenuItem.DICE -> Icons.Rounded.Casino
+    HomeMenuItem.PLAY_ON -> Icons.Rounded.Cast
+    HomeMenuItem.SOURCES -> Icons.Rounded.LibraryMusic
+    HomeMenuItem.ARRANGE -> Icons.Rounded.Reorder
+}
+
 @Composable
 private fun StyleHint(text: String) {
     Text(
@@ -262,6 +310,8 @@ internal fun <T> ArrangeList(
     canHide: (T) -> Boolean,
     canShowMore: Boolean,
     onChange: (order: List<T>, shown: Set<T>) -> Unit,
+    /** Whether rows have the eye at all: Home's menu only puts its options in order (issue #872). */
+    eyes: Boolean = true,
 ) {
     val haptics = LocalHapticFeedback.current
     val pitchPx = with(LocalDensity.current) { ARRANGE_PITCH.toPx() }
@@ -348,7 +398,7 @@ internal fun <T> ArrangeList(
                         color = if (isShown) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f).padding(start = Space.Page).alpha(if (isShown) 1f else 0.6f),
                     )
-                    IconButton(
+                    if (eyes) IconButton(
                         enabled = toggleable,
                         onClick = { change(items, if (isShown) on - item else on + item) },
                     ) {

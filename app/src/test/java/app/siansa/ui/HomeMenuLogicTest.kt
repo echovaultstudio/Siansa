@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.data.HomeMenuItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals

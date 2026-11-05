@@ -173,6 +173,8 @@ data class AppSettings(
     /** Settings › Style (issue #346): the mini player's buttons, the bottom bar's tabs, and now playing's lyrics button. */
     val miniButtons: List<MiniButton> = MiniButton.default,
     val navTabs: List<NavTab> = NavTab.default,
+    /** Home's menu, top to bottom (issue #872). */
+    val homeMenu: List<HomeMenuItem> = HomeMenuItem.default,
     /** On: now playing's lyrics, device and queue buttons (issue #294). Off: the earlier look, lyrics card peeking in. */
     val nowPlayingLyricsButton: Boolean = true,
     val topBar: TopBarStyle = TopBarStyle.CLEAR,
@@ -451,6 +453,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeOrder = HomeSection.parse(prefs.getString("home_order", null)),
         miniButtons = MiniButton.parse(prefs.getString("mini_buttons", null)),
         navTabs = NavTab.parse(prefs.getString("nav_tabs", null)),
+        homeMenu = HomeMenuItem.parse(prefs.getString("home_menu", null)),
         nowPlayingLyricsButton = prefs.getBoolean("now_playing_lyrics_button", true),
         topBar = TopBarStyle.parse(prefs.getString("top_bar", null)),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
@@ -663,6 +666,12 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setMiniButtons(buttons: List<MiniButton>) {
         prefs.edit().putString("mini_buttons", MiniButton.format(buttons)).apply()
         _state.value = _state.value.copy(miniButtons = buttons)
+    }
+
+    fun setHomeMenu(order: List<HomeMenuItem>) {
+        val kept = HomeMenuItem.parse(HomeMenuItem.format(order))
+        prefs.edit().putString("home_menu", HomeMenuItem.format(kept)).apply()
+        _state.value = _state.value.copy(homeMenu = kept)
     }
 
     fun setNavTabs(tabs: List<NavTab>) {
