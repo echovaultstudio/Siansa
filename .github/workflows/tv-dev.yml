@@ -3,11 +3,12 @@ name: Siansa TV Dev
 # Siansa TV Dev (issue #860): a test build of the TV app only, for an Android TV or Google TV box. It installs as
 # app.siansa.tv.dev, next to any other Siansa build, and is published only here, as the APK of the pre-release
 # "tv-dev-latest" on GitHub: never to F-Droid or Google Play, never as a release of Siansa (the release history skips
-# pre-releases), and apart from Siansa Dev (dev-app.yml), which it leaves alone. Built from the TV app's branch until it's
-# merged, then from mixer; each push replaces the APK.
+# pre-releases), and apart from Siansa Dev (dev-app.yml), which it leaves alone. Built from mixer, and from a TV branch
+# (claude/tv-…) so a change can be tried on the TV before it's merged; each push replaces the APK, and its notes say
+# which branch it's from.
 on:
   push:
-    branches: [mixer, claude/android-tv-860]
+    branches: [mixer, "claude/tv-*"]
 
 permissions:
   contents: write
