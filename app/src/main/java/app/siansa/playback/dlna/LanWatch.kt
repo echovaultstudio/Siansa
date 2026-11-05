@@ -36,11 +36,11 @@ internal class LocalNetworks {
  * [onLeft] is called on the main thread, so the music comes back to the phone straight away instead of after
  * the device stops answering.
  */
-internal class LanWatch(context: Context, private val tag: String = "DLNA", private val onLeft: () -> Unit) {
+internal class LanWatch(context: Context, private val onLeft: () -> Unit) {
     private val cm = context.applicationContext.getSystemService(ConnectivityManager::class.java)
     private val main = Handler(Looper.getMainLooper())
     private val networks = LocalNetworks()
-    private val check = Runnable { if (networks.left) { AppLog.i(tag, "The phone left the Wi-Fi"); onLeft() } }
+    private val check = Runnable { if (networks.left) { AppLog.i("DLNA", "The phone left the Wi-Fi"); onLeft() } }
 
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -54,7 +54,7 @@ internal class LanWatch(context: Context, private val tag: String = "DLNA", priv
             main.post {
                 networks.lost(network.toString())
                 if (networks.left) {
-                    AppLog.i(tag, "Wi-Fi gone; giving it ${GRACE_MS / 1000} s to come back")
+                    AppLog.i("DLNA", "Wi-Fi gone; giving it ${GRACE_MS / 1000} s to come back")
                     main.removeCallbacks(check)
                     main.postDelayed(check, GRACE_MS)
                 }
@@ -68,7 +68,7 @@ internal class LanWatch(context: Context, private val tag: String = "DLNA", priv
             .addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET)
             .build()
         runCatching { cm?.registerNetworkCallback(request, callback) }
-            .onFailure { AppLog.w(tag, "Can't follow the Wi-Fi: ${it.javaClass.simpleName}") }
+            .onFailure { AppLog.w("DLNA", "Can't follow the Wi-Fi: ${it.javaClass.simpleName}") }
     }
 
     fun stop() {

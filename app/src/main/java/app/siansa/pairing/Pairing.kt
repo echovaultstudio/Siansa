@@ -1,8 +1,8 @@
 package app.siansa.pairing
 
 import app.siansa.data.AppSettings
+import app.siansa.net.LanAddress
 import app.siansa.net.SourceKind
-import app.siansa.playback.gapless.LanAddress
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.net.URI

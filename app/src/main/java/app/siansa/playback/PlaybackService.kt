@@ -40,7 +40,6 @@ import app.siansa.car.GraphCarLibrary
 import app.siansa.AppGraph
 import app.siansa.BuildConfig
 import app.siansa.playback.engine.AudioEngine
-import app.siansa.playback.gapless.CastGapless
 import app.siansa.AppEntry
 import app.siansa.SiansaApp
 import app.siansa.data.OutsideMedia
@@ -93,8 +92,6 @@ class PlaybackService : MediaLibraryService() {
     private lateinit var phone: ServerSeekPlayer
     /** The Chromecast or Google TV, playing the phone's queue (issue #114). */
     private var castPlayer: TvPlayer? = null
-    /** Casting gaplessly through this phone (issue #114): the phone plays and sends its mix to the TV. */
-    private var gapless: CastGapless? = null
     /** The phone lost touch with the TV for a moment (Cast suspended the session); it may come back (issue #114). */
     private var castSuspended = false
     private var dlnaPlayer: DlnaPlayer? = null
@@ -226,24 +223,6 @@ class PlaybackService : MediaLibraryService() {
             // The TV plays the phone's queue a few songs at a time; the phone keeps the queue (issue #114).
             val tv = TvPlayer(CastItems(graph.source), { Cast.currentSession() }, castPrep)
             castPlayer = tv
-            gapless = engine?.let { mixer ->
-                CastGapless(
-                    context = this,
-                    engine = mixer,
-                    player = phone,
-                    source = { graph.source },
-                    onFallback = { if (tv.connected) moveTo(tv) else phone.pause() },
-                    onEnd = { why ->
-                        phone.pause()
-                        graph.player.notice("Casting ended: ${why}. The music is paused on the phone.")
-                    },
-                    // The sound goes to the TV: headphones or Bluetooth going away mustn't pause it (0.52.0-dev: the
-                    // owner's headphones disconnecting paused the gapless cast).
-                    onActive = { on -> exo.setHandleAudioBecomingNoisy(!on) },
-                    notice = { graph.player.notice(it) },
-                )
-            }
-            phone.onUserJump = { gapless?.userJumped() }
             cast.sessionManager.addSessionManagerListener(object : SessionManagerListener<CastSession> {
                 override fun onSessionEnding(castSession: CastSession) {
                     if (session?.player === tv) castSaved = spotOf(tv)
@@ -251,7 +230,7 @@ class PlaybackService : MediaLibraryService() {
                 override fun onSessionStarting(castSession: CastSession) { castSaved = null }
                 override fun onSessionStarted(castSession: CastSession, sessionId: String) {
                     tv.attach(castSession)
-                    castAvailable(tv, cast)
+                    castAvailable(tv)
                 }
                 override fun onSessionStartFailed(castSession: CastSession, error: Int) {}
                 override fun onSessionEnded(castSession: CastSession, error: Int) {
@@ -263,8 +242,7 @@ class PlaybackService : MediaLibraryService() {
                     castSuspended = false
                     handler.removeCallbacks(castGaveUp)
                     tv.attach(castSession)
-                    gapless?.resumed(castSession)
-                    castAvailable(tv, cast)
+                    castAvailable(tv)
                 }
                 override fun onSessionResumeFailed(castSession: CastSession, error: Int) {
                     tv.detach()
@@ -278,11 +256,7 @@ class PlaybackService : MediaLibraryService() {
             }, CastSession::class.java)
             Cast.currentSession()?.takeIf { it.isConnected }?.let { cs ->
                 tv.attach(cs)
-                castAvailable(tv, cast)
-            }
-            // How it plays, changed in the cog while casting: the cast switches over (issue #114).
-            mainScope.launch {
-                CastSettings.mode.collect { mode -> castModeChanged(mode, tv, cast) }
+                castAvailable(tv)
             }
         }
 
@@ -563,16 +537,6 @@ class PlaybackService : MediaLibraryService() {
      * again (0.52.0-dev). An ended session brings it back to the phone.
      */
     private val castGone = Runnable {
-        if (gapless?.active == true) {
-            if (castSuspended) {
-                AppLog.i("Cast", "Lost touch with the TV for a moment; the phone keeps playing while Cast reconnects")
-                handler.removeCallbacks(castGaveUp)
-                handler.postDelayed(castGaveUp, CAST_RESUME_WAIT_MS)
-            } else {
-                endGapless("casting ended")
-            }
-            return@Runnable
-        }
         val tv = castPlayer ?: return@Runnable
         if (session?.player !== tv) return@Runnable
         if (castSuspended) {
@@ -587,10 +551,6 @@ class PlaybackService : MediaLibraryService() {
     /** The TV didn't come back after a moment away: the music comes back to the phone. */
     private val castGaveUp = Runnable {
         castSuspended = false
-        if (gapless?.active == true) {
-            if (castPlayer?.connected != true) endGapless("the TV didn't come back within ${CAST_RESUME_WAIT_MS / 1000}s")
-            return@Runnable
-        }
         val tv = castPlayer ?: return@Runnable
         if (session?.player !== tv || tv.connected) return@Runnable
         AppLog.w("Cast", "The TV didn't come back within ${CAST_RESUME_WAIT_MS / 1000}s")
@@ -601,74 +561,23 @@ class PlaybackService : MediaLibraryService() {
     private fun castEnded() {
         castSuspended = false
         handler.removeCallbacks(castGaveUp)
-        if (gapless?.active == true) endGapless("casting ended")
         if (castPlayer != null && session?.player === castPlayer) moveTo(phone)
     }
 
     /** A Cast session is on (started, resumed, or already there): the music goes to the TV unless it's there. */
-    private fun castAvailable(tv: TvPlayer, cast: com.google.android.gms.cast.framework.CastContext) {
+    private fun castAvailable(tv: TvPlayer) {
         handler.removeCallbacks(castGaveUp)
         if (session?.player === tv) return // back in touch after a moment away: the music never left the TV
-        if (gapless?.active == true) return // the same, casting gaplessly
         // Only one place plays at a time: a TV picked through DLNA lets go.
         Dlna.select(null)
-        castStarted(tv, cast)
+        castStarted(tv)
     }
 
-    /**
-     * A Cast session started: the TV plays the queue, or, with "Gapless through this phone" (issue #114), the phone
-     * plays on and sends its mix to the TV. That needs Siansa's own TV screen and the new audio engine; without them,
-     * or if it fails to start, the TV plays the queue.
-     */
-    private fun castStarted(tv: Player, cast: com.google.android.gms.cast.framework.CastContext) {
-        if (session?.player === tv || gapless?.active == true) return
-        AppLog.i("Cast", "How it plays: ${CastSettings.mode.value.label}" + if (CastSettings.mode.value == CastMode.Queue) "" else ", trying it")
-        if (CastSettings.mode.value == CastMode.Gapless) {
-            val castSession = cast.sessionManager.currentCastSession
-            val g = gapless
-            when {
-                g == null -> AppLog.w("Cast", "Gapless through this phone needs the new audio engine, which this build doesn't have: the TV plays the queue")
-                castSession == null -> AppLog.w("Cast", "No Cast session to cast gaplessly with: the TV plays the queue")
-                g.start(castSession) -> return
-            }
-        }
+    /** A Cast session started: the TV plays the queue. */
+    private fun castStarted(tv: Player) {
+        if (session?.player === tv) return
         if (phone.mediaItemCount == 0) AppLog.i("Cast", "Nothing playing yet: the TV shows Siansa's screen, and music goes there when it starts")
         moveTo(tv)
-    }
-
-    /**
-     * "How it plays" changed under the cog (issue #114). While a cast is on, it switches at once: from the TV playing
-     * the queue to gapless, the phone takes the queue back from the TV (song and place) and streams it; from gapless
-     * to the queue, the TV gets the phone's queue. Either way the phone keeps its player: the owner's first try left the
-     * TV playing the queue with no player on the phone (0.52.0-dev).
-     */
-    private fun castModeChanged(mode: CastMode, tv: TvPlayer, cast: com.google.android.gms.cast.framework.CastContext) {
-        val g = gapless
-        when {
-            mode == CastMode.Gapless && session?.player === tv -> {
-                val castSession = cast.sessionManager.currentCastSession ?: return
-                if (g == null) {
-                    AppLog.w("Cast", "Gapless through this phone needs the new audio engine, which this build doesn't have: the TV keeps playing the queue")
-                    return
-                }
-                val playing = tv.playWhenReady
-                AppLog.i("Cast", "How it plays changed to gapless during the cast: the phone takes the queue back from the TV and streams it")
-                moveTo(phone)
-                if (g.start(castSession)) {
-                    if (playing) phone.play()
-                } else {
-                    AppLog.w("Cast", "Gapless didn't start (see above): the TV plays the queue again")
-                    graph.player.notice("Gapless through this phone didn't start, so the TV plays the queue.")
-                    moveTo(tv)
-                }
-            }
-            mode == CastMode.Queue && g?.active == true -> {
-                AppLog.i("Cast", "How it plays changed to the TV playing the queue during the cast: the TV gets the phone's queue")
-                // The TV gets the queue first (the phone's player stops), then the mix comes back to the phone, silent.
-                moveTo(tv)
-                g.stop("switched to the TV playing the queue")
-            }
-        }
     }
 
     /**
@@ -703,24 +612,6 @@ class PlaybackService : MediaLibraryService() {
             AppLog.i("Cast", "To the TV: ${songs.size} songs (${bytes / 1024} KB), ${summary.describe(quality)}")
             if (bytes > CAST_MESSAGE_WARN_BYTES) AppLog.w("Cast", "That's near Cast's 64 KB limit for one message: the TV may not take it")
         }
-    }
-
-    /**
-     * Gapless casting ended (the TV went, or stopping casting): the music stays on the phone, paused, as it does when
-     * the TV hands the queue back. Hold to stop (issue #491) clears it instead.
-     */
-    private fun endGapless(why: String) {
-        val g = gapless ?: return
-        // The player stops before the mix comes back to the phone's own output, so nothing plays out of its speaker.
-        if (StopCasting.requested) {
-            StopCasting.requested = false
-            AppLog.i("Cast", "Stopped with hold to stop: the queue is cleared")
-            phone.stop()
-            phone.clearMediaItems()
-        } else {
-            phone.pause()
-        }
-        g.stop(why)
     }
 
     /**
@@ -897,8 +788,6 @@ class PlaybackService : MediaLibraryService() {
         events?.finishCurrent()
         handler.removeCallbacks(castGone)
         handler.removeCallbacks(castGaveUp)
-        gapless?.stop("playback closed")
-        gapless = null
         castPlayer?.release()
         lanWatch?.stop()
         lanWatch = null
@@ -1268,12 +1157,6 @@ class PlaybackService : MediaLibraryService() {
             override fun run() {
                 if (!player.playWhenReady || !onPhone) return
                 handler.postDelayed(this, 1_000)
-                // Casting gaplessly, the position is the TV's: it stands still until the TV plays, which CastGapless
-                // looks after. Reloading the song here asked the TV for a new stream every 6 s (0.52.0-dev).
-                if (gapless?.active == true) {
-                    watchedPosition = -1
-                    return
-                }
                 val state = player.playbackState
                 val now = SystemClock.elapsedRealtime()
                 val position = player.currentPosition

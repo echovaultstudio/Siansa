@@ -141,9 +141,6 @@
 </div>
 <audio id="audio"></audio>
 <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
-<!-- The phone's own stream while casting gaplessly (issue #114): played here, not through Google's Cast player, which
-     never got past 0 s with an endless stream on a SHIELD (0.52.0-dev). -->
-<audio id="live" preload="auto"></audio>
 <script>
 const ICONS = {
   play: '<path d="M8 5v14l11-7z"/>',
@@ -164,21 +161,6 @@ const context = cast.framework.CastReceiverContext.getInstance();
 const LOG_NS = 'urn:x-cast:app.siansa.log';
 function tvlog(text) {
   try { context.sendCustomMessage(LOG_NS, undefined, String(text)); } catch (e) { /* no phone listening yet */ }
-}
-// Gapless through the phone (issue #114): the phone plays the queue itself and sends its mix here as one endless
-// stream; this page plays that in its own <audio> when the phone says start (on LIVE_NS: start, stop, now), shows the
-// song the phone says and sends the remote's keys there. It tells
-// the phone where the stream is, so the phone writes only so far ahead and shows what plays here.
-const LIVE_NS = 'urn:x-cast:app.siansa.live';
-let live = null;      // {stream: n, format} while playing the phone's stream, in the page's own <audio id="live">
-let liveNow = null;   // the phone's last word on the song: title, artist, album, cover, positionMs, durationMs, playing
-let liveAt = 0;       // when it came (Date.now())
-let liveWaiting = false;
-// The page closes itself after 5 minutes with nothing playing (Google's own idle timeout is off: see below).
-const IDLE_CLOSE_MS = 5 * 60 * 1000;
-let idleSince = Date.now();
-function liveSend(obj) {
-  try { context.sendCustomMessage(LIVE_NS, undefined, obj); } catch (e) { /* the phone isn't listening yet */ }
 }
 
 // How much memory the page uses (Chrome's own figure, where it gives one), for the log: at each queue and when it
@@ -237,19 +219,16 @@ function render() {
   const media = player.getMediaInformation();
   const state = player.getPlayerState();
   const S = cast.framework.messages.PlayerState;
-  // The phone's song, once it has one: while it has none (cast started with nothing playing), the splash.
-  const phone = !!(live && liveNow && liveNow.title);
-  if (!phone && (live || !media || state === S.IDLE)) { $('splash-note').textContent = note(); showNow(false); return; }
+  if (!media || state === S.IDLE) { $('splash-note').textContent = note(); showNow(false); return; }
   played = true;
   failed = false;
   showNow(true);
-  const paused = phone ? !liveNow.playing : state === S.PAUSED;
+  const paused = state === S.PAUSED;
   const was = $('now').classList.contains('paused');
   $('now').classList.toggle('paused', paused);
   if (paused && !was) sign('pause', true);
   if (!paused && was) sign('play');
-  const m = phone ? { title: liveNow.title, artist: liveNow.artist, albumName: liveNow.album,
-    images: liveNow.cover ? [{ url: liveNow.cover }] : [] } : (media.metadata || {});
+  const m = media.metadata || {};
   $('title').textContent = m.title || '';
   $('artist').textContent = m.artist || m.albumArtist || '';
   $('album').textContent = m.albumName || '';
@@ -261,20 +240,12 @@ function render() {
     $('cover').style.backgroundImage = bg;
     $('backdrop').style.backgroundImage = bg;
   }
-  $('spinner').classList.toggle('hidden', phone ? !(liveWaiting && liveNow.playing) : state !== S.BUFFERING);
-}
-
-// Where the song is: the TV's own player, or, playing the phone's stream, what the phone said, on by this clock.
-function livePos() {
-  if (!liveNow) return 0;
-  const dur = liveNow.durationMs / 1000;
-  let pos = liveNow.positionMs / 1000 + (liveNow.playing && !liveWaiting ? (Date.now() - liveAt) / 1000 : 0);
-  return dur > 0 ? Math.min(pos, dur) : pos;
+  $('spinner').classList.toggle('hidden', state !== S.BUFFERING);
 }
 
 function tick() {
-  const pos = live ? (windTo !== null ? windTo : livePos()) : player.getCurrentTimeSec();
-  const dur = live ? (liveNow ? liveNow.durationMs / 1000 : 0) : player.getDurationSec();
+  const pos = player.getCurrentTimeSec();
+  const dur = player.getDurationSec();
   $('pos').textContent = fmt(pos);
   $('dur').textContent = fmt(dur);
   $('fill').style.width = dur > 0 ? Math.min(100, pos / dur * 100) + '%' : '0';
@@ -302,13 +273,6 @@ function act(name) {
   if (now - lastAct < 600) { tvlog('ignored ' + name + ' (just did one)'); return; }
   tvlog('does ' + name);
   lastAct = now;
-  if (live) {
-    // The phone is the player: it does what the remote asks (previous goes back to the song's start after its first
-    // seconds, as on the phone), and says so.
-    if (name === 'next' || name === 'prev') sign(name);
-    liveSend({ type: 'command', action: name });
-    return;
-  }
   const S = cast.framework.messages.PlayerState;
   if (name === 'toggle') name = player.getPlayerState() === S.PAUSED ? 'play' : 'pause';
   if (name === 'play') player.play();
@@ -331,25 +295,14 @@ function wind(dir) {
   windAt = now;
   const held = now - windStart;
   const step = held > 5000 ? 20 : held > 2000 ? 10 : 5;
-  const dur = live ? (liveNow ? liveNow.durationMs / 1000 : 0) : player.getDurationSec();
-  let to = (windTo !== null ? windTo : (live ? livePos() : player.getCurrentTimeSec())) + dir * step;
+  const dur = player.getDurationSec();
+  let to = (windTo !== null ? windTo : player.getCurrentTimeSec()) + dir * step;
   to = Math.max(0, dur > 0 ? Math.min(dur - 1, to) : to);
   sign(dir < 0 ? 'back' : 'forward');
   tvlog('winds to ' + Math.round(to) + ' s');
   windTo = to;
-  // Playing the phone's stream, every seek starts a new stream: the bar shows where it'll go, and the phone is
-  // asked once the key is let go.
-  if (!live) seekTo(to);
+  seekTo(to);
   tick();
-}
-
-// Winding ended: playing the phone's stream, the phone now moves to where the winding got to.
-function windDone() {
-  if (live && windTo !== null) {
-    tvlog('asks the phone to go to ' + Math.round(windTo) + ' s');
-    liveSend({ type: 'command', action: 'seek', toMs: Math.round(windTo * 1000) });
-    if (liveNow) { liveNow.positionMs = windTo * 1000; liveAt = Date.now(); }
-  }
 }
 
 // One arrow at a time: which way, whether it's being held, and the timer that settles a press.
@@ -361,7 +314,7 @@ let settle = 0;
 function arrowDone() {
   clearTimeout(settle);
   if (arrow && !holding) act(arrow < 0 ? 'prev' : 'next');
-  if (holding) { tvlog('stopped winding'); windDone(); }
+  if (holding) tvlog('stopped winding');
   arrow = 0;
   holding = false;
   windStart = 0;
@@ -415,7 +368,7 @@ document.addEventListener('keyup', e => {
   tvlog('key up ' + e.key + ' (' + e.keyCode + ')');
   const key = keyOf(e);
   if ((key === 'ArrowLeft' && arrow < 0) || (key === 'ArrowRight' && arrow > 0)) { arrowAt = Date.now(); arrowDone(); }
-  if (key === 'MediaRewind' || key === 'MediaFastForward') { windStart = 0; windDone(); windTo = null; }
+  if (key === 'MediaRewind' || key === 'MediaFastForward') { windStart = 0; windTo = null; }
 });
 
 // What each song plays as. Siansa sends the song's lossy stream (Opus 320 in Ogg, or MP3 320) as its address, and in
@@ -487,11 +440,7 @@ function failedNote() {
 }
 
 player.setMessageInterceptor(M.MessageType.LOAD, req => {
-  idleSince = Date.now();
   heap('a load');
-  // The page's own load of the phone's stream into Google's player.
-  if (req.media && req.media.customData && req.media.customData.siansaLive) return req;
-  if (live) stopLive('the queue is loading');
   try {
     const items = req.queueData && req.queueData.items || [];
     const said = counts(items);
@@ -518,11 +467,6 @@ function songOf(media) {
 // A song that can't play: the queue loads again from where it was, with that kind dropped for every song; once a song
 // is down to MP3, the splash says so. Nothing here may throw or leave the page waiting: the session must carry on.
 player.addEventListener(E.ERROR, event => {
-  if (live && live.cast) {
-    tvlog('Google’s player: error ' + (event && event.detailedErrorCode) + ' on the phone’s stream ' + live.stream + ': ' + liveState());
-    liveSend({ type: 'error', stream: live.stream, code: String(event && event.detailedErrorCode), message: String(event && event.reason || '') });
-    return;
-  }
   let media = null;
   let kind = 'mp3';
   try {
@@ -586,232 +530,28 @@ player.setMessageInterceptor(M.MessageType.SEEK, req => {
     return null;
   }
   if (Date.now() - arrowAt < 1500) return null;
-  // The phone's stream is live: a point in it means nothing to the song. Dropped.
-  if (live) { tvlog('seek dropped: the phone\u2019s stream is live'); return null; }
   return req;
 });
 
 // Other commands, only logged: to see what the TV's remote sends besides keys and seeks.
-// Playing the phone's stream, play, pause and the TV's own next and previous go to the phone instead, which plays and
-// pauses this TV in turn.
 [M.MessageType.PLAY, M.MessageType.PAUSE, M.MessageType.QUEUE_UPDATE, M.MessageType.STOP].forEach(type =>
   player.setMessageInterceptor(type, req => {
     tvlog(type + ' from ' + (req.senderId || 'the TV') + (req.jump ? ', jump ' + req.jump : ''));
     if (type === M.MessageType.PLAY || type === M.MessageType.PAUSE) tvDidIt();
-    // Google's player stopping (the phone ending the queue, as it takes the music over) never touches the phone's
-    // stream, which plays in its own element.
-    // The page's own requests to Google's player (the phone's stream in it) go through as they are.
-    if (Date.now() - ownCafAt < 1000) return req;
-    if (live && type === M.MessageType.STOP) {
-      if (!live.cast) { tvlog('STOP is for Google\u2019s player: the phone\u2019s stream ' + live.stream + ' plays on'); return req; }
-      // The phone's stream plays in Google's player: stopping it is pausing the music.
-      liveSend({ type: 'command', action: 'pause' });
-      return null;
-    }
-    if (live && type === M.MessageType.PLAY) { liveSend({ type: 'command', action: 'play' }); return null; }
-    if (live && type === M.MessageType.PAUSE) { liveSend({ type: 'command', action: 'pause' }); return null; }
-    if (live && type === M.MessageType.QUEUE_UPDATE && req.jump) {
-      liveSend({ type: 'command', action: req.jump > 0 ? 'next' : 'prev' });
-      return null;
-    }
     return req;
   }));
-
-// The phone's stream plays in the page's own <audio id="live">, which Google's Cast player doesn't manage: started and
-// stopped by the phone's messages, not by a LOAD.
-const liveEl = $('live');
-// The element the phone's stream plays in: the page's own, or Google's player's (the stream loaded into it by the page).
-const cafEl = $('audio');
-const media = () => (live && live.cast ? cafEl : liveEl);
-// When the page itself last asked Google's player to play, pause or stop: those come through its interceptors too, and
-// mustn't go back to the phone as the remote's.
-let ownCafAt = 0;
-function cafDo(what) {
-  ownCafAt = Date.now();
-  try { if (what === 'play') player.play(); else if (what === 'pause') player.pause(); else player.stop(); } catch (e) { tvlog('Google\u2019s player: ' + what + ' failed: ' + e.message); }
-}
-
-// How the element is doing, for the log: the time, how far it has data, and what it's waiting for.
-function liveState() {
-  const liveEl = media();
-  const b = liveEl.buffered;
-  const end = b && b.length ? b.end(b.length - 1) : 0;
-  return 'at ' + (liveEl.currentTime || 0).toFixed(1) + ' s, data to ' + end.toFixed(1) + ' s, readyState ' + liveEl.readyState +
-    ', networkState ' + liveEl.networkState + (liveEl.paused ? ', paused' : '') +
-    (liveEl.error ? ', error ' + liveEl.error.code + ' ' + (liveEl.error.message || '') : '');
-}
-
-// Whether the phone's stream should play (the phone's word), and whether it has started. Until it has started, the
-// phone saying "not playing" is ignored (its player can wait for the TV, or be taking the music over from it): pausing
-// then stopped the stream from ever starting (0.52.0-dev: "play() was interrupted by a call to pause()" right after
-// every start, on the SHIELD). The phone repeats its word every few seconds, so a real pause still arrives.
-let liveWanted = true;
-let liveStarted = false;
-let liveDeferred = false;
-
-function playLive(why) {
-  const liveEl = media();
-  if (!live || !liveWanted || !liveEl.paused) return;
-  const n = live.stream;
-  if (live.cast) {
-    // Google's player plays it once it has loaded it; after that, play is asked of it.
-    if (live.loaded) cafDo('play');
-    return;
-  }
-  const p = liveEl.play();
-  if (!p || !p.catch) return;
-  p.catch(e => {
-    // A newer stream (or a stop) took over: nothing to do.
-    if (!live || live.stream !== n || liveEl.getAttribute('src') == null) return;
-    const name = e && e.name || String(e);
-    tvlog('the phone\u2019s stream ' + n + ' didn\u2019t play (' + why + '): ' + name + ' ' + (e && e.message || '') + '; ' + liveState());
-    // Interrupted (a pause, a load): tried again in a moment while it should play.
-    if (name === 'AbortError') setTimeout(() => playLive('again'), 300);
-  });
-}
-
-function startLive(m) {
-  const S = cast.framework.messages.PlayerState;
-  // The TV was playing the queue: that stops (the phone plays it now).
-  // (A stream of the phone's in Google's player before is replaced by the new load, or stopped for the page's own.)
-  if (player.getPlayerState() !== S.IDLE && !(live && live.cast && m.player === 'cast')) cafDo('stop');
-  // A stream in the page's own element before: emptied.
-  if (liveEl.getAttribute('src') != null) { liveEl.pause(); liveEl.removeAttribute('src'); try { liveEl.load(); } catch (e) { /* empty */ } }
-  live = { stream: m.stream || 0, format: m.format || '?', cast: m.player === 'cast', loaded: false };
-  liveWaiting = false;
-  liveWanted = true;
-  liveStarted = false;
-  liveDeferred = false;
-  idleSince = Date.now();
-  tvlog('plays the phone\u2019s stream ' + live.stream + ' (' + live.format + (live.cast ? ', through Google\u2019s player' : ', in its own player') + ')');
-  if (live.cast) {
-    // Known to play on the SHIELD: a buffered stream of unknown length, loaded into Google's player.
-    const req = new M.LoadRequestData();
-    const info = new M.MediaInformation();
-    info.contentId = m.url;
-    info.contentUrl = m.url;
-    info.contentType = m.mime || 'audio/flac';
-    info.streamType = M.StreamType.BUFFERED;
-    info.customData = { siansaLive: true, stream: live.stream };
-    req.media = info;
-    req.autoplay = true;
-    const n = live.stream;
-    ownCafAt = Date.now();
-    Promise.resolve(player.load(req))
-      .then(() => { if (live && live.stream === n) { live.loaded = true; tvlog('Google\u2019s player loaded the phone\u2019s stream ' + n + ': ' + liveState()); playLive('loaded'); } })
-      .catch(e => {
-        if (!live || live.stream !== n) return;
-        tvlog('Google\u2019s player couldn\u2019t load the phone\u2019s stream ' + n + ': ' + (e && (e.type || e.message) || e));
-        liveSend({ type: 'error', stream: n, code: 'load', message: String(e && (e.detailedErrorCode || e.reason || e.type) || '') });
-      });
-  } else {
-    liveEl.src = m.url;
-    playLive('start');
-  }
-  render();
-}
-
-function stopLive(why) {
-  if (!live) return;
-  tvlog('stops the phone\u2019s stream ' + live.stream + ': ' + why + '; ' + liveState());
-  const wasCast = live.cast;
-  live = null;
-  liveNow = null;
-  liveWaiting = false;
-  if (wasCast) { if (!why.startsWith('the queue')) cafDo('stop'); }
-  else {
-    liveEl.pause();
-    liveEl.removeAttribute('src');
-    try { liveEl.load(); } catch (e) { /* already empty */ }
-  }
-  render();
-}
-
-// The phone's word: start or stop its stream, and the song with whether it plays (the element follows).
-context.addCustomMessageListener(LIVE_NS, event => {
-  const m = event.data || {};
-  idleSince = Date.now();
-  if (m.type === 'start' && m.url) { startLive(m); return; }
-  if (m.type === 'stop') { stopLive('the phone stopped it'); return; }
-  if (m.type !== 'now' || !live) return;
-  liveNow = m;
-  liveAt = Date.now();
-  if (!holding) windTo = null;
-  const was = liveWanted;
-  if (m.playing || liveStarted) liveWanted = !!m.playing;
-  else if (!liveDeferred) { liveDeferred = true; tvlog('the phone says not playing: left for now, the stream hasn\u2019t started'); }
-  if (liveWanted && !was) tvlog('the phone plays');
-  if (!liveWanted && was) tvlog('the phone pauses');
-  if (liveWanted) playLive('the phone plays');
-  else if (!media().paused) { if (live.cast) cafDo('pause'); else liveEl.pause(); }
-  render();
-  tick();
-});
-
-// Where the phone's stream is, for the phone: twice a second, and at once when it stops or starts moving.
-function liveClock() {
-  if (!live) return;
-  const liveEl = media();
-  const moving = !liveEl.paused && !liveWaiting && liveEl.readyState >= 3;
-  liveSend({ type: 'clock', stream: live.stream, time: liveEl.currentTime || 0, moving: moving });
-}
-// The stream's events, from whichever element it plays in.
-function onLive(type, f) {
-  [liveEl, cafEl].forEach(el => el.addEventListener(type, e => { if (live && e.target === media()) f(e.target); }));
-}
-onLive('waiting', () => { liveWaiting = true; tvlog('waiting for the phone\u2019s stream: ' + liveState()); liveClock(); render(); });
-onLive('stalled', () => tvlog('the phone\u2019s stream stalled: ' + liveState()));
-onLive('error', el => {
-  if (!live.cast && el.getAttribute('src') == null) return;
-  // The phone decides: it tries another way, or hands this TV the queue.
-  const err = el.error;
-  tvlog('the phone\u2019s stream ' + live.stream + ' failed: ' + liveState());
-  liveSend({ type: 'error', stream: live.stream, code: String(err ? err.code : '?'), message: String(err && err.message || '') });
-});
-onLive('timeupdate', el => {
-  if (liveStarted || el.currentTime < 0.3) return;
-  liveStarted = true;
-  tvlog('the phone\u2019s stream ' + live.stream + ' has started: ' + liveState());
-});
-// Enough data now: play, if it should and isn't.
-['loadedmetadata', 'loadeddata', 'canplay', 'canplaythrough'].forEach(t => onLive(t, () => {
-  if (t === 'canplay' || t === 'loadedmetadata') tvlog('the phone\u2019s stream: ' + t + ', ' + liveState());
-  playLive(t);
-}));
-['playing', 'pause'].forEach(t => onLive(t, el => {
-  if (t === 'playing') { if (liveWaiting || el.currentTime < 0.5) tvlog('the phone\u2019s stream plays: ' + liveState()); liveWaiting = false; }
-  liveClock();
-  render();
-}));
-setInterval(liveClock, 500);
-
-// Nothing loaded in Google's player while the phone's stream plays: its own idle timeout (which closed this page, it
-// seems: status 2161 on the phone, 0.52.0-dev) is off, and the page closes itself instead after 5 minutes with
-// nothing playing at all, as the Cast player did.
-// Any word from the phone, a stream or a queue counts as something happening: it can't close while one plays or
-// within 5 minutes of one.
-setInterval(() => {
-  const S = cast.framework.messages.PlayerState;
-  const busy = live || player.getPlayerState() !== S.IDLE;
-  if (busy) { idleSince = Date.now(); return; }
-  if (Date.now() - idleSince > IDLE_CLOSE_MS) {
-    tvlog('nothing played for ' + Math.round((Date.now() - idleSince) / 60000) + ' minutes: closing');
-    context.stop();
-  }
-}, 10000);
 
 // Why the session ends, as far as the page sees it (2161 on the phone is the phone ending the cast itself: Play on ›
 // This phone, or hold to stop).
 const SE = cast.framework.system.EventType;
-if (SE.SENDER_DISCONNECTED) context.addEventListener(SE.SENDER_DISCONNECTED, e => tvlog('the phone let go (' + (e && e.reason) + ')' + (live ? '; ' + liveState() : '')));
-if (SE.SHUTDOWN) context.addEventListener(SE.SHUTDOWN, () => tvlog('the TV screen is closing' + (live ? '; ' + liveState() : '')));
+if (SE.SENDER_DISCONNECTED) context.addEventListener(SE.SENDER_DISCONNECTED, e => tvlog('the phone let go (' + (e && e.reason) + ')'));
+if (SE.SHUTDOWN) context.addEventListener(SE.SHUTDOWN, () => tvlog('the TV screen is closing'));
 
 // Previous and next work on the queue the phone sends (the whole queue, with the next song loaded ahead).
 const options = new cast.framework.CastReceiverOptions();
 options.statusText = 'Siansa';
-options.customNamespaces = { [LOG_NS]: cast.framework.system.MessageType.STRING, [LIVE_NS]: cast.framework.system.MessageType.JSON };
+options.customNamespaces = { [LOG_NS]: cast.framework.system.MessageType.STRING };
 options.supportedCommands = M.Command.ALL_BASIC_MEDIA | M.Command.QUEUE_NEXT | M.Command.QUEUE_PREV;
-options.disableIdleTimeout = true;
 // The splash says "Connecting…" until the TV has started the page, then waits for the phone's first song.
 const pageAt = Date.now();
 context.addEventListener(cast.framework.system.EventType.READY, () => {

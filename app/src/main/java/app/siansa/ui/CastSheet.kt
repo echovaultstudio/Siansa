@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -53,8 +52,6 @@ import androidx.mediarouter.media.MediaRouter
 import app.siansa.playback.Cast
 import com.google.android.gms.cast.CastDevice
 import app.siansa.playback.AudioOutput
-import app.siansa.BuildConfig
-import app.siansa.playback.CastMode
 import app.siansa.playback.CastQuality
 import app.siansa.playback.CastSettings
 import app.siansa.playback.CastStatus
@@ -340,33 +337,11 @@ private fun ChromecastSettings(name: String, onDismiss: () -> Unit) {
     )
 }
 
-/**
- * What the Chromecast settings show, in their own function so the screenshot tests can draw them: how the TV plays
- * (the queue itself, or gapless through this phone, issue #114; only with the new audio engine, [gapless]) and the
- * sound quality of the queue.
- */
+/** What the Chromecast settings show, in their own function so the screenshot tests can draw them. */
 @Composable
-internal fun ChromecastSettingsContent(gapless: Boolean = BuildConfig.MIXER_ENGINE) {
+internal fun ChromecastSettingsContent() {
     val quality by CastSettings.quality.collectAsStateWithLifecycle()
-    val mode by CastSettings.mode.collectAsStateWithLifecycle()
-    val throughPhone = gapless && mode == CastMode.Gapless
     Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-        if (gapless) {
-            Text("How it plays", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            CastMode.entries.forEach { option ->
-                SettingChoice(
-                    label = option.label,
-                    detail = when (option) {
-                        CastMode.Queue -> "The TV gets each song from your server by itself. Your phone is free."
-                        CastMode.Gapless -> "This phone plays, with its crossfades and DJ blends, and sends the sound to the TV, lossless. " +
-                            "Keep the phone on this Wi-Fi with Siansa running; it uses more battery."
-                    },
-                    selected = mode == option,
-                    tag = "castMode-${option.key}",
-                ) { CastSettings.setMode(option) }
-            }
-            Spacer(Modifier.height(Space.Small))
-        }
         Text("Sound quality", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         CastQuality.entries.forEach { option ->
             SettingChoice(
@@ -377,14 +352,11 @@ internal fun ChromecastSettingsContent(gapless: Boolean = BuildConfig.MIXER_ENGI
                     CastQuality.Mp3 -> "Everything as MP3 320, for older TVs and speakers that can't play Opus."
                 },
                 selected = quality == option,
-                enabled = !throughPhone,
                 tag = "castQuality-${option.key}",
             ) { CastSettings.setQuality(option) }
         }
         Text(
-            if (throughPhone) "Gapless through this phone is always lossless. For every Chromecast; changing how it plays switches a cast at once."
-            else if (gapless) "For every Chromecast. Sound quality applies to music you start playing after this; changing how it plays switches a cast at once."
-            else "For every Chromecast. Applies to music you start playing after this.",
+            "For every Chromecast. Applies to music you start playing after this.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -393,24 +365,20 @@ internal fun ChromecastSettingsContent(gapless: Boolean = BuildConfig.MIXER_ENGI
 
 /** One choice of a setting: a radio button, its name and a line on what it does. */
 @Composable
-private fun SettingChoice(label: String, detail: String, selected: Boolean, tag: String, enabled: Boolean = true, onPick: () -> Unit) {
+private fun SettingChoice(label: String, detail: String, selected: Boolean, tag: String, onPick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(Space.Small))
-            .clickable(enabled = enabled, onClick = onPick).testTag(tag),
+            .clickable(onClick = onPick).testTag(tag),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.Small),
     ) {
-        RadioButton(selected = selected, enabled = enabled, onClick = onPick)
+        RadioButton(selected = selected, onClick = onPick)
         Column(Modifier.weight(1f)) {
-            Text(
-                label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-            )
+            Text(label, style = MaterialTheme.typography.bodyLarge)
             Text(
                 detail,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.38f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
