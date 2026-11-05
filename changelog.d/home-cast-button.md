@@ -1,2 +1,2 @@
 ### Added
-- **A cast button on Home**, between the dice and the filter, when there's a TV or speaker to play on. It turns amber while something plays there.
+- **Play on a TV or speaker from Home**, with **Play on…** in the menu at the top of Home.

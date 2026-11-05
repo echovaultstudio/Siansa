@@ -166,7 +166,7 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Gap under the tile", captionGap, Space.Small, 1.dp)
     }
 
-    /** Home (issue #347): the dice and the filter button sit side by side, both centred on the greeting's line. */
+    /** Home (issue #347): the dice and the menu button sit side by side, both centred on the greeting's line. */
     @Test fun diceSitsBesideTheFilterOnTheGreetingLine() {
         compose.setContent {
             SiansaTheme {
@@ -182,6 +182,31 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Dice against the greeting", title.top - dice.top, dice.bottom - title.bottom, tolerance = 2.dp)
         assertEven("Dice and filter on one line", dice.top, filter.top, 1.dp)
         assertTrue("The dice is left of the filter", dice.right <= filter.left)
+    }
+
+    /**
+     * Home's menu (issue #872): the same room above the first row as below the last, Sources and Arrange Home the
+     * same height, Play on… a little taller, and the icons lined up down the menu.
+     */
+    @Test fun homeMenuRowsSitEvenly() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.HomeMenuPanel(
+                    app.siansa.ui.HomeMenuInfo(app.siansa.ui.PlayOnLine("Play on…", "TV or speaker", false), "All libraries", false),
+                    highlighted = null, onPick = {}, onStop = {},
+                )
+            }
+        }
+        val panel = compose.onNodeWithTag("homeMenuPanel").getBoundsInRoot()
+        val playOn = compose.onNodeWithTag("homeMenu-play_on").getBoundsInRoot()
+        val sources = compose.onNodeWithTag("homeMenu-sources").getBoundsInRoot()
+        val arrange = compose.onNodeWithTag("homeMenu-arrange").getBoundsInRoot()
+        assertEven("Menu: above the first row and below the last", playOn.top - panel.top, panel.bottom - arrange.bottom, 1.dp)
+        assertEven("Menu: room at its edges", playOn.top - panel.top, Space.Small, 1.dp)
+        assertEven("Menu: Sources and Arrange Home rows", sources.bottom - sources.top, arrange.bottom - arrange.top, 1.dp)
+        assertEven("Menu: Sources follows Arrange Home without a gap", arrange.top, sources.bottom, 1.dp)
+        assertTrue("Play on… is the taller row", playOn.bottom - playOn.top > sources.bottom - sources.top)
+        assertEven("Menu: rows share the left edge", playOn.left, sources.left, 1.dp)
     }
 
     /** Custom cards (issue #622): the banner sits a page margin from both edges of the screen. */

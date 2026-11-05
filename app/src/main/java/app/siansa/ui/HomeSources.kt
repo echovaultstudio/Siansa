@@ -25,7 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.DownloadForOffline
-import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -435,23 +434,8 @@ internal fun sourceChipLabels(downloadedOnly: Boolean): List<String> = buildList
 internal fun canToggleUser(connected: Boolean, inUse: Boolean, ownHidden: Boolean, shownUsers: Int): Boolean =
     connected && (!inUse || ownHidden || shownUsers > 1)
 
-/** Whether Home's filter button is lit: something is hidden, or several users' music is shown. */
+/** Whether Home's menu button is lit: something is hidden, or several users' music is shown. */
 internal fun sourceFilterActive(downloadedOnly: Boolean, shownUsers: Int): Boolean = downloadedOnly || shownUsers > 1
-
-/**
- * Home's one settings button (issue #152): opens the panel with Sources and Arrange. Lit while the source
- * filter hides something or shows several users.
- */
-@Composable
-internal fun SourceFilterButton(onClick: () -> Unit) {
-    val graph = LocalGraph.current
-    val settings by graph.settings.state.collectAsStateWithLifecycle()
-    val shown by graph.guests.shown.collectAsStateWithLifecycle()
-    val active = sourceFilterActive(settings.downloadedOnly, shown.size)
-    IconButton(onClick = onClick) {
-        Icon(Icons.Rounded.FilterList, "Source filter and Arrange Home", tint = if (active) Accent else MaterialTheme.colorScheme.onSurface)
-    }
-}
 
 /** A user's card for the spacing check, with two libraries. */
 @Composable

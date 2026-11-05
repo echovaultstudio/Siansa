@@ -47,7 +47,7 @@ library, play history and settings. A user can be on the same server or a differ
 
 ## Showing several users' music together
 
-The **filter button at the top of Home** opens the source filter. There you can:
+**Sources** in the menu at the top of Home opens the source filter. There you can:
 
 - **Show other users' music next to yours**, for users on the **same server** as you (for example two logins on
   one Navidrome). Their albums, artists, songs and playlists appear in your library, and everything about their

@@ -302,6 +302,36 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     ChromecastSettingsContent()
                 }
             },
+            // Home's top line (issue #872): the dice and the menu button, with the dot while something is cast.
+            Scene("home_header_menu") {
+                Column {
+                    app.siansa.ui.HomeHeader("Good afternoon") {
+                        app.siansa.ui.RollingDie(0, false, MaterialTheme.colorScheme.onSurface, Modifier.padding(Space.Medium))
+                        app.siansa.ui.HomeMenuButton(app.siansa.ui.rememberHomeMenuState(), casting = true, filterActive = false, onPick = {})
+                    }
+                    app.siansa.ui.HomeHeader("Good evening") {
+                        app.siansa.ui.RollingDie(0, false, MaterialTheme.colorScheme.onSurface, Modifier.padding(Space.Medium))
+                        app.siansa.ui.HomeMenuButton(app.siansa.ui.rememberHomeMenuState(), casting = false, filterActive = true, onPick = {})
+                    }
+                }
+            },
+            // Home's menu (issue #872): Sources lit under the finger of a glide; and while casting, Play on… in the
+            // accent colour with Stop, a long device name and a long Sources line cut off with "…".
+            Scene("home_menu") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                    app.siansa.ui.HomeMenuPanel(
+                        app.siansa.ui.HomeMenuInfo(app.siansa.ui.PlayOnLine("Play on…", "TV or speaker", false), "All libraries", false),
+                        highlighted = app.siansa.ui.HomeMenuItem.SOURCES, onPick = {}, onStop = {},
+                    )
+                    app.siansa.ui.HomeMenuPanel(
+                        app.siansa.ui.HomeMenuInfo(
+                            app.siansa.ui.PlayOnLine("Playing on Living Room SHIELD with an uncharacteristically long name", "Chromecast", true),
+                            "Downloaded only · 2 users · 2 of 3 libraries", true,
+                        ),
+                        highlighted = null, onPick = {}, onStop = {},
+                    )
+                }
+            },
             // Menu rows (issue #778): no badge on shuffle, a word badge where one says something.
             Scene("menu_rows") {
                 Column {
