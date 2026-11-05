@@ -6,11 +6,14 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import android.app.Application
 import org.robolectric.shadows.ShadowLooper
 import java.util.concurrent.TimeUnit
 
 /** Saves made as music plays go to Siansa's own thread, in order (issue #860: a song's start waited for them). */
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], application = Application::class)
 class QuietWritesTest {
     @Test fun savesArriveInTheOrderMade() {
         val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("quiet_test", Context.MODE_PRIVATE)
