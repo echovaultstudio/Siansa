@@ -1,5 +1,8 @@
 package app.siansa.screenshots
 
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
