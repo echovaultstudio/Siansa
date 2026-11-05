@@ -45,8 +45,9 @@ Settings) always open that tab's own page, wherever you are.
   reaches the lyrics, and up and down scroll through them. Animated covers move here and on album pages, as on the
   phone. The artists and the album open their pages. The TV app has no sleep timer: the TV's own sleep setting
   turns everything off.
-- **Typing**: the keyboard opens as soon as the remote reaches a text field. You can also type on your phone with the
-  Google TV app's keyboard while it's open.
+- **Typing**: OK on a text field opens a box over the page with the keyboard up (in Search it opens as soon as you get
+  there). Type with the remote, say it with the microphone button, or type or paste on your phone with the Google TV
+  app's keyboard. What you type shows straight away; OK or Done closes the box, and Cancel puts back what was there.
 - **Skipping within a song**: rewind and fast forward on the remote go back and forward 10 seconds anywhere in the
   app. On a remote without them, press up from the controls in Now playing to reach the progress bar, then left and
   right.

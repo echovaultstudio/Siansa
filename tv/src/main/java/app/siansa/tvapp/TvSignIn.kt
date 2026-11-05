@@ -4,18 +4,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Login
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -32,10 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import app.siansa.ui.keyboardOnTvFocus
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import app.siansa.ui.TvTextBox
+import app.siansa.ui.TvTextKind
 import androidx.compose.ui.unit.dp
 import app.siansa.AppGraph
 import app.siansa.log.AppLog
@@ -146,20 +143,10 @@ private fun TypedSignIn(onBack: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
 
     Column(Modifier.width(FORM_WIDTH), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
-        OutlinedTextField(
-            address, { address = it }, singleLine = true,
-            label = { Text("Server address") }, placeholder = { Text("http://192.168.1.10:4533") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
-            modifier = Modifier.keyboardOnTvFocus(),
-        )
-        OutlinedTextField(user, { user = it }, singleLine = true, label = { Text("Username") },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next), modifier = Modifier.keyboardOnTvFocus())
-        OutlinedTextField(
-            password, { password = it }, singleLine = true, label = { Text("Password") },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.keyboardOnTvFocus(),
-        )
+        // Android's own text boxes, so a phone's keyboard can type and paste into them.
+        TvTextBox(address, { address = it }, "Server address", Modifier.fillMaxWidth(), placeholder = "http://192.168.1.10:4533", kind = TvTextKind.ADDRESS)
+        TvTextBox(user, { user = it }, "Username", Modifier.fillMaxWidth())
+        TvTextBox(password, { password = it }, "Password", Modifier.fillMaxWidth(), kind = TvTextKind.SECRET)
         Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
             TvButton(if (busy) "Signing in…" else "Sign in", Icons.AutoMirrored.Rounded.Login, strong = true, onClick = {
                 if (busy) return@TvButton

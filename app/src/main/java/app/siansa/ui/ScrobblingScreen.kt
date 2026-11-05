@@ -208,6 +208,10 @@ private fun Status(text: String) {
 
 @Composable
 private fun Field(label: String, value: String, placeholder: String? = null, onChange: (String) -> Unit) {
+    if (app.siansa.BuildConfig.TV_APP) {
+        TvTextBox(value, onChange, label, Modifier.fillMaxWidth(), placeholder = placeholder, kind = TvTextKind.ADDRESS)
+        return
+    }
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
@@ -215,12 +219,16 @@ private fun Field(label: String, value: String, placeholder: String? = null, onC
         placeholder = { if (placeholder != null) Text(placeholder) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false),
-        modifier = Modifier.fillMaxWidth().keyboardOnTvFocus(),
+        modifier = Modifier.fillMaxWidth(),
     )
 }
 
 @Composable
 private fun Secret(label: String, value: String, onChange: (String) -> Unit) {
+    if (app.siansa.BuildConfig.TV_APP) {
+        TvTextBox(value, onChange, label, Modifier.fillMaxWidth(), kind = TvTextKind.SECRET)
+        return
+    }
     OutlinedTextField(
         value = value,
         onValueChange = onChange,

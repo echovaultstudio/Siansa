@@ -92,6 +92,8 @@ private const val TIMELINE_MS = 30_000L
 class PlaybackService : MediaLibraryService() {
     private var session: MediaLibrarySession? = null
     private lateinit var exo: ExoPlayer
+    /** Whether the last output opened was a bitstream to the receiver (issue #860), so a stall is never "fixed" by converting. */
+    @Volatile private var bitstreamOut = false
     /** [exo] as the rest of the app sees it: converted songs seek on Navidrome (issue #162). */
     private lateinit var phone: ServerSeekPlayer
     /** The Chromecast or Google TV, playing the phone's queue (issue #114). */
@@ -179,7 +181,8 @@ class PlaybackService : MediaLibraryService() {
             }
             // A song sent to the receiver unchanged (issue #860): noted, so it never blends with its neighbours.
             override fun onAudioTrackInitialized(eventTime: AnalyticsListener.EventTime, audioTrackConfig: AudioSink.AudioTrackConfig) {
-                if (androidx.media3.common.util.Util.isEncodingLinearPcm(audioTrackConfig.encoding)) return
+                bitstreamOut = !androidx.media3.common.util.Util.isEncodingLinearPcm(audioTrackConfig.encoding)
+                if (!bitstreamOut) return
                 val id = exo.currentMediaItem?.mediaId ?: return
                 Passthrough.played.add(id)
                 AppLog.i("Audio", "Song $id: ${Passthrough.name(exo.audioFormat?.sampleMimeType)} sent to the receiver unchanged (passthrough)")
@@ -1198,8 +1201,21 @@ class PlaybackService : MediaLibraryService() {
                 // last few seconds of any song: the player is finishing it and moving on.
                 val librarySec = SongRegistry.get(id)?.durationSec ?: 0
                 val nearEnd = librarySec > 0 && position >= librarySec * 1000L - END_GRACE_MS
-                if (id in Passthrough.played || nearEnd) {
-                    AppLog.i("Player", "Song $id hasn't moved for 5 s ($where); left alone (${if (nearEnd) "at its end" else "sent to the receiver unchanged"})")
+                if (nearEnd) {
+                    AppLog.i("Player", "Song $id hasn't moved for 5 s ($where); left alone at its end")
+                    return
+                }
+                if (bitstreamOut || id in Passthrough.played) {
+                    if (stuckRescues < 2) {
+                        AppLog.w("Player", "Song $id stuck for 5 s with its data loaded ($where), sent to the receiver unchanged; opening its output again",
+                            event = "playback.recovery", fields = mapOf("song_id" to id, "action" to "restart_output", "reason" to "stuck", "attempt" to stuckRescues))
+                        player.seekTo(player.currentMediaItemIndex, position)
+                        stuckRescues++
+                    } else {
+                        AppLog.e("Player", "Song $id still stuck after $stuckRescues rescues ($where); giving up on it",
+                            event = "playback.recovery_failed", fields = mapOf("song_id" to id, "attempts" to stuckRescues))
+                        handler.removeCallbacks(this)
+                    }
                     return
                 }
                 val alreadyOpus = (chosenKbps[id] ?: 0) > 0

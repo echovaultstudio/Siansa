@@ -7,16 +7,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.foundation.layout.Row
 import app.siansa.ui.LocalNav
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,8 +24,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import app.siansa.ui.keyboardOnTvFocus
-import androidx.compose.ui.text.input.ImeAction
+import app.siansa.ui.TvTextBox
+import app.siansa.ui.TvTextKind
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.siansa.data.SearchResults
 import app.siansa.ui.LocalGraph
@@ -62,18 +57,18 @@ fun TvSearch(fromSystem: String?, onDone: () -> Unit) {
         value = runCatching { if (graph.library.isSynced) graph.library.search(terms) else graph.source.search(terms) }.getOrNull()
     }
 
-    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    // Opening Search opens the keyboard (not for a search Google TV handed over, which has its words already).
+    val opensKeyboard = remember { fromSystem == null }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
-        OutlinedTextField(
+        // Android's own text box, so a phone's keyboard can type and paste into it; results show as it's typed.
+        TvTextBox(
             value = query,
             onValueChange = { query = it },
-            singleLine = true,
-            leadingIcon = { Icon(Icons.Rounded.Search, null) },
-            placeholder = { Text("Songs, albums or artists") },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            // The results show as it's typed: Search on the keyboard only closes it, to reach them.
-            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-            modifier = Modifier.padding(horizontal = TV_EDGE).fillMaxWidth(SEARCH_WIDTH).focusRequester(field).keyboardOnTvFocus(),
+            label = "Search",
+            placeholder = "Songs, albums or artists",
+            kind = TvTextKind.SEARCH,
+            opensOnFocus = opensKeyboard,
+            modifier = Modifier.padding(horizontal = TV_EDGE).fillMaxWidth(SEARCH_WIDTH).focusRequester(field),
         )
         // With AudioMuse: songs that sound like the words ("rainy sunday morning"), said or typed, as on the phone.
         val settings by graph.settings.state.collectAsStateWithLifecycle()
