@@ -10,7 +10,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.foundation.layout.Row
+import app.siansa.ui.LocalNav
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -69,6 +72,16 @@ fun TvSearch(fromSystem: String?, onDone: () -> Unit) {
             keyboardActions = KeyboardActions(onSearch = { }),
             modifier = Modifier.padding(horizontal = TV_EDGE).fillMaxWidth(SEARCH_WIDTH).focusRequester(field),
         )
+        // With AudioMuse: songs that sound like the words ("rainy sunday morning"), said or typed, as on the phone.
+        val settings by graph.settings.state.collectAsStateWithLifecycle()
+        val nav = LocalNav.current
+        if (settings.audioMuseReady && query.trim().length >= MOOD_LETTERS) {
+            Row(Modifier.padding(horizontal = TV_EDGE)) {
+                TvButton("Songs that sound like \"${query.trim()}\"", Icons.Rounded.AutoAwesome, onClick = {
+                    nav.navigate("mood/${android.net.Uri.encode(query.trim())}")
+                })
+            }
+        }
         val found = results
         when {
             query.trim().length < MIN_LETTERS -> EmptyNote("Type or say what you're looking for.")
@@ -100,6 +113,7 @@ fun TvSearch(fromSystem: String?, onDone: () -> Unit) {
 }
 
 private const val MIN_LETTERS = 2
+private const val MOOD_LETTERS = 3
 private const val TYPING_PAUSE_MS = 250L
 private const val RESULTS = 30
 private const val SEARCH_WIDTH = 0.6f

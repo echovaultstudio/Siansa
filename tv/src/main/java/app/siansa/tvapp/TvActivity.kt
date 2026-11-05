@@ -3,6 +3,7 @@ package app.siansa.tvapp
 import android.app.SearchManager
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material.ripple.RippleAlpha
@@ -56,6 +57,21 @@ class TvActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * The remote's rewind and fast-forward keys go back and forward 10 seconds wherever the remote is in the app. Taken
+     * here, so they don't depend on what has the focus, and before Android hands them to the media session.
+     */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val step = when (keyCode) {
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> SEEK_STEP_MS
+            KeyEvent.KEYCODE_MEDIA_REWIND -> -SEEK_STEP_MS
+            else -> return super.onKeyDown(keyCode, event)
+        }
+        val graph = (application as SiansaApp).graph
+        if (graph.player.state.value.hasMedia) seekBy(graph, step)
+        return true
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         queryOf(intent)?.let { searches.value = it }
@@ -95,3 +111,4 @@ fun TvSurface(content: @Composable () -> Unit) {
 }
 
 private const val FOCUSED_ALPHA = 0.32f
+private const val SEEK_STEP_MS = 10_000L

@@ -39,6 +39,8 @@ import app.siansa.data.RecentPlay
 import app.siansa.data.SyncPhase
 import app.siansa.data.cover
 import app.siansa.log.AppLog
+import app.siansa.mix.MixGenerator
+import app.siansa.mix.MixRules
 import app.siansa.mix.MoodRadio
 import app.siansa.mix.moodRadios
 import app.siansa.ui.LocalGraph
@@ -67,6 +69,8 @@ sealed interface TvItem {
     data class OfGenre(val genre: Genre) : TvItem { override val key get() = "gn:" + genre.name }
     /** Something played lately as a whole (Home's shortcuts on the phone): an album, a playlist, a mix… */
     data class OfShortcut(val play: RecentPlay) : TvItem { override val key get() = "sc:" + play.route }
+    /** Today's personal mix of a kind (Your sound, On repeat, Discover for you): made when picked, then played. */
+    data class OfPersonal(val kind: MixGenerator.Personal) : TvItem { override val key get() = "pm:" + kind.id }
 }
 
 data class TvRow(val title: String, val items: List<TvItem>)
@@ -101,7 +105,12 @@ private suspend fun homeRow(graph: AppGraph, section: Section): TvRow? {
     fun albums(list: List<Album>) = list.distinctBy { it.id }.take(ROW_SIZE).map { TvItem.OfAlbum(it) }
     return when (section) {
         Section.QUICK -> TvRow("Jump back in", graph.recentPlays.all().filter { shortcutOpens(it.route) }.take(ROW_SIZE).map { TvItem.OfShortcut(it) })
-        Section.MADE_FOR_YOU -> TvRow("Your mixes", latestMixes(graph.mixes.all()).take(ROW_SIZE).map { TvItem.OfMix(it) })
+        // Today's personal mixes first (AudioMuse's need it set up), then the mixes made so far.
+        Section.MADE_FOR_YOU -> TvRow(
+            "Your mixes",
+            MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, settings(graph).audioMuseReady) }.map { TvItem.OfPersonal(it) } +
+                latestMixes(graph.mixes.all()).filter { mix -> MixGenerator.Personal.entries.none { mix.selectorId == it.id } }.take(ROW_SIZE).map { TvItem.OfMix(it) },
+        )
         Section.REDISCOVER -> TvRow("Rediscover", graph.insights.rediscover().take(ROW_SIZE).map { TvItem.OfAlbum(it.album, rediscoverSubtitle(it)) })
         Section.RADIOS -> if (settings(graph).audioMuseReady) TvRow("Radios", moodRadios.map { TvItem.OfMood(it) }) else null
         Section.PLAYLISTS -> TvRow("Your playlists", graph.playlists.removed.visible(library.playlists()).take(ROW_SIZE).map { TvItem.OfPlaylist(it) })
@@ -207,6 +216,7 @@ fun TvItemTile(item: TvItem, modifier: Modifier = Modifier) {
             colors = Color(item.radio.colors.first) to Color(item.radio.colors.second))
         is TvItem.OfGenre -> TvTile(item.genre.name, "${item.genre.songCount} songs", null, { play.genreRadio(item.genre.name) }, modifier, colors = tileColors(item.genre.name))
         is TvItem.OfShortcut -> TvTile(item.play.title, shortcutKind(item.play.route), item.play.cover, { nav.navigate(item.play.route) }, modifier)
+        is TvItem.OfPersonal -> TvTile(item.kind.title, "Made for you today", null, { play.personal(item.kind) }, modifier, colors = tileColors(item.kind.title))
     }
 }
 
@@ -240,6 +250,21 @@ class TvPlay(private val graph: AppGraph, private val launcher: app.siansa.ui.Pl
             }
             graph.player.play(mix.songs)
             graph.recentPlays.note("mix/${mix.id}", mix.title, mix.songs.firstOrNull()?.cover)
+        }
+    }
+
+    /** Today's personal mix of [kind], made if it isn't yet (it can take a moment with AudioMuse), then played. */
+    fun personal(kind: MixGenerator.Personal) {
+        scope.launch {
+            notify("Making ${kind.title}…")
+            val mix = runCatching { graph.generator.ensurePersonal(kind) }.onFailure { AppLog.w("Tv", "${kind.title} failed: ${it.message}") }
+            val made = mix.getOrNull()
+            if (made == null || made.songs.isEmpty()) {
+                notify(mix.exceptionOrNull()?.message ?: "${kind.title} isn't ready yet.")
+                return@launch
+            }
+            graph.player.play(made.songs)
+            graph.recentPlays.note("mix/${made.id}", made.title, made.songs.firstOrNull()?.cover)
         }
     }
 

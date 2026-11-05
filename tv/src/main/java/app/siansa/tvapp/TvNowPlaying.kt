@@ -43,7 +43,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -105,14 +107,34 @@ fun TvNowPlaying() {
             }
             Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                 val fraction = if (progress.durationMs > 0) (progress.positionMs.toFloat() / progress.durationMs).coerceIn(0f, 1f) else 0f
+                // Up from the controls: left and right then go back and forward 10 seconds, for remotes without
+                // rewind and fast-forward keys (those work anywhere in the app, TvActivity).
+                var seeking by remember { mutableStateOf(false) }
                 LinearProgressIndicator(
                     progress = { fraction },
-                    modifier = Modifier.fillMaxWidth().height(PROGRESS_HEIGHT),
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(if (seeking) SEEKING_HEIGHT else PROGRESS_HEIGHT)
+                        .onFocusChanged { seeking = it.isFocused }
+                        .onKeyEvent { e ->
+                            if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                            when (e.key) {
+                                Key.DirectionLeft -> { seekBy(graph, -SEEK_MS); progress = graph.player.progress(); true }
+                                Key.DirectionRight -> { seekBy(graph, SEEK_MS); progress = graph.player.progress(); true }
+                                else -> false
+                            }
+                        }
+                        .focusable(),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = if (seeking) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.surfaceVariant,
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(minutes(progress.positionMs), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(details(state.codec, state.transcodeKbps), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        if (seeking) "◀  10 s back   ·   10 s forward  ▶" else details(state.codec, state.transcodeKbps),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (seeking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Text(minutes(progress.durationMs), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -124,15 +146,7 @@ fun TvNowPlaying() {
                     if (state.isPlaying) "Pause" else "Play",
                     onClick = { graph.player.togglePlay() },
                     big = true,
-                    modifier = Modifier.focusRequester(playButton).onPreviewKeyEvent { e ->
-                        // The remote's rewind and fast-forward keys: back and forward 10 s, as on most TV players.
-                        if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                        when (e.key) {
-                            Key.MediaRewind -> { graph.player.seekTo((graph.player.positionMs() - SEEK_MS).coerceAtLeast(0)); true }
-                            Key.MediaFastForward -> { graph.player.seekTo(graph.player.positionMs() + SEEK_MS); true }
-                            else -> false
-                        }
-                    },
+                    modifier = Modifier.focusRequester(playButton),
                 )
                 TvIconButton(Icons.Rounded.SkipNext, "Next", onClick = { graph.player.next() })
                 TvIconButton(
@@ -221,4 +235,14 @@ private const val ROW_GROW = 1.02f
 private const val QUEUE_SHOWN = 100
 private val SLEEP_MINUTES = listOf(15, 30, 45, 60, 90)
 private val PROGRESS_HEIGHT = 6.dp
+private val SEEKING_HEIGHT = 12.dp
+
+/** Back or forward [deltaMs] in the song playing, kept inside it. */
+fun seekBy(graph: app.siansa.AppGraph, deltaMs: Long) {
+    val duration = graph.player.progress().durationMs
+    val to = (graph.player.positionMs() + deltaMs).coerceAtLeast(0L)
+    graph.player.seekTo(if (duration > 0) to.coerceAtMost((duration - END_MARGIN_MS).coerceAtLeast(0L)) else to)
+}
+
+private const val END_MARGIN_MS = 1_000L
 private val QUEUE_WIDTH = 420.dp

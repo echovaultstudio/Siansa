@@ -9,6 +9,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.RendererCapabilities
 import androidx.media3.exoplayer.audio.AudioRendererEventListener
 import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.AudioTrackAudioOutputProvider
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
@@ -68,6 +69,23 @@ class PassthroughRenderer private constructor(
         else -> "code $support"
     }
 
+    /** A bitstream's buffer from its format alone (see [sink]); decoded audio keeps Media3's own size. */
+    private object SteadyBuffer : DefaultAudioSink.AudioTrackBufferSizeProvider {
+        override fun getBufferSizeInBytes(
+            minBufferSizeInBytes: Int,
+            encoding: Int,
+            outputMode: Int,
+            pcmFrameSize: Int,
+            sampleRate: Int,
+            bitrate: Int,
+            maxAudioTrackPlaybackSpeed: Double,
+        ): Int = DefaultAudioSink.AudioTrackBufferSizeProvider.DEFAULT.getBufferSizeInBytes(
+            minBufferSizeInBytes, encoding, outputMode, pcmFrameSize, sampleRate,
+            if (outputMode == DefaultAudioSink.OUTPUT_MODE_PASSTHROUGH) Format.NO_VALUE else bitrate,
+            maxAudioTrackPlaybackSpeed,
+        )
+    }
+
     companion object {
         fun create(
             context: Context,
@@ -76,14 +94,26 @@ class PassthroughRenderer private constructor(
             listener: AudioRendererEventListener?,
             mode: () -> PassthroughMode,
         ): PassthroughRenderer =
-            PassthroughRenderer(context, selector, handler, listener, DefaultAudioSink.Builder(context).build(), mode)
+            PassthroughRenderer(context, selector, handler, listener, sink(context), mode)
+
+        /**
+         * The passthrough sink, with an output buffer that's the same size for every song of a format. Media3 sizes it
+         * from each file's bitrate, and keeps the output open from one song to the next only when nothing about it
+         * changes: two Atmos songs of different bitrates closed and reopened it, a gap (and the receiver finding the
+         * signal again) between songs meant to run into each other, such as a DJ mix. Sized for the format's highest
+         * rate instead, it stays open, gapless as in Kodi.
+         */
+        private fun sink(context: Context): AudioSink {
+            val output = AudioTrackAudioOutputProvider.Builder(context).setAudioTrackBufferSizeProvider(SteadyBuffer).build()
+            return DefaultAudioSink.Builder(context).setAudioOutputProvider(output).build()
+        }
 
         /**
          * Whether this TV's output takes [mime] as a bitstream right now, for the TV's settings page. Asks a sink of
          * its own, which reads the same capabilities the player does.
          */
         fun outputTakes(context: Context, mime: String): Boolean {
-            val sink = DefaultAudioSink.Builder(context).build()
+            val sink = sink(context)
             return try {
                 val format = Format.Builder().setSampleMimeType(mime).setChannelCount(6).setSampleRate(48_000).build()
                 sink.getFormatSupport(format) == AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY

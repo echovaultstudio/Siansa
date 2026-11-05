@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -91,8 +93,16 @@ fun TvLibrary() {
         }.onFailure { AppLog.w("Tv", "Couldn't read the library's ${shelf.label.lowercase()}: ${it.message}") }
     }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
-        Row(Modifier.padding(horizontal = TV_EDGE), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        val settings by graph.settings.state.collectAsStateWithLifecycle()
+        val nav = LocalNav.current
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = TV_EDGE, vertical = Space.Small),
+            horizontalArrangement = Arrangement.spacedBy(Space.Small),
+        ) {
             for (s in Shelf.entries) TvButton(s.label, null, onClick = { shelf = s }, strong = s == shelf)
+            // The phone's pages for these: your listening by year, and (with AudioMuse) the sound of your library.
+            TvButton("Time machine", null, onClick = { nav.navigate("timemachine") })
+            if (settings.audioMuseReady) TvButton("Your sound", null, onClick = { nav.navigate("fingerprint") })
         }
         when {
             shown != shelf -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -322,6 +332,8 @@ fun SongActions(song: Song, liked: Boolean, onDismiss: () -> Unit) {
         add((if (liked) "Unlike" else "Like") to { graph.favorites.toggle(song) })
         // Steady or DJ, asked the way the phone asks (RadioChooserHost, in the TV's root too).
         add("Start song radio" to { app.siansa.ui.RadioChooser.song.value = song })
+        // AudioMuse (or the server) finds songs that sound like it, on the phone's page for it.
+        add("Similar songs" to { nav.navigate("similar/songs/${android.net.Uri.encode(song.id)}") })
         song.albumId?.let { id -> add("Go to album" to { nav.navigate(TvRoutes.album(id)) }) }
         song.artistId?.let { id -> add("Go to artist" to { nav.navigate(TvRoutes.artist(id)) }) }
     }

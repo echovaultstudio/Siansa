@@ -30,13 +30,27 @@ Everything works with the remote's arrows and the centre button.
 - **Home**: Today's mix, Shuffle your library and Liked songs, then the rows of your phone's Home, in the same order
   and with the same rows hidden: Jump back in, Your mixes, Rediscover, Radios, Your playlists, Recently played, Artist
   radios, Recently added, Your genres and Random picks. A radio starts playing straight away.
-- **Library**: albums, artists, playlists and genres as covers, and your liked songs.
+- **Library**: albums, artists, playlists and genres as covers, your liked songs, and Time machine.
 - **Albums, playlists and mixes**: Play, Shuffle, or pick a song to play from it. The button at the end of each song
   has Play next, Add to queue, Like, Start song radio, and Go to album or artist.
 - **Search**: type with the on-screen keyboard or press the microphone button and say it. "Play … on Siansa" from
   Google TV's own search opens it too.
 - **Now playing**: the cover, the song and the controls, large enough to read from the sofa, with Like, Up next and a
-  sleep timer. Rewind and fast forward on the remote skip back and forward 10 seconds.
+  sleep timer.
+- **Skipping within a song**: rewind and fast forward on the remote go back and forward 10 seconds anywhere in the
+  app. On a remote without them, press up from the controls in Now playing to reach the progress bar, then left and
+  right.
+
+## AudioMuse
+
+With AudioMuse set up (on the phone or under **Settings › Servers and services** on the TV), the TV has what it adds on
+the phone:
+
+- **Your sound** and **Discover for you** among Your mixes on Home, made when you pick them.
+- **Radios** on Home: sound radios that play straight away.
+- **Similar songs** in a song's actions, and **Start song radio** with DJ blends.
+- **Songs that sound like…** in Search: type or say a few words ("rainy sunday morning").
+- **Your sound** in the Library: the sound of your library.
 
 ## Settings
 
@@ -71,7 +85,8 @@ and play in stereo, with the centre and surround channels folded in.
 - Only those songs go to the receiver as they are. All other music plays as usual.
 - Those songs play without crossfades, DJ blends, levelling, the equaliser or Siansa's volume: the receiver decides
   how they sound. Use the receiver's volume.
-- Songs in the same format play one after another without a gap.
+- Songs in the same format play one after another without a gap, a DJ mix or a live album included: the output to the
+  receiver stays open from one song to the next.
 - They always stream as the original file, whatever **Streaming quality** says, since a converted song can't go to the
   receiver.
 
