@@ -29,6 +29,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaLibraryService
@@ -976,6 +977,20 @@ class PlaybackService : MediaLibraryService() {
             AppLog.e("Player", "Playback error ${error.errorCodeName} on ${current?.id ?: "?"}", error, event = "playback.error", fields = mapOf(
                 "song_id" to current?.id, "code" to error.errorCodeName, "category" to errorCategory(error.errorCode),
             ))
+            // Passthrough (issue #860) failed: the TV said the receiver takes the format, but the output couldn't be
+            // opened for it or broke while playing. Give it up for this run, so these songs are decoded on the TV,
+            // and play the song again from where it was instead of stopping.
+            if (BuildConfig.TV_APP && (error as? ExoPlaybackException)?.rendererName == "PassthroughRenderer" && Passthrough.failed == null) {
+                val why = "${error.errorCodeName}: ${error.cause?.message ?: error.message}"
+                Passthrough.failed = why
+                val position = player.currentPosition
+                AppLog.w("Passthrough", "Sending ${current?.id ?: "?"} to the receiver failed ($why); decoding Dolby and DTS on the TV from now on",
+                    error, event = "passthrough.failed", fields = mapOf("song_id" to current?.id, "code" to error.errorCodeName))
+                player.seekTo(player.currentMediaItemIndex, position)
+                player.prepare()
+                player.play()
+                return
+            }
             // A file the phone can't open or decode at all (a WMA, say) plays converted to Opus by Navidrome
             // instead of stopping (issue #354). Tracks the phone can open but not decode are handled in
             // onTracksChanged; this covers the ones that never get that far.

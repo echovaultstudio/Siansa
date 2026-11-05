@@ -10,6 +10,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Logout
+import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.Equalizer
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.NewReleases
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.SpeakerGroup
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,63 +39,72 @@ import app.siansa.playback.Passthrough
 import app.siansa.playback.PassthroughMode
 import app.siansa.playback.PassthroughRenderer
 import app.siansa.ui.LocalGraph
+import app.siansa.ui.LocalNav
 import app.siansa.ui.Space
+import app.siansa.ui.syncSummary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** The TV app's settings (issue #860): audio passthrough, the library, and the server it plays from. */
+/**
+ * The TV app's settings (issue #860): the phone's settings that matter on a TV, each opening the phone's own page for it
+ * (servers, sync, playback, streaming, mixes, scrobbling, colours, help), so the two never drift apart; and the TV's own
+ * (audio passthrough). Downloads, mobile data, Android Auto, the mini player, arranging Home and backups are the
+ * phone's and aren't here.
+ */
 @Composable
-fun TvSettings() {
+fun TvSettingsHub() {
     val graph = LocalGraph.current
-    val context = LocalContext.current
+    val nav = LocalNav.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    // What the receiver takes, asked when the page opens (switching the receiver on changes it).
-    val takes by produceState<List<String>?>(null) {
-        value = withContext(Dispatchers.Default) {
-            Passthrough.bitstreamMimes.filter { runCatching { PassthroughRenderer.outputTakes(context, it) }.getOrDefault(false) }
-                .map { Passthrough.name(it) }.distinct()
-        }
-    }
+    val progress by graph.sync.progress.collectAsStateWithLifecycle()
+    val library by graph.library.status.collectAsStateWithLifecycle()
     var confirmSignOut by remember { mutableStateOf(false) }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = TV_EDGE).padding(bottom = Space.Large),
-        verticalArrangement = Arrangement.spacedBy(Space.Large),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = TV_EDGE).padding(top = Space.Small, bottom = Space.Large),
+        verticalArrangement = Arrangement.spacedBy(Space.Section),
     ) {
-        Section("Audio passthrough") {
-            Note(
-                "Dolby and DTS music goes unchanged to your AV receiver or soundbar, which plays it (Dolby Atmos included). " +
-                    "These songs play without crossfades, DJ blends, levelling, the equaliser or Siansa's volume. Other music plays as usual.",
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                for (mode in PassthroughMode.entries) {
-                    TvButton(mode.label, null, strong = settings.audioPassthrough == mode, onClick = {
-                        if (settings.audioPassthrough != mode) {
-                            graph.settings.setAudioPassthrough(mode)
-                            AppLog.i("Settings", "Audio passthrough: ${mode.label}")
-                        }
-                    })
-                }
-            }
-            val list = takes
-            Note(
-                when {
-                    list == null -> "Asking the TV what your receiver takes…"
-                    list.isEmpty() -> "Your TV doesn't report a receiver that takes Dolby or DTS right now. Check it's switched on and connected over HDMI (eARC or ARC)."
-                    else -> "Your receiver takes: ${list.joinToString(", ")}."
+        Group("Music") {
+            TvSettingRow("Servers and services", "${AppLog.redact(settings.navidromeUrl)} · ${settings.navidromeUser.ifBlank { "API key" }}",
+                onClick = { nav.navigate("settings/connections") }, icon = Icons.Rounded.Dns)
+            TvSettingRow("Library sync", syncSummary(progress, library), onClick = { nav.navigate("sync") }, icon = Icons.Rounded.Sync)
+            TvSettingRow("Mixes and vibes", "Your daily mixes and when they're made", onClick = { nav.navigate("vibes") }, icon = Icons.Rounded.Schedule)
+            TvSettingRow("Scrobbling and history", "Last.fm, ListenBrainz and what you've played", onClick = { nav.navigate("settings/scrobbling") }, icon = Icons.Rounded.GraphicEq)
+        }
+        Group("Sound") {
+            TvSettingRow("Audio passthrough", "${settings.audioPassthrough.label} · Dolby and DTS to your receiver",
+                onClick = { nav.navigate(TvRoutes.PASSTHROUGH) }, icon = Icons.Rounded.SpeakerGroup)
+            TvSettingRow("Playback", "Crossfades, DJ blends, levelling, the equaliser, keep playing", onClick = { nav.navigate("settings/playback") }, icon = Icons.Rounded.Equalizer)
+            TvSettingRow("Streaming quality", if (settings.transcodeWifiKbps > 0) "Opus ${settings.transcodeWifiKbps} kbit/s" else "Original files",
+                onClick = { nav.navigate("settings/streaming") }, icon = Icons.Rounded.SwapVert)
+        }
+        Group("Look") {
+            TvSettingRow("Colours", "Siansa's colours on the TV (always dark)", onClick = { nav.navigate("settings/themes") }, icon = Icons.Rounded.Palette)
+        }
+        Group("Help") {
+            TvSwitchRow(
+                "Debug logs",
+                "Records what the TV app does, to trace problems. Nothing leaves the TV unless you send a report.",
+                on = settings.logging,
+                onChange = { on ->
+                    graph.settings.setLogging(on)
+                    AppLog.setEnabled(on)
+                    AppLog.i("Help", "Debug logs ${if (on) "on" else "off"} (TV)")
                 },
             )
+            TvSettingRow("Report a problem", "Make it happen a few times with debug logs on, then send: the log goes with it.",
+                onClick = { nav.navigate("settings/report") }, icon = Icons.Rounded.BugReport)
+            TvSettingRow("Show the log", null, onClick = { nav.navigate("settings/logs") }, icon = Icons.Rounded.Description)
+            TvSettingRow("What's new", null, onClick = { nav.navigate("settings/whatsnew") }, icon = Icons.Rounded.NewReleases)
+            TvSettingRow("About", null, onClick = { nav.navigate("settings/about") }, icon = Icons.Rounded.Info)
         }
-        Section("Library") {
-            Note("The library on this TV is synced from your server, as on your phone.")
-            TvButton("Sync now", Icons.Rounded.Sync, onClick = { graph.sync.start() })
-        }
-        Section("Server") {
-            Note("Playing from ${AppLog.redact(settings.navidromeUrl)} as ${settings.navidromeUser.ifBlank { "an API key" }}.")
+        Group("This TV") {
             if (!confirmSignOut) {
-                TvButton("Sign out", Icons.AutoMirrored.Rounded.Logout, onClick = { confirmSignOut = true })
+                TvSettingRow("Sign out", "Sign this TV out of your server. Your phone stays signed in.", onClick = { confirmSignOut = true },
+                    icon = Icons.AutoMirrored.Rounded.Logout)
             } else {
-                Note("Sign out of this server on the TV? Your phone stays signed in.")
+                Text("Sign out of this server on the TV? Your phone stays signed in.", style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                     TvButton("Sign out", Icons.AutoMirrored.Rounded.Logout, strong = true, onClick = {
                         graph.player.stop()
@@ -99,17 +119,64 @@ fun TvSettings() {
     }
 }
 
+/** Audio passthrough (issue #860): Dolby and DTS music sent unchanged to the AV receiver. */
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
-    Column(Modifier.widthIn(max = TEXT_WIDTH), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
-        Text(title, style = MaterialTheme.typography.titleLarge)
+fun TvPassthrough() {
+    val graph = LocalGraph.current
+    val context = LocalContext.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    // What the receiver takes, asked when the page opens (switching the receiver on changes it).
+    val takes by produceState<List<String>?>(null) {
+        value = withContext(Dispatchers.Default) {
+            Passthrough.bitstreamMimes.filter { runCatching { PassthroughRenderer.outputTakes(context, it) }.getOrDefault(false) }
+                .map { Passthrough.name(it) }.distinct()
+        }
+    }
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = TV_EDGE).padding(bottom = Space.Large),
+        verticalArrangement = Arrangement.spacedBy(Space.Page),
+    ) {
+        Text("Audio passthrough", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
+        Note(
+            "Dolby and DTS music goes unchanged to your AV receiver or soundbar, which plays it (Dolby Atmos included). " +
+                "These songs play without crossfades, DJ blends, levelling, the equaliser or Siansa's volume. Other music plays as usual.",
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            for (mode in PassthroughMode.entries) {
+                TvButton(mode.label, null, strong = settings.audioPassthrough == mode, onClick = {
+                    if (settings.audioPassthrough != mode) {
+                        graph.settings.setAudioPassthrough(mode)
+                        AppLog.i("Settings", "Audio passthrough: ${mode.label}")
+                    }
+                })
+            }
+        }
+        val list = takes
+        Note(
+            when {
+                list == null -> "Asking the TV what your receiver takes…"
+                list.isEmpty() -> "Your TV doesn't report a receiver that takes Dolby or DTS right now. Check it's switched on and connected over HDMI (eARC or ARC). " +
+                    "Dolby and DTS songs are decoded on the TV meanwhile, in stereo."
+                else -> "Your receiver takes: ${list.joinToString(", ")}."
+            },
+        )
+        Passthrough.failed?.let { why ->
+            Note("Passthrough stopped working earlier, so Dolby and DTS songs are decoded on the TV until Siansa is opened again ($why). Report a problem to send the log.")
+        }
+    }
+}
+
+@Composable
+private fun Group(title: String, content: @Composable () -> Unit) {
+    Column(Modifier.widthIn(max = TEXT_WIDTH), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+        Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(bottom = Space.Tight))
         content()
     }
 }
 
 @Composable
 private fun Note(text: String) {
-    Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.widthIn(max = TEXT_WIDTH))
 }
 
-private val TEXT_WIDTH = 760.dp
+private val TEXT_WIDTH = 860.dp

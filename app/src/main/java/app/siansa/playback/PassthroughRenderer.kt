@@ -12,6 +12,7 @@ import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import app.siansa.log.AppLog
 
 /**
  * Audio passthrough on the TV app (issue #860): takes only Dolby and DTS songs, and only when passthrough is on and the
@@ -35,12 +36,36 @@ class PassthroughRenderer private constructor(
     override fun getName(): String = "PassthroughRenderer"
 
     override fun supportsFormat(mediaCodecSelector: MediaCodecSelector, format: Format): Int {
-        if (mode() == PassthroughMode.OFF || !Passthrough.isBitstream(format.sampleMimeType) ||
-            sink.getFormatSupport(format) != AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY
-        ) {
-            return RendererCapabilities.create(C.FORMAT_UNSUPPORTED_TYPE)
+        val mime = format.sampleMimeType
+        if (!Passthrough.isBitstream(mime)) return RendererCapabilities.create(C.FORMAT_UNSUPPORTED_TYPE)
+        val mode = mode()
+        val support = sink.getFormatSupport(format)
+        val failed = Passthrough.failed
+        val take = mode != PassthroughMode.OFF && failed == null && support == AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY
+        // What was decided for each format, once: the first thing to look at when a Dolby or DTS song doesn't play.
+        val key = "$mime/${format.channelCount}/${format.sampleRate}/$mode/$support/${failed != null}"
+        if (Passthrough.logged.add(key)) {
+            val what = "${Passthrough.name(mime)}, ${format.channelCount} ch, ${format.sampleRate} Hz"
+            val decision = when {
+                take -> "sent to the receiver unchanged"
+                mode == PassthroughMode.OFF -> "decoded on the TV (passthrough is off)"
+                failed != null -> "decoded on the TV (passthrough gave up earlier: $failed)"
+                else -> "decoded on the TV (the TV's output doesn't take it as a bitstream: ${supportName(support)})"
+            }
+            AppLog.i("Passthrough", "$what: $decision", event = "passthrough.decision", fields = mapOf(
+                "mime" to mime, "channels" to format.channelCount, "sample_rate" to format.sampleRate,
+                "mode" to mode.name, "sink_support" to supportName(support), "taken" to take,
+            ))
         }
+        if (!take) return RendererCapabilities.create(C.FORMAT_UNSUPPORTED_TYPE)
         return super.supportsFormat(mediaCodecSelector, format)
+    }
+
+    private fun supportName(support: Int): String = when (support) {
+        AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY -> "directly"
+        AudioSink.SINK_FORMAT_SUPPORTED_WITH_TRANSCODING -> "only decoded"
+        AudioSink.SINK_FORMAT_UNSUPPORTED -> "not at all"
+        else -> "code $support"
     }
 
     companion object {

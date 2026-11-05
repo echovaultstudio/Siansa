@@ -38,7 +38,7 @@ import kotlinx.coroutines.delay
  * or arriving from Google TV's own search. Results come from the library on the TV, as the phone's do.
  */
 @Composable
-fun TvSearch(fromSystem: String?, onDone: () -> Unit, open: (TvPage) -> Unit) {
+fun TvSearch(fromSystem: String?, onDone: () -> Unit) {
     val graph = LocalGraph.current
     val player by graph.player.state.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf(fromSystem.orEmpty()) }
@@ -54,7 +54,8 @@ fun TvSearch(fromSystem: String?, onDone: () -> Unit, open: (TvPage) -> Unit) {
         val terms = query.trim()
         if (terms.length < MIN_LETTERS) { value = null; return@produceState }
         delay(TYPING_PAUSE_MS)
-        value = runCatching { graph.library.search(terms) }.getOrNull()
+        // The library on the TV once synced; the server until then, so search works straight after signing in.
+        value = runCatching { if (graph.library.isSynced) graph.library.search(terms) else graph.source.search(terms) }.getOrNull()
     }
 
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
@@ -79,15 +80,15 @@ fun TvSearch(fromSystem: String?, onDone: () -> Unit, open: (TvPage) -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(Space.Section),
             ) {
                 if (found.artists.isNotEmpty()) item("artists") {
-                    TvItemRow(TvRow("Artists", found.artists.take(RESULTS).map { TvItem.OfArtist(it) }), open)
+                    TvItemRow(TvRow("Artists", found.artists.take(RESULTS).map { TvItem.OfArtist(it) }))
                 }
                 if (found.albums.isNotEmpty()) item("albums") {
-                    TvItemRow(TvRow("Albums", found.albums.take(RESULTS).map { TvItem.OfAlbum(it) }), open)
+                    TvItemRow(TvRow("Albums", found.albums.take(RESULTS).map { TvItem.OfAlbum(it) }))
                 }
                 if (found.songs.isNotEmpty()) item("songs") {
                     val songs = found.songs.take(RESULTS)
                     Column(Modifier.padding(horizontal = TV_EDGE), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-                        Text("Songs", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = Space.Page))
+                        Text("Songs", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(bottom = Space.Page))
                         songs.forEachIndexed { i, song ->
                             SongRow(i + 1, song, playing = player.current?.id == song.id) { graph.player.play(songs, startIndex = i) }
                         }

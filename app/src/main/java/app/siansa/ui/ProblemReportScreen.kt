@@ -117,7 +117,8 @@ fun ProblemReportScreen(nav: NavController) {
                         if (state.result.issue != null) "It's issue #${state.result.issue} in the beta testers repo, where you can follow it."
                         else "It will be looked at soon.",
                 )
-                state.result.url?.let { url ->
+                // A TV usually has no web browser to open it in (issue #860).
+                state.result.url?.takeIf { !app.siansa.BuildConfig.TV_APP }?.let { url ->
                     OutlinedButton(onClick = {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     }) { Text("Open the issue") }

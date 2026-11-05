@@ -74,13 +74,16 @@ object AppLog {
         dir = File(context.filesDir, "logs").apply { mkdirs() }
         text = RotatingFile(dir, "siansa", "log", TEXT_BYTES, 2)
         events = RotatingFile(dir, "events", "jsonl", EVENT_BYTES, 3)
-        val version = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "?"
+        val installed = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "?"
+        // The TV app's reports and logs say so (issue #860), so a report from the TV isn't read as the phone's.
+        val version = if (app.siansa.BuildConfig.TV_APP) "$installed TV" else installed
         header = "Siansa $version · Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT}) · ${Build.MANUFACTURER} ${Build.MODEL}"
         about = linkedMapOf(
             "app_version" to version,
             "android" to Build.VERSION.RELEASE,
             "sdk" to Build.VERSION.SDK_INT,
             "device" to "${Build.MANUFACTURER} ${Build.MODEL}",
+            "app_id" to context.packageName,
             "session_id" to Trace.session,
         )
         setEnabled(enabled)
