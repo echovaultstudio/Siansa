@@ -100,7 +100,8 @@ internal fun HomeTopBar(notices: List<Notice>, onOpen: (Notice) -> Unit, modifie
                     .background(Brush.horizontalGradient(0f to surface.copy(alpha = 0f), 0.7f to surface, 1f to surface))
                     .testTag("noticesFade"),
             )
-            Box { menuButton() }
+            // Passes on the exact size: the button is a chip's height whatever its own default.
+            Box(propagateMinConstraints = true) { menuButton() }
         },
     ) { measurables, constraints ->
         val chip = measurables[0].measure(Constraints()).height
