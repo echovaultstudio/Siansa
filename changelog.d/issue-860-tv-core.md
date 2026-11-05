@@ -7,7 +7,9 @@
   genres and albums on other pages open them.
 - **Several servers and users on the TV**: switch between them, add one, and pick whose music and which libraries
   show, under Settings.
-- **Lyrics and song radio in Now playing on the TV**, and today's daily mixes on Home.
+- **Lyrics and song radio in Now playing on the TV**, over the cover blurred as on the phone, and today's daily mixes
+  on Home.
+- **AudioMuse's song path and song alchemy on the TV**.
 - **Settings on the TV**: servers, library sync, playback, streaming quality, mixes, scrobbling, colours and help,
   the same pages as on the phone.
 - **AudioMuse on the TV**: Your sound and Discover for you among your mixes, sound radios, similar songs, and songs

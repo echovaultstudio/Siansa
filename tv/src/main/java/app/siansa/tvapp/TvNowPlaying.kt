@@ -1,6 +1,14 @@
 package app.siansa.tvapp
 
 import androidx.compose.foundation.background
+import android.os.Build
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -25,6 +33,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.produceState
 import app.siansa.log.AppLog
+import app.siansa.ui.openSongPath
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Pause
@@ -93,116 +102,144 @@ fun TvNowPlaying() {
     val song = state.current
     val liked = song != null && (likes[song.id] ?: song.starred)
 
-    Row(
-        Modifier.fillMaxSize().padding(horizontal = TV_EDGE, vertical = Space.Large),
-        horizontalArrangement = Arrangement.spacedBy(Space.Large * 2),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (!queue) Cover(song?.cover, LARGE_COVER, Modifier.size(COVER_SIZE), RoundedCornerShape(Space.Page))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
-            Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-                Text(
-                    song?.title ?: "Nothing playing",
-                    style = if (queue) MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (song != null) {
-                    // The song's artists and album, each opening its page.
-                    val nav = app.siansa.ui.LocalNav.current
-                    val artists = song.artists.ifEmpty { listOfNotNull(song.artistId?.let { app.siansa.data.ArtistRef(it, song.artist) }) }
-                    androidx.compose.foundation.layout.FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(Space.Small),
-                        verticalArrangement = Arrangement.spacedBy(Space.Small),
-                    ) {
-                        if (artists.isEmpty()) {
-                            Text(song.artist, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    // The cover, enlarged and blurred, as the background, darkened down to its own colour: the phone's player
+    // (a darker plain version before Android 12, which can't blur).
+    val tint = app.siansa.ui.rememberCoverColor(song?.cover)
+    Box(Modifier.fillMaxSize().clipToBounds().background(Color.Black)) {
+        Cover(
+            song?.cover,
+            BACKDROP_COVER,
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { scaleX = BACKDROP_SCALE; scaleY = BACKDROP_SCALE; alpha = if (Build.VERSION.SDK_INT >= 31) 0.85f else 0.45f }
+                .then(if (Build.VERSION.SDK_INT >= 31) Modifier.blur(BACKDROP_BLUR) else Modifier),
+            RectangleShape,
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0f to Color.Black.copy(alpha = 0.35f),
+                    0.55f to Color.Black.copy(alpha = 0.5f),
+                    1f to app.siansa.ui.pageBottomColor(tint).copy(alpha = 0.9f),
+                ),
+            ),
+        )
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = TV_EDGE, vertical = Space.Large),
+            horizontalArrangement = Arrangement.spacedBy(Space.Large * 2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (!queue) Cover(song?.cover, LARGE_COVER, Modifier.size(COVER_SIZE), RoundedCornerShape(Space.Page))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    Text(
+                        song?.title ?: "Nothing playing",
+                        style = if (queue) MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (song != null) {
+                        // The song's artists and album, each opening its page.
+                        val nav = app.siansa.ui.LocalNav.current
+                        val artists = song.artists.ifEmpty { listOfNotNull(song.artistId?.let { app.siansa.data.ArtistRef(it, song.artist) }) }
+                        androidx.compose.foundation.layout.FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(Space.Small),
+                            verticalArrangement = Arrangement.spacedBy(Space.Small),
+                        ) {
+                            if (artists.isEmpty()) {
+                                Text(song.artist, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            for (a in artists.take(MAX_ARTISTS)) TvChip(a.name, onClick = { nav.navigate(TvRoutes.artist(a.id)) }, strong = true)
+                            val albumId = song.albumId
+                            if (albumId != null && song.album.isNotBlank()) TvChip(song.album, onClick = { nav.navigate(TvRoutes.album(albumId)) })
                         }
-                        for (a in artists.take(MAX_ARTISTS)) TvChip(a.name, onClick = { nav.navigate(TvRoutes.artist(a.id)) }, strong = true)
-                        val albumId = song.albumId
-                        if (albumId != null && song.album.isNotBlank()) TvChip(song.album, onClick = { nav.navigate(TvRoutes.album(albumId)) })
                     }
                 }
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-                val fraction = if (progress.durationMs > 0) (progress.positionMs.toFloat() / progress.durationMs).coerceIn(0f, 1f) else 0f
-                // Up from the controls: left and right then go back and forward 10 seconds, for remotes without
-                // rewind and fast-forward keys (those work anywhere in the app, TvActivity).
-                var seeking by remember { mutableStateOf(false) }
-                LinearProgressIndicator(
-                    progress = { fraction },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(if (seeking) SEEKING_HEIGHT else PROGRESS_HEIGHT)
-                        .onFocusChanged { seeking = it.isFocused }
-                        .onKeyEvent { e ->
-                            if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
-                            when (e.key) {
-                                Key.DirectionLeft -> { seekBy(graph, -SEEK_MS); progress = graph.player.progress(); true }
-                                Key.DirectionRight -> { seekBy(graph, SEEK_MS); progress = graph.player.progress(); true }
-                                else -> false
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    val fraction = if (progress.durationMs > 0) (progress.positionMs.toFloat() / progress.durationMs).coerceIn(0f, 1f) else 0f
+                    // Up from the controls: left and right then go back and forward 10 seconds, for remotes without
+                    // rewind and fast-forward keys (those work anywhere in the app, TvActivity).
+                    var seeking by remember { mutableStateOf(false) }
+                    LinearProgressIndicator(
+                        progress = { fraction },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(if (seeking) SEEKING_HEIGHT else PROGRESS_HEIGHT)
+                            .onFocusChanged { seeking = it.isFocused }
+                            .onKeyEvent { e ->
+                                if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                                when (e.key) {
+                                    Key.DirectionLeft -> { seekBy(graph, -SEEK_MS); progress = graph.player.progress(); true }
+                                    Key.DirectionRight -> { seekBy(graph, SEEK_MS); progress = graph.player.progress(); true }
+                                    else -> false
+                                }
                             }
-                        }
-                        .focusable(),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = if (seeking) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.surfaceVariant,
-                )
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(minutes(progress.positionMs), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(
-                        if (seeking) "◀  10 s back   ·   10 s forward  ▶" else details(state.codec, state.transcodeKbps),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (seeking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            .focusable(),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = if (seeking) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.surfaceVariant,
                     )
-                    Text(minutes(progress.durationMs), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(minutes(progress.positionMs), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            if (seeking) "◀  10 s back   ·   10 s forward  ▶" else details(state.codec, state.transcodeKbps),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (seeking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(minutes(progress.durationMs), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.Page), verticalAlignment = Alignment.CenterVertically) {
+                    TvIconButton(Icons.Rounded.Shuffle, "Shuffle", onClick = { graph.player.toggleShuffle() }, on = state.shuffle)
+                    TvIconButton(Icons.Rounded.SkipPrevious, "Previous", onClick = { graph.player.previous() })
+                    TvIconButton(
+                        if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        if (state.isPlaying) "Pause" else "Play",
+                        onClick = { graph.player.togglePlay() },
+                        big = true,
+                        modifier = Modifier.focusRequester(playButton),
+                    )
+                    TvIconButton(Icons.Rounded.SkipNext, "Next", onClick = { graph.player.next() })
+                    TvIconButton(
+                        if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat, "Repeat",
+                        onClick = { graph.player.cycleRepeat() },
+                        on = state.repeatMode != Player.REPEAT_MODE_OFF,
+                    )
+                }
+                // The rest with their names, on a row of their own that scrolls sideways as the remote moves along it.
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()).padding(vertical = Space.Small),
+                    horizontalArrangement = Arrangement.spacedBy(Space.Small),
+                ) {
+                    TvButton(if (liked) "Liked" else "Like", if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                        onClick = { song?.let { graph.favorites.toggle(it) } }, strong = liked)
+                    TvButton("Lyrics", Icons.Rounded.Lyrics, onClick = { panel = if (panel == Panel.LYRICS) Panel.NONE else Panel.LYRICS }, strong = panel == Panel.LYRICS)
+                    TvButton("Up next", Icons.AutoMirrored.Rounded.QueueMusic, onClick = { panel = if (panel == Panel.QUEUE) Panel.NONE else Panel.QUEUE },
+                        strong = panel == Panel.QUEUE)
+                    // A radio from this song: AudioMuse's songs that sound like it when set up, Steady or DJ as on the phone.
+                    TvButton("Song radio", Icons.Rounded.Radio, onClick = { song?.let { app.siansa.ui.RadioChooser.song.value = it } })
+                    // AudioMuse's song path from this song, queued after it once ready (as on the phone's player).
+                    if (graph.settings.current.audioMuseReady) {
+                        val nav = app.siansa.ui.LocalNav.current
+                        TvButton("Song path", null, onClick = { song?.let { nav.openSongPath(it.id, fromNowPlaying = true) } })
+                    }
+                    TvButton(sleep?.let { sleepLine(it) } ?: "Sleep timer", Icons.Rounded.Bedtime, onClick = { sleepChoices = true }, strong = sleep != null)
+                }
+                val timer = sleep
+                val next = state.queue.getOrNull(state.index + 1)
+                val line = listOfNotNull(
+                    next?.takeIf { !queue }?.let { "Next: ${it.title} · ${it.artist}" },
+                ).joinToString("   ·   ")
+                if (line.isNotEmpty()) {
+                    Text(line, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.Page), verticalAlignment = Alignment.CenterVertically) {
-                TvIconButton(Icons.Rounded.Shuffle, "Shuffle", onClick = { graph.player.toggleShuffle() }, on = state.shuffle)
-                TvIconButton(Icons.Rounded.SkipPrevious, "Previous", onClick = { graph.player.previous() })
-                TvIconButton(
-                    if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    if (state.isPlaying) "Pause" else "Play",
-                    onClick = { graph.player.togglePlay() },
-                    big = true,
-                    modifier = Modifier.focusRequester(playButton),
-                )
-                TvIconButton(Icons.Rounded.SkipNext, "Next", onClick = { graph.player.next() })
-                TvIconButton(
-                    if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat, "Repeat",
-                    onClick = { graph.player.cycleRepeat() },
-                    on = state.repeatMode != Player.REPEAT_MODE_OFF,
-                )
+            when (panel) {
+                Panel.QUEUE -> UpNext(state.queue, state.index)
+                Panel.LYRICS -> LyricsPanel(song, progress.positionMs)
+                Panel.NONE -> Unit
             }
-            // The rest with their names, on a row of their own that scrolls sideways as the remote moves along it.
-            Row(
-                Modifier.horizontalScroll(rememberScrollState()).padding(vertical = Space.Small),
-                horizontalArrangement = Arrangement.spacedBy(Space.Small),
-            ) {
-                TvButton(if (liked) "Liked" else "Like", if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                    onClick = { song?.let { graph.favorites.toggle(it) } }, strong = liked)
-                TvButton("Lyrics", Icons.Rounded.Lyrics, onClick = { panel = if (panel == Panel.LYRICS) Panel.NONE else Panel.LYRICS }, strong = panel == Panel.LYRICS)
-                TvButton("Up next", Icons.AutoMirrored.Rounded.QueueMusic, onClick = { panel = if (panel == Panel.QUEUE) Panel.NONE else Panel.QUEUE },
-                    strong = panel == Panel.QUEUE)
-                // A radio from this song: AudioMuse's songs that sound like it when set up, Steady or DJ as on the phone.
-                TvButton("Song radio", Icons.Rounded.Radio, onClick = { song?.let { app.siansa.ui.RadioChooser.song.value = it } })
-                TvButton(sleep?.let { sleepLine(it) } ?: "Sleep timer", Icons.Rounded.Bedtime, onClick = { sleepChoices = true }, strong = sleep != null)
-            }
-            val timer = sleep
-            val next = state.queue.getOrNull(state.index + 1)
-            val line = listOfNotNull(
-                next?.takeIf { !queue }?.let { "Next: ${it.title} · ${it.artist}" },
-            ).joinToString("   ·   ")
-            if (line.isNotEmpty()) {
-                Text(line, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        when (panel) {
-            Panel.QUEUE -> UpNext(state.queue, state.index)
-            Panel.LYRICS -> LyricsPanel(song, progress.positionMs)
-            Panel.NONE -> Unit
         }
     }
     if (sleepChoices) SleepChoices(onDismiss = { sleepChoices = false })
@@ -307,6 +344,9 @@ fun details(codec: String?, kbps: Int): String = when {
 private const val PROGRESS_TICK_MS = 500L
 private const val SEEK_MS = 10_000L
 private val COVER_SIZE = 300.dp
+private const val BACKDROP_COVER = 300
+private const val BACKDROP_SCALE = 1.4f
+private val BACKDROP_BLUR = 70.dp
 private const val LINES_ABOVE = 2
 private const val ROW_GROW = 1.02f
 private const val QUEUE_SHOWN = 100

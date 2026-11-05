@@ -39,7 +39,8 @@ Everything works with the remote's arrows and the centre button.
 - **Search**: type with the on-screen keyboard or press the microphone button and say it. "Play … on Siansa" from
   Google TV's own search opens it too.
 - **Now playing**: the cover, the song and the controls, large enough to read from the sofa, with Like, Up next and a
-  sleep timer, Lyrics (synced ones follow the song) and Song radio. The artists and the album open their pages.
+  sleep timer, Lyrics (synced ones follow the song) and Song radio, over the cover blurred as on the phone. The artists
+  and the album open their pages.
 - **Skipping within a song**: rewind and fast forward on the remote go back and forward 10 seconds anywhere in the
   app. On a remote without them, press up from the controls in Now playing to reach the progress bar, then left and
   right.
@@ -54,6 +55,10 @@ the phone:
 - **Similar songs** in a song's actions, and **Start song radio** with DJ blends.
 - **Songs that sound like…** in Search: type or say a few words ("rainy sunday morning").
 - **Your sound** in the Library: the sound of your library.
+- **Song path** in Now playing and in a song's actions: from that song to another, through songs that sound in between.
+- **Song alchemy** on a playlist's page: songs that blend the sound of its songs.
+- Loudness and fade shapes from the Siansa plugin for crossfades and levelling, and the vibes of your daily mixes, as
+  on the phone.
 
 Scrobbling to Last.fm or ListenBrainz works on the TV as on the phone once it's set up under **Settings › Scrobbling
 and history** (each server or user on the TV has its own).

@@ -62,6 +62,7 @@ import app.siansa.ui.LocalNav
 import app.siansa.ui.LocalSnack
 import app.siansa.ui.Space
 import app.siansa.ui.albumTagRoute
+import app.siansa.ui.openSongPath
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -198,6 +199,8 @@ fun TvPlaylist(id: String) {
     val detail by produceState<app.siansa.data.PlaylistDetail?>(null, id) {
         value = runCatching { graph.playlistCache.get(id) }.onFailure { AppLog.w("Tv", "Couldn't open playlist $id: ${it.message}") }.getOrNull()
     }
+    val nav = LocalNav.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
     val d = detail ?: return Loading()
     val cover = d.playlist.coverArt ?: d.songs.firstOrNull()?.cover
     val total = d.songs.sumOf { it.durationSec } / 60
@@ -207,6 +210,12 @@ fun TvPlaylist(id: String) {
         songs = d.songs,
         shortcut = Shortcut("playlist/$id", d.playlist.name, cover),
         about = listOfNotNull("Playlist", "${d.songs.size} songs", "$total min".takeIf { total > 0 }).joinToString(" · "),
+        // AudioMuse's song alchemy: songs that blend the sound of this playlist's songs.
+        buttons = if (settings.audioMuseReady) {
+            { TvButton("Song alchemy", null, onClick = { nav.navigate("blend/${android.net.Uri.encode(id)}") }) }
+        } else {
+            null
+        },
     )
 }
 
@@ -469,6 +478,8 @@ fun SongActions(song: Song, liked: Boolean, onDismiss: () -> Unit) {
         add("Start song radio" to { app.siansa.ui.RadioChooser.song.value = song })
         // AudioMuse (or the server) finds songs that sound like it, on the phone's page for it.
         add("Similar songs" to { nav.navigate("similar/songs/${android.net.Uri.encode(song.id)}") })
+        // AudioMuse's song path: from this song to another, through songs that sound in between.
+        if (graph.settings.current.audioMuseReady) add("Song path from here" to { nav.openSongPath(song.id) })
         song.albumId?.let { id -> add("Go to album: ${song.album}" to { nav.navigate(TvRoutes.album(id)) }) }
         val artists = song.artists.ifEmpty { listOfNotNull(song.artistId?.let { ArtistRef(it, song.artist) }) }
         for (a in artists.take(MAX_ARTISTS)) add("Go to artist: ${a.name}" to { nav.navigate(TvRoutes.artist(a.id)) })
