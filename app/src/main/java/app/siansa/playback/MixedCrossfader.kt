@@ -800,11 +800,17 @@ internal object EngineFade {
 
     /**
      * Where the next song comes in (ms of its own) and the point of the old song it comes in with (ms): its first
-     * downbeat or phrase with the blend's start for a beat-matched blend, else its start with the fade's.
+     * downbeat or phrase with the blend's start for a beat-matched blend, its start a pause after the old song's end
+     * for a cold end, else its start with the fade's.
      */
     fun incomingCue(plan: FadePlan, startAtMs: Long): Pair<Long, Long> {
         val beat = plan.beat
-        return if (beat != null) beat.incomingStartMs to beat.startMs else 0L to startAtMs
+        return when {
+            beat != null -> beat.incomingStartMs to beat.startMs
+            // A cold end: after the old song's last sound and the pause (the point is past its end, on its clock).
+            plan.gapMs > 0 -> 0L to startAtMs + plan.overlapMs + plan.gapMs
+            else -> 0L to startAtMs
+        }
     }
 
     /** How far the next song's beats are from the old song's (ms; ahead is positive), from where each is heard (µs). */
