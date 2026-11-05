@@ -4,18 +4,17 @@ Home is built from sections you can reorder and hide (**Arrange Home**, in the m
 
 ## Home's menu
 
-The button with three lines at the top right of Home opens a small menu:
+The button with three lines at the top right of Home opens a short column of round buttons straight under it,
+each with its name beside it:
 
-- **Play on…** (TV or speaker) opens the list of TVs and speakers to play on: Chromecast, Google TV, Cast
-  speakers and DLNA ones. While something plays on one, the row says **Playing on** and its name in the accent colour (amber unless you picked another in Themes), with
-  Chromecast or DLNA under it, and a **Stop** button that brings the music back to the phone. The menu button
-  then has a small dot in the same colour.
-- **Sources** opens the source filter, and says what it shows now: All libraries, Downloaded only, 2 of 3
-  libraries, or how many users' music.
+- **Play on…** opens the list of TVs and speakers to play on: Chromecast, Google TV, Cast speakers and DLNA ones.
+  While something plays on one, the bubble is in the accent colour (amber unless you picked another in Themes) and
+  the menu button has a small dot in the same colour; to stop, open Play on… and pick **This phone**.
+- **Sources** opens the source filter. Its bubble is in the accent colour while the filter hides something.
 - **Arrange Home** opens Arrange, for the order and looks of Home's sections.
 
-Tap the button and then a row, or do it in one go: press the button, slide your finger down to the row (it lights
-up, with a light tick as you pass each row) and let go. Letting go anywhere else closes the menu. The button itself
+Tap the button and then one of them, or do it in one go: press the button, slide your finger down to one (it lights
+up, with a light tick as you pass each) and let go. Letting go anywhere else closes the menu. The button itself
 turns to the accent colour while the source filter hides something.
 
 ## Arrange Home

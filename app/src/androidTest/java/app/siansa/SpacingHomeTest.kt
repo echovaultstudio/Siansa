@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -185,28 +186,36 @@ class SpacingHomeTest : SpacingCheck() {
     }
 
     /**
-     * Home's menu (issue #872): the same room above the first row as below the last, Sources and Arrange Home the
-     * same height, Play on… a little taller, and the icons lined up down the menu.
+     * Home's menu (issue #872): the bubbles are one size and perfectly in line (their centres on one vertical line),
+     * the same room between each, and each label centred on its bubble. Checked narrow, while casting and with the
+     * source filter on.
      */
-    @Test fun homeMenuRowsSitEvenly() {
+    @Test fun homeMenuBubblesSitInLine() {
         compose.setContent {
             SiansaTheme {
+                // Narrow, as on a small phone with big text: no bubble may be squeezed.
                 app.siansa.ui.HomeMenuPanel(
-                    app.siansa.ui.HomeMenuInfo(app.siansa.ui.PlayOnLine("Play on…", "TV or speaker", false), "All libraries", false),
-                    highlighted = null, onPick = {}, onStop = {},
+                    modifier = Modifier.widthIn(max = 280.dp),
+                    info = app.siansa.ui.HomeMenuInfo(
+                        app.siansa.ui.PlayOnLine("Playing on Living Room SHIELD with an uncharacteristically long name", "Chromecast", true),
+                        "Downloaded only · 2 users", true,
+                    ),
+                    highlighted = app.siansa.ui.HomeMenuItem.SOURCES, onPick = {},
                 )
             }
         }
-        val panel = compose.onNodeWithTag("homeMenuPanel").getBoundsInRoot()
-        val playOn = compose.onNodeWithTag("homeMenu-play_on").getBoundsInRoot()
-        val sources = compose.onNodeWithTag("homeMenu-sources").getBoundsInRoot()
-        val arrange = compose.onNodeWithTag("homeMenu-arrange").getBoundsInRoot()
-        assertEven("Menu: above the first row and below the last", playOn.top - panel.top, panel.bottom - arrange.bottom, 1.dp)
-        assertEven("Menu: room at its edges", playOn.top - panel.top, Space.Small, 1.dp)
-        assertEven("Menu: Sources and Arrange Home rows", sources.bottom - sources.top, arrange.bottom - arrange.top, 1.dp)
-        assertEven("Menu: Sources follows Arrange Home without a gap", arrange.top, sources.bottom, 1.dp)
-        assertTrue("Play on… is the taller row", playOn.bottom - playOn.top > sources.bottom - sources.top)
-        assertEven("Menu: rows share the left edge", playOn.left, sources.left, 1.dp)
+        val bubbles = listOf("play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenuBubble-$it", useUnmergedTree = true).getBoundsInRoot() }
+        val labels = listOf("play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenuLabel-$it", useUnmergedTree = true).getBoundsInRoot() }
+        val centre = (bubbles[0].left + bubbles[0].right) / 2
+        bubbles.forEachIndexed { i, b ->
+            assertEven("Menu: bubble $i on the same centre line", (b.left + b.right) / 2, centre, 0.5.dp)
+            assertEven("Menu: bubble $i is round and the button's size", b.right - b.left, app.siansa.ui.MENU_BUBBLE, 0.5.dp)
+            assertEven("Menu: bubble $i height", b.bottom - b.top, app.siansa.ui.MENU_BUBBLE, 0.5.dp)
+            assertEven("Menu: label $i centred on its bubble", (labels[i].top + labels[i].bottom) / 2, (b.top + b.bottom) / 2, 1.dp)
+            assertEven("Menu: label $i a step from its bubble", b.left - labels[i].right, Space.Small, 1.dp)
+        }
+        assertEven("Menu: room between the bubbles", bubbles[1].top - bubbles[0].bottom, bubbles[2].top - bubbles[1].bottom, 0.5.dp)
+        assertEven("Menu: room between bubbles is a step of the scale", bubbles[1].top - bubbles[0].bottom, Space.Medium, 0.5.dp)
     }
 
     /** Custom cards (issue #622): the banner sits a page margin from both edges of the screen. */
