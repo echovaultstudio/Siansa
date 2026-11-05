@@ -35,13 +35,14 @@ Settings) always open that tab's own page, wherever you are.
   favourite artists, and Time machine.
 - **Albums, playlists and mixes**: the cover (a playlist's own cover from the server) and what it is at the top, with the artists, genre and label to open,
   then Play, Shuffle and Add to favourites; down from them goes straight to the songs. The button at the end of each
-  song has Play next, Add to queue, Like, Start song radio, Similar songs, and Go to album or artist.
+  song has Play next, Add to queue, Add to playlist, Like, Start (or Stop) song radio, Similar songs, Go to album or
+  artist, and Song details.
 - **Artists**: Play, Shuffle, Artist radio and Add to favourites, then their top songs, albums and similar artists.
 - **Search**: type with the on-screen keyboard or press the microphone button and say it. "Play … on Siansa" from
   Google TV's own search opens it too.
 - **Now playing**: the cover, the song and the controls, large enough to read from the sofa, over the cover blurred as
-  on the phone. Under the controls are round buttons for Like, Lyrics, Up next, Song radio and Song path (with
-  AudioMuse); each says its name as the remote reaches it. Synced lyrics follow the song; right from the buttons
+  on the phone. Under the controls are round buttons for Like, Lyrics, Up next, Song radio (or Stop song radio while
+  one plays), Add to playlist, Song path (with AudioMuse) and Song details; each says its name as the remote reaches it. Synced lyrics follow the song; right from the buttons
   reaches the lyrics, and up and down scroll through them. Animated covers move here and on album pages, as on the
   phone. The artists and the album open their pages. The TV app has no sleep timer: the TV's own sleep setting
   turns everything off.

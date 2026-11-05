@@ -168,7 +168,13 @@ fun TvSwitchRow(title: String, detail: String?, on: Boolean, onChange: (Boolean)
  * choice has the focus when it opens.
  */
 @Composable
-fun TvChoices(title: String, choices: List<Pair<String, () -> Unit>>, onDismiss: () -> Unit) {
+fun TvChoices(
+    title: String,
+    choices: List<Pair<String, () -> Unit>>,
+    onDismiss: () -> Unit,
+    /** Choices that open something of their own (a playlist picker) instead of closing the list. */
+    keepOpen: Set<String> = emptySet(),
+) {
     val first = remember { FocusRequester() }
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -178,7 +184,7 @@ fun TvChoices(title: String, choices: List<Pair<String, () -> Unit>>, onDismiss:
             Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(bottom = Space.Small))
             choices.forEachIndexed { i, (label, action) ->
-                TvSettingRow(label, null, onClick = { onDismiss(); action() }, modifier = if (i == 0) Modifier.focusRequester(first) else Modifier)
+                TvSettingRow(label, null, onClick = { if (label !in keepOpen) onDismiss(); action() }, modifier = if (i == 0) Modifier.focusRequester(first) else Modifier)
             }
         }
     }
