@@ -40,62 +40,6 @@ class ServerSeekPlayer(
         })
     }
 
-    /**
-     * Told before every jump the user asks for (a skip, going back, moving in the song, playing something else), not
-     * the crossfader's own moves, which work on the player underneath: casting gaplessly, the TV then starts a new
-     * stream instead of playing out what it has in hand (issue #114).
-     */
-    var onUserJump: (() -> Unit)? = null
-
-    private fun jumped() {
-        onUserJump?.invoke()
-    }
-
-    override fun seekToNext() {
-        jumped()
-        super.seekToNext()
-    }
-
-    override fun seekToNextMediaItem() {
-        jumped()
-        super.seekToNextMediaItem()
-    }
-
-    override fun seekToPreviousMediaItem() {
-        jumped()
-        super.seekToPreviousMediaItem()
-    }
-
-    override fun setMediaItems(mediaItems: MutableList<MediaItem>) {
-        jumped()
-        super.setMediaItems(mediaItems)
-    }
-
-    override fun setMediaItems(mediaItems: MutableList<MediaItem>, resetPosition: Boolean) {
-        jumped()
-        super.setMediaItems(mediaItems, resetPosition)
-    }
-
-    override fun setMediaItems(mediaItems: MutableList<MediaItem>, startIndex: Int, startPositionMs: Long) {
-        jumped()
-        super.setMediaItems(mediaItems, startIndex, startPositionMs)
-    }
-
-    override fun setMediaItem(mediaItem: MediaItem) {
-        jumped()
-        super.setMediaItem(mediaItem)
-    }
-
-    override fun setMediaItem(mediaItem: MediaItem, startPositionMs: Long) {
-        jumped()
-        super.setMediaItem(mediaItem, startPositionMs)
-    }
-
-    override fun setMediaItem(mediaItem: MediaItem, resetPosition: Boolean) {
-        jumped()
-        super.setMediaItem(mediaItem, resetPosition)
-    }
-
     /** Where the current stream starts in its song (0 unless Navidrome was asked to start later). */
     private fun offset(): Long = Streaming.offsetMs(exo.currentMediaItem?.localConfiguration?.uri)
 
@@ -157,7 +101,6 @@ class ServerSeekPlayer(
     override fun seekTo(positionMs: Long) = seekTo(exo.currentMediaItemIndex, positionMs)
 
     override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
-        jumped()
         if (mediaItemIndex !in 0 until exo.mediaItemCount) return exo.seekTo(mediaItemIndex, positionMs)
         val item = exo.getMediaItemAt(mediaItemIndex)
         val uri = item.localConfiguration?.uri
@@ -185,7 +128,6 @@ class ServerSeekPlayer(
     override fun seekForward() = seekTo(currentPosition + exo.seekForwardIncrement)
 
     override fun seekToPrevious() {
-        jumped()
         // Back to the start of this song (its real start, not the start of a stream that began part-way in).
         if (offset() > 0 && currentPosition > exo.maxSeekToPreviousPosition) return seekTo(exo.currentMediaItemIndex, 0)
         exo.seekToPrevious()

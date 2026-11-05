@@ -57,24 +57,6 @@ class AudioEngine(context: Context) {
     @Volatile private var movedNs = 0L
     @Volatile private var reopenWanted = false
 
-    /**
-     * Where the mix goes instead of this phone's output (gapless casting, issue #114), or null for the phone. Set from
-     * any thread; the mixer's thread switches between blocks.
-     */
-    @Volatile var out: MixOut? = null
-        private set
-
-    /** Sends the mix to [target] instead of this phone's output, or back to the phone with null. */
-    fun routeTo(target: MixOut?) {
-        if (out === target) return
-        out = target
-        AppLog.i("Engine", if (target != null) "The mix now goes to ${target.describe()}, not this phone's output" else "The mix is back on this phone's output")
-        wake()
-    }
-
-    /** How far ahead of what's heard cues must be set beyond the phone's own output (ms): the far end's lead. */
-    val extraLeadMs: Long get() = out?.leadMs ?: 0L
-
     /** The player output each stream belongs to, told when its stream first sounds. */
     internal val outputs = ConcurrentHashMap<DeckStream, DeckOutput>()
 
@@ -111,7 +93,6 @@ class AudioEngine(context: Context) {
      * mix's limiter holds back. Never past what was written.
      */
     fun heardMix(nanos: Long = System.nanoTime()): Double {
-        out?.let { remote -> return (minOf(remote.heard(nanos), writtenMix.toDouble()) - core.latencyFrames).coerceAtLeast(0.0) }
         val at = stampMix
         val heard = if (at == Long.MIN_VALUE) {
             // No timestamp yet (just started): what was written less the output's buffer.
@@ -135,19 +116,6 @@ class AudioEngine(context: Context) {
                 AppLog.w("Engine", "Opening the output again")
                 close()
             }
-            val remote = out
-            if (remote != null) {
-                // Gapless casting: the phone's own output lets go, and the mix goes to the TV at its pace.
-                if (track != null) close()
-                val started = mix(block)
-                if (!remote.write(block, BLOCK, writtenMix)) {
-                    AppLog.w("Engine", "${remote.describe()} took no more; the mix is back on this phone's output")
-                    if (out === remote) out = null
-                }
-                writtenMix += BLOCK
-                for (stream in started) outputs[stream]?.advancing()
-                continue
-            }
             val t = track ?: open() ?: run {
                 Thread.sleep(RETRY_MS)
                 null
@@ -157,7 +125,14 @@ class AudioEngine(context: Context) {
                 trackPlaying = true
                 movedNs = System.nanoTime()
             }
-            val started = mix(block)
+            val started = try {
+                core.render(block, BLOCK, writtenMix)
+            } catch (e: Throwable) {
+                // A fault in the mixing mustn't stop the music app: this block is silence, the next is tried again.
+                if (failures++ % 500 == 0) AppLog.e("Engine", "Mixing failed (${failures}×): ${e.stackTraceToString().lines().take(4).joinToString(" | ")}")
+                java.util.Arrays.fill(block, 0f)
+                emptyList()
+            }
             var off = 0
             var dead = false
             while (off < block.size && running && !reopenWanted) {
@@ -183,19 +158,8 @@ class AudioEngine(context: Context) {
         close()
     }
 
-    /** One block of the mix into [block]: the streams that first sounded in it. */
-    private fun mix(block: FloatArray): List<DeckStream> = try {
-        core.render(block, BLOCK, writtenMix)
-    } catch (e: Throwable) {
-        // A fault in the mixing mustn't stop the music app: this block is silence, the next is tried again.
-        if (failures++ % 500 == 0) AppLog.e("Engine", "Mixing failed (${failures}×): ${e.stackTraceToString().lines().take(4).joinToString(" | ")}")
-        java.util.Arrays.fill(block, 0f)
-        emptyList()
-    }
-
     /** Nothing to play: the output pauses (what it holds plays out first) and the thread waits to be woken. */
     private fun rest() {
-        out?.rest()
         track?.let { t ->
             if (trackPlaying) {
                 takeStamp(t)
@@ -220,10 +184,6 @@ class AudioEngine(context: Context) {
 
     /** The output for the log: playing or not, where to, dropouts, and how far behind the heard sound is. */
     fun status(): String {
-        out?.let { remote ->
-            val heard = heardMix()
-            return "output to ${remote.describe()}, ${((writtenMix - heard) * 1000 / outRate).toLong()} ms written ahead of what's heard"
-        }
         val t = track
         val state = when (t?.playState) {
             AudioTrack.PLAYSTATE_PLAYING -> "playing"

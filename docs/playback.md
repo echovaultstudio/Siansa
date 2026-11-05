@@ -235,37 +235,6 @@ before the songs go to the TV (the library doesn't keep it), which can take a mo
 FLAC needs Navidrome (or another Subsonic server) with a **flac** transcoding, and Opus its **opus** transcoding (both
 come with Navidrome); with Jellyfin and Emby, those files go as MP3 320.
 
-**Gapless through this phone.** With Siansa's new audio engine (in Siansa Dev for now), the cog beside a Chromecast
-also has **How it plays**:
-
-- **The TV plays the queue** (the default): the TV gets each song from your server by itself, as above. The phone
-  only sends it the queue, and is free to do other things or leave the Wi-Fi.
-- **Gapless through this phone**: the phone plays the music itself, with everything it does on its own speaker:
-  crossfades, DJ blends, levelling and the equaliser, songs running into each other without a gap. Instead of its
-  speaker, it sends the sound to the TV over the Wi-Fi as one lossless stream (FLAC or WAV, 16-bit, about 1.4 Mbit/s).
-  The TV shows the song, its cover and where it is, a second or so behind the phone so it matches what you hear.
-
-In gapless mode the phone's controls, notification and lock screen work as usual, and so does the TV remote (left
-and right for the previous and next song, hold to wind, OK to play and pause). Pausing is quick; a skip or a jump in
-the song starts the stream again from there, with a short gap. Use the TV's remote for the volume. Keep in mind:
-
-- The phone must stay on the same Wi-Fi as the TV with Siansa running. If it leaves the Wi-Fi, the music stops
-  there and waits, paused, on the phone.
-- It keeps the phone awake and its Wi-Fi busy while it casts, so it uses more battery than letting the TV play the
-  queue. Plug the phone in for long listening.
-- It needs Siansa's own TV screen. A TV that gets Google's plain screen plays the queue instead. If the TV doesn't
-  start the phone's stream within a few seconds, Siansa tries another way: the TV screen plays it through Google's
-  Cast player first, then in a player of its own, then as WAV (plain, uncompressed sound) instead of FLAC. If none
-  starts, the TV plays the queue itself and a short note says so. The log says which way played, and the TV keeps it
-  until Siansa restarts.
-- Headphones or Bluetooth going away while the phone casts gaplessly don't pause the music: the sound is on the TV.
-- A VPN on the phone is fine: the stream goes over the Wi-Fi. A VPN set to block everything outside it may stop the
-  TV from reaching the phone; the TV then plays the queue.
-
-Changing it during a cast switches over at once, from the same song and place: to gapless, the phone takes the
-queue back from the TV and streams it; to the queue, the TV gets the phone's queue. If gapless can't start, the TV
-keeps playing the queue and a short note says so.
-
 **Adding the FLAC conversion to Navidrome.** Recent Navidrome versions come with it (**Settings › Transcodings**
 lists **flac audio**). If yours doesn't, ALAC songs fall back to MP3 320 on the TV. To add it, sign in to Navidrome as
 an admin, open **Settings › Transcodings**, choose **Create**, and fill in:

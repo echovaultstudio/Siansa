@@ -302,12 +302,6 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     ChromecastSettingsContent()
                 }
             },
-            // The same with the new audio engine (issue #114): how the TV plays, the queue or gapless through this phone.
-            Scene("cast_chromecast_settings_gapless") {
-                Column(Modifier.padding(Space.Section)) {
-                    ChromecastSettingsContent(gapless = true)
-                }
-            },
             // Menu rows (issue #778): no badge on shuffle, a word badge where one says something.
             Scene("menu_rows") {
                 Column {

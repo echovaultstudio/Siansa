@@ -1,8 +1,8 @@
 package app.siansa.tvapp
 
 import app.siansa.log.AppLog
+import app.siansa.net.LanAddress
 import app.siansa.pairing.Pairing
-import app.siansa.playback.gapless.LanAddress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
