@@ -315,6 +315,7 @@ fun SiansaRoot() {
                 composable("settings/style/now-playing") { NowPlayingStyleScreen(nav) }
                 composable("settings/style/mini-player") { MiniPlayerStyleScreen(nav) }
                 composable("settings/style/nav-bar") { NavBarStyleScreen(nav) }
+                composable("settings/style/home-menu") { HomeMenuStyleScreen(nav) }
                 composable("settings/equaliser") { EqualiserScreen(nav) }
                 composable("settings/crossfade") { CrossfadeScreen(nav) }
                 // Storage became Streaming and data (issue #780); the old address opens it.

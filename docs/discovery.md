@@ -99,8 +99,9 @@ One song from your library you've never played, at random. "Never played" means 
 and it isn't in Siansa's own history. With some music hidden or other users shown, it rolls only from what the
 source filter shows.
 
-The dice is at the top of Home, beside the menu button. Tap it and it tumbles, keeps turning while the song is
-found, and lands on a new face when the song starts. With animations turned off on the phone, it only fades.
+Roll the dice is in Home's menu (the round button at the top of Home): tap it there, or slide down to it from the
+button. While the song is found, the dice tumbles in the menu button and lands on a new face when the song starts.
+With animations turned off on the phone, it only fades.
 
 ## Artists you might like
 

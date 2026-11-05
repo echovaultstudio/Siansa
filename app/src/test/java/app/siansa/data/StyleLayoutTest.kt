@@ -86,4 +86,18 @@ class StyleLayoutTest {
         val order = listOf(MiniButton.NEXT, MiniButton.LIKE, MiniButton.PLAY, MiniButton.CAST)
         assertEquals(listOf(MiniButton.NEXT, MiniButton.LIKE, MiniButton.PLAY), shownInOrder(order, setOf(MiniButton.PLAY, MiniButton.NEXT, MiniButton.LIKE)))
     }
+
+    @Test fun homeMenuStartsWithTheDiceAndKeepsEveryOption() {
+        // Home's menu (issue #872): the dice first, then Play on…, Sources and Arrange Home.
+        assertEquals(listOf(HomeMenuItem.DICE, HomeMenuItem.PLAY_ON, HomeMenuItem.SOURCES, HomeMenuItem.ARRANGE), HomeMenuItem.parse(null))
+        assertEquals(HomeMenuItem.default, HomeMenuItem.parse(""))
+        val order = listOf(HomeMenuItem.SOURCES, HomeMenuItem.ARRANGE, HomeMenuItem.DICE, HomeMenuItem.PLAY_ON)
+        assertEquals(order, HomeMenuItem.parse(HomeMenuItem.format(order)))
+        // Unknown and repeated ids are dropped; a missing option goes back in its default place, so none is lost.
+        assertEquals(
+            listOf(HomeMenuItem.DICE, HomeMenuItem.SOURCES, HomeMenuItem.PLAY_ON, HomeMenuItem.ARRANGE),
+            HomeMenuItem.parse("sources,gone,sources,play_on,arrange"),
+        )
+        assertEquals(4, HomeMenuItem.parse("arrange").size)
+    }
 }
