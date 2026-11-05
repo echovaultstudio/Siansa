@@ -143,7 +143,7 @@ fun TvSettingsHub() {
             } else {
                 Text("Sign out of this server on the TV? Your phone stays signed in.", style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
                     TvButton("Sign out", Icons.AutoMirrored.Rounded.Logout, strong = true, onClick = {
                         graph.player.stop()
                         graph.settings.save(graph.settings.current.copy(navidromePassword = "", navidromeApiKey = "", navidromeUser = ""))
@@ -192,7 +192,7 @@ fun TvPassthrough() {
             "Dolby and DTS music goes unchanged to your AV receiver or soundbar, which plays it (Dolby Atmos included). " +
                 "These songs play without crossfades, DJ blends, levelling, the equaliser or Siansa's volume. Other music plays as usual.",
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
             for (mode in PassthroughMode.entries) {
                 TvButton(mode.label, null, strong = settings.audioPassthrough == mode, onClick = {
                     if (settings.audioPassthrough != mode) {

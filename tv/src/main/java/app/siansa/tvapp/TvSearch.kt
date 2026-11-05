@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import app.siansa.ui.keyboardOnTvFocus
 import androidx.compose.ui.text.input.ImeAction
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.siansa.data.SearchResults
@@ -61,6 +62,7 @@ fun TvSearch(fromSystem: String?, onDone: () -> Unit) {
         value = runCatching { if (graph.library.isSynced) graph.library.search(terms) else graph.source.search(terms) }.getOrNull()
     }
 
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
         OutlinedTextField(
             value = query,
@@ -69,8 +71,9 @@ fun TvSearch(fromSystem: String?, onDone: () -> Unit) {
             leadingIcon = { Icon(Icons.Rounded.Search, null) },
             placeholder = { Text("Songs, albums or artists") },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { }),
-            modifier = Modifier.padding(horizontal = TV_EDGE).fillMaxWidth(SEARCH_WIDTH).focusRequester(field),
+            // The results show as it's typed: Search on the keyboard only closes it, to reach them.
+            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+            modifier = Modifier.padding(horizontal = TV_EDGE).fillMaxWidth(SEARCH_WIDTH).focusRequester(field).keyboardOnTvFocus(),
         )
         // With AudioMuse: songs that sound like the words ("rainy sunday morning"), said or typed, as on the phone.
         val settings by graph.settings.state.collectAsStateWithLifecycle()

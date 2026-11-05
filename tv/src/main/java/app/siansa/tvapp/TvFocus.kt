@@ -30,6 +30,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.widthIn
@@ -55,7 +56,9 @@ fun Modifier.tvFocus(shape: Shape, onClick: () -> Unit, grow: Float = FOCUS_GROW
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) grow else 1f, label = "tvFocus")
     val ring = if (focused) MaterialTheme.colorScheme.primary else Color.Transparent
+    // Drawn over its neighbours while it's grown, so it never looks merged into the button beside it.
     return this
+        .zIndex(if (focused) 1f else 0f)
         .graphicsLayer { scaleX = scale; scaleY = scale }
         .onFocusChanged { focused = it.isFocused }
         .border(FOCUS_RING, ring, shape)
@@ -211,10 +214,11 @@ fun TvChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, str
 /** The room at a TV page's left and right edges: TVs may cut off the edge of the picture (overscan). */
 val TV_EDGE = Space.Large
 
-private const val FOCUS_GROW = 1.08f
+private const val FOCUS_GROW = 1.06f
 private const val ROW_GROW = 1.02f
 private val CHOICES_WIDTH = 520.dp
-private const val BUTTON_GROW = 1.1f
+/** Buttons sit close together: they grow less than covers, so a grown one stays clear of the next. */
+private const val BUTTON_GROW = 1.04f
 private val FOCUS_RING = 3.dp
 val TILE_WIDTH = 168.dp
 private val TILE_CORNER = 10.dp

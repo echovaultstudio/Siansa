@@ -157,7 +157,7 @@ fun SongPathPicker(nav: NavController, songId: String, fromNowPlaying: Boolean =
                     leadingIcon = { Icon(Icons.Rounded.Search, null) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = Space.Page),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Space.Page).keyboardOnTvFocus(),
                 )
                 Spacer(Modifier.height(Space.Small))
             }

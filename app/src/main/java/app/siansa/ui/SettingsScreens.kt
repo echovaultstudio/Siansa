@@ -295,7 +295,7 @@ internal fun Field(
         placeholder = { if (placeholder != null) Text(placeholder) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = keyboard, autoCorrectEnabled = false),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().keyboardOnTvFocus(),
     )
 }
 
@@ -314,7 +314,7 @@ internal fun SecretField(label: String, value: String, onChange: (String) -> Uni
                 Icon(if (visible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, "Show or hide")
             }
         },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().keyboardOnTvFocus(),
     )
 }
 

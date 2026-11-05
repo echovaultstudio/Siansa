@@ -215,7 +215,7 @@ private fun Field(label: String, value: String, placeholder: String? = null, onC
         placeholder = { if (placeholder != null) Text(placeholder) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().keyboardOnTvFocus(),
     )
 }
 

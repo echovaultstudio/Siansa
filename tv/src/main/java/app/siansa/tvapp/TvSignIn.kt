@@ -32,7 +32,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import app.siansa.ui.keyboardOnTvFocus
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import app.siansa.AppGraph
@@ -147,13 +149,16 @@ private fun TypedSignIn(onBack: () -> Unit) {
         OutlinedTextField(
             address, { address = it }, singleLine = true,
             label = { Text("Server address") }, placeholder = { Text("http://192.168.1.10:4533") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
+            modifier = Modifier.keyboardOnTvFocus(),
         )
-        OutlinedTextField(user, { user = it }, singleLine = true, label = { Text("Username") })
+        OutlinedTextField(user, { user = it }, singleLine = true, label = { Text("Username") },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next), modifier = Modifier.keyboardOnTvFocus())
         OutlinedTextField(
             password, { password = it }, singleLine = true, label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            modifier = Modifier.keyboardOnTvFocus(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
             TvButton(if (busy) "Signing in…" else "Sign in", Icons.AutoMirrored.Rounded.Login, strong = true, onClick = {

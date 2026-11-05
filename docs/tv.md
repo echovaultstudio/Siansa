@@ -38,10 +38,12 @@ Everything works with the remote's arrows and the centre button.
 - **Artists**: Play, Shuffle, Artist radio and Add to favourites, then their top songs, albums and similar artists.
 - **Search**: type with the on-screen keyboard or press the microphone button and say it. "Play … on Siansa" from
   Google TV's own search opens it too.
-- **Now playing**: the cover, the song and the controls, large enough to read from the sofa, with Like, Up next and a
-  sleep timer, Lyrics (synced ones follow the song) and Song radio, over the cover blurred as on the phone. Animated
-  covers move here and on album pages, as on the phone. The artists
-  and the album open their pages.
+- **Now playing**: the cover, the song and the controls, large enough to read from the sofa, over the cover blurred as
+  on the phone. Under the controls are round buttons for Like, Lyrics (synced ones follow the song), Up next, Song
+  radio, Song path (with AudioMuse) and the sleep timer; each says its name as the remote reaches it. Animated covers
+  move here and on album pages, as on the phone. The artists and the album open their pages.
+- **Typing**: the keyboard opens as soon as the remote reaches a text field. You can also type on your phone with the
+  Google TV app's keyboard while it's open.
 - **Skipping within a song**: rewind and fast forward on the remote go back and forward 10 seconds anywhere in the
   app. On a remote without them, press up from the controls in Now playing to reach the progress bar, then left and
   right.
@@ -103,7 +105,8 @@ and play in stereo, with the centre and surround channels folded in.
 - Those songs play without crossfades, DJ blends, levelling, the equaliser or Siansa's volume: the receiver decides
   how they sound. Use the receiver's volume.
 - Songs in the same format play one after another without a gap, a DJ mix or a live album included: the output to the
-  receiver stays open from one song to the next.
+  receiver stays open from one song to the next. A file that says it's longer than it is (some DJ mixes do) plays as
+  long as your server says the song is, so the next one still follows straight on.
 - They always stream as the original file, whatever **Streaming quality** says, since a converted song can't go to the
   receiver.
 

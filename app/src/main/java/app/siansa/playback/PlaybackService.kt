@@ -67,6 +67,9 @@ import java.io.InterruptedIOException
 import java.util.Collections
 
 private const val FALLBACK_KBPS = 320
+
+/** The stuck-song rescue leaves the last seconds of a song alone: the player is finishing it (issue #860). */
+private const val END_GRACE_MS = 3_000L
 /** How long music stays on a TV that Cast lost touch with, waiting for it to come back (issue #114). */
 private const val CAST_RESUME_WAIT_MS = 30_000L
 
@@ -1190,6 +1193,15 @@ class PlaybackService : MediaLibraryService() {
                 val item = player.currentMediaItem ?: return
                 val id = item.mediaId
                 val where = "at ${position / 1000}s, ${(buffered - position) / 1000.0}s loaded ahead, state $state"
+                // A song going to the receiver unchanged (issue #860) isn't decoded here, so there's no decoder to be
+                // stuck, and converting it would lose its Dolby sound and the gapless join to the next song. Nor is the
+                // last few seconds of any song: the player is finishing it and moving on.
+                val librarySec = SongRegistry.get(id)?.durationSec ?: 0
+                val nearEnd = librarySec > 0 && position >= librarySec * 1000L - END_GRACE_MS
+                if (id in Passthrough.played || nearEnd) {
+                    AppLog.i("Player", "Song $id hasn't moved for 5 s ($where); left alone (${if (nearEnd) "at its end" else "sent to the receiver unchanged"})")
+                    return
+                }
                 val alreadyOpus = (chosenKbps[id] ?: 0) > 0
                 when {
                     !alreadyOpus -> {

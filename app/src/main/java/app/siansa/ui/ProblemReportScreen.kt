@@ -192,14 +192,14 @@ internal fun ReportBody(
             label = { Text("What happened?") },
             minLines = 3, maxLines = 6,
             supportingText = { Text("${happened.length} / ${Report.MAX_TEXT}") },
-            modifier = Modifier.fillMaxWidth().testTag("report-happened"),
+            modifier = Modifier.fillMaxWidth().testTag("report-happened").keyboardOnTvFocus(),
         )
         OutlinedTextField(
             expected, onExpected,
             label = { Text("What did you expect to happen?") },
             minLines = 2, maxLines = 5,
             supportingText = { Text("${expected.length} / ${Report.MAX_TEXT}") },
-            modifier = Modifier.fillMaxWidth().testTag("report-expected"),
+            modifier = Modifier.fillMaxWidth().testTag("report-expected").keyboardOnTvFocus(),
         )
         Row(
             Modifier.fillMaxWidth().toggleable(value = repeated, enabled = logging, role = Role.Checkbox, onValueChange = onRepeated).testTag("report-repeated"),

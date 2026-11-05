@@ -31,3 +31,13 @@
   song to the next.
 - Dolby Atmos songs in `.m4a` or `.mp4` files on the TV: they now always stream as the original file while passthrough
   is on, and a song the receiver can't take after all plays decoded on the TV instead of failing.
+- Songs whose file says it's far longer than it is (some Dolby Atmos DJ mixes in `.m4a`) stopped at their end and
+  didn't load the next song in time, so a gapless mix had gaps, and the end of a song could switch to a converted
+  stream without Dolby Atmos. Siansa now goes by the song's length from your server, on the phone too.
+- The TV's Now playing: the cover is blurred much more, on TVs without Android 12 too (an NVIDIA SHIELD showed it
+  sharp), the page is calmer, with the other buttons round under the controls and their names shown as the remote
+  reaches them, and it runs more smoothly.
+- Buttons on the TV that looked joined to the one beside them when the remote was on them.
+- Text fields on the TV now open the keyboard as soon as the remote reaches them, and take what's typed on a phone
+  with the Google TV app.
+- Siansa's settings showing the Siansa plugin as 0.3.3 whatever version was installed (update the plugin to 0.5.6).

@@ -109,8 +109,8 @@ fun TvLibrary() {
     }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
         Row(
-            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = TV_EDGE, vertical = Space.Small),
-            horizontalArrangement = Arrangement.spacedBy(Space.Small),
+            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = TV_EDGE, vertical = Space.Medium),
+            horizontalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             for (s in Shelf.entries) {
                 TvButton(s.label, null, onClick = { shelf = s }, strong = s == shelf, modifier = if (s == Shelf.ALBUMS) Modifier.initialFocus() else Modifier)
@@ -280,7 +280,7 @@ fun TvArtist(id: String) {
                     Text(a.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
                     albums?.let { Text("${it.size} albums", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    Row(Modifier.horizontalScroll(rememberScrollState()).padding(vertical = Space.Small), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Space.Tight, vertical = Space.Medium), horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
                         PlayButtons(play = { graph.library.songsOf(a).ifEmpty { top } }, note = null, shortcut = Shortcut("artist/$id", a.name, a.coverArt), focusFirst = true)
                         TvButton("Artist radio", Icons.Rounded.Radio, onClick = { play.artistRadio(a) })
                         TvButton(
@@ -357,11 +357,11 @@ private fun CollectionPage(
                     Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (values != null) {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) { values() }
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Medium)) { values() }
                     }
                     Text(about, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     note?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis) }
-                    Row(Modifier.horizontalScroll(rememberScrollState()).padding(vertical = Space.Small), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Space.Tight, vertical = Space.Medium), horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
                         PlayButtons(play = { songs }, note = null, shortcut = shortcut, focusFirst = true)
                         buttons?.invoke()
                     }
