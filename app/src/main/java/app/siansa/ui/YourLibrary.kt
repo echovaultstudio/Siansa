@@ -206,8 +206,8 @@ fun YourLibraryScreen(nav: NavController) {
     // Chips in the order last opened, and a sort kept for each page until it's changed (issue #497).
     var chipOrder by remember { mutableStateOf(LibraryChips.parse(libraryPrefs(context).getString("chips", null))) }
     var sorts by remember { mutableStateOf(LibraryChips.parseSorts(libraryPrefs(context).getString("sorts", null))) }
-    // Grid or list, kept for next time (issue #289).
-    var grid by rememberGridMode("library", default = false)
+    // Grid or list: each view its own, kept until changed; one never set starts as the library's old choice.
+    val oldGrid by rememberGridMode("library", default = false)
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var pinVersion by remember { mutableStateOf(0) }
@@ -235,6 +235,7 @@ fun YourLibraryScreen(nav: NavController) {
     val selectedSort = sorts[sortKey]?.let { runCatching { Sort.valueOf(it) }.getOrNull() } ?: Sort.RECENTS
     // Under Music: Albums, Artists or Songs, when one is picked.
     val musicPart = if (selectedKind == Kind.MUSIC) MUSIC_PARTS.firstOrNull { it.label == sub } else null
+    var grid by rememberGridMode(LibraryChips.viewKey(selectedKind?.name, musicPart?.name), default = oldGrid)
     // Every song, only while Music is shown: there can be tens of thousands (issue #497).
     val showSongs = selectedKind == Kind.MUSIC && (musicPart == null || musicPart == Kind.SONG)
     val songs by produceState<SongEntries?>(null, showSongs, version) {
