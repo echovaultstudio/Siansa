@@ -92,7 +92,8 @@ fun TvLibrary() {
         if (shown == shelf) delay(RELOAD_PAUSE_MS)
         runCatching {
             if (shelf == Shelf.LIKED) {
-                liked = graph.favorites.mergeLiked(graph.library.starredSongs())
+                // As the phone's Liked songs: Navidrome's list, which the library may not have marked yet.
+                liked = app.siansa.ui.likedSongs(graph)
             } else {
                 tiles = when (shelf) {
                     Shelf.ALBUMS -> graph.library.albums("name").map { TvItem.OfAlbum(it) }

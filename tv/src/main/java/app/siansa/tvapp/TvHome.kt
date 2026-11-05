@@ -173,7 +173,7 @@ fun TvHome() {
                 TvButton("Today's mix", Icons.Rounded.AutoAwesome, strong = true, onClick = { play.todaysMix() }, modifier = Modifier.initialFocus())
                 TvButton("Shuffle your library", Icons.Rounded.Shuffle, onClick = { play.label("your library") { graph.library.randomSongs(SHUFFLE_SONGS) } })
                 TvButton("Liked songs", Icons.Rounded.Favorite, onClick = {
-                    play.label("your liked songs", shuffle = true) { graph.favorites.mergeLiked(graph.library.starredSongs()) }
+                    play.label("your liked songs", shuffle = true) { app.siansa.ui.likedSongs(graph) }
                 })
             }
         }

@@ -48,6 +48,7 @@
 - Pausing for most of a second when making a mix (Today's mix, a daily mix), on the phone too; and the TV uses less memory for covers,
   giving them back when the TV runs low (an NVIDIA SHIELD kept warning of low memory). The sleep timer is gone from
   the TV app.
+- Liked songs on the TV showing nothing: they now come from your server, as on the phone.
 - Typing on the TV: text fields open Android's own text box with the keyboard up (Search as soon as you reach it), and
   take what's typed or pasted on a phone with the Google TV app.
 - Siansa's settings showing the Siansa plugin as 0.3.3 whatever version was installed (update the plugin to 0.5.6).

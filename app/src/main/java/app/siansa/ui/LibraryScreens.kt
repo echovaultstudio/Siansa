@@ -108,6 +108,22 @@ import app.siansa.data.favouriteArtistList
 import app.siansa.data.Artist
 import app.siansa.data.PickUps
 
+/**
+ * The liked songs, as the Liked songs page shows them (and the TV app, issue #860): Navidrome's list, as the library has
+ * them, or the library's own when Navidrome can't be reached. Songs liked just now are at the top even before Navidrome
+ * lists them, unliked ones are gone, and the rest are newest liked first.
+ */
+suspend fun likedSongs(graph: app.siansa.AppGraph): List<Song> =
+    runCatching { graph.source.starredSongs() }
+        .map { list ->
+            val local = graph.library.songs(list.map { it.id }).associateBy { it.id }
+            graph.library.keepSyncedSongs(list.map { local[it.id] ?: it }, "Liked songs")
+        }
+        .getOrElse { if (graph.library.isSynced) graph.library.starredSongs() else throw it }
+        .let { graph.favorites.mergeLiked(it) }
+        // Songs liked just now (no date from Navidrome yet) at the very top.
+        .sortedByDescending { isoMillis(SongDatesCache[it.id]?.starred) ?: Long.MAX_VALUE }
+
 /** Songs with a heart, newest first as Navidrome lists them. */
 @Composable
 fun LikedScreen(nav: NavController) {
@@ -117,18 +133,7 @@ fun LikedScreen(nav: NavController) {
     val saved by graph.favorites.saved.collectAsStateWithLifecycle()
     var sort by remember { mutableStateOf(graph.listSort.get("liked")) }
     val heard by loadState("heard-at" to saved) { lastHeard(graph) }
-    val loaded by loadState(changes to saved) {
-        runCatching { graph.source.starredSongs() }
-            .map { list ->
-                val local = graph.library.songs(list.map { it.id }).associateBy { it.id }
-                graph.library.keepSyncedSongs(list.map { local[it.id] ?: it }, "Liked songs")
-            }
-            .getOrElse { if (graph.library.isSynced) graph.library.starredSongs() else throw it }
-            // Songs liked just now show at the top even before Navidrome lists them; unliked ones go.
-            .let { graph.favorites.mergeLiked(it) }
-            // Newest liked first; songs liked just now (no date from Navidrome yet) at the very top.
-            .sortedByDescending { isoMillis(SongDatesCache[it.id]?.starred) ?: Long.MAX_VALUE }
-    }
+    val loaded by loadState(changes to saved) { likedSongs(graph) }
     val songs = when (val l = loaded) {
         is Load.Ok -> Load.Ok(sortSongs(l.value, sort, { it }, { SongDatesCache[it] }, { heard.valueOrNull()?.get(it) }))
         else -> l
