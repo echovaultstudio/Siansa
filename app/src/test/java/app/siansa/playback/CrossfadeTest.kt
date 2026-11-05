@@ -186,6 +186,23 @@ class CrossfadePlanTest {
         assertEquals(0L, Crossfade.plan(CrossfadeMode.FIXED, 6_000, a1, b1, minutes4, minutes4, profile("a1", 0, 0), profile("b1", 0, 0))!!.gapMs)
     }
 
+    @Test fun aColdEndBetweenTwoBeatsHasNoPause() {
+        // 0.52.0-dev, 20:19, a DJ radio: a 132 BPM house track loud to its end into 176 BPM drum and bass loud from its
+        // start (too far apart to match) got 0.6 s of silence between them. Two beats run straight on instead.
+        val house = BeatEnd(bpm = 132.0, beatMs = 230_000.0, barMs = 230_000.0, rhythm = 0.88f, steady = 0.88f)
+        val dnb = BeatEnd(bpm = 176.0, beatMs = 0.0, barMs = null, rhythm = 0.84f, steady = 0.86f)
+        val out = TrackProfile("a1", -10.0, listOf(RampPoint(-18, 0)), listOf(RampPoint(-18, 0)), outro = house)
+        val inn = TrackProfile("b1", -10.0, listOf(RampPoint(-18, 0)), emptyList(), intro = dnb)
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, out, inn, beatMatch = true)!!
+        assertTrue(plan.why, plan.coldEnd)
+        assertEquals(0L, plan.gapMs)
+        assertEquals(Crossfade.COLD_OUT_MS, plan.overlapMs)
+        assertTrue(plan.why, plan.why.contains("no pause"))
+        // One side without a beat (Yor Zarad's 0.15 into a beat): the pause, as before.
+        val beatless = out.copy(outro = house.copy(rhythm = 0.15f, steady = 0.0f))
+        assertTrue(Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, beatless, inn, beatMatch = true)!!.gapMs > 0)
+    }
+
     @Test fun aColdEndPausesLongerWhenTheTemposAreFarApart() {
         assertEquals(Crossfade.COLD_GAP_MS, Crossfade.coldGap(120.0, 126.0))
         assertEquals(Crossfade.COLD_GAP_FAR_MS, Crossfade.coldGap(145.0, 191.5))

@@ -63,7 +63,9 @@ Same page. **Off**, a **fixed** length (1–30 seconds, 6 by default), or **Smar
 - **Cold ends**: when a song ends hard (loud to its last second) and the next one starts hard (loud straight away),
   they don't overlap at all: the old song plays to its very last sound, then a short pause (0.4 seconds, 0.6 when
   their tempos are far apart), then the next song from its start, as a radio DJ plays a cold end. Both songs stay
-  whole. Only when both edges are hard: a soft ending or a soft start blends as above. A beat-matched DJ blend still
+  whole. When both songs keep a beat (dance music, a DJ radio), there's no pause: the next song starts right as the
+  old one's last sound ends, so the music doesn't stop. Only when both edges are hard: a soft ending or a soft start
+  blends as above. A beat-matched DJ blend still
   comes first. Needs the new audio engine (Siansa Dev); otherwise the two play straight back to back.
 - With Smart, the length (**Up to**) is the longest a fade can be, not the length of every fade: most are shorter,
   as the songs decide. The full length is used for songs the plugin hasn't measured yet, and in DJ blends for a

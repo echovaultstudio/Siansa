@@ -808,7 +808,7 @@ internal object EngineFade {
         return when {
             beat != null -> beat.incomingStartMs to beat.startMs
             // A cold end: after the old song's last sound and the pause (the point is past its end, on its clock).
-            plan.gapMs > 0 -> 0L to startAtMs + plan.overlapMs + plan.gapMs
+            plan.coldEnd -> 0L to startAtMs + plan.overlapMs + plan.gapMs
             else -> 0L to startAtMs
         }
     }

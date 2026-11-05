@@ -36,9 +36,11 @@ data class FadePlan(
     /** In smart mode, what the plugin measured at both ends and why the blend wasn't beat-matched (issue #744). */
     val beatNote: String? = null,
     /**
-     * A cold end (a hard ending into a hard start): no overlap. The old song plays to its last sound, then this long
-     * a pause, then the next song from its start. 0 for every other blend.
+     * A cold end (a hard ending into a hard start): no overlap. The old song plays to its last sound, then [gapMs]
+     * of pause (none when both keep a beat), then the next song from its start.
      */
+    val coldEnd: Boolean = false,
+    /** A cold end's pause; 0 for every other blend, and for a cold end where both songs keep a beat. */
     val gapMs: Long = 0L,
 )
 
@@ -101,15 +103,21 @@ object Crossfade {
      * can't share an overlap, so none: the old song plays to its very last sound, a short pause, then the next song
      * from its start, as a radio DJ plays a cold end. Both songs stay whole. Null when either edge is soft, so every
      * other blend is as before.
+     *
+     * When both edges keep a beat ([bothBeat]: dance music, a DJ radio), no pause: a silence between two beats is a
+     * gap in the music (0.52.0-dev, 20:15: house and drum and bass in a DJ radio had 0.4 to 0.6 s of silence between
+     * songs). The next song starts right as the old one's last sound ends, still without overlap.
      */
-    fun coldEnd(tailMs: Long, headMs: Long, cutMs: Long, outBpm: Double?, inBpm: Double?): FadePlan? {
+    fun coldEnd(tailMs: Long, headMs: Long, cutMs: Long, outBpm: Double?, inBpm: Double?, bothBeat: Boolean = false): FadePlan? {
         if (tailMs >= COLD_TAIL_MS || headMs >= COLD_HEAD_MS) return null
-        val gap = coldGap(outBpm, inBpm)
+        val gap = if (bothBeat) 0L else coldGap(outBpm, inBpm)
+        val then = if (bothBeat) "then the next song straight on (both keep a beat, so no pause)" else "then a ${gap} ms pause"
         return FadePlan(
             overlapMs = tailMs.coerceAtLeast(COLD_OUT_MS),
             fadeInMs = MIN_FADE_IN_MS,
-            why = "smart: a hard ending into a hard start (${tailMs} ms tail + ${headMs} ms intro), so no overlap: the old song plays to its last sound, then a ${gap} ms pause",
+            why = "smart: a hard ending into a hard start (${tailMs} ms tail + ${headMs} ms intro), so no overlap: the old song plays to its last sound, $then",
             cutMs = cutMs,
+            coldEnd = true,
             gapMs = gap,
         )
     }
@@ -258,7 +266,7 @@ object Crossfade {
             val djLong = beatMatch && !rhythmic && (BeatMatch.beatless(outro) || BeatMatch.beatless(intro)) &&
                 beatlessRunsLong(BeatMatch.beatless(outro), BeatMatch.beatless(intro), tail, head)
             if (!djLong) {
-                coldEnd(tail, head, cut, outro?.bpm, intro?.bpm)?.let { cold ->
+                coldEnd(tail, head, cut, outro?.bpm, intro?.bpm, bothBeat = BeatMatch.someBeat(outro) && BeatMatch.someBeat(intro))?.let { cold ->
                     val note = if (outro != null || intro != null) BeatMatch.note(outro, intro, beatMatch) else null
                     return cold.copy(why = cold.why + (cutWhy?.let { " · $it" } ?: ""), beatNote = note)
                 }
