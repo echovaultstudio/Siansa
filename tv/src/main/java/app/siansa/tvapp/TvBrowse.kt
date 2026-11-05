@@ -129,10 +129,15 @@ fun TvAlbum(id: String) {
     val d = detail ?: return Loading()
     val (album, songs) = d
     val about = listOfNotNull(album.year?.toString(), "${songs.size} songs").joinToString(" · ")
+    val artistId = album.artistId
     SongsPage(
         album.name, album.artist, about, album.coverArt, songs,
         shortcut = Shortcut("album/$id", album.name, album.coverArt),
-        extra = album.artistId?.let { a -> { TvButton("Go to artist", null, onClick = { nav.navigate(TvRoutes.artist(a)) }) } },
+        extra = if (artistId != null) {
+            { TvButton("Go to artist", null, onClick = { nav.navigate(TvRoutes.artist(artistId)) }) }
+        } else {
+            null
+        },
     )
 }
 
