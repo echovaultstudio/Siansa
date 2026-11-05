@@ -303,7 +303,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 }
             },
             // The top of Home (issue #872): the notices with the round menu button in line at their end, while casting;
-            // then with no notices and the source filter on (the button filled, its lines in the accent colour).
+            // then with no notices and the source filter on (a ring round the button, its lines in the accent colour).
             Scene("home_header_menu") {
                 Column(verticalArrangement = Arrangement.spacedBy(Space.Section)) {
                     app.siansa.ui.HomeTopBar(

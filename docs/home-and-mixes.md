@@ -22,7 +22,8 @@ The round button opens a short column of round buttons straight under it, each w
 
 Tap the button and then one of them, or do it in one go: press the button, slide your finger down to one (it lights
 up, with a light tick as you pass each) and let go. Letting go anywhere else closes the menu. The button's three
-lines are always in the accent colour; the button is filled in while the source filter hides something.
+lines are always in the accent colour; the button has a thin ring in the same colour while the source filter hides
+something.
 
 Their order is yours: **Settings › Style › Home Menu**, hold a row and drag it.
 

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -187,7 +188,7 @@ fun rememberHomeMenuInfo(): HomeMenuInfo {
 
 /**
  * Home's menu button: a circle the notice chips' height ([size]), so it sits in line with them, its three lines always
- * in the accent colour. It's filled like a chosen chip while the source filter hides something, has a small dot while
+ * in the accent colour. It has a thin ring in the accent colour while the source filter hides something, a small dot while
  * something is cast, and shows the dice tumbling while a roll finds a song. A tap opens the menu; a press slid down
  * glides through it ([HomeMenuState]). Once a press starts here, the slide belongs to the menu, so Home doesn't scroll.
  */
@@ -215,13 +216,9 @@ fun HomeMenuButton(
         modifier
             .size(size)
             .clip(CircleShape)
-            .background(
-                when {
-                    state.open -> MaterialTheme.colorScheme.surfaceContainerHighest
-                    filterActive -> Selected
-                    else -> MaterialTheme.colorScheme.surfaceContainerHigh
-                },
-            )
+            .background(if (state.open) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh)
+            // A ring, not a fill: the lines stay the accent colour and must show on it.
+            .then(if (filterActive) Modifier.border(1.5.dp, Accent, CircleShape) else Modifier)
             .onGloballyPositioned { coords = it; state.anchor = it.boundsInRoot() }
             .semantics {
                 contentDescription = description
