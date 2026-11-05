@@ -1,12 +1,26 @@
 # Home and your mixes
 
-Home is built from sections you can reorder and hide (**Arrange Home**, from the filter button at the top of Home).
+Home is built from sections you can reorder and hide (**Arrange Home**, in the menu at the top of Home).
 
-Next to the filter button, a **cast button** shows when there's a TV or speaker to play on: a Chromecast, Google TV
-or Cast speaker on your Wi-Fi, or a DLNA TV or speaker Siansa found before. It turns amber while something plays
-there. Finding them costs nothing in the background: Google Play services keeps the Cast list itself, and Siansa
-asks the DLNA ones it knows once, when Home opens.
-Its **Spacing** slider sets the gap between every section at once, from Tight to Airy; **Reset** puts the order,
+## Home's menu
+
+The button with three lines at the top right of Home opens a small menu:
+
+- **Play on…** (TV or speaker) opens the list of TVs and speakers to play on: Chromecast, Google TV, Cast
+  speakers and DLNA ones. While something plays on one, the row says **Playing on** and its name in the accent colour (amber unless you picked another in Themes), with
+  Chromecast or DLNA under it, and a **Stop** button that brings the music back to the phone. The menu button
+  then has a small dot in the same colour.
+- **Sources** opens the source filter, and says what it shows now: All libraries, Downloaded only, 2 of 3
+  libraries, or how many users' music.
+- **Arrange Home** opens Arrange, for the order and looks of Home's sections.
+
+Tap the button and then a row, or do it in one go: press the button, slide your finger down to the row (it lights
+up, with a light tick as you pass each row) and let go. Letting go anywhere else closes the menu. The button itself
+turns to the accent colour while the source filter hides something.
+
+## Arrange Home
+
+Arrange's **Spacing** slider sets the gap between every section at once, from Tight to Airy; **Reset** puts the order,
 the hidden sections, the spacing and the looks back.
 
 The **cog** on a section changes its look, to any of the custom cards' looks:

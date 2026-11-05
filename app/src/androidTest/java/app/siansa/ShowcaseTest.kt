@@ -145,7 +145,10 @@ class ShowcaseTest {
             }
             step("arrange") {
                 tab("Home")
-                compose.onAllNodesWithContentDescription("Source filter and Arrange Home").onFirst().performClick()
+                // Home's menu (issue #872), then its row.
+                compose.onAllNodesWithContentDescription("Home menu", substring = true).onFirst().performClick()
+                idle(400)
+                click("Arrange Home")
                 idle(1200)
                 click("Arrange")
                 idle(1200)

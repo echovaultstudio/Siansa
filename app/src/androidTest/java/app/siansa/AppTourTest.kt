@@ -91,7 +91,10 @@ class AppTourTest {
             }
             step("source filter") {
                 tab("Home")
-                compose.onAllNodesWithContentDescription("Source filter and Arrange Home").onFirst().performClick()
+                // Home's menu (issue #872), then its row.
+                compose.onAllNodesWithContentDescription("Home menu", substring = true).onFirst().performClick()
+                idle(400)
+                click("Sources")
                 idle(1200)
                 waitText("Only downloaded music")
                 shot("01b-source-filter", popups = true)
@@ -130,7 +133,10 @@ class AppTourTest {
                     graph.guests.state.value[second]?.error?.let { problems += "source filter: the second user's music didn't load: $it" }
                     idle(800)
                     shot("01c-home-two-users")
-                    compose.onAllNodesWithContentDescription("Source filter and Arrange Home").onFirst().performClick()
+                    // Home's menu (issue #872), then its row.
+                    compose.onAllNodesWithContentDescription("Home menu", substring = true).onFirst().performClick()
+                    idle(400)
+                    click("Sources")
                     idle(1200)
                     waitText("Servers and libraries")
                     shot("01d-source-filter-two-users", popups = true)

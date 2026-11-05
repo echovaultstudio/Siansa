@@ -4,7 +4,6 @@ import app.siansa.data.normalizeKey
 import app.siansa.mix.mixArtistRadios
 import app.siansa.mix.ArtistRadioPicks
 import androidx.compose.ui.platform.testTag
-import androidx.compose.material.icons.rounded.Casino
 
 import app.siansa.mix.resumeStart
 import app.siansa.mix.MixRules
@@ -51,6 +50,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -118,7 +120,20 @@ fun HomeScreen(nav: NavController) {
     val homeSettings by graph.settings.state.collectAsStateWithLifecycle()
     val homeOrder = homeSettings.homeOrder
     val homeHidden = homeSettings.homeHidden
-    var arranging by remember { mutableStateOf(false) }
+    // The Home settings panel, open on Sources (true) or Arrange (false); null while closed.
+    var panel by remember { mutableStateOf<Boolean?>(null) }
+    // Home's menu (Play on…, Sources, Arrange Home) and the Play on sheet it opens.
+    val menu = rememberHomeMenuState()
+    val menuInfo = rememberHomeMenuInfo()
+    var castOpen by remember { mutableStateOf(false) }
+    fun pick(item: HomeMenuItem) {
+        AppLog.d("Home", "Menu: ${item.name.lowercase()}")
+        when (item) {
+            HomeMenuItem.PLAY_ON -> castOpen = true
+            HomeMenuItem.SOURCES -> panel = true
+            HomeMenuItem.ARRANGE -> panel = false
+        }
+    }
 
     // While AudioMuse can't be reached (offline, or it's down), mixes aren't attempted: a clear message instead.
     val aiProblem = rememberAiProblem()
@@ -261,22 +276,21 @@ fun HomeScreen(nav: NavController) {
 
     // The gap between sections, from Arrange Home's spacing slider (#554).
     CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap)) {
+    Box(Modifier.fillMaxSize()) {
     LazyColumn(
         Modifier.fillMaxSize().aboveKeyboard(),
         state = listState,
         contentPadding = PaddingValues(bottom = if (keyboardOpen()) Space.Page else bottomBarPadding(Space.Section)),
     ) {
         item {
-            // One button for the source filter and arranging Home (issue #152): both are tabs of one panel.
+            // One menu button for Play on…, the source filter and arranging Home (issues #152, #872).
             HomeHeader(greeting(), Modifier.statusBarsPadding()) {
-                // Left of the source filter and Arrange (issue #347).
+                // Left of the menu (issue #347).
                 DiceButton()
-                // Between the dice and the filter, only when there's a TV or speaker to play on (or one is playing).
-                HomeCastButton()
-                SourceFilterButton { arranging = true }
+                HomeMenuButton(menu, casting = menuInfo.playOn.active, filterActive = menuInfo.filterActive, onPick = ::pick)
             }
         }
-        item(key = "sources") { SourceChips { arranging = true } }
+        item(key = "sources") { SourceChips { panel = true } }
 
         if (loaded && !synced) {
             item(key = "sync") { Card(Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Small)) { SyncPrompt(nav) } }
@@ -576,11 +590,17 @@ fun HomeScreen(nav: NavController) {
             }
         }
     }
+    HomeMenuOverlay(menu, menuInfo, onPick = ::pick, onStop = {
+        AppLog.i("Cast", "Stopped from Home's menu")
+        stopCasting()
+    })
     }
-    if (arranging) {
+    }
+    panel?.let { sources ->
         // The same panel opens from Settings › Home (issue #780).
-        HomeSettingsSheet(nav, startOnSources = true) { arranging = false }
+        HomeSettingsSheet(nav, startOnSources = sources) { panel = null }
     }
+    if (castOpen) CastSheet(onDismiss = { castOpen = false })
 }
 
 internal suspend fun recentlyPlayedAlbums(graph: AppGraph, limit: Int = 15): List<Album> {
@@ -810,22 +830,25 @@ fun MixRow(mix: Mix, onClick: () -> Unit) {
     }
 }
 
-/** Home's top line: the greeting, and the one button for the source filter and arranging Home. */
-/** Roll the dice (issue #347): plays a song from your library you've never played, straight away. */
+/** Roll the dice (issue #347): plays a song from your library you've never played, straight away. The die tumbles while it rolls. */
 @Composable
 private fun DiceButton() {
     val graph = LocalGraph.current
     val launch = rememberPlayLauncher()
     val scope = rememberCoroutineScope()
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     var rolling by remember { mutableStateOf(false) }
+    var rolls by remember { mutableIntStateOf(0) }
     IconButton(
-        enabled = !rolling,
         onClick = {
+            if (rolling) return@IconButton
             if (graph.connection.current.offline) {
                 launch.notify("You're offline: rolling the dice needs the server")
                 return@IconButton
             }
             rolling = true
+            rolls++
+            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
             scope.launch {
                 try {
                     val song = graph.dice.roll()
@@ -846,8 +869,10 @@ private fun DiceButton() {
         },
         modifier = Modifier.testTag("dice"),
     ) {
-        if (rolling) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) // spacing: exact
-        else Icon(Icons.Rounded.Casino, "Roll the dice: play a song you've never played")
+        RollingDie(
+            rolls, rolling, MaterialTheme.colorScheme.onSurface,
+            Modifier.semantics { contentDescription = if (rolling) "Rolling the dice…" else "Roll the dice: play a song you've never played" },
+        )
     }
 }
 
