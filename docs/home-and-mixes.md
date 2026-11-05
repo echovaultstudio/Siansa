@@ -212,6 +212,9 @@ and **Stations**.
   are hidden to the right, the row fades there with a **›** button that scrolls on.
 - **Each chip keeps its own sort** (Recents, Alphabetical, Most played…) until you change it, also after Siansa
   restarts. Sorting Music by name doesn't change how Playlists are sorted.
+- **Each view keeps its own list or grid** (the button next to the sort) until you change it, also after Siansa
+  restarts: Playlists can be a grid while Music's Artists stay a list. Albums, Artists and Songs under Music each
+  keep their own.
 
 ## Long lists
 

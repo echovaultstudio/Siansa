@@ -38,4 +38,13 @@ class LibraryChipsTest {
         assertEquals("ALL", LibraryChips.sortKey(null))
         assertEquals("MUSIC", LibraryChips.sortKey("MUSIC"))
     }
+
+    @Test fun eachViewKeepsItsOwnListOrGrid() {
+        assertEquals("library:ALL", LibraryChips.viewKey(null))
+        assertEquals("library:PLAYLIST", LibraryChips.viewKey("PLAYLIST"))
+        // Under Music, Albums, Artists and Songs each have their own.
+        assertEquals("library:MUSIC", LibraryChips.viewKey("MUSIC"))
+        assertEquals("library:MUSIC:ALBUM", LibraryChips.viewKey("MUSIC", "ALBUM"))
+        assertEquals("library:MUSIC:ARTIST", LibraryChips.viewKey("MUSIC", "ARTIST"))
+    }
 }
