@@ -3,6 +3,8 @@ package app.siansa.pairing
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.widget.CheckBox
+import android.widget.FrameLayout
 import android.widget.Toast
 import app.siansa.AppGraph
 import app.siansa.log.AppLog
@@ -43,12 +45,29 @@ object PhonePairing {
         }
         val server = runCatching { URI(settings.navidromeUrl).host }.getOrNull() ?: settings.navidromeUrl
         val who = settings.navidromeUser.ifBlank { "your API key" }
+        // The phone's other services can go too, with a tick (issue #860): set up once, on both.
+        val services = Pairing.Services.of(settings).names
+        val tick = if (services.isEmpty()) null else CheckBox(activity).apply {
+            text = "Also set up ${services.joinToString()} on the TV"
+            isChecked = true
+        }
+        val view = tick?.let { box ->
+            val density = activity.resources.displayMetrics.density
+            FrameLayout(activity).apply {
+                val side = (app.siansa.ui.Space.Section.value * density).toInt()
+                setPadding(side, (app.siansa.ui.Space.Small.value * density).toInt(), side, 0)
+                addView(box)
+            }
+        }
         AlertDialog.Builder(activity)
             .setTitle("Sign in your TV?")
             .setMessage("Siansa on the TV at ${link.host} will play from $server as $who.")
+            .setView(view)
             .setPositiveButton("Sign in") { _, _ ->
+                val withServices = tick?.isChecked == true
+                AppLog.i("Pairing", "Signing in the TV at ${link.host}" + if (withServices) " with ${services.joinToString()}" else "")
                 graph.scope.launch {
-                    val ok = send(graph.http, link, Pairing.Login.of(graph.settings.current))
+                    val ok = send(graph.http, link, Pairing.Login.of(graph.settings.current, withServices))
                     withContext(Dispatchers.Main) {
                         Toast.makeText(
                             activity.applicationContext,
