@@ -108,7 +108,7 @@ private suspend fun homeRow(graph: AppGraph, section: Section): TvRow? {
     return when (section) {
         Section.QUICK -> TvRow("Jump back in", graph.recentPlays.all().filter { shortcutOpens(it.route) }.take(ROW_SIZE).map { TvItem.OfShortcut(it) })
         // Today's personal mixes first (AudioMuse's need it set up), then the mixes made so far.
-        // The daily mixes made today (Today's mix and the ones for each time of day, Settings › Mixes and vibes).
+        // The daily mixes made today (Today's mix and the ones for each time of day, Settings › Auto Generated Mixes).
         Section.TODAY -> {
             val made = todaysMixes(graph)
             TvRow("Today's mixes", if (made.isEmpty()) listOf(TvItem.MakeToday) else made.map { TvItem.OfMix(it) })

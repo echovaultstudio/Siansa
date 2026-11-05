@@ -156,7 +156,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
             users.forEach { user ->
                 val inUse = user.id == Users.active
                 val isShown = if (inUse) !ownHidden else user.id in shown
-                // Only users on the same server show together; others are switched to in Settings › Servers and services.
+                // Only users on the same server show together; others are switched to in Settings › Connections.
                 val same = if (inUse) true else remember(sameServerFound) { graph.guests.sameServerNow(user.id) }
                 val elsewhere = same == false
                 val checking = same == null
@@ -174,8 +174,8 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
                     // The user, and under it the kind of server, then how it stands (#571): "max", "OpenSubsonic · In use · …".
                     name = user.title,
                     status = (if (user.connected) user.serverLine + " · " else "") + when {
-                        !user.connected -> "Not connected yet. Set it up in Settings › Servers and services."
-                        elsewhere -> "on another server. To listen, switch to this user in Settings › Servers and services."
+                        !user.connected -> "Not connected yet. Set it up in Settings › Connections."
+                        elsewhere -> "on another server. To listen, switch to this user in Settings › Connections."
                         checking -> "Checking whether it's your server…"
                         inUse && ownHidden -> "In use · their music is hidden. Their settings and history stay in use."
                         inUse -> inUseStatus(syncing, libraryStatus)
@@ -256,7 +256,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
         }
         Text(
             if (users.size > 1) "Users on the same server can be shown together. Your history, playlists and settings stay with the user in use."
-            else "Add another user in Settings › Servers and services to show their music here too.",
+            else "Add another user in Settings › Connections to show their music here too.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = Space.Medium, bottom = Space.Page, start = Space.Tight, end = Space.Tight),
@@ -520,7 +520,7 @@ internal fun syncLine(p: SyncProgress): String {
 
 /** Audiobookshelf's line on its card (issue #693). */
 internal fun booksStatus(ready: Boolean, sync: BookSync): String = when {
-    !ready -> "Not signed in. Set it up in Settings › Servers and services."
+    !ready -> "Not signed in. Set it up in Settings › Connections."
     sync.running -> "Audiobooks and podcasts · syncing…"
     sync.done -> "Audiobooks and podcasts · " + booksCounts(sync)
     else -> "Audiobooks and podcasts"

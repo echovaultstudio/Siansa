@@ -4,9 +4,9 @@ The Settings tab, page by page. The start page has six groups, so each setting i
 
 | Group | Pages |
 |---|---|
-| Sources | [Servers and services](#servers-and-services) |
-| Listening | [Playback](#playback) · [Streaming and data](#streaming-and-data) · [Downloads](#downloads) · [Audiobooks and podcasts](#audiobooks-and-podcasts) |
-| Home and mixes | [Home](#home) · [Mixes and vibes](#mixes-and-vibes) |
+| Sources | [Connections](#connections) |
+| Listening | [Playback](#playback) · [Data](#data) |
+| Home | [Notices and Cards](#notices-and-cards) · [Auto Generated Mixes](#auto-generated-mixes) |
 | Look | [Style](#style) |
 | Your listening | [Scrobbling and history](#scrobbling-and-history) |
 | App | [Backup and restore](#backup-and-restore) · [Help](#help) · [About](#about) |
@@ -14,7 +14,7 @@ The Settings tab, page by page. The start page has six groups, so each setting i
 Settings pages are in sections that fold: each shows its heading and, while folded, what's set. They start open;
 tap a heading to fold it, and it stays folded the next time you come to the page.
 
-## Servers and services
+## Connections
 
 Everything Siansa connects to, on one page, in two parts. Each server and service is a card: tap it, or its arrow,
 to fold it open; they start folded. **Save** (at the top, or in any open card) keeps every change on the page, and
@@ -45,37 +45,31 @@ How music plays.
 | Setting | What it does |
 |---|---|
 | **Equaliser** | Ten bands, presets and a pre-amp. |
-| **Crossfade and levelling** | Levelling (Track, Album, Off), where loudness comes from (tags or the Siansa plugin), the target (−18 or −14 LUFS), the crossfade (Off, fixed or Smart, 1–30 s), and beat-matched blends (experimental: Off, DJ radio or Everywhere, their length in bars and the bass swap; with Smart and the plugin). |
+| **Crossfade and levelling** | Levelling (Track, Album, Off), where loudness comes from (tags or the Siansa plugin), the target (−18 or −14 LUFS), the crossfade (Off, fixed or Smart, 1–30 s), and beat-matched blends (Off, DJ radio or Everywhere, their length in bars and the bass swap; with Smart and the plugin). |
+| **Streaming quality** | Original or Opus 96–320 kbit/s, on Wi-Fi and on mobile data. |
 | **Song radio** | How far a radio may wander: Stay close, A little, Wander. |
 | **Keep playing** | Off, Steady or DJ, when the queue is about to end. A DJ mix's shape and surprises are set in the queue while a DJ radio plays (see [Discovery](discovery.md#shape-the-mix)). |
 | **Wind down** | How many calm songs Wind down plays without a sleep timer: 10, 20 or 30. |
+| **Audiobooks and podcasts** | How far the book player's ↺ and ↻ skip, 10–90 s each. The Audiobookshelf server itself is under [Connections](#connections). |
 
-See [Playback](playback.md) and [Discovery](discovery.md).
+See [Playback](playback.md), [Discovery](discovery.md) and [Audiobooks and podcasts](books.md).
 
-## Streaming and data
+## Data
 
-What decides how much data Siansa uses and how well it plays on without a connection.
+What's kept on the phone, what it costs in data, and how well Siansa plays on without a connection.
 
 | Setting | What it does |
 |---|---|
-| **Streaming quality** | Original or Opus 96–320 kbit/s, on Wi-Fi and on mobile data. |
 | **Load songs ahead** | How many songs to load ahead, on Wi-Fi and on mobile data (0–5). |
 | **Song cache** | Keeps songs as they play, up to the size chosen, with **Clear song cache**. **Off** keeps no song once it has played (from the next song); then up to 3 songs are loaded ahead, each held only until it plays. A new size applies after a restart. |
+| **Downloads** | **Your downloads** (what's on the phone, opening the list to add or remove music), **Download on Wi-Fi only**, the download quality, the storage limit and **Remove all downloads**. See [Playback](playback.md#downloads). |
+| **Covers on the phone** | **Download all covers**, and the **Image cache** (its size, a limit or none, and **Clear image cache**; a new size applies after a restart). |
 | **Other data on this phone** | What the library database and the logs take. |
 
-## Downloads
+The downloads themselves are also in Your Library (the download button at the top), with **Add music**,
+**Downloaded songs** and a link to these settings.
 
-Your downloads (**Add music**, **Downloaded songs**, **Remove all downloads**) and how songs download: Wi-Fi only,
-quality, storage limit. Under them, the covers kept on the phone: **Download all covers**, and the **Image cache**
-(its size, a limit or none, and **Clear image cache**; a new size applies after a restart). See
-[Playback](playback.md#downloads).
-
-## Audiobooks and podcasts
-
-**Skip buttons**: how far the book player's ↺ and ↻ skip, 10–90 s each. **Audiobookshelf** opens the server's card
-in Servers and services. See [Audiobooks and podcasts](books.md).
-
-## Home
+## Notices and Cards
 
 The source filter (whose music shows, and **Only downloaded music**) and **Arrange Home** (the order of Home's
 sections, which are hidden, their looks and the spacing) are in the menu behind the round button at the top of Home,
@@ -88,7 +82,7 @@ not here.
   - **Made for you**: cards of your own on Home's Made for you. Each gets new songs every day; tap a name to change it.
   - **Custom cards**: cards pinned to Home's **Your cards** section, each with a name, a look (song tiles, album row, banner, song list or play button) and its songs, from your library by tags (genre, years, artist, album, title words, favourites) or by a sound described to AudioMuse-AI. Tap a card to change its name, look or rules; the switch takes it off Home without removing it. See [Your cards](home-and-mixes.md#your-cards).
 
-## Mixes and vibes
+## Auto Generated Mixes
 
 **Today's mix** (Auto update, and its own tuning over the vibe's), your vibes for each part of the day, and the
 **Use the moment** panel. See [Home and your mixes](home-and-mixes.md#vibes-and-todays-mix).

@@ -128,7 +128,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
     }
 
     Screen(
-        title = if (firstRun) "Connect your servers" else "Servers and services",
+        title = if (firstRun) "Connect your servers" else "Connections",
         nav = if (firstRun && !fromPicker) null else nav,
         actions = { IconButton(onClick = { save() }) { Icon(Icons.Rounded.Check, "Save") } },
     ) { padding ->

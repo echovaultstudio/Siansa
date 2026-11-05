@@ -75,7 +75,7 @@ fun CrossfadeScreen(nav: NavController) {
             Hint(settings.loudnessSource.detail + ".")
             if (settings.loudnessSource == LoudnessSource.PLUGIN) {
                 if (!settings.audioMuseReady) {
-                    Hint("Set up AudioMuse in Settings › Servers and services first. Until then, song tags are used.")
+                    Hint("Set up AudioMuse in Settings › Connections first. Until then, song tags are used.")
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                         OutlinedButton(onClick = {
@@ -132,7 +132,7 @@ fun CrossfadeScreen(nav: NavController) {
                 HorizontalDivider()
                 val blendSummary = if (settings.beatMatch == BeatMatchMode.OFF) "Off" else "${settings.beatMatch.label} · ${settings.blendBars} bars" +
                     (if (settings.bassSwap) " · bass swap" else "") + (if (AppSettings.BLEND_EXTRAS && settings.echoTail) " · echo" else "")
-                FoldSection("Beat-matched blends (experimental)", blendSummary, tag = "beat-matched-blends") {
+                FoldSection("Beat-matched blends", blendSummary, tag = "beat-matched-blends") {
                     BeatMatchSection(
                         settings.beatMatch, settings.blendBars, settings.echoTail, settings.bassSwap, settings.keepKey,
                         graph.settings::setBeatMatch, graph.settings::setBlendBars, graph.settings::setEchoTail, graph.settings::setBassSwap,

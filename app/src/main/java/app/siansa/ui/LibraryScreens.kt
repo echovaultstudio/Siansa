@@ -283,7 +283,7 @@ fun SyncPrompt(nav: NavController) {
     ) {
         Text("Your library isn't on the phone yet", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         Text(
-            "Sync it once to browse albums and artists. You choose which libraries on your server to include (Settings › Servers and services, under your server).",
+            "Sync it once to browse albums and artists. You choose which libraries on your server to include (Settings › Connections, under your server).",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

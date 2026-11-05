@@ -78,7 +78,7 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
     }
 
     /**
-     * Covers are kept on disk as they load, up to the size chosen in Settings › Streaming and data (or without a
+     * Covers are kept on disk as they load, up to the size chosen in Settings › Data (or without a
      * limit), so scrolling back is instant and works offline. With no limit they're kept in the app's
      * files rather than its cache, so Android doesn't remove them when it runs short of space.
      *

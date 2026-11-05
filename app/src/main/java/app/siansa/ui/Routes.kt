@@ -60,7 +60,8 @@ fun NavGraphBuilder.siansaRoutes(nav: NavController, except: Set<String> = empty
     // Storage became Streaming and data (issue #780); the old address opens it.
     page("settings/storage") { StreamingDataScreen(nav) }
     page("settings/streaming") { StreamingDataScreen(nav) }
-    page("settings/books") { BooksSettingsScreen(nav) }
+    // The book player's skips are under Playback now (v1.0); the old address still leads there.
+    page("settings/books") { PlaybackSettingsScreen(nav) }
     page("settings/home") { HomeSettingsScreen(nav) }
     page("settings/home/notices") { NoticesSettingsScreen(nav) }
     page("downloads") { DownloadsScreen(nav) }

@@ -14,7 +14,7 @@ class SettingsNamesTest {
         assertFalse("HubRow still takes a summary", Regex("""fun HubRow\([^)]*subtitle""").containsMatchIn(hub))
     }
 
-    /** Settings › Home has Notices and Cards; the source filter and Arrange Home are only behind Home's own button. */
+    /** Settings › Notices and Cards has Notices and Cards; the source filter and Arrange Home are only behind Home's own button. */
     @Test fun homeSettingsLeaveTheFilterToHome() {
         val pages = File(ui, "SettingsPages.kt").readText()
         val home = pages.substringAfter("fun HomeSettingsScreen(").substringBefore("\n}\n")
@@ -31,15 +31,15 @@ class SettingsNamesTest {
     }
 
     /**
-     * Servers and services are one entry, called what its page is called (#565, #665, #780): no separate Users entry,
-     * and the page has Servers and Services.
+     * Servers and services are one entry, Connections, called what its page is called (#565, #665, #780, v1.0): no
+     * separate Users entry, and the page has Servers and Services.
      */
     @Test fun serversAndServicesAreOneConnectionsEntry() {
         val hub = File(ui, "SettingsHub.kt").readText()
-        assertTrue("Settings has no \"Servers and services\" entry", hub.contains("HubRow(Icons.Rounded.Dns, \"Servers and services\")"))
+        assertTrue("Settings has no \"Connections\" entry", hub.contains("HubRow(Icons.Rounded.Dns, \"Connections\")"))
         assertFalse("Users is still its own entry", hub.contains("\"Users\")"))
         val page = File(ui, "ConnectionsHub.kt").readText()
-        assertTrue("The page isn't called Servers and services", page.contains("title = \"Servers and services\""))
+        assertTrue("The page isn't called Connections", page.contains("title = \"Connections\""))
         assertTrue("No Servers section", page.contains("SectionHeading(\"Servers\")"))
         assertTrue("No Services section", page.contains("SectionHeading(\"Services\")"))
     }

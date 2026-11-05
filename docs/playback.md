@@ -2,7 +2,7 @@
 
 ## Streaming quality
 
-**Settings › Streaming and data › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
+**Settings › Data › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
 
 - **Original**: the file as it is on your server. Best on Wi-Fi.
 - **Opus 96–320 kbit/s**: converted by your server (Navidrome's "opus" transcoding profile), to save data.
@@ -13,10 +13,10 @@ Siansa always plays the quality you chose; it never switches by itself. Changes 
 
 ## Song cache and loading ahead
 
-- **Song cache** (**Settings › Streaming and data**, 2 GB by default): songs are kept on the phone as they play, so replays
+- **Song cache** (**Settings › Data**, 2 GB by default): songs are kept on the phone as they play, so replays
   and skips start at once and survive a bad connection. Only original-quality streams are cached. **Off** keeps
   no song once it has played (the songs already cached are removed); it applies from the next song.
-- **Load songs ahead** (**Settings › Streaming and data**): while a song plays, Siansa loads the next ones, one at a time, so
+- **Load songs ahead** (**Settings › Data**): while a song plays, Siansa loads the next ones, one at a time, so
   they start at once and keep playing if the connection drops. 2 on Wi-Fi and 1 on mobile data by default, up to
   5. Only original files are loaded ahead. This works with the song cache off too, for up to 3 songs: each is held
   only until it has played.
@@ -25,7 +25,7 @@ Siansa always plays the quality you chose; it never switches by itself. Changes 
 
 ## Downloads
 
-**Settings › Downloads** (or the download button on an album or playlist): music you download stays on the phone
+**Settings › Data › Downloads** (or the download button on an album or playlist): music you download stays on the phone
 and plays without a connection. It isn't part of the song cache and is never removed by itself.
 
 - **Download on Wi-Fi only** (on by default).
@@ -83,7 +83,7 @@ Same page. **Off**, a **fixed** length (1–30 seconds, 6 by default), or **Smar
 - Without the plugin's measurements, Smart uses the fixed length. When the song going out keeps a beat but the
   next song hasn't been measured, the blend is short instead, so the two beats don't clash for the whole length.
 
-### Beat-matched blends (experimental)
+### Beat-matched blends
 
 **Settings › Playback › Crossfade and levelling › Beat-matched blends**, shown with Smart crossfades and the Siansa
 plugin. Two songs that both keep a beat can clash at the changeover when their beats land at different moments,
@@ -138,7 +138,7 @@ A quiet build-up that
 keeps a steady beat with clear bars is laid on the old song's beats too, so when its drums come in they're in
 step.
 
-It's experimental: downbeats are the hardest thing to hear in a recording. When the plugin couldn't hear a song's
+Downbeats are the hardest thing to hear in a recording. When the plugin couldn't hear a song's
 bars or phrases but the song was made on a grid (a whole number of BPM, steady from start to end), its downbeats and
 8-bar phrases are assumed to count from its first beat, as DJ software assumes, and the blend is laid phrase on phrase
 all the same; the log says "assumed". When that doesn't hold either, the songs are laid beat on beat, and a mix can

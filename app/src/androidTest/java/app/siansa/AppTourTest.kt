@@ -37,8 +37,6 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.test.hasScrollToIndexAction
-import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.SemanticsMatcher
 import org.junit.Rule
 import org.junit.Test
@@ -326,7 +324,7 @@ class AppTourTest {
                 else if (compose.onAllNodesWithText("Radios").fetchSemanticsNodes().isEmpty()) problems += "Back from a search didn't return to the search page"
             }
             step("vibes") {
-                settingsRow("Mixes and vibes")
+                settingsRow("Auto Generated Mixes")
                 idle(1000)
                 shot("17-vibes")
             }
@@ -335,8 +333,8 @@ class AppTourTest {
                 idle(800)
                 shot("18-settings")
                 // Users joined Connections in 0.43; Cards has a page of its own.
-                // Grouped and renamed in issue #780.
-                listOf("Servers and services", "Playback", "Streaming and data", "Downloads", "Audiobooks and podcasts", "Home", "Style", "Scrobbling and history", "Help").forEachIndexed { i, page ->
+                // Grouped and renamed in issue #780, and again for v1.0.
+                listOf("Connections", "Playback", "Data", "Notices and Cards", "Style", "Scrobbling and history", "Help").forEachIndexed { i, page ->
                     tab("Settings")
                     // The row itself, not the Home tab of the same name, scrolled into view on the longer page.
                     waitText(page)
@@ -347,12 +345,13 @@ class AppTourTest {
                     back()
                     idle(400)
                 }
-                // Issue #302: Download all covers sits at the bottom of Downloads, under the song download settings.
-                settingsRow("Downloads")
+                // Issue #302: Download all covers is in Settings › Data, under the song download settings (v1.0).
+                settingsRow("Data")
                 idle(800)
-                compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Download all covers"))
+                // The Data page is a plain scrolling column: scroll the heading itself into view.
+                compose.onAllNodesWithText("Download all covers").onFirst().performScrollTo()
                 idle(600)
-                if (!exists("Download all covers")) problems += "Download all covers isn't on the Downloads page"
+                if (!exists("Download all covers")) problems += "Download all covers isn't on the Data page"
                 shot("19-settings-downloads-covers")
                 back()
                 idle(400)

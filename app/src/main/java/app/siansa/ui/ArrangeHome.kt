@@ -64,13 +64,13 @@ import app.siansa.data.movesFirstVisible
 
 /**
  * Home's settings panel with the saved settings, from Home's button or Settings › Home (issue #780): Sources
- * ([startOnSources]) or Arrange. Your cards' cog closes it and opens Settings › Home › Cards.
+ * ([startOnSources]) or Arrange. Your cards' cog closes it and opens Settings › Notices and Cards › Cards.
  */
 @Composable
 fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Boolean, onDismiss: () -> Unit) {
     val graph = LocalGraph.current
     val s by graph.settings.state.collectAsStateWithLifecycle()
-    // The notices are the top of Home (issue #872), not a section to move: shown or not in Settings › Home › Notices.
+    // The notices are the top of Home (issue #872), not a section to move: shown or not in Settings › Notices and Cards › Notices.
     ArrangeHomeSheet(s.homeOrder - HomeSection.NOTICES, s.homeHidden, gap = s.homeGap, onGapChange = {
         AppLog.i("Home", "Spacing: ${homeGapLabel(it)}")
         graph.settings.setHomeGap(it)
@@ -116,8 +116,8 @@ fun ArrangeHomeSheet(
     // The gap between Home's sections, a step of the spacing scale (#554).
     gap: Int = AppSettings.HOME_GAP_DEFAULT,
     onGapChange: (Int) -> Unit = {},
-    // Each row's look (issue #655), changed with its cog; Your cards' cog opens Settings › Home › Cards, and
-    // Notices' cog Settings › Home › Notices (issue #784).
+    // Each row's look (issue #655), changed with its cog; Your cards' cog opens Settings › Notices and Cards › Cards, and
+    // Notices' cog Settings › Notices and Cards › Notices (issue #784).
     looks: Map<HomeSection, HomeLook> = emptyMap(),
     onLookChange: (HomeSection, HomeLook) -> Unit = { _, _ -> },
     onResetLooks: () -> Unit = {},

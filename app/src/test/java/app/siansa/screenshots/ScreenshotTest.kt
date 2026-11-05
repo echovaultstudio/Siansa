@@ -1,5 +1,8 @@
 package app.siansa.screenshots
 
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
@@ -368,7 +371,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     TuningRow("Songs", 40, DailyMix.LENGTHS, { "$it" }, "dailyLength") {}
                     TuningRow("Leave out most played", null, DailyMix.LEAVE_OUT, { if (it == 0) "None" else "Top $it" }, "dailyLeaveOut") {}
                     FoldSection("Streaming quality", "Wi-Fi Original · mobile Opus 128", tag = "quality", startOpen = false) { Text("Body") }
-                    FoldSection("Beat-matched blends (experimental)", "DJ radio · 16 bars · echo", tag = "blends", startOpen = true) {
+                    FoldSection("Beat-matched blends", "DJ radio · 16 bars · echo", tag = "blends", startOpen = true) {
                         Text("Incomprehensibilities of the uncharacteristically long settings body")
                     }
                 }
@@ -403,15 +406,17 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.HomeMenuButton(app.siansa.ui.rememberHomeMenuState(), casting = false, filterActive = false, onPick = {})
                 }
             },
-            // The Settings start page in groups (issue #780), and Settings › Home's rows with what's set.
+            // The Settings start page in groups (issue #780, renamed for v1.0), and Settings › Notices and Cards' rows.
             Scene("settings_groups") {
                 Column {
                     app.siansa.ui.HubGroup("Sources", first = true)
-                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Dns, "Servers and services") {}
+                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Dns, "Connections") {}
                     app.siansa.ui.HubGroup("Listening")
                     app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Playback") {}
-                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.MenuBook, "Audiobooks and podcasts") {}
-                    app.siansa.ui.HubGroup("Home and mixes")
+                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.SwapVert, "Data") {}
+                    app.siansa.ui.HubGroup("Home")
+                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Home, "Notices and Cards") {}
+                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Schedule, "Auto Generated Mixes") {}
                     Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
                         app.siansa.ui.PageLink("Notices", app.siansa.ui.noticesLine(true, app.siansa.mix.NoticePrefs()), "n") {}
                         app.siansa.ui.PageLink("Cards", "Made for you and your own cards", "c") {}
