@@ -5,7 +5,9 @@
 - **Favourites on the TV**: favourite albums and artists in the Library, and a heart on album and artist pages.
 - **Artist pages on the TV**: top songs, albums and similar artists, with Play, Shuffle and Artist radio; artists,
   genres and albums on other pages open them.
-- **Several servers and users on the TV**: switch between them, or add one, under Settings.
+- **Several servers and users on the TV**: switch between them, add one, and pick whose music and which libraries
+  show, under Settings.
+- **Lyrics and song radio in Now playing on the TV**, and today's daily mixes on Home.
 - **Settings on the TV**: servers, library sync, playback, streaming quality, mixes, scrobbling, colours and help,
   the same pages as on the phone.
 - **AudioMuse on the TV**: Your sound and Discover for you among your mixes, sound radios, similar songs, and songs

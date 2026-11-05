@@ -59,6 +59,7 @@ object TvRoutes {
     const val SETTINGS = "settings"
     const val NOW_PLAYING = "tv/now-playing"
     const val PASSTHROUGH = "tv/passthrough"
+    const val SOURCES = "tv/sources"
     const val ALBUM = "album/{id}"
     const val ARTIST = "artist/{id}"
     const val PLAYLIST = "playlist/{id}"
@@ -148,6 +149,7 @@ fun TvRoot(searches: MutableStateFlow<String?>) {
                     composable(TvRoutes.SEARCH) { TvSearch(search, onDone = { searches.value = null }) }
                     composable(TvRoutes.SETTINGS) { TvSettingsHub() }
                     composable(TvRoutes.PASSTHROUGH) { TvPassthrough() }
+                    composable(TvRoutes.SOURCES) { TvSources() }
                     composable(TvRoutes.NOW_PLAYING) { TvNowPlaying() }
                     composable(TvRoutes.ALBUM) { TvAlbum(it.arguments?.getString("id").orEmpty()) }
                     composable(TvRoutes.ARTIST) { TvArtist(it.arguments?.getString("id").orEmpty()) }

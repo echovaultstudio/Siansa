@@ -18,6 +18,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material.icons.rounded.Lyrics
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.produceState
+import app.siansa.log.AppLog
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Pause
@@ -71,7 +78,9 @@ fun TvNowPlaying() {
     val likes by graph.favorites.changes.collectAsStateWithLifecycle()
     val sleep by graph.sleepTimer.state.collectAsStateWithLifecycle()
     var progress by remember { mutableStateOf(graph.player.progress()) }
-    var queue by remember { mutableStateOf(false) }
+    // What the right side shows instead of the cover: the songs up next, or the lyrics.
+    var panel by remember { mutableStateOf(Panel.NONE) }
+    val queue = panel != Panel.NONE
     var sleepChoices by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -85,11 +94,11 @@ fun TvNowPlaying() {
     val liked = song != null && (likes[song.id] ?: song.starred)
 
     Row(
-        Modifier.fillMaxSize().padding(horizontal = TV_EDGE * 2, vertical = Space.Large),
+        Modifier.fillMaxSize().padding(horizontal = TV_EDGE, vertical = Space.Large),
         horizontalArrangement = Arrangement.spacedBy(Space.Large * 2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (!queue) Cover(song?.cover, LARGE_COVER, Modifier.fillMaxHeight(COVER_HEIGHT).aspectRatio(1f), RoundedCornerShape(Space.Page))
+        if (!queue) Cover(song?.cover, LARGE_COVER, Modifier.size(COVER_SIZE), RoundedCornerShape(Space.Page))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
             Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                 Text(
@@ -166,24 +175,79 @@ fun TvNowPlaying() {
                     onClick = { graph.player.cycleRepeat() },
                     on = state.repeatMode != Player.REPEAT_MODE_OFF,
                 )
-                TvIconButton(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (liked) "Unlike" else "Like",
-                    onClick = { song?.let { graph.favorites.toggle(it) } }, on = liked)
-                TvIconButton(Icons.AutoMirrored.Rounded.QueueMusic, "Up next", onClick = { queue = !queue }, on = queue)
-                TvIconButton(Icons.Rounded.Bedtime, "Sleep timer", onClick = { sleepChoices = true }, on = sleep != null)
+            }
+            // The rest with their names, on a row of their own that scrolls sideways as the remote moves along it.
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()).padding(vertical = Space.Small),
+                horizontalArrangement = Arrangement.spacedBy(Space.Small),
+            ) {
+                TvButton(if (liked) "Liked" else "Like", if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                    onClick = { song?.let { graph.favorites.toggle(it) } }, strong = liked)
+                TvButton("Lyrics", Icons.Rounded.Lyrics, onClick = { panel = if (panel == Panel.LYRICS) Panel.NONE else Panel.LYRICS }, strong = panel == Panel.LYRICS)
+                TvButton("Up next", Icons.AutoMirrored.Rounded.QueueMusic, onClick = { panel = if (panel == Panel.QUEUE) Panel.NONE else Panel.QUEUE },
+                    strong = panel == Panel.QUEUE)
+                // A radio from this song: AudioMuse's songs that sound like it when set up, Steady or DJ as on the phone.
+                TvButton("Song radio", Icons.Rounded.Radio, onClick = { song?.let { app.siansa.ui.RadioChooser.song.value = it } })
+                TvButton(sleep?.let { sleepLine(it) } ?: "Sleep timer", Icons.Rounded.Bedtime, onClick = { sleepChoices = true }, strong = sleep != null)
             }
             val timer = sleep
             val next = state.queue.getOrNull(state.index + 1)
             val line = listOfNotNull(
                 next?.takeIf { !queue }?.let { "Next: ${it.title} · ${it.artist}" },
-                timer?.let { sleepLine(it) },
             ).joinToString("   ·   ")
             if (line.isNotEmpty()) {
                 Text(line, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        if (queue) UpNext(state.queue, state.index)
+        when (panel) {
+            Panel.QUEUE -> UpNext(state.queue, state.index)
+            Panel.LYRICS -> LyricsPanel(song, progress.positionMs)
+            Panel.NONE -> Unit
+        }
     }
     if (sleepChoices) SleepChoices(onDismiss = { sleepChoices = false })
+}
+
+private enum class Panel { NONE, QUEUE, LYRICS }
+
+/**
+ * The song's lyrics from the server, as on the phone: synced ones follow the song, the line being sung lit and kept in
+ * view; others are shown to read along, and down scrolls through them.
+ */
+@Composable
+private fun LyricsPanel(song: app.siansa.data.Song?, positionMs: Long) {
+    val graph = LocalGraph.current
+    val lyrics by produceState<app.siansa.data.Lyrics?>(null, song?.id) {
+        value = song?.let { s -> runCatching { graph.source.lyrics(s) }.onFailure { AppLog.w("Tv", "Lyrics for ${s.id}: ${it.message}") }.getOrNull() }
+    }
+    val lines = lyrics?.lines?.filter { it.text.isNotBlank() }.orEmpty()
+    val synced = lyrics?.synced == true
+    val current = if (synced) lines.indexOfLast { (it.startMs ?: Long.MAX_VALUE) <= positionMs } else -1
+    val list = androidx.compose.foundation.lazy.rememberLazyListState()
+    LaunchedEffect(current) { if (current >= 0) list.animateScrollToItem((current - LINES_ABOVE).coerceAtLeast(0)) }
+    Column(Modifier.width(QUEUE_WIDTH).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+        Text("Lyrics", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+        if (lines.isEmpty()) {
+            Text(if (lyrics == null && song != null) "No lyrics for this song on your server." else "", style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            LazyColumn(state = list, contentPadding = PaddingValues(bottom = Space.Large), verticalArrangement = Arrangement.spacedBy(Space.Small),
+                modifier = if (synced) Modifier else Modifier.focusable()) {
+                itemsIndexed(lines, key = { i, _ -> i }) { i, line ->
+                    Text(
+                        line.text,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = if (i == current) FontWeight.Bold else FontWeight.Normal,
+                        color = when {
+                            i == current -> MaterialTheme.colorScheme.primary
+                            synced && i < current -> MaterialTheme.colorScheme.onSurfaceVariant
+                            else -> MaterialTheme.colorScheme.onSurface
+                        },
+                    )
+                }
+            }
+        }
+    }
 }
 
 /** The songs after this one: OK plays from that song. */
@@ -242,7 +306,8 @@ fun details(codec: String?, kbps: Int): String = when {
 
 private const val PROGRESS_TICK_MS = 500L
 private const val SEEK_MS = 10_000L
-private const val COVER_HEIGHT = 0.8f
+private val COVER_SIZE = 300.dp
+private const val LINES_ABOVE = 2
 private const val ROW_GROW = 1.02f
 private const val QUEUE_SHOWN = 100
 private const val MAX_ARTISTS = 4

@@ -28,7 +28,7 @@ To sign out, go to **Settings › Sign out** on the TV. Your phone stays signed 
 Everything works with the remote's arrows and the centre button.
 
 - **Home**: Today's mix, Shuffle your library and Liked songs, then the rows of your phone's Home, in the same order
-  and with the same rows hidden: Jump back in, Your mixes, Rediscover, Radios, Your playlists, Recently played, Artist
+  and with the same rows hidden: Today's mixes (the daily mixes made today), Jump back in, Your mixes, Rediscover, Radios, Your playlists, Recently played, Artist
   radios, Recently added, Your genres and Random picks. A radio starts playing straight away.
 - **Library**: albums, artists, playlists and genres as covers, your liked songs, favourite albums and favourite
   artists, and Time machine.
@@ -39,7 +39,7 @@ Everything works with the remote's arrows and the centre button.
 - **Search**: type with the on-screen keyboard or press the microphone button and say it. "Play … on Siansa" from
   Google TV's own search opens it too.
 - **Now playing**: the cover, the song and the controls, large enough to read from the sofa, with Like, Up next and a
-  sleep timer. The artists and the album open their pages.
+  sleep timer, Lyrics (synced ones follow the song) and Song radio. The artists and the album open their pages.
 - **Skipping within a song**: rewind and fast forward on the remote go back and forward 10 seconds anywhere in the
   app. On a remote without them, press up from the controls in Now playing to reach the progress bar, then left and
   right.
@@ -55,12 +55,16 @@ the phone:
 - **Songs that sound like…** in Search: type or say a few words ("rainy sunday morning").
 - **Your sound** in the Library: the sound of your library.
 
+Scrobbling to Last.fm or ListenBrainz works on the TV as on the phone once it's set up under **Settings › Scrobbling
+and history** (each server or user on the TV has its own).
+
 ## Settings
 
 The TV has the settings that matter on a TV, each the same page as on the phone:
 
 - **Servers and users**: every server and user on the TV; pick one to switch (Siansa starts again as them). **Add a
   server or user** signs in with the code on the TV, like the first time, and keeps its own library and settings.
+- **Show music from**: whose music shows on the TV and which of their libraries, as in the phone's Sources.
 - **Servers and services** (AudioMuse, Last.fm and more), **Library sync**, **Mixes and vibes** and **Scrobbling and history**.
 - **Audio passthrough** (below), **Playback** (crossfades, DJ blends, levelling, the equaliser, keep playing) and
   **Streaming quality**.

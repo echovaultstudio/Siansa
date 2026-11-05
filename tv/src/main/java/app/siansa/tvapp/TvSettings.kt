@@ -15,6 +15,7 @@ import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Schedule
@@ -87,6 +88,8 @@ fun TvSettingsHub() {
                     modifier = if (active) Modifier.initialFocus() else Modifier,
                 )
             }
+            TvSettingRow("Show music from", "Each user's music and libraries: show or hide them here, as in the phone's Sources",
+                onClick = { nav.navigate(TvRoutes.SOURCES) }, icon = Icons.Rounded.LibraryMusic)
             TvSettingRow("Add a server or user", "Sign in with the code on the TV, as the first time. Each keeps its own library.", onClick = {
                 val id = Users.add(context) { }
                 AppLog.i("Tv", "Added user ${id + 1} on the TV")
@@ -145,6 +148,19 @@ fun TvSettingsHub() {
                 }
             }
         }
+    }
+}
+
+/**
+ * Whose music shows on the TV, and which of their libraries (music folders): the phone's Sources panel (Home's menu
+ * there), the same switches and the same rules.
+ */
+@Composable
+fun TvSources() {
+    Column(Modifier.fillMaxSize().padding(horizontal = TV_EDGE), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+        Text("Show music from", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
+        Note("Pick whose music shows here, and which of their libraries. The user in use keeps their own settings and history.")
+        app.siansa.ui.SourcesPanel(Modifier.fillMaxSize())
     }
 }
 

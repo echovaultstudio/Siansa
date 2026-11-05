@@ -71,6 +71,8 @@ sealed interface TvItem {
     data class OfShortcut(val play: RecentPlay) : TvItem { override val key get() = "sc:" + play.route }
     /** Today's personal mix of a kind (Your sound, On repeat, Discover for you): made when picked, then played. */
     data class OfPersonal(val kind: MixGenerator.Personal) : TvItem { override val key get() = "pm:" + kind.id }
+    /** Today's mix isn't made yet: making it, then playing it. */
+    data object MakeToday : TvItem { override val key get() = "make-today" }
 }
 
 data class TvRow(val title: String, val items: List<TvItem>)
@@ -106,10 +108,16 @@ private suspend fun homeRow(graph: AppGraph, section: Section): TvRow? {
     return when (section) {
         Section.QUICK -> TvRow("Jump back in", graph.recentPlays.all().filter { shortcutOpens(it.route) }.take(ROW_SIZE).map { TvItem.OfShortcut(it) })
         // Today's personal mixes first (AudioMuse's need it set up), then the mixes made so far.
+        // The daily mixes made today (Today's mix and the ones for each time of day, Settings › Mixes and vibes).
+        Section.TODAY -> {
+            val made = todaysMixes(graph)
+            TvRow("Today's mixes", if (made.isEmpty()) listOf(TvItem.MakeToday) else made.map { TvItem.OfMix(it) })
+        }
         Section.MADE_FOR_YOU -> TvRow(
             "Your mixes",
             MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, settings(graph).audioMuseReady) }.map { TvItem.OfPersonal(it) } +
-                latestMixes(graph.mixes.all()).filter { mix -> MixGenerator.Personal.entries.none { mix.selectorId == it.id } }.take(ROW_SIZE).map { TvItem.OfMix(it) },
+                latestMixes(graph.mixes.all()).filter { mix -> MixGenerator.Personal.entries.none { mix.selectorId == it.id } && !madeToday(mix) }
+                    .take(ROW_SIZE).map { TvItem.OfMix(it) },
         )
         Section.REDISCOVER -> TvRow("Rediscover", graph.insights.rediscover().take(ROW_SIZE).map { TvItem.OfAlbum(it.album, rediscoverSubtitle(it)) })
         Section.RADIOS -> if (settings(graph).audioMuseReady) TvRow("Radios", moodRadios.map { TvItem.OfMood(it) }) else null
@@ -119,12 +127,18 @@ private suspend fun homeRow(graph: AppGraph, section: Section): TvRow? {
         Section.ADDED -> TvRow("Recently added", albums(library.albums("newest")))
         Section.GENRES -> TvRow("Your genres", library.genres(ROW_SIZE).map { TvItem.OfGenre(it) })
         Section.RANDOM -> TvRow("Random picks", albums(library.randomAlbums(ROW_SIZE)))
-        // Today's mix is the first button above the rows; notices, the carousel, cards, books and podcasts are the phone's.
+        // Notices, the carousel, cards, books and podcasts are the phone's.
         else -> null
     }
 }
 
 private fun settings(graph: AppGraph) = graph.settings.current
+
+/** A mix made today: mixes are kept by date ("2026-11-05-…"). */
+fun madeToday(mix: Mix, today: String = java.time.LocalDate.now().toString()): Boolean = mix.id.startsWith(today)
+
+private suspend fun todaysMixes(graph: AppGraph): List<Mix> =
+    graph.mixes.all().filter { madeToday(it) && MixGenerator.Personal.entries.none { p -> it.selectorId == p.id } }.sortedByDescending { it.id }
 
 /** The shortcuts the TV can open: albums, playlists, mixes, artists and radios (books and cards are the phone's). */
 fun shortcutOpens(route: String): Boolean =
@@ -216,6 +230,8 @@ fun TvItemTile(item: TvItem, modifier: Modifier = Modifier) {
             colors = Color(item.radio.colors.first) to Color(item.radio.colors.second))
         is TvItem.OfGenre -> TvTile(item.genre.name, "${item.genre.songCount} songs", null, { play.genreRadio(item.genre.name) }, modifier, colors = tileColors(item.genre.name))
         is TvItem.OfShortcut -> TvTile(item.play.title, shortcutKind(item.play.route), item.play.cover, { nav.navigate(item.play.route) }, modifier)
+        TvItem.MakeToday -> TvTile("Make today's mix", "From what you play at this time of day", null, { play.todaysMix() }, modifier,
+            colors = tileColors("Today's mix"))
         is TvItem.OfPersonal -> TvTile(item.kind.title, "Made for you today", null, { play.personal(item.kind) }, modifier, colors = tileColors(item.kind.title))
     }
 }
