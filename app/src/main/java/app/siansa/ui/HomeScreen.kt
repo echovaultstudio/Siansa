@@ -590,10 +590,7 @@ fun HomeScreen(nav: NavController) {
             }
         }
     }
-    HomeMenuOverlay(menu, menuInfo, onPick = ::pick, onStop = {
-        AppLog.i("Cast", "Stopped from Home's menu")
-        stopCasting()
-    })
+    HomeMenuOverlay(menu, menuInfo, onPick = ::pick)
     }
     }
     panel?.let { sources ->

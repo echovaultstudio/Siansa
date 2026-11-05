@@ -187,20 +187,20 @@ class SpacingHomeTest : SpacingCheck() {
 
     /**
      * Home's menu (issue #872): the bubbles are one size and perfectly in line (their centres on one vertical line),
-     * the same room between each, and each label centred on its bubble. Checked with a long label and while casting
-     * (Stop beside Play on…), where a bubble would be pushed out of line first.
+     * the same room between each, and each label centred on its bubble. Checked narrow, while casting and with the
+     * source filter on.
      */
     @Test fun homeMenuBubblesSitInLine() {
         compose.setContent {
             SiansaTheme {
-                // Narrow, as on a small phone with big text: a long name and Stop mustn't squeeze a bubble.
+                // Narrow, as on a small phone with big text: no bubble may be squeezed.
                 app.siansa.ui.HomeMenuPanel(
                     modifier = Modifier.widthIn(max = 280.dp),
                     info = app.siansa.ui.HomeMenuInfo(
                         app.siansa.ui.PlayOnLine("Playing on Living Room SHIELD with an uncharacteristically long name", "Chromecast", true),
                         "Downloaded only · 2 users", true,
                     ),
-                    highlighted = app.siansa.ui.HomeMenuItem.SOURCES, onPick = {}, onStop = {},
+                    highlighted = app.siansa.ui.HomeMenuItem.SOURCES, onPick = {},
                 )
             }
         }

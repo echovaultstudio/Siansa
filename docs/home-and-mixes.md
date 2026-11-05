@@ -8,11 +8,9 @@ The button with three lines at the top right of Home opens a short column of rou
 each with its name beside it:
 
 - **Play on…** opens the list of TVs and speakers to play on: Chromecast, Google TV, Cast speakers and DLNA ones.
-  While something plays on one, its name says **Playing on** and the TV or speaker in the accent colour (amber unless
-  you picked another in Themes), with a **Stop** button beside it that brings the music back to the phone. The menu
-  button then has a small dot in the same colour.
-- **Sources** opens the source filter. While the filter hides something, its name says what it shows (Downloaded
-  only, 2 of 3 libraries, or how many users' music) and its icon is in the accent colour.
+  While something plays on one, the bubble is in the accent colour (amber unless you picked another in Themes) and
+  the menu button has a small dot in the same colour; to stop, open Play on… and pick **This phone**.
+- **Sources** opens the source filter. Its bubble is in the accent colour while the filter hides something.
 - **Arrange Home** opens Arrange, for the order and looks of Home's sections.
 
 Tap the button and then one of them, or do it in one go: press the button, slide your finger down to one (it lights

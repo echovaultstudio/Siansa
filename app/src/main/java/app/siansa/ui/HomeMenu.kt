@@ -184,13 +184,6 @@ fun rememberHomeMenuInfo(): HomeMenuInfo {
     )
 }
 
-/** Ends casting from Home's menu (its Stop), back to this phone, as "This phone" in Play on does. */
-internal fun stopCasting() {
-    val status = Cast.status.value
-    if (status.device != null || status.connecting) Cast.disconnect()
-    Dlna.select(null)
-}
-
 /**
  * Home's menu button: the three lines, lit while the source filter hides something, with a small dot while
  * something is cast. A tap opens the menu; a press slid down glides through it ([HomeMenuState]). Once a press
@@ -275,7 +268,7 @@ fun HomeMenuButton(state: HomeMenuState, casting: Boolean, filterActive: Boolean
  * each bubble centred on the button's own centre line. Back closes it too.
  */
 @Composable
-fun HomeMenuOverlay(state: HomeMenuState, info: HomeMenuInfo, onPick: (HomeMenuItem) -> Unit, onStop: () -> Unit) {
+fun HomeMenuOverlay(state: HomeMenuState, info: HomeMenuInfo, onPick: (HomeMenuItem) -> Unit) {
     androidx.activity.compose.BackHandler(enabled = state.open) { state.close() }
     var origin by remember { mutableStateOf(Offset.Zero) }
     val density = LocalDensity.current
@@ -314,7 +307,6 @@ fun HomeMenuOverlay(state: HomeMenuState, info: HomeMenuInfo, onPick: (HomeMenuI
                     info,
                     highlighted = state.highlighted,
                     onPick = { item -> state.close(); onPick(item) },
-                    onStop = onStop,
                     onRowPlaced = { item, b -> state.rows[item] = MenuBounds(b.left, b.top - reach, b.right, b.bottom + reach) },
                 )
                 if (state.gliding && state.highlighted != null) {
@@ -341,15 +333,15 @@ private val MENU_LABEL_MAX = 224.dp
 /**
  * The menu itself: a column of round bubbles (Play on…, Sources, Arrange Home), each with its name in a label to
  * its left. Every bubble is the same size and right-aligned, so their centres are on one line; a lit bubble only
- * changes colour. While something is cast, Play on…'s label says where, with Stop beside it; while the source
- * filter hides something, Sources' label says what's shown.
+ * changes colour. Each opens its usual menu (the TVs and speakers, the source filter, Arrange), which has the
+ * controls: the bubbles only say which one is in use, with Play on… amber while something is cast and Sources amber
+ * while the source filter hides something.
  */
 @Composable
 internal fun HomeMenuPanel(
     info: HomeMenuInfo,
     highlighted: HomeMenuItem?,
     onPick: (HomeMenuItem) -> Unit,
-    onStop: () -> Unit,
     modifier: Modifier = Modifier,
     onRowPlaced: (HomeMenuItem, MenuBounds) -> Unit = { _, _ -> },
 ) {
@@ -362,19 +354,18 @@ internal fun HomeMenuPanel(
         HomeMenuBubble(
             HomeMenuItem.PLAY_ON,
             if (playOn.active) Icons.Rounded.CastConnected else Icons.Rounded.Cast,
-            playOn.title, null,
+            "Play on…", "Play on… ${playOn.title.takeIf { playOn.active } ?: ""}".trim(),
             highlighted = highlighted == HomeMenuItem.PLAY_ON,
             lit = playOn.active,
             onPick = onPick, onRowPlaced = onRowPlaced,
-            onStop = onStop.takeIf { playOn.active },
         )
         HomeMenuBubble(
-            HomeMenuItem.SOURCES, Icons.Rounded.LibraryMusic, "Sources", info.sources.takeIf { info.filterActive },
+            HomeMenuItem.SOURCES, Icons.Rounded.LibraryMusic, "Sources", "Sources: ${info.sources}",
             highlighted = highlighted == HomeMenuItem.SOURCES, lit = info.filterActive,
             onPick = onPick, onRowPlaced = onRowPlaced,
         )
         HomeMenuBubble(
-            HomeMenuItem.ARRANGE, Icons.Rounded.Reorder, "Arrange Home", null,
+            HomeMenuItem.ARRANGE, Icons.Rounded.Reorder, "Arrange Home", "Arrange Home",
             highlighted = highlighted == HomeMenuItem.ARRANGE,
             onPick = onPick, onRowPlaced = onRowPlaced,
         )
@@ -386,44 +377,29 @@ private fun HomeMenuBubble(
     item: HomeMenuItem,
     icon: ImageVector,
     title: String,
-    /** What follows the name on its line (what the source filter shows), or none. */
-    detail: String?,
+    /** What TalkBack reads: the name, and what's in use (where it's cast, what the source filter shows). */
+    spoken: String,
     highlighted: Boolean,
     lit: Boolean = false,
     onPick: (HomeMenuItem) -> Unit,
     onRowPlaced: (HomeMenuItem, MenuBounds) -> Unit,
-    /** A Stop label beside the name (Play on… while casting). */
-    onStop: (() -> Unit)? = null,
 ) {
     val tag = item.name.lowercase()
     Row(
         Modifier
             .onGloballyPositioned { c -> c.boundsInRoot().let { onRowPlaced(item, MenuBounds(it.left, it.top, it.right, it.bottom)) } }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Button) { onPick(item) }
+            .semantics(mergeDescendants = true) { contentDescription = spoken }
             .height(MENU_BUBBLE) // every row the bubble's height, so the bubbles stay evenly spaced at any font size
             .testTag("homeMenu-$tag"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.Small),
     ) {
-        if (onStop != null) {
-            Surface(
-                onClick = onStop,
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                shadowElevation = 4.dp,
-                modifier = Modifier.semantics { contentDescription = "Stop playing on the TV or speaker" }.testTag("homeMenuStop"),
-            ) {
-                Text(
-                    "Stop", color = Accent, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = Space.Medium, vertical = Space.Small),
-                )
-            }
-        }
         Surface(
             shape = RoundedCornerShape(50),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shadowElevation = 4.dp,
-            // Weighted, so the Row measures the bubble (and Stop) first: a long name shortens with "…", the bubble
+            // Weighted, so the Row measures the bubble first: a long name shortens with "…", the bubble
             // never shrinks or leaves the line.
             modifier = Modifier.weight(1f, fill = false).widthIn(max = MENU_LABEL_MAX).wrapContentHeight(unbounded = true).testTag("homeMenuLabel-$tag"),
         ) {
@@ -437,16 +413,6 @@ private fun HomeMenuBubble(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                if (detail != null) {
-                    Text(
-                        " · $detail",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                }
             }
         }
         Surface(

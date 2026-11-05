@@ -315,20 +315,20 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // Home's menu (issue #872), its bubbles in line: Sources lit under the finger of a glide; and while casting, Play on… in the
-            // accent colour with Stop, a long device name and a long Sources line cut off with "…".
+            // Home's menu (issue #872), its bubbles in line: Sources lit under the finger of a glide; and while casting
+            // with the source filter on, Play on… and Sources in the accent colour, each with only its name.
             Scene("home_menu") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
                     app.siansa.ui.HomeMenuPanel(
                         app.siansa.ui.HomeMenuInfo(app.siansa.ui.PlayOnLine("Play on…", "TV or speaker", false), "All libraries", false),
-                        highlighted = app.siansa.ui.HomeMenuItem.SOURCES, onPick = {}, onStop = {},
+                        highlighted = app.siansa.ui.HomeMenuItem.SOURCES, onPick = {},
                     )
                     app.siansa.ui.HomeMenuPanel(
                         app.siansa.ui.HomeMenuInfo(
                             app.siansa.ui.PlayOnLine("Playing on Living Room SHIELD with an uncharacteristically long name", "Chromecast", true),
                             "Downloaded only · 2 users · 2 of 3 libraries", true,
                         ),
-                        highlighted = null, onPick = {}, onStop = {},
+                        highlighted = null, onPick = {},
                     )
                 }
             },
