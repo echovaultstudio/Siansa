@@ -302,15 +302,17 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     ChromecastSettingsContent()
                 }
             },
-            // Home's top line (issue #872): the dice and the menu button, with the dot while something is cast.
+            // The top of Home (issue #872): the notices with the round menu button in line at their end, while casting;
+            // then with no notices and the source filter on (a ring round the button, its lines in the accent colour).
             Scene("home_header_menu") {
-                Column {
-                    app.siansa.ui.HomeHeader("Good afternoon") {
-                        app.siansa.ui.RollingDie(0, false, MaterialTheme.colorScheme.onSurface, Modifier.padding(Space.Medium))
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.HomeTopBar(
+                        listOf(app.siansa.mix.Notices.yourMonth(java.time.LocalDate.of(2026, 11, 2))!!, app.siansa.mix.Notices.newAlbums(6, "a")!!, app.siansa.mix.Notices.carryOn("b", "Dune")),
+                        onOpen = {},
+                    ) {
                         app.siansa.ui.HomeMenuButton(app.siansa.ui.rememberHomeMenuState(), casting = true, filterActive = false, onPick = {})
                     }
-                    app.siansa.ui.HomeHeader("Good evening") {
-                        app.siansa.ui.RollingDie(0, false, MaterialTheme.colorScheme.onSurface, Modifier.padding(Space.Medium))
+                    app.siansa.ui.HomeTopBar(emptyList(), onOpen = {}) {
                         app.siansa.ui.HomeMenuButton(app.siansa.ui.rememberHomeMenuState(), casting = false, filterActive = true, onPick = {})
                     }
                 }
@@ -321,7 +323,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
                     app.siansa.ui.HomeMenuPanel(
                         app.siansa.ui.HomeMenuInfo(app.siansa.ui.PlayOnLine("Play on…", "TV or speaker", false), "All libraries", false),
-                        highlighted = app.siansa.ui.HomeMenuItem.SOURCES, onPick = {},
+                        highlighted = app.siansa.data.HomeMenuItem.SOURCES, onPick = {},
                     )
                     app.siansa.ui.HomeMenuPanel(
                         app.siansa.ui.HomeMenuInfo(
@@ -390,14 +392,16 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             },
             // The notices row at the top of Home (issue #784), with a long book title cut off.
             Scene("home_notices") {
-                app.siansa.ui.NoticeChips(
+                app.siansa.ui.HomeTopBar(
                     listOf(
                         app.siansa.mix.Notice(app.siansa.mix.NoticeKind.NEEDS_YOU, "n", "Library sync failed", "x"),
                         app.siansa.mix.Notices.carryOn("b", "The Extraordinarily Long Chronicles of Wandering Mapmakers"),
                         app.siansa.mix.Notices.newAlbums(3, "a")!!,
                     ),
                     onOpen = {},
-                )
+                ) {
+                    app.siansa.ui.HomeMenuButton(app.siansa.ui.rememberHomeMenuState(), casting = false, filterActive = false, onPick = {})
+                }
             },
             // The Settings start page in groups (issue #780), and Settings › Home's rows with what's set.
             Scene("settings_groups") {

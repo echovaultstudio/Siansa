@@ -2,13 +2,11 @@ package app.siansa
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,7 +27,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.siansa.ui.HomeMenuButton
 import app.siansa.ui.HomeMenuInfo
-import app.siansa.ui.HomeMenuItem
+import app.siansa.data.HomeMenuItem
 import app.siansa.ui.HomeMenuOverlay
 import app.siansa.ui.HomeSettingsSheet
 import app.siansa.ui.LocalGraph
@@ -72,19 +70,18 @@ class HomeMenuTest {
                         when (item) {
                             HomeMenuItem.SOURCES -> panel = true
                             HomeMenuItem.ARRANGE -> panel = false
-                            HomeMenuItem.PLAY_ON -> Unit
+                            HomeMenuItem.PLAY_ON, HomeMenuItem.DICE -> Unit
                         }
                     }
                     Box(Modifier.fillMaxSize()) {
-                        // Home's page: long enough to scroll, the menu button in its top line.
+                        // Home's page: long enough to scroll, the notices and the menu button at its top (issue #872).
                         Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
-                            Row(Modifier.fillMaxWidth()) {
-                                Text("Good morning", Modifier.weight(1f))
+                            app.siansa.ui.HomeTopBar(listOf(app.siansa.mix.Notices.newAlbums(2, "a")!!), onOpen = {}) {
                                 HomeMenuButton(menu, casting = casting, filterActive = false, onPick = ::pick)
                             }
                             Box(Modifier.fillMaxWidth().height(3000.dp))
                         }
-                        HomeMenuOverlay(menu, info, onPick = ::pick)
+                        HomeMenuOverlay(menu, info, HomeMenuItem.default, onPick = ::pick)
                     }
                     panel?.let { sources -> HomeSettingsSheet(nav, startOnSources = sources) { panel = null } }
                 }
@@ -139,13 +136,14 @@ class HomeMenuTest {
         home()
         compose.onNodeWithTag("homeMenu").performClick()
         compose.waitForIdle()
-        // A tap leaves it open, with its three rows.
+        // A tap leaves it open, with its four rows.
+        compose.onNodeWithText("Roll the dice").assertIsDisplayed()
         compose.onNodeWithText("Play on…").assertIsDisplayed()
         compose.onNodeWithText("Sources").assertIsDisplayed()
         compose.onNodeWithText("Arrange Home").assertIsDisplayed()
         // The bubbles hang straight down from the button: each one's centre on the button's centre line.
         val button = compose.onNodeWithTag("homeMenu").getBoundsInRoot()
-        for (tag in listOf("play_on", "sources", "arrange")) {
+        for (tag in listOf("dice", "play_on", "sources", "arrange")) {
             val bubble = compose.onNodeWithTag("homeMenuBubble-$tag", useUnmergedTree = true).getBoundsInRoot()
             val off = ((bubble.left + bubble.right) / 2 - (button.left + button.right) / 2).value
             assertTrue("Bubble $tag is ${off} dp off the button's centre line", kotlin.math.abs(off) <= 0.5f)

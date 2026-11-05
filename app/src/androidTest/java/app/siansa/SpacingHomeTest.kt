@@ -45,29 +45,43 @@ import org.junit.runner.RunWith
 /** Even spacing, measured on a real screen: Home, its cards and rows, the source filter, mixes, vibes and discovery. Shared setup in [SpacingCheck]. */
 @RunWith(AndroidJUnit4::class)
 class SpacingHomeTest : SpacingCheck() {
-    /** Notices (issue #784): the chips sit one section gap below what's above, the same gap as below them, and a small gap apart. */
-    @Test fun noticeChipsSitEvenly() {
+    /**
+     * The top of Home (issues #784, #872): the notice chips a small gap apart from the page margin, and Home's menu
+     * button a circle exactly a chip's height, its top and bottom in line with the chips', a page margin from the
+     * right edge. At the normal text size and a larger one, where a fixed-size circle would fall out of line.
+     */
+    @Test fun noticeChipsAndTheMenuButtonSitInLine() {
+        // One content (a test may set it only once), its text size changed between the checks.
+        var scale by androidx.compose.runtime.mutableFloatStateOf(1f)
         compose.setContent {
-            SiansaTheme {
-                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalSectionGap provides Space.Page) {
-                    Column {
-                        Box(Modifier.fillMaxWidth().height(24.dp).testTag("above"))
-                        app.siansa.ui.NoticeChips(
-                            listOf(app.siansa.mix.Notices.carryOn("b", "Dune"), app.siansa.mix.Notices.newAlbums(2, "a")!!),
-                            onOpen = {},
-                        )
-                        Box(Modifier.fillMaxWidth().padding(top = Space.Page).height(24.dp).testTag("below"))
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(androidx.compose.ui.platform.LocalDensity.current.density, fontScale = scale),
+            ) {
+                SiansaTheme {
+                    app.siansa.ui.HomeTopBar(
+                        listOf(app.siansa.mix.Notices.carryOn("b", "Dune"), app.siansa.mix.Notices.newAlbums(2, "a")!!),
+                        onOpen = {},
+                    ) {
+                        app.siansa.ui.HomeMenuButton(app.siansa.ui.rememberHomeMenuState(), casting = true, filterActive = false, onPick = {})
                     }
                 }
             }
         }
-        val above = compose.onNodeWithTag("above").getBoundsInRoot()
-        val below = compose.onNodeWithTag("below").getBoundsInRoot()
-        val first = compose.onNodeWithTag("notice-carry_on").getBoundsInRoot()
-        val second = compose.onNodeWithTag("notice-new_albums").getBoundsInRoot()
-        val row = compose.onNodeWithTag("noticesRow").getBoundsInRoot()
-        assertEven("Notices: above and below", row.top - above.bottom, below.top - row.bottom)
-        assertEven("Notices: between chips", second.left - first.right, Space.Small, tolerance = 1.dp)
+        for (fontScale in listOf(1f, 1.3f)) {
+            scale = fontScale
+            compose.waitForIdle()
+            val screen = compose.onRoot().getBoundsInRoot()
+            val first = compose.onNodeWithTag("notice-carry_on").getBoundsInRoot()
+            val second = compose.onNodeWithTag("notice-new_albums").getBoundsInRoot()
+            val button = compose.onNodeWithTag("homeMenu").getBoundsInRoot()
+            assertEven("Notices: from the left edge ($fontScale)", first.left - screen.left, Space.Page, 1.dp)
+            assertEven("Notices: between chips ($fontScale)", second.left - first.right, Space.Small, 1.dp)
+            assertEven("Menu button: a chip's height ($fontScale)", button.bottom - button.top, first.bottom - first.top, 0.5.dp)
+            assertEven("Menu button: round ($fontScale)", button.right - button.left, button.bottom - button.top, 0.5.dp)
+            assertEven("Menu button: top in line with the chips ($fontScale)", button.top, first.top, 0.5.dp)
+            assertEven("Menu button: bottom in line with the chips ($fontScale)", button.bottom, first.bottom, 0.5.dp)
+            assertEven("Menu button: a page margin from the right edge ($fontScale)", screen.right - button.right, Space.Page, 1.dp)
+        }
     }
 
     /** Home's notice chips are Your Library's pills (issue #794): the same height, so Home and the library match. */
@@ -76,7 +90,7 @@ class SpacingHomeTest : SpacingCheck() {
             SiansaTheme {
                 Column {
                     app.siansa.ui.LibraryPill("Books", active = false) {}
-                    app.siansa.ui.NoticeChips(listOf(app.siansa.mix.Notices.newAlbums(2, "a")!!), onOpen = {})
+                    app.siansa.ui.HomeTopBar(listOf(app.siansa.mix.Notices.newAlbums(2, "a")!!), onOpen = {}) {}
                 }
             }
         }
@@ -125,19 +139,6 @@ class SpacingHomeTest : SpacingCheck() {
         assertTrue("\"Melancholy\" doesn't fit on one line: $sizes", fits)
     }
 
-    /** Home: the one settings button sits centred on the greeting's line (issue #152). */
-    @Test fun homeButtonSitsOnTheGreetingLine() {
-        compose.setContent {
-            SiansaTheme {
-                app.siansa.ui.HomeHeader("Good evening") { Box(Modifier.height(48.dp).fillMaxWidth(0.12f).testTag("button")) }
-            }
-        }
-        val title = compose.onNodeWithText("Good evening").getBoundsInRoot()
-        val button = compose.onNodeWithTag("button").getBoundsInRoot()
-        // Centred on one line: as far past the greeting's top as past its bottom.
-        assertEven("Home button against the greeting", title.top - button.top, button.bottom - title.bottom, tolerance = 2.dp)
-    }
-
     /** Home carousel (issue #253): the dots under the cards sit the same distance apart. */
     @Test fun carouselDotsAreEvenlySpaced() {
         compose.setContent { SiansaTheme { app.siansa.ui.CarouselDots(count = 4, current = 1) } }
@@ -167,24 +168,6 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Gap under the tile", captionGap, Space.Small, 1.dp)
     }
 
-    /** Home (issue #347): the dice and the menu button sit side by side, both centred on the greeting's line. */
-    @Test fun diceSitsBesideTheFilterOnTheGreetingLine() {
-        compose.setContent {
-            SiansaTheme {
-                app.siansa.ui.HomeHeader("Good evening") {
-                    Box(Modifier.size(48.dp).testTag("dice"))
-                    Box(Modifier.size(48.dp).testTag("filter"))
-                }
-            }
-        }
-        val title = compose.onNodeWithText("Good evening").getBoundsInRoot()
-        val dice = compose.onNodeWithTag("dice").getBoundsInRoot()
-        val filter = compose.onNodeWithTag("filter").getBoundsInRoot()
-        assertEven("Dice against the greeting", title.top - dice.top, dice.bottom - title.bottom, tolerance = 2.dp)
-        assertEven("Dice and filter on one line", dice.top, filter.top, 1.dp)
-        assertTrue("The dice is left of the filter", dice.right <= filter.left)
-    }
-
     /**
      * Home's menu (issue #872): the bubbles are one size and perfectly in line (their centres on one vertical line),
      * the same room between each, and each label centred on its bubble. Checked narrow, while casting and with the
@@ -200,22 +183,23 @@ class SpacingHomeTest : SpacingCheck() {
                         app.siansa.ui.PlayOnLine("Playing on Living Room SHIELD with an uncharacteristically long name", "Chromecast", true),
                         "Downloaded only · 2 users", true,
                     ),
-                    highlighted = app.siansa.ui.HomeMenuItem.SOURCES, onPick = {},
+                    highlighted = app.siansa.data.HomeMenuItem.SOURCES, onPick = {},
                 )
             }
         }
-        val bubbles = listOf("play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenuBubble-$it", useUnmergedTree = true).getBoundsInRoot() }
-        val labels = listOf("play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenuLabel-$it", useUnmergedTree = true).getBoundsInRoot() }
+        val bubbles = listOf("dice", "play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenuBubble-$it", useUnmergedTree = true).getBoundsInRoot() }
+        val labels = listOf("dice", "play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenuLabel-$it", useUnmergedTree = true).getBoundsInRoot() }
         val centre = (bubbles[0].left + bubbles[0].right) / 2
         bubbles.forEachIndexed { i, b ->
             assertEven("Menu: bubble $i on the same centre line", (b.left + b.right) / 2, centre, 0.5.dp)
-            assertEven("Menu: bubble $i is round and the button's size", b.right - b.left, app.siansa.ui.MENU_BUBBLE, 0.5.dp)
-            assertEven("Menu: bubble $i height", b.bottom - b.top, app.siansa.ui.MENU_BUBBLE, 0.5.dp)
+            assertEven("Menu: bubble $i is round and the button's size", b.right - b.left, app.siansa.ui.MENU_CIRCLE, 0.5.dp)
+            assertEven("Menu: bubble $i height", b.bottom - b.top, app.siansa.ui.MENU_CIRCLE, 0.5.dp)
             assertEven("Menu: label $i centred on its bubble", (labels[i].top + labels[i].bottom) / 2, (b.top + b.bottom) / 2, 1.dp)
             assertEven("Menu: label $i a step from its bubble", b.left - labels[i].right, Space.Small, 1.dp)
         }
-        assertEven("Menu: room between the bubbles", bubbles[1].top - bubbles[0].bottom, bubbles[2].top - bubbles[1].bottom, 0.5.dp)
-        assertEven("Menu: room between bubbles is a step of the scale", bubbles[1].top - bubbles[0].bottom, Space.Medium, 0.5.dp)
+        for (i in 1 until bubbles.size - 1) {
+            assertEven("Menu: room between the bubbles ($i)", bubbles[i].top - bubbles[i - 1].bottom, bubbles[i + 1].top - bubbles[i].bottom, 0.5.dp)
+        }
     }
 
     /** Custom cards (issue #622): the banner sits a page margin from both edges of the screen. */

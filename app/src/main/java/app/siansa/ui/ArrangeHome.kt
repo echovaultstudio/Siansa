@@ -70,12 +70,14 @@ import app.siansa.data.movesFirstVisible
 fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Boolean, onDismiss: () -> Unit) {
     val graph = LocalGraph.current
     val s by graph.settings.state.collectAsStateWithLifecycle()
-    ArrangeHomeSheet(s.homeOrder, s.homeHidden, gap = s.homeGap, onGapChange = {
+    // The notices are the top of Home (issue #872), not a section to move: shown or not in Settings › Home › Notices.
+    ArrangeHomeSheet(s.homeOrder - HomeSection.NOTICES, s.homeHidden, gap = s.homeGap, onGapChange = {
         AppLog.i("Home", "Spacing: ${homeGapLabel(it)}")
         graph.settings.setHomeGap(it)
     }, onChange = {
-        AppLog.i("Home", "Arranged: ${HomeSection.format(it)}")
-        graph.settings.setHomeOrder(it)
+        val order = listOf(HomeSection.NOTICES) + (it - HomeSection.NOTICES)
+        AppLog.i("Home", "Arranged: ${HomeSection.format(order)}")
+        graph.settings.setHomeOrder(order)
     }, onHiddenChange = {
         AppLog.i("Home", "Hidden: ${HomeSection.formatHidden(it).ifEmpty { "none" }}")
         graph.settings.setHomeHidden(it)
@@ -120,6 +122,8 @@ fun ArrangeHomeSheet(
     onLookChange: (HomeSection, HomeLook) -> Unit = { _, _ -> },
     onResetLooks: () -> Unit = {},
     onOpenSettings: (HomeSection) -> Unit = {},
+    // The sections listed here, in Reset's order: all but the notices, which are the top of Home (issue #872).
+    sections: List<HomeSection> = HomeSection.default - HomeSection.NOTICES,
 ) {
     var picking by remember { mutableStateOf<HomeSection?>(null) }
     picking?.let { section ->
@@ -197,19 +201,20 @@ fun ArrangeHomeSheet(
                 }
                 if (!sources) TextButton(
                     onClick = {
-                        if (items != HomeSection.default) {
+                        if (items != sections) {
                             list.requestScrollToItem(0)  // the reset order shows from its top (#614)
-                            items = HomeSection.default
+                            items = sections
                             onChange(items)
                         }
-                        if (hiddenItems.isNotEmpty()) {
-                            hiddenItems = emptySet()
+                        // Only what's listed here shows again: notices hidden in Settings stay hidden.
+                        if (hiddenItems.any { it in sections }) {
+                            hiddenItems = hiddenItems - sections.toSet()
                             onHiddenChange(hiddenItems)
                         }
                         if (gap != AppSettings.HOME_GAP_DEFAULT) onGapChange(AppSettings.HOME_GAP_DEFAULT)
                         if (looks.isNotEmpty()) onResetLooks()
                     },
-                    enabled = items != HomeSection.default || hiddenItems.isNotEmpty() || gap != AppSettings.HOME_GAP_DEFAULT || looks.isNotEmpty(),
+                    enabled = items != sections || hiddenItems.any { it in sections } || gap != AppSettings.HOME_GAP_DEFAULT || looks.isNotEmpty(),
                 ) { Text("Reset") }
             }
             SheetTabs(sources) { sources = it }

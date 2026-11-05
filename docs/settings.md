@@ -78,7 +78,8 @@ in Servers and services. See [Audiobooks and podcasts](books.md).
 ## Home
 
 The source filter (whose music shows, and **Only downloaded music**) and **Arrange Home** (the order of Home's
-sections, which are hidden, their looks and the spacing) are behind the button at the top of Home, not here.
+sections, which are hidden, their looks and the spacing) are in the menu behind the round button at the top of Home,
+not here.
 
 - **Notices**: the row of chips at the top of Home: show it or not, and each kind **Pinned** (always first, in the
   order you pin them), **Automatic** (the default: ordered by what needs you and what you tap) or **Off**. See
@@ -102,7 +103,9 @@ sections, which are hidden, their looks and the spacing) are behind the button a
   theme** for the colour scheme's own tinted backgrounds. Album, artist and now playing pages keep their colours from
   the cover.
 - **Now playing**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in.
-- **Mini player** and **bottom bar**: hold a row and drag it to reorder; tap the eye to show or hide it. The mini player
+- **Mini player** and **bottom bar**: hold a row and drag it to reorder; tap the eye to show or hide it.
+- **Home Menu**: the order of the options under the round button at the top of Home (Roll the dice, Play on…,
+  Sources, Arrange Home): hold a row and drag it. The mini player
   starts with **Play or pause**, **Next song** and **Add to playlist**.
 - **Phone's top bar** (the clock and battery): **See-through** (the app shows behind it), **Black**, or **Hidden** for
   full screen. When it's hidden, swipe down from the top of the screen to see it for a moment; on phones with a camera hole at the top, pages stay just below it.
