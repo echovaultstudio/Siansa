@@ -131,6 +131,12 @@ fun TvSettingsHub() {
             TvSettingRow("About", null, onClick = { nav.navigate("settings/about") }, icon = Icons.Rounded.Info)
         }
         Group("This TV") {
+            var opens by remember { mutableStateOf(TvPrefs.opensPlayer(context)) }
+            TvSwitchRow("Open Now playing when a song starts", "Picking a song, an album or a radio goes straight to the player.", on = opens, onChange = { on ->
+                opens = on
+                TvPrefs.setOpensPlayer(context, on)
+                AppLog.i("Tv", "Open Now playing when a song starts: $on")
+            })
             if (!confirmSignOut) {
                 TvSettingRow("Sign out", "Sign this TV out of your server. Your phone stays signed in.", onClick = { confirmSignOut = true },
                     icon = Icons.AutoMirrored.Rounded.Logout)

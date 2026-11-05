@@ -107,6 +107,16 @@ fun TvRoot(searches: MutableStateFlow<String?>) {
             if (TABS.any { it.first == route }) tab = route
         }
     }
+    // Starting something to play (a song, an album, a radio, here or on a phone page) opens Now playing, unless that's
+    // switched off under Settings: on a TV the player is what's watched.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(nav) {
+        graph.player.newQueues.collect {
+            if (TvPrefs.opensPlayer(context) && nav.currentDestination?.route != TvRoutes.NOW_PLAYING) {
+                nav.navigate(TvRoutes.NOW_PLAYING) { launchSingleTop = true }
+            }
+        }
+    }
     // A search from Google TV opens the Search page with it.
     LaunchedEffect(search) { if (search != null) nav.switchTab(TvRoutes.SEARCH) }
 
@@ -164,6 +174,19 @@ fun TvRoot(searches: MutableStateFlow<String?>) {
             app.siansa.ui.RadioChooserHost()
         }
     }
+}
+
+/** The TV app's own settings, kept on the TV (not in the phone's settings the two share). */
+object TvPrefs {
+    private const val FILE = "tv"
+    private const val OPENS_PLAYER = "opens_player"
+
+    private fun prefs(context: android.content.Context) = context.getSharedPreferences(FILE, android.content.Context.MODE_PRIVATE)
+
+    /** Whether starting something to play opens Now playing. On until switched off. */
+    fun opensPlayer(context: android.content.Context): Boolean = prefs(context).getBoolean(OPENS_PLAYER, true)
+
+    fun setOpensPlayer(context: android.content.Context, on: Boolean) = prefs(context).edit().putBoolean(OPENS_PLAYER, on).apply()
 }
 
 /** Opens a tab from wherever the remote is: one page of each tab is kept, and Back from it goes Home. */

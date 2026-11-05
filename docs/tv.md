@@ -75,6 +75,8 @@ The TV has the settings that matter on a TV, each the same page as on the phone:
   **Streaming quality**.
 - **Colours**: the TV is always dark.
 - **Help**: debug logs, **Report a problem**, the log, What's new and About.
+- **Open Now playing when a song starts**: on from the start; picking a song, an album or a radio goes straight to the
+  player.
 - **Sign out** of the server on the TV; your phone stays signed in.
 
 Downloads, mobile data, Android Auto, the mini player, arranging Home, cards and backups are on the phone only.
