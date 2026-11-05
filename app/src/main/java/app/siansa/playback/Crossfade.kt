@@ -183,6 +183,11 @@ object Crossfade {
      * comes in one beat after the last (so the last beat is heard whole), and the outro plays out under it to the
      * end of its sound, fade and all; only the silence after it is left out. At most [AFTER_BEAT_MAX_MS] (then it
      * comes in that long before the end) and a third of the shorter song.
+     *
+     * Only an outro that really winds down (quiet, under [QUIET_DB], for [QUIET_END_MS] or more before its sound ends)
+     * gets that long blend. A beatless outro that stays loud (0.52.0-dev, 20:06: a loud track's 33.6 s outro played
+     * 30 s under the next song's start, two songs at full volume) gets a short one at its very end, [BEATLESS_LOUD_MS],
+     * as the DJ blends do ([beatlessRunsLong]). An outro whose loudness wasn't measured counts as loud.
      */
     fun afterLastBeat(profile: TrackProfile?, durationMs: Long, nextDurationMs: Long): FadePlan? {
         val lastBeat = profile?.beatsUntilMs ?: return null
@@ -194,11 +199,15 @@ object Crossfade {
         val tail = soundEnds - comesIn
         if (tail < AFTER_BEAT_MIN_MS) return null
         val shortest = listOf(soundEnds, nextDurationMs).filter { it > 0 }.minOrNull() ?: return null
-        val overlap = minOf(tail, AFTER_BEAT_MAX_MS, shortest / 3)
-        if (overlap < AFTER_BEAT_MIN_MS) return null
         val cut = durationMs - soundEnds
+        // How long the outro is quiet before its sound ends (the silence after it isn't counted).
+        val quiet = ((profile.quietForLastMs(QUIET_DB) ?: 0L) - cut).coerceAtLeast(0L)
+        val windsDown = quiet >= QUIET_END_MS
+        val overlap = minOf(tail, if (windsDown) AFTER_BEAT_MAX_MS else BEATLESS_LOUD_MS, shortest / 3)
+        if (overlap < AFTER_BEAT_MIN_MS) return null
         val why = "smart: after the last beat (${clockOf(lastBeat)}), over ${seconds(tail)} of beatless outro" +
-            (if (overlap < tail) ", its last ${seconds(overlap)}" else "") +
+            (if (!windsDown) " that stays loud (${seconds(quiet)} quiet at its end), so only its last ${seconds(overlap)}"
+            else if (overlap < tail) ", its last ${seconds(overlap)}" else "") +
             (if (cut > 0) " · left out the last ${seconds(cut)} of silence" else "")
         return FadePlan(overlap, AFTER_BEAT_FADE_IN_MS.coerceAtMost(overlap), why, cut, beatNote = "the beat stops at ${clockOf(lastBeat)}, so no beat-matching is needed")
     }
