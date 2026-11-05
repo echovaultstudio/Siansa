@@ -13,7 +13,8 @@ enum class MiniButton(val id: String, val label: String) {
     LIKE("like", "Like");
 
     companion object {
-        val default: List<MiniButton> = listOf(PLAY, CAST, NEXT)
+        /** A fresh install's (the owner, 0.52.0-dev): play or pause, next song, add to playlist. Cast is on Home. */
+        val default: List<MiniButton> = listOf(PLAY, NEXT, ADD)
 
         /** At most this many, so the song's title keeps room beside them. */
         const val MAX = 4

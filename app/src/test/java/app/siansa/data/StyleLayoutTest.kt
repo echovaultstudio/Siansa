@@ -7,7 +7,7 @@ import org.junit.Test
 /** Settings › Style: the mini player's buttons and the bottom bar's tabs (issue #346). */
 class StyleLayoutTest {
     @Test fun miniPlayerStartsWithPlayCastNext() {
-        assertEquals(listOf(MiniButton.PLAY, MiniButton.CAST, MiniButton.NEXT), MiniButton.parse(null))
+        assertEquals(listOf(MiniButton.PLAY, MiniButton.NEXT, MiniButton.ADD), MiniButton.parse(null))
     }
 
     @Test fun miniPlayerOrderRoundTripsAndDropsUnknowns() {
@@ -23,8 +23,8 @@ class StyleLayoutTest {
         val three = MiniButton.default
         val four = MiniButton.toggle(three, MiniButton.LIKE)
         assertEquals(three + MiniButton.LIKE, four)
-        assertEquals(four, MiniButton.toggle(four, MiniButton.ADD))
-        assertEquals(listOf(MiniButton.PLAY, MiniButton.NEXT, MiniButton.LIKE), MiniButton.toggle(four, MiniButton.CAST))
+        assertEquals(four, MiniButton.toggle(four, MiniButton.CAST))
+        assertEquals(listOf(MiniButton.PLAY, MiniButton.ADD, MiniButton.LIKE), MiniButton.toggle(four, MiniButton.NEXT))
     }
 
     @Test fun navBarDefaultsWithDscvrBeforeSettings() {

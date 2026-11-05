@@ -102,7 +102,8 @@ sections, which are hidden, their looks and the spacing) are behind the button a
   theme** for the colour scheme's own tinted backgrounds. Album, artist and now playing pages keep their colours from
   the cover.
 - **Now playing**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in.
-- **Mini player** and **bottom bar**: hold a row and drag it to reorder; tap the eye to show or hide it.
+- **Mini player** and **bottom bar**: hold a row and drag it to reorder; tap the eye to show or hide it. The mini player
+  starts with **Play or pause**, **Next song** and **Add to playlist**.
 - **Phone's top bar** (the clock and battery): **See-through** (the app shows behind it), **Black**, or **Hidden** for
   full screen. When it's hidden, swipe down from the top of the screen to see it for a moment; on phones with a camera hole at the top, pages stay just below it.
 - **Animated covers**: when an album folder has an animated cover (cover.gif or cover.webp), it moves on the album
