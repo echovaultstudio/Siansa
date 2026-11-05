@@ -204,7 +204,7 @@ private suspend fun tryLogin(graph: AppGraph, login: Pairing.Login): String? {
         signInProblem = "Couldn't sign in: ${reached.exceptionOrNull()?.message ?: "the server didn't answer"}."
         return signInProblem
     }
-    AppLog.i("Tv", "Signed in: ${reached.getOrNull()}")
+    AppLog.i("Tv", "Signed in: ${reached.getOrNull()}" + (login.services?.names?.takeIf { it.isNotEmpty() }?.let { ", with ${it.joinToString()} from the phone" } ?: ""))
     graph.sync.start()
     return null
 }

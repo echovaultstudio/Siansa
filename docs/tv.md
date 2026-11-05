@@ -11,12 +11,14 @@ your phone: install it on the TV, and both keep their own settings, library and 
 The first time you open it, the TV shows a QR code.
 
 1. Scan the code with your phone's camera.
-2. Tap **Open in Siansa**, then **Sign in** in Siansa on your phone.
+2. Tap **Open in Siansa**. Leave **Also set up … on the TV** ticked to bring your phone's other services too
+   (AudioMuse, the AI service, Audiobookshelf, Last.fm and ListenBrainz, whichever are set up), then tap **Sign in**.
 3. The TV signs in to the same server as your phone and syncs its library.
 
-The phone and the TV must be on the same home network. Your phone sends the TV only the server address and the login
-it uses, sealed with a key that's only in the QR code, so nothing else on the network can read it. A code that
-points anywhere other than your home network is ignored.
+The phone and the TV must be on the same home network. Your phone sends the TV the server address and the login it
+uses, and the services you ticked, sealed with a key that's only in the QR code, so nothing else on the network can
+read them. A code that points anywhere other than your home network is ignored. Services the TV already has and the
+phone doesn't send stay as they are.
 
 No Siansa on your phone, or the TV isn't on Wi-Fi or Ethernet? Pick **Type it in instead** and enter the server
 address, username and password with the remote.
