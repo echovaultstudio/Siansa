@@ -221,7 +221,7 @@ internal class Crossfader(
                 beatMatch = beatMatch,
                 blendBars = s.blendBars,
             )
-            if (planned == null || planned.gapMs > 0) {
+            if (planned == null || planned.coldEnd) {
                 // A cold end's pause needs the new audio engine (issue #826): here the two songs play back to back.
                 val why = if (planned != null) "${planned.why}; played back to back (the pause needs the new audio engine)"
                 else Crossfade.whyNoFade(s.crossfade, maxMs, current, next, profiles.cached(current.id), profiles.cached(next.id), beatMatch)
