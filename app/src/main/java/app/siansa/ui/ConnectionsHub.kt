@@ -391,19 +391,23 @@ internal fun FoldCard(
     }
 }
 
-/** Runs a Test with what's typed, before it's saved, and shows "✓ …" or "✗ …". */
-private fun test(graph: AppGraph, draft: AppSettings, scope: kotlinx.coroutines.CoroutineScope, set: (String) -> Unit, block: suspend (AppSettings) -> String) {
+/**
+ * Runs a Test with what's typed, before it's saved, and shows "✓ …" or "✗ …". Each Test and its result is logged
+ * (which card, not what's typed), so a report shows which one didn't work and why (the TV app, 0.52.0-dev).
+ */
+private fun test(graph: AppGraph, draft: AppSettings, scope: kotlinx.coroutines.CoroutineScope, set: (String) -> Unit, what: String = "connection", block: suspend (AppSettings) -> String) {
     set("Testing…")
+    AppLog.i("Settings", "Testing $what")
     scope.launch {
-        set(
-            try {
-                "✓ " + block(graph.settings.clean(draft))
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                "✗ " + (e.message ?: e.javaClass.simpleName)
-            },
-        )
+        val result = try {
+            "✓ " + block(graph.settings.clean(draft))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            "✗ " + (e.message ?: e.javaClass.simpleName)
+        }
+        AppLog.i("Settings", "Test of $what: ${AppLog.redact(result)}")
+        set(result)
     }
 }
 
@@ -439,7 +443,7 @@ private fun ServerFields(
         TextButton(onClick = { showProxy = true }) { Text("Server behind a login page? Add a proxy login") }
     }
     TestRow(result) {
-        test(graph, draft, scope, { result = it }) { s -> testServer(graph, s, kind) }
+        test(graph, draft, scope, { result = it }, "the music server") { s -> testServer(graph, s, kind) }
     }
     Field("Name shown in Siansa", serverName, "Like Home or Kids", keyboard = KeyboardType.Text) { onServerName(it.replace("\n", " ").take(UserFiles.SERVER_NAME_MAX)) }
     Hint("Shown instead of the address, so two logins can be told apart. Leave empty to show the address.")
@@ -541,7 +545,7 @@ private fun AudiobookshelfFields(graph: AppGraph, draft: AppSettings, onChange: 
     Field("Username", draft.audiobookshelfUser, keyboard = KeyboardType.Text) { onChange(draft.copy(audiobookshelfUser = it)) }
     SecretField("Password", draft.audiobookshelfPassword) { onChange(draft.copy(audiobookshelfPassword = it)) }
     TestRow(result) {
-        test(graph, draft, scope, { result = it }) { s ->
+        test(graph, draft, scope, { result = it }, "Audiobookshelf") { s ->
             if (!s.booksReady) throw ApiException("Enter the server address and a token, or a username and password")
             val api = AudiobookshelfApi(graph.http) { s }
             val who = api.ping()
@@ -604,7 +608,7 @@ internal fun AudioMuseFields(graph: AppGraph, draft: AppSettings, onChange: (App
     Field("Username", draft.audioMuseUser, keyboard = KeyboardType.Text) { onChange(draft.copy(audioMuseUser = it)) }
     SecretField("Password", draft.audioMusePassword) { onChange(draft.copy(audioMusePassword = it)) }
     Hint("With several music servers in AudioMuse, each server's own name there is under Servers.")
-    TestRow(result) { test(graph, draft, scope, { result = it }) { s -> testAudioMuse(graph, s) } }
+    TestRow(result) { test(graph, draft, scope, { result = it }, "AudioMuse") { s -> testAudioMuse(graph, s) } }
 }
 
 /** AudioMuse's Test: a sound search, and whether its songs are this server's (only known once it's synced). */
@@ -653,7 +657,7 @@ internal fun AiFields(graph: AppGraph, draft: AppSettings, onChange: (AppSetting
     Field("Model", draft.aiModel, draft.aiProvider.defaultModel.ifEmpty { null }, keyboard = KeyboardType.Text) { onChange(draft.copy(aiModel = it)) }
     SwitchRow("AI titles and sound searches", draft.aiTitles) { onChange(draft.copy(aiTitles = it)) }
     TestRow(result) {
-        test(graph, draft, scope, { result = it }) { s ->
+        test(graph, draft, scope, { result = it }, "the AI service") { s ->
             val answer = ChatApi(graph.http) { s }.complete("Reply with one word.", "Say hello.")
             "${s.aiProvider.label} answered: ${answer.trim().take(40)}"
         }

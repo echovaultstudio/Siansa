@@ -30,7 +30,8 @@ To sign out, go to **Settings › Sign out** on the TV. Your phone stays signed 
 Everything works with the remote's arrows and the centre button. The tabs along the top (Home, Library, Search,
 Settings) always open that tab's own page, wherever you are.
 
-- **Home**: Today's mix, Shuffle your library and Liked songs, then the rows of your phone's Home, in the same order
+- **Home**: your notices first, as on the phone (what needs you, what you're partway through, what's new; shown or
+  hidden in Settings › Notices and Cards › Notices), then Today's mix, Shuffle your library and Liked songs, then the rows of your phone's Home, in the same order
   and with the same rows hidden: Today's mixes (the daily mixes made today), Jump back in, Your mixes, Rediscover, Radios, Your playlists, Recently played, Artist
   radios, Recently added, Your genres and Random picks. A radio starts playing straight away.
 - **Library**: albums, artists, playlists and genres as covers, six across, your liked songs, favourite albums and
@@ -43,13 +44,15 @@ Settings) always open that tab's own page, wherever you are.
   Google TV's own search opens it too.
 - **Now playing**: the cover, the song and the controls, large enough to read from the sofa, over the cover blurred as
   on the phone. Under the controls are round buttons for Like, Lyrics, Up next, Song radio and Song path (with
-  AudioMuse); each says its name as the remote reaches it. Synced lyrics follow the song; right from the buttons
+  AudioMuse); each says its name as the remote reaches it. In Up next, songs Siansa added on its own (a radio, Keep
+  playing) have a star, as in the phone's queue. Synced lyrics follow the song; right from the buttons
   reaches the lyrics, and up and down scroll through them. Animated covers move here and on album pages, as on the
   phone. The artists and the album open their pages. The TV app has no sleep timer: the TV's own sleep setting
   turns everything off.
-- **Typing**: OK on a text field opens a box over the page with the keyboard up (in Search it opens as soon as you get
-  there). Type with the remote, say it with the microphone button, or type or paste on your phone with the Google TV
-  app's keyboard. What you type shows straight away; OK or Done closes the box, and Cancel puts back what was there.
+- **Typing**: text fields are the TV's own, in the page: move to one (its border lights up) and press OK for the
+  keyboard (in Search it comes up as soon as you open it). Type with the remote, say it with the microphone button, or
+  type or paste on your phone with the Google TV app's keyboard. What you type shows straight away; Done (or Search)
+  finishes.
 - **Skipping within a song**: rewind and fast forward on the remote go back and forward 10 seconds anywhere in the
   app. On a remote without them, press up from the controls in Now playing to reach the progress bar, then left and
   right.
@@ -111,8 +114,8 @@ and play in stereo, with the centre and surround channels folded in.
 - Those songs play without crossfades, DJ blends, levelling, the equaliser or Siansa's volume: the receiver decides
   how they sound. Use the receiver's volume.
 - Songs in the same format play one after another without a gap, a DJ mix or a live album included: the output to the
-  receiver stays open from one song to the next. A file that says it's longer than it is (some DJ mixes do) plays as
-  long as your server says the song is, so the next one still follows straight on.
+  receiver stays open from one song to the next. A file that says it's longer than it is (some DJ mixes do) plays to
+  its real last frame, read from the file's own audio, so the next one still follows straight on.
 - They always stream as the original file, whatever **Streaming quality** says, since a converted song can't go to the
   receiver.
 

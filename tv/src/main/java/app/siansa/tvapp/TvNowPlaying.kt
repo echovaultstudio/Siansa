@@ -1,5 +1,8 @@
 package app.siansa.tvapp
 
+import androidx.compose.ui.platform.testTag
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.animateScrollBy
@@ -192,7 +195,7 @@ fun TvNowPlaying() {
                 }
             }
             when (panel) {
-                Panel.QUEUE -> UpNext(state.queue, state.index)
+                Panel.QUEUE -> UpNext(state.queue, state.index, state.auto)
                 Panel.LYRICS -> LyricsPanel(song) { progress.value.positionMs }
                 Panel.NONE -> Unit
             }
@@ -329,9 +332,12 @@ private fun LyricsPanel(song: app.siansa.data.Song?, positionMs: () -> Long) {
     }
 }
 
-/** The songs after this one: OK plays from that song. */
+/**
+ * The songs after this one: OK plays from that song. Songs Siansa added on its own (AudioMuse's radio, Keep playing)
+ * have the same star as on the phone's queue.
+ */
 @Composable
-private fun UpNext(queue: List<app.siansa.data.Song>, index: Int) {
+private fun UpNext(queue: List<app.siansa.data.Song>, index: Int, auto: Set<Int> = emptySet()) {
     val graph = LocalGraph.current
     Column(Modifier.width(QUEUE_WIDTH).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
         Text("Up next", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
@@ -342,13 +348,22 @@ private fun UpNext(queue: List<app.siansa.data.Song>, index: Int) {
             LazyColumn(contentPadding = PaddingValues(bottom = Space.Large), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
                 itemsIndexed(after.take(QUEUE_SHOWN), key = { i, s -> "${index + 1 + i}:${s.id}" }) { i, song ->
                     val shape = RoundedCornerShape(Space.Small)
-                    Column(
+                    Row(
                         Modifier.fillMaxWidth().tvFocus(shape, onClick = { graph.player.skipTo(index + 1 + i) }, grow = ROW_GROW)
                             .background(MaterialTheme.colorScheme.background, shape).padding(horizontal = Space.Page, vertical = Space.Small),
-                        verticalArrangement = Arrangement.spacedBy(Space.Tight),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(song.title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(song.artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                            Text(song.title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(song.artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        if ((index + 1 + i) in auto) {
+                            Icon(
+                                Icons.Rounded.AutoAwesome, "Added automatically",
+                                Modifier.padding(start = Space.Small).size(AUTO_MARK).testTag("autoAdded"),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                     }
                 }
             }
@@ -374,6 +389,8 @@ private const val FOLLOW_AGAIN_MS = 4_000L
 private val LYRICS_RING = 2.dp
 private const val ROW_GROW = 1.02f
 private const val QUEUE_SHOWN = 100
+/** The star on a song Siansa added on its own, a little larger than the phone's for the distance. */
+private val AUTO_MARK = 20.dp
 private const val MAX_ARTISTS = 3
 private val PROGRESS_HEIGHT = 6.dp
 private val SEEKING_HEIGHT = 12.dp
