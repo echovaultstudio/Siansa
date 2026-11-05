@@ -146,7 +146,7 @@ object PlayerFactory {
         AppLog.i("Player", "FFmpeg decoders " + if (FfmpegLibrary.isAvailable()) "ready (${FfmpegLibrary.getVersion()})" else "not available")
 
         val player = ExoPlayer.Builder(context, renderers)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource, SongLength.extractors()))
             .setLoadControl(loadControl)
             .setAudioAttributes(
                 AudioAttributes.Builder()

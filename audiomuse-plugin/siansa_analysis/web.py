@@ -27,7 +27,7 @@ from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url,
 from . import generations, jobs, similarity, status, store
 
 PLUGIN_ID = "siansa_analysis"
-VERSION = "0.3.3"
+VERSION = "0.5.6"  # the newest in plugin.json: AudioMuse-AI and the Siansa app show it (test_version.py)
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 

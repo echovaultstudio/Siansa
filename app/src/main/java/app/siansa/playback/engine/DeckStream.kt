@@ -30,6 +30,8 @@ class DeckStream(
     enum class Encoding(val bytes: Int) { PCM_16(2), PCM_FLOAT(4) }
 
     private val lock = Any()
+    /** 5.1 and 7.1 folded into the mix's two channels (issue #860); stereo and mono are read straight. */
+    private val downmix: Downmix.Weights? = if (channels > 2) Downmix.weights(channels) else null
     private val capacity = max(SincTable.TAPS * 4, sampleRate * capacityMs / 1_000)
     private val ring = FloatArray(capacity * 2)
 
@@ -147,8 +149,21 @@ class DeckStream(
             }
             val keepFrom = max(first, floor(readPos).toLong() - KEEP_BEHIND)
             if (end - keepFrom >= capacity) break
-            val l = sample(data, at, 0)
-            val r = if (channels >= 2) sample(data, at, 1) else l
+            val fold = downmix
+            var l: Float
+            var r: Float
+            if (fold == null) {
+                l = sample(data, at, 0)
+                r = if (channels >= 2) sample(data, at, 1) else l
+            } else {
+                l = 0f
+                r = 0f
+                for (c in 0 until channels) {
+                    val v = sample(data, at, c)
+                    l += v * fold.left[c]
+                    r += v * fold.right[c]
+                }
+            }
             val i = ((end % capacity) * 2).toInt()
             ring[i] = l
             ring[i + 1] = r

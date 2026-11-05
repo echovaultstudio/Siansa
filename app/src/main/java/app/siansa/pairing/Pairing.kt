@@ -1,5 +1,6 @@
 package app.siansa.pairing
 
+import app.siansa.data.AiProvider
 import app.siansa.data.AppSettings
 import app.siansa.net.LanAddress
 import app.siansa.net.SourceKind
@@ -35,7 +36,10 @@ object Pairing {
     private val b64 = Base64.getUrlEncoder().withoutPadding()
     private val unb64 = Base64.getUrlDecoder()
 
-    /** The server and login a phone sends; only what the TV needs to play from it. */
+    /**
+     * The server and login a phone sends; only what the TV needs to play from it, and, when the phone's owner ticks it,
+     * the phone's other services too ([services]).
+     */
     @Serializable
     data class Login(
         val source: String = SourceKind.OPENSUBSONIC.name,
@@ -45,8 +49,9 @@ object Pairing {
         val apiKey: String = "",
         val proxyUser: String = "",
         val proxyPassword: String = "",
+        val services: Services? = null,
     ) {
-        /** [settings] with this login in them. */
+        /** [settings] with this login in them, and the services that came with it. */
         fun into(settings: AppSettings): AppSettings = settings.copy(
             sourceKind = SourceKind.parse(source),
             navidromeUrl = url,
@@ -55,10 +60,10 @@ object Pairing {
             navidromeApiKey = apiKey,
             proxyUser = proxyUser,
             proxyPassword = proxyPassword,
-        )
+        ).let { services?.into(it) ?: it }
 
         companion object {
-            fun of(s: AppSettings) = Login(
+            fun of(s: AppSettings, withServices: Boolean = false) = Login(
                 source = s.sourceKind.name,
                 url = s.navidromeUrl,
                 user = s.navidromeUser,
@@ -66,7 +71,99 @@ object Pairing {
                 apiKey = s.navidromeApiKey,
                 proxyUser = s.proxyUser,
                 proxyPassword = s.proxyPassword,
+                services = if (withServices) Services.of(s) else null,
             )
+        }
+    }
+
+    /**
+     * The phone's other services, sent with the login when asked (issue #860): AudioMuse, the AI service, Audiobookshelf
+     * and scrobbling (Navidrome's, Last.fm and ListenBrainz). Only those set up on the phone are sent; on the TV each
+     * one sent replaces its own, and the rest stay as they were.
+     */
+    @Serializable
+    data class Services(
+        val audioMuseUrl: String = "",
+        val audioMuseToken: String = "",
+        val audioMuseUser: String = "",
+        val audioMusePassword: String = "",
+        val audioMuseServer: String = "",
+        val aiProvider: String = "",
+        val aiKey: String = "",
+        val aiModel: String = "",
+        val aiAddress: String = "",
+        val aiTitles: Boolean = true,
+        val audiobookshelfUrl: String = "",
+        val audiobookshelfToken: String = "",
+        val audiobookshelfUser: String = "",
+        val audiobookshelfPassword: String = "",
+        val scrobbleNavidrome: Boolean = true,
+        val scrobblePercent: Int = 50,
+        val lastFmApiKey: String = "",
+        val lastFmSecret: String = "",
+        val lastFmUser: String = "",
+        val lastFmSession: String = "",
+        val listenBrainzUrl: String = "",
+        val listenBrainzToken: String = "",
+    ) {
+        /** The services' names, as the phone lists what it would send ("AudioMuse, Last.fm"). */
+        val names: List<String>
+            get() = listOfNotNull(
+                "AudioMuse".takeIf { audioMuseUrl.isNotBlank() },
+                "the AI service".takeIf { aiProvider.isNotBlank() },
+                "Audiobookshelf".takeIf { audiobookshelfUrl.isNotBlank() },
+                "Last.fm".takeIf { lastFmSession.isNotBlank() },
+                "ListenBrainz".takeIf { listenBrainzToken.isNotBlank() },
+            )
+
+        fun into(s: AppSettings): AppSettings {
+            var out = s.copy(scrobbleNavidrome = scrobbleNavidrome, scrobblePercent = scrobblePercent)
+            if (audioMuseUrl.isNotBlank()) {
+                out = out.copy(
+                    audioMuseUrl = audioMuseUrl, audioMuseToken = audioMuseToken, audioMuseUser = audioMuseUser,
+                    audioMusePassword = audioMusePassword, audioMuseServer = audioMuseServer,
+                )
+            }
+            if (aiProvider.isNotBlank()) {
+                out = out.copy(
+                    aiProvider = AiProvider.parse(aiProvider), aiKey = aiKey, aiModel = aiModel.ifBlank { out.aiModel },
+                    aiAddress = aiAddress, aiTitles = aiTitles,
+                )
+            }
+            if (audiobookshelfUrl.isNotBlank()) {
+                out = out.copy(
+                    audiobookshelfUrl = audiobookshelfUrl, audiobookshelfToken = audiobookshelfToken,
+                    audiobookshelfUser = audiobookshelfUser, audiobookshelfPassword = audiobookshelfPassword,
+                )
+            }
+            if (lastFmSession.isNotBlank()) {
+                out = out.copy(lastFmEnabled = true, lastFmApiKey = lastFmApiKey, lastFmSecret = lastFmSecret, lastFmUser = lastFmUser, lastFmSession = lastFmSession)
+            }
+            if (listenBrainzToken.isNotBlank()) {
+                out = out.copy(listenBrainzEnabled = true, listenBrainzUrl = listenBrainzUrl, listenBrainzToken = listenBrainzToken)
+            }
+            return out
+        }
+
+        companion object {
+            fun of(s: AppSettings): Services {
+                val ai = s.aiKey.isNotBlank() || s.aiAddress.isNotBlank()
+                return Services(
+                    audioMuseUrl = s.audioMuseUrl, audioMuseToken = s.audioMuseToken, audioMuseUser = s.audioMuseUser,
+                    audioMusePassword = s.audioMusePassword, audioMuseServer = s.audioMuseServer,
+                    aiProvider = if (ai) s.aiProvider.name else "",
+                    aiKey = if (ai) s.aiKey else "", aiModel = if (ai) s.aiModel else "", aiAddress = if (ai) s.aiAddress else "",
+                    aiTitles = s.aiTitles,
+                    audiobookshelfUrl = s.audiobookshelfUrl, audiobookshelfToken = s.audiobookshelfToken,
+                    audiobookshelfUser = s.audiobookshelfUser, audiobookshelfPassword = s.audiobookshelfPassword,
+                    scrobbleNavidrome = s.scrobbleNavidrome, scrobblePercent = s.scrobblePercent,
+                    // Only a scrobbling service that's switched on and signed in goes.
+                    lastFmApiKey = if (s.lastFmReady) s.lastFmApiKey else "", lastFmSecret = if (s.lastFmReady) s.lastFmSecret else "",
+                    lastFmUser = if (s.lastFmReady) s.lastFmUser else "", lastFmSession = if (s.lastFmReady) s.lastFmSession else "",
+                    listenBrainzUrl = if (s.listenBrainzReady) s.listenBrainzUrl else "",
+                    listenBrainzToken = if (s.listenBrainzReady) s.listenBrainzToken else "",
+                )
+            }
         }
     }
 

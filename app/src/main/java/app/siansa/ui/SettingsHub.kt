@@ -266,10 +266,13 @@ fun PlaybackSettingsScreen(nav: NavController) {
                 ContinuousChips(settings.continuousPlay) { graph.settings.setContinuousPlay(it) }
                 Hint(continuousHint(settings.continuousPlay, settings.audioMuseReady))
             }
-            HorizontalDivider()
-            FoldSection("Wind down", "${settings.windDownSongs} songs") {
-                Hint("With the sleep timer's Wind down switched on and no time picked, how many calmer songs play before the music ends?")
-                WindDownChips(settings.windDownSongs) { graph.settings.save(graph.settings.current.copy(windDownSongs = it)) }
+            // The TV app has no sleep timer (issue #860), so nothing to wind down.
+            if (!app.siansa.BuildConfig.TV_APP) {
+                HorizontalDivider()
+                FoldSection("Wind down", "${settings.windDownSongs} songs") {
+                    Hint("With the sleep timer's Wind down switched on and no time picked, how many calmer songs play before the music ends?")
+                    WindDownChips(settings.windDownSongs) { graph.settings.save(graph.settings.current.copy(windDownSongs = it)) }
+                }
             }
         }
     }
@@ -497,7 +500,9 @@ fun StreamingDataScreen(nav: NavController) {
 }
 
 internal fun restartApp(context: Context) {
-    val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+    // The TV app (issue #860) has only a TV launcher entry.
+    val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        ?: context.packageManager.getLeanbackLaunchIntentForPackage(context.packageName) ?: return
     val component = launch.component ?: return
     context.startActivity(Intent.makeRestartActivityTask(component))
     Runtime.getRuntime().exit(0)
@@ -565,19 +570,25 @@ fun LogsScreen(nav: NavController) {
                         horizontalArrangement = Arrangement.spacedBy(Space.Small),
                         verticalArrangement = Arrangement.spacedBy(Space.Small),
                     ) {
-                        Button(onClick = {
-                            val stamp = java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.ROOT).format(Date())
-                            saver.launch("siansa-logs-$stamp.txt")
-                        }) {
-                            Icon(Icons.Rounded.Download, null)
-                            Spacer(Modifier.width(Space.Small))
-                            Text("Save logs")
+                        // A TV has no file picker or apps to share with (issue #860): its log goes in a report.
+                        val tv = app.siansa.BuildConfig.TV_APP
+                        if (!tv) {
+                            Button(onClick = {
+                                val stamp = java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.ROOT).format(Date())
+                                saver.launch("siansa-logs-$stamp.txt")
+                            }) {
+                                Icon(Icons.Rounded.Download, null)
+                                Spacer(Modifier.width(Space.Small))
+                                Text("Save logs")
+                            }
                         }
                         Button(onClick = { nav.navigate("settings/report") }) { Text("Report a problem") }
-                        OutlinedButton(onClick = { scope.launch { shareLogs(context) } }) {
-                            Icon(Icons.Rounded.Share, null)
-                            Spacer(Modifier.width(Space.Small))
-                            Text("Share")
+                        if (!tv) {
+                            OutlinedButton(onClick = { scope.launch { shareLogs(context) } }) {
+                                Icon(Icons.Rounded.Share, null)
+                                Spacer(Modifier.width(Space.Small))
+                                Text("Share")
+                            }
                         }
                         OutlinedButton(onClick = {
                             AppLog.clear()

@@ -117,7 +117,8 @@ fun ProblemReportScreen(nav: NavController) {
                         if (state.result.issue != null) "It's issue #${state.result.issue} in the beta testers repo, where you can follow it."
                         else "It will be looked at soon.",
                 )
-                state.result.url?.let { url ->
+                // A TV usually has no web browser to open it in (issue #860).
+                state.result.url?.takeIf { !app.siansa.BuildConfig.TV_APP }?.let { url ->
                     OutlinedButton(onClick = {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     }) { Text("Open the issue") }
@@ -186,6 +187,11 @@ internal fun ReportBody(
                 "read with AI tools to find the problem. It records every request in full, including your server's address " +
                 "and what you played. Passwords, tokens and API keys are removed.",
         )
+        if (app.siansa.BuildConfig.TV_APP) {
+            // On the TV, Android's own text box, which a phone's keyboard can type and paste into (issue #860).
+            TvTextBox(happened, onHappened, "What happened? (${happened.length} / ${Report.MAX_TEXT})", Modifier.fillMaxWidth(), kind = TvTextKind.LONG_TEXT)
+            TvTextBox(expected, onExpected, "What did you expect to happen? (${expected.length} / ${Report.MAX_TEXT})", Modifier.fillMaxWidth(), kind = TvTextKind.LONG_TEXT)
+        } else {
         OutlinedTextField(
             happened, onHappened,
             label = { Text("What happened?") },
@@ -200,6 +206,7 @@ internal fun ReportBody(
             supportingText = { Text("${expected.length} / ${Report.MAX_TEXT}") },
             modifier = Modifier.fillMaxWidth().testTag("report-expected"),
         )
+        }
         Row(
             Modifier.fillMaxWidth().toggleable(value = repeated, enabled = logging, role = Role.Checkbox, onValueChange = onRepeated).testTag("report-repeated"),
             verticalAlignment = Alignment.CenterVertically,

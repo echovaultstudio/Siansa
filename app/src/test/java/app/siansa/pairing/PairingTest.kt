@@ -91,4 +91,44 @@ class PairingTest {
         assertEquals(160, after.transcodeWifiKbps)
         assertEquals(login, Pairing.Login.of(after))
     }
+
+    @Test
+    fun theTickedServicesTravelAndAreSetUpOnTheTv() {
+        val phone = AppSettings(
+            navidromeUrl = "https://music.example.org", navidromeUser = "ana", navidromePassword = "pw",
+            audioMuseUrl = "http://192.168.1.10:8000", audioMuseToken = "am-token",
+            lastFmEnabled = true, lastFmApiKey = "k", lastFmSecret = "s", lastFmUser = "ana", lastFmSession = "sess",
+            listenBrainzEnabled = false, listenBrainzToken = "lb-off",
+            scrobblePercent = 75,
+        )
+        val sent = Pairing.Login.of(phone, withServices = true)
+        val key = Pairing.newKey()
+        val arrived = Pairing.open(Pairing.seal(sent, key), key)
+        assertEquals(sent, arrived)
+        assertEquals(listOf("AudioMuse", "Last.fm"), arrived!!.services!!.names)
+        // A TV with its own ListenBrainz keeps it: the phone's is switched off, so it isn't sent.
+        val tv = arrived.into(AppSettings(listenBrainzEnabled = true, listenBrainzToken = "tv-lb"))
+        assertEquals("http://192.168.1.10:8000", tv.audioMuseUrl)
+        assertEquals("am-token", tv.audioMuseToken)
+        assertTrue(tv.lastFmReady)
+        assertEquals("sess", tv.lastFmSession)
+        assertEquals("tv-lb", tv.listenBrainzToken)
+        assertEquals(75, tv.scrobblePercent)
+        assertTrue("am-token" !in Pairing.seal(sent, key))
+    }
+
+    @Test
+    fun withoutTheTickOnlyTheLoginTravels() {
+        val phone = AppSettings(navidromeUrl = "https://music.example.org", navidromeUser = "ana", navidromePassword = "pw", audioMuseUrl = "http://am")
+        val sent = Pairing.Login.of(phone)
+        assertNull(sent.services)
+        assertEquals("", sent.into(AppSettings()).audioMuseUrl)
+    }
+
+    @Test
+    fun anOlderPhonesLoginStillOpens() {
+        // A phone without the tick sends no services at all; the TV reads it as before.
+        val key = Pairing.newKey()
+        assertNull(Pairing.open(Pairing.seal(login, key), key)!!.services)
+    }
 }

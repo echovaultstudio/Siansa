@@ -421,7 +421,9 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         coverDownload = prefs.getBoolean("cover_download", false),
         coverDownloadAnyWifi = prefs.getBoolean("cover_download_any_wifi", false),
         coverDownloadWifiOnly = prefs.getBoolean("cover_download_wifi_only", true),
-        logging = prefs.getBoolean("logging", false),
+        // On in the TV app until switched off (issue #860): a TV is hard to repeat a problem on, so the log is
+        // already there when Report a problem is used. It stays on the TV unless reported.
+        logging = prefs.getBoolean("logging", app.siansa.BuildConfig.TV_APP),
         situation = SituationOptions(
             weather = prefs.getBoolean("situation_weather", false),
             movement = prefs.getBoolean("situation_movement", false),
@@ -482,7 +484,9 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .takeIf { it in AppSettings.BLEND_BAR_CHOICES } ?: AppSettings.DEFAULT_BLEND_BARS,
         mixShape = MixShape.parse(prefs.getString("mix_shape", null)),
         mixSurprise = prefs.getInt("mix_surprise", AppSettings.DEFAULT_MIX_SURPRISE).coerceIn(0, 100),
-        audioPassthrough = app.siansa.playback.PassthroughMode.parse(prefs.getString("audio_passthrough", null)),
+        // On in the TV app until switched off (issue #860): it only acts when the TV says the receiver takes the format.
+        audioPassthrough = prefs.getString("audio_passthrough", null)?.let { app.siansa.playback.PassthroughMode.parse(it) }
+            ?: if (app.siansa.BuildConfig.TV_APP) app.siansa.playback.PassthroughMode.DOLBY_DTS else app.siansa.playback.PassthroughMode.OFF,
         dailyMix = DailyMix(
             autoUpdate = prefs.getBoolean("daily_auto", true),
             length = prefs.getInt("daily_length", -1).takeIf { it > 0 },

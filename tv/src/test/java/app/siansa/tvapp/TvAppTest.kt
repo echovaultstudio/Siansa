@@ -35,6 +35,21 @@ class TvAppTest {
     }
 
     @Test
+    fun jumpBackInShowsWhatTheTvCanOpen() {
+        assertTrue(shortcutOpens("album/123"))
+        assertTrue(shortcutOpens("mix/2026-11-05-daily"))
+        assertTrue(shortcutOpens("radio/mood/calm"))
+        assertFalse(shortcutOpens("book/9"))
+        assertFalse(shortcutOpens("pinned/3"))
+    }
+
+    @Test
+    fun theTvsOwnPagesStandInForThePhones() {
+        // The phone's pages for these aren't added to the TV's NavHost: the TV's are, under the same routes.
+        assertTrue(TvRoutes.own.containsAll(listOf("home", "library", "search", "settings", "album/{id}", "artist/{id}", "playlist/{id}", "mix/{id}")))
+    }
+
+    @Test
     fun streamDetails() {
         assertEquals("Opus 160 kbit/s", details("OPUS", 160))
         assertEquals("FLAC", details("FLAC", 0))

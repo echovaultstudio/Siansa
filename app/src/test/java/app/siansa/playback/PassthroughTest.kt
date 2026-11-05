@@ -36,6 +36,12 @@ class PassthroughTest {
         assertTrue(Passthrough.keepsOriginal(PassthroughMode.DOLBY_DTS, " thd "))
         assertFalse(Passthrough.keepsOriginal(PassthroughMode.OFF, "eac3"))
         assertFalse(Passthrough.keepsOriginal(PassthroughMode.DOLBY_DTS, "flac"))
+        // Dolby Atmos music is mostly sold as .m4a or .mp4: those stream untouched too, but only while passthrough is on.
+        assertTrue(Passthrough.keepsOriginal(PassthroughMode.DOLBY_DTS, "m4a"))
+        assertTrue(Passthrough.keepsOriginal(PassthroughMode.DOLBY_DTS, "MP4"))
+        assertFalse(Passthrough.keepsOriginal(PassthroughMode.OFF, "m4a"))
+        // An .m4a isn't taken for Dolby when deciding about blends until it went to the receiver.
+        assertFalse(Passthrough.likely(PassthroughMode.DOLBY_DTS, "m4a"))
         assertFalse(Passthrough.keepsOriginal(PassthroughMode.DOLBY_DTS, null))
     }
 

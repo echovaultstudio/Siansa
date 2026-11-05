@@ -104,8 +104,9 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
                 // Animated covers shown as stills: their first frame (Android's still decoder fails on some).
                 add(app.siansa.covers.FirstFrameDecoder.Factory())
             }
-            // Room for a few hundred decoded list covers, so scrolling back shows them at once.
-            .memoryCache { MemoryCache.Builder().maxSizePercent(context, 0.30).build() }
+            // Room for a few hundred decoded list covers, so scrolling back shows them at once. Half that on a TV
+            // (issue #860): an NVIDIA SHIELD kept warning of low memory, and its covers come from the disk cache quickly.
+            .memoryCache { MemoryCache.Builder().maxSizePercent(context, if (BuildConfig.TV_APP) 0.15 else 0.30).build() }
             .diskCache {
                 DiskCache.Builder()
                     .directory(directory)
@@ -169,6 +170,13 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
         super.onTrimMemory(level)
         if (level >= TRIM_MEMORY_RUNNING_LOW && level < TRIM_MEMORY_UI_HIDDEN || level >= TRIM_MEMORY_BACKGROUND) {
             AppLog.w("Phone", "Low memory signal (level $level) · ${Diagnostics.snapshot(this)}")
+        }
+        // Give back decoded covers, the biggest thing the app keeps that it can do without: half when memory runs
+        // low, all of them when it's critical or the app is out of sight. They load again from the disk cache.
+        val covers = runCatching { coil3.SingletonImageLoader.get(this).memoryCache }.getOrNull() ?: return
+        when {
+            level >= TRIM_MEMORY_RUNNING_CRITICAL && level < TRIM_MEMORY_UI_HIDDEN || level >= TRIM_MEMORY_BACKGROUND -> covers.clear()
+            level >= TRIM_MEMORY_RUNNING_LOW || level == TRIM_MEMORY_UI_HIDDEN -> covers.trimToSize(covers.maxSize / 2)
         }
     }
 

@@ -246,7 +246,8 @@ class MixGenerator(private val graph: AppGraph) {
         val leaveOut = taste?.favouriteSongs.orEmpty().take(selector.leaveOutTopPlayed.coerceAtLeast(0)).toSet()
         val candidates = graph.library.randomSongs(LIBRARY_CANDIDATES)
         val text = listOf(plan.query, plan.title, selector.baseQuery, selector.guidance, selector.name).joinToString(" ")
-        val more = LibraryMix.pick(
+        // Weighing a few thousand songs is real work: off the main thread, which a mix started from a page is on.
+        val more = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { LibraryMix.pick(
             candidates,
             vibeText = text,
             hourGenres = taste?.hourGenres.orEmpty(),
@@ -254,7 +255,7 @@ class MixGenerator(private val graph: AppGraph) {
             avoid = recent + leaveOut + taste?.skipped.orEmpty(),
             exclude = exclude + first.map { it.id },
             otherArtists = otherArtists + graph.mixes.lastArtists(selector.id, excludeId = id),
-        )
+        ) }
         val vibe = LibraryMix.words(text)
         AppLog.i(
             "Mix",

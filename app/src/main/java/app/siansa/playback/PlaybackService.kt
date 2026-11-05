@@ -29,6 +29,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaLibraryService
@@ -66,6 +67,9 @@ import java.io.InterruptedIOException
 import java.util.Collections
 
 private const val FALLBACK_KBPS = 320
+
+/** The stuck-song rescue leaves the last seconds of a song alone: the player is finishing it (issue #860). */
+private const val END_GRACE_MS = 3_000L
 /** How long music stays on a TV that Cast lost touch with, waiting for it to come back (issue #114). */
 private const val CAST_RESUME_WAIT_MS = 30_000L
 
@@ -88,6 +92,8 @@ private const val TIMELINE_MS = 30_000L
 class PlaybackService : MediaLibraryService() {
     private var session: MediaLibrarySession? = null
     private lateinit var exo: ExoPlayer
+    /** Whether the last output opened was a bitstream to the receiver (issue #860), so a stall is never "fixed" by converting. */
+    @Volatile private var bitstreamOut = false
     /** [exo] as the rest of the app sees it: converted songs seek on Navidrome (issue #162). */
     private lateinit var phone: ServerSeekPlayer
     /** The Chromecast or Google TV, playing the phone's queue (issue #114). */
@@ -175,7 +181,8 @@ class PlaybackService : MediaLibraryService() {
             }
             // A song sent to the receiver unchanged (issue #860): noted, so it never blends with its neighbours.
             override fun onAudioTrackInitialized(eventTime: AnalyticsListener.EventTime, audioTrackConfig: AudioSink.AudioTrackConfig) {
-                if (androidx.media3.common.util.Util.isEncodingLinearPcm(audioTrackConfig.encoding)) return
+                bitstreamOut = !androidx.media3.common.util.Util.isEncodingLinearPcm(audioTrackConfig.encoding)
+                if (!bitstreamOut) return
                 val id = exo.currentMediaItem?.mediaId ?: return
                 Passthrough.played.add(id)
                 AppLog.i("Audio", "Song $id: ${Passthrough.name(exo.audioFormat?.sampleMimeType)} sent to the receiver unchanged (passthrough)")
@@ -976,6 +983,20 @@ class PlaybackService : MediaLibraryService() {
             AppLog.e("Player", "Playback error ${error.errorCodeName} on ${current?.id ?: "?"}", error, event = "playback.error", fields = mapOf(
                 "song_id" to current?.id, "code" to error.errorCodeName, "category" to errorCategory(error.errorCode),
             ))
+            // Passthrough (issue #860) failed: the TV said the receiver takes the format, but the output couldn't be
+            // opened for it or broke while playing. Give it up for this run, so these songs are decoded on the TV,
+            // and play the song again from where it was instead of stopping.
+            if (BuildConfig.TV_APP && (error as? ExoPlaybackException)?.rendererName == "PassthroughRenderer" && Passthrough.failed == null) {
+                val why = "${error.errorCodeName}: ${error.cause?.message ?: error.message}"
+                Passthrough.failed = why
+                val position = player.currentPosition
+                AppLog.w("Passthrough", "Sending ${current?.id ?: "?"} to the receiver failed ($why); decoding Dolby and DTS on the TV from now on",
+                    error, event = "passthrough.failed", fields = mapOf("song_id" to current?.id, "code" to error.errorCodeName))
+                player.seekTo(player.currentMediaItemIndex, position)
+                player.prepare()
+                player.play()
+                return
+            }
             // A file the phone can't open or decode at all (a WMA, say) plays converted to Opus by Navidrome
             // instead of stopping (issue #354). Tracks the phone can open but not decode are handled in
             // onTracksChanged; this covers the ones that never get that far.
@@ -1175,6 +1196,28 @@ class PlaybackService : MediaLibraryService() {
                 val item = player.currentMediaItem ?: return
                 val id = item.mediaId
                 val where = "at ${position / 1000}s, ${(buffered - position) / 1000.0}s loaded ahead, state $state"
+                // A song going to the receiver unchanged (issue #860) isn't decoded here, so there's no decoder to be
+                // stuck, and converting it would lose its Dolby sound and the gapless join to the next song. Nor is the
+                // last few seconds of any song: the player is finishing it and moving on.
+                val librarySec = SongRegistry.get(id)?.durationSec ?: 0
+                val nearEnd = librarySec > 0 && position >= librarySec * 1000L - END_GRACE_MS
+                if (nearEnd) {
+                    AppLog.i("Player", "Song $id hasn't moved for 5 s ($where); left alone at its end")
+                    return
+                }
+                if (bitstreamOut || id in Passthrough.played) {
+                    if (stuckRescues < 2) {
+                        AppLog.w("Player", "Song $id stuck for 5 s with its data loaded ($where), sent to the receiver unchanged; opening its output again",
+                            event = "playback.recovery", fields = mapOf("song_id" to id, "action" to "restart_output", "reason" to "stuck", "attempt" to stuckRescues))
+                        player.seekTo(player.currentMediaItemIndex, position)
+                        stuckRescues++
+                    } else {
+                        AppLog.e("Player", "Song $id still stuck after $stuckRescues rescues ($where); giving up on it",
+                            event = "playback.recovery_failed", fields = mapOf("song_id" to id, "attempts" to stuckRescues))
+                        handler.removeCallbacks(this)
+                    }
+                    return
+                }
                 val alreadyOpus = (chosenKbps[id] ?: 0) > 0
                 when {
                     !alreadyOpus -> {

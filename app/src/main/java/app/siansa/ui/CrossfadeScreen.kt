@@ -121,7 +121,11 @@ fun CrossfadeScreen(nav: NavController) {
                         graph.settings.setCrossfade(seconds = it)
                     }
                     crossfadeLengthHint(settings)?.let { Hint(it) }
-                    Hint("Only on this phone: on a TV or speaker, songs play back to back. Not used with Repeat one, or while the sleep timer lets a song finish.")
+                    Hint(
+                        // The TV app plays on the TV itself and has no sleep timer (issue #860).
+                        if (app.siansa.BuildConfig.TV_APP) "Not used with Repeat one, or for Dolby and DTS songs sent to your receiver."
+                        else "Only on this phone: on a TV or speaker, songs play back to back. Not used with Repeat one, or while the sleep timer lets a song finish.",
+                    )
                 }
             }
             if (settings.crossfade == CrossfadeMode.SMART && settings.loudnessSource == LoudnessSource.PLUGIN) {

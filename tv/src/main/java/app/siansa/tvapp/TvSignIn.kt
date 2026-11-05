@@ -4,18 +4,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Login
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -24,14 +23,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import app.siansa.ui.TvTextBox
+import app.siansa.ui.TvTextKind
 import androidx.compose.ui.unit.dp
 import app.siansa.AppGraph
 import app.siansa.log.AppLog
@@ -54,7 +55,7 @@ fun TvSignIn() {
         horizontalArrangement = Arrangement.spacedBy(Space.Large * 2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
             Text("Welcome to Siansa", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
             signInProblem?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.titleMedium) }
             if (!typing) {
@@ -62,6 +63,12 @@ fun TvSignIn() {
                 Step(2, "Tap \"Open in Siansa\", then \"Sign in\".")
                 Step(3, "Your TV signs in to the same server as your phone.")
                 TvButton("Type it in instead", Icons.Rounded.Keyboard, onClick = { typing = true })
+                // A server or user added from Settings that isn't wanted after all: back to one already signed in.
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val others = remember { app.siansa.data.Users.all(context).filter { it.id != app.siansa.data.Users.active && it.connected } }
+                for (u in others.take(MAX_OTHERS)) {
+                    TvButton("Use ${u.label} instead", null, onClick = { app.siansa.data.Users.switchTo(context, u.id) })
+                }
             } else {
                 TypedSignIn(onBack = { typing = false })
             }
@@ -136,17 +143,10 @@ private fun TypedSignIn(onBack: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
 
     Column(Modifier.width(FORM_WIDTH), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
-        OutlinedTextField(
-            address, { address = it }, singleLine = true,
-            label = { Text("Server address") }, placeholder = { Text("http://192.168.1.10:4533") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-        )
-        OutlinedTextField(user, { user = it }, singleLine = true, label = { Text("Username") })
-        OutlinedTextField(
-            password, { password = it }, singleLine = true, label = { Text("Password") },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-        )
+        // Android's own text boxes, so a phone's keyboard can type and paste into them.
+        TvTextBox(address, { address = it }, "Server address", Modifier.fillMaxWidth(), placeholder = "http://192.168.1.10:4533", kind = TvTextKind.ADDRESS)
+        TvTextBox(user, { user = it }, "Username", Modifier.fillMaxWidth())
+        TvTextBox(password, { password = it }, "Password", Modifier.fillMaxWidth(), kind = TvTextKind.SECRET)
         Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
             TvButton(if (busy) "Signing in…" else "Sign in", Icons.AutoMirrored.Rounded.Login, strong = true, onClick = {
                 if (busy) return@TvButton
@@ -204,11 +204,12 @@ private suspend fun tryLogin(graph: AppGraph, login: Pairing.Login): String? {
         signInProblem = "Couldn't sign in: ${reached.exceptionOrNull()?.message ?: "the server didn't answer"}."
         return signInProblem
     }
-    AppLog.i("Tv", "Signed in: ${reached.getOrNull()}")
+    AppLog.i("Tv", "Signed in: ${reached.getOrNull()}" + (login.services?.names?.takeIf { it.isNotEmpty() }?.let { ", with ${it.joinToString()} from the phone" } ?: ""))
     graph.sync.start()
     return null
 }
 
 private val STEP_DOT = 36.dp
+private const val MAX_OTHERS = 3
 private val QR_SIZE = 340.dp
 private val FORM_WIDTH = 520.dp

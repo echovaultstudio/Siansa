@@ -301,7 +301,9 @@ object Users {
         prefs(context).edit().putInt(KEY_ACTIVE, id).putString(KEY_SHOWN, UserFiles.formatShown(shown + id)).commit()
         AppLog.i("Users", "Switching user; the app restarts")
         val app = context.applicationContext
-        val launch = app.packageManager.getLaunchIntentForPackage(app.packageName) ?: return
+        // The TV app (issue #860) has only a TV launcher entry: without it, the user was changed but the app didn't restart.
+        val launch = app.packageManager.getLaunchIntentForPackage(app.packageName)
+            ?: app.packageManager.getLeanbackLaunchIntentForPackage(app.packageName) ?: return
         val component = launch.component ?: return
         app.startActivity(Intent.makeRestartActivityTask(component).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         Runtime.getRuntime().exit(0)

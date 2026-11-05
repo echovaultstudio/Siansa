@@ -288,6 +288,12 @@ internal fun Field(
     keyboard: KeyboardType = KeyboardType.Uri,
     onChange: (String) -> Unit,
 ) {
+    // On the TV, Android's own text box, which a phone's keyboard can type into (issue #860).
+    if (app.siansa.BuildConfig.TV_APP) {
+        TvTextBox(value, onChange, label, Modifier.fillMaxWidth(), placeholder = placeholder,
+            kind = if (keyboard == KeyboardType.Uri) TvTextKind.ADDRESS else TvTextKind.TEXT)
+        return
+    }
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
@@ -301,6 +307,10 @@ internal fun Field(
 
 @Composable
 internal fun SecretField(label: String, value: String, onChange: (String) -> Unit) {
+    if (app.siansa.BuildConfig.TV_APP) {
+        TvTextBox(value, onChange, label, Modifier.fillMaxWidth(), kind = TvTextKind.SECRET)
+        return
+    }
     var visible by remember { mutableStateOf(false) }
     OutlinedTextField(
         value = value,
