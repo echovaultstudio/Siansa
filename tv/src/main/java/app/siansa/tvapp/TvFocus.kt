@@ -164,7 +164,7 @@ fun TvSwitchRow(title: String, detail: String?, on: Boolean, onChange: (Boolean)
 }
 
 /**
- * A short list of choices over the page (a song's actions, the sleep timer): OK picks one, Back closes it. The first
+ * A short list of choices over the page (a song's actions, the sources to show): OK picks one, Back closes it. The first
  * choice has the focus when it opens.
  */
 @Composable
@@ -220,7 +220,10 @@ private val CHOICES_WIDTH = 520.dp
 /** Buttons sit close together: they grow less than covers, so a grown one stays clear of the next. */
 private const val BUTTON_GROW = 1.04f
 private val FOCUS_RING = 3.dp
-val TILE_WIDTH = 168.dp
+/** Six covers across a TV (960 dp wide less its edges), in Home's rows and the Library. */
+val TILE_WIDTH = 136.dp
+/** The Library's covers across. */
+const val GRID_COLUMNS = 6
 private val TILE_CORNER = 10.dp
 private val CONTROL = 56.dp
 private val BIG_CONTROL = 76.dp

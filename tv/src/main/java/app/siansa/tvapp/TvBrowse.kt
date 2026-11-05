@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -135,14 +136,15 @@ fun TvLibrary() {
                 }
             }
             tiles.isNullOrEmpty() -> EmptyNote(empty)
+            // Six across, as many as Home's rows show.
             else -> LazyVerticalGrid(
-                columns = GridCells.Adaptive(TILE_WIDTH),
+                columns = GridCells.Fixed(GRID_COLUMNS),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = TV_EDGE, vertical = Space.Page),
-                horizontalArrangement = Arrangement.spacedBy(Space.Section),
+                horizontalArrangement = Arrangement.spacedBy(Space.Page),
                 verticalArrangement = Arrangement.spacedBy(Space.Section),
             ) {
-                items(tiles.orEmpty(), key = { it.key }) { item -> TvItemTile(item) }
+                items(tiles.orEmpty(), key = { it.key }) { item -> TvItemTile(item, Modifier.fillMaxWidth()) }
             }
         }
     }

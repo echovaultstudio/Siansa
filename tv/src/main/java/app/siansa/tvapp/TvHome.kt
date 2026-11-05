@@ -208,7 +208,7 @@ fun TvItemRow(row: TvRow) {
         Text(row.title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = TV_EDGE))
         LazyRow(
             contentPadding = PaddingValues(horizontal = TV_EDGE, vertical = Space.Small),
-            horizontalArrangement = Arrangement.spacedBy(Space.Section),
+            horizontalArrangement = Arrangement.spacedBy(Space.Page),
         ) {
             items(row.items, key = { it.key }) { item -> TvItemTile(item) }
         }

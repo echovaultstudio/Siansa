@@ -44,14 +44,6 @@ class TvAppTest {
     }
 
     @Test
-    fun sleepTimerReadsPlainly() {
-        val now = 1_000_000L
-        assertEquals("Stops in 24 min", sleepLine(app.siansa.playback.SleepTimerState(endsAt = now + 24 * 60_000L + 5_000, totalMs = 0), now))
-        assertEquals("Stops in under a minute", sleepLine(app.siansa.playback.SleepTimerState(endsAt = now + 20_000, totalMs = 0), now))
-        assertEquals("Stops after this song", sleepLine(app.siansa.playback.SleepTimerState(endsAt = null, totalMs = 0), now))
-    }
-
-    @Test
     fun theTvsOwnPagesStandInForThePhones() {
         // The phone's pages for these aren't added to the TV's NavHost: the TV's are, under the same routes.
         assertTrue(TvRoutes.own.containsAll(listOf("home", "library", "search", "settings", "album/{id}", "artist/{id}", "playlist/{id}", "mix/{id}")))

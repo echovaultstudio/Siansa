@@ -25,13 +25,14 @@ To sign out, go to **Settings › Sign out** on the TV. Your phone stays signed 
 
 ## Finding your way
 
-Everything works with the remote's arrows and the centre button.
+Everything works with the remote's arrows and the centre button. The tabs along the top (Home, Library, Search,
+Settings) always open that tab's own page, wherever you are.
 
 - **Home**: Today's mix, Shuffle your library and Liked songs, then the rows of your phone's Home, in the same order
   and with the same rows hidden: Today's mixes (the daily mixes made today), Jump back in, Your mixes, Rediscover, Radios, Your playlists, Recently played, Artist
   radios, Recently added, Your genres and Random picks. A radio starts playing straight away.
-- **Library**: albums, artists, playlists and genres as covers, your liked songs, favourite albums and favourite
-  artists, and Time machine.
+- **Library**: albums, artists, playlists and genres as covers, six across, your liked songs, favourite albums and
+  favourite artists, and Time machine.
 - **Albums, playlists and mixes**: the cover (a playlist's own cover from the server) and what it is at the top, with the artists, genre and label to open,
   then Play, Shuffle and Add to favourites; down from them goes straight to the songs. The button at the end of each
   song has Play next, Add to queue, Like, Start song radio, Similar songs, and Go to album or artist.
@@ -39,9 +40,11 @@ Everything works with the remote's arrows and the centre button.
 - **Search**: type with the on-screen keyboard or press the microphone button and say it. "Play … on Siansa" from
   Google TV's own search opens it too.
 - **Now playing**: the cover, the song and the controls, large enough to read from the sofa, over the cover blurred as
-  on the phone. Under the controls are round buttons for Like, Lyrics (synced ones follow the song), Up next, Song
-  radio, Song path (with AudioMuse) and the sleep timer; each says its name as the remote reaches it. Animated covers
-  move here and on album pages, as on the phone. The artists and the album open their pages.
+  on the phone. Under the controls are round buttons for Like, Lyrics, Up next, Song radio and Song path (with
+  AudioMuse); each says its name as the remote reaches it. Synced lyrics follow the song; right from the buttons
+  reaches the lyrics, and up and down scroll through them. Animated covers move here and on album pages, as on the
+  phone. The artists and the album open their pages. The TV app has no sleep timer: the TV's own sleep setting
+  turns everything off.
 - **Typing**: the keyboard opens as soon as the remote reaches a text field. You can also type on your phone with the
   Google TV app's keyboard while it's open.
 - **Skipping within a song**: rewind and fast forward on the remote go back and forward 10 seconds anywhere in the

@@ -33,7 +33,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -189,11 +193,13 @@ object TvPrefs {
     fun setOpensPlayer(context: android.content.Context, on: Boolean) = prefs(context).edit().putBoolean(OPENS_PLAYER, on).apply()
 }
 
-/** Opens a tab from wherever the remote is: one page of each tab is kept, and Back from it goes Home. */
+/**
+ * Opens a tab's own page from wherever the remote is: Library from an album opened in it goes back to the Library, not
+ * to the album. Back from a tab goes Home.
+ */
 fun NavController.switchTab(route: String) = navigate(route) {
-    popUpTo(graph.findStartDestination().id) { saveState = true }
+    popUpTo(graph.findStartDestination().id)
     launchSingleTop = true
-    restoreState = true
 }
 
 @Composable
@@ -203,11 +209,15 @@ private fun TopBar(current: String, playing: Boolean, onTab: (String) -> Unit, o
         horizontalArrangement = Arrangement.spacedBy(Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Siansa's name as in its logo: the S in the accent, the rest white.
         Text(
-            "Siansa",
+            buildAnnotatedString {
+                withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append("S") }
+                append("iansa")
+            },
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
+            color = Color.White,
             modifier = Modifier.padding(end = Space.Section),
         )
         for ((tab, label) in TABS) {

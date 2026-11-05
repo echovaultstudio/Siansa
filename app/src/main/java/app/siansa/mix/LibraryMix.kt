@@ -20,7 +20,10 @@ object LibraryMix {
 
     /** The words of a text that may name a genre: lower case, three letters or more, common words left out. */
     fun words(text: String?): Set<String> =
-        text.orEmpty().lowercase().split(Regex("[^\\p{L}\\p{N}]+")).filter { it.length >= 3 && it !in STOP }.toSet()
+        text.orEmpty().lowercase().split(NOT_WORD).filter { it.length >= 3 && it !in STOP }.toSet()
+
+    /** Made once: compiling it for each of the 2,000 songs looked at froze the TV for most of a second (issue #860). */
+    private val NOT_WORD = Regex("[^\\p{L}\\p{N}]+")
 
     /** How well [song] fits: 2 for a genre the vibe names, 1 for one usually played at this hour, else 0. */
     fun fit(song: Song, vibe: Set<String>, hourGenres: Set<String>): Int {

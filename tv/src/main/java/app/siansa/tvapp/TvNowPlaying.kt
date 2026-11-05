@@ -1,6 +1,9 @@
 package app.siansa.tvapp
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.animateScrollBy
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
@@ -20,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.AltRoute
-import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.foundation.layout.size
@@ -79,13 +81,11 @@ fun TvNowPlaying() {
     val graph = LocalGraph.current
     val state by graph.player.state.collectAsStateWithLifecycle()
     val likes by graph.favorites.changes.collectAsStateWithLifecycle()
-    val sleep by graph.sleepTimer.state.collectAsStateWithLifecycle()
     // Read only by the parts that show it, so the rest of the page doesn't redraw twice a second.
     val progress = remember { mutableStateOf(graph.player.progress()) }
     // What the right side shows instead of the cover: the songs up next, or the lyrics.
     var panel by remember { mutableStateOf(Panel.NONE) }
     val queue = panel != Panel.NONE
-    var sleepChoices by remember { mutableStateOf(false) }
     // The name of the button the remote is on, in the row of other buttons.
     var focusedName by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
@@ -138,7 +138,7 @@ fun TvNowPlaying() {
                     }
                 }
                 ProgressBlock(progress, details(state.codec, state.transcodeKbps))
-                Row(horizontalArrangement = Arrangement.spacedBy(Space.Section), verticalAlignment = Alignment.CenterVertically) {
+                Row(horizontalArrangement = Arrangement.spacedBy(if (queue) Space.Page else Space.Section), verticalAlignment = Alignment.CenterVertically) {
                     TvIconButton(Icons.Rounded.Shuffle, "Shuffle", onClick = { graph.player.toggleShuffle() }, on = state.shuffle)
                     TvIconButton(Icons.Rounded.SkipPrevious, "Previous", onClick = { graph.player.previous() })
                     TvIconButton(
@@ -157,7 +157,6 @@ fun TvNowPlaying() {
                 }
                 // The rest, as round buttons too; the one the remote is on says its name underneath.
                 val likeName = if (liked) "Liked" else "Like"
-                val sleepName = sleep?.let { sleepLine(it) } ?: "Sleep timer"
                 Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                     // Wraps onto a second line when Up next or Lyrics leaves less room.
                     androidx.compose.foundation.layout.FlowRow(
@@ -181,16 +180,10 @@ fun TvNowPlaying() {
                             TvIconButton(Icons.Rounded.AltRoute, "Song path", onClick = { song?.let { nav.openSongPath(it.id, fromNowPlaying = true) } },
                                 modifier = Modifier.named("Song path"))
                         }
-                        TvIconButton(Icons.Rounded.Bedtime, sleepName, onClick = { sleepChoices = true }, on = sleep != null, modifier = Modifier.named(SLEEP))
                     }
                     // Always there, so the page doesn't move as the name comes and goes.
                     Text(
-                        when (focusedName) {
-                            LIKE -> likeName
-                            SLEEP -> sleepName
-                            null -> sleep?.let { sleepLine(it) } ?: ""
-                            else -> focusedName.orEmpty()
-                        },
+                        if (focusedName == LIKE) likeName else focusedName.orEmpty(),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -205,7 +198,6 @@ fun TvNowPlaying() {
             }
         }
     }
-    if (sleepChoices) SleepChoices(onDismiss = { sleepChoices = false })
 }
 
 /**
@@ -252,13 +244,13 @@ private fun ProgressBlock(progress: androidx.compose.runtime.MutableState<app.si
 
 private enum class Panel { NONE, QUEUE, LYRICS }
 
-/** The buttons whose name changes (Like or Liked, the sleep timer's time left), by what they are. */
+/** Like, whose name changes to Liked: kept by what it is, so the name under the buttons follows. */
 private const val LIKE = "like"
-private const val SLEEP = "sleep"
 
 /**
  * The song's lyrics from the server, as on the phone: synced ones follow the song, the line being sung lit and kept in
- * view; others are shown to read along, and down scrolls through them.
+ * view. Right from the buttons reaches them, and up and down then scroll through them; synced ones follow the song again
+ * a few seconds after the last press.
  */
 @Composable
 private fun LyricsPanel(song: app.siansa.data.Song?, positionMs: () -> Long) {
@@ -273,15 +265,53 @@ private fun LyricsPanel(song: app.siansa.data.Song?, positionMs: () -> Long) {
         androidx.compose.runtime.derivedStateOf { if (synced) lines.indexOfLast { (it.startMs ?: Long.MAX_VALUE) <= positionMs() } else -1 }
     }
     val list = androidx.compose.foundation.lazy.rememberLazyListState()
-    LaunchedEffect(current) { if (current >= 0) list.animateScrollToItem((current - LINES_ABOVE).coerceAtLeast(0)) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val step = with(androidx.compose.ui.platform.LocalDensity.current) { LYRICS_STEP.toPx() }
+    var focused by remember { mutableStateOf(false) }
+    // While the remote scrolls them, synced lyrics stop following the song, and start again a few seconds later.
+    var scrolledAt by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
+    var following by remember { mutableStateOf(true) }
+    LaunchedEffect(scrolledAt) {
+        if (scrolledAt == 0L) return@LaunchedEffect
+        delay(FOLLOW_AGAIN_MS)
+        following = true
+    }
+    LaunchedEffect(current, following) { if (following && current >= 0) list.animateScrollToItem((current - LINES_ABOVE).coerceAtLeast(0)) }
     Column(Modifier.width(QUEUE_WIDTH).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-        Text("Lyrics", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            if (focused) "Lyrics · up and down scroll" else "Lyrics",
+            style = MaterialTheme.typography.titleLarge,
+            color = if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
         if (lines.isEmpty()) {
             Text(if (lyrics == null && song != null) "No lyrics for this song on your server." else "", style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
-            LazyColumn(state = list, contentPadding = PaddingValues(bottom = Space.Large), verticalArrangement = Arrangement.spacedBy(Space.Small),
-                modifier = if (synced) Modifier else Modifier.focusable()) {
+            val shape = RoundedCornerShape(Space.Small)
+            LazyColumn(
+                state = list,
+                contentPadding = PaddingValues(horizontal = Space.Small, vertical = Space.Small),
+                verticalArrangement = Arrangement.spacedBy(Space.Small),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .border(LYRICS_RING, if (focused) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
+                    .onFocusChanged { focused = it.isFocused }
+                    .onKeyEvent { e ->
+                        if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                        val delta = when (e.key) {
+                            Key.DirectionDown -> step
+                            Key.DirectionUp -> -step
+                            else -> return@onKeyEvent false
+                        }
+                        following = false
+                        scrolledAt = android.os.SystemClock.elapsedRealtime()
+                        scope.launch { list.animateScrollBy(delta) }
+                        true
+                    }
+                    .focusable(),
+            ) {
                 itemsIndexed(lines, key = { i, _ -> i }) { i, line ->
                     Text(
                         line.text,
@@ -326,26 +356,6 @@ private fun UpNext(queue: List<app.siansa.data.Song>, index: Int) {
     }
 }
 
-/** The sleep timer's choices: stop after a while, or at the end of this song. */
-@Composable
-private fun SleepChoices(onDismiss: () -> Unit) {
-    val graph = LocalGraph.current
-    val timer = graph.sleepTimer
-    val choices = buildList<Pair<String, () -> Unit>> {
-        if (timer.state.value != null) add("Turn off the sleep timer" to { timer.cancel() })
-        for (m in SLEEP_MINUTES) add("$m minutes" to { timer.start(m, windDown = false) })
-        add("At the end of this song" to { timer.startEndOfSong() })
-    }
-    TvChoices("Sleep timer", choices, onDismiss)
-}
-
-/** "Stops in 24 min", or "Stops after this song". */
-fun sleepLine(timer: app.siansa.playback.SleepTimerState, now: Long = System.currentTimeMillis()): String {
-    val ends = timer.endsAt ?: return "Stops after this song"
-    val left = ((ends - now) / 60_000L).coerceAtLeast(0)
-    return if (left < 1) "Stops in under a minute" else "Stops in $left min"
-}
-
 /** "FLAC", "Opus 160 kbit/s", or nothing until the player knows. */
 fun details(codec: String?, kbps: Int): String = when {
     kbps > 0 -> "Opus $kbps kbit/s"
@@ -358,10 +368,13 @@ private const val SEEK_MS = 10_000L
 private val COVER_SIZE = 320.dp
 private const val TRACK_ALPHA = 0.25f
 private const val LINES_ABOVE = 2
+/** How far one press of up or down scrolls the lyrics: about three lines. */
+private val LYRICS_STEP = 120.dp
+private const val FOLLOW_AGAIN_MS = 4_000L
+private val LYRICS_RING = 2.dp
 private const val ROW_GROW = 1.02f
 private const val QUEUE_SHOWN = 100
 private const val MAX_ARTISTS = 3
-private val SLEEP_MINUTES = listOf(15, 30, 45, 60, 90)
 private val PROGRESS_HEIGHT = 6.dp
 private val SEEKING_HEIGHT = 12.dp
 
@@ -373,4 +386,5 @@ fun seekBy(graph: app.siansa.AppGraph, deltaMs: Long) {
 }
 
 private const val END_MARGIN_MS = 1_000L
-private val QUEUE_WIDTH = 420.dp
+/** Leaves the controls room for all their buttons in a row beside it. */
+private val QUEUE_WIDTH = 380.dp

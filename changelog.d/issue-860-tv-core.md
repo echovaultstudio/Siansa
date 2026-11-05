@@ -1,7 +1,7 @@
 ### Added
 - **More of Siansa on the TV.** The TV app's Home now has Today's mix, your mixes, radios, Rediscover, Jump back in and
   the other rows of your phone's Home, in the same order. The Library has liked songs and genres. Songs have Play next,
-  Add to queue, Like and song radio. Now playing has Like, Up next and a sleep timer.
+  Add to queue, Like and song radio. Now playing has Like and Up next.
 - **Favourites on the TV**: favourite albums and artists in the Library, and a heart on album and artist pages.
 - **Artist pages on the TV**: top songs, albums and similar artists, with Play, Shuffle and Artist radio; artists,
   genres and albums on other pages open them.
@@ -38,6 +38,13 @@
   sharp), the page is calmer, with the other buttons round under the controls and their names shown as the remote
   reaches them, and it runs more smoothly.
 - Buttons on the TV that looked joined to the one beside them when the remote was on them.
+- The TV's tabs along the top go back to that tab's own page: Library from an album opened in it shows the Library
+  again, not the album.
+- The TV's Library and Home rows show six covers across instead of four or five, and the lyrics in Now playing can be
+  scrolled with the remote.
+- Pausing for most of a second when making a mix (Today's mix, a daily mix), on the phone too; and the TV uses less memory for covers,
+  giving them back when the TV runs low (an NVIDIA SHIELD kept warning of low memory). The sleep timer is gone from
+  the TV app.
 - Text fields on the TV now open the keyboard as soon as the remote reaches them, and take what's typed on a phone
   with the Google TV app.
 - Siansa's settings showing the Siansa plugin as 0.3.3 whatever version was installed (update the plugin to 0.5.6).

@@ -266,10 +266,13 @@ fun PlaybackSettingsScreen(nav: NavController) {
                 ContinuousChips(settings.continuousPlay) { graph.settings.setContinuousPlay(it) }
                 Hint(continuousHint(settings.continuousPlay, settings.audioMuseReady))
             }
-            HorizontalDivider()
-            FoldSection("Wind down", "${settings.windDownSongs} songs") {
-                Hint("With the sleep timer's Wind down switched on and no time picked, how many calmer songs play before the music ends?")
-                WindDownChips(settings.windDownSongs) { graph.settings.save(graph.settings.current.copy(windDownSongs = it)) }
+            // The TV app has no sleep timer (issue #860), so nothing to wind down.
+            if (!app.siansa.BuildConfig.TV_APP) {
+                HorizontalDivider()
+                FoldSection("Wind down", "${settings.windDownSongs} songs") {
+                    Hint("With the sleep timer's Wind down switched on and no time picked, how many calmer songs play before the music ends?")
+                    WindDownChips(settings.windDownSongs) { graph.settings.save(graph.settings.current.copy(windDownSongs = it)) }
+                }
             }
         }
     }
