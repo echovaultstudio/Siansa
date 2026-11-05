@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -192,8 +193,10 @@ class SpacingHomeTest : SpacingCheck() {
     @Test fun homeMenuBubblesSitInLine() {
         compose.setContent {
             SiansaTheme {
+                // Narrow, as on a small phone with big text: a long name and Stop mustn't squeeze a bubble.
                 app.siansa.ui.HomeMenuPanel(
-                    app.siansa.ui.HomeMenuInfo(
+                    modifier = Modifier.widthIn(max = 280.dp),
+                    info = app.siansa.ui.HomeMenuInfo(
                         app.siansa.ui.PlayOnLine("Playing on Living Room SHIELD with an uncharacteristically long name", "Chromecast", true),
                         "Downloaded only · 2 users", true,
                     ),

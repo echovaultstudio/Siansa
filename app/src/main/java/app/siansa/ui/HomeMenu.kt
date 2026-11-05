@@ -290,6 +290,7 @@ fun HomeMenuOverlay(state: HomeMenuState, info: HomeMenuInfo, onPick: (HomeMenuI
         }
         val anchor = state.anchor
         val gap = with(density) { Space.Small.toPx() }
+        val edge = with(density) { Space.Page.toPx() }
         // Half the room between bubbles counts for the bubble on each side, so a glide never falls between two.
         val reach = with(density) { Space.Medium.toPx() } / 2
         AnimatedVisibility(
@@ -298,7 +299,9 @@ fun HomeMenuOverlay(state: HomeMenuState, info: HomeMenuInfo, onPick: (HomeMenuI
             enter = fadeIn(tween(120)),
             exit = fadeOut(tween(100)),
             modifier = Modifier.layout { measurable, constraints ->
-                val menu = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                // No wider than the room left of the button's right edge, keeping the page margin on the left.
+                val room = anchor?.let { (it.right - origin.x - edge).roundToInt() }?.coerceIn(0, constraints.maxWidth) ?: constraints.maxWidth
+                val menu = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0, maxWidth = room))
                 layout(constraints.maxWidth, constraints.maxHeight) {
                     val a = anchor ?: return@layout
                     // The bubbles are the button's size, so the menu's right edge on the button's lines them up.
@@ -420,7 +423,9 @@ private fun HomeMenuBubble(
             shape = RoundedCornerShape(50),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shadowElevation = 4.dp,
-            modifier = Modifier.widthIn(max = MENU_LABEL_MAX).wrapContentHeight(unbounded = true).testTag("homeMenuLabel-$tag"),
+            // Weighted, so the Row measures the bubble (and Stop) first: a long name shortens with "…", the bubble
+            // never shrinks or leaves the line.
+            modifier = Modifier.weight(1f, fill = false).widthIn(max = MENU_LABEL_MAX).wrapContentHeight(unbounded = true).testTag("homeMenuLabel-$tag"),
         ) {
             Row(Modifier.padding(horizontal = Space.Medium, vertical = Space.Small), verticalAlignment = Alignment.CenterVertically) {
                 Text(
