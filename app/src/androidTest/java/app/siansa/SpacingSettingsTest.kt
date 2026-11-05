@@ -166,7 +166,7 @@ class SpacingSettingsTest : SpacingCheck() {
         app.siansa.ui.FoldMemory.setFolded(context, "radio", false)
     }
 
-    /** Downloads › Image cache (issue #780, moved from Storage): the size chips sit evenly between their label and Clear. */
+    /** Settings › Data › Image cache (issue #780, moved from Storage; in Data since v1.0): the size chips sit evenly between their label and Clear. */
     @Test fun imageCacheChipsAreEvenlySpaced() {
         val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
         compose.setContent {
@@ -350,7 +350,7 @@ class SpacingSettingsTest : SpacingCheck() {
             SiansaTheme {
                 Column {
                     app.siansa.ui.HubGroup("Sources", first = true)
-                    HubRow(Icons.Rounded.Palette, "Servers and services") { }
+                    HubRow(Icons.Rounded.Palette, "Connections") { }
                     app.siansa.ui.HubGroup("Look")
                     HubRow(Icons.Rounded.Palette, "Style") { }
                 }
@@ -372,7 +372,7 @@ class SpacingSettingsTest : SpacingCheck() {
         gaps.forEach { assertEven("Gap between source rows", gaps[0], it, 1.dp) }
     }
 
-    /** Settings › Servers and services (issue #665): folded cards are one height, evenly spaced, the page margin from the edges. */
+    /** Settings › Connections (issue #665): folded cards are one height, evenly spaced, the page margin from the edges. */
     @Test fun connectionCardsAreEven() {
         compose.setContent {
             SiansaTheme {

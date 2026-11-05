@@ -315,7 +315,7 @@ fun HomeScreen(nav: NavController) {
         for (section in HomeSection.visible(homeOrder, homeHidden)) {
             val look = homeSettings.homeLooks[section] ?: HomeLook.AS_IS
             when (section) {
-                // The chips row (issue #784); its kinds are set in Settings › Home › Notices.
+                // The chips row (issue #784); its kinds are set in Settings › Notices and Cards › Notices.
                 // The notices are the top of Home now (issue #872), not a section of their own.
                 HomeSection.NOTICES -> Unit
                 HomeSection.QUICK -> {
@@ -480,7 +480,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.CARDS -> {
-                    // Your cards (issue #622), in the order set in Settings › Home › Cards; each is its own row.
+                    // Your cards (issue #622), in the order set in Settings › Notices and Cards › Cards; each is its own row.
                     pinnedCards.orEmpty().filter { it.shown }.forEach { card ->
                         item(key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
                     }
@@ -771,7 +771,7 @@ internal fun MakeTodayCard(onMake: () -> Unit) {
         Row(Modifier.padding(Space.Page), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Today's mix", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("None made yet. Auto update is off in Settings › Mixes and vibes, so it's made when you ask.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("None made yet. Auto update is off in Settings › Auto Generated Mixes, so it's made when you ask.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(Space.Page))
             FilledTonalButton(onClick = onMake) { Text("Make it") }

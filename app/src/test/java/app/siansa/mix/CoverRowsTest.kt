@@ -81,7 +81,7 @@ class CoverRowsTest {
     @Test fun booksNeedAudiobookshelfAndTheirOwnLook() {
         val card = PinnedCard.new("Audiobooks").copy(contents = CardContents.BOOKS, look = CardLook.COVER_ROWS)
         assertNull("no rules needed", pinnedCardProblem(card, audioMuseReady = false, booksReady = true))
-        assertEquals("Set up Audiobookshelf in Settings › Servers and services first.", pinnedCardProblem(card, false, booksReady = false))
+        assertEquals("Set up Audiobookshelf in Settings › Connections first.", pinnedCardProblem(card, false, booksReady = false))
         assertEquals("Books and episodes show as Cover rows.", pinnedCardProblem(card.copy(look = CardLook.TILES), false, booksReady = true))
         assertEquals("Audiobooks · Recently added", card.copy(sort = CardSort.ADDED).detail)
     }

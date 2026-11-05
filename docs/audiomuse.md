@@ -24,7 +24,7 @@ how it starts and ends, and similar albums and artists.
 
 ## Set up AudioMuse-AI in Siansa
 
-**Settings › Servers and services › Services › AudioMuse-AI**:
+**Settings › Connections › Services › AudioMuse-AI**:
 
 1. **Server address**, for example `http://192.168.1.10:8000`.
 2. If AudioMuse-AI has a login: either an **API token**, or its **user name and password**.
@@ -59,7 +59,7 @@ It needs AudioMuse-AI 3.6.4 or later and works on the standalone builds too.
 Until a song is measured, Siansa uses its ReplayGain tags, and crossfades use the fixed length.
 
 Plugin 0.3.0 also measures the beat grid at each end of a song (tempo, where the beats and bars fall, how
-beat-driven and how steady the end is), for [beat-matched blends](playback.md#beat-matched-blends-experimental);
+beat-driven and how steady the end is), for [beat-matched blends](playback.md#beat-matched-blends);
 0.4.0 finds the phrases too (which bar of every 4 or 8 starts one, from where the parts of the song come in or
 drop out, read over the song's last minute and its first 40 s), so blends go phrase on phrase. A song whose bars
 don't change from one to the next gets no phrase, and blends bar on bar; so does one whose last minute changes
@@ -103,7 +103,7 @@ AudioMuse-AI 3 can serve several music servers (for example Navidrome and Emby).
 name** in AudioMuse-AI (Setup › Music Servers). Siansa must name the right server in every request, or AudioMuse
 answers with the other server's songs or says it doesn't know the song.
 
-In **Settings › Servers and services**, in the card of your music server, **Server name in AudioMuse** is its name,
+In **Settings › Connections**, in the card of your music server, **Server name in AudioMuse** is its name,
 as AudioMuse-AI shows it (capitals don't matter). Leave it empty for AudioMuse-AI's default server. Each user keeps
 their own: enter the Emby server's name in your Emby user's card, and Navidrome's in your Navidrome user's.
 

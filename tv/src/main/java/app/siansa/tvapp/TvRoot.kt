@@ -55,7 +55,7 @@ import app.siansa.ui.siansaRoutes
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /** The TV app's own pages (issue #860), by route. Album, artist, playlist and mix use the phone's routes, so a phone page
- * that opens one (a mix from Mixes and vibes, an album from a radio) opens the TV's. */
+ * that opens one (a mix from Auto Generated Mixes, an album from a radio) opens the TV's. */
 object TvRoutes {
     const val HOME = "home"
     const val LIBRARY = "library"

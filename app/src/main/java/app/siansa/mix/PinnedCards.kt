@@ -135,11 +135,11 @@ val BOOK_SORTS = listOf(CardSort.ADDED, CardSort.NAME, CardSort.RANDOM)
 fun pinnedCardProblem(card: PinnedCard, audioMuseReady: Boolean, thisYear: Int = LocalDate.now().year, booksReady: Boolean = true): String? = when {
     card.title.isBlank() -> "Give the card a name."
     // Books and episodes come from Audiobookshelf, in their own look, without rules (issue #782).
-    card.contents.fromBooks && !booksReady -> "Set up Audiobookshelf in Settings › Servers and services first."
+    card.contents.fromBooks && !booksReady -> "Set up Audiobookshelf in Settings › Connections first."
     card.contents.fromBooks && card.look != CardLook.COVER_ROWS -> "Books and episodes show as Cover rows."
     card.contents.fromBooks -> if (card.size !in 1..MAX_SIZE) "A card holds 1 to $MAX_SIZE." else null
     card.contents == CardContents.ALBUMS && card.source == CardSource.SOUND -> "Albums come from your library: pick From your library."
-    card.source == CardSource.SOUND && !audioMuseReady -> "Set up AudioMuse-AI in Settings › Servers and services to make a card by sound."
+    card.source == CardSource.SOUND && !audioMuseReady -> "Set up AudioMuse-AI in Settings › Connections to make a card by sound."
     card.source == CardSource.SOUND && card.sound.isBlank() -> "Describe the sound."
     card.source == CardSource.LIBRARY && !card.hasRule -> "Set at least one rule, so the card isn't your whole library."
     card.fromYear != null && card.fromYear !in 1900..thisYear -> "Years run from 1900 to $thisYear."
@@ -306,7 +306,7 @@ class PinnedCards(private val graph: AppGraph, context: Context) {
                 val found = graph.generator.soundSearch(card.sound.trim(), card.size.coerceAtMost(PinnedCard.SIZE))
                 found to if (card.look == CardLook.ALBUMS) albumIdsOf(found).take(ALBUMS).mapNotNull { graph.library.album(it) } else emptyList()
             }
-            !graph.library.isSynced -> throw IllegalStateException("Sync your library first (Settings › Servers and services, under your server)")
+            !graph.library.isSynced -> throw IllegalStateException("Sync your library first (Settings › Connections, under your server)")
             card.contents == CardContents.ALBUMS -> {
                 val needsFavourites = card.allRules.any { it.field == RuleField.FAVOURITE }
                 val favourites = if (needsFavourites) graph.library.starredSongs().mapNotNullTo(HashSet()) { it.albumId } else emptySet()
@@ -339,7 +339,7 @@ class PinnedCards(private val graph: AppGraph, context: Context) {
      */
     /** The content, and whether every request for it worked (a partial one isn't kept for the day). */
     private suspend fun bookContent(card: PinnedCard, random: Random): Pair<CardContent, Boolean> {
-        if (!graph.settings.current.booksReady) throw IllegalStateException("Set up Audiobookshelf in Settings › Servers and services first")
+        if (!graph.settings.current.booksReady) throw IllegalStateException("Set up Audiobookshelf in Settings › Connections first")
         val size = card.size.coerceIn(1, MAX_SIZE)
         var whole = true
         /** One podcast's episodes; a failure leaves it out and marks the content partial. A cancel goes on up. */

@@ -56,7 +56,7 @@ Settings) always open that tab's own page, wherever you are.
 
 ## AudioMuse
 
-With AudioMuse set up (on the phone or under **Settings › Servers and services** on the TV), the TV has what it adds on
+With AudioMuse set up (on the phone or under **Settings › Connections** on the TV), the TV has what it adds on
 the phone:
 
 - **Your sound** and **Discover for you** among Your mixes on Home, made when you pick them.
@@ -79,9 +79,9 @@ The TV has the settings that matter on a TV, each the same page as on the phone:
 - **Servers and users**: every server and user on the TV; pick one to switch (Siansa starts again as them). **Add a
   server or user** signs in with the code on the TV, like the first time, and keeps its own library and settings.
 - **Show music from**: whose music shows on the TV and which of their libraries, as in the phone's Sources.
-- **Servers and services** (AudioMuse, Last.fm and more), **Library sync**, **Mixes and vibes** and **Scrobbling and history**.
+- **Connections** (AudioMuse, Last.fm and more), **Library sync**, **Auto Generated Mixes** and **Scrobbling and history**.
 - **Audio passthrough** (below), **Playback** (crossfades, DJ blends, levelling, the equaliser, keep playing) and
-  **Streaming quality**.
+  **Streaming quality** (on the Playback page).
 - **Colours**: the TV is always dark.
 - **Help**: debug logs, **Report a problem**, the log, What's new and About.
 - **Open Now playing when a song starts**: on from the start; picking a song, an album or a radio goes straight to the

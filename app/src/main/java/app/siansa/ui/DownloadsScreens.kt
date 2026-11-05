@@ -289,46 +289,16 @@ fun DownloadsScreen(nav: NavController) {
             item {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
                     HorizontalDivider()
-                    Heading("Settings")
-                    SwitchRow("Download on Wi-Fi only", settings.downloadWifiOnly) { on ->
-                        graph.settings.setDownloads(wifiOnly = on)
-                        graph.downloads.retry()
-                    }
-                    Hint(
-                        if (settings.downloadWifiOnly) "A VPN counts as mobile data, so nothing downloads while one is on."
-                        else "Downloads on any connection, including mobile data and a VPN.",
-                    )
-                    Text("Download quality", style = MaterialTheme.typography.bodyLarge)
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                        downloadQualities.forEach { kbps ->
-                            FilterChip(
-                                selected = settings.downloadKbps == kbps,
-                                onClick = { graph.settings.setDownloads(kbps = kbps) },
-                                label = { Text(if (kbps == 0) "Original" else "Opus $kbps") },
-                            )
-                        }
-                    }
-                    Hint(ServerWords.downloadHint(LocalGraph.current.settings.current.sourceKind))
-                    Text("Storage limit", style = MaterialTheme.typography.bodyLarge)
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                        downloadLimits.forEach { mb ->
-                            FilterChip(
-                                selected = settings.downloadLimitMb == mb,
-                                onClick = {
-                                    graph.settings.setDownloads(limitMb = mb)
-                                    graph.downloads.retry()
-                                },
-                                label = { Text(if (mb == 0) "No limit" else formatSize(mb * 1024L * 1024L)) },
-                            )
-                        }
-                    }
-                    Hint("Downloads stop when the limit is reached. Remove something to make room.")
+                    // How music downloads and the covers kept on the phone are in Settings › Data (v1.0, the owner).
+                    PageLink(
+                        "Download settings",
+                        "${if (settings.downloadWifiOnly) "Wi-Fi only" else "Any connection"} · ${qualityLabel(settings.downloadKbps)} · " +
+                            (if (settings.downloadLimitMb > 0) "up to ${formatSize(settings.downloadLimitMb * 1024L * 1024L)}" else "no limit") + " · covers",
+                        "downloadSettings",
+                    ) { nav.navigate("settings/streaming") }
                     if (list.items.isNotEmpty()) {
                         OutlinedButton(onClick = { removeAll = true }) { Text("Remove all downloads") }
                     }
-                    CoverDownloadSection()
-                    // The image cache, with the covers it keeps (issue #780, moved here from Storage).
-                    ImageCacheSection()
                 }
             }
         }
@@ -437,7 +407,7 @@ fun DownloadPickerScreen(nav: NavController) {
                 is Load.Ok -> {
                     if (o.value.isEmpty()) item {
                         Text(
-                            "Nothing here yet. Sync your library first (Settings › Servers and services, under your server).",
+                            "Nothing here yet. Sync your library first (Settings › Connections, under your server).",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(Space.Page),
@@ -642,8 +612,83 @@ private fun StopAllButton(onStop: () -> Unit) {
 internal fun DownloadControlForTest() = DownloadControl(Icons.Rounded.Pause, "Pause") { }
 
 /**
- * Download all covers (issue #302, moved here from Storage), placed in the Settings column under the song
- * download settings: the switch, when it may run, a network check, and its progress with Stop or Download covers now.
+ * Settings › Data's downloads (v1.0, the owner: everything Downloads had in Settings): the music kept on the phone
+ * (opening Downloads to see, add or remove it), on which connections and at what quality it downloads, the storage
+ * limit, Remove all downloads, and the covers kept on the phone (Download all covers and the image cache).
+ */
+@Composable
+internal fun DownloadSettings(nav: NavController) {
+    val graph = LocalGraph.current
+    val list by graph.downloads.list.collectAsStateWithLifecycle()
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    var removeAll by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { graph.downloads.refresh() }
+    val used = list.done.sumOf { it.bytes }
+    val total = "${list.done.size} songs · ${formatSize(used)}" + if (settings.downloadLimitMb > 0) " of ${formatSize(settings.downloadLimitMb * 1024L * 1024L)}" else ""
+    FoldSection("Downloads", total) {
+        PageLink("Your downloads", "$total · add or remove music", "dataDownloads") { nav.navigate("downloads") }
+        SwitchRow("Download on Wi-Fi only", settings.downloadWifiOnly) { on ->
+            graph.settings.setDownloads(wifiOnly = on)
+            graph.downloads.retry()
+        }
+        Hint(
+            if (settings.downloadWifiOnly) "A VPN counts as mobile data, so nothing downloads while one is on."
+            else "Downloads on any connection, including mobile data and a VPN.",
+        )
+        Text("Download quality", style = MaterialTheme.typography.bodyLarge)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            downloadQualities.forEach { kbps ->
+                FilterChip(
+                    selected = settings.downloadKbps == kbps,
+                    onClick = { graph.settings.setDownloads(kbps = kbps) },
+                    label = { Text(if (kbps == 0) "Original" else "Opus $kbps") },
+                )
+            }
+        }
+        Hint(ServerWords.downloadHint(settings.sourceKind))
+        Text("Storage limit", style = MaterialTheme.typography.bodyLarge)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            downloadLimits.forEach { mb ->
+                FilterChip(
+                    selected = settings.downloadLimitMb == mb,
+                    onClick = {
+                        graph.settings.setDownloads(limitMb = mb)
+                        graph.downloads.retry()
+                    },
+                    label = { Text(if (mb == 0) "No limit" else formatSize(mb * 1024L * 1024L)) },
+                )
+            }
+        }
+        Hint("Downloads stop when the limit is reached. Remove something to make room.")
+        if (list.items.isNotEmpty()) {
+            OutlinedButton(onClick = { removeAll = true }) { Text("Remove all downloads") }
+        }
+    }
+    HorizontalDivider()
+    FoldSection("Covers on the phone", if (settings.coverDownload) "Download all covers on" else null) {
+        CoverDownloadSection()
+        // The image cache, with the covers it keeps (issue #780).
+        ImageCacheSection()
+    }
+    if (removeAll) {
+        AlertDialog(
+            onDismissRequest = { removeAll = false },
+            title = { Text("Remove all downloads?") },
+            text = { Text("Everything will need a connection to play again. Playlists kept on this phone download again.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    removeAll = false
+                    graph.downloads.removeAll()
+                }) { Text("Remove all") }
+            },
+            dismissButton = { TextButton(onClick = { removeAll = false }) { Text("Keep") } },
+        )
+    }
+}
+
+/**
+ * Download all covers (issue #302), in Settings › Data's Covers on the phone: the switch, when it may run, a
+ * network check, and its progress with Stop or Download covers now.
  */
 @Composable
 private fun CoverDownloadSection() {
@@ -651,7 +696,6 @@ private fun CoverDownloadSection() {
     val context = LocalContext.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     var refresh by remember { mutableIntStateOf(0) }
-    HorizontalDivider()
     Heading("Download all covers")
     Hint("Fetches every album, artist and playlist cover in the background, so browsing never waits for one. Runs after each library sync and once a day, and only fetches covers that aren't on the phone yet. Choose No limit under Image cache, below, so none are removed again.")
     val download by CoverDownload.progress.collectAsStateWithLifecycle()

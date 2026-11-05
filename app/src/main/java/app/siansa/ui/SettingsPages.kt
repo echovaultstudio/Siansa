@@ -34,44 +34,14 @@ import app.siansa.mix.NoticeMode
 import app.siansa.mix.NoticePrefs
 
 /**
- * Settings › Audiobooks and podcasts (issue #780): the book player's skip buttons (moved here from Playback) and the
- * way to the Audiobookshelf server, which is set up with the other servers.
- */
-@Composable
-fun BooksSettingsScreen(nav: NavController) {
-    val graph = LocalGraph.current
-    val settings by graph.settings.state.collectAsStateWithLifecycle()
-    Screen(title = "Audiobooks and podcasts", nav = nav) { padding ->
-        Column(
-            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
-            verticalArrangement = Arrangement.spacedBy(Space.Medium),
-        ) {
-            FoldSection("Skip buttons", "Back ${settings.bookSkipBackSec} s · forward ${settings.bookSkipForwardSec} s") {
-                Hint("How far the book player's skip buttons jump.")
-                Text("Back", style = MaterialTheme.typography.bodyMedium)
-                SkipChips(settings.bookSkipBackSec, "bookSkipBack") { graph.settings.save(graph.settings.current.copy(bookSkipBackSec = it)) }
-                Text("Forward", style = MaterialTheme.typography.bodyMedium)
-                SkipChips(settings.bookSkipForwardSec, "bookSkipForward") { graph.settings.save(graph.settings.current.copy(bookSkipForwardSec = it)) }
-            }
-            HorizontalDivider()
-            PageLink(
-                "Audiobookshelf",
-                if (settings.booksReady) "Signed in. Change it with your other servers." else "Not set up yet. Add it with your other servers.",
-                "booksServer",
-            ) { nav.navigate("settings/audiobookshelf") }
-        }
-    }
-}
-
-/**
- * Settings › Home (issue #780): the notices and the cards. The source filter and Arrange Home are only behind the
+ * Settings › Notices and Cards (issue #780, was Home): the notices and the cards. The source filter and Arrange Home are only behind the
  * button at the top of Home, where they act on what's in front of you.
  */
 @Composable
 fun HomeSettingsScreen(nav: NavController) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    Screen(title = "Home", nav = nav) { padding ->
+    Screen(title = "Notices and Cards", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
@@ -87,7 +57,7 @@ fun HomeSettingsScreen(nav: NavController) {
 }
 
 /**
- * Settings › Home › Notices (issue #784): the chips at the top of Home, shown or not, and each kind pinned (always
+ * Settings › Notices and Cards › Notices (issue #784): the chips at the top of Home, shown or not, and each kind pinned (always
  * first, in the order pinned), automatic (ordered by what matters and what you tap) or off.
  */
 @Composable

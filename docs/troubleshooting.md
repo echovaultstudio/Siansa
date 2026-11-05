@@ -5,7 +5,7 @@ few times, then use **Report a problem** there. See [Reporting problems](privacy
 
 ## Can't connect to my server
 
-- Use **Test** in **Settings › Servers and services**. It shows what the server answered.
+- Use **Test** in **Settings › Connections**. It shows what the server answered.
 - Try the address in the phone's browser. If that doesn't load either, it's the network: are you on the same
   Wi-Fi, or on your VPN when away from home?
 - Include the port (`:4533` for Navidrome, `:8096` for Emby) and `http://` or `https://`.
@@ -26,7 +26,7 @@ The album, artist or song isn't on the server Siansa asked. Common reasons:
 Song radio, similar songs or similar albums say "AudioMuse doesn't know this song".
 
 1. **Has AudioMuse-AI analysed it?** New songs need its analysis first. Check in AudioMuse-AI, or run an analysis.
-2. **Several music servers in AudioMuse-AI?** Each server's name must be set in **Settings › Servers and services**, in the
+2. **Several music servers in AudioMuse-AI?** Each server's name must be set in **Settings › Connections**, in the
    card of that music server (Server name in AudioMuse), exactly as AudioMuse-AI shows it. See
    [Several music servers](audiomuse.md#several-music-servers-in-one-audiomuse-ai).
 3. **Does AudioMuse-AI know the song on that server?** It links a second server's songs by analysis or by
