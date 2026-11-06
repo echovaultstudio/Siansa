@@ -314,7 +314,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
             )
 
             val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-            // A slide from the play button shows its choice in the middle of the cover (siansa-dev#38).
+            // A slide from the play button shows its choice in the middle of the cover (issue #933).
             var slideLabel by remember { mutableStateOf<SlideLabel?>(null) }
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 // The player fills the screen; the cards below only come into view when scrolling, so none
@@ -723,7 +723,7 @@ private fun SeekBar(state: PlayerState) {
 
 /**
  * Repeat, previous, play, next and add to playlist. [onSlide]: what a slide from the play button runs (issue #919),
- * null for none; [onSlideLabel] gets what the slide shows, for the cover (siansa-dev#38).
+ * null for none; [onSlideLabel] gets what the slide shows, for the cover (issue #933).
  */
 @Composable
 internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null, onSlideLabel: (SlideLabel?) -> Unit = {}) {

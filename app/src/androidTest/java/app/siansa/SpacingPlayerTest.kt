@@ -274,7 +274,7 @@ class SpacingPlayerTest : SpacingCheck() {
         assertEven("Up and left", upGap, leftGap, 1.dp)
     }
 
-    /** A slide's name sits in the middle of the cover, out from under the thumb (siansa-dev#38). */
+    /** A slide's name sits in the middle of the cover, out from under the thumb (issue #933). */
     @Test fun slideNameIsCentredInTheCover() {
         compose.setContent {
             SiansaTheme {

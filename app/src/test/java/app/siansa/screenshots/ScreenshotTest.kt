@@ -433,7 +433,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // A slide's choice in the middle of the cover (siansa-dev#38): far enough to start, not yet, and one that can't run.
+            // A slide's choice in the middle of the cover (issue #933): far enough to start, not yet, and one that can't run.
             Scene("slide_label_in_cover") {
                 OnPlayer {
                     Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {

@@ -288,7 +288,7 @@ internal fun PlayButton(
 
 /**
  * The choice of a slide, beside the play button on its side. Its name is in the middle of the cover ([SlideCoverLabel]),
- * where the thumb on the button can't cover it (siansa-dev#38).
+ * where the thumb on the button can't cover it (issue #933).
  */
 @Composable
 private fun SlideChoice(slide: PlaySlide, state: SlideState, accent: Color, onAccent: Color) {
@@ -314,7 +314,7 @@ private fun SlideChoice(slide: PlaySlide, state: SlideState, accent: Color, onAc
 data class SlideLabel(val slide: PlaySlide, val way: SlideWay, val armed: Boolean, val why: String? = null)
 
 /**
- * A slide's choice in the middle of now playing's cover (siansa-dev#38), where a thumb on the play button can't hide it:
+ * A slide's choice in the middle of now playing's cover (issue #933), where a thumb on the play button can't hide it:
  * the cover blurs behind its icon and name. Until the finger is far enough it's faint, on a lighter blur, with "Slide a
  * little further" and the way to go; then it lights up in the accent with "Let go to start" (the second vibrate comes
  * from the button). Why a choice can't run ("Needs AudioMuse") shows in place of those words. Nothing while [label] is
@@ -378,7 +378,7 @@ internal fun SlideCoverLabel(label: SlideLabel?, modifier: Modifier = Modifier) 
     }
 }
 
-/** How much the cover blurs behind a slide's name: lightly while sliding, fully once it's far enough (siansa-dev#38). */
+/** How much the cover blurs behind a slide's name: lightly while sliding, fully once it's far enough (issue #933). */
 internal fun slideBlur(label: SlideLabel?): androidx.compose.ui.unit.Dp = when {
     label == null -> 0.dp
     label.armed && label.why == null -> COVER_BLUR_READY
