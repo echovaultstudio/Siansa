@@ -68,6 +68,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.blur
 import app.siansa.data.HomeMenuItem
 import androidx.compose.material.icons.rounded.Casino
 import androidx.compose.ui.unit.Dp
@@ -283,6 +284,26 @@ fun HomeMenuButton(
     }
 }
 
+/** How much Home blurs behind its open menu (issue #959): enough that the page stops competing with the labels, short of a smear. */
+internal val HOME_MENU_BLUR = 6.dp
+
+/**
+ * How dark the layer behind the open menu is (issue #959): lighter where the page also blurs (Android 12 and later),
+ * darker where it can't, so the labels read on their own.
+ */
+internal fun homeMenuDim(blurs: Boolean): Float = if (blurs) 0.3f else 0.55f
+
+/** Home's page, blurred a little while its menu is open (issue #959), easing in and out with the menu. */
+@Composable
+fun Modifier.blurBehindMenu(state: HomeMenuState): Modifier {
+    val radius by androidx.compose.animation.core.animateDpAsState(
+        if (state.open && android.os.Build.VERSION.SDK_INT >= 31) HOME_MENU_BLUR else 0.dp,
+        tween(120),
+        label = "homeMenuBlur",
+    )
+    return if (radius > 0.dp) this.blur(radius) else this
+}
+
 /**
  * The open menu over Home: a dim layer (a tap on it closes the menu) and the column of bubbles under the button, the
  * button's size, each bubble's centre on the button's centre line. Back closes it too.
@@ -297,7 +318,7 @@ fun HomeMenuOverlay(state: HomeMenuState, info: HomeMenuInfo, order: List<HomeMe
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f))
+                    .background(Color.Black.copy(alpha = homeMenuDim(blurs = android.os.Build.VERSION.SDK_INT >= 31)))
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = "Close the menu") { state.close() },
             )
         }

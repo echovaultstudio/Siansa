@@ -10,7 +10,8 @@ With no notices, or notices turned off, the button sits on its own.
 
 ## Home's menu
 
-The round button opens a short column of round buttons straight under it, each with its name beside it:
+The round button opens a short column of round buttons straight under it, each with its name beside it. The page
+behind blurs a little and darkens while it's open, so the names are easy to read (before Android 12 it only darkens):
 
 - **Roll the dice** plays a song you've never played (see [Roll the dice](discovery.md)). While it finds one, the
   dice tumbles in the menu button.
@@ -48,9 +49,12 @@ today's mix or the carousel's first mix where they left off, or the albums of Re
 added and Random picks in order. Sections of radios, playlists, genres, books and Made for you open instead. **Your
 cards** keep their own looks: their cog opens **Settings › Notices and Cards › Cards**.
 
+The same cog has **Show its title**: turn it off and the section shows without the heading above it ("Your evening",
+"Recently played"), keeping the gap where it was.
+
 | Section | What it shows |
 |---|---|
-| **Shortcuts** | Liked songs first, then the albums, playlists and mixes you played from last. Until there's enough of that, today's mixes, your playlists and recent albums. |
+| **Shortcuts** | The albums, playlists, mixes and Liked songs you played from last, newest first: 8 of them, or as many as you pick from 2 to 8 under **Settings › Style › Home**. Until there's enough of that, today's mixes, your playlists and recent albums. |
 | **Today's mix** | The day's mix, made for the vibe of the hour it's made in (see below). |
 | **Your mixes carousel** | Three or four mixes of your own for each part of the day, side by side. |
 | **Made for you** | Your sound, On repeat, Discover for you, then cards of your own. |

@@ -130,7 +130,7 @@ data class AppSettings(
     val syncFolders: Set<String> = emptySet(),
     /** Image cache limit in MB; 0 = no limit. */
     val imageCacheMb: Int = 500,
-    val animatedCovers: Boolean = true,
+    val animatedCovers: Boolean = animatedCoversByDefault(app.siansa.BuildConfig.TV_APP),
     /** Download every album, artist and playlist cover in the background. */
     val coverDownload: Boolean = false,
     /** ...on any Wi-Fi, rather than only on the same local network as Navidrome. */
@@ -175,6 +175,8 @@ data class AppSettings(
     val navTabs: List<NavTab> = NavTab.default,
     /** Home's menu, top to bottom (issue #872). */
     val homeMenu: List<HomeMenuItem> = HomeMenuItem.default,
+    /** How many shortcuts Home shows at its top, 2 to 8 (issue #934). */
+    val homeShortcuts: Int = 8,
     /** On: now playing's lyrics, device and queue buttons (issue #294). Off: the earlier look, lyrics card peeking in. */
     val nowPlayingLyricsButton: Boolean = true,
     /** Sliding from now playing's play button, and what each way does (issue #919). */
@@ -183,6 +185,8 @@ data class AppSettings(
     val homeHidden: Set<HomeSection> = emptySet(),
     /** Home's rows in another look than their own (issue #655); a row not in it looks as it is. */
     val homeLooks: Map<HomeSection, HomeLook> = emptyMap(),
+    /** Home's sections shown without their title (issue #961). */
+    val homeUntitled: Set<HomeSection> = emptySet(),
     /** The gap between Home's sections (#554), as a step of the spacing scale: 0 tight … 4 airy. 2 is the default. */
     val homeGap: Int = HOME_GAP_DEFAULT,
     /** Show only music on the phone, across the whole app (issue #141). */
@@ -421,7 +425,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         preampDb = prefs.getFloat("preamp", 0f),
         syncFolders = prefs.getStringSet("sync_folders", emptySet())?.toSet() ?: emptySet(),
         imageCacheMb = prefs.getInt("image_cache_mb", 500),
-        animatedCovers = prefs.getBoolean("animated_covers", true),
+        // Off from the start on the TV app (issue #945): an animation costs a TV more than it gives.
+        animatedCovers = prefs.getBoolean("animated_covers", animatedCoversByDefault(app.siansa.BuildConfig.TV_APP)),
         coverDownload = prefs.getBoolean("cover_download", false),
         coverDownloadAnyWifi = prefs.getBoolean("cover_download_any_wifi", false),
         coverDownloadWifiOnly = prefs.getBoolean("cover_download_wifi_only", true),
@@ -458,11 +463,13 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         miniButtons = MiniButton.parse(prefs.getString("mini_buttons", null)),
         navTabs = NavTab.parse(prefs.getString("nav_tabs", null)),
         homeMenu = HomeMenuItem.parse(prefs.getString("home_menu", null)),
+        homeShortcuts = prefs.getInt("home_shortcuts", 8).coerceIn(2, 8),
         nowPlayingLyricsButton = prefs.getBoolean("now_playing_lyrics_button", true),
         playSlides = app.siansa.ui.PlaySlides.parse(prefs.getString("play_slides", null)),
         topBar = TopBarStyle.parse(prefs.getString("top_bar", null)),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
         homeLooks = HomeLook.parse(prefs.getString("home_looks", null)),
+        homeUntitled = HomeSection.parseHidden(prefs.getString("home_untitled", null)),
         homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
         timeMachineMissing = prefs.getBoolean("time_machine_missing", true),
@@ -686,6 +693,19 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeMenu = kept)
     }
 
+    fun setHomeShortcuts(count: Int) {
+        val kept = count.coerceIn(2, 8)
+        prefs.edit().putInt("home_shortcuts", kept).apply()
+        _state.value = _state.value.copy(homeShortcuts = kept)
+    }
+
+    /** Shows or hides [section]'s title on Home (issue #961). */
+    fun setHomeTitleShown(section: HomeSection, shown: Boolean) {
+        val untitled = if (shown) _state.value.homeUntitled - section else _state.value.homeUntitled + section
+        prefs.edit().putString("home_untitled", HomeSection.formatHidden(untitled)).apply()
+        _state.value = _state.value.copy(homeUntitled = untitled)
+    }
+
     fun setNavTabs(tabs: List<NavTab>) {
         val kept = NavTab.parse(NavTab.format(tabs))
         prefs.edit().putString("nav_tabs", NavTab.format(kept)).apply()
@@ -846,3 +866,6 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(mixShape = shape, mixSurprise = s)
     }
 }
+
+/** Whether covers move until it's set: on a phone, yes; on the TV app, no (issue #945). */
+internal fun animatedCoversByDefault(tv: Boolean): Boolean = !tv

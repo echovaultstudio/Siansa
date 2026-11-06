@@ -1,9 +1,8 @@
 package app.siansa.tvapp
 
 import android.net.Uri
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -153,10 +152,12 @@ fun TvRoot(searches: MutableStateFlow<String?>) {
                     navController = nav,
                     startDestination = TvRoutes.HOME,
                     modifier = Modifier.fillMaxSize(),
-                    enterTransition = { fadeIn(tween(PAGE_FADE_MS)) },
-                    exitTransition = { fadeOut(tween(PAGE_FADE_MS)) },
-                    popEnterTransition = { fadeIn(tween(PAGE_FADE_MS)) },
-                    popExitTransition = { fadeOut(tween(PAGE_FADE_MS)) },
+                    // Pages switch at once (issue #947): a fade drew both pages together for a while, which a TV
+                    // feels as lag.
+                    enterTransition = { EnterTransition.None },
+                    exitTransition = { ExitTransition.None },
+                    popEnterTransition = { EnterTransition.None },
+                    popExitTransition = { ExitTransition.None },
                 ) {
                     composable(TvRoutes.HOME) { TvHome() }
                     composable(TvRoutes.LIBRARY) { TvLibrary() }
@@ -251,4 +252,3 @@ private fun TopBar(current: String, playing: Boolean, onTab: (String) -> Unit, o
     }
 }
 
-private const val PAGE_FADE_MS = 120

@@ -35,12 +35,12 @@ Settings) always open that tab's own page, wherever you are.
   and with the same rows hidden: Today's mixes (the daily mixes made today), Jump back in, Your mixes, Rediscover, Radios, Your playlists, Recently played, Artist
   radios, Recently added, Your genres and Random picks. A radio starts playing straight away.
 - **Library**: albums, artists, playlists and genres as covers, six across, your liked songs, favourite albums and
-  favourite artists, and Time machine.
+  favourite artists. Time machine is on the phone only for now.
 - **Albums, playlists and mixes**: the cover (a playlist's own cover from the server) and what it is at the top, with the artists, genre and label to open,
   then Play, Shuffle and Add to favourites; down from them goes straight to the songs. The button at the end of each
   song has Play next, Add to queue, Add to playlist, Like, Start (or Stop) a mix, Similar songs, Go to album or
   artist, and Song details.
-- **Artists**: Play, Shuffle, Artist radio and Add to favourites, then their top songs, albums and similar artists.
+- **Artists**: Play, Shuffle, Artist radio and Add to favourites, then their top three songs (**Show all** for the rest), albums and similar artists.
 - **Search**: type with the on-screen keyboard or press the microphone button and say it. "Play … on Siansa" from
   Google TV's own search opens it too.
 - **Now playing**: the cover, the song and the controls, large enough to read from the sofa, over the cover blurred as
@@ -48,8 +48,9 @@ Settings) always open that tab's own page, wherever you are.
   plays) and More, with Song path (with AudioMuse), Add to playlist, Similar songs and Song details; each says its name
   as the remote reaches it. In Up next, songs Siansa added on its own (a radio, Keep
   playing) have a star, as in the phone's queue. Synced lyrics follow the song; right from the buttons
-  reaches the lyrics, and up and down scroll through them. Animated covers move here and on album pages, as on the
-  phone. The artists and the album open their pages. The TV app has no sleep timer: the TV's own sleep setting
+  reaches the lyrics, and up and down scroll through them. Animated covers can move here and on album pages, as on the
+  phone: they're off from the start on the TV, and **Settings › Animated covers** turns them on. The artists and the
+  album open their pages. The TV app has no sleep timer: the TV's own sleep setting
   turns everything off.
 - **Typing**: text fields are the TV's own, in the page: move to one (its border lights up) and press OK for the
   keyboard (in Search it comes up as soon as you open it). Type with the remote, say it with the microphone button, or
@@ -87,7 +88,7 @@ The TV has the settings that matter on a TV, each the same page as on the phone:
 - **Connections** (AudioMuse, Last.fm and more), **Library sync**, **Auto Generated Mixes** and **Scrobbling and history**.
 - **Audio passthrough** (below), **Playback** (crossfades, DJ blends, levelling, the equaliser, keep playing) and
   **Streaming quality** (on the Playback page).
-- **Colours**: the TV is always dark.
+- **Colours**: the TV is always dark. **Animated covers** (off from the start: they make the TV slower) is beside it.
 - **Help**: debug logs, **Report a problem**, the log, What's new and About.
 - **Open Now playing when a song starts**: on from the start; picking a song, an album or a radio goes straight to the
   player.

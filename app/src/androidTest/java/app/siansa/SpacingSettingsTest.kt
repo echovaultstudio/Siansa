@@ -402,4 +402,12 @@ class SpacingSettingsTest : SpacingCheck() {
         val icon = compose.onNode(hasContentDescription("Opens in the browser"), useUnmergedTree = true).getBoundsInRoot()
         assertEven("Icon above and below", icon.top - row.top, row.bottom - icon.bottom, 2.dp)
     }
+
+    /** Settings › Style › Home: the shortcut count sits level with its slider (issue #934). */
+    @Test fun shortcutCountIsLevelWithItsSlider() {
+        compose.setContent { SiansaTheme { app.siansa.ui.ShortcutCountRow(6) {} } }
+        val slider = compose.onNodeWithTag("homeShortcuts").getBoundsInRoot()
+        val count = compose.onNodeWithTag("homeShortcutsCount").getBoundsInRoot()
+        assertEven("Count above and below", count.top - slider.top, slider.bottom - count.bottom, 2.dp)
+    }
 }

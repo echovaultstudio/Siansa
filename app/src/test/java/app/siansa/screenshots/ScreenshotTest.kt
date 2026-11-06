@@ -450,6 +450,17 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // Settings › Style › Home: how many shortcuts Home shows (issue #934).
+            Scene("home_style_shortcuts") {
+                Column(Modifier.padding(vertical = Space.Page)) { app.siansa.ui.ShortcutCountRow(6) {} }
+            },
+            // Arrange Home's switch for a section's title (issue #961), on and off.
+            Scene("home_section_title_switch") {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.SectionTitleSwitch(true) {}
+                    app.siansa.ui.SectionTitleSwitch(false) {}
+                }
+            },
             // Settings › Style › Now playing: the play button slides, each way and what it does.
             Scene("play_slides_settings") {
                 Column(Modifier.padding(Space.Page)) {

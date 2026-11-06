@@ -127,7 +127,7 @@ private suspend fun homeRow(graph: AppGraph, section: Section): TvRow? {
         Section.ARTIST_RADIOS -> TvRow("Artist radios", artistRadioArtists(graph, ROW_SIZE).map { TvItem.OfArtistRadio(it) })
         Section.ADDED -> TvRow("Recently added", albums(library.albums("newest")))
         Section.GENRES -> TvRow("Your genres", library.genres(ROW_SIZE).map { TvItem.OfGenre(it) })
-        Section.RANDOM -> TvRow("Random picks", albums(library.randomAlbums(ROW_SIZE)))
+        Section.RANDOM -> TvRow(RANDOM_PICKS, albums(library.randomAlbums(ROW_SIZE)))
         // Notices, the carousel, cards, books and podcasts are the phone's.
         else -> null
     }
@@ -154,9 +154,15 @@ fun TvHome() {
     var rows by remember { mutableStateOf<List<TvRow>?>(null) }
     // Read again when the library changes, but only once it has stopped changing for a moment: a sync changes it many
     // times a minute, and reading Home again each time made the rows jump and the remote lose its place.
-    LaunchedEffect(version, settings.homeOrder, settings.homeHidden) {
-        if (rows != null) delay(RELOAD_PAUSE_MS)
-        rows = homeRows(graph)
+    // While a sync runs, nothing is read again (issue #953): Home is read once it's done, and rows that didn't change
+    // stay as they are, so the TV doesn't redraw them.
+    LaunchedEffect(version, settings.homeOrder, settings.homeHidden, sync.running) {
+        if (rows != null) {
+            if (sync.running) return@LaunchedEffect
+            delay(RELOAD_PAUSE_MS)
+        }
+        val next = steadyRows(rows, homeRows(graph))
+        if (next !== rows) rows = next
     }
     val play = rememberTvPlay()
     val nav = LocalNav.current
@@ -326,3 +332,21 @@ fun rememberTvPlay(): TvPlay {
 
 private const val SHUFFLE_SONGS = 200
 private const val RELOAD_PAUSE_MS = 4_000L
+
+/** The row of random albums: they stay the same until Home is opened again (issue #953). */
+internal const val RANDOM_PICKS = "Random picks"
+
+/**
+ * Home's rows read again ([new]) with what's shown ([old]) kept where nothing changed (issue #953): a row equal to the
+ * one shown stays that same row, Random picks keeps its albums, and when nothing changed at all the old list comes
+ * back, so the screen isn't drawn again for nothing.
+ */
+internal fun steadyRows(old: List<TvRow>?, new: List<TvRow>): List<TvRow> {
+    if (old == null) return new
+    val before = old.associateBy { it.title }
+    val kept = new.map { row ->
+        val was = before[row.title] ?: return@map row
+        if (was == row || row.title == RANDOM_PICKS) was else row
+    }
+    return if (kept == old) old else kept
+}

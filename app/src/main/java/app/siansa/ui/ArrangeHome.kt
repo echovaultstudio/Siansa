@@ -40,6 +40,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -83,6 +84,11 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
         graph.settings.setHomeHidden(it)
     }, onDismiss = onDismiss, startOnSources = startOnSources,
         looks = s.homeLooks,
+        untitled = s.homeUntitled,
+        onTitleShownChange = { section, shown ->
+            AppLog.i("Home", "${section.label}: title ${if (shown) "shown" else "hidden"}")
+            graph.settings.setHomeTitleShown(section, shown)
+        },
         onLookChange = { section, look ->
             AppLog.i("Home", "${section.label} looks: ${look.label}")
             graph.settings.setHomeLook(section, look)
@@ -119,6 +125,9 @@ fun ArrangeHomeSheet(
     // Each row's look (issue #655), changed with its cog; Your cards' cog opens Settings › Notices and Cards › Cards, and
     // Notices' cog Settings › Notices and Cards › Notices (issue #784).
     looks: Map<HomeSection, HomeLook> = emptyMap(),
+    // Each row's title shown or hidden (issue #961), in the same dialog as its look.
+    untitled: Set<HomeSection> = emptySet(),
+    onTitleShownChange: (HomeSection, Boolean) -> Unit = { _, _ -> },
     onLookChange: (HomeSection, HomeLook) -> Unit = { _, _ -> },
     onResetLooks: () -> Unit = {},
     onOpenSettings: (HomeSection) -> Unit = {},
@@ -127,7 +136,13 @@ fun ArrangeHomeSheet(
 ) {
     var picking by remember { mutableStateOf<HomeSection?>(null) }
     picking?.let { section ->
-        HomeLookDialog(section, looks[section] ?: HomeLook.AS_IS, onPick = { onLookChange(section, it); picking = null }, onDismiss = { picking = null })
+        HomeLookDialog(
+            section, looks[section] ?: HomeLook.AS_IS,
+            titleShown = section !in untitled,
+            onTitleShown = { onTitleShownChange(section, it) },
+            onPick = { onLookChange(section, it); picking = null },
+            onDismiss = { picking = null },
+        )
     }
     var sources by remember { mutableStateOf(startOnSources) }
     var items by remember { mutableStateOf(order) }
@@ -194,7 +209,7 @@ fun ArrangeHomeSheet(
                 Column(Modifier.weight(1f)) {
                     Text(if (sources) "Source filter" else "Arrange Home", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
-                        if (sources) "Whose music shows, everywhere in the app" else "Hold a row and drag it. Tap the eye to hide it, the cog to change its look.",
+                        if (sources) "Whose music shows, everywhere in the app" else "Hold a row and drag it. Tap the eye to hide it, the cog to change its look or hide its title.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -314,12 +329,27 @@ fun ArrangeHomeSheet(
 
 /** The looks one of Home's rows can take (issue #655): its own, or one of the custom cards' looks. */
 @Composable
-private fun HomeLookDialog(section: HomeSection, current: HomeLook, onPick: (HomeLook) -> Unit, onDismiss: () -> Unit) {
+private fun HomeLookDialog(
+    section: HomeSection,
+    current: HomeLook,
+    titleShown: Boolean,
+    onTitleShown: (Boolean) -> Unit,
+    onPick: (HomeLook) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // The switch shows its change at once: the dialog stays open for the look.
+    var shown by remember(section) { mutableStateOf(titleShown) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(section.label) },
         text = {
             Column(Modifier.testTag("homeLookDialog")) {
+                // Its title on Home (issue #961): off leaves only the gap above the section.
+                SectionTitleSwitch(shown) {
+                    shown = it
+                    onTitleShown(it)
+                }
+                HorizontalDivider(Modifier.padding(vertical = Space.Small))
                 HomeLook.entries.forEach { look ->
                     Row(
                         Modifier.fillMaxWidth().clickable { onPick(look) }.padding(vertical = Space.Small).testTag("homeLook-${look.id}"),
@@ -422,5 +452,21 @@ internal fun autoScrollSpeed(top: Float, bottom: Float, viewportStart: Float, vi
         intoEnd > 0f -> max * (intoEnd / edge).coerceIn(0f, 1f)
         intoStart > 0f -> -max * (intoStart / edge).coerceIn(0f, 1f)
         else -> 0f
+    }
+}
+
+/** "Show its title" for one of Home's sections (issue #961). */
+@Composable
+internal fun SectionTitleSwitch(shown: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable { onChange(!shown) }.padding(vertical = Space.Small).testTag("homeTitleShown"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Show its title", style = MaterialTheme.typography.bodyLarge)
+            Text("The heading above it on Home", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(Space.Medium))
+        androidx.compose.material3.Switch(checked = shown, onCheckedChange = onChange, modifier = Modifier.testTag("homeTitleSwitch"))
     }
 }

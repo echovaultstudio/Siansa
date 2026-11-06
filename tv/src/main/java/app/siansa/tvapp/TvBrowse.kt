@@ -23,6 +23,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.MoreVert
@@ -44,6 +46,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -89,14 +92,20 @@ fun TvLibrary() {
     var liked by remember { mutableStateOf<List<Song>?>(null) }
     var shown by remember { mutableStateOf<Shelf?>(null) }
     // As on Home: read again once a sync has stopped changing the library for a moment, keeping what's shown meanwhile.
-    LaunchedEffect(shelf, version, likes, favouriteAlbums, favouriteArtists) {
-        if (shown == shelf) delay(RELOAD_PAUSE_MS)
+    // Nothing is read again while a sync runs (issue #953), and a shelf that didn't change isn't drawn again.
+    val syncing = graph.sync.progress.collectAsStateWithLifecycle().value.running
+    LaunchedEffect(shelf, version, likes, favouriteAlbums, favouriteArtists, syncing) {
+        if (shown == shelf) {
+            if (syncing) return@LaunchedEffect
+            delay(RELOAD_PAUSE_MS)
+        }
         runCatching {
             if (shelf == Shelf.LIKED) {
                 // As the phone's Liked songs: Navidrome's list, which the library may not have marked yet.
-                liked = app.siansa.ui.likedSongs(graph)
+                val next = app.siansa.ui.likedSongs(graph)
+                if (next != liked) liked = next
             } else {
-                tiles = when (shelf) {
+                val next = when (shelf) {
                     Shelf.ALBUMS -> graph.library.albums("name").map { TvItem.OfAlbum(it) }
                     Shelf.ARTISTS -> graph.library.artists().map { TvItem.OfArtist(it) }
                     Shelf.PLAYLISTS -> graph.playlists.removed.visible(graph.library.playlists()).map { TvItem.OfPlaylist(it) }
@@ -106,6 +115,7 @@ fun TvLibrary() {
                     Shelf.GENRES -> graph.library.genres(GENRES).map { TvItem.OfGenre(it) }
                     Shelf.LIKED -> emptyList()
                 }
+                if (next != tiles) tiles = next
             }
             shown = shelf
         }.onFailure { AppLog.w("Tv", "Couldn't read the library's ${shelf.label.lowercase()}: ${it.message}") }
@@ -118,8 +128,8 @@ fun TvLibrary() {
             for (s in Shelf.entries) {
                 TvButton(s.label, null, onClick = { shelf = s }, strong = s == shelf, modifier = if (s == Shelf.ALBUMS) Modifier.initialFocus() else Modifier)
             }
-            // The phone's pages for these: your listening by year, and (with AudioMuse) the sound of your library.
-            TvButton("Time machine", null, onClick = { nav.navigate("timemachine") })
+            // The phone's page for this: (with AudioMuse) the sound of your library. Time machine isn't on the TV for now
+            // (issue #949): laying it out froze a SHIELD for seconds.
             if (settings.audioMuseReady) TvButton("Your sound", null, onClick = { nav.navigate("fingerprint") })
         }
         val empty = when (shelf) {
@@ -270,6 +280,7 @@ fun TvArtist(id: String) {
             graph.source.artistInfo(a.id).similar.mapNotNull { s -> s.id?.let { Artist(id = it, name = s.name, coverArt = s.coverArt) } }
         }.getOrDefault(emptyList())
     }
+    var topOpen by rememberSaveable(id) { mutableStateOf(false) }
     val a = artist ?: return Loading()
     val favourite = a.id in favourites
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = Space.Large), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
@@ -298,9 +309,22 @@ fun TvArtist(id: String) {
         }
         if (top.isNotEmpty()) {
             item("top-title") { SectionTitle("Top songs") }
-            itemsIndexed(top.take(TOP_SHOWN), key = { i, s -> "top:$i:${s.id}" }) { i, song ->
+            // Folded, as on the phone (issue #943): three, so the albums are a few presses down; Show all for the rest.
+            itemsIndexed(top.take(tvTopShown(top.size, topOpen)), key = { i, s -> "top:$i:${s.id}" }) { i, song ->
                 Box(Modifier.padding(horizontal = TV_EDGE)) {
                     SongRow(i + 1, song, playing = player.current?.id == song.id) { graph.player.play(top, startIndex = i) }
+                }
+            }
+            if (top.size > TOP_FOLDED) {
+                item("top-more") {
+                    Row(Modifier.padding(start = TV_EDGE, end = TV_EDGE, top = Space.Small)) {
+                        TvButton(
+                            if (topOpen) "Show fewer" else "Show all ${top.size}",
+                            if (topOpen) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                            onClick = { topOpen = !topOpen },
+                            modifier = Modifier.testTag("tvTopMore"),
+                        )
+                    }
                 }
             }
         }
@@ -541,6 +565,10 @@ private val LIKED_ICON = 20.dp
 private const val ROW_GROW = 1.02f
 private const val GENRES = 200
 private const val TOP_SONGS = 10
-private const val TOP_SHOWN = 5
+/** Top songs shown on an artist's page before Show all (issue #943). */
+internal const val TOP_FOLDED = 3
+
+/** How many top songs show: [TOP_FOLDED], or all of them once opened. */
+internal fun tvTopShown(available: Int, open: Boolean): Int = if (open) available else minOf(available, TOP_FOLDED)
 private const val MAX_ARTISTS = 6
 private const val RELOAD_PAUSE_MS = 4_000L
