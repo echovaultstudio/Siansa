@@ -406,6 +406,29 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.HomeMenuButton(app.siansa.ui.rememberHomeMenuState(), casting = false, filterActive = false, onPick = {})
                 }
             },
+            // Now playing's play button (issue #919): record grooves while a DJ mix plays, and a slide's choice, far enough
+            // to start (up, with its name) and not yet (left), on the player's colours.
+            Scene("play_button_grooves_and_slides") {
+                OnPlayer {
+                    Row(Modifier.padding(horizontal = Space.Large * 2, vertical = Space.Large * 3), horizontalArrangement = Arrangement.spacedBy(Space.Large * 3)) {
+                        app.siansa.ui.PlayButton(playing = false, slides = app.siansa.ui.PlaySlides(), djMix = true, onToggle = {}, onStop = {}, onSlide = {})
+                        app.siansa.ui.PlayButton(
+                            playing = true, slides = app.siansa.ui.PlaySlides(), djMix = false, onToggle = {}, onStop = {}, onSlide = {},
+                            preview = app.siansa.ui.SlideState(app.siansa.ui.SlideWay.UP, armed = true),
+                        )
+                        app.siansa.ui.PlayButton(
+                            playing = true, slides = app.siansa.ui.PlaySlides(), djMix = false, onToggle = {}, onStop = {}, onSlide = {},
+                            preview = app.siansa.ui.SlideState(app.siansa.ui.SlideWay.LEFT, armed = false),
+                        )
+                    }
+                }
+            },
+            // Settings › Style › Now playing: the play button slides, each way and what it does.
+            Scene("play_slides_settings") {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.PlaySlidesSettings(app.siansa.ui.PlaySlides(left = app.siansa.ui.PlaySlide.START_A_MIX)) {}
+                }
+            },
             // Song radio's choices (issue #916): an icon and the name each, no descriptions; and the mixing docs link under
             // Crossfade and levelling.
             Scene("radio_choices_and_mixing_docs") {

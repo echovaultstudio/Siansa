@@ -2,7 +2,8 @@
 
 ## Song radio
 
-Long-press a song (or use its menu) and pick **Start song radio**. The radio always starts with its song, then
+Long-press a song (or use its menu) and pick **Start a mix**, or slide from the play button in now playing (see
+[Playback](playback.md#now-playing-and-the-mini-player)). The radio always starts with its song, then
 adds songs that sound like it and share its mood. When only a few are left, it finds more, so it keeps going.
 Playing anything else ends the radio.
 

@@ -96,7 +96,9 @@ not here.
   (pages, cards, menus and sheets): **Grey** to start with, like Spotify, **Warm grey**, **Blue grey**, or **Match
   theme** for the colour scheme's own tinted backgrounds. Album, artist and now playing pages keep their colours from
   the cover.
-- **Now playing**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in.
+- **Now playing**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in. **Play
+  button slides**: whether sliding from the play button does anything, what each way does (DJ mix, Steady radio,
+  Song path, Sonic match, Start a mix… or Nothing), and **Record grooves** on the play button while a DJ mix plays.
 - **Mini player** and **bottom bar**: hold a row and drag it to reorder; tap the eye to show or hide it.
 - **Home Menu**: the order of the options under the round button at the top of Home (Roll the dice, Play on…,
   Sources, Arrange Home): hold a row and drag it. The mini player

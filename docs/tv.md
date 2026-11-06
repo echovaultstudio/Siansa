@@ -38,7 +38,7 @@ Settings) always open that tab's own page, wherever you are.
   favourite artists, and Time machine.
 - **Albums, playlists and mixes**: the cover (a playlist's own cover from the server) and what it is at the top, with the artists, genre and label to open,
   then Play, Shuffle and Add to favourites; down from them goes straight to the songs. The button at the end of each
-  song has Play next, Add to queue, Like, Start song radio, Similar songs, and Go to album or artist.
+  song has Play next, Add to queue, Like, Start a mix, Similar songs, and Go to album or artist.
 - **Artists**: Play, Shuffle, Artist radio and Add to favourites, then their top songs, albums and similar artists.
 - **Search**: type with the on-screen keyboard or press the microphone button and say it. "Play … on Siansa" from
   Google TV's own search opens it too.
@@ -64,7 +64,7 @@ the phone:
 
 - **Your sound** and **Discover for you** among Your mixes on Home, made when you pick them.
 - **Radios** on Home: sound radios that play straight away.
-- **Similar songs** in a song's actions, and **Start song radio** with DJ blends.
+- **Similar songs** in a song's actions, and **Start a mix** with DJ blends.
 - **Songs that sound like…** in Search: type or say a few words ("rainy sunday morning").
 - **Your sound** in the Library: the sound of your library.
 - **Song path** in Now playing and in a song's actions: from that song to another, through songs that sound in between.

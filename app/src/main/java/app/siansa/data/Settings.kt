@@ -177,6 +177,8 @@ data class AppSettings(
     val homeMenu: List<HomeMenuItem> = HomeMenuItem.default,
     /** On: now playing's lyrics, device and queue buttons (issue #294). Off: the earlier look, lyrics card peeking in. */
     val nowPlayingLyricsButton: Boolean = true,
+    /** Sliding from now playing's play button, and what each way does (issue #919). */
+    val playSlides: app.siansa.ui.PlaySlides = app.siansa.ui.PlaySlides(),
     val topBar: TopBarStyle = TopBarStyle.CLEAR,
     val homeHidden: Set<HomeSection> = emptySet(),
     /** Home's rows in another look than their own (issue #655); a row not in it looks as it is. */
@@ -455,6 +457,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         navTabs = NavTab.parse(prefs.getString("nav_tabs", null)),
         homeMenu = HomeMenuItem.parse(prefs.getString("home_menu", null)),
         nowPlayingLyricsButton = prefs.getBoolean("now_playing_lyrics_button", true),
+        playSlides = app.siansa.ui.PlaySlides.parse(prefs.getString("play_slides", null)),
         topBar = TopBarStyle.parse(prefs.getString("top_bar", null)),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
         homeLooks = HomeLook.parse(prefs.getString("home_looks", null)),
@@ -688,6 +691,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setNowPlayingLyricsButton(on: Boolean) {
         prefs.edit().putBoolean("now_playing_lyrics_button", on).apply()
         _state.value = _state.value.copy(nowPlayingLyricsButton = on)
+    }
+
+    fun setPlaySlides(slides: app.siansa.ui.PlaySlides) {
+        prefs.edit().putString("play_slides", slides.format()).apply()
+        _state.value = _state.value.copy(playSlides = slides)
     }
 
     fun setHomeOrder(order: List<HomeSection>) {
