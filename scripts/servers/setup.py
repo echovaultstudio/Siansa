@@ -109,12 +109,38 @@ def describe():
                 for src in item.get("MediaSources") or []:
                     for st in src.get("MediaStreams") or []:
                         if st.get("Type") in ("Subtitle", "Lyrics"):
-                            url = f"{base}/Items/{item['Id']}/{src['Id']}/Subtitles/{st.get('Index')}/Stream.{st.get('Codec')}"
-                            try:
-                                code, text = call("GET", url, headers=head)
-                                print(f"{name} lyrics #{st.get('Index')}: {code} {str(text)[:120]!r}")
-                            except RuntimeError as e:
-                                print(f"{name} lyrics #{st.get('Index')}: {e}")
+                            for route in ("Items", "Videos", "Audio"):
+                                for fmt in ("lrc", "txt", "srt", "vtt", "js"):
+                                    url = f"{base}/{route}/{item['Id']}/{src['Id']}/Subtitles/{st.get('Index')}/Stream.{fmt}"
+                                    try:
+                                        req = urllib.request.Request(url, headers=head)
+                                        with urllib.request.urlopen(req, timeout=30) as r:
+                                            body = r.read()
+                                            print(f"{name} lyrics {route} .{fmt}: {r.status} {r.headers.get('Content-Type')} {len(body)} bytes {body[:80]!r}")
+                                    except Exception as e:  # noqa: BLE001
+                                        print(f"{name} lyrics {route} .{fmt}: {e}")
+
+
+def refresh_emby_pictures():
+    """Asks Emby to refresh every album's pictures, then shows what it has: is it only slow to read them?"""
+    device = 'Emby Client="Siansa CI", Device="CI", DeviceId="siansa-ci", Version="1"'
+    _, r = call("POST", EMBY + "/Users/AuthenticateByName", {"Username": USER, "Pw": PASSWORD}, {"X-Emby-Authorization": device})
+    head = {"X-Emby-Token": r["AccessToken"]}
+    user = r["User"]["Id"]
+    q = urllib.parse.urlencode({"IncludeItemTypes": "MusicAlbum,Audio", "Recursive": "true", "Fields": "ImageTags"})
+    _, found = call("GET", f"{EMBY}/Users/{user}/Items?{q}", headers=head)
+    for item in found["Items"]:
+        print(f"Emby before: {item['Type']} {item['Name']} images {item.get('ImageTags')} album image {item.get('AlbumPrimaryImageTag')}")
+        if item["Type"] == "MusicAlbum":
+            rq = urllib.parse.urlencode({"Recursive": "true", "ImageRefreshMode": "FullRefresh", "MetadataRefreshMode": "FullRefresh", "ReplaceAllImages": "true"})
+            call("POST", f"{EMBY}/Items/{item['Id']}/Refresh?{rq}", headers=head)
+    time.sleep(20)
+    _, found = call("GET", f"{EMBY}/Users/{user}/Items?{q}", headers=head)
+    for item in found["Items"]:
+        print(f"Emby after refresh: {item['Type']} {item['Name']} images {item.get('ImageTags')} album image {item.get('AlbumPrimaryImageTag')}")
+    _, tasks = call("GET", f"{EMBY}/ScheduledTasks", headers=head)
+    for t in tasks:
+        print(f"Emby task: {t.get('Name')} {t.get('State')} last {(t.get('LastExecutionResult') or {}).get('Status')}")
 
 
 def main(library):
@@ -126,4 +152,8 @@ def main(library):
 
 
 if __name__ == "__main__":
-    describe() if sys.argv[1] == "--describe" else main(sys.argv[1])
+    if sys.argv[1] == "--describe":
+        describe()
+        refresh_emby_pictures()
+    else:
+        main(sys.argv[1])
