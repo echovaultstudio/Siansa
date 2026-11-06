@@ -77,4 +77,7 @@ implements them and opens a pull request. Labels show where each one is: `claude
 - The siansa.app server kit (Caddy, the sign-up and report service, emails, F-Droid repo scripts, website pages) and the
   owner's own runbooks are in the private `echovaultstudio/siansa-dev` repository, not here (#634, #636). The licences page stays here as
   `docs/licenses.html`; copy it to siansa-dev's `deploy/site/` when it changes.
+- Don't publish the app as a file on GitHub: a release of Siansa carries its notes only, never an APK or app bundle
+  (#584; the owner's decision, 2026-11-06). Siansa reaches users only through its F-Droid repo and Google Play. The
+  APK and bundle stay workflow artifacts, for the F-Droid and Google Play steps.
 - Don't commit secrets: the repository is public. The signing key lives only in CI's secrets (`SIGNING_KEYSTORE_BASE64`); a local build is unsigned unless `SIANSA_KEYSTORE` points at a key of your own.
