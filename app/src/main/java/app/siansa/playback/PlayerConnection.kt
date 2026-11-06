@@ -227,6 +227,21 @@ class PlayerConnection(
     }
 
     /**
+     * Moves a queued song to play straight after the one playing (a swipe to the right in the queue, issue #915).
+     * False when there's nothing to move: it's playing, or already next.
+     */
+    fun moveToPlayNext(index: Int, onMoved: (Boolean) -> Unit = {}) = withController { c ->
+        val target = queuePlayNextIndex(index, c.currentMediaItemIndex, c.mediaItemCount)
+        if (target == null) {
+            onMoved(false)
+            return@withController
+        }
+        AppLog.i("Queue", "Moved ${c.getMediaItemAt(index).mediaId} from ${index + 1} to play next (${target + 1} of ${c.mediaItemCount})")
+        c.moveMediaItem(index, target)
+        onMoved(true)
+    }
+
+    /**
      * "Remove songs up to here" on a queue row: every song before it goes, so it becomes the first in the queue.
      * When the song playing is among them, the row's song starts playing.
      */
