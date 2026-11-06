@@ -50,6 +50,8 @@ internal class MixedCrossfader(
     private val sleepLevel: () -> Float,
     private val allowed: () -> Boolean,
     private val inDjRadio: () -> Boolean = { false },
+    /** Whether the song playing goes to the receiver as a bitstream (TV passthrough), past the mix (issue #939). */
+    private val bitstream: () -> Boolean = { false },
     private val onLevel: () -> Unit,
 ) : Player.Listener, Fader {
 
@@ -522,6 +524,10 @@ internal class MixedCrossfader(
             stream.freeHold()
         }
         if (!main.isPlaying || sleepLevel() < 0.99f || main.volume < 0.01f) return
+        // A Dolby or DTS song sent to the receiver unchanged never goes through the mix, so the mix is silent by design:
+        // taking that for lost sound made the decoder again 3 s into every Atmos song that followed straight on from the
+        // one before (issue #939), a gap each time.
+        if (bitstream()) return
         // The player hands over sound, but none goes out (0.52.0-dev: Djrum's Waxcap, Camo & Krooked's Passion, both
         // right after a song that ended back to back): whatever holds it, it's logged in full and put right.
         // Fed for longer than the stream holds plus the limit: a song that starts silent isn't taken for this.

@@ -40,6 +40,7 @@ import app.siansa.AppGraph
 import app.siansa.data.AppSettings
 import app.siansa.data.SyncPhase
 import app.siansa.log.AppLog
+import androidx.compose.material.icons.rounded.Favorite
 import app.siansa.mix.Notice
 import app.siansa.mix.NoticeKind
 import app.siansa.mix.Notices
@@ -163,6 +164,7 @@ internal fun noticeIcon(kind: NoticeKind): ImageVector = when (kind) {
     NoticeKind.NEW_ALBUMS -> Icons.Rounded.Album
     NoticeKind.YOUR_MONTH -> Icons.Rounded.BarChart
     NoticeKind.NEW_ARTISTS -> Icons.Rounded.Person
+    NoticeKind.LIKED -> Icons.Rounded.Favorite
 }
 
 /** Every notice there is something to say about now; [Notices.order] picks and orders them. Looks only at what's on the phone, except the books in progress. */
@@ -192,4 +194,5 @@ private suspend fun noticeCandidates(graph: AppGraph, settings: AppSettings, syn
     }
     Notices.yourMonth(today)?.let(::add)
     Notices.newArtists(graph.suggestions.savedToday().size, today)?.let(::add)
+    if (settings.notices.modeOf(NoticeKind.LIKED) != app.siansa.mix.NoticeMode.OFF) add(Notices.liked())
 }

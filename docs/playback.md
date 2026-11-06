@@ -172,8 +172,9 @@ player opens and closes the same way.
 
 Slide a finger from the play button to start something from the song playing: **up** for a DJ mix, **down** for a
 Steady radio, **left** for its song path and **right** for songs that sound like it. Only the way you slide shows its
-choice beside the button, with its name; once you're far enough it fills with your colour and the phone clicks, and
-letting go there starts it. Slide back to the middle to change your mind. A tap still plays and pauses, and pressing
+choice: its icon beside the button, and its name in the middle of the cover, which blurs behind it so your thumb never
+hides it. Until you're far enough the name is faint and says "Slide a little further"; then it lights up in your
+colour, says "Let go to start" and the phone clicks, and letting go there starts it. Slide back to the middle to change your mind. A tap still plays and pauses, and pressing
 and holding still stops. What each way does can be changed, or the slides switched off, under **Settings › Style ›
 Now playing**. While a DJ mix plays, the play button has record grooves in its colour, with a glint that turns as it
 plays.
