@@ -6,6 +6,8 @@ import app.siansa.data.Song
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.buildJsonObject
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -193,6 +195,26 @@ class EmbyApiTest {
         assertEquals("World", lyrics.lines[1].text)
     }
 
+    /** Emby 4.8 answers a song's .lrc file as `.lrc` with nothing at all; its SRT has the lines and times. */
+    @Test fun anEmptyLrcAnswerIsReadAsSrtInstead() = runBlocking {
+        val server = FakeEmby { seen ->
+            when (seen.path) {
+                "/Users/u1/Items/s1" -> 200 to """{"Id":"s1","MediaSources":[{"Id":"ms1","MediaStreams":[
+                    {"Type":"Audio","Index":0},{"Type":"Subtitle","Index":1,"Codec":"lrc","IsExternal":true}]}]}"""
+                "/Items/s1/ms1/Subtitles/1/Stream.lrc" -> 200 to ""
+                "/Items/s1/ms1/Subtitles/1/Stream.srt" ->
+                    200 to "﻿1\n00:00:01,000 --> 00:00:10,000\nThe first line\n\n2\n00:00:10,000 --> 00:00:20,000\nThe second line\n"
+                else -> 404 to ""
+            }
+        }
+        val lyrics = EmbyApi(server.client, { settings }).lyrics(Song("s1", "T"))!!
+        assertTrue(lyrics.synced)
+        assertEquals(listOf("The first line", "The second line"), lyrics.lines.map { it.text })
+        assertEquals(listOf(1000L, 10_000L), lyrics.lines.map { it.startMs })
+        assertEquals(listOf("lrc", "srt"), EmbyApi.lyricsFormats("lrc"))
+        assertEquals(listOf("srt"), EmbyApi.lyricsFormats("subrip"))
+    }
+
     @Test fun noLyricsStreamMeansNoLyrics() = runBlocking {
         val server = FakeEmby { 200 to """{"Id":"s1","MediaSources":[{"Id":"ms1","MediaStreams":[{"Type":"Audio","Index":0}]}]}""" }
         assertNull(EmbyApi(server.client, { settings }).lyrics(Song("s1", "T")))
@@ -226,6 +248,37 @@ class EmbyApiTest {
         val detail = EmbyApi(server.client, { settings }).artist("ar1")
         assertEquals(listOf("a1"), detail.albums.map { it.id })
         assertEquals("ar1", server.seen.first { it.query["IncludeItemTypes"] == "MusicAlbum" }.query["ArtistIds"])
+    }
+
+    /**
+     * Emby makes albums from tags, so a cover.jpg or folder.jpg is its folder's picture, never the album's (found by
+     * the real-server tests): songs and albums with their cover only there showed none.
+     */
+    @Test fun aSongWithoutAPictureShowsItsAlbumsElseItsFolders() {
+        val api = EmbyApi(OkHttpClient(), { settings })
+        fun cover(json: String) = api.parseSong(app.siansa.data.AppJson.parseToJsonElement(json) as JsonObject).coverArt
+        assertEquals("s1", cover("""{"Id":"s1","AlbumId":"a1","ParentId":"f1","ImageTags":{"Primary":"t"}}"""))
+        assertEquals("a1", cover("""{"Id":"s1","AlbumId":"a1","ParentId":"f1","AlbumPrimaryImageTag":"t"}"""))
+        assertEquals("f1", cover("""{"Id":"s1","AlbumId":"a1","ParentId":"f1"}"""))
+        assertEquals("a1", cover("""{"Id":"s1","AlbumId":"a1","ParentId":"a1"}"""))
+        assertEquals("a1", cover("""{"Id":"s1","AlbumId":"a1"}"""))
+    }
+
+    @Test fun anAlbumWithItsCoverOnlyInItsFolderShowsTheFolders() = runBlocking {
+        val server = FakeEmby { seen ->
+            when {
+                seen.query["ParentId"] == "a1" -> 200 to """{"Items":[{"Id":"s1","Name":"One","Type":"Audio","AlbumId":"a1","ParentId":"f1"},
+                    {"Id":"s2","Name":"Two","Type":"Audio","AlbumId":"a1","ParentId":"f1"}]}"""
+                seen.query["ParentId"] == "a2" -> 200 to """{"Items":[{"Id":"s3","Name":"Three","Type":"Audio","AlbumId":"a2","ParentId":"f2"}]}"""
+                seen.path == "/Users/u1/Items/f1" -> 200 to """{"Id":"f1","Type":"Folder","ImageTags":{"Primary":"x"}}"""
+                seen.path == "/Users/u1/Items/f2" -> 200 to """{"Id":"f2","Type":"Folder"}"""
+                else -> 200 to """{"Items":[{"Id":"a1","Name":"First Light"},{"Id":"a2","Name":"Bare"}]}"""
+            }
+        }
+        assertEquals(listOf("f1", null), EmbyApi(server.client, { settings }).albums("newest", 20, 0).map { it.coverArt })
+        assertEquals("f1", EmbyApi.folderOf(listOf(buildJsonObject { put("ParentId", "f1") }, buildJsonObject { put("ParentId", "f1") }), "a1"))
+        assertNull(EmbyApi.folderOf(listOf(buildJsonObject { put("ParentId", "f1") }, buildJsonObject { put("ParentId", "f9") }), "a1"))
+        assertNull(EmbyApi.folderOf(listOf(buildJsonObject { put("ParentId", "a1") }), "a1"))
     }
 
     /** Issue #811 (beta report 80dcb26b): album lists showed nothing where the player showed the song's art. */
