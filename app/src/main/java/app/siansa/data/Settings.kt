@@ -232,6 +232,8 @@ data class AppSettings(
     val dailyMix: DailyMix = DailyMix(),
     /** The TV app's audio passthrough (issue #860): Dolby and DTS music sent unchanged to the receiver. Phones ignore it. */
     val audioPassthrough: app.siansa.playback.PassthroughMode = app.siansa.playback.PassthroughMode.OFF,
+    /** How much louder the receiver plays Dolby Digital Plus songs sent to it, in dB (issue #930); 0 is off. TV app only. */
+    val dolbyLouderDb: Int = 0,
 ) {
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
@@ -490,6 +492,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         // On in the TV app until switched off (issue #860): it only acts when the TV says the receiver takes the format.
         audioPassthrough = prefs.getString("audio_passthrough", null)?.let { app.siansa.playback.PassthroughMode.parse(it) }
             ?: if (app.siansa.BuildConfig.TV_APP) app.siansa.playback.PassthroughMode.DOLBY_DTS else app.siansa.playback.PassthroughMode.OFF,
+        dolbyLouderDb = prefs.getInt("dolby_louder_db", 0).takeIf { it in app.siansa.playback.DolbyLevel.CHOICES } ?: 0,
         dailyMix = DailyMix(
             autoUpdate = prefs.getBoolean("daily_auto", true),
             length = prefs.getInt("daily_length", -1).takeIf { it > 0 },
@@ -635,6 +638,12 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setAudioPassthrough(mode: app.siansa.playback.PassthroughMode) {
         prefs.edit().putString("audio_passthrough", mode.name).apply()
         _state.value = _state.value.copy(audioPassthrough = mode)
+    }
+
+    /** How much louder the receiver plays Dolby songs (issue #930); applies straight away. */
+    fun setDolbyLouder(db: Int) {
+        prefs.edit().putInt("dolby_louder_db", db).apply()
+        _state.value = _state.value.copy(dolbyLouderDb = db)
     }
 
     fun setLogging(on: Boolean) {

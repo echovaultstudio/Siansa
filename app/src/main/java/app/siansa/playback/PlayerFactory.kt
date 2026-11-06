@@ -139,7 +139,7 @@ object PlayerFactory {
                 out: ArrayList<Renderer>,
             ) {
                 if (passthrough) {
-                    out.add(PassthroughRenderer.create(context, mediaCodecSelector, eventHandler, eventListener) { graph.settings.current.audioPassthrough })
+                    out.add(PassthroughRenderer.create(context, mediaCodecSelector, eventHandler, eventListener, louderDb = { graph.settings.current.dolbyLouderDb }) { graph.settings.current.audioPassthrough })
                 }
                 super.buildAudioRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, audioSink, eventHandler, eventListener, out)
             }

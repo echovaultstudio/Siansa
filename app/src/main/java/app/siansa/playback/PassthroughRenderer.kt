@@ -5,6 +5,7 @@ import android.os.Handler
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.Format
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.RendererCapabilities
 import androidx.media3.exoplayer.audio.AudioRendererEventListener
@@ -14,8 +15,10 @@ import androidx.media3.exoplayer.audio.AudioTrackAudioOutputProvider
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.ForwardingAudioOutputProvider
 import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
+import androidx.media3.exoplayer.mediacodec.MediaCodecAdapter
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import app.siansa.log.AppLog
+import java.nio.ByteBuffer
 
 /**
  * Audio passthrough on the TV app (issue #860): takes only Dolby and DTS songs, and only when passthrough is on and the
@@ -33,10 +36,59 @@ class PassthroughRenderer private constructor(
     handler: Handler?,
     listener: AudioRendererEventListener?,
     private val sink: AudioSink,
+    private val louderDb: () -> Int,
     private val mode: () -> PassthroughMode,
 ) : MediaCodecAudioRenderer(context, selector, handler, listener, sink) {
 
     override fun getName(): String = "PassthroughRenderer"
+
+    /** The batch last marked louder (its first frame's time and frame count), so one the output takes in parts is marked once. */
+    private var markedBatch: Pair<Long, Int>? = null
+    private var loggedLevel: Pair<Int, Int>? = null
+
+    /**
+     * Dolby Digital Plus songs marked louder for the receiver on their way to it (issue #930, [DolbyLevel]), when
+     * Settings › Playback asks for it.
+     */
+    override fun processOutputBuffer(
+        positionUs: Long,
+        elapsedRealtimeUs: Long,
+        codec: MediaCodecAdapter?,
+        buffer: ByteBuffer?,
+        bufferIndex: Int,
+        bufferFlags: Int,
+        sampleCount: Int,
+        bufferPresentationTimeUs: Long,
+        isDecodeOnlyBuffer: Boolean,
+        isLastBuffer: Boolean,
+        format: Format,
+    ): Boolean {
+        val db = louderDb()
+        if (db > 0 && buffer != null && !isDecodeOnlyBuffer &&
+            (format.sampleMimeType == MimeTypes.AUDIO_E_AC3 || format.sampleMimeType == MimeTypes.AUDIO_E_AC3_JOC)
+        ) {
+            val batch = bufferPresentationTimeUs to sampleCount
+            if (batch != markedBatch) {
+                markedBatch = batch
+                DolbyLevel.raise(buffer, db)?.let { raised ->
+                    val level = raised.fromDb to raised.toDb
+                    if (level != loggedLevel) {
+                        loggedLevel = level
+                        AppLog.i("Passthrough", "${Passthrough.name(format.sampleMimeType)} played louder on the receiver: marked " +
+                            "${raised.fromDb} dB, sent as ${raised.toDb} dB (+${raised.toDb - raised.fromDb} dB of the +$db dB asked for)",
+                            event = "passthrough.louder", fields = mapOf("from_db" to raised.fromDb, "to_db" to raised.toDb, "asked_db" to db))
+                    }
+                }
+            }
+        }
+        return super.processOutputBuffer(positionUs, elapsedRealtimeUs, codec, buffer, bufferIndex, bufferFlags, sampleCount,
+            bufferPresentationTimeUs, isDecodeOnlyBuffer, isLastBuffer, format)
+    }
+
+    override fun onPositionReset(positionUs: Long, joining: Boolean, sampleStreamIsResetToKeyFrame: Boolean) {
+        markedBatch = null
+        super.onPositionReset(positionUs, joining, sampleStreamIsResetToKeyFrame)
+    }
 
     override fun supportsFormat(mediaCodecSelector: MediaCodecSelector, format: Format): Int {
         val mime = format.sampleMimeType
@@ -146,9 +198,10 @@ class PassthroughRenderer private constructor(
             selector: MediaCodecSelector,
             handler: Handler?,
             listener: AudioRendererEventListener?,
+            louderDb: () -> Int = { 0 },
             mode: () -> PassthroughMode,
         ): PassthroughRenderer =
-            PassthroughRenderer(context, selector, handler, listener, sink(context), mode)
+            PassthroughRenderer(context, selector, handler, listener, sink(context), louderDb, mode)
 
         /**
          * The passthrough sink, with an output buffer that's the same size for every song of a format. Media3 sizes it
