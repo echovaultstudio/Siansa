@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.log.AppLog
 import android.content.Context
 import android.text.Editable
 import android.text.InputType
@@ -75,11 +76,17 @@ fun TvTextBox(
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     fun leave(way: androidx.compose.ui.focus.FocusDirection, field: EditText) {
         leaving = true
-        (if (way == androidx.compose.ui.focus.FocusDirection.Down) bottom else top).requestFocus()
-        val moved = focusManager.moveFocus(way)
-        if (!moved) field.requestFocus()
-        // Once the focus has moved on, the points go back to not taking it.
-        scope.launch { kotlinx.coroutines.yield(); leaving = false }
+        scope.launch {
+            // A frame first: the points can take the focus only once Compose has seen [leaving] (the emulator test: asked
+            // at once, they refused, and the focus stayed in the field).
+            androidx.compose.runtime.withFrameNanos { }
+            val point = if (way == androidx.compose.ui.focus.FocusDirection.Down) bottom else top
+            val moved = runCatching { point.requestFocus(); focusManager.moveFocus(way) }.getOrDefault(false)
+            AppLog.d("TvTextBox", "Leaving \"$label\" ${if (way == androidx.compose.ui.focus.FocusDirection.Down) "down" else "up"}: ${if (moved) "moved on" else "nothing that way, stays"}")
+            if (!moved) field.requestFocus()
+            // Once the focus has moved on, the points go back to not taking it.
+            leaving = false
+        }
     }
     val shape = RoundedCornerShape(Space.Small)
     val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
@@ -129,9 +136,10 @@ fun TvTextBox(
                         setOnKeyListener { view, keyCode, event ->
                             val way = textBoxExit(keyCode, kind == TvTextKind.LONG_TEXT) ?: return@setOnKeyListener false
                             if (event.action != android.view.KeyEvent.ACTION_DOWN) return@setOnKeyListener false
-                            // Another of these fields that way: Android moves there itself.
+                            // Another of these fields that way: straight to it (left to Android, the focus didn't move at all
+                            // inside Compose's page on the emulator).
                             val next = view.focusSearch(if (way == androidx.compose.ui.focus.FocusDirection.Down) android.view.View.FOCUS_DOWN else android.view.View.FOCUS_UP)
-                            if (next is EditText && next !== view) return@setOnKeyListener false
+                            if (next is EditText && next !== view && next.requestFocus()) return@setOnKeyListener true
                             leave(way, this)
                             true
                         }
