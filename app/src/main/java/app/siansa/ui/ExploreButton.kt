@@ -181,12 +181,15 @@ internal fun ExploreCoverLabel(slide: ExploreSlide?, modifier: Modifier = Modifi
                 Text(choice.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("exploreName"))
                 Spacer(Modifier.height(Space.Tight))
-                Text(choice.hint, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f), textAlign = TextAlign.Center)
+                Text(choice.hint, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f), textAlign = TextAlign.Center,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(Space.Tight))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null,
                         tint = Accent, modifier = Modifier.size(EXPLORE_ARROW))
-                    Text(if (ready) choice.ready else "Slide a little further", style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                    // One line, so it never runs off a small cover or with large text (issue #965).
+                    Text(if (ready) choice.ready else "Slide further", style = MaterialTheme.typography.bodyMedium, color = Color.White,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
