@@ -66,6 +66,9 @@ class TvPlayer(
     /** The load the TV was last asked for, so the TV's word about an older one is ignored. */
     private var loadGeneration = 0
     private var loading = false
+    /** The queue entry the phone last told the TV to jump to, and when: see [TvJump]. */
+    private var jumpingTo: Long? = null
+    private var jumpedAt = 0L
     private var syncing = false
     private var syncAgain = false
     private var client: RemoteMediaClient? = null
@@ -188,6 +191,8 @@ class TvPlayer(
         // A song the TV holds is jumped to there; anything else is a new load around it.
         val itemId = tvItemId(keys[target])
         if (c != null && itemId != null && !loading) {
+            jumpingTo = keys[target]
+            jumpedAt = System.currentTimeMillis()
             c.queueJumpToItem(itemId, at, null)
             sync()
             return Futures.immediateVoidFuture()
@@ -306,6 +311,7 @@ class TvPlayer(
     private fun load(why: String): ListenableFuture<*> {
         val generation = ++loadGeneration
         loading = true
+        jumpingTo = null
         state = Player.STATE_BUFFERING
         val window = TvWindow.around(items.size, index, repeat == Player.REPEAT_MODE_ALL)
         val sending = window.map { items[it] }
@@ -389,6 +395,16 @@ class TvPlayer(
                 AppLog.w("Cast", "The TV stopped with an error")
             }
             return
+        }
+        // Right after a jump the TV still reports the song it's leaving: the phone stays on the one it asked for
+        // (issue #901: each skip went back and on again, and told ListenBrainz both songs).
+        when (TvJump.follow(jumpingTo, jumpedAt, key, System.currentTimeMillis())) {
+            TvJump.Follow.IGNORE -> return
+            TvJump.Follow.ARRIVED -> jumpingTo = null
+            TvJump.Follow.FOLLOW -> if (jumpingTo != null) {
+                AppLog.w("Cast", "The TV didn't reach song ${keys.indexOf(jumpingTo!!) + 1} within ${TvJump.SETTLE_MS} ms; following the TV")
+                jumpingTo = null
+            }
         }
         val before = index
         index = at
@@ -479,6 +495,24 @@ class TvPlayer(
 }
 
 /** The few songs of the phone's queue the TV holds (issue #114), as index arithmetic. */
+/**
+ * After the phone tells the TV to jump to a song, the TV's next status updates can still name the song it's leaving
+ * (issue #901). Those are ignored until the TV names the song it was sent to, for up to [SETTLE_MS]; after that the
+ * TV's word counts again.
+ */
+object TvJump {
+    const val SETTLE_MS = 3_000L
+
+    enum class Follow { FOLLOW, IGNORE, ARRIVED }
+
+    fun follow(jumpingTo: Long?, jumpedAt: Long, reported: Long?, now: Long): Follow = when {
+        jumpingTo == null -> Follow.FOLLOW
+        reported == jumpingTo -> Follow.ARRIVED
+        now - jumpedAt < SETTLE_MS -> Follow.IGNORE
+        else -> Follow.FOLLOW
+    }
+}
+
 object TvWindow {
     /** Songs before the current one (the TV remote's previous). */
     const val BEHIND = 1
