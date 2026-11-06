@@ -874,8 +874,10 @@ private fun QueueView(state: PlayerState) {
                         onClick = { graph.player.skipTo(index) },
                         highlighted = playing,
                         swipeToQueue = false,
-                        // Swipe to queue in reverse, left to right: a red strip takes the song out (issue #809).
+                        // Right to left, the way a song is swiped into the queue: a red strip takes it out; left to
+                        // right: an amber one moves it to play next, unless it's playing or next already (issue #915).
                         swipeToRemove = { graph.player.removeFromQueue(index) },
+                        swipeToPlayNext = if (index == state.index || index == state.index + 1) null else ({ graph.player.moveToPlayNext(index) }),
                         swipeRowColour = QUEUE_ROW,
                         subtitle = artistAndAlbum(song),
                         nowPlaying = playing,
@@ -885,6 +887,12 @@ private fun QueueView(state: PlayerState) {
                                 close()
                                 graph.player.removeFromQueue(index)
                             })
+                            if (index != state.index && index != state.index + 1) {
+                                DropdownMenuItem(text = { Text("Play next") }, onClick = {
+                                    close()
+                                    graph.player.moveToPlayNext(index)
+                                })
+                            }
                             if (index > 0) {
                                 DropdownMenuItem(text = { Text("Remove songs up to here") }, onClick = {
                                     close()

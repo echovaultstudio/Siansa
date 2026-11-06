@@ -64,27 +64,49 @@ class SpacingPlayerTest : SpacingCheck() {
     }
 
     /**
-     * Swipe to remove in the queue goes left to right (issue #809), the reverse of swipe to queue: a right swipe
-     * takes the song out, with the red strip's bin and label at the left edge, where the row slid away from; a left
-     * swipe does nothing.
+     * The queue's swipes (issue #915): right to left takes the song out, the way a song is swiped into the queue, once
+     * the bin has shaken; left to right moves it to play next.
      */
-    @Test fun aQueuedSongIsRemovedBySwipingRight() {
+    @Test fun aQueuedSongIsRemovedBySwipingLeftAndPlaysNextBySwipingRight() {
         var removed = 0
+        var next = 0
         compose.setContent {
             SiansaTheme {
                 Box(Modifier.width(360.dp).testTag("queued")) {
-                    app.siansa.ui.SwipeToRemove(rowColour = app.siansa.ui.QUEUE_ROW, onRemove = { removed++ }) { background ->
+                    app.siansa.ui.QueueSwipes(rowColour = app.siansa.ui.QUEUE_ROW, onRemove = { removed++ }, onPlayNext = { next++ }) { background ->
                         Box(Modifier.then(background).fillMaxWidth().height(56.dp))
                     }
                 }
             }
         }
-        compose.onNodeWithTag("queued").performTouchInput { swipeLeft() }
-        compose.waitForIdle()
-        assertEquals("A left swipe leaves the queue alone", 0, removed)
         compose.onNodeWithTag("queued").performTouchInput { swipeRight() }
         compose.waitForIdle()
-        assertEquals("A right swipe takes the song out", 1, removed)
+        assertEquals("A right swipe moves the song to play next", 1, next)
+        assertEquals("A right swipe doesn't take it out", 0, removed)
+        compose.onNodeWithTag("queued").performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        assertEquals("A left swipe takes the song out", 1, removed)
+        assertEquals("A left swipe doesn't move it", 1, next)
+    }
+
+    /** Without play next (the song playing), a right swipe in the queue does nothing; a left one still takes it out. */
+    @Test fun thePlayingSongOnlySwipesOut() {
+        var removed = 0
+        compose.setContent {
+            SiansaTheme {
+                Box(Modifier.width(360.dp).testTag("queued")) {
+                    app.siansa.ui.QueueSwipes(rowColour = app.siansa.ui.QUEUE_ROW, onRemove = { removed++ }, onPlayNext = null) { background ->
+                        Box(Modifier.then(background).fillMaxWidth().height(56.dp))
+                    }
+                }
+            }
+        }
+        compose.onNodeWithTag("queued").performTouchInput { swipeRight() }
+        compose.waitForIdle()
+        assertEquals(0, removed)
+        compose.onNodeWithTag("queued").performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        assertEquals(1, removed)
     }
 
     /** Shape the mix (issue #649): the shape chips sit evenly between their title and the hint under them. */

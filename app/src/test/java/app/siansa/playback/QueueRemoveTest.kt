@@ -1,6 +1,7 @@
 package app.siansa.playback
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -23,5 +24,23 @@ class QueueRemoveTest {
         assertTrue(queueRemoveUpTo(10, 10).isEmpty())
         assertTrue(queueRemoveUpTo(-1, 10).isEmpty())
         assertTrue(queueRemoveUpTo(2, 0).isEmpty())
+    }
+
+    // Swipe right in the queue (issue #915): the song plays straight after the one playing.
+    @Test fun aLaterSongMovesToRightAfterTheOnePlaying() {
+        assertEquals(3, queuePlayNextIndex(index = 7, current = 2, count = 10))
+    }
+
+    @Test fun anEarlierSongLandsWhereThePlayingSongWas() {
+        // Taken out from before it, the song playing moves up one: at 4 it's straight after it.
+        assertEquals(4, queuePlayNextIndex(index = 1, current = 4, count = 10))
+    }
+
+    @Test fun nothingMovesForThePlayingOrNextSongOrOutsideTheQueue() {
+        assertNull(queuePlayNextIndex(index = 2, current = 2, count = 10))
+        assertNull(queuePlayNextIndex(index = 3, current = 2, count = 10))
+        assertNull(queuePlayNextIndex(index = 10, current = 2, count = 10))
+        assertNull(queuePlayNextIndex(index = -1, current = 2, count = 10))
+        assertNull(queuePlayNextIndex(index = 1, current = -1, count = 10))
     }
 }
