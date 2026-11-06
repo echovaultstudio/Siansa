@@ -75,7 +75,7 @@ object SongLength {
     /** The library's length of the song a stream address is for, when it's a whole song from the server. */
     fun librarySec(uri: Uri): Int? {
         if (Streaming.offsetMs(uri) > 0) return null
-        val id = runCatching { uri.getQueryParameter("id") }.getOrNull() ?: return null
+        val id = streamSongId(uri.toString()) ?: return null
         return SongRegistry.get(id)?.durationSec
     }
 
@@ -89,7 +89,7 @@ object SongLength {
         override fun createExtractors(uri: Uri, responseHeaders: Map<String, List<String>>): Array<Extractor> {
             val made = inner.createExtractors(uri, responseHeaders)
             val librarySec = librarySec(uri) ?: return made
-            val id = uri.getQueryParameter("id").orEmpty()
+            val id = streamSongId(uri.toString()).orEmpty()
             return Array(made.size) { Checked(made[it], librarySec, id) }
         }
 

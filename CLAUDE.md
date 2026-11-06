@@ -21,6 +21,9 @@ released app goes to `main`, and only when the owner asks.
 - Build and test before opening a pull request: `gradle :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:assembleRelease :app:bundleRelease`.
   Lint errors fail the build.
 - Add or update unit tests in `app/src/test/` for any logic you change.
+- Siansa plays from Navidrome, Emby and Jellyfin. Test anything that takes a server's addresses or answers (the
+  player, downloads, the song cache, covers, scrobbling) on all three with `EveryServer.all`
+  (`app/src/test/java/app/siansa/servers/`), and don't read a song from `?id=` alone: use `streamSongId` (issue #903).
 - Add a note file in `changelog.d/` (e.g. `changelog.d/issue-42.md`, see its README) with `### Fixed` /
   `### Added` / `### Changed`, written for the app's user in plain words. Don't edit `CHANGELOG.md` or
   `version.txt`: the release does that, so pull requests never conflict over them. Use `### Added` only for

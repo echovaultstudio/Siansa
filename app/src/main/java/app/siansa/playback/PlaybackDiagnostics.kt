@@ -79,7 +79,7 @@ class PlaybackDiagnostics(
         val kb = loadEventInfo.bytesLoaded / 1024
         val ms = loadEventInfo.loadDurationMs.coerceAtLeast(1)
         val kbps = loadEventInfo.bytesLoaded * 8 / ms
-        val id = loadEventInfo.uri.getQueryParameter("id") ?: "?"
+        val id = streamSongId(loadEventInfo.uri) ?: "?"
         val format = loadEventInfo.uri.getQueryParameter("format") ?: "original"
         AppLog.d("Load", "Song $id ($format): ${kb} KB in ${ms}ms = ${kbps} kbit/s")
     }
@@ -92,7 +92,7 @@ class PlaybackDiagnostics(
         wasCanceled: Boolean,
     ) {
         if (wasCanceled) return
-        val id = loadEventInfo.uri.getQueryParameter("id") ?: "?"
+        val id = streamSongId(loadEventInfo.uri) ?: "?"
         AppLog.w("Load", "Loading song $id failed after ${loadEventInfo.loadDurationMs}ms: ${error.javaClass.simpleName}: ${error.message} · ${where(eventTime)}",
             event = "stream.load_failed", fields = mapOf("song_id" to id, "duration_ms" to loadEventInfo.loadDurationMs, "error_type" to error.javaClass.simpleName))
     }
