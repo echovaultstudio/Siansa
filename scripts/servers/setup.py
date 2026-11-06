@@ -55,8 +55,9 @@ def navidrome(songs):
 
     def count():
         _, r = call("GET", f"{NAVIDROME}/rest/search3?query=&songCount=500&{q}")
-        return len(r["subsonic-response"].get("searchResult3", {}).get("song", [])) >= songs
-    wait(f"Navidrome scan ({songs} songs)", count)
+        got = {(x.get("title"), (x.get("artist"),)) for x in r["subsonic-response"].get("searchResult3", {}).get("song", [])}
+        return all(want in got for want in songs)
+    wait(f"Navidrome scan ({len(songs)} songs)", count)
 
 
 def emby_like(name, base, auth_header, scheme):
@@ -104,9 +105,9 @@ def emby_count(base, head, user, songs):
         waited = time.time() - state["start"]
         if waited > 30 * (state["asked"] + 1):
             state["asked"] += 1
-            print(f"{base}: {state['seen']} of {songs} songs after {waited:.0f}s; asking for a scan")
+            print(f"{base}: {state['seen']} of {len(songs)} songs ready after {waited:.0f}s; asking for a scan")
             call("POST", f"{base}/Library/Refresh", headers=state["head"])
-        params = {"IncludeItemTypes": "Audio", "Recursive": "true", "Limit": "0"}
+        params = {"IncludeItemTypes": "Audio", "Recursive": "true", "Fields": "Artists"}
         if head["_jellyfin"]:
             url = f"{base}/Items?" + urllib.parse.urlencode({**params, "userId": user})
         else:
@@ -118,8 +119,11 @@ def emby_count(base, head, user, songs):
                 token, _ = head["_login"]()
                 state["head"] = {**state["head"], "X-Emby-Token": token}
             raise
-        state["seen"] = r["TotalRecordCount"]
-        return r["TotalRecordCount"] >= songs
+        # Ready when every song has its tagged title and artist: Emby lists a song by its file name until it has
+        # read the file's tags ("01 Loose Ends", no artist), and a count alone let the tests in too early.
+        got = {(i.get("Name"), tuple(i.get("Artists") or [])) for i in r.get("Items", [])}
+        state["seen"] = sum(1 for want in songs if want in got)
+        return state["seen"] == len(songs)
     return count
 
 
@@ -242,7 +246,8 @@ def versions():
 
 
 def main(library):
-    songs = len(json.load(open(library))["songs"])
+    # Each song as the servers should show it: its title and artist.
+    songs = [(x["title"], (x["artist"],)) for x in json.load(open(library))["songs"]]
     import os
     with open(os.path.join(os.path.dirname(os.path.dirname(library)), "versions.txt"), "w") as f:
         # Written before the setup, so a server whose setup fails still shows which version it was.
@@ -252,7 +257,7 @@ def main(library):
     navidrome(songs)
     for name, base, header, scheme in (("Emby", EMBY, "X-Emby-Authorization", "Emby"), ("Jellyfin", JELLYFIN, "Authorization", "MediaBrowser")):
         head, user = emby_like(name, base, header, scheme)
-        wait(f"{name} scan ({songs} songs)", emby_count(base, head, user, songs))
+        wait(f"{name} scan ({len(songs)} songs)", emby_count(base, head, user, songs))
 
 
 if __name__ == "__main__":
