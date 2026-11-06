@@ -80,6 +80,24 @@ object Passthrough {
     fun involves(mode: PassthroughMode, id: String?, suffix: String?): Boolean =
         mode != PassthroughMode.OFF && id != null && (likely(mode, suffix) || id in played)
 
+    /**
+     * The format a Dolby or DTS track is read with, so the next song joins it without a gap (issue #924).
+     *
+     * Most Dolby Atmos `.m4a` files start with a priming frame before the music, which the file's edit list cuts off.
+     * Media3 then treats the song as starting with a jump, plays everything of the song before it out, and stops and
+     * reopens the output to the receiver for it: a gap, with the receiver finding the signal again, between songs
+     * meant to run into each other. Only the songs without a priming frame joined cleanly.
+     *
+     * Sent unchanged, the receiver decodes that frame itself (Kodi sends it too), so while passthrough is [on] the jump
+     * is ignored for these formats and the song goes straight on after the one before it. Other formats are left alone.
+     */
+    fun joinable(format: androidx.media3.common.Format, on: Boolean): androidx.media3.common.Format =
+        if (on && format.hasPrerollSamples && isBitstream(format.sampleMimeType)) {
+            format.buildUpon().setHasPrerollSamples(false).build()
+        } else {
+            format
+        }
+
     /** A plain name for a bitstream type, for the log and the TV's settings ("Dolby Atmos (E-AC-3 JOC)"). */
     fun name(mime: String?): String = when (mime) {
         MimeTypes.AUDIO_AC3 -> "Dolby Digital (AC-3)"

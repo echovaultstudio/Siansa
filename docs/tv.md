@@ -117,7 +117,9 @@ and play in stereo, with the centre and surround channels folded in.
   how they sound. Use the receiver's volume.
 - Songs in the same format play one after another without a gap, a DJ mix or a live album included: the output to the
   receiver stays open from one song to the next. A file that says it's longer than it is (some DJ mixes do) plays to
-  its real last frame, read from the file's own audio, so the next one still follows straight on.
+  its real last frame, read from the file's own audio, so the next one still follows straight on. Most Atmos files
+  start with a short priming frame; it goes to the receiver with the rest of the song, as Kodi sends it, so the output
+  doesn't stop for it.
 - They always stream as the original file, whatever **Streaming quality** says, since a converted song can't go to the
   receiver.
 
