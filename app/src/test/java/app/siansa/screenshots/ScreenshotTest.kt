@@ -461,6 +461,25 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.SectionTitleSwitch(false) {}
                 }
             },
+            // An album's Explore (issue #965): the row with it, and its slides on the cover: right onto Play, up onto the cover.
+            Scene("album_explore") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = {}, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {})
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = {}, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {},
+                        explore = app.siansa.ui.ExploreSlide(app.siansa.ui.SlideWay.RIGHT, armed = true), dim = 0.3f)
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
+                        listOf(
+                            app.siansa.ui.ExploreSlide(app.siansa.ui.SlideWay.RIGHT, armed = true),
+                            app.siansa.ui.ExploreSlide(app.siansa.ui.SlideWay.UP, armed = false),
+                        ).forEach { slide ->
+                            Box(
+                                Modifier.size(160.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                                    .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFFD4813A), Color(0xFF1E2A6B)))),
+                            ) { app.siansa.ui.ExploreCoverLabel(slide, Modifier.fillMaxSize()) }
+                        }
+                    }
+                }
+            },
             // Settings › Style › Now playing: the play button slides, each way and what it does.
             Scene("play_slides_settings") {
                 Column(Modifier.padding(Space.Page)) {

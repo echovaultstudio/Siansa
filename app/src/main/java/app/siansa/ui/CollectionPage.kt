@@ -56,7 +56,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -125,6 +129,10 @@ fun CollectionPage(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
+    // A slide from the album's Explore button (issue #965): shown on the cover, the rest of the page dimmed.
+    var explore by remember { mutableStateOf<ExploreSlide?>(null) }
+    val launcher = rememberPlayLauncher()
+    val exploreDim by androidx.compose.animation.core.animateFloatAsState(if (explore != null) EXPLORE_OTHERS else 1f, label = "exploreDim")
     val coverSize = (LocalConfiguration.current.screenWidthDp * 0.62f).dp
     val coverPx = with(density) { coverSize.toPx() }
     val scrolled by remember {
@@ -190,20 +198,34 @@ fun CollectionPage(
                             },
                         contentAlignment = Alignment.Center,
                     ) {
-                        cover(Modifier.size(coverSize).shadow(18.dp, RoundedCornerShape(6.dp)))
+                        Box(Modifier.size(coverSize).shadow(18.dp, RoundedCornerShape(6.dp)).clip(RoundedCornerShape(6.dp))) {
+                            val blur by androidx.compose.animation.core.animateDpAsState(
+                                when { explore == null -> 0.dp; explore?.armed == true -> EXPLORE_BLUR_READY; else -> EXPLORE_BLUR },
+                                label = "exploreBlur",
+                            )
+                            cover(Modifier.size(coverSize).then(if (blur > 0.dp) Modifier.blur(blur) else Modifier))
+                            ExploreCoverLabel(explore, Modifier.fillMaxSize())
+                        }
                     }
                     Spacer(Modifier.height(Space.Page))
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.height(Space.Small))
-                    header()
+                    Column(Modifier.alpha(exploreDim)) {
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(Modifier.height(Space.Small))
+                        header()
+                    }
                     Spacer(Modifier.height(Space.Tight))
-                    ActionRow(songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed, saveAs = title.takeIf { saveAsPlaylist })
+                    ActionRow(
+                        songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed, saveAs = title.takeIf { saveAsPlaylist },
+                        // An album's Explore slides right onto Play for a DJ mix of its own songs (issue #965).
+                        onDjMix = if (onSimilar != null) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) { launcher.notify(it) } } }) else null,
+                        explore = explore, onExplore = { explore = it }, dim = exploreDim,
+                    )
                 }
             }
             when {
@@ -370,7 +392,17 @@ private fun DiscHeading(label: String, cover: Color) {
 
 /** Queue all and download on the left; find similar albums, shuffle and the big round play button on the right. */
 @Composable
-private fun ActionRow(songs: List<Song>, offline: OfflineItem?, onSimilar: (() -> Unit)?, onPlayed: () -> Unit = {}, saveAs: String? = null) {
+private fun ActionRow(
+    songs: List<Song>,
+    offline: OfflineItem?,
+    onSimilar: (() -> Unit)?,
+    onPlayed: () -> Unit = {},
+    saveAs: String? = null,
+    onDjMix: (() -> Unit)? = null,
+    explore: ExploreSlide? = null,
+    onExplore: (ExploreSlide?) -> Unit = {},
+    dim: Float = 1f,
+) {
     val graph = LocalGraph.current
     var saving by remember { mutableStateOf(false) }
     // ⏸ while this page's songs play; it pauses them rather than starting over (issue #644).
@@ -385,6 +417,10 @@ private fun ActionRow(songs: List<Song>, offline: OfflineItem?, onSimilar: (() -
         onShuffle = { graph.player.play(songs, shuffle = true); onPlayed() },
         onPlay = { playback.press { graph.player.play(songs); onPlayed() } },
         playing = playback.playing,
+        onDjMix = onDjMix?.let { mix -> { mix(); onPlayed() } },
+        explore = explore,
+        onExplore = onExplore,
+        dim = dim,
     )
 }
 
@@ -399,9 +435,17 @@ internal fun ActionButtons(
     onPlay: () -> Unit,
     onSave: (() -> Unit)? = null,
     playing: Boolean = false,
+    // An album's Explore (issue #965): with [onDjMix], the similar albums button becomes Explore, which slides.
+    onDjMix: (() -> Unit)? = null,
+    explore: ExploreSlide? = null,
+    onExplore: (ExploreSlide?) -> Unit = {},
+    dim: Float = 1f,
 ) {
+    // How far right of Explore's middle the Play button's near edge is: sliding there starts the DJ mix.
+    var exploreX by remember { mutableStateOf<Float?>(null) }
+    var playLeft by remember { mutableStateOf<Float?>(null) }
     PlayButtonRow {
-        IconButton(onClick = onQueue, enabled = enabled, modifier = Modifier.testTag("queueAll")) {
+        IconButton(onClick = onQueue, enabled = enabled, modifier = Modifier.alpha(dim).testTag("queueAll")) {
             Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add all to queue", Modifier.size(28.dp))
         }
         if (onSave != null) {
@@ -410,19 +454,29 @@ internal fun ActionButtons(
                 Icon(Icons.Rounded.AddCircle, "Save as playlist", Modifier.size(28.dp))
             }
         }
-        download()
+        Box(Modifier.alpha(dim)) { download() }
         Spacer(Modifier.weight(1f))
-        if (onSimilar != null) {
+        if (onSimilar != null && onDjMix != null && enabled) {
+            ExploreButton(
+                onSimilar = onSimilar,
+                onDjMix = onDjMix,
+                onSliding = onExplore,
+                rightArmPx = exploreX?.let { x -> playLeft?.let { it - x } },
+                modifier = Modifier.onGloballyPositioned { exploreX = it.positionInRoot().x + it.size.width / 2f },
+            )
+        } else if (onSimilar != null) {
             // The waveform with an "A", as "Similar albums" in the now playing menu (issue #239).
             IconButton(onClick = onSimilar, modifier = Modifier.testTag("findSimilarAlbums")) {
                 Icon(rememberSimilarAlbumsIcon(), "Find similar albums", tint = Accent, modifier = Modifier.size(28.dp))
             }
         }
-        IconButton(onClick = onShuffle, enabled = enabled, modifier = Modifier.testTag("shuffleAll")) {
+        IconButton(onClick = onShuffle, enabled = enabled, modifier = Modifier.alpha(dim).testTag("shuffleAll")) {
             Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
         }
         Spacer(Modifier.width(Space.Small))
-        BigPlayButton(enabled, playing = playing, onPlay = onPlay)
+        Box(Modifier.onGloballyPositioned { playLeft = it.positionInRoot().x }.alpha(if (explore != null && explore.way != SlideWay.RIGHT) dim else 1f)) {
+            BigPlayButton(enabled, playing = playing, onPlay = onPlay, grooves = explore?.way == SlideWay.RIGHT && explore.armed)
+        }
     }
 }
 
@@ -441,7 +495,7 @@ fun PlayButtonRow(modifier: Modifier = Modifier, content: @Composable RowScope.(
 
 /** The big round Play button of album, playlist, mix and artist pages. Only ever inside a [PlayButtonRow]. */
 @Composable
-fun BigPlayButton(enabled: Boolean, playing: Boolean = false, onPlay: () -> Unit) {
+fun BigPlayButton(enabled: Boolean, playing: Boolean = false, grooves: Boolean = false, onPlay: () -> Unit) {
     Box(
         Modifier
             .size(56.dp)
@@ -451,6 +505,8 @@ fun BigPlayButton(enabled: Boolean, playing: Boolean = false, onPlay: () -> Unit
             .testTag("bigPlay"),
         contentAlignment = Alignment.Center,
     ) {
+        // Record grooves while an album's Explore is slid onto it for a DJ mix (issue #965).
+        if (grooves) Grooves(playing = false, Modifier.fillMaxSize().testTag("bigPlayGrooves"))
         // ⏸ while what the page shows is playing (a book's page, issue #626): the same button pauses it.
         Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (playing) "Pause" else "Play", tint = OnAccent, modifier = Modifier.size(32.dp))
     }
@@ -553,3 +609,8 @@ fun ContinueButton(track: String, onClick: () -> Unit) {
         Text("Continue from $track")
     }
 }
+
+/** The page around an album's Explore, while it slides (issue #965): dimmed like now playing's controls. */
+private const val EXPLORE_OTHERS = 0.3f
+private val EXPLORE_BLUR = 8.dp
+private val EXPLORE_BLUR_READY = 18.dp

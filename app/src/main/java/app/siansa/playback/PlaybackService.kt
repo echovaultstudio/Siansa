@@ -156,7 +156,9 @@ class PlaybackService : MediaLibraryService() {
             bitstream = { Passthrough.pastTheMix(bitstreamOut, exo.audioFormat?.sampleMimeType) },
             inDjRadio = {
                 (graph.songRadio.seed.value != null && graph.songRadio.mode == ContinuousMode.DJ) ||
-                    graph.settings.current.continuousPlay == ContinuousMode.DJ
+                    graph.settings.current.continuousPlay == ContinuousMode.DJ ||
+                    // An album's DJ mix blends as one (issue #965).
+                    app.siansa.mix.AlbumDjMix.isOn(exo.currentMediaItem?.mediaId)
             },
         ).also { it.start() } else Crossfader(
             main = exo,
@@ -172,7 +174,9 @@ class PlaybackService : MediaLibraryService() {
             onLevel = { if (session?.player === phone) applyVolume(phone) },
             inDjRadio = {
                 (graph.songRadio.seed.value != null && graph.songRadio.mode == ContinuousMode.DJ) ||
-                    graph.settings.current.continuousPlay == ContinuousMode.DJ
+                    graph.settings.current.continuousPlay == ContinuousMode.DJ ||
+                    // An album's DJ mix blends as one (issue #965).
+                    app.siansa.mix.AlbumDjMix.isOn(exo.currentMediaItem?.mediaId)
             },
         ).also { it.start() }
         exo.addAnalyticsListener(PlaybackDiagnostics(exo, this))

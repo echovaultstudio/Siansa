@@ -399,7 +399,7 @@ private val SlideWay.arrowIcon: ImageVector
  * and a glint that goes round while it plays and stands still when paused.
  */
 @Composable
-private fun Grooves(playing: Boolean, modifier: Modifier = Modifier) {
+internal fun Grooves(playing: Boolean, modifier: Modifier = Modifier) {
     val turn = remember { Animatable(0f) }
     LaunchedEffect(playing) {
         while (playing) {

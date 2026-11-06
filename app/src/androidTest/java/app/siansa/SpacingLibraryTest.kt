@@ -122,6 +122,20 @@ class SpacingLibraryTest : SpacingCheck() {
         assertTrue("Find similar right next to Shuffle (${(shuffle.left - similar.right).value} dp)", shuffle.left - similar.right <= app.siansa.ui.Space.Small + 0.5.dp)
     }
 
+    /** Album page (issue #965): Explore sits on the line of Shuffle, just left of it, in place of Find similar albums. */
+    @Test fun exploreSitsBesideShuffle() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = {}, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {})
+            }
+        }
+        val explore = compose.onNodeWithTag("exploreButton", useUnmergedTree = true).getBoundsInRoot()
+        val shuffle = compose.onNodeWithTag("shuffleAll").getBoundsInRoot()
+        assertEven("Explore and Shuffle, vertical centre", (explore.top + explore.bottom) / 2, (shuffle.top + shuffle.bottom) / 2, 1.dp)
+        assertTrue("Explore is left of Shuffle and doesn't overlap it", explore.right <= shuffle.left + 0.5.dp)
+        assertTrue("Explore right next to Shuffle (${(shuffle.left - explore.right).value} dp)", shuffle.left - explore.right <= app.siansa.ui.Space.Small + 0.5.dp)
+    }
+
     /** Album page (issue #240): room under the big Play button before the first song, marked when it's playing. */
     @Test fun roomBelowThePlayButton() {
         compose.setContent {
