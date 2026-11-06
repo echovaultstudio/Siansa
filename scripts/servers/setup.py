@@ -151,6 +151,16 @@ def refresh_emby_pictures():
     _, found = call("GET", f"{EMBY}/Users/{user}/Items?{q}", headers=head)
     for item in found["Items"]:
         print(f"Emby after refresh: {item['Type']} {item['Name']} images {item.get('ImageTags')} album image {item.get('AlbumPrimaryImageTag')}")
+    # Emby keeps an item for each folder on disk too: is cover.jpg on the folder rather than the album?
+    q = urllib.parse.urlencode({"IncludeItemTypes": "Folder", "Recursive": "true", "Fields": "Path,ImageTags"})
+    _, folders = call("GET", f"{EMBY}/Users/{user}/Items?{q}", headers=head)
+    for item in folders["Items"]:
+        print(f"Emby folder: {item.get('Path')} id {item['Id']} images {item.get('ImageTags')}")
+    for item in found["Items"]:
+        if item["Type"] == "MusicAlbum":
+            _, images = call("GET", f"{EMBY}/Items/{item['Id']}/Images", headers=head)
+            _, full = call("GET", f"{EMBY}/Users/{user}/Items/{item['Id']}?Fields=Path,ParentId", headers=head)
+            print(f"Emby album {item['Name']}: path {full.get('Path')} parent {full.get('ParentId')} images list {images}")
     _, tasks = call("GET", f"{EMBY}/ScheduledTasks", headers=head)
     for t in tasks:
         print(f"Emby task: {t.get('Name')} {t.get('State')} last {(t.get('LastExecutionResult') or {}).get('Status')}")
