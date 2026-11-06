@@ -101,6 +101,41 @@ def emby_count(base, head, user, songs):
     return count
 
 
+def probe_newest():
+    """For a failed run on new versions: Jellyfin's version answer as it is, and which way Emby renames a playlist."""
+    for name, base in (("Emby", EMBY), ("Jellyfin", JELLYFIN)):
+        try:
+            print(f"{name} /System/Info/Public: {str(call('GET', base + '/System/Info/Public')[1])[:400]}")
+        except Exception as e:  # noqa: BLE001
+            print(f"{name} /System/Info/Public: {e}")
+    device = 'Emby Client="Siansa CI", Device="CI", DeviceId="siansa-ci", Version="1"'
+    _, r = call("POST", EMBY + "/Users/AuthenticateByName", {"Username": USER, "Pw": PASSWORD}, {"X-Emby-Authorization": device})
+    head = {"X-Emby-Token": r["AccessToken"]}
+    user = r["User"]["Id"]
+    q = urllib.parse.urlencode({"IncludeItemTypes": "Audio", "Recursive": "true", "Limit": "1"})
+    song = call("GET", f"{EMBY}/Users/{user}/Items?{q}", headers=head)[1]["Items"][0]["Id"]
+    made = call("POST", f"{EMBY}/Playlists?" + urllib.parse.urlencode({"Name": "Probe", "Ids": song, "UserId": user, "MediaType": "Audio"}), headers=head)[1]
+    pid = made["Id"]
+    def name_now():
+        return call("GET", f"{EMBY}/Users/{user}/Items/{pid}", headers=head)[1].get("Name")
+    item = call("GET", f"{EMBY}/Users/{user}/Items/{pid}", headers=head)[1]
+    tries = [
+        ("POST /Items/{id} with the whole item", lambda n: call("POST", f"{EMBY}/Items/{pid}", {**item, "Name": n}, head)),
+        ("POST /Items/{id} with the item and Name locked", lambda n: call("POST", f"{EMBY}/Items/{pid}", {**item, "Name": n, "LockedFields": ["Name"], "LockData": False}, head)),
+        ("POST /Playlists/{id} {Name}", lambda n: call("POST", f"{EMBY}/Playlists/{pid}", {"Name": n}, head)),
+        ("POST /Items/{id}?Name=", lambda n: call("POST", f"{EMBY}/Items/{pid}?" + urllib.parse.urlencode({"Name": n}), {}, head)),
+    ]
+    for i, (how, do) in enumerate(tries):
+        want = f"Probe {i}"
+        try:
+            code = do(want)[0]
+        except Exception as e:  # noqa: BLE001
+            print(f"Emby rename by {how}: {e}")
+            continue
+        time.sleep(3)
+        print(f"Emby rename by {how}: {code}, name now {name_now()!r} (wanted {want!r})")
+
+
 def describe():
     """What Emby and Jellyfin hold for the album with a cover and the song with lyrics: for reading a failed run."""
     for name, base, header, scheme in (("Emby", EMBY, "X-Emby-Authorization", "Emby"), ("Jellyfin", JELLYFIN, "Authorization", "MediaBrowser")):
@@ -176,7 +211,8 @@ def versions():
         found.append(f"Navidrome ? ({e})")
     for name, base in (("Emby", EMBY), ("Jellyfin", JELLYFIN)):
         try:
-            found.append(f"{name} " + call("GET", base + "/System/Info/Public")[1].get("Version", "?"))
+            info = call("GET", base + "/System/Info/Public")[1]
+            found.append(f"{name} " + str(info.get("Version") or info.get("version") or "? (" + ",".join(list(info)[:8]) + ")"))
         except Exception as e:  # noqa: BLE001
             found.append(f"{name} ? ({e})")
     return ", ".join(found)
@@ -198,6 +234,10 @@ def main(library):
 
 if __name__ == "__main__":
     if sys.argv[1] == "--describe":
+        try:
+            probe_newest()
+        except Exception as e:  # noqa: BLE001
+            print(f"probe: {e}")
         describe()
         refresh_emby_pictures()
     else:
