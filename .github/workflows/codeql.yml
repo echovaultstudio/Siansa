@@ -1,0 +1,72 @@
+name: CodeQL
+
+# GitHub's code scanning (Security › Code scanning). CodeQL's default setup couldn't scan the Kotlin: it builds with
+# a Gradle wrapper, and Siansa has none (CI installs Gradle 8.14.3 itself). This is the advanced setup: Kotlin is
+# compiled the way CI compiles it, the phone and TV apps both, while CodeQL watches; the workflows, the Python
+# scripts and the Cast TV screen's JavaScript need no build. The default setup must be off (Settings › Code security
+# › CodeQL analysis › Switch to advanced) for this one to report.
+on:
+  pull_request:
+  push:
+    branches: [main, mixer]
+  schedule:
+    # Weekly, so new queries also look at code nobody has changed.
+    - cron: "41 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: CodeQL (${{ matrix.language }})
+    # Always on GitHub's runners (free for a public repository), like CI's pull request checks (issue #535).
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: java-kotlin
+            build-mode: manual
+          - language: actions
+            build-mode: none
+          - language: python
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - uses: actions/setup-java@v6
+        if: matrix.language == 'java-kotlin'
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v6
+        if: matrix.language == 'java-kotlin'
+        with:
+          gradle-version: "8.14.3"
+
+      # Compiled from scratch (no build cache), so CodeQL sees every Kotlin file of both apps.
+      - name: Compile the phone and TV apps
+        if: matrix.language == 'java-kotlin'
+        run: gradle :app:compileDebugKotlin :tv:compileDebugKotlin --no-build-cache --no-daemon --stacktrace
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"
