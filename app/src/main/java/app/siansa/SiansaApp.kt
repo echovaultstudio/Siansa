@@ -12,6 +12,7 @@ import coil3.disk.DiskCache
 import coil3.disk.directory
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.request.allowRgb565
 import coil3.request.transitionFactory
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -113,10 +114,20 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
                     .maxSizeBytes(bytes)
                     .build()
             }
-            // Fade in only covers that just came over the network. One read from the phone's own cache
-            // appears straight away, as it would if it were still in memory.
+            .apply {
+                if (BuildConfig.TV_APP) {
+                    // Lighter covers on a TV (issue #951): a cover without see-through parts takes half the memory
+                    // (16 bits a pixel, which a cover on a TV doesn't show), and a few load at a time, so a row of
+                    // six doesn't hold up the screen or the music.
+                    allowRgb565(true)
+                    fetcherCoroutineContext(kotlinx.coroutines.Dispatchers.IO.limitedParallelism(TV_COVER_LOADS))
+                    decoderCoroutineContext(kotlinx.coroutines.Dispatchers.Default.limitedParallelism(TV_COVER_DECODES))
+                }
+            }
+            // Fade in only covers that just came over the network, and never on a TV (issue #951). One read from the
+            // phone's own cache appears straight away, as it would if it were still in memory.
             .transitionFactory { target, result ->
-                if (result is coil3.request.SuccessResult && result.dataSource == coil3.decode.DataSource.NETWORK) {
+                if (!BuildConfig.TV_APP && result is coil3.request.SuccessResult && result.dataSource == coil3.decode.DataSource.NETWORK) {
                     coil3.transition.CrossfadeTransition(target, result, 110)
                 } else {
                     coil3.transition.Transition.Factory.NONE.create(target, result)
@@ -200,3 +211,7 @@ object CoverTrim {
         else -> null
     }
 }
+
+/** Covers a TV loads and decodes at a time (issue #951). */
+private const val TV_COVER_LOADS = 4
+private const val TV_COVER_DECODES = 2
