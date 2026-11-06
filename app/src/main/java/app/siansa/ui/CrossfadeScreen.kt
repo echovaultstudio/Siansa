@@ -99,6 +99,20 @@ fun CrossfadeScreen(nav: NavController) {
             }
             LevellingNow(settings)
             HorizontalDivider()
+            // Dolby songs go to the receiver unchanged, so levelling can't reach them (issue #930).
+            if (app.siansa.BuildConfig.TV_APP && settings.audioPassthrough != app.siansa.playback.PassthroughMode.OFF) {
+                val louder = settings.dolbyLouderDb
+                FoldSection("Dolby songs on your receiver", if (louder == 0) "As they are" else "+$louder dB", tag = "dolby-louder") {
+                    DolbyLouderRow(louder, graph.settings::setDolbyLouder)
+                    Hint(
+                        "Dolby Atmos and Dolby Digital Plus songs go to your receiver as they are, and most play quieter than other " +
+                            "music at the same volume. Raise them until they match: the receiver plays them louder, the sound itself " +
+                            "isn't changed. A song can't go past the receiver's full level, so some get less. Not for Dolby TrueHD, " +
+                            "DTS or plain Dolby Digital.",
+                    )
+                }
+                HorizontalDivider()
+            }
             // The sections below fold (issue #776): their heading and what's set show; tap to open.
             val levellingSummary = if (settings.replayGain == ReplayGainMode.OFF) "Off" else "${settings.replayGain.label} · −${-settings.loudnessTarget} LUFS"
             FoldSection("Levelling", levellingSummary) {
@@ -238,6 +252,16 @@ private fun LoudnessTargetRow(selected: Int, onPick: (Int) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         Levelling.TARGETS.sorted().forEach { target ->
             FilterChip(selected = selected == target, onClick = { onPick(target) }, label = { Text("−${-target} LUFS") })
+        }
+    }
+}
+
+/** How much louder Dolby songs play on the receiver (issue #930). */
+@Composable
+private fun DolbyLouderRow(selected: Int, onPick: (Int) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        app.siansa.playback.DolbyLevel.CHOICES.forEach { db ->
+            FilterChip(selected = selected == db, onClick = { onPick(db) }, label = { Text(if (db == 0) "Off" else "+$db dB") })
         }
     }
 }
