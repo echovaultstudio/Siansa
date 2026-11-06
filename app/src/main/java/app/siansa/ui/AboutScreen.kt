@@ -34,6 +34,8 @@ internal object AboutLinks {
     const val LICENCES = "https://siansa.app/licenses"
     /** The user docs. They're in the public Siansa repository until docs.siansa.app is up. */
     const val DOCS = "https://github.com/echovaultstudio/Siansa/tree/main/docs"
+    /** The docs on mixing: crossfades, smart crossfade and beat-matched blends (issue #916). */
+    const val MIXING = "https://github.com/echovaultstudio/Siansa/blob/main/docs/playback.md#crossfade"
     const val PRIVACY = "https://siansa.app/privacy"
 
     /** The links in the order About shows them: what it's called, what it says under it, where it goes. */

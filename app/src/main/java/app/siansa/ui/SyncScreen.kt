@@ -115,11 +115,11 @@ fun SyncScreen(nav: NavController) {
             }
 
             if (progress.running) {
-                OutlinedButton(onClick = { graph.sync.cancel() }, modifier = Modifier.fillMaxWidth()) { Text("Stop") }
+                OutlinedButton(onClick = { graph.sync.cancel() }, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Stop") }
             } else {
                 // Always a full sync (issue #376): new music and changed tags are picked up, whatever Navidrome
                 // says about its last scan. The check at app start stays a quick one.
-                Button(onClick = { graph.sync.start(full = true) }, modifier = Modifier.fillMaxWidth().testTag("syncNow")) {
+                Button(onClick = { graph.sync.start(full = true) }, modifier = Modifier.focusRing().fillMaxWidth().testTag("syncNow")) {
                     Icon(Icons.Rounded.Sync, null)
                     Spacer(Modifier.width(Space.Small))
                     Text("Sync now")

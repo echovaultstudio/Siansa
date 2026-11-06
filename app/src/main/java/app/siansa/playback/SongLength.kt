@@ -79,18 +79,25 @@ object SongLength {
         return SongRegistry.get(id)?.durationSec
     }
 
+    /**
+     * The extractors the player reads songs with: lengths corrected as above and, while [passthrough] says passthrough
+     * is on, Dolby and DTS tracks read so the next song joins them without a gap ([Passthrough.joinable]).
+     */
     @OptIn(UnstableApi::class)
-    fun extractors(inner: ExtractorsFactory = DefaultExtractorsFactory()): ExtractorsFactory = Factory(inner)
+    fun extractors(inner: ExtractorsFactory = DefaultExtractorsFactory(), passthrough: () -> Boolean = { false }): ExtractorsFactory =
+        Factory(inner, passthrough)
 
     @OptIn(UnstableApi::class)
-    private class Factory(private val inner: ExtractorsFactory) : ExtractorsFactory {
+    private class Factory(private val inner: ExtractorsFactory, private val passthrough: () -> Boolean) : ExtractorsFactory {
         override fun createExtractors(): Array<Extractor> = inner.createExtractors()
 
         override fun createExtractors(uri: Uri, responseHeaders: Map<String, List<String>>): Array<Extractor> {
             val made = inner.createExtractors(uri, responseHeaders)
-            val librarySec = librarySec(uri) ?: return made
+            val librarySec = librarySec(uri)
+            val joins = passthrough()
+            if (librarySec == null && !joins) return made
             val id = streamSongId(uri.toString()).orEmpty()
-            return Array(made.size) { Checked(made[it], librarySec, id) }
+            return Array(made.size) { Checked(made[it], librarySec, id, joins) }
         }
 
         @Deprecated("Deprecated in Java")
@@ -106,9 +113,9 @@ object SongLength {
         }
     }
 
-    /** An extractor that hands the player the corrected length. */
+    /** An extractor that hands the player the corrected length, and Dolby and DTS tracks that join ([joins]). */
     @OptIn(UnstableApi::class)
-    private class Checked(private val inner: Extractor, private val librarySec: Int, private val id: String) : Extractor {
+    private class Checked(private val inner: Extractor, private val librarySec: Int?, private val id: String, private val joins: Boolean) : Extractor {
         override fun sniff(input: ExtractorInput): Boolean = inner.sniff(input)
         override fun getSniffFailureDetails() = inner.sniffFailureDetails
         override fun getUnderlyingImplementation(): Extractor = inner.underlyingImplementation
@@ -117,9 +124,16 @@ object SongLength {
         override fun release() = inner.release()
 
         override fun init(output: ExtractorOutput) = inner.init(object : ExtractorOutput {
-            override fun track(id: Int, type: Int): TrackOutput = output.track(id, type)
+            override fun track(id: Int, type: Int): TrackOutput {
+                val track = output.track(id, type)
+                return if (joins && type == C.TRACK_TYPE_AUDIO) Joining(track, this@Checked.id) else track
+            }
             override fun endTracks() = output.endTracks()
             override fun seekMap(seekMap: SeekMap) {
+                if (librarySec == null) {
+                    output.seekMap(seekMap)
+                    return
+                }
                 val fileUs = seekMap.durationUs
                 val lengthUs = corrected(fileUs, librarySec, lastFrameUs(seekMap, fileUs))
                 if (lengthUs == fileUs) {
@@ -138,4 +152,19 @@ object SongLength {
             }
         })
     }
+
+    /** A track whose Dolby or DTS format is handed on as [Passthrough.joinable] makes it, said once in the log. */
+    @OptIn(UnstableApi::class)
+    private class Joining(private val inner: TrackOutput, private val id: String) : TrackOutput by inner {
+        override fun format(format: androidx.media3.common.Format) {
+            val joined = Passthrough.joinable(format, on = true)
+            if (joined !== format && joinsLogged.add(id)) {
+                AppLog.i("Passthrough", "Song $id: ${Passthrough.name(format.sampleMimeType)} with a priming frame; joining it to the song before without a gap",
+                    event = "passthrough.join", fields = mapOf("song_id" to id, "mime" to format.sampleMimeType))
+            }
+            inner.format(joined)
+        }
+    }
+
+    private val joinsLogged: MutableSet<String> = Collections.synchronizedSet(HashSet())
 }

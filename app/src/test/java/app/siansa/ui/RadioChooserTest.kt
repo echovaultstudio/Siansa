@@ -13,9 +13,18 @@ import java.io.File
 
 /** Song radio asks Steady or DJ, and the queue marks what it added by itself (issue #337). */
 class RadioChooserTest {
-    @Test fun eachChoiceSaysWhatItDoes() {
-        assertNotEquals(radioModeHint(ContinuousMode.STEADY), radioModeHint(ContinuousMode.DJ))
-        assertTrue(radioModeHint(ContinuousMode.DJ).contains("tempo"))
+    @Test fun eachChoiceHasItsOwnIcon() {
+        // Issue #916: a wave for Steady, a turntable for DJ, in place of the descriptions.
+        assertNotEquals(radioModeIcon(ContinuousMode.STEADY).name, radioModeIcon(ContinuousMode.DJ).name)
+        assertEquals("Siansa.Turntable", radioModeIcon(ContinuousMode.DJ).name)
+    }
+
+    @Test fun theMixingDocsLinkGoesToTheCrossfadeDocs() {
+        assertTrue(AboutLinks.MIXING.startsWith(AboutLinks.DOCS.replace("/tree/", "/blob/")))
+        assertTrue(AboutLinks.MIXING.endsWith("playback.md#crossfade"))
+        // The section it points at is there.
+        val docs = listOf(File("../docs/playback.md"), File("docs/playback.md")).first { it.isFile }
+        assertTrue(docs.readLines().any { it == "## Crossfade" })
     }
 
     @Test fun askingHoldsTheSongUntilAChoice() {
