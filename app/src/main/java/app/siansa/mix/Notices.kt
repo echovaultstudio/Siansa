@@ -11,7 +11,7 @@ import java.util.Locale
 enum class NoticeKind(val id: String, val label: String, val hint: String, val tier: Int) {
     NEEDS_YOU("needs", "Needs you", "When the library sync failed", 0),
     CARRY_ON("carry_on", "Carry on", "A book or episode you're partway through", 1),
-    NEW_ALBUMS("new_albums", "New in your library", "Albums added in the last few days", 2),
+    NEW_ALBUMS("new_albums", "New in your library", "Albums added in the last 30 days", 2),
     YOUR_MONTH("month", "Your month", "Last month's listening, in the first week", 2),
     NEW_ARTISTS("artists", "Artists for you", "Today's new artists to try", 2);
 
@@ -77,8 +77,11 @@ object Notices {
     /** A book counts as "carry on" when it was played this recently. */
     const val CARRY_ON_DAYS = 7
 
-    /** Albums this new count as new in your library. */
-    const val NEW_ALBUM_DAYS = 3
+    /** Albums this new count as new in your library (issue #922, the owner: the last 30 days). */
+    const val NEW_ALBUM_DAYS = 30
+
+    /** The newest albums looked at for New in your library: enough for a month of new albums. */
+    const val NEW_ALBUM_LOOK = 200
 
     /** Your month shows in the first days of the next month. */
     const val MONTH_DAYS = 7
