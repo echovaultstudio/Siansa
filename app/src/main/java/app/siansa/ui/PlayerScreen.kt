@@ -314,6 +314,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
             )
 
             val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            // A slide from the play button shows its choice in the middle of the cover (siansa-dev#38).
+            var slideLabel by remember { mutableStateOf<SlideLabel?>(null) }
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 // The player fills the screen; the cards below only come into view when scrolling, so none
                 // sits under the phone's own buttons (#294). The classic style leaves the top of the lyrics card
@@ -347,7 +349,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         TopRow(song, onClose = onClose, onAlbum = ::openAlbum, onMenu = { menuOpen = true }, onSleep = { sleepOpen = true })
 
                         Box(Modifier.weight(1f).fillMaxWidth().padding(top = Space.Page, bottom = Space.Medium), contentAlignment = Alignment.Center) {
-                            SwipeCover(song, onTap = ::openAlbum)
+                            SwipeCover(song, onTap = ::openAlbum, slideLabel = slideLabel)
                         }
 
                         TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
@@ -355,7 +357,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         }
                         // A radio station has no seek bar, only that it's live (issue #353).
                         if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state)
-                        Controls(state, onSlide = ::slide)
+                        Controls(state, onSlide = ::slide, onSlideLabel = { slideLabel = it })
                         // The lyrics bottom left (greyed out when the song has none), where the music plays in
                         // the middle (with the TV, speaker or headphones' name), and the queue bottom right: tap
                         // it, or swipe up from it (#294).
@@ -518,11 +520,12 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
  * slides out, and the new cover slides in from the other side. Tap opens the album.
  */
 @Composable
-private fun SwipeCover(song: Song?, onTap: () -> Unit) {
+private fun SwipeCover(song: Song?, onTap: () -> Unit, slideLabel: SlideLabel? = null) {
     val graph = LocalGraph.current
     val scope = rememberCoroutineScope()
     val offset = remember { Animatable(0f) }
     val currentId by rememberUpdatedState(song?.id)
+    val blur by androidx.compose.animation.core.animateDpAsState(slideBlur(slideLabel), label = "coverBlur")
     BoxWithConstraints(Modifier.fillMaxWidth().aspectRatio(1f)) {
         val width = constraints.maxWidth.toFloat().coerceAtLeast(1f)
 
@@ -543,6 +546,7 @@ private fun SwipeCover(song: Song?, onTap: () -> Unit) {
                     alpha = 1f - (kotlin.math.abs(offset.value) / width).coerceIn(0f, 1f) * 0.5f
                 }
                 .shadow(24.dp, RoundedCornerShape(10.dp))
+                .then(if (blur > 0.dp) Modifier.blur(blur, androidx.compose.ui.draw.BlurredEdgeTreatment(RoundedCornerShape(10.dp))) else Modifier)
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
@@ -563,6 +567,7 @@ private fun SwipeCover(song: Song?, onTap: () -> Unit) {
                 }
                 .clickable(enabled = song?.albumId != null, onClick = onTap)
         BigCover(song?.cover, song?.albumId, coverModifier, RoundedCornerShape(10.dp))
+        SlideCoverLabel(slideLabel, Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)))
     }
 }
 
@@ -718,10 +723,10 @@ private fun SeekBar(state: PlayerState) {
 
 /**
  * Repeat, previous, play, next and add to playlist. [onSlide]: what a slide from the play button runs (issue #919),
- * null for none.
+ * null for none; [onSlideLabel] gets what the slide shows, for the cover (siansa-dev#38).
  */
 @Composable
-internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null) {
+internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null, onSlideLabel: (SlideLabel?) -> Unit = {}) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
@@ -764,7 +769,13 @@ internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null
             onStop = { graph.player.stop() },
             onSlide = { onSlide?.invoke(it) },
             unavailable = { slideUnavailable(it, settings, graph.connection.current.aiProblem(settings)) },
-            onSliding = { sliding = it },
+            onSliding = { shown ->
+                sliding = shown?.way
+                onSlideLabel(shown?.let {
+                    val slide = slides.of(it.way)
+                    SlideLabel(slide, it.way, it.armed, slideUnavailable(slide, settings, graph.connection.current.aiProblem(settings)))
+                })
+            },
         )
         IconButton(onClick = { graph.player.next() }, modifier = Modifier.size(56.dp).alpha(alphaOf(SlideWay.RIGHT))) {
             Icon(Icons.Rounded.SkipNext, "Next", Modifier.size(40.dp))

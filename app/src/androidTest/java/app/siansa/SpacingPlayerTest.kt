@@ -2,6 +2,7 @@ package app.siansa
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
@@ -271,5 +272,23 @@ class SpacingPlayerTest : SpacingCheck() {
         val left = compose.onNodeWithTag("slideChoice-left", useUnmergedTree = true).getBoundsInRoot()
         val leftGap = button.left - (left.left + left.right) / 2
         assertEven("Up and left", upGap, leftGap, 1.dp)
+    }
+
+    /** A slide's name sits in the middle of the cover, out from under the thumb (siansa-dev#38). */
+    @Test fun slideNameIsCentredInTheCover() {
+        compose.setContent {
+            SiansaTheme {
+                Box(Modifier.size(300.dp)) {
+                    app.siansa.ui.SlideCoverLabel(
+                        app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.SlideWay.UP, armed = true),
+                        Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        val cover = compose.onNodeWithTag("slideLabel", useUnmergedTree = true).getBoundsInRoot()
+        val name = compose.onNodeWithTag("slideName", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Left and right of the name", name.left - cover.left, cover.right - name.right, 1.dp)
     }
 }
