@@ -41,15 +41,11 @@ jobs:
         with:
           gradle-version: "8.14.3"
 
-      # Ubuntu's mirror sometimes hangs: each try gets four minutes, and a hung one is tried again.
+      # ffmpeg (for making the test library) from PyPI: Ubuntu's mirror can hang for the whole job.
       - name: Install ffmpeg
-        timeout-minutes: 10
         run: |
-          for try in 1 2; do
-            timeout 240 sudo apt-get update -qq && timeout 240 sudo apt-get install -y -qq ffmpeg > /dev/null && exit 0
-            echo "::warning::Installing ffmpeg: try $try didn't finish"
-          done
-          exit 1
+          python3 -m pip install --quiet --break-system-packages imageio-ffmpeg==0.6.0
+          echo "FFMPEG=$(python3 -c 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())')" >> "$GITHUB_ENV"
 
       - name: Start the servers with the test library
         env:

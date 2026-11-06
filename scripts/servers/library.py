@@ -30,8 +30,22 @@ CODEC = {"flac": ["-c:a", "flac"], "mp3": ["-c:a", "libmp3lame", "-b:a", "128k",
          "m4a": ["-c:a", "aac", "-b:a", "128k"], "opus": ["-c:a", "libopus", "-b:a", "96k"]}
 
 
+def ffmpeg():
+    """ffmpeg from FFMPEG, else the one in the imageio-ffmpeg package (pip, so no apt), else the system's."""
+    if os.environ.get("FFMPEG"):
+        return os.environ["FFMPEG"]
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except ImportError:
+        return "ffmpeg"
+
+
+FFMPEG = ffmpeg()
+
+
 def run(args):
-    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", *args], check=True)
+    subprocess.run([FFMPEG, "-loglevel", "error", "-y", *args], check=True)
 
 
 def main(root):
