@@ -19,8 +19,15 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.performClick
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.swipe
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.siansa.ui.SiansaTheme
 import app.siansa.ui.Space
@@ -188,4 +195,81 @@ class SpacingPlayerTest : SpacingCheck() {
         listOf(prev, back, fwd, next).forEach { assertEven("Centred on play", (it.top + it.bottom) / 2 - (play.top + play.bottom) / 2, 0.dp, 1.dp) }
     }
 
+
+    /** Song radio's choices (issue #916): two rows of the same height, each name centred in its row beside its icon. */
+    @Test fun radioChoicesAreEvenRows() {
+        compose.setContent { SiansaTheme { Box(Modifier.width(320.dp)) { app.siansa.ui.RadioModeChoices {} } } }
+        val steady = compose.onNodeWithTag("radioMode-steady").getBoundsInRoot()
+        val dj = compose.onNodeWithTag("radioMode-dj").getBoundsInRoot()
+        assertEven("Row heights", steady.bottom - steady.top, dj.bottom - dj.top, 1.dp)
+        for ((row, name) in listOf(steady to "Steady", dj to "DJ")) {
+            val label = compose.onNodeWithText(name, useUnmergedTree = true).getBoundsInRoot()
+            assertEven("$name above and below", label.top - row.top, row.bottom - label.bottom, 2.dp)
+        }
+    }
+
+    /**
+     * Sliding from the play button (issue #919): up runs up's choice, a way with Nothing on it does nothing, a tap still
+     * plays and pauses, and pressing and holding still stops.
+     */
+    @Test fun playButtonSlidesTapsAndHolds() {
+        val slid = mutableListOf<app.siansa.ui.PlaySlide>()
+        var toggled = 0
+        var stopped = 0
+        compose.setContent {
+            SiansaTheme {
+                Box(Modifier.size(300.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                    app.siansa.ui.PlayButton(
+                        playing = true,
+                        slides = app.siansa.ui.PlaySlides(left = app.siansa.ui.PlaySlide.NOTHING),
+                        djMix = false,
+                        onToggle = { toggled++ },
+                        onStop = { stopped++ },
+                        onSlide = { slid += it },
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("playButton", useUnmergedTree = true).performTouchInput { swipe(center, center + Offset(0f, -height.toFloat())) }
+        compose.waitForIdle()
+        assertEquals(listOf(app.siansa.ui.PlaySlide.DJ_MIX), slid)
+        compose.onNodeWithTag("playButton", useUnmergedTree = true).performTouchInput { swipe(center, center + Offset(width.toFloat(), 0f)) }
+        compose.waitForIdle()
+        assertEquals(listOf(app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.PlaySlide.SONIC_MATCH), slid)
+        compose.onNodeWithTag("playButton", useUnmergedTree = true).performTouchInput { swipe(center, center + Offset(-width.toFloat(), 0f)) }
+        compose.waitForIdle()
+        assertEquals("Nothing on left", 2, slid.size)
+        assertEquals("No slide plays or pauses", 0, toggled)
+        compose.onNodeWithTag("playButton", useUnmergedTree = true).performClick()
+        compose.waitForIdle()
+        assertEquals(1, toggled)
+        compose.onNodeWithTag("playButton", useUnmergedTree = true).performTouchInput { longClick() }
+        compose.waitForIdle()
+        assertEquals(1, stopped)
+        assertEquals("A hold doesn't play or pause", 1, toggled)
+    }
+
+    /** A slide's choice sits the same gap from the play button's edge, up and to the side (issue #919). */
+    @Test fun slideChoicesAreEvenlyAway() {
+        var way by androidx.compose.runtime.mutableStateOf(app.siansa.ui.SlideWay.UP)
+        compose.setContent {
+            SiansaTheme {
+                Box(Modifier.size(300.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                    app.siansa.ui.PlayButton(
+                        playing = false, slides = app.siansa.ui.PlaySlides(), djMix = false,
+                        onToggle = {}, onStop = {}, onSlide = {},
+                        preview = app.siansa.ui.SlideState(way, armed = true),
+                    )
+                }
+            }
+        }
+        val button = compose.onNodeWithTag("playButton", useUnmergedTree = true).getBoundsInRoot()
+        val up = compose.onNodeWithTag("slideChoice-up", useUnmergedTree = true).getBoundsInRoot()
+        val upGap = button.top - (up.top + up.bottom) / 2
+        way = app.siansa.ui.SlideWay.LEFT
+        compose.waitForIdle()
+        val left = compose.onNodeWithTag("slideChoice-left", useUnmergedTree = true).getBoundsInRoot()
+        val leftGap = button.left - (left.left + left.right) / 2
+        assertEven("Up and left", upGap, leftGap, 1.dp)
+    }
 }

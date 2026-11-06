@@ -137,7 +137,7 @@ fun ScrobblingScreen(nav: NavController) {
             Field("Last.fm username", lfmUser) { lfmUser = it }
             Secret("Last.fm password (used once to sign in, not stored)", lfmPassword) { lfmPassword = it }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                Button(onClick = {
+                Button(modifier = Modifier.focusRing(), onClick = {
                     result({ lfmStatus = it }) {
                         val session = graph.lastFm.mobileSession(lfmKey.trim(), lfmSecret.trim(), lfmUser.trim(), lfmPassword)
                         graph.settings.save(
@@ -154,7 +154,7 @@ fun ScrobblingScreen(nav: NavController) {
                     }
                 }) { Text(if (settings.lastFmSession.isBlank()) "Sign in" else "Sign in again") }
                 if (settings.lastFmSession.isNotBlank()) {
-                    OutlinedButton(onClick = {
+                    OutlinedButton(modifier = Modifier.focusRing(), onClick = {
                         graph.settings.save(graph.settings.current.copy(lastFmSession = "", lastFmEnabled = false))
                         lfmStatus = "Signed out"
                     }) { Text("Sign out") }
@@ -174,7 +174,7 @@ fun ScrobblingScreen(nav: NavController) {
             Field("Server address", lbUrl, placeholder = "https://koito.example.com") { lbUrl = it }
             Secret("Token / API key", lbToken) { lbToken = it }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                Button(onClick = {
+                Button(modifier = Modifier.focusRing(), onClick = {
                     result({ lbStatus = it }) {
                         val message = graph.listenBrainz.validate(lbUrl, lbToken.trim())
                         graph.settings.save(

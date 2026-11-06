@@ -170,6 +170,14 @@ Both follow your finger, and let go wherever you like: a hard swipe finishes qui
 a short pull springs back. The mini player fades away as the player rises and comes back as it goes. The book
 player opens and closes the same way.
 
+Slide a finger from the play button to start something from the song playing: **up** for a DJ mix, **down** for a
+Steady radio, **left** for its song path and **right** for songs that sound like it. Only the way you slide shows its
+choice beside the button, with its name; once you're far enough it fills with your colour and the phone clicks, and
+letting go there starts it. Slide back to the middle to change your mind. A tap still plays and pauses, and pressing
+and holding still stops. What each way does can be changed, or the slides switched off, under **Settings › Style ›
+Now playing**. While a DJ mix plays, the play button has record grooves in its colour, with a glint that turns as it
+plays.
+
 Swipe the mini player left for the next song or right for the one before; the phone gives a short buzz as the song
 changes, and when you press **Repeat** or **Add to playlist** in now playing (if touch vibration is on in your
 phone's settings).

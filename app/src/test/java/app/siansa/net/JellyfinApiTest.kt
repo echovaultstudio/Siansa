@@ -148,8 +148,23 @@ class JellyfinApiTest {
         assertEquals("u1", made.str("UserId"))
         assertEquals(2, (made["Ids"] as kotlinx.serialization.json.JsonArray).size)
         a.renamePlaylist("p9", "Late night")
-        assertEquals("/Playlists/p9", server.seen.last().path)
-        assertEquals("Late night", (AppJson.parseToJsonElement(server.seen.last().body) as JsonObject).str("Name"))
+        val rename = server.seen.last { it.method == "POST" }
+        assertEquals("/Playlists/p9", rename.path)
+        assertEquals("Late night", (AppJson.parseToJsonElement(rename.body) as JsonObject).str("Name"))
+    }
+
+    /** Jellyfin 12 and Emby 4.10 can put a playlist's old name back right after songs were removed: it's renamed again. */
+    @Test fun aRenameTheServerUndoesIsSentAgain() = runBlocking {
+        var renames = 0
+        val server = FakeJellyfin { seen ->
+            when {
+                seen.path == "/Playlists/p9" && seen.method == "POST" -> { renames++; 204 to "" }
+                seen.path == "/Items/p9" -> 200 to """{"Id":"p9","Name":"${if (renames < 2) "Night" else "Late night"}"}"""
+                else -> 200 to ""
+            }
+        }
+        api(server).renamePlaylist("p9", "Late night")
+        assertEquals(2, renames)
     }
 
     @Test fun theConnectionTestNamesJellyfin() = runBlocking {

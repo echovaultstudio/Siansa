@@ -394,4 +394,12 @@ class SpacingSettingsTest : SpacingCheck() {
     private fun MusicSourceRows() {
         SiansaTheme { Column { SourceKind.entries.forEach { SourceRow(it) { } } } }
     }
+
+    /** How mixing works (issue #916): the open-in-browser icon sits centred beside the heading and hint. */
+    @Test fun mixingDocsLinkIsCentred() {
+        compose.setContent { SiansaTheme { Column(Modifier.padding(Space.Page)) { app.siansa.ui.MixingDocsLink() } } }
+        val row = compose.onNodeWithTag("mixingDocs").getBoundsInRoot()
+        val icon = compose.onNode(hasContentDescription("Opens in the browser"), useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Icon above and below", icon.top - row.top, row.bottom - icon.bottom, 2.dp)
+    }
 }

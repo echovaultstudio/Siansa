@@ -187,10 +187,10 @@ fun PlayerMenu(
                 if (song.artistId != null || song.artists.isNotEmpty()) {
                     MenuRow(Icons.Rounded.Person, if (song.artists.size > 1) "Go to artists" else "Go to artist") { onDismiss(); onOpenArtist() }
                 }
-                MenuRow(Icons.Rounded.Radio, if (radioSeed != null) "Stop song radio" else "Start song radio", tint = if (radioSeed != null) Accent else null) {
+                MenuRow(Icons.Rounded.Radio, if (radioSeed != null) "Stop the mix" else "Start a mix", tint = if (radioSeed != null) Accent else null) {
                     if (radioSeed != null) {
                         graph.songRadio.stop()
-                        notify("Song radio off")
+                        notify("Mix off")
                     } else if (graph.connection.current.aiProblem(graph.settings.current) != null && graph.settings.current.audioMuseReady) {
                         notify("AI backend is currently not available :( ${graph.connection.current.aiProblem(graph.settings.current)}")
                     } else {

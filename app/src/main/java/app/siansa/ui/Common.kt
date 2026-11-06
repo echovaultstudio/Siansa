@@ -623,9 +623,9 @@ fun SongRow(
                         menu = false
                         pickPlaylist = true
                     })
-                    DropdownMenuItem(text = { Text("Start song radio") }, onClick = {
+                    DropdownMenuItem(text = { Text("Start a mix") }, onClick = {
                         menu = false
-                        if (graph.connection.current.offline) launch.notify("You're offline: song radio needs the server")
+                        if (graph.connection.current.offline) launch.notify("You're offline: a mix needs the server")
                         else RadioChooser.ask(song)
                     })
                     if (graph.settings.current.audioMuseReady) {
