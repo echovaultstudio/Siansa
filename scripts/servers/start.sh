@@ -3,11 +3,16 @@
 # Siansa's own server code against real servers (app/src/test/java/app/siansa/servers/, issue #903).
 #   Navidrome http://127.0.0.1:4533 · Emby http://127.0.0.1:8096 · Jellyfin http://127.0.0.1:8097 · user max, password sesame
 # Navidrome runs from its release; Emby and Jellyfin in Docker. Versions can be set with ND_VERSION, EMBY_VERSION
-# and JELLYFIN_VERSION. Writes servers.env (what the tests need) next to the library.
+# and JELLYFIN_VERSION (a release, or "latest"; Emby also "beta"). Writes servers.env (what the tests need) next to the library.
 set -euo pipefail
 ND_VERSION="${ND_VERSION:-0.64.2}"
 EMBY_VERSION="${EMBY_VERSION:-4.8.10.0}"
 JELLYFIN_VERSION="${JELLYFIN_VERSION:-10.10.7}"
+# "latest" asks GitHub for Navidrome's newest release.
+if [ "$ND_VERSION" = latest ]; then
+  ND_VERSION="$(curl -sSL https://api.github.com/repos/navidrome/navidrome/releases/latest | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"].lstrip("v"))')"
+fi
+echo "Navidrome $ND_VERSION, Emby $EMBY_VERSION, Jellyfin $JELLYFIN_VERSION"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DIR="${RUNNER_TEMP:-/tmp}/siansa-servers"
 mkdir -p "$DIR" && cd "$DIR"

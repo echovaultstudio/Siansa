@@ -166,8 +166,30 @@ def refresh_emby_pictures():
         print(f"Emby task: {t.get('Name')} {t.get('State')} last {(t.get('LastExecutionResult') or {}).get('Status')}")
 
 
+def versions():
+    """The versions running, as the servers say them: for the run's summary (versions.txt next to the library)."""
+    found = []
+    q = urllib.parse.urlencode({"u": USER, "p": PASSWORD, "v": "1.16.1", "c": "ci", "f": "json"})
+    try:
+        found.append("Navidrome " + call("GET", f"{NAVIDROME}/rest/ping?{q}")[1]["subsonic-response"].get("serverVersion", "?"))
+    except Exception as e:  # noqa: BLE001
+        found.append(f"Navidrome ? ({e})")
+    for name, base in (("Emby", EMBY), ("Jellyfin", JELLYFIN)):
+        try:
+            found.append(f"{name} " + call("GET", base + "/System/Info/Public")[1].get("Version", "?"))
+        except Exception as e:  # noqa: BLE001
+            found.append(f"{name} ? ({e})")
+    return ", ".join(found)
+
+
 def main(library):
     songs = len(json.load(open(library))["songs"])
+    import os
+    with open(os.path.join(os.path.dirname(os.path.dirname(library)), "versions.txt"), "w") as f:
+        # Written before the setup, so a server whose setup fails still shows which version it was.
+        wait("servers answering", lambda: all(call("GET", u)[0] == 200 for u in (NAVIDROME + "/ping", EMBY + "/System/Info/Public", JELLYFIN + "/System/Info/Public")))
+        f.write(versions())
+    print(open(os.path.join(os.path.dirname(os.path.dirname(library)), "versions.txt")).read())
     navidrome(songs)
     for name, base, header, scheme in (("Emby", EMBY, "X-Emby-Authorization", "Emby"), ("Jellyfin", JELLYFIN, "Authorization", "MediaBrowser")):
         head, user = emby_like(name, base, header, scheme)

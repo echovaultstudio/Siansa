@@ -26,9 +26,27 @@ concurrency:
 
 jobs:
   servers:
-    name: Navidrome, Emby and Jellyfin
+    # Each set at once: the newest releases (so a new Emby or Jellyfin is tested the day it's out), Emby's beta, and
+    # the oldest versions Siansa supports (Jellyfin 10.9 and later, issue #703). Each run names the versions it tested.
+    name: ${{ matrix.set }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - set: Newest releases
+            navidrome: latest
+            emby: latest
+            jellyfin: latest
+          - set: Emby beta
+            navidrome: latest
+            emby: beta
+            jellyfin: latest
+          - set: Oldest supported
+            navidrome: 0.64.2
+            emby: 4.8.10.0
+            jellyfin: 10.10.7
     steps:
       - uses: actions/checkout@v7
 
@@ -49,11 +67,10 @@ jobs:
 
       - name: Start the servers with the test library
         env:
-          EMBY_VERSION: ${{ inputs.emby }}
-          JELLYFIN_VERSION: ${{ inputs.jellyfin }}
+          ND_VERSION: ${{ matrix.navidrome }}
+          EMBY_VERSION: ${{ inputs.emby || matrix.emby }}
+          JELLYFIN_VERSION: ${{ inputs.jellyfin || matrix.jellyfin }}
         run: |
-          [ -n "$EMBY_VERSION" ] || unset EMBY_VERSION
-          [ -n "$JELLYFIN_VERSION" ] || unset JELLYFIN_VERSION
           scripts/servers/start.sh
           cat "$RUNNER_TEMP/siansa-servers/servers.env" >> "$GITHUB_ENV"
 
@@ -80,7 +97,9 @@ jobs:
                       skipped += 1
                   else:
                       passed += 1
-          print(f"::notice title=Servers::{passed} passed, {failed} failed, {skipped} skipped")
+          import os
+          versions = open(os.environ["RUNNER_TEMP"] + "/siansa-servers/versions.txt").read().strip() if os.path.exists(os.environ["RUNNER_TEMP"] + "/siansa-servers/versions.txt") else "versions unknown"
+          print(f"::notice title=${{ matrix.set }}::{versions}: {passed} passed, {failed} failed, {skipped} skipped")
           PY
 
       - name: Server logs
@@ -94,7 +113,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: servers-test-report
+          name: servers-test-report-${{ strategy.job-index }}
           path: |
             app/build/reports/tests/testDebugUnitTest/
             ${{ runner.temp }}/siansa-servers/*.log
