@@ -5,10 +5,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,7 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
@@ -42,6 +40,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
@@ -70,7 +69,7 @@ enum class ExploreChoice(val title: String, val hint: String, val ready: String)
 }
 
 /**
- * An album's Explore button (issue #965), where "Find similar albums" was: a tap opens similar albums; sliding the finger
+ * An album's Explore button (issue #965), where "Find similar albums" was, as an icon: a tap opens similar albums; sliding the finger
  * up (onto the cover) does too, and sliding right onto the Play button starts a DJ mix of the album's own songs in the
  * best order. The choice shows in the middle of the cover ([ExploreCoverLabel], from [onSliding]) and is armed once the
  * finger is far enough, with a click; letting go there starts it, with a stronger one. [rightArmPx] is how far right
@@ -104,12 +103,13 @@ internal fun ExploreButton(
         }
     }
     val active = shown != null
-    Row(
+    // Just its icon (the owner, issue #965): a record with AudioMuse's sparkle, the size of Shuffle beside it. It fills
+    // with the accent while it slides.
+    Box(
         modifier
-            .height(EXPLORE_HEIGHT)
-            .clip(RoundedCornerShape(percent = 50))
+            .size(EXPLORE_SIZE)
+            .clip(CircleShape)
             .background(if (active) Accent else Color.Transparent)
-            .border(EXPLORE_BORDER, Accent, RoundedCornerShape(percent = 50))
             .pointerInput(Unit) { detectTapGestures(onTap = { similar() }) }
             .pointerInput(Unit) {
                 detectDragGestures(
@@ -139,19 +139,16 @@ internal fun ExploreButton(
             }
             .semantics(mergeDescendants = true) {
                 role = Role.Button
+                contentDescription = "Explore: similar albums, or a DJ mix of this album"
                 onClick(label = "Find similar albums") { similar(); true }
                 customActions = listOf(
                     CustomAccessibilityAction(ExploreChoice.DJ_MIX.title) { djMix(); true },
                 )
             }
-            .padding(horizontal = Space.Medium)
             .testTag("exploreButton"),
-        horizontalArrangement = Arrangement.spacedBy(Space.Tight),
-        verticalAlignment = Alignment.CenterVertically,
+        contentAlignment = Alignment.Center,
     ) {
-        val tint = if (active) OnAccent else Accent
-        Icon(rememberSimilarAlbumsIcon(), null, tint = tint, modifier = Modifier.size(EXPLORE_ICON))
-        Text("Explore", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = tint, maxLines = 1)
+        Icon(SiansaIcons.RecordSparkle, null, tint = if (active) OnAccent else Accent, modifier = Modifier.size(EXPLORE_ICON))
     }
 }
 
@@ -201,9 +198,8 @@ internal fun ExploreCoverLabel(slide: ExploreSlide?, modifier: Modifier = Modifi
     }
 }
 
-private val EXPLORE_HEIGHT = 36.dp
-private val EXPLORE_BORDER = 1.5.dp
-private val EXPLORE_ICON = 20.dp
+private val EXPLORE_SIZE = 48.dp
+private val EXPLORE_ICON = 28.dp
 private val EXPLORE_LABEL_ICON = 36.dp
 private val EXPLORE_ARROW = 18.dp
 private val EXPLORE_DEAD_ZONE = 16.dp

@@ -62,7 +62,7 @@ queue.
 
 From a song's menu: **Similar songs** and **Similar albums**. On an artist's page: **Fans also like**.
 
-On an album's page (with AudioMuse-AI), the **Explore** button beside Shuffle:
+On an album's page (with AudioMuse-AI), the **Explore** button beside Shuffle (a record with a sparkle):
 
 - **Tap** it, or **slide up** onto the cover, for similar albums.
 - **Slide right** onto the Play button for a **DJ mix of the album**: its own songs only, put in the order that blends
