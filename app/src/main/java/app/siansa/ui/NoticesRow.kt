@@ -59,7 +59,10 @@ internal fun rememberNotices(graph: AppGraph, settings: AppSettings, shown: Bool
     val failed = sync.phase == SyncPhase.FAILED
     // From the last shown, so the row doesn't vanish and come back each time Home is opened.
     var notices by remember { mutableStateOf(if (shown) graph.notices.shown else emptyList()) }
-    LaunchedEffect(failed, settings.booksReady, settings.notices, shown) {
+    // Worked out again when the library changes (issue #922): on a cold start Home opened before the library had
+    // loaded, so New in your library only showed after going to another page and back.
+    val library by graph.library.version.collectAsStateWithLifecycle()
+    LaunchedEffect(failed, settings.booksReady, settings.notices, shown, library) {
         val fresh = if (!shown) emptyList() else withContext(Dispatchers.IO) {
             val candidates = noticeCandidates(graph, settings, failed)
             Notices.order(candidates, settings.notices, graph.notices.taps())
@@ -184,7 +187,7 @@ private suspend fun noticeCandidates(graph: AppGraph, settings: AppSettings, syn
         }
     }
     if (graph.library.isSynced) {
-        val newest = graph.library.albums("newest").take(20)
+        val newest = graph.library.albums("newest").take(Notices.NEW_ALBUM_LOOK)
         newest.firstOrNull()?.let { first -> Notices.newAlbums(Notices.newAlbumCount(newest.map { it.created }, today), first.id)?.let(::add) }
     }
     Notices.yourMonth(today)?.let(::add)

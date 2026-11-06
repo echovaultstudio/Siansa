@@ -22,6 +22,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddCircleOutline
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Cast
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.FavoriteBorder
@@ -160,14 +165,109 @@ fun NowPlayingStyleScreen(nav: NavController) {
                 )
             }
             Spacer(Modifier.height(Space.Section))
-            Text(
-                "More now playing looks will come here.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            PlaySlidesSettings(settings.playSlides) { slides ->
+                AppLog.i("Style", "Play button slides: ${slides.format()}")
+                graph.settings.setPlaySlides(slides)
+            }
+            Spacer(Modifier.height(Space.Section))
         }
     }
 }
+
+/**
+ * Play button slides (issue #919): whether a slide from now playing's play button does anything, what each way does,
+ * and whether the button gets record grooves while a DJ mix plays.
+ */
+@Composable
+internal fun PlaySlidesSettings(slides: PlaySlides, onChange: (PlaySlides) -> Unit) {
+    Column {
+        Text("Play button slides", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+        StyleSwitchRow("Slide from the play button", "Up, down, left or right starts a mix or finds songs", slides.on, "playSlidesSwitch") {
+            onChange(slides.copy(on = it))
+        }
+        if (slides.on) {
+            SlideWay.entries.forEach { way ->
+                SlideWayRow(way, slides.of(way)) { onChange(slides.with(way, it)) }
+            }
+            Text(
+                "A tap still plays and pauses, and pressing and holding still stops.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = Space.Small),
+            )
+        }
+        StyleSwitchRow("Record grooves", "The play button looks like a record while a DJ mix plays", slides.grooves, "playGroovesSwitch") {
+            onChange(slides.copy(grooves = it))
+        }
+    }
+}
+
+@Composable
+private fun StyleSwitchRow(title: String, hint: String, on: Boolean, tag: String, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable { onChange(!on) }.padding(vertical = Space.Medium),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(Space.Medium))
+        Switch(checked = on, onCheckedChange = onChange, modifier = Modifier.testTag(tag))
+    }
+}
+
+/** One way to slide: its arrow and name, and what it does, picked from a menu. */
+@Composable
+private fun SlideWayRow(way: SlideWay, slide: PlaySlide, onPick: (PlaySlide) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().clickable { open = true }.padding(vertical = Space.Small).testTag("slideWay-${way.name.lowercase()}"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.Medium),
+    ) {
+        Icon(way.arrow, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Slide ${way.label}", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Box {
+            Row(
+                Modifier.clip(RoundedCornerShape(percent = 50)).background(MaterialTheme.colorScheme.primary.copy(alpha = CHIP_TINT))
+                    .padding(horizontal = Space.Medium, vertical = Space.Tight),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Space.Small),
+            ) {
+                slide.icon?.let { Icon(it, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(CHIP_ICON)) }
+                Text(slide.label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+                Icon(Icons.Rounded.ArrowDropDown, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(CHIP_ICON))
+            }
+            androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                PlaySlide.entries.forEach { choice ->
+                    val icon = choice.icon
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(choice.label) },
+                        leadingIcon = icon?.let { i -> @Composable { Icon(i, null) } },
+                        onClick = {
+                            open = false
+                            if (choice != slide) onPick(choice)
+                        },
+                        modifier = Modifier.testTag("slideOption-${way.name.lowercase()}-${choice.name.lowercase()}"),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The arrow for a way to slide. */
+private val SlideWay.arrow: ImageVector
+    get() = when (this) {
+        SlideWay.UP -> Icons.Rounded.ArrowUpward
+        SlideWay.DOWN -> Icons.Rounded.ArrowDownward
+        SlideWay.LEFT -> Icons.AutoMirrored.Rounded.ArrowBack
+        SlideWay.RIGHT -> Icons.AutoMirrored.Rounded.ArrowForward
+    }
+
+private const val CHIP_TINT = 0.14f
+private val CHIP_ICON = 18.dp
 
 private fun setLyricsButton(graph: app.siansa.AppGraph, on: Boolean) {
     AppLog.i("Style", "Now playing: ${if (on) "lyrics button" else "classic"}")

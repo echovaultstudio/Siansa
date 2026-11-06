@@ -72,7 +72,7 @@ their own: a finished book, albums older than three days or last month's report 
 |---|---|---|
 | **Library sync failed** | The last library sync didn't finish. | Connections |
 | **Carry on: …** | A book or podcast episode you played in the last week and haven't finished. | The book |
-| **3 new albums** | Albums added to your library in the last three days. | Recently added |
+| **3 new albums** | Albums added to your library in the last 30 days. It shows as soon as Home opens. | Recently added |
 | **Your October** | The first week of a month: last month's listening. | The month's report |
 | **4 artists for you** | New artists to try were found today. | Artists for you |
 

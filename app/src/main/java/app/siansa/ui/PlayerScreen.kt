@@ -23,7 +23,9 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.zIndex
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
@@ -231,6 +233,20 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
         nav.openSongPath(id, fromNowPlaying = true)
     }
 
+    // A slide from the play button (issue #919): a mix from this song, its song path or songs that sound like it.
+    fun slide(action: PlaySlide) {
+        val from = song ?: return
+        AppLog.i("Player", "Slid from the play button: ${action.label} from ${from.id}")
+        when (action) {
+            PlaySlide.DJ_MIX -> RadioChooser.startNow(graph, from, app.siansa.mix.ContinuousMode.DJ) { message -> scope.launch { snack.showSnackbar(message) } }
+            PlaySlide.STEADY -> RadioChooser.startNow(graph, from, app.siansa.mix.ContinuousMode.STEADY) { message -> scope.launch { snack.showSnackbar(message) } }
+            PlaySlide.SONG_PATH -> openSongPath()
+            PlaySlide.SONIC_MATCH -> openSimilarSongs()
+            PlaySlide.START_A_MIX -> RadioChooser.ask(from)
+            PlaySlide.NOTHING -> Unit
+        }
+    }
+
     // Dragging down (at the top of the page) moves the whole player with the finger; let go far or fast
     // enough and it closes. Swiping up scrolls the whole page down to the cards under the player; swiping
     // back up brings the controls back (no small header over the page, #717).
@@ -339,7 +355,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         }
                         // A radio station has no seek bar, only that it's live (issue #353).
                         if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state)
-                        Controls(state)
+                        Controls(state, onSlide = ::slide)
                         // The lyrics bottom left (greyed out when the song has none), where the music plays in
                         // the middle (with the TV, speaker or headphones' name), and the queue bottom right: tap
                         // it, or swipe up from it (#294).
@@ -389,7 +405,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 LyricsScreen(song, tint, onClose = { lyricsOpen = false }, menu = { menuOpen = true }) {
                     Column {
                         if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state)
-                        Controls(state)
+                        Controls(state, onSlide = ::slide)
                     }
                 }
             }
@@ -700,20 +716,30 @@ private fun SeekBar(state: PlayerState) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+/**
+ * Repeat, previous, play, next and add to playlist. [onSlide]: what a slide from the play button runs (issue #919),
+ * null for none.
+ */
 @Composable
-internal fun Controls(state: PlayerState) {
+internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null) {
     val graph = LocalGraph.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
+    // While a finger slides from the play button, the other controls make way: dimmed, and the one on the slide's
+    // side out of the way.
+    var sliding by remember { mutableStateOf<SlideWay?>(null) }
+    val others by animateFloatAsState(if (sliding != null) SLIDING_OTHERS else 1f, label = "controlsDim")
+    fun alphaOf(side: SlideWay?) = if (sliding != null && sliding == side) 0f else others
     // A short buzz for repeat and add to playlist (issue #771), as for the mini player's swipe (#763); the phone's
     // touch-feedback setting decides whether it's felt.
     val haptics = LocalHapticFeedback.current
     Row(
-        Modifier.fillMaxWidth().padding(vertical = Space.Small),
+        Modifier.fillMaxWidth().zIndex(if (sliding != null) 1f else 0f).padding(vertical = Space.Small),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Repeat on the left, add to playlist on the right (issue #370); shuffle is in the ⋮ menu.
-        StateButton(
+        Box(Modifier.alpha(others)) { StateButton(
             icon = if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
             label = repeatLabel(state.repeatMode),
             on = state.repeatMode != Player.REPEAT_MODE_OFF,
@@ -722,40 +748,32 @@ internal fun Controls(state: PlayerState) {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             graph.player.cycleRepeat()
             AppLog.i("Player", "Repeat: " + repeatLabel(nextRepeat(state.repeatMode)).lowercase())
-        }
-        IconButton(onClick = { graph.player.previous() }, modifier = Modifier.size(56.dp)) {
+        } }
+        IconButton(onClick = { graph.player.previous() }, modifier = Modifier.size(56.dp).alpha(alphaOf(SlideWay.LEFT))) {
             Icon(Icons.Rounded.SkipPrevious, "Previous", Modifier.size(40.dp))
         }
-        // Tap to play or pause; press and hold to stop and clear the queue.
-        Box(
-            Modifier
-                .size(68.dp)
-                .clip(CircleShape)
-                .background(Accent)
-                .combinedClickable(
-                    onClick = { graph.player.togglePlay() },
-                    onLongClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        graph.player.stop()
-                    },
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                "Play or pause",
-                tint = OnAccent,
-                modifier = Modifier.size(38.dp),
-            )
-        }
-        IconButton(onClick = { graph.player.next() }, modifier = Modifier.size(56.dp)) {
+        // Tap to play or pause; press and hold to stop and clear the queue; slide for a mix (issue #919). A radio
+        // station or podcast has nothing to mix from.
+        val song = state.current
+        val slides = settings.playSlides.let { if (onSlide == null || song == null || OutsideMedia.isOutside(song.id)) it.copy(on = false) else it }
+        PlayButton(
+            playing = state.isPlaying,
+            slides = slides,
+            djMix = radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ,
+            onToggle = { graph.player.togglePlay() },
+            onStop = { graph.player.stop() },
+            onSlide = { onSlide?.invoke(it) },
+            unavailable = { slideUnavailable(it, settings, graph.connection.current.aiProblem(settings)) },
+            onSliding = { sliding = it },
+        )
+        IconButton(onClick = { graph.player.next() }, modifier = Modifier.size(56.dp).alpha(alphaOf(SlideWay.RIGHT))) {
             Icon(Icons.Rounded.SkipNext, "Next", Modifier.size(40.dp))
         }
         var picking by remember { mutableStateOf(false) }
-        StateButton(icon = Icons.Rounded.AddCircleOutline, label = "Add to playlist", on = false, tag = "addToPlaylistButton") {
+        Box(Modifier.alpha(others)) { StateButton(icon = Icons.Rounded.AddCircleOutline, label = "Add to playlist", on = false, tag = "addToPlaylistButton") {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             if (state.current != null) picking = true
-        }
+        } }
         if (picking) {
             val launch = rememberPlayLauncher()
             state.current?.let { song ->
@@ -943,6 +961,9 @@ object LyricsShortcut {
 
 /** How strongly the song playing now is marked in the queue (#212). */
 private const val NOW_PLAYING_TINT = 0.14f
+
+/** How faint the other controls go while a finger slides from the play button (issue #919). */
+private const val SLIDING_OTHERS = 0.3f
 
 /** How far up the queue button has to be pulled to open the queue. */
 private const val QUEUE_PULL_PX = 40f
