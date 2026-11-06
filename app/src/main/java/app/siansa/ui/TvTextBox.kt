@@ -8,6 +8,10 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import androidx.compose.foundation.background
+import kotlinx.coroutines.launch
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -61,88 +65,119 @@ fun TvTextBox(
     val done by rememberUpdatedState(onDone)
     val focusManager by rememberUpdatedState(androidx.compose.ui.platform.LocalFocusManager.current)
     var focused by remember { mutableStateOf(false) }
+    // The way out to the page's own controls (issue #955). From Android's field the remote only reached another such
+    // field: the button under the last one (Test under the AudioMuse login) was skipped. Leaving, the focus goes to an
+    // invisible point at the field's top or bottom edge, and from there to the control above or below; the points take
+    // the focus only then, so moving around the page never stops on them.
+    var leaving by remember { mutableStateOf(false) }
+    val top = remember { androidx.compose.ui.focus.FocusRequester() }
+    val bottom = remember { androidx.compose.ui.focus.FocusRequester() }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    fun leave(way: androidx.compose.ui.focus.FocusDirection, field: EditText) {
+        leaving = true
+        (if (way == androidx.compose.ui.focus.FocusDirection.Down) bottom else top).requestFocus()
+        val moved = focusManager.moveFocus(way)
+        if (!moved) field.requestFocus()
+        // Once the focus has moved on, the points go back to not taking it.
+        scope.launch { kotlinx.coroutines.yield(); leaving = false }
+    }
     val shape = RoundedCornerShape(Space.Small)
     val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
     val hintColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
     val textSize = MaterialTheme.typography.bodyLarge.fontSize.value
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-        AndroidView(
-            factory = { context ->
-                EditText(context).apply {
-                    setText(value)
-                    setSelection(value.length)
-                    inputType = kind.inputType
-                    if (kind == TvTextKind.LONG_TEXT) {
-                        setMinLines(LONG_LINES)
-                        setMaxLines(LONG_LINES * 2)
-                    } else {
-                        setSingleLine(true)
-                    }
-                    imeOptions = (if (kind == TvTextKind.SEARCH) EditorInfo.IME_ACTION_SEARCH else EditorInfo.IME_ACTION_DONE) or EditorInfo.IME_FLAG_NO_FULLSCREEN
-                    hint = placeholder ?: "Press OK to type"
-                    background = null
-                    setTextColor(textColor)
-                    setHintTextColor(hintColor)
-                    setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, textSize)
-                    isFocusable = true
-                    isFocusableInTouchMode = true
-                    addTextChangedListener(object : TextWatcher {
-                        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-                        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
-                        override fun afterTextChanged(s: Editable?) {
-                            val text = s?.toString().orEmpty()
-                            if (text != (tag as? String)) {
-                                tag = text
-                                change(text)
+        androidx.compose.foundation.layout.Box {
+            AndroidView(
+                factory = { context ->
+                    EditText(context).apply {
+                        setText(value)
+                        setSelection(value.length)
+                        inputType = kind.inputType
+                        if (kind == TvTextKind.LONG_TEXT) {
+                            setMinLines(LONG_LINES)
+                            setMaxLines(LONG_LINES * 2)
+                        } else {
+                            setSingleLine(true)
+                        }
+                        imeOptions = (if (kind == TvTextKind.SEARCH) EditorInfo.IME_ACTION_SEARCH else EditorInfo.IME_ACTION_DONE) or EditorInfo.IME_FLAG_NO_FULLSCREEN
+                        hint = placeholder ?: "Press OK to type"
+                        background = null
+                        setTextColor(textColor)
+                        setHintTextColor(hintColor)
+                        setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, textSize)
+                        isFocusable = true
+                        isFocusableInTouchMode = true
+                        addTextChangedListener(object : TextWatcher {
+                            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                            override fun afterTextChanged(s: Editable?) {
+                                val text = s?.toString().orEmpty()
+                                if (text != (tag as? String)) {
+                                    tag = text
+                                    change(text)
+                                }
+                            }
+                        })
+                        setOnFocusChangeListener { _, has -> focused = has }
+                        // Up and down leave the field for the control above or below it, the page's own (issue #955): from
+                        // Android's field the remote didn't reach a button under it, such as Test under the AudioMuse login.
+                        // A field of several lines keeps up and down for its lines.
+                        setOnKeyListener { view, keyCode, event ->
+                            val way = textBoxExit(keyCode, kind == TvTextKind.LONG_TEXT) ?: return@setOnKeyListener false
+                            if (event.action != android.view.KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+                            // Another of these fields that way: Android moves there itself.
+                            val next = view.focusSearch(if (way == androidx.compose.ui.focus.FocusDirection.Down) android.view.View.FOCUS_DOWN else android.view.View.FOCUS_UP)
+                            if (next is EditText && next !== view) return@setOnKeyListener false
+                            leave(way, this)
+                            true
+                        }
+                        setOnEditorActionListener { view, action, _ ->
+                            if (action == EditorInfo.IME_ACTION_DONE || action == EditorInfo.IME_ACTION_SEARCH || action == EditorInfo.IME_ACTION_GO) {
+                                (context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.hideSoftInputFromWindow(view.windowToken, 0)
+                                done?.invoke(text.toString())
+                                true
+                            } else {
+                                false
                             }
                         }
-                    })
-                    setOnFocusChangeListener { _, has -> focused = has }
-                    // Up and down leave the field for the control above or below it, the page's own (issue #955): from
-                    // Android's field the remote didn't reach a button under it, such as Test under the AudioMuse login.
-                    // A field of several lines keeps up and down for its lines.
-                    setOnKeyListener { _, keyCode, event ->
-                        val way = textBoxExit(keyCode, kind == TvTextKind.LONG_TEXT) ?: return@setOnKeyListener false
-                        if (event.action != android.view.KeyEvent.ACTION_DOWN) return@setOnKeyListener false
-                        focusManager.moveFocus(way)
-                    }
-                    setOnEditorActionListener { view, action, _ ->
-                        if (action == EditorInfo.IME_ACTION_DONE || action == EditorInfo.IME_ACTION_SEARCH || action == EditorInfo.IME_ACTION_GO) {
-                            (context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.hideSoftInputFromWindow(view.windowToken, 0)
-                            done?.invoke(text.toString())
-                            true
-                        } else {
-                            false
+                        tag = value
+                        if (opensOnFocus) {
+                            post {
+                                requestFocus()
+                                (context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
+                            }
                         }
                     }
-                    tag = value
-                    if (opensOnFocus) {
-                        post {
-                            requestFocus()
-                            (context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
-                        }
+                },
+                update = { edit ->
+                    // A value changed from outside (a search Google TV handed over, a field filled by sign-in) shows here;
+                    // the field's own typing is left as it is, so the cursor doesn't jump.
+                    if (edit.tag as? String != value) {
+                        edit.tag = value
+                        edit.setText(value)
+                        edit.setSelection(value.length)
                     }
-                }
-            },
-            update = { edit ->
-                // A value changed from outside (a search Google TV handed over, a field filled by sign-in) shows here;
-                // the field's own typing is left as it is, so the cursor doesn't jump.
-                if (edit.tag as? String != value) {
-                    edit.tag = value
-                    edit.setText(value)
-                    edit.setSelection(value.length)
-                }
-            },
-            onRelease = { edit ->
-                (edit.context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.hideSoftInputFromWindow(edit.windowToken, 0)
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(if (focused) FOCUSED_BORDER else BORDER, if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, shape)
-                .background(Color.Transparent, shape)
-                .padding(horizontal = Space.Small, vertical = Space.Tight),
-        )
+                },
+                onRelease = { edit ->
+                    (edit.context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.hideSoftInputFromWindow(edit.windowToken, 0)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(if (focused) FOCUSED_BORDER else BORDER, if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, shape)
+                    .background(Color.Transparent, shape)
+                    .padding(horizontal = Space.Small, vertical = Space.Tight),
+            )
+            // The invisible ways out at the field's top and bottom edges (see [leave]).
+            androidx.compose.foundation.layout.Box(
+                Modifier.align(androidx.compose.ui.Alignment.TopStart)
+                    .focusProperties { canFocus = leaving }.focusRequester(top).focusable(),
+            )
+            androidx.compose.foundation.layout.Box(
+                Modifier.align(androidx.compose.ui.Alignment.BottomStart)
+                    .focusProperties { canFocus = leaving }.focusRequester(bottom).focusable(),
+            )
+        }
     }
 }
 
