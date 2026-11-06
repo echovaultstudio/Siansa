@@ -289,8 +289,17 @@ class AudioEngine(context: Context) {
         const val OUTPUT_RATE = 44_100
         /** Frames mixed at a time: 5.8 ms. A volume or a filter moves at most once a block. */
         const val BLOCK = 256
-        /** The output's buffer: what's written ahead of what's heard. */
-        const val BUFFER_MS = 120
+        /**
+         * The output's buffer: what's written ahead of what's heard. On a phone it's short, so a volume change or a pause
+         * is heard straight away. A TV (issue #941) can stall for longer than that while it lays out a page or frees
+         * memory, and the music had a silence each time; nobody hears half a second's delay there, so it holds more.
+         */
+        val BUFFER_MS: Int = bufferMs(app.siansa.BuildConfig.TV_APP)
+
+        /** [BUFFER_MS] for a phone or for a TV. */
+        internal fun bufferMs(tv: Boolean): Int = if (tv) TV_BUFFER_MS else PHONE_BUFFER_MS
+        const val PHONE_BUFFER_MS = 120
+        const val TV_BUFFER_MS = 480
         const val IDLE_WAIT_MS = 250L
         const val RETRY_MS = 300L
         /** How often (in blocks) the output's timestamp is read again: about every 50 ms. */
