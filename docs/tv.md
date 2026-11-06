@@ -40,7 +40,7 @@ Settings) always open that tab's own page, wherever you are.
   then Play, Shuffle and Add to favourites; down from them goes straight to the songs. The button at the end of each
   song has Play next, Add to queue, Add to playlist, Like, Start (or Stop) a mix, Similar songs, Go to album or
   artist, and Song details.
-- **Artists**: Play, Shuffle, Artist radio and Add to favourites, then their top songs, albums and similar artists.
+- **Artists**: Play, Shuffle, Artist radio and Add to favourites, then their top three songs (**Show all** for the rest), albums and similar artists.
 - **Search**: type with the on-screen keyboard or press the microphone button and say it. "Play … on Siansa" from
   Google TV's own search opens it too.
 - **Now playing**: the cover, the song and the controls, large enough to read from the sofa, over the cover blurred as
