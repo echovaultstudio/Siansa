@@ -25,12 +25,13 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
-import androidx.compose.material.icons.rounded.AltRoute
+import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.produceState
 import app.siansa.log.AppLog
+import app.siansa.ui.openSongDetails
 import app.siansa.ui.openSongPath
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
@@ -102,6 +103,9 @@ fun TvNowPlaying() {
     val song = state.current
     val liked = song != null && (likes[song.id] ?: song.starred)
     val nav = app.siansa.ui.LocalNav.current
+    val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
+    var more by remember { mutableStateOf(false) }
+    var pickPlaylist by remember { mutableStateOf(false) }
 
     val tint = app.siansa.ui.rememberCoverColor(song?.cover)
     Box(Modifier.fillMaxSize().clipToBounds()) {
@@ -186,22 +190,28 @@ fun TvNowPlaying() {
                             TvIconButton(Icons.AutoMirrored.Rounded.QueueMusic, "Up next", onClick = { panel = if (panel == Panel.QUEUE) Panel.NONE else Panel.QUEUE },
                                 on = panel == Panel.QUEUE, modifier = Modifier.named("Up next"))
                         }
-                        // A radio from this song: AudioMuse's songs that sound like it when set up, Steady or DJ as on the phone.
+                        // A mix from this song: AudioMuse's songs that sound like it when set up, Steady or DJ as on the phone;
+                        // while one plays, this stops it, as the phone's menu does (issue #895).
                         ButtonSlot {
-                            TvIconButton(Icons.Rounded.Radio, "Start a mix", onClick = { song?.let { app.siansa.ui.RadioChooser.song.value = it } },
-                                modifier = Modifier.named("Start a mix"))
+                            TvIconButton(Icons.Rounded.Radio, if (radioSeed != null) "Stop the mix" else "Start a mix", on = radioSeed != null,
+                                onClick = {
+                                    if (radioSeed != null) graph.songRadio.stop() else song?.let { app.siansa.ui.RadioChooser.song.value = it }
+                                },
+                                modifier = Modifier.named(MIX))
                         }
-                        // AudioMuse's song path from this song, queued after it once ready (as on the phone's player).
-                        if (graph.settings.current.audioMuseReady) {
-                            ButtonSlot {
-                                TvIconButton(Icons.Rounded.AltRoute, "Song path", onClick = { song?.let { nav.openSongPath(it.id, fromNowPlaying = true) } },
-                                    modifier = Modifier.named("Song path"))
-                            }
+                        // The rest of the phone's now playing menu, in one list, so the buttons stay five, one under each
+                        // control: song path, add to playlist, similar songs and song details (issue #895).
+                        ButtonSlot {
+                            TvIconButton(Icons.Rounded.MoreHoriz, "More", onClick = { if (song != null) more = true }, modifier = Modifier.named("More"))
                         }
                     }
                     // Always there, so the page doesn't move as the name comes and goes.
                     Text(
-                        if (focusedName == LIKE) likeName else focusedName.orEmpty(),
+                        when (focusedName) {
+                            LIKE -> likeName
+                            MIX -> if (radioSeed != null) "Stop the mix" else "Start a mix"
+                            else -> focusedName.orEmpty()
+                        },
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -214,6 +224,25 @@ fun TvNowPlaying() {
                 Panel.LYRICS -> LyricsPanel(song) { progress.value.positionMs }
                 Panel.NONE -> Unit
             }
+        }
+    }
+    val snack = app.siansa.ui.LocalSnack.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    if (more && song != null) {
+        val choices = buildList<Pair<String, () -> Unit>> {
+            // AudioMuse's song path from this song, queued after it once ready (as on the phone's player).
+            if (graph.settings.current.audioMuseReady) add("Song path" to { nav.openSongPath(song.id, fromNowPlaying = true) })
+            add("Add to playlist" to { pickPlaylist = true })
+            add("Similar songs" to { nav.navigate("similar/songs/${android.net.Uri.encode(song.id)}") })
+            add("Song details" to { nav.openSongDetails(song.id) })
+        }
+        TvChoices(song.title, choices, onDismiss = { more = false })
+    }
+    // The phone's own playlist picker (issue #895).
+    if (pickPlaylist && song != null) {
+        app.siansa.ui.AddToPlaylistDialog(listOf(song)) { message ->
+            pickPlaylist = false
+            if (message != null) scope.launch { snack.showSnackbar(message) }
         }
     }
 }
@@ -415,6 +444,8 @@ private val BUTTON_SLOT = 76.dp
 /** The star on a song Siansa added on its own, a little larger than the phone's for the distance. */
 private val AUTO_MARK = 20.dp
 private const val MAX_ARTISTS = 3
+/** The mix button, whose name changes to Stop the mix while one plays. */
+private const val MIX = "mix"
 private val PROGRESS_HEIGHT = 6.dp
 private val SEEKING_HEIGHT = 12.dp
 
