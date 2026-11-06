@@ -14,10 +14,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.AltRoute
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Radio
@@ -34,6 +37,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -43,7 +47,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -180,7 +183,7 @@ internal fun PlayButton(
     onSlide: (PlaySlide) -> Unit,
     modifier: Modifier = Modifier,
     unavailable: (PlaySlide) -> String? = { null },
-    onSliding: (SlideWay?) -> Unit = {},
+    onSliding: (SlideState?) -> Unit = {},
     preview: SlideState? = null,
 ) {
     val context = LocalContext.current
@@ -204,7 +207,7 @@ internal fun PlayButton(
         if (next == shown) return
         val before = shown
         shown = next
-        if (next?.way != before?.way) sliding(next?.way)
+        sliding(next)
         // A click as a choice appears, changes, or is far enough to start.
         if (next != null && (next.way != before?.way || (next.armed && before?.armed != true))) {
             QueueHaptics.vibrate(context, QueueHaptics.Kind.START)
@@ -278,16 +281,18 @@ internal fun PlayButton(
         }
         if (state != null) {
             val slide = slides.of(state.way)
-            SlideChoice(slide, state, unavailable(slide), accent, onAccent)
+            SlideChoice(slide, state, accent, onAccent)
         }
     }
 }
 
-/** The choice of a slide, beside the play button on its side, with its name (or why it can't run) beyond it. */
+/**
+ * The choice of a slide, beside the play button on its side. Its name is in the middle of the cover ([SlideCoverLabel]),
+ * where the thumb on the button can't cover it (issue #933).
+ */
 @Composable
-private fun SlideChoice(slide: PlaySlide, state: SlideState, why: String?, accent: Color, onAccent: Color) {
-    val density = LocalDensity.current
-    val reach = with(density) { SLIDE_REACH.roundToPx() }
+private fun SlideChoice(slide: PlaySlide, state: SlideState, accent: Color, onAccent: Color) {
+    val reach = with(LocalDensity.current) { SLIDE_REACH.roundToPx() }
     val (x, y) = when (state.way) {
         SlideWay.UP -> 0 to -reach
         SlideWay.DOWN -> 0 to reach
@@ -302,41 +307,92 @@ private fun SlideChoice(slide: PlaySlide, state: SlideState, why: String?, accen
         ) {
             slide.icon?.let { Icon(it, null, tint = if (state.armed) onAccent else Color.White, modifier = Modifier.size(CHOICE_ICON)) }
         }
-        // The name goes beyond the choice, away from the button: above it going up, below going down, and beside it
-        // going left or right, where previous or next has made way, so it never covers the play button.
-        val half = with(density) { (CHOICE_SIZE / 2 + Space.Small).roundToPx() }
-        Text(
-            why ?: slide.label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            color = if (state.armed) accent else Color.White,
-            maxLines = 1,
-            softWrap = false,
-            modifier = Modifier
-                .wrapContentSize(unbounded = true)
-                .layout { measurable, constraints ->
-                    val name = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
-                    layout(name.width, name.height) {
-                        val x = when (state.way) {
-                            SlideWay.LEFT -> -(name.width / 2 + half)
-                            SlideWay.RIGHT -> name.width / 2 + half
-                            else -> 0
-                        }
-                        val y = when (state.way) {
-                            SlideWay.UP -> -(name.height / 2 + half)
-                            SlideWay.DOWN -> name.height / 2 + half
-                            else -> 0
-                        }
-                        name.place(x, y)
-                    }
-                }
-                .clip(RoundedCornerShape(Space.Small))
-                .background(Color.Black.copy(alpha = NAME_BACKING))
-                .padding(horizontal = Space.Small, vertical = Space.Tight)
-                .testTag("slideName"),
-        )
     }
 }
+
+/** What a slide from the play button shows in the cover: the choice, its way, whether it's far enough, and why it can't run. */
+data class SlideLabel(val slide: PlaySlide, val way: SlideWay, val armed: Boolean, val why: String? = null)
+
+/**
+ * A slide's choice in the middle of now playing's cover (issue #933), where a thumb on the play button can't hide it:
+ * the cover blurs behind its icon and name. Until the finger is far enough it's faint, on a lighter blur, with "Slide a
+ * little further" and the way to go; then it lights up in the accent with "Let go to start" (the second vibrate comes
+ * from the button). Why a choice can't run ("Needs AudioMuse") shows in place of those words. Nothing while [label] is
+ * null.
+ */
+@Composable
+internal fun SlideCoverLabel(label: SlideLabel?, modifier: Modifier = Modifier) {
+    var last by remember { mutableStateOf(label) }
+    if (label != null) last = label
+    androidx.compose.animation.AnimatedVisibility(
+        visible = label != null,
+        modifier = modifier,
+        enter = androidx.compose.animation.fadeIn(tween(LABEL_FADE_MS)),
+        exit = androidx.compose.animation.fadeOut(tween(LABEL_FADE_MS)),
+    ) {
+        val shown = last ?: return@AnimatedVisibility
+        val ready = shown.armed && shown.why == null
+        val scrim by androidx.compose.animation.core.animateFloatAsState(
+            when {
+                ready -> if (android.os.Build.VERSION.SDK_INT >= 31) SCRIM_READY else SCRIM_READY_NO_BLUR
+                else -> if (android.os.Build.VERSION.SDK_INT >= 31) SCRIM_SLIDING else SCRIM_SLIDING_NO_BLUR
+            },
+            label = "slideScrim",
+        )
+        Box(
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrim)).testTag("slideLabel"),
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.foundation.layout.Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(horizontal = Space.Section).alpha(if (ready) 1f else LABEL_FAINT),
+            ) {
+                // Its icon, on its own: no circle round it.
+                shown.slide.icon?.let { Icon(it, null, tint = if (ready) Accent else Color.White, modifier = Modifier.size(LABEL_ICON)) }
+                androidx.compose.foundation.layout.Spacer(Modifier.size(Space.Medium))
+                Text(
+                    shown.slide.label,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("slideName"),
+                )
+                androidx.compose.foundation.layout.Spacer(Modifier.size(Space.Small))
+                androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (shown.why == null) {
+                        Icon(shown.way.arrowIcon, null, tint = Accent, modifier = Modifier.size(LABEL_ARROW))
+                        androidx.compose.foundation.layout.Spacer(Modifier.size(Space.Tight))
+                    }
+                    Text(
+                        shown.why ?: if (ready) "Let go to start" else "Slide a little further",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White.copy(alpha = LABEL_HINT),
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** How much the cover blurs behind a slide's name: lightly while sliding, fully once it's far enough (issue #933). */
+internal fun slideBlur(label: SlideLabel?): androidx.compose.ui.unit.Dp = when {
+    label == null -> 0.dp
+    label.armed && label.why == null -> COVER_BLUR_READY
+    else -> COVER_BLUR_SLIDING
+}
+
+/** The arrow pointing the way a slide goes. */
+private val SlideWay.arrowIcon: ImageVector
+    get() = when (this) {
+        SlideWay.UP -> Icons.Rounded.KeyboardArrowUp
+        SlideWay.DOWN -> Icons.Rounded.KeyboardArrowDown
+        SlideWay.LEFT -> Icons.AutoMirrored.Rounded.KeyboardArrowLeft
+        SlideWay.RIGHT -> Icons.AutoMirrored.Rounded.KeyboardArrowRight
+    }
 
 /**
  * Record grooves over the play button, in its own colour (issue #919): fine rings a shade darker, a label in the middle,
@@ -381,7 +437,18 @@ private val CHOICE_SIZE = 36.dp
 private val CHOICE_SIZE_RESTING = 30.dp
 private val CHOICE_ICON = 20.dp
 private const val RESTING_ALPHA = 0.18f
-private const val NAME_BACKING = 0.35f
+private const val LABEL_FADE_MS = 140
+private val LABEL_ICON = 48.dp
+private val LABEL_ARROW = 20.dp
+private const val LABEL_FAINT = 0.6f
+private const val LABEL_HINT = 0.85f
+private val COVER_BLUR_SLIDING = 10.dp
+private val COVER_BLUR_READY = 24.dp
+private const val SCRIM_SLIDING = 0.25f
+private const val SCRIM_READY = 0.4f
+// Without blur (before Android 12) the cover is darkened more, so the name still reads over it.
+private const val SCRIM_SLIDING_NO_BLUR = 0.45f
+private const val SCRIM_READY_NO_BLUR = 0.62f
 private val GROOVE_RADII = listOf(0.94f, 0.86f, 0.78f, 0.70f, 0.62f, 0.54f)
 private const val GROOVE_DARK = 0.16f
 private const val GROOVE_LIGHT = 0.10f

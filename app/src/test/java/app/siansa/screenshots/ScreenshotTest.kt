@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -427,6 +429,23 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                                 playing = true, slides = app.siansa.ui.PlaySlides(), djMix = false, onToggle = {}, onStop = {}, onSlide = {},
                                 preview = app.siansa.ui.SlideState(app.siansa.ui.SlideWay.LEFT, armed = false),
                             )
+                        }
+                    }
+                }
+            },
+            // A slide's choice in the middle of the cover (issue #933): far enough to start, not yet, and one that can't run.
+            Scene("slide_label_in_cover") {
+                OnPlayer {
+                    Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                        listOf(
+                            app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.SlideWay.UP, armed = true),
+                            app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.SONIC_MATCH, app.siansa.ui.SlideWay.RIGHT, armed = false),
+                            app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.SONG_PATH, app.siansa.ui.SlideWay.LEFT, armed = false, why = "Needs AudioMuse"),
+                        ).forEach { label ->
+                            Box(
+                                Modifier.size(220.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                                    .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFFB0476A), Color(0xFF3A1D6E)))),
+                            ) { app.siansa.ui.SlideCoverLabel(label, Modifier.fillMaxSize()) }
                         }
                     }
                 }
