@@ -1,0 +1,33 @@
+name: Dependency graph
+
+# Sends GitHub the full list of Gradle libraries the app is built with (Insights › Dependency graph), so Dependabot
+# alerts cover everything, including what other libraries bring in. GitHub's automatic submission builds with a
+# Gradle wrapper, which Siansa doesn't have; this uses Gradle 8.14.3 as CI does.
+on:
+  push:
+    branches: [main, mixer]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dependency-graph-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  submit:
+    name: Gradle dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/dependency-submission@v6
+        with:
+          gradle-version: "8.14.3"
