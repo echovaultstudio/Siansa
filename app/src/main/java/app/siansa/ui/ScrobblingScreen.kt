@@ -132,7 +132,8 @@ fun ScrobblingScreen(nav: NavController) {
                 graph.settings.save(graph.settings.current.copy(lastFmEnabled = it))
             }
             Hint("Uses your own Last.fm API account: create one at last.fm/api/account/create and copy the API key and shared secret here. Hearts are sent to Last.fm as loved tracks.")
-            Field("API key", lfmKey) { lfmKey = it }
+            // A key, so hidden like the secret (issue #957).
+            Secret("API key", lfmKey) { lfmKey = it }
             Secret("Shared secret", lfmSecret) { lfmSecret = it }
             Field("Last.fm username", lfmUser) { lfmUser = it }
             Secret("Last.fm password (used once to sign in, not stored)", lfmPassword) { lfmPassword = it }
