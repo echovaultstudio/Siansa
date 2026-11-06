@@ -171,13 +171,9 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
         if (level >= TRIM_MEMORY_RUNNING_LOW && level < TRIM_MEMORY_UI_HIDDEN || level >= TRIM_MEMORY_BACKGROUND) {
             AppLog.w("Phone", "Low memory signal (level $level) · ${Diagnostics.snapshot(this)}")
         }
-        // Give back decoded covers, the biggest thing the app keeps that it can do without: half when memory runs
-        // low, all of them when it's critical or the app is out of sight. They load again from the disk cache.
+        // Give back decoded covers, the biggest thing the app keeps that it can do without ([CoverTrim]).
         val covers = runCatching { coil3.SingletonImageLoader.get(this).memoryCache }.getOrNull() ?: return
-        when {
-            level >= TRIM_MEMORY_RUNNING_CRITICAL && level < TRIM_MEMORY_UI_HIDDEN || level >= TRIM_MEMORY_BACKGROUND -> covers.clear()
-            level >= TRIM_MEMORY_RUNNING_LOW || level == TRIM_MEMORY_UI_HIDDEN -> covers.trimToSize(covers.maxSize / 2)
-        }
+        CoverTrim.keep(level, covers.maxSize)?.let { keep -> if (keep == 0L) covers.clear() else covers.trimToSize(keep) }
     }
 
     companion object {
@@ -186,5 +182,21 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
         /** In the cache folder normally; in the app's own files when there's no limit. */
         fun imageCacheDir(context: android.content.Context, unlimited: Boolean): java.io.File =
             if (unlimited) context.filesDir.resolve(IMAGE_CACHE_DIR) else context.cacheDir.resolve(IMAGE_CACHE_DIR)
+    }
+}
+
+/**
+ * How much of the cover memory cache to keep when Android asks for memory back (issue #892): all of it goes once the
+ * app is out of sight, half while it's on screen and memory runs low or critical, as the covers showing load again
+ * from the disk cache otherwise. The NVIDIA SHIELD says "critical" about once a minute while Siansa uses a quarter of
+ * what it may, and emptying the whole cache each time made every cover on the TV load again: the lag, and the same
+ * covers fetched over and over. Null: leave it as it is.
+ */
+object CoverTrim {
+    fun keep(level: Int, maxSize: Long): Long? = when {
+        level >= android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND -> 0L
+        level == android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> maxSize / 2
+        level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW -> maxSize / 2
+        else -> null
     }
 }
