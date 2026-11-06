@@ -1,6 +1,8 @@
 package app.siansa.ui
 
 import app.siansa.log.AppLog
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import android.content.Context
 import android.text.Editable
 import android.text.InputType
@@ -94,7 +96,17 @@ fun TvTextBox(
     val textSize = MaterialTheme.typography.bodyLarge.fontSize.value
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-        androidx.compose.foundation.layout.Box {
+        // Compose sees the remote's keys before Android's field does (the emulator test: the field's own key listener
+        // never heard up or down, and the focus didn't move), so up and down are taken here first.
+        androidx.compose.foundation.layout.Box(
+            Modifier.onPreviewKeyEvent { event ->
+                if (event.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                val way = textBoxExit(event.nativeKeyEvent.keyCode, kind == TvTextKind.LONG_TEXT) ?: return@onPreviewKeyEvent false
+                val moved = runCatching { focusManager.moveFocus(way) }.getOrDefault(false)
+                AppLog.d("TvTextBox", "\"$label\" ${if (way == androidx.compose.ui.focus.FocusDirection.Down) "down" else "up"}: ${if (moved) "moved on" else "nothing that way"}")
+                moved
+            },
+        ) {
             AndroidView(
                 factory = { context ->
                     EditText(context).apply {
