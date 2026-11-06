@@ -163,6 +163,19 @@ class RealServersTest(private val server: String) {
         assertEquals("$server: covers", emptyList<String>(), missing)
     }
 
+    /** The player's and lock screen's picture of a song, for each way its album keeps its cover. */
+    @Test fun songCoversShowHoweverTheAlbumKeepsIt() = runBlocking {
+        val missing = listOf("Morning Tone", "Upstairs", "Shared Room").mapNotNull { title ->
+            val s = song(title)
+            val id = s.coverArt ?: return@mapNotNull "$title: no picture id"
+            get(source().coverUrl(id, 300)).use { r ->
+                val type = r.header("Content-Type").orEmpty()
+                if (r.code == 200 && type.startsWith("image/")) null else "$title (${s.album}): ${r.code} $type"
+            }
+        }
+        assertEquals("$server: song covers", emptyList<String>(), missing)
+    }
+
     @Test fun syncedLyricsAreRead() = runBlocking {
         val lyrics = source().lyrics(song("Second Glow"))
         assertNotNull("$server: lyrics for Second Glow (from its .lrc)", lyrics)
@@ -201,7 +214,10 @@ class RealServersTest(private val server: String) {
         source().removeFromPlaylist(id, listOf(0))
         assertEquals("$server: first song removed", listOf(b.id, c.id), source().playlist(id).songs.map { it.id })
         source().renamePlaylist(id, "CI renamed")
-        assertEquals("$server: renamed", "CI renamed", source().playlist(id).playlist.name)
+        // Jellyfin can apply a rename a moment after answering (a refresh after the removal can still show the old name).
+        var name = source().playlist(id).playlist.name
+        repeat(20) { if (name != "CI renamed") { Thread.sleep(500); name = source().playlist(id).playlist.name } }
+        assertEquals("$server: renamed", "CI renamed", name)
     }
 
     @Test fun playsAreReported() = runBlocking {

@@ -278,10 +278,12 @@ class EmbyApi(
         val album = call(itemPath(id))
         if (album.str("Id") == null) throw ApiException("Album not found")
         // Emby can't sort by disc and track number (not among its sort fields), so they're put in order here.
-        val songs = items("ParentId" to id, "IncludeItemTypes" to "Audio", "SortBy" to "SortName")
-            .map(::parseSong)
-            .sortedWith(compareBy({ it.disc ?: 1 }, { it.track ?: Int.MAX_VALUE }))
-        return AlbumDetail(albumWithSongCover(parseAlbum(album), songs), songs, info = Tags.embyAlbum(album))
+        val raw = items("ParentId" to id, "IncludeItemTypes" to "Audio", "SortBy" to "SortName")
+        val songs = raw.map(::parseSong).sortedWith(compareBy({ it.disc ?: 1 }, { it.track ?: Int.MAX_VALUE }))
+        var shown = albumWithSongCover(parseAlbum(album), songs)
+        // Neither the album nor its songs have a picture: the folder's cover.jpg or folder.jpg, when it has one.
+        if (shown.coverArt == null) folderWithPicture(raw, id)?.let { shown = shown.copy(coverArt = it) }
+        return AlbumDetail(shown, songs, info = Tags.embyAlbum(album))
     }
 
     override suspend fun artists(folderId: String?): List<Artist> =
@@ -578,8 +580,16 @@ class EmbyApi(
 
     private fun hasImage(o: JsonObject): Boolean = o.obj("ImageTags")?.containsKey("Primary") == true
 
-    /** The id whose picture is the song's cover: its own, else its album's. */
-    private fun songCover(o: JsonObject): String? = if (hasImage(o)) o.str("Id") else o.str("AlbumId")
+    /**
+     * The id whose picture is the song's cover: its own; else its album's, when the album has one
+     * (AlbumPrimaryImageTag); else its folder's, as Emby keeps an album folder's cover.jpg or folder.jpg on the folder
+     * (found by the real-server tests); else the album's anyway.
+     */
+    private fun songCover(o: JsonObject): String? = when {
+        hasImage(o) -> o.str("Id")
+        o.str("AlbumPrimaryImageTag") != null -> o.str("AlbumId")
+        else -> o.str("ParentId")?.takeIf { it != o.str("AlbumId") } ?: o.str("AlbumId")
+    }
 
     internal fun parseSong(o: JsonObject): Song {
         val user = o.obj("UserData")
@@ -641,10 +651,25 @@ class EmbyApi(
         return albums.map { a -> if (a.coverArt != null) a else songCovers[a.id]?.takeIf { it.isNotEmpty() }?.let { a.copy(coverArt = it) } ?: a }
     }
 
-    /** The first of an album's songs with a picture of its own, by id; null when none of the first few has one. */
-    private suspend fun firstSongCover(albumId: String): String? =
-        items("ParentId" to albumId, "IncludeItemTypes" to "Audio", "SortBy" to "SortName", "Limit" to SONGS_LOOKED_AT)
-            .firstNotNullOfOrNull { o -> o.str("Id")?.takeIf { hasImage(o) && it != albumId } }
+    /**
+     * The first of an album's songs with a picture of its own, by id; else the picture of the folder its songs are in;
+     * null when there's neither. Emby makes albums from tags, so a cover.jpg or folder.jpg in the album's folder is
+     * the folder item's picture, never the album's (found by the real-server tests): albums with their cover only
+     * there showed none.
+     */
+    private suspend fun firstSongCover(albumId: String): String? {
+        val songs = items("ParentId" to albumId, "IncludeItemTypes" to "Audio", "SortBy" to "SortName", "Limit" to SONGS_LOOKED_AT)
+        songs.firstNotNullOfOrNull { o -> o.str("Id")?.takeIf { hasImage(o) && it != albumId } }?.let { return it }
+        val folder = folderWithPicture(songs, albumId) ?: return null
+        AppLog.d("Covers", "${if (jellyfin) "Jellyfin" else "Emby"}: album $albumId shows its folder's picture ($folder)")
+        return folder
+    }
+
+    /** The folder (by id) that holds [songs], when it has a picture: their shared ParentId other than the album's. */
+    private suspend fun folderWithPicture(songs: List<JsonObject>, albumId: String): String? {
+        val folder = folderOf(songs, albumId) ?: return null
+        return folder.takeIf { runCatching { hasImage(call(itemPath(folder))) }.getOrDefault(false) }
+    }
 
     internal fun parseAlbum(o: JsonObject): Album {
         val albumArtist = o.arr("AlbumArtists").firstOrNull()
@@ -728,6 +753,10 @@ class EmbyApi(
          * real-server tests).
          */
         fun lyricsFormats(codec: String?): List<String> = listOf(lyricsFormat(codec), "srt").distinct()
+
+        /** The folder [songs] share (their ParentId), when it isn't the album itself; null when they're spread out. */
+        fun folderOf(songs: List<JsonObject>, albumId: String): String? =
+            songs.mapNotNull { it["ParentId"]?.let { p -> (p as? JsonPrimitive)?.content } }.distinct().singleOrNull()?.takeIf { it != albumId }
 
         fun readLyrics(raw: String?): Lyrics? {
             val text = raw?.removePrefix("\uFEFF")?.trim()?.takeIf { it.isNotEmpty() } ?: return null
