@@ -40,7 +40,20 @@ object RadioChooser {
     fun ask(song: Song) {
         this.song.value = song
     }
+
+    /**
+     * Starts a mix from [song] in [mode] without asking (a slide from the play button, issue #919, or a choice here),
+     * saying so with [say], and why not if it can't.
+     */
+    fun startNow(graph: app.siansa.AppGraph, song: Song, mode: ContinuousMode, say: (String) -> Unit) {
+        AppLog.i("SongRadio", "Chose ${mode.label} for a radio from \"${song.title}\"")
+        say("Starting ${mixName(mode)} from ${song.title}… more songs are added as it plays")
+        graph.songRadio.start(song, mode) { message -> say(message) }
+    }
 }
+
+/** A mix's name as the app says it: Steady radio or DJ mix (issue #919). */
+internal fun mixName(mode: ContinuousMode): String = if (mode == ContinuousMode.DJ) "DJ mix" else "Steady radio"
 
 /** Each choice's icon in the chooser (issue #916): a wave for Steady, a turntable for DJ. */
 internal fun radioModeIcon(mode: ContinuousMode): ImageVector = when (mode) {
@@ -83,14 +96,12 @@ fun RadioChooserHost() {
 
     fun start(mode: ContinuousMode) {
         RadioChooser.song.value = null
-        AppLog.i("SongRadio", "Chose ${mode.label} for a radio from \"${seed.title}\"")
-        scope.launch { snack.showSnackbar("Starting ${mode.label} radio from ${seed.title}… more songs are added as it plays") }
-        graph.songRadio.start(seed, mode) { message -> scope.launch { snack.showSnackbar(message) } }
+        RadioChooser.startNow(graph, seed, mode) { message -> scope.launch { snack.showSnackbar(message) } }
     }
 
     AlertDialog(
         onDismissRequest = { RadioChooser.song.value = null },
-        title = { Text("Start song radio") },
+        title = { Text("Start a mix") },
         text = { RadioModeChoices(::start) },
         confirmButton = {},
         dismissButton = { TextButton(onClick = { RadioChooser.song.value = null }) { Text("Cancel") } },

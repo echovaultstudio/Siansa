@@ -10,6 +10,7 @@ import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -404,6 +405,36 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     onOpen = {},
                 ) {
                     app.siansa.ui.HomeMenuButton(app.siansa.ui.rememberHomeMenuState(), casting = false, filterActive = false, onPick = {})
+                }
+            },
+            // Now playing's play button (issue #919): record grooves while a DJ mix plays, and a slide's choice, far enough
+            // to start (up, with its name) and not yet (left), on the player's colours.
+            Scene("play_button_grooves_and_slides") {
+                OnPlayer {
+                    // Each in a band of its own, with room on the side its choice and name go.
+                    Column(Modifier.fillMaxWidth().padding(vertical = Space.Section)) {
+                        Box(Modifier.fillMaxWidth().padding(vertical = Space.Section), contentAlignment = Alignment.Center) {
+                            app.siansa.ui.PlayButton(playing = false, slides = app.siansa.ui.PlaySlides(), djMix = true, onToggle = {}, onStop = {}, onSlide = {})
+                        }
+                        Box(Modifier.fillMaxWidth().padding(top = Space.Large * 3, bottom = Space.Section), contentAlignment = Alignment.Center) {
+                            app.siansa.ui.PlayButton(
+                                playing = true, slides = app.siansa.ui.PlaySlides(), djMix = false, onToggle = {}, onStop = {}, onSlide = {},
+                                preview = app.siansa.ui.SlideState(app.siansa.ui.SlideWay.UP, armed = true),
+                            )
+                        }
+                        Box(Modifier.fillMaxWidth().padding(vertical = Space.Section, horizontal = Space.Large), contentAlignment = Alignment.CenterEnd) {
+                            app.siansa.ui.PlayButton(
+                                playing = true, slides = app.siansa.ui.PlaySlides(), djMix = false, onToggle = {}, onStop = {}, onSlide = {},
+                                preview = app.siansa.ui.SlideState(app.siansa.ui.SlideWay.LEFT, armed = false),
+                            )
+                        }
+                    }
+                }
+            },
+            // Settings › Style › Now playing: the play button slides, each way and what it does.
+            Scene("play_slides_settings") {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.PlaySlidesSettings(app.siansa.ui.PlaySlides(left = app.siansa.ui.PlaySlide.START_A_MIX)) {}
                 }
             },
             // Song radio's choices (issue #916): an icon and the name each, no descriptions; and the mixing docs link under

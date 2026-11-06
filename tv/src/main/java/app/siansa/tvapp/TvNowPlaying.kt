@@ -188,8 +188,8 @@ fun TvNowPlaying() {
                         }
                         // A radio from this song: AudioMuse's songs that sound like it when set up, Steady or DJ as on the phone.
                         ButtonSlot {
-                            TvIconButton(Icons.Rounded.Radio, "Song radio", onClick = { song?.let { app.siansa.ui.RadioChooser.song.value = it } },
-                                modifier = Modifier.named("Song radio"))
+                            TvIconButton(Icons.Rounded.Radio, "Start a mix", onClick = { song?.let { app.siansa.ui.RadioChooser.song.value = it } },
+                                modifier = Modifier.named("Start a mix"))
                         }
                         // AudioMuse's song path from this song, queued after it once ready (as on the phone's player).
                         if (graph.settings.current.audioMuseReady) {

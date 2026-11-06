@@ -489,7 +489,7 @@ fun SongActions(song: Song, liked: Boolean, onDismiss: () -> Unit) {
         add("Add to queue" to { graph.player.addToQueue(song); say("Added to the queue: ${song.title}") })
         add((if (liked) "Unlike" else "Like") to { graph.favorites.toggle(song) })
         // Steady or DJ, asked the way the phone asks (RadioChooserHost, in the TV's root too).
-        add("Start song radio" to { app.siansa.ui.RadioChooser.song.value = song })
+        add("Start a mix" to { app.siansa.ui.RadioChooser.song.value = song })
         // AudioMuse (or the server) finds songs that sound like it, on the phone's page for it.
         add("Similar songs" to { nav.navigate("similar/songs/${android.net.Uri.encode(song.id)}") })
         // AudioMuse's song path: from this song to another, through songs that sound in between.
