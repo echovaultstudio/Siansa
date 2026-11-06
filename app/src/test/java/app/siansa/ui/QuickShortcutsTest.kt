@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Home's shortcuts: Liked songs first, then what was played last (issue #271). */
+/** Home's shortcuts: what was played last, as many as set, nothing pinned (issues #271, #934). */
 class QuickShortcutsTest {
     private fun p(route: String) = RecentPlay(route, route)
 
@@ -16,11 +16,18 @@ class QuickShortcutsTest {
         assertEquals(listOf("album/1", "playlist/2", "mix/today", "album/3"), quickShortcuts(played, fill, 7).map { it.route })
     }
 
-    @Test fun likedSongsIsNeverRepeatedAndThereAreAtMostSeven() {
-        val played = listOf(p("liked")) + (1..10).map { p("album/$it") }
-        val shown = quickShortcuts(played, emptyList(), QUICK_COUNT - 1)
-        assertEquals(7, shown.size)
-        assertEquals("album/1", shown.first().route)
+    @Test fun likedSongsIsOnlyThereWhenItWasPlayed() {
+        val played = listOf(p("album/1"), p("liked"), p("album/2"))
+        assertEquals(listOf("album/1", "liked", "album/2"), quickShortcuts(played, emptyList(), 8).map { it.route })
+        assertEquals(listOf("album/1", "album/2"), quickShortcuts(listOf(p("album/1"), p("album/2")), emptyList(), 8).map { it.route })
+    }
+
+    @Test fun asManyAsSetFromTwoToEight() {
+        val played = (1..12).map { p("album/$it") }
+        assertEquals(4, quickShortcuts(played, emptyList(), 4).size)
+        assertEquals("album/1", quickShortcuts(played, emptyList(), 4).first().route)
+        assertEquals(QUICK_COUNT, quickShortcuts(played, emptyList(), 20).size)
+        assertEquals(QUICK_MIN, quickShortcuts(played, emptyList(), 0).size)
     }
 
     @Test fun aBookPlayedIsAShortcutToItsPage() {

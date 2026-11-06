@@ -319,8 +319,9 @@ fun HomeScreen(nav: NavController) {
                 // The notices are the top of Home now (issue #872), not a section of their own.
                 HomeSection.NOTICES -> Unit
                 HomeSection.QUICK -> {
-                    // Quick access, like the top grid in Spotify (issue #271): Liked songs always first, then what
-                    // you played last; until there's enough of that, today's mixes, playlists and recent albums.
+                    // Quick access, like the top grid in Spotify (issue #271): what you played last, newest first, as
+                    // many as Settings › Style › Home says (issue #934); until there's enough of that, today's mixes,
+                    // playlists and recent albums. Liked songs is one of them only when you played it.
                     item(key = "quick") {
                         val mixIds = mixes.orEmpty().mapTo(HashSet()) { it.id }
                         val fill = buildList {
@@ -330,25 +331,20 @@ fun HomeScreen(nav: NavController) {
                         }
                         val played = shownRecents(recentPlays.orEmpty(), shownRecentAlbums)
                             .filter { !it.route.startsWith("mix/") || it.route.removePrefix("mix/") in mixIds }
-                        val quick = buildList<Triple<String, String?, () -> Unit>> {
-                            add(Triple("Liked songs", null) { nav.navigate("liked") })
-                            quickShortcuts(played, fill, QUICK_COUNT - 1).forEach { r -> add(Triple(r.title, r.cover) { nav.navigate(r.route) }) }
-                        }
+                        val quick = quickShortcuts(played, fill, homeSettings.homeShortcuts)
+                        fun colorsOf(r: RecentPlay) = if (r.route == "liked") Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(r.title)
                         if (look != HomeLook.AS_IS) {
-                            HomeLookRow(look, "quick", "Shortcuts", quick.mapIndexed { i, (title, cover, open) ->
-                                val liked = title == "Liked songs" && cover == null
-                                HomeItem("quick-$i", title, coverArt = cover, colors = if (liked) Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(title), open = open)
+                            HomeLookRow(look, "quick", "Shortcuts", quick.mapIndexed { i, r ->
+                                HomeItem("quick-$i", r.title, coverArt = r.cover, colors = colorsOf(r), open = { nav.navigate(r.route) })
                             })
                         } else if (quick.isNotEmpty()) {
-                            Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                            Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium).testTag("quickShortcuts"), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                                 quick.chunked(2).forEach { row ->
                                     Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                                        row.forEach { (title, cover, open) ->
-                                            val liked = title == "Liked songs" && cover == null
-                                            val colors = if (liked) Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(title)
+                                        row.forEach { r ->
                                             QuickTile(
-                                                title, cover, colors, open, Modifier.weight(1f),
-                                                icon = if (liked) Icons.Rounded.Favorite else null,
+                                                r.title, r.cover, colorsOf(r), { nav.navigate(r.route) }, Modifier.weight(1f),
+                                                icon = if (r.route == "liked" && r.cover == null) Icons.Rounded.Favorite else null,
                                             )
                                         }
                                         if (row.size == 1) Spacer(Modifier.weight(1f))
@@ -892,13 +888,10 @@ internal fun madeForYouCaption(trackCount: Int?, aiDown: Boolean, prompt: String
     else -> prompt
 }
 
-/** Shortcuts on Home in all, Liked songs included (issue #271). */
+/** The most shortcuts on Home, and the fewest (Settings › Style › Home, issue #934). */
 internal const val QUICK_COUNT = 8
+internal const val QUICK_MIN = 2
 
-/**
- * The shortcuts after Liked songs: what was played last first, then [fill] (today's mixes, playlists, recent
- * albums) until there are [count], each page once. Liked songs is never among them: it always comes first.
- */
 /** The album a shortcut opens ("album/123"), or null for any other page. */
 internal fun recentAlbumId(route: String): String? =
     route.takeIf { it.startsWith("album/") }?.removePrefix("album/")?.substringBefore('?')?.takeIf { it.isNotBlank() }
@@ -907,5 +900,10 @@ internal fun recentAlbumId(route: String): String? =
 internal fun shownRecents(played: List<RecentPlay>, shownAlbums: Set<String>?): List<RecentPlay> =
     if (shownAlbums == null) played else played.filter { r -> recentAlbumId(r.route)?.let { it in shownAlbums } ?: true }
 
+/**
+ * Home's shortcuts (issue #934): what was played last first, newest first, then [fill] (today's mixes, playlists,
+ * recent albums) until there are [count] (2 to 8), each page once. Nothing is pinned: Liked songs is there only when it
+ * was played.
+ */
 internal fun quickShortcuts(played: List<RecentPlay>, fill: List<RecentPlay>, count: Int): List<RecentPlay> =
-    (played + fill).filter { it.route != "liked" }.distinctBy { it.route }.take(count)
+    (played + fill).distinctBy { it.route }.take(count.coerceIn(QUICK_MIN, QUICK_COUNT))

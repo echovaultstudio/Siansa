@@ -50,7 +50,7 @@ cards** keep their own looks: their cog opens **Settings › Notices and Cards �
 
 | Section | What it shows |
 |---|---|
-| **Shortcuts** | Liked songs first, then the albums, playlists and mixes you played from last. Until there's enough of that, today's mixes, your playlists and recent albums. |
+| **Shortcuts** | The albums, playlists, mixes and Liked songs you played from last, newest first: 8 of them, or as many as you pick from 2 to 8 under **Settings › Style › Home**. Until there's enough of that, today's mixes, your playlists and recent albums. |
 | **Today's mix** | The day's mix, made for the vibe of the hour it's made in (see below). |
 | **Your mixes carousel** | Three or four mixes of your own for each part of the day, side by side. |
 | **Made for you** | Your sound, On repeat, Discover for you, then cards of your own. |

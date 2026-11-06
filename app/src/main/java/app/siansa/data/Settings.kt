@@ -175,6 +175,8 @@ data class AppSettings(
     val navTabs: List<NavTab> = NavTab.default,
     /** Home's menu, top to bottom (issue #872). */
     val homeMenu: List<HomeMenuItem> = HomeMenuItem.default,
+    /** How many shortcuts Home shows at its top, 2 to 8 (issue #934). */
+    val homeShortcuts: Int = 8,
     /** On: now playing's lyrics, device and queue buttons (issue #294). Off: the earlier look, lyrics card peeking in. */
     val nowPlayingLyricsButton: Boolean = true,
     /** Sliding from now playing's play button, and what each way does (issue #919). */
@@ -459,6 +461,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         miniButtons = MiniButton.parse(prefs.getString("mini_buttons", null)),
         navTabs = NavTab.parse(prefs.getString("nav_tabs", null)),
         homeMenu = HomeMenuItem.parse(prefs.getString("home_menu", null)),
+        homeShortcuts = prefs.getInt("home_shortcuts", 8).coerceIn(2, 8),
         nowPlayingLyricsButton = prefs.getBoolean("now_playing_lyrics_button", true),
         playSlides = app.siansa.ui.PlaySlides.parse(prefs.getString("play_slides", null)),
         topBar = TopBarStyle.parse(prefs.getString("top_bar", null)),
@@ -685,6 +688,12 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         val kept = HomeMenuItem.parse(HomeMenuItem.format(order))
         prefs.edit().putString("home_menu", HomeMenuItem.format(kept)).apply()
         _state.value = _state.value.copy(homeMenu = kept)
+    }
+
+    fun setHomeShortcuts(count: Int) {
+        val kept = count.coerceIn(2, 8)
+        prefs.edit().putInt("home_shortcuts", kept).apply()
+        _state.value = _state.value.copy(homeShortcuts = kept)
     }
 
     fun setNavTabs(tabs: List<NavTab>) {
