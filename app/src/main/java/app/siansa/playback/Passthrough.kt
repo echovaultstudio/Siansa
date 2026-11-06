@@ -98,6 +98,13 @@ object Passthrough {
             format
         }
 
+    /**
+     * Whether the song playing goes past the mix, to the receiver unchanged (issue #939): the output was last opened for
+     * a bitstream ([trackIsBitstream]) and the song's format ([mime]) is one. A FLAC after an Atmos song, or an Atmos
+     * song decoded on the TV, goes through the mix, so the mix's checks for lost sound apply to it.
+     */
+    fun pastTheMix(trackIsBitstream: Boolean, mime: String?): Boolean = trackIsBitstream && isBitstream(mime)
+
     /** A plain name for a bitstream type, for the log and the TV's settings ("Dolby Atmos (E-AC-3 JOC)"). */
     fun name(mime: String?): String = when (mime) {
         MimeTypes.AUDIO_AC3 -> "Dolby Digital (AC-3)"

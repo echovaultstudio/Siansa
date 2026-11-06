@@ -30,6 +30,17 @@ class PassthroughTest {
     }
 
     @Test
+    fun onlyASongSentUnchangedGoesPastTheMix() {
+        // Issue #939: the mix is silent by design while Atmos goes to the receiver; its silence checks must leave it be.
+        assertTrue(Passthrough.pastTheMix(true, MimeTypes.AUDIO_E_AC3_JOC))
+        // A FLAC after it goes through the mix again, though the output was last opened for a bitstream.
+        assertFalse(Passthrough.pastTheMix(true, MimeTypes.AUDIO_FLAC))
+        // Atmos decoded on the TV (no receiver, or passthrough off) goes through the mix.
+        assertFalse(Passthrough.pastTheMix(false, MimeTypes.AUDIO_E_AC3_JOC))
+        assertFalse(Passthrough.pastTheMix(true, null))
+    }
+
+    @Test
     fun dolbyAndDtsAreBitstreams() {
         for (mime in listOf(
             MimeTypes.AUDIO_AC3, MimeTypes.AUDIO_E_AC3, MimeTypes.AUDIO_E_AC3_JOC, MimeTypes.AUDIO_TRUEHD,
