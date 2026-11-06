@@ -193,6 +193,26 @@ class EmbyApiTest {
         assertEquals("World", lyrics.lines[1].text)
     }
 
+    /** Emby 4.8 answers a song's .lrc file as `.lrc` with nothing at all; its SRT has the lines and times. */
+    @Test fun anEmptyLrcAnswerIsReadAsSrtInstead() = runBlocking {
+        val server = FakeEmby { seen ->
+            when (seen.path) {
+                "/Users/u1/Items/s1" -> 200 to """{"Id":"s1","MediaSources":[{"Id":"ms1","MediaStreams":[
+                    {"Type":"Audio","Index":0},{"Type":"Subtitle","Index":1,"Codec":"lrc","IsExternal":true}]}]}"""
+                "/Items/s1/ms1/Subtitles/1/Stream.lrc" -> 200 to ""
+                "/Items/s1/ms1/Subtitles/1/Stream.srt" ->
+                    200 to "﻿1\n00:00:01,000 --> 00:00:10,000\nThe first line\n\n2\n00:00:10,000 --> 00:00:20,000\nThe second line\n"
+                else -> 404 to ""
+            }
+        }
+        val lyrics = EmbyApi(server.client, { settings }).lyrics(Song("s1", "T"))!!
+        assertTrue(lyrics.synced)
+        assertEquals(listOf("The first line", "The second line"), lyrics.lines.map { it.text })
+        assertEquals(listOf(1000L, 10_000L), lyrics.lines.map { it.startMs })
+        assertEquals(listOf("lrc", "srt"), EmbyApi.lyricsFormats("lrc"))
+        assertEquals(listOf("srt"), EmbyApi.lyricsFormats("subrip"))
+    }
+
     @Test fun noLyricsStreamMeansNoLyrics() = runBlocking {
         val server = FakeEmby { 200 to """{"Id":"s1","MediaSources":[{"Id":"ms1","MediaStreams":[{"Type":"Audio","Index":0}]}]}""" }
         assertNull(EmbyApi(server.client, { settings }).lyrics(Song("s1", "T")))

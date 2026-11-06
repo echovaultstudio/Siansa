@@ -20,7 +20,10 @@ def call(method, url, body=None, headers=None, ok_codes=(200, 204)):
     req = urllib.request.Request(url, data=data, method=method, headers={"Content-Type": "application/json", **(headers or {})})
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
-            text = r.read().decode() or "null"
+            raw = r.read()
+            if not r.headers.get("Content-Type", "").startswith(("application/json", "text/")):
+                return r.status, raw
+            text = raw.decode("utf-8-sig") or "null"
             return r.status, json.loads(text) if text.strip()[:1] in "{[" else text
     except urllib.error.HTTPError as e:
         if e.code in ok_codes:

@@ -400,9 +400,13 @@ class EmbyApi(
         if (streams.isEmpty()) return null
         val options = streams.mapNotNull { stream ->
             val index = stream.int("Index") ?: return@mapNotNull null
-            val raw = runCatching {
-                text("/Items/" + enc(song.id) + "/" + enc(sourceId) + "/Subtitles/$index/Stream." + lyricsFormat(stream.str("Codec")))
-            }.onFailure { AppLog.w("Lyrics", "Emby lyrics ${song.id} #$index not read: ${it.message}") }.getOrNull()
+            val formats = lyricsFormats(stream.str("Codec"))
+            val raw = formats.firstNotNullOfOrNull { format ->
+                runCatching { text("/Items/" + enc(song.id) + "/" + enc(sourceId) + "/Subtitles/$index/Stream.$format") }
+                    .onFailure { AppLog.w("Lyrics", "Emby lyrics ${song.id} #$index as .$format not read: ${it.message}") }
+                    .getOrNull()?.takeIf { it.removePrefix("\uFEFF").isNotBlank() }
+                    ?.also { if (format != formats.first()) AppLog.d("Lyrics", "Emby lyrics ${song.id} #$index: .${formats.first()} came back empty, read as .$format") }
+            }
             readLyrics(raw)?.let { stream.str("Language") to it }
         }
         return LyricsFormats.best(options)
@@ -718,8 +722,15 @@ class EmbyApi(
         }
 
         /** Lyrics from Emby's text: timed when it is LRC or subtitles, else plain lines; null when empty. */
+        /**
+         * The formats to ask Emby for a lyrics stream in, best first: its own, then SRT. Emby 4.8 answers `.lrc` and
+         * `.vtt` with nothing at all for a song's .lrc file, and its SRT has the same lines and times (found by the
+         * real-server tests).
+         */
+        fun lyricsFormats(codec: String?): List<String> = listOf(lyricsFormat(codec), "srt").distinct()
+
         fun readLyrics(raw: String?): Lyrics? {
-            val text = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+            val text = raw?.removePrefix("\uFEFF")?.trim()?.takeIf { it.isNotEmpty() } ?: return null
             return LyricsFormats.parse(text) ?: Lyrics(false, text.lines().map { LyricLine(null, it.trimEnd()) })
         }
 
