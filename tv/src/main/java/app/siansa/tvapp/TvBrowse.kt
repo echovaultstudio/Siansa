@@ -63,6 +63,7 @@ import app.siansa.ui.LocalNav
 import app.siansa.ui.LocalSnack
 import app.siansa.ui.Space
 import app.siansa.ui.albumTagRoute
+import app.siansa.ui.openSongDetails
 import app.siansa.ui.openSongPath
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -483,13 +484,26 @@ fun SongActions(song: Song, liked: Boolean, onDismiss: () -> Unit) {
     val nav = LocalNav.current
     val snack = LocalSnack.current
     val scope = rememberCoroutineScope()
+    val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
+    var pickPlaylist by remember { mutableStateOf(false) }
     fun say(text: String) { scope.launch { snack.showSnackbar(text) } }
+    if (pickPlaylist) {
+        // The phone's own: server, other users' and phone playlists, and a new one (issue #895).
+        app.siansa.ui.AddToPlaylistDialog(listOf(song)) { message ->
+            pickPlaylist = false
+            if (message != null) say(message)
+            onDismiss()
+        }
+        return
+    }
     val choices = buildList<Pair<String, () -> Unit>> {
         add("Play next" to { graph.player.playNext(song); say("Plays next: ${song.title}") })
         add("Add to queue" to { graph.player.addToQueue(song); say("Added to the queue: ${song.title}") })
+        add("Add to playlist" to { pickPlaylist = true })
         add((if (liked) "Unlike" else "Like") to { graph.favorites.toggle(song) })
-        // Steady or DJ, asked the way the phone asks (RadioChooserHost, in the TV's root too).
-        add("Start song radio" to { app.siansa.ui.RadioChooser.song.value = song })
+        // As on the phone: while a mix plays, this stops it; otherwise Steady or DJ is asked (RadioChooserHost).
+        if (radioSeed != null) add("Stop the mix" to { graph.songRadio.stop(); say("Mix off") })
+        else add("Start a mix" to { app.siansa.ui.RadioChooser.song.value = song })
         // AudioMuse (or the server) finds songs that sound like it, on the phone's page for it.
         add("Similar songs" to { nav.navigate("similar/songs/${android.net.Uri.encode(song.id)}") })
         // AudioMuse's song path: from this song to another, through songs that sound in between.
@@ -497,8 +511,9 @@ fun SongActions(song: Song, liked: Boolean, onDismiss: () -> Unit) {
         song.albumId?.let { id -> add("Go to album: ${song.album}" to { nav.navigate(TvRoutes.album(id)) }) }
         val artists = song.artists.ifEmpty { listOfNotNull(song.artistId?.let { ArtistRef(it, song.artist) }) }
         for (a in artists.take(MAX_ARTISTS)) add("Go to artist: ${a.name}" to { nav.navigate(TvRoutes.artist(a.id)) })
+        add("Song details" to { nav.openSongDetails(song.id) })
     }
-    TvChoices(song.title, choices, onDismiss)
+    TvChoices(song.title, choices, onDismiss, keepOpen = setOf("Add to playlist"))
 }
 
 @Composable
