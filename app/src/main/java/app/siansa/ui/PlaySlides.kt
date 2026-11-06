@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -316,8 +317,9 @@ private fun SlideChoice(slide: PlaySlide, state: SlideState, why: String?, accen
         ) {
             slide.icon?.let { Icon(it, null, tint = if (state.armed) onAccent else Color.White, modifier = Modifier.size(CHOICE_ICON)) }
         }
-        // The name goes beyond the choice, away from the button: above, except going down.
-        val nameShift = with(density) { (CHOICE_SIZE / 2 + Space.Page).roundToPx() }
+        // The name goes beyond the choice, away from the button: above it going up, below going down, and beside it
+        // going left or right, where previous or next has made way, so it never covers the play button.
+        val half = with(density) { (CHOICE_SIZE / 2 + Space.Small).roundToPx() }
         Text(
             why ?: slide.label,
             style = MaterialTheme.typography.labelLarge,
@@ -327,7 +329,22 @@ private fun SlideChoice(slide: PlaySlide, state: SlideState, why: String?, accen
             softWrap = false,
             modifier = Modifier
                 .wrapContentSize(unbounded = true)
-                .offset { IntOffset(0, if (state.way == SlideWay.DOWN) nameShift else -nameShift) }
+                .layout { measurable, constraints ->
+                    val name = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                    layout(name.width, name.height) {
+                        val x = when (state.way) {
+                            SlideWay.LEFT -> -(name.width / 2 + half)
+                            SlideWay.RIGHT -> name.width / 2 + half
+                            else -> 0
+                        }
+                        val y = when (state.way) {
+                            SlideWay.UP -> -(name.height / 2 + half)
+                            SlideWay.DOWN -> name.height / 2 + half
+                            else -> 0
+                        }
+                        name.place(x, y)
+                    }
+                }
                 .clip(RoundedCornerShape(Space.Small))
                 .background(Color.Black.copy(alpha = NAME_BACKING))
                 .padding(horizontal = Space.Small, vertical = Space.Tight)
