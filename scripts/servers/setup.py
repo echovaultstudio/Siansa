@@ -17,7 +17,8 @@ NAVIDROME, EMBY, JELLYFIN = "http://127.0.0.1:4533", "http://127.0.0.1:8096", "h
 
 def call(method, url, body=None, headers=None, ok_codes=(200, 204)):
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(url, data=data, method=method, headers={"Content-Type": "application/json", **(headers or {})})
+    sent = {k: v for k, v in (headers or {}).items() if not k.startswith("_")}  # "_" keys are the script's own notes
+    req = urllib.request.Request(url, data=data, method=method, headers={"Content-Type": "application/json", **sent})
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             raw = r.read()
@@ -77,7 +78,7 @@ def emby_like(name, base, auth_header, scheme):
         _, r = call("POST", base + "/Users/AuthenticateByName", {"Username": USER, "Pw": PASSWORD}, head)
         return r["AccessToken"], r["User"]["Id"]
     token, user = wait(f"{name} login", login)
-    head = {auth_header: device + f', Token="{token}"', "X-Emby-Token": token}
+    head = {auth_header: device + f', Token="{token}"', "X-Emby-Token": token, "_login": login, "_jellyfin": name == "Jellyfin"}
     # The library as the server's own web page makes it: with each kind of item's default metadata and picture
     # readers switched on (without them Emby read no cover.jpg or folder.jpg at all).
     _, available = call("GET", f"{base}/Libraries/AvailableOptions?LibraryContentType=music&IsNewLibrary=true", headers=head)
@@ -94,9 +95,23 @@ def emby_like(name, base, auth_header, scheme):
 
 
 def emby_count(base, head, user, songs):
+    """Whether the scan has every song. Jellyfin 12 refuses the old /Users/{user}/Items now and then (401), so
+    Jellyfin is asked at /Items?userId= as the app does, and a 401 logs in again."""
+    state = {"head": {k: v for k, v in head.items() if not k.startswith("_")}}
+
     def count():
-        q = urllib.parse.urlencode({"IncludeItemTypes": "Audio", "Recursive": "true", "Limit": "0"})
-        _, r = call("GET", f"{base}/Users/{user}/Items?{q}", headers=head)
+        params = {"IncludeItemTypes": "Audio", "Recursive": "true", "Limit": "0"}
+        if head["_jellyfin"]:
+            url = f"{base}/Items?" + urllib.parse.urlencode({**params, "userId": user})
+        else:
+            url = f"{base}/Users/{user}/Items?" + urllib.parse.urlencode(params)
+        try:
+            _, r = call("GET", url, headers=state["head"])
+        except RuntimeError as e:
+            if "401" in str(e):
+                token, _ = head["_login"]()
+                state["head"] = {**state["head"], "X-Emby-Token": token}
+            raise
         return r["TotalRecordCount"] >= songs
     return count
 
@@ -146,7 +161,8 @@ def describe():
         for kind, term in (("MusicAlbum", ""), ("Audio", "Second Glow")):
             q = urllib.parse.urlencode({"IncludeItemTypes": kind, "Recursive": "true", **({"SearchTerm": term} if term else {}),
                                         "Fields": "MediaSources,MediaStreams,Path,ImageTags"})
-            _, found = call("GET", f"{base}/Users/{user}/Items?{q}", headers=head)
+            items_url = f"{base}/Items?{q}&userId={user}" if name == "Jellyfin" else f"{base}/Users/{user}/Items?{q}"
+            _, found = call("GET", items_url, headers=head)
             for item in found.get("Items", []):
                 streams = [(s.get("Type"), s.get("Codec"), s.get("IsExternal"), s.get("Path")) for src in item.get("MediaSources") or [] for s in src.get("MediaStreams") or []]
                 print(f"{name} {kind} {item.get('Name')}: id {item.get('Id')} images {item.get('ImageTags')} "

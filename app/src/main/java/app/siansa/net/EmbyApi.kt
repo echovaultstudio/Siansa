@@ -476,7 +476,22 @@ class EmbyApi(
         return Playlist(id = id, name = name, songCount = songIds.size)
     }
 
+    /**
+     * Renames a playlist, and checks it stuck: right after songs were added or removed, the server's own refresh of the
+     * playlist can put the old name back a moment later (Emby 4.10 and Jellyfin 12, found by the real-server tests).
+     * Then it's renamed again, up to [RENAME_TRIES] times.
+     */
     override suspend fun renamePlaylist(playlistId: String, name: String) {
+        repeat(RENAME_TRIES) { attempt ->
+            sendRename(playlistId, name)
+            kotlinx.coroutines.delay(RENAME_CHECK_MS)
+            val now = runCatching { call(itemPath(playlistId)).str("Name") }.getOrNull()
+            if (now == null || now == name) return
+            AppLog.w("Playlists", "${if (jellyfin) "Jellyfin" else "Emby"} put playlist $playlistId's old name back; renaming again (${attempt + 1})")
+        }
+    }
+
+    private suspend fun sendRename(playlistId: String, name: String) {
         // Jellyfin lets a playlist's owner rename it here; editing the item itself is for admins.
         if (jellyfin) {
             call("/Playlists/" + enc(playlistId), method = "POST", body = buildJsonObject { put("Name", name) }.toString())
@@ -717,6 +732,9 @@ class EmbyApi(
         const val FIELDS = "Genres,DateCreated,ProductionYear,ChildCount,ProviderIds,Overview,Container,AlbumArtist,ParentId,Studios"
         /** How many albums without a picture are asked about their songs at once, and how many songs each (issue #811). */
         const val LOOKUPS_AT_ONCE = 6
+        /** How many times a playlist is renamed when the server puts its old name back, and how long before each check. */
+        const val RENAME_TRIES = 3
+        const val RENAME_CHECK_MS = 700L
         const val SONGS_LOOKED_AT = 3
 
         /** `{user}` once it has been through [enc] as a parameter value. */
