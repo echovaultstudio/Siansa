@@ -5,8 +5,8 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -43,7 +43,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -212,59 +211,45 @@ internal fun PlayButton(
         }
     }
 
-    val gestures = Modifier.pointerInput(Unit) {
-        awaitEachGesture {
-            val down = awaitFirstDown()
-            val slop = viewConfiguration.touchSlop
-            // Until it's held long enough, let go, or moved: a tap, a hold or a slide.
-            var outcome = TAP_PENDING
-            withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-                while (outcome == TAP_PENDING) {
-                    val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
-                    if (change == null) {
-                        outcome = CANCELLED
-                    } else if (change.changedToUp()) {
-                        change.consume()
-                        outcome = TAPPED
-                    } else if (current.on && (change.position - down.position).getDistance() > slop) {
-                        change.consume()
-                        outcome = SLIDING
-                    }
+    // Taps and holds, and slides, each to Compose's own gesture detector. The slide's detector comes first for each
+    // touch (it's further in), and once it has taken a moving finger the tap and the hold no longer happen.
+    var held by remember { mutableStateOf(false) }
+    val taps = Modifier.pointerInput(Unit) {
+        detectTapGestures(
+            onPress = { held = false },
+            onTap = { toggle() },
+            onLongPress = {
+                // Held: stop, as before; letting go after doesn't slide.
+                held = true
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                stop()
+            },
+        )
+    }
+    val slidesInput = Modifier.pointerInput(Unit) {
+        detectDragGestures(
+            onDragEnd = {
+                val last = shown
+                if (last?.armed == true && !held) {
+                    QueueHaptics.vibrate(context, QueueHaptics.Kind.ADDED)
+                    runSlide(current.of(last.way))
                 }
-            }
-            when (outcome) {
-                TAPPED -> toggle()
-                TAP_PENDING -> {
-                    // Held: stop, as before.
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    stop()
-                    do {
-                        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
-                        change.consume()
-                    } while (!change.changedToUp())
-                }
-                SLIDING -> {
-                    while (true) {
-                        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
-                        change.consume()
-                        val d = change.position - down.position
-                        val way = slideWay(d.x, d.y, deadZone)
-                        val slide = way?.let { current.of(it) }
-                        val next = if (way == null || slide == PlaySlide.NOTHING) null
-                        else SlideState(way, slideDistance(way, d.x, d.y) >= armAt && blocked(slide!!) == null)
-                        if (change.changedToUp()) {
-                            if (next?.armed == true) {
-                                QueueHaptics.vibrate(context, QueueHaptics.Kind.ADDED)
-                                runSlide(current.of(next.way))
-                            }
-                            break
-                        }
-                        show(next)
-                    }
-                    show(null)
-                }
-            }
-        }
+                show(null)
+            },
+            onDragCancel = { show(null) },
+            onDrag = { change, _ ->
+                if (!current.on || held) return@detectDragGestures
+                change.consume()
+                // Where the finger is from the button's middle: only the way counts, and past the edge is fine.
+                val d = change.position - Offset(size.width / 2f, size.height / 2f)
+                val way = slideWay(d.x, d.y, deadZone)
+                val slide = way?.let { current.of(it) }
+                show(
+                    if (way == null || slide == PlaySlide.NOTHING) null
+                    else SlideState(way, slideDistance(way, d.x, d.y) >= armAt && blocked(slide!!) == null),
+                )
+            },
+        )
     }
 
     Box(
@@ -285,7 +270,7 @@ internal fun PlayButton(
     ) {
         Box(
             // The touch is taken on the whole square, not only the round inside: a finger on the edge still counts.
-            Modifier.fillMaxSize().then(gestures).clip(CircleShape).background(accent).testTag("playButton"),
+            Modifier.fillMaxSize().then(taps).then(slidesInput).clip(CircleShape).background(accent).testTag("playButton"),
             contentAlignment = Alignment.Center,
         ) {
             if (djMix && slides.grooves) Grooves(playing, Modifier.fillMaxSize().testTag("playGrooves"))
@@ -385,16 +370,11 @@ private fun Grooves(playing: Boolean, modifier: Modifier = Modifier) {
     }
 }
 
-private const val TAP_PENDING = 0
-private const val TAPPED = 1
-private const val SLIDING = 2
-private const val CANCELLED = 3
-
 val PLAY_SIZE = 68.dp
-/** Within this of where the finger went down, no choice shows: back in the middle cancels. */
+/** Within this of the button's middle, no choice shows: back in the middle cancels. */
 private val SLIDE_DEAD_ZONE = 20.dp
-/** Far enough to start on letting go: half the play button. */
-private val SLIDE_ARM = 34.dp
+/** Far enough to start on letting go, from the button's middle: a little past its edge. */
+private val SLIDE_ARM = PLAY_SIZE / 2 + Space.Small
 /** The choice's middle from the button's: the button's edge, a gap, then the choice (issue #919: not too close, not far). */
 private val SLIDE_REACH = PLAY_SIZE / 2 + Space.Page + 18.dp
 private val CHOICE_SIZE = 36.dp
