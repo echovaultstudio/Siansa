@@ -96,7 +96,7 @@ fun RadioScreen(nav: NavController, kind: String, key: String) {
                     (when (kind) { "mood" -> "Sound radio"; "centre" -> "AudioMuse mood radio"; else -> "Genre radio" }) + (songs.valueOrNull()?.let { " · ${it.size} songs" } ?: ""),
                 )
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = { round++ }) {
+                TextButton(onClick = { round++ }, modifier = Modifier.focusRing()) {
                     Icon(Icons.Rounded.Refresh, null)
                     Spacer(Modifier.width(Space.Tight))
                     Text("New picks")
@@ -143,7 +143,7 @@ fun BlendScreen(nav: NavController, playlistId: String) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CollectionByline(null, null, null, "Song alchemy" + (songs.valueOrNull()?.let { " · ${it.size} songs" } ?: ""))
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = { round++ }) {
+                TextButton(onClick = { round++ }, modifier = Modifier.focusRing()) {
                     Icon(Icons.Rounded.Refresh, null)
                     Spacer(Modifier.width(Space.Tight))
                     Text("New picks")
@@ -183,7 +183,7 @@ fun MoodScreen(nav: NavController, text: String) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CollectionByline(null, null, null, "From “$text”" + (r?.let { " · ${it.songs.size} songs" } ?: ""))
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = { round++ }) {
+                TextButton(onClick = { round++ }, modifier = Modifier.focusRing()) {
                     Icon(Icons.Rounded.Refresh, null)
                     Spacer(Modifier.width(Space.Tight))
                     Text("Again")

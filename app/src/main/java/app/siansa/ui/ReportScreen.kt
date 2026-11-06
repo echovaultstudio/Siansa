@@ -195,6 +195,7 @@ internal fun ReportBody(r: ListeningReport, nav: NavController, songs: (@Composa
             if (playable.isNotEmpty()) {
                 val playback = rememberListPlayback(playable)
                 Button(
+                    modifier = Modifier.focusRing(),
                     onClick = { playback.press { graph.player.play(playable) } },
                     colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = OnAccent),
                 ) {

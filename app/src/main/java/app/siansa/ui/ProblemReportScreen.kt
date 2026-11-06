@@ -119,11 +119,11 @@ fun ProblemReportScreen(nav: NavController) {
                 )
                 // A TV usually has no web browser to open it in (issue #860).
                 state.result.url?.takeIf { !app.siansa.BuildConfig.TV_APP }?.let { url ->
-                    OutlinedButton(onClick = {
+                    OutlinedButton(modifier = Modifier.focusRing(), onClick = {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     }) { Text("Open the issue") }
                 }
-                OutlinedButton(onClick = { nav.popBackStack() }) { Text("Done") }
+                OutlinedButton(onClick = { nav.popBackStack() }, modifier = Modifier.focusRing()) { Text("Done") }
             } else {
                 ReportBody(
                     happened = happened,
@@ -217,7 +217,7 @@ internal fun ReportBody(
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Button(onClick = onSend, enabled = ready && !busy, modifier = Modifier.testTag("report-send")) { Text("Send report") }
+            Button(onClick = onSend, enabled = ready && !busy, modifier = Modifier.focusRing().testTag("report-send")) { Text("Send report") }
             if (busy) {
                 Spacer(Modifier.width(Space.Medium))
                 CircularProgressIndicator(Modifier.size(Space.Section))

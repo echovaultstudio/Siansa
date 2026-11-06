@@ -45,7 +45,7 @@ How music plays.
 | Setting | What it does |
 |---|---|
 | **Equaliser** | Ten bands, presets and a pre-amp. |
-| **Crossfade and levelling** | Levelling (Track, Album, Off), where loudness comes from (tags or the Siansa plugin), the target (−18 or −14 LUFS), the crossfade (Off, fixed or Smart, 1–30 s), and beat-matched blends (Off, DJ radio or Everywhere, their length in bars and the bass swap; with Smart and the plugin). |
+| **Crossfade and levelling** | Levelling (Track, Album, Off), where loudness comes from (tags or the Siansa plugin), the target (−18 or −14 LUFS), the crossfade (Off, fixed or Smart, 1–30 s), and beat-matched blends (Off, DJ radio or Everywhere, their length in bars and the bass swap; with Smart and the plugin). At the bottom, **How mixing works** opens these docs on crossfades and blends. |
 | **Streaming quality** | Original or Opus 96–320 kbit/s, on Wi-Fi and on mobile data. |
 | **Song radio** | How far a radio may wander: Stay close, A little, Wander. |
 | **Keep playing** | Off, Steady or DJ, when the queue is about to end. A DJ mix's shape and surprises are set in the queue while a DJ radio plays (see [Discovery](discovery.md#shape-the-mix)). |
@@ -96,7 +96,9 @@ not here.
   (pages, cards, menus and sheets): **Grey** to start with, like Spotify, **Warm grey**, **Blue grey**, or **Match
   theme** for the colour scheme's own tinted backgrounds. Album, artist and now playing pages keep their colours from
   the cover.
-- **Now playing**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in.
+- **Now playing**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in. **Play
+  button slides**: whether sliding from the play button does anything, what each way does (DJ mix, Steady radio,
+  Song path, Sonic match, Start a mix… or Nothing), and **Record grooves** on the play button while a DJ mix plays.
 - **Mini player** and **bottom bar**: hold a row and drag it to reorder; tap the eye to show or hide it.
 - **Home Menu**: the order of the options under the round button at the top of Home (Roll the dice, Play on…,
   Sources, Arrange Home): hold a row and drag it. The mini player
@@ -104,7 +106,8 @@ not here.
 - **Phone's top bar** (the clock and battery): **See-through** (the app shows behind it), **Black**, or **Hidden** for
   full screen. When it's hidden, swipe down from the top of the screen to see it for a moment; on phones with a camera hole at the top, pages stay just below it.
 - **Animated covers**: when an album folder has an animated cover (cover.gif or cover.webp), it moves on the album
-  page and in now playing.
+  page and in now playing. Lists and the Library show its first frame, read from the start of the file, so a big
+  animation is only downloaded where it plays.
 
 ## Scrobbling and history
 

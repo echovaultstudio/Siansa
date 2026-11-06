@@ -144,11 +144,11 @@ fun SmartExtrasScreen(nav: NavController, sourceName: String) {
             )
             Button(
                 onClick = { AppLog.i("Setup", "Smart extras: yes"); nav.navigate(connectionsRoute(kind, extras = true)) },
-                modifier = Modifier.fillMaxWidth().testTag("extrasYes"),
+                modifier = Modifier.focusRing().fillMaxWidth().testTag("extrasYes"),
             ) { Text("Add AudioMuse-AI") }
             OutlinedButton(
                 onClick = { AppLog.i("Setup", "Smart extras: not now"); nav.navigate(connectionsRoute(kind, extras = false)) },
-                modifier = Modifier.fillMaxWidth().testTag("extrasNo"),
+                modifier = Modifier.focusRing().fillMaxWidth().testTag("extrasNo"),
             ) { Text("Not now") }
         }
     }
@@ -160,7 +160,7 @@ private fun SwitchBackButtons() {
     val context = LocalContext.current
     val others = remember { Users.all(context).filter { it.id != Users.active && it.connected } }
     others.forEach { user ->
-        TextButton(onClick = { Users.switchTo(context, user.id) }, modifier = Modifier.padding(horizontal = Space.Small)) {
+        TextButton(onClick = { Users.switchTo(context, user.id) }, modifier = Modifier.padding(horizontal = Space.Small).focusRing()) {
             Text("Switch back to ${user.label}")
         }
     }

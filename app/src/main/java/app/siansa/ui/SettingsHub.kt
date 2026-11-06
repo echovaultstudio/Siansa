@@ -169,11 +169,11 @@ fun HelpScreen(nav: NavController) {
                 "While on, Siansa records what it does, to trace problems. Nothing leaves the phone unless you send a " +
                     "report or share the log. Passwords, tokens and API keys are removed.",
             )
-            OutlinedButton(onClick = { nav.navigate("settings/logs") }, modifier = Modifier.testTag("helpLogs")) { Text("Show the log") }
+            OutlinedButton(onClick = { nav.navigate("settings/logs") }, modifier = Modifier.focusRing().testTag("helpLogs")) { Text("Show the log") }
             HorizontalDivider()
             Heading("Report a problem")
             Hint("1. Turn on debug logs above.\n2. Make the problem happen a few times.\n3. Send a report: the log goes with it.")
-            Button(onClick = { nav.navigate("settings/report") }, modifier = Modifier.testTag("helpReport")) {
+            Button(onClick = { nav.navigate("settings/report") }, modifier = Modifier.focusRing().testTag("helpReport")) {
                 Icon(Icons.Rounded.BugReport, null)
                 Spacer(Modifier.width(Space.Small))
                 Text("Report a problem")
@@ -474,7 +474,7 @@ fun StreamingDataScreen(nav: NavController) {
                     )
                 }
             }
-            OutlinedButton(onClick = {
+            OutlinedButton(modifier = Modifier.focusRing(), onClick = {
                 scope.launch {
                     withContext(Dispatchers.IO) {
                         val cache = graph.songCache
@@ -491,7 +491,7 @@ fun StreamingDataScreen(nav: NavController) {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                         Text("New cache sizes apply after the app restarts.", style = MaterialTheme.typography.bodyMedium)
-                        Button(onClick = { restartApp(context) }) { Text("Restart now") }
+                        Button(onClick = { restartApp(context) }, modifier = Modifier.focusRing()) { Text("Restart now") }
                     }
                 }
             }
@@ -585,7 +585,7 @@ fun LogsScreen(nav: NavController) {
                         // A TV has no file picker or apps to share with (issue #860): its log goes in a report.
                         val tv = app.siansa.BuildConfig.TV_APP
                         if (!tv) {
-                            Button(onClick = {
+                            Button(modifier = Modifier.focusRing(), onClick = {
                                 val stamp = java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.ROOT).format(Date())
                                 saver.launch("siansa-logs-$stamp.txt")
                             }) {
@@ -594,20 +594,20 @@ fun LogsScreen(nav: NavController) {
                                 Text("Save logs")
                             }
                         }
-                        Button(onClick = { nav.navigate("settings/report") }) { Text("Report a problem") }
+                        Button(onClick = { nav.navigate("settings/report") }, modifier = Modifier.focusRing()) { Text("Report a problem") }
                         if (!tv) {
-                            OutlinedButton(onClick = { scope.launch { shareLogs(context) } }) {
+                            OutlinedButton(onClick = { scope.launch { shareLogs(context) } }, modifier = Modifier.focusRing()) {
                                 Icon(Icons.Rounded.Share, null)
                                 Spacer(Modifier.width(Space.Small))
                                 Text("Share")
                             }
                         }
-                        OutlinedButton(onClick = {
+                        OutlinedButton(modifier = Modifier.focusRing(), onClick = {
                             AppLog.clear()
                             refresh++
                         }) { Text("Clear") }
                         // Every error and warning with its details, ready to paste into a message or an issue.
-                        OutlinedButton(onClick = {
+                        OutlinedButton(modifier = Modifier.focusRing(), onClick = {
                             scope.launch {
                                 val text = withContext(Dispatchers.IO) {
                                     problemsForClipboard(logEntries(AppLog.allLines()), AppLog.header)
@@ -629,7 +629,7 @@ fun LogsScreen(nav: NavController) {
                             Text("Copy problems")
                         }
                         // The whole log, ready to paste; the newest part when it's too big for the clipboard.
-                        OutlinedButton(onClick = {
+                        OutlinedButton(modifier = Modifier.focusRing(), onClick = {
                             scope.launch {
                                 val entries = withContext(Dispatchers.IO) { logEntries(AppLog.allLines()) }
                                 val text = withContext(Dispatchers.Default) { logForClipboard(entries, AppLog.header) }
