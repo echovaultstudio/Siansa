@@ -406,6 +406,14 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.HomeMenuButton(app.siansa.ui.rememberHomeMenuState(), casting = false, filterActive = false, onPick = {})
                 }
             },
+            // Song radio's choices (issue #916): an icon and the name each, no descriptions; and the mixing docs link under
+            // Crossfade and levelling.
+            Scene("radio_choices_and_mixing_docs") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.RadioModeChoices {}
+                    app.siansa.ui.MixingDocsLink()
+                }
+            },
             // The Settings start page in groups (issue #780, renamed for v1.0), and Settings › Notices and Cards' rows.
             Scene("settings_groups") {
                 Column {

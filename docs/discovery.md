@@ -14,7 +14,7 @@ Playing anything else ends the radio.
 | **A little** (default) | Mostly like the first song, with a few steps away from it. |
 | **Wander** | Each new batch follows the song playing, so the radio drifts. |
 
-When you start a radio you can also pick **Steady** or **DJ** order (see Keep playing below).
+When you start a radio you pick **Steady** (the wave) or **DJ** (the turntable) order; Keep playing below says what each does.
 
 ### Shape the mix
 

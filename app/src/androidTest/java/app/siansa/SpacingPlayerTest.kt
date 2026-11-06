@@ -166,4 +166,16 @@ class SpacingPlayerTest : SpacingCheck() {
         listOf(prev, back, fwd, next).forEach { assertEven("Centred on play", (it.top + it.bottom) / 2 - (play.top + play.bottom) / 2, 0.dp, 1.dp) }
     }
 
+
+    /** Song radio's choices (issue #916): two rows of the same height, each name centred in its row beside its icon. */
+    @Test fun radioChoicesAreEvenRows() {
+        compose.setContent { SiansaTheme { Box(Modifier.width(320.dp)) { app.siansa.ui.RadioModeChoices {} } } }
+        val steady = compose.onNodeWithTag("radioMode-steady").getBoundsInRoot()
+        val dj = compose.onNodeWithTag("radioMode-dj").getBoundsInRoot()
+        assertEven("Row heights", steady.bottom - steady.top, dj.bottom - dj.top, 1.dp)
+        for ((row, name) in listOf(steady to "Steady", dj to "DJ")) {
+            val label = compose.onNodeWithText(name, useUnmergedTree = true).getBoundsInRoot()
+            assertEven("$name above and below", label.top - row.top, row.bottom - label.bottom, 2.dp)
+        }
+    }
 }
