@@ -35,7 +35,7 @@ Settings) always open that tab's own page, wherever you are.
   and with the same rows hidden: Today's mixes (the daily mixes made today), Jump back in, Your mixes, Rediscover, Radios, Your playlists, Recently played, Artist
   radios, Recently added, Your genres and Random picks. A radio starts playing straight away.
 - **Library**: albums, artists, playlists and genres as covers, six across, your liked songs, favourite albums and
-  favourite artists, and Time machine.
+  favourite artists. Time machine is on the phone only for now.
 - **Albums, playlists and mixes**: the cover (a playlist's own cover from the server) and what it is at the top, with the artists, genre and label to open,
   then Play, Shuffle and Add to favourites; down from them goes straight to the songs. The button at the end of each
   song has Play next, Add to queue, Add to playlist, Like, Start (or Stop) a mix, Similar songs, Go to album or

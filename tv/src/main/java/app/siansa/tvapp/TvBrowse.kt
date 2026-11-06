@@ -118,8 +118,8 @@ fun TvLibrary() {
             for (s in Shelf.entries) {
                 TvButton(s.label, null, onClick = { shelf = s }, strong = s == shelf, modifier = if (s == Shelf.ALBUMS) Modifier.initialFocus() else Modifier)
             }
-            // The phone's pages for these: your listening by year, and (with AudioMuse) the sound of your library.
-            TvButton("Time machine", null, onClick = { nav.navigate("timemachine") })
+            // The phone's page for this: (with AudioMuse) the sound of your library. Time machine isn't on the TV for now
+            // (issue #949): laying it out froze a SHIELD for seconds.
             if (settings.audioMuseReady) TvButton("Your sound", null, onClick = { nav.navigate("fingerprint") })
         }
         val empty = when (shelf) {
