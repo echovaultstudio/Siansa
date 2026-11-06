@@ -437,4 +437,25 @@ class SpacingHomeTest : SpacingCheck() {
     }
 
     private fun Float.toDp() = with(compose.density) { this@toDp.toDp() }
+
+    /** A section shown without its title keeps the same gap above its row as a titled one has above its title (issue #961). */
+    @Test fun aHiddenTitleKeepsTheGap() {
+        var shown by androidx.compose.runtime.mutableStateOf(true)
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.testTag("top")) {
+                    androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalSectionTitleShown provides shown) {
+                        app.siansa.ui.Shelf("Your evening", listOf(1, 2), key = { it }) { Box(Modifier.size(60.dp).testTag("tile")) }
+                    }
+                }
+            }
+        }
+        val titled = compose.onAllNodesWithTag("tile").onFirst().getBoundsInRoot().top - compose.onNodeWithTag("top").getBoundsInRoot().top
+        shown = false
+        compose.waitForIdle()
+        val untitled = compose.onAllNodesWithTag("tile").onFirst().getBoundsInRoot().top - compose.onNodeWithTag("top").getBoundsInRoot().top
+        assertTrue("the title takes no room once hidden", untitled < titled)
+        assertEven("Gap above the row, hidden title", untitled, app.siansa.ui.SECTION_GAP, 1.dp)
+        assertTrue("no title text", compose.onAllNodes(hasText("Your evening")).fetchSemanticsNodes().isEmpty())
+    }
 }

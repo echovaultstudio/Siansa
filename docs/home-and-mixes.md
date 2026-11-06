@@ -48,6 +48,9 @@ today's mix or the carousel's first mix where they left off, or the albums of Re
 added and Random picks in order. Sections of radios, playlists, genres, books and Made for you open instead. **Your
 cards** keep their own looks: their cog opens **Settings › Notices and Cards › Cards**.
 
+The same cog has **Show its title**: turn it off and the section shows without the heading above it ("Your evening",
+"Recently played"), keeping the gap where it was.
+
 | Section | What it shows |
 |---|---|
 | **Shortcuts** | The albums, playlists, mixes and Liked songs you played from last, newest first: 8 of them, or as many as you pick from 2 to 8 under **Settings › Style › Home**. Until there's enough of that, today's mixes, your playlists and recent albums. |

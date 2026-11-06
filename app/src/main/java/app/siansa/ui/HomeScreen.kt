@@ -322,7 +322,7 @@ fun HomeScreen(nav: NavController) {
                     // Quick access, like the top grid in Spotify (issue #271): what you played last, newest first, as
                     // many as Settings › Style › Home says (issue #934); until there's enough of that, today's mixes,
                     // playlists and recent albums. Liked songs is one of them only when you played it.
-                    item(key = "quick") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "quick") {
                         val mixIds = mixes.orEmpty().mapTo(HashSet()) { it.id }
                         val fill = buildList {
                             todaysMixes.take(2).forEach { m -> add(RecentPlay("mix/${m.id}", m.title, m.songs.firstOrNull()?.cover)) }
@@ -355,7 +355,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.TODAY -> {
-                    item(key = "today") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "today") {
                         val mix = current
                         when {
                             mix != null && look != HomeLook.AS_IS -> HomeLookRow(
@@ -390,7 +390,7 @@ fun HomeScreen(nav: NavController) {
                     // While AudioMuse can't be reached the card above says so; no error and Try again as well. Without
                     // AudioMuse at all there's no today's mix (issue #486).
                     error?.takeIf { aiDown == null && aiMixes }?.let { message ->
-                        item(key = "today_error") {
+                        titledItem(section !in homeSettings.homeUntitled, key = "today_error") {
                             Column(Modifier.padding(horizontal = Space.Page)) {
                                 ErrorText(message, Modifier)
                                 TextButton(onClick = { build(null, force = false, open = false) }) { Text("Try again") }
@@ -401,14 +401,14 @@ fun HomeScreen(nav: NavController) {
                 HomeSection.CAROUSEL -> {
                     // Your own mixes for this part of the day, set in Vibes (issue #253): AI mixes, so only with
                     // AudioMuse (issue #486).
-                    if (homeSettings.navidromeReady && aiMixes) item(key = "carousel") { HomeCarousel(nav, aiDown, look) }
+                    if (homeSettings.navidromeReady && aiMixes) titledItem(section !in homeSettings.homeUntitled, key = "carousel") { HomeCarousel(nav, aiDown, look) }
                 }
                 // Audiobookshelf's books and podcasts (issue #521): only with a server set up.
-                HomeSection.BOOKS -> if (homeSettings.booksReady) item(key = "books") { BooksCarousel(nav, podcasts = false, look = look) }
-                HomeSection.PODCASTS -> if (homeSettings.booksReady) item(key = "podcasts") { BooksCarousel(nav, podcasts = true, look = look) }
+                HomeSection.BOOKS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, key = "books") { BooksCarousel(nav, podcasts = false, look = look) }
+                HomeSection.PODCASTS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, key = "podcasts") { BooksCarousel(nav, podcasts = true, look = look) }
                 HomeSection.MADE_FOR_YOU -> {
                     // Made for you: the vibe for this hour, then mixes from your own listening.
-                    item(key = "made") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "made") {
                         // The same tiles as plain items, for the other looks (issue #655).
                         val made: List<HomeItem> = buildList {
                             applicable.filter { aiMixes }.forEach { selector ->
@@ -478,12 +478,12 @@ fun HomeScreen(nav: NavController) {
                 HomeSection.CARDS -> {
                     // Your cards (issue #622), in the order set in Settings › Notices and Cards › Cards; each is its own row.
                     pinnedCards.orEmpty().filter { it.shown }.forEach { card ->
-                        item(key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
+                        titledItem(section !in homeSettings.homeUntitled, key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
                     }
                 }
                 HomeSection.REDISCOVER -> {
                     // Albums you loved a while ago but haven't played since.
-                    item(key = "rediscover") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "rediscover") {
                         val albums = lovedBefore.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "rediscover", "Rediscover", albums.map { r -> albumItem(r.album, rediscoverSubtitle(r), play = { playAlbums(r.album.name, listOf(r.album)) }) { nav.navigate("album/${r.album.id}") } },
@@ -500,7 +500,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.RADIOS -> {
-                    item(key = "radios") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "radios") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "radios", "Radios", moodRadios.map { radio ->
                                 HomeItem(radio.id, radio.name, colors = Color(radio.colors.first) to Color(radio.colors.second), open = { nav.openMoodRadio(radio.id) })
@@ -517,7 +517,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.PLAYLISTS -> {
-                    item(key = "playlists") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "playlists") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "playlists", "Your playlists", playlists.valueOrNull().orEmpty().map { p ->
                                 HomeItem(p.id, p.name, if (p.songCount > 0) "${p.songCount} songs" else "", p.coverArt, open = { nav.navigate("playlist/${p.id}") })
@@ -528,7 +528,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.RECENT -> {
-                    item(key = "recent") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "recent") {
                         val albums = recentAlbums.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "recent", "Recently played", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
@@ -539,7 +539,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.ARTIST_RADIOS -> {
-                    item(key = "artist_radios") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "artist_radios") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "artist_radios", "Artist radios", recentArtists.valueOrNull().orEmpty().map { artist ->
                                 HomeItem(artist.id, "${artist.name} radio", "With similar artists", freshCovers[artist.id] ?: artist.coverArt, round = true, open = {
@@ -561,7 +561,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.ADDED -> {
-                    item(key = "added") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "added") {
                         val albums = newest.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "added", "Recently added", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
@@ -572,7 +572,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.GENRES -> {
-                    item(key = "genres") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "genres") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "genres", "Your genres", genres.valueOrNull().orEmpty().map { genre ->
                                 HomeItem(genre.name, genre.name, open = { nav.openGenreRadio(genre.name) })
@@ -589,7 +589,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.RANDOM -> {
-                    item(key = "random") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "random") {
                         val albums = rediscover.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "random", "Random picks", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
@@ -907,3 +907,14 @@ internal fun shownRecents(played: List<RecentPlay>, shownAlbums: Set<String>?): 
  */
 internal fun quickShortcuts(played: List<RecentPlay>, fill: List<RecentPlay>, count: Int): List<RecentPlay> =
     (played + fill).distinctBy { it.route }.take(count.coerceIn(QUICK_MIN, QUICK_COUNT))
+
+/**
+ * A section of Home as one list item, with its title shown or not as set in Arrange Home (issue #961).
+ */
+internal fun androidx.compose.foundation.lazy.LazyListScope.titledItem(
+    titleShown: Boolean,
+    key: Any,
+    content: @Composable androidx.compose.foundation.lazy.LazyItemScope.() -> Unit,
+) = item(key = key) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalSectionTitleShown provides titleShown) { content() }
+}

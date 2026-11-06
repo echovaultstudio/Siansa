@@ -107,7 +107,7 @@ private fun PinnedCardLook(card: PinnedCard, content: CardContent, open: () -> U
     if (card.contents == CardContents.ALBUMS && card.look in setOf(CardLook.TILES, CardLook.ALBUMS, CardLook.LIST)) {
         if (card.look == CardLook.LIST) {
             Column {
-                Row(
+                if (!LocalSectionTitleShown.current) HiddenTitleGap() else Row(
                     Modifier.fillMaxWidth().clickable(onClickLabel = "Show all", onClick = open)
                         .padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current, bottom = Space.Small),
                     verticalAlignment = Alignment.CenterVertically,
@@ -143,7 +143,7 @@ private fun PinnedCardLook(card: PinnedCard, content: CardContent, open: () -> U
         }
         CardLook.BANNER -> PinnedBanner(card, songs, open, play, rememberListPlayback(songs))
         CardLook.LIST -> Column {
-            Row(
+            if (!LocalSectionTitleShown.current) HiddenTitleGap() else Row(
                 Modifier.fillMaxWidth().clickable(onClickLabel = "Show all", onClick = open)
                     .padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current, bottom = Space.Small),
                 verticalAlignment = Alignment.CenterVertically,

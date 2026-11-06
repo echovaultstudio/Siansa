@@ -185,6 +185,8 @@ data class AppSettings(
     val homeHidden: Set<HomeSection> = emptySet(),
     /** Home's rows in another look than their own (issue #655); a row not in it looks as it is. */
     val homeLooks: Map<HomeSection, HomeLook> = emptyMap(),
+    /** Home's sections shown without their title (issue #961). */
+    val homeUntitled: Set<HomeSection> = emptySet(),
     /** The gap between Home's sections (#554), as a step of the spacing scale: 0 tight … 4 airy. 2 is the default. */
     val homeGap: Int = HOME_GAP_DEFAULT,
     /** Show only music on the phone, across the whole app (issue #141). */
@@ -467,6 +469,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         topBar = TopBarStyle.parse(prefs.getString("top_bar", null)),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
         homeLooks = HomeLook.parse(prefs.getString("home_looks", null)),
+        homeUntitled = HomeSection.parseHidden(prefs.getString("home_untitled", null)),
         homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
         timeMachineMissing = prefs.getBoolean("time_machine_missing", true),
@@ -694,6 +697,13 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         val kept = count.coerceIn(2, 8)
         prefs.edit().putInt("home_shortcuts", kept).apply()
         _state.value = _state.value.copy(homeShortcuts = kept)
+    }
+
+    /** Shows or hides [section]'s title on Home (issue #961). */
+    fun setHomeTitleShown(section: HomeSection, shown: Boolean) {
+        val untitled = if (shown) _state.value.homeUntitled - section else _state.value.homeUntitled + section
+        prefs.edit().putString("home_untitled", HomeSection.formatHidden(untitled)).apply()
+        _state.value = _state.value.copy(homeUntitled = untitled)
     }
 
     fun setNavTabs(tabs: List<NavTab>) {
