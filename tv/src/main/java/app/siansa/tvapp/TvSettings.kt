@@ -113,6 +113,16 @@ fun TvSettingsHub() {
         }
         Group("Look") {
             TvSettingRow("Colours", "Siansa's colours on the TV (always dark)", onClick = { nav.navigate("settings/themes") }, icon = Icons.Rounded.Palette)
+            // Off from the start on the TV (issue #945): they cost the TV a lot to play.
+            TvSwitchRow(
+                "Animated covers",
+                "Covers that move, in Now playing and on album pages. Off makes the TV quicker.",
+                on = settings.animatedCovers,
+                onChange = { on ->
+                    graph.settings.setAnimatedCovers(on)
+                    AppLog.i("Tv", "Animated covers: $on")
+                },
+            )
         }
         Group("Help") {
             TvSwitchRow(

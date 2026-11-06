@@ -130,7 +130,7 @@ data class AppSettings(
     val syncFolders: Set<String> = emptySet(),
     /** Image cache limit in MB; 0 = no limit. */
     val imageCacheMb: Int = 500,
-    val animatedCovers: Boolean = true,
+    val animatedCovers: Boolean = animatedCoversByDefault(app.siansa.BuildConfig.TV_APP),
     /** Download every album, artist and playlist cover in the background. */
     val coverDownload: Boolean = false,
     /** ...on any Wi-Fi, rather than only on the same local network as Navidrome. */
@@ -421,7 +421,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         preampDb = prefs.getFloat("preamp", 0f),
         syncFolders = prefs.getStringSet("sync_folders", emptySet())?.toSet() ?: emptySet(),
         imageCacheMb = prefs.getInt("image_cache_mb", 500),
-        animatedCovers = prefs.getBoolean("animated_covers", true),
+        // Off from the start on the TV app (issue #945): an animation costs a TV more than it gives.
+        animatedCovers = prefs.getBoolean("animated_covers", animatedCoversByDefault(app.siansa.BuildConfig.TV_APP)),
         coverDownload = prefs.getBoolean("cover_download", false),
         coverDownloadAnyWifi = prefs.getBoolean("cover_download_any_wifi", false),
         coverDownloadWifiOnly = prefs.getBoolean("cover_download_wifi_only", true),
@@ -846,3 +847,6 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(mixShape = shape, mixSurprise = s)
     }
 }
+
+/** Whether covers move until it's set: on a phone, yes; on the TV app, no (issue #945). */
+internal fun animatedCoversByDefault(tv: Boolean): Boolean = !tv
