@@ -153,6 +153,7 @@ class PlaybackService : MediaLibraryService() {
             // A Dolby or DTS song going to the receiver as a bitstream can't be mixed (issue #860): no blend into or out of it.
             allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true && !passthroughNearby() },
             onLevel = { if (session?.player === phone) applyVolume(phone) },
+            bitstream = { Passthrough.pastTheMix(bitstreamOut, exo.audioFormat?.sampleMimeType) },
             inDjRadio = {
                 (graph.songRadio.seed.value != null && graph.songRadio.mode == ContinuousMode.DJ) ||
                     graph.settings.current.continuousPlay == ContinuousMode.DJ
