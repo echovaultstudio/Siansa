@@ -71,13 +71,16 @@ fun TvTextBox(
                 EditText(context).apply {
                     setText(value)
                     setSelection(value.length)
-                    inputType = kind.inputType
                     if (kind == TvTextKind.LONG_TEXT) {
                         setMinLines(LONG_LINES)
                         setMaxLines(LONG_LINES * 2)
                     } else {
                         setSingleLine(true)
                     }
+                    // After setSingleLine, which puts its own way of showing text in place of the password dots: keys,
+                    // tokens and passwords showed as typed (issue #957).
+                    inputType = kind.inputType
+                    if (kind == TvTextKind.SECRET) transformationMethod = android.text.method.PasswordTransformationMethod.getInstance()
                     imeOptions = (if (kind == TvTextKind.SEARCH) EditorInfo.IME_ACTION_SEARCH else EditorInfo.IME_ACTION_DONE) or EditorInfo.IME_FLAG_NO_FULLSCREEN
                     hint = placeholder ?: "Press OK to type"
                     background = null
