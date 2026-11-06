@@ -45,7 +45,7 @@ How music plays.
 | Setting | What it does |
 |---|---|
 | **Equaliser** | Ten bands, presets and a pre-amp. |
-| **Crossfade and levelling** | Levelling (Track, Album, Off), where loudness comes from (tags or the Siansa plugin), the target (−18 or −14 LUFS), the crossfade (Off, fixed or Smart, 1–30 s), and beat-matched blends (Off, DJ radio or Everywhere, their length in bars and the bass swap; with Smart and the plugin). |
+| **Crossfade and levelling** | Levelling (Track, Album, Off), where loudness comes from (tags or the Siansa plugin), the target (−18 or −14 LUFS), the crossfade (Off, fixed or Smart, 1–30 s), and beat-matched blends (Off, DJ radio or Everywhere, their length in bars and the bass swap; with Smart and the plugin). At the bottom, **How mixing works** opens these docs on crossfades and blends. |
 | **Streaming quality** | Original or Opus 96–320 kbit/s, on Wi-Fi and on mobile data. |
 | **Song radio** | How far a radio may wander: Stay close, A little, Wander. |
 | **Keep playing** | Off, Steady or DJ, when the queue is about to end. A DJ mix's shape and surprises are set in the queue while a DJ radio plays (see [Discovery](discovery.md#shape-the-mix)). |
