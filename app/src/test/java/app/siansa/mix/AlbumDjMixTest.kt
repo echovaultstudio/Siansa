@@ -1,6 +1,8 @@
 package app.siansa.mix
 
+import app.siansa.data.Song
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -34,5 +36,22 @@ class AlbumDjMixTest {
         assertEquals(unmeasured, bestAlbumOrder(unmeasured))
         val two = listOf(t("1", 140.0), t("2", 80.0))
         assertEquals(two, bestAlbumOrder(two))
+    }
+
+    private fun songs(vararg ids: String) = ids.map { Song(id = it, title = it) }
+
+    @Test
+    fun albumPagesPlayKeepsItsGroovesOnlyWhileItsMixPlays() {
+        val album = songs("a", "b", "c")
+        val mix = listOf("c", "a", "b")
+        // The mix playing, with songs keep playing added after it.
+        assertTrue(albumMixPlaying(songs("c", "a", "b", "x"), album, mix))
+        // The album played in its own order, or shuffled another way: not the mix.
+        assertFalse(albumMixPlaying(songs("a", "b", "c"), album, mix))
+        // Something else, nothing, or another album's page.
+        assertFalse(albumMixPlaying(songs("x", "y"), album, mix))
+        assertFalse(albumMixPlaying(emptyList(), album, mix))
+        assertFalse(albumMixPlaying(songs("c", "a", "b"), songs("d", "e", "f"), mix))
+        assertFalse(albumMixPlaying(songs("c", "a", "b"), album, emptyList()))
     }
 }

@@ -1,26 +1,12 @@
 package app.siansa.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,7 +15,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -44,18 +29,14 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /** What a slide from an album's Explore button shows (issue #965): right onto Play for a DJ mix. */
 data class ExploreSlide(val way: SlideWay, val armed: Boolean)
 
-/** The two things a slide from Explore can start (issue #965). */
-enum class ExploreChoice(val title: String, val hint: String, val ready: String) {
-    SIMILAR("Similar albums", "Albums that sound like this one", "Let go to open"),
-    DJ_MIX("DJ mix this album", "Its songs only, in the order that blends best", "Let go to start");
+/** What a slide from Explore can start (issue #965): only the DJ mix; similar albums is a tap. */
+enum class ExploreChoice(val title: String) {
+    DJ_MIX("DJ mix this album");
 
     companion object {
         /**
@@ -117,7 +98,6 @@ internal fun ExploreButton(
                         if (last?.armed == true) {
                             QueueHaptics.vibrate(context, QueueHaptics.Kind.ADDED)
                             when (ExploreChoice.of(last.way)) {
-                                ExploreChoice.SIMILAR -> similar()
                                 ExploreChoice.DJ_MIX -> djMix()
                                 null -> Unit
                             }
@@ -154,55 +134,8 @@ internal fun ExploreButton(
 /** Whether a slide is far enough to start its choice: right past [rightArm] (onto Play), in px. */
 internal fun exploreArmed(way: SlideWay, dx: Float, rightArm: Float): Boolean = way == SlideWay.RIGHT && dx >= rightArm
 
-/**
- * The choice of a slide from Explore, in the middle of the album's cover (issue #965), as now playing shows a slide
- * from its play button: the cover darkens behind it (the page blurs the cover itself), faint until it's far enough.
- */
-@Composable
-internal fun ExploreCoverLabel(slide: ExploreSlide?, modifier: Modifier = Modifier) {
-    var last by remember { mutableStateOf(slide) }
-    if (slide != null) last = slide
-    AnimatedVisibility(slide != null, modifier = modifier, enter = fadeIn(tween(EXPLORE_FADE_MS)), exit = fadeOut(tween(EXPLORE_FADE_MS))) {
-        val shownSlide = last ?: return@AnimatedVisibility
-        val choice = ExploreChoice.of(shownSlide.way) ?: return@AnimatedVisibility
-        val ready = shownSlide.armed
-        Box(
-            Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (ready) EXPLORE_SCRIM_READY else EXPLORE_SCRIM)).testTag("exploreLabel"),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(horizontal = Space.Page).alpha(if (ready) 1f else EXPLORE_FAINT),
-            ) {
-                val tint = if (ready) Accent else Color.White
-                if (choice == ExploreChoice.DJ_MIX) Icon(SiansaIcons.Turntable, null, tint = tint, modifier = Modifier.size(EXPLORE_LABEL_ICON))
-                else Icon(rememberSimilarAlbumsIcon(), null, tint = tint, modifier = Modifier.size(EXPLORE_LABEL_ICON))
-                Spacer(Modifier.height(Space.Small))
-                Text(choice.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("exploreName"))
-                Spacer(Modifier.height(Space.Tight))
-                Text(choice.hint, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f), textAlign = TextAlign.Center,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(Space.Tight))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null,
-                        tint = Accent, modifier = Modifier.size(EXPLORE_ARROW))
-                    // One line, so it never runs off a small cover or with large text (issue #965).
-                    Text(if (ready) choice.ready else "Slide further", style = MaterialTheme.typography.bodyMedium, color = Color.White,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-        }
-    }
-}
 
 private val EXPLORE_SIZE = 48.dp
 private val EXPLORE_ICON = 28.dp
-private val EXPLORE_LABEL_ICON = 36.dp
-private val EXPLORE_ARROW = 18.dp
 private val EXPLORE_DEAD_ZONE = 16.dp
 private val EXPLORE_RIGHT_ARM = 96.dp
-private const val EXPLORE_FADE_MS = 140
-private const val EXPLORE_FAINT = 0.6f
-private const val EXPLORE_SCRIM = 0.3f
-private const val EXPLORE_SCRIM_READY = 0.5f

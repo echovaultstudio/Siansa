@@ -65,12 +65,13 @@ From a song's menu: **Similar songs** and **Similar albums**. On an artist's pag
 On an album's page (with AudioMuse-AI), the **Explore** button beside Shuffle (a record with a sparkle):
 
 - **Tap** it for similar albums.
-- **Slide right** onto the Play button for a **DJ mix of the album**: its own songs only, put in the order that blends
-  best (tempo and key, as a DJ mix orders them) and played with DJ blends. Nothing else is added, so the mix ends with
-  the album.
+- **Slide right** all the way onto the Play button for a **DJ mix of the album**: its own songs only, put in the order
+  that blends best (tempo and key, as a DJ mix orders them) and played with DJ blends. Nothing else is added, so the
+  mix ends with the album.
 
-While you slide, the cover shows the choice and the rest of the page dims, the Play button too; once you're far enough
-it lights up and the phone clicks, and letting go starts it.
+While you slide, the cover says **DJ mix**, as in now playing, and the rest of the page dims. Once your finger is on
+Play, it turns into a record and the phone clicks; letting go starts the mix. Play stays a turning record while the
+album's mix plays.
 
 - **Similar songs** come from the best source your setup has: Navidrome's sonic similarity (if the AudioMuse-AI
   Navidrome plugin is installed), else AudioMuse-AI directly, else Navidrome's similar songs (or Emby's Instant

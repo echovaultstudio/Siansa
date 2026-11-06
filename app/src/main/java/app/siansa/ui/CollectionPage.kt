@@ -131,7 +131,6 @@ fun CollectionPage(
     val density = LocalDensity.current
     // A slide from the album's Explore button (issue #965): shown on the cover, the rest of the page dimmed.
     var explore by remember { mutableStateOf<ExploreSlide?>(null) }
-    val launcher = rememberPlayLauncher()
     val exploreDim by androidx.compose.animation.core.animateFloatAsState(if (explore != null) EXPLORE_OTHERS else 1f, label = "exploreDim")
     val coverSize = (LocalConfiguration.current.screenWidthDp * 0.62f).dp
     val coverPx = with(density) { coverSize.toPx() }
@@ -199,12 +198,11 @@ fun CollectionPage(
                         contentAlignment = Alignment.Center,
                     ) {
                         Box(Modifier.size(coverSize).shadow(18.dp, RoundedCornerShape(6.dp)).clip(RoundedCornerShape(6.dp))) {
-                            val blur by androidx.compose.animation.core.animateDpAsState(
-                                when { explore == null -> 0.dp; explore?.armed == true -> EXPLORE_BLUR_READY; else -> EXPLORE_BLUR },
-                                label = "exploreBlur",
-                            )
+                            // The same name on the cover as now playing's play button slides (the owner, issue #965).
+                            val label = explore?.let { SlideLabel(PlaySlide.DJ_MIX, it.way, it.armed) }
+                            val blur by androidx.compose.animation.core.animateDpAsState(slideBlur(label), label = "exploreBlur")
                             cover(Modifier.size(coverSize).then(if (blur > 0.dp) Modifier.blur(blur) else Modifier))
-                            ExploreCoverLabel(explore, Modifier.fillMaxSize())
+                            SlideCoverLabel(label, Modifier.fillMaxSize())
                         }
                     }
                     Spacer(Modifier.height(Space.Page))
@@ -223,7 +221,7 @@ fun CollectionPage(
                     ActionRow(
                         songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed, saveAs = title.takeIf { saveAsPlaylist },
                         // An album's Explore slides right onto Play for a DJ mix of its own songs (issue #965).
-                        onDjMix = if (onSimilar != null) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) { launcher.notify(it) } } }) else null,
+                        onDjMix = if (onSimilar != null) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } }) else null,
                         explore = explore, onExplore = { explore = it }, dim = exploreDim,
                     )
                 }
@@ -407,6 +405,10 @@ private fun ActionRow(
     var saving by remember { mutableStateOf(false) }
     // ⏸ while this page's songs play; it pauses them rather than starting over (issue #644).
     val playback = rememberListPlayback(songs)
+    // The album's DJ mix playing (issue #965): Play keeps its grooves until something else plays or playback ends.
+    val playerState by graph.player.state.collectAsStateWithLifecycle()
+    val albumMix by app.siansa.mix.AlbumDjMix.playing.collectAsStateWithLifecycle()
+    val mixOn = onDjMix != null && playerState.hasMedia && app.siansa.mix.albumMixPlaying(playerState.queue, songs, albumMix)
     if (saving && saveAs != null) SaveAsPlaylistDialog(saveAs, songs) { saving = false }
     ActionButtons(
         enabled = songs.isNotEmpty(),
@@ -421,6 +423,7 @@ private fun ActionRow(
         explore = explore,
         onExplore = onExplore,
         dim = dim,
+        mixOn = mixOn,
     )
 }
 
@@ -440,6 +443,8 @@ internal fun ActionButtons(
     explore: ExploreSlide? = null,
     onExplore: (ExploreSlide?) -> Unit = {},
     dim: Float = 1f,
+    // The album's DJ mix is playing: Play has the record grooves, turning while it plays.
+    mixOn: Boolean = false,
 ) {
     // How far right of Explore's middle the Play button's near edge is: sliding there starts the DJ mix.
     var exploreX by remember { mutableStateOf<Float?>(null) }
@@ -474,9 +479,11 @@ internal fun ActionButtons(
             Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
         }
         Spacer(Modifier.width(Space.Small))
-        // Play darkens with the rest while Explore slides onto it (the owner, issue #965): the cover says what letting go does.
-        Box(Modifier.onGloballyPositioned { playLeft = it.positionInRoot().x }.alpha(dim)) {
-            BigPlayButton(enabled, playing = playing, onPlay = onPlay)
+        // While Explore slides, Play darkens with the rest; once the finger is on it, it lights up as a turning record, as
+        // now playing's does in a DJ mix, and keeps turning while the mix plays (the owner, issue #965).
+        val onPlayButton = explore?.armed == true
+        Box(Modifier.onGloballyPositioned { playLeft = it.positionInRoot().x }.alpha(if (onPlayButton) 1f else dim)) {
+            BigPlayButton(enabled, playing = playing, grooves = onPlayButton || mixOn, turning = onPlayButton || (mixOn && playing), onPlay = onPlay)
         }
     }
 }
@@ -496,7 +503,7 @@ fun PlayButtonRow(modifier: Modifier = Modifier, content: @Composable RowScope.(
 
 /** The big round Play button of album, playlist, mix and artist pages. Only ever inside a [PlayButtonRow]. */
 @Composable
-fun BigPlayButton(enabled: Boolean, playing: Boolean = false, onPlay: () -> Unit) {
+fun BigPlayButton(enabled: Boolean, playing: Boolean = false, grooves: Boolean = false, turning: Boolean = false, onPlay: () -> Unit) {
     Box(
         Modifier
             .size(56.dp)
@@ -506,6 +513,8 @@ fun BigPlayButton(enabled: Boolean, playing: Boolean = false, onPlay: () -> Unit
             .testTag("bigPlay"),
         contentAlignment = Alignment.Center,
     ) {
+        // Record grooves for an album's DJ mix (issue #965), as now playing's play button has.
+        if (grooves) Grooves(playing = turning, Modifier.fillMaxSize().testTag("bigPlayGrooves"))
         // ⏸ while what the page shows is playing (a book's page, issue #626): the same button pauses it.
         Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (playing) "Pause" else "Play", tint = OnAccent, modifier = Modifier.size(32.dp))
     }
@@ -611,5 +620,3 @@ fun ContinueButton(track: String, onClick: () -> Unit) {
 
 /** The page around an album's Explore, while it slides (issue #965): dimmed like now playing's controls. */
 private const val EXPLORE_OTHERS = 0.3f
-private val EXPLORE_BLUR = 8.dp
-private val EXPLORE_BLUR_READY = 18.dp

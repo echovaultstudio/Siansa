@@ -461,12 +461,15 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.SectionTitleSwitch(false) {}
                 }
             },
-            // An album's Explore (issue #965): the row with it, and its slides on the cover: right onto Play, up onto the cover.
+            // An album's Explore (issue #965): the row at rest, with the finger on Play (a record), and while the album's DJ
+            // mix plays; and the name on the cover, as now playing's, once on Play and before.
             Scene("album_explore") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
                     app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = {}, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {})
                     app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = {}, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {},
                         explore = app.siansa.ui.ExploreSlide(app.siansa.ui.SlideWay.RIGHT, armed = true), dim = 0.3f)
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = {}, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {},
+                        playing = true, mixOn = true)
                     Row(horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
                         listOf(
                             app.siansa.ui.ExploreSlide(app.siansa.ui.SlideWay.RIGHT, armed = true),
@@ -475,7 +478,11 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                             Box(
                                 Modifier.size(160.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
                                     .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFFD4813A), Color(0xFF1E2A6B)))),
-                            ) { app.siansa.ui.ExploreCoverLabel(slide, Modifier.fillMaxSize()) }
+                            ) {
+                                app.siansa.ui.SlideCoverLabel(
+                                    app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.DJ_MIX, slide.way, slide.armed), Modifier.fillMaxSize(),
+                                )
+                            }
                         }
                     }
                 }
