@@ -59,6 +59,7 @@ fun TvTextBox(
 ) {
     val change by rememberUpdatedState(onValueChange)
     val done by rememberUpdatedState(onDone)
+    val focusManager by rememberUpdatedState(androidx.compose.ui.platform.LocalFocusManager.current)
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(Space.Small)
     val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
@@ -98,6 +99,14 @@ fun TvTextBox(
                         }
                     })
                     setOnFocusChangeListener { _, has -> focused = has }
+                    // Up and down leave the field for the control above or below it, the page's own (issue #955): from
+                    // Android's field the remote didn't reach a button under it, such as Test under the AudioMuse login.
+                    // A field of several lines keeps up and down for its lines.
+                    setOnKeyListener { _, keyCode, event ->
+                        val way = textBoxExit(keyCode, kind == TvTextKind.LONG_TEXT) ?: return@setOnKeyListener false
+                        if (event.action != android.view.KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+                        focusManager.moveFocus(way)
+                    }
                     setOnEditorActionListener { view, action, _ ->
                         if (action == EditorInfo.IME_ACTION_DONE || action == EditorInfo.IME_ACTION_SEARCH || action == EditorInfo.IME_ACTION_GO) {
                             (context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.hideSoftInputFromWindow(view.windowToken, 0)
@@ -140,3 +149,14 @@ fun TvTextBox(
 private val BORDER = 1.dp
 private val FOCUSED_BORDER = 2.dp
 private const val LONG_LINES = 3
+
+/**
+ * Which way the remote's [keyCode] leaves a TV text box (issue #955): up and down to the control above or below, unless
+ * the box has several lines ([multiLine]), which keep them. Left, right and OK stay in the box.
+ */
+internal fun textBoxExit(keyCode: Int, multiLine: Boolean): androidx.compose.ui.focus.FocusDirection? = when {
+    multiLine -> null
+    keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN -> androidx.compose.ui.focus.FocusDirection.Down
+    keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP -> androidx.compose.ui.focus.FocusDirection.Up
+    else -> null
+}
