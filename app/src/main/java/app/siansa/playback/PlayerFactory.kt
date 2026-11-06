@@ -77,13 +77,14 @@ object PlayerFactory {
             // A radio station or podcast episode (issue #353) plays from its own address as it is.
             if (OutsideMedia.isMarked(spec.uri.toString())) spec else {
                 val uri = spec.uri.toString().let { if (Streaming.RELOAD_PARAM in it) android.net.Uri.parse(Streaming.withoutReload(it)) else spec.uri }
-                val key = uri.getQueryParameter("id") ?: uri.toString()
+                val key = streamSongId(uri) ?: uri.toString()
                 spec.withUri(Streaming.rewrite(uri, kbpsFor(key)))
             }
         }
-        // Songs downloaded for offline listening play from their file, with no network at all.
+        // Songs downloaded for offline listening play from their file, with no network at all: on every kind of
+        // server, as the song's id is read from Navidrome's `?id=` and from Emby's and Jellyfin's `/Audio/<id>/` (#903).
         val dataSource = ResolvingDataSource.Factory(DefaultDataSource.Factory(context, resolving)) { spec ->
-            val id = if ((spec.uri.scheme == "http" || spec.uri.scheme == "https") && !OutsideMedia.isMarked(spec.uri.toString())) spec.uri.getQueryParameter("id") else null
+            val id = if ((spec.uri.scheme == "http" || spec.uri.scheme == "https") && !OutsideMedia.isMarked(spec.uri.toString())) streamSongId(spec.uri) else null
             id?.let { graph.downloads.fileFor(it) }?.let { spec.withUri(android.net.Uri.fromFile(it)) } ?: spec
         }
 

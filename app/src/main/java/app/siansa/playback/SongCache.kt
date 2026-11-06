@@ -11,13 +11,36 @@ import app.siansa.data.AppSettings
 import app.siansa.data.OutsideMedia
 
 /**
+ * The song a stream address is for: `?id=` on Navidrome and other Subsonic servers (`/rest/stream?id=…`), the path on
+ * Emby and Jellyfin (`/Audio/<id>/stream?…`, issue #903). Null for anything else (a radio station, a podcast).
+ */
+fun streamSongId(url: String): String? {
+    val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return null
+    uri.rawQuery?.split('&')?.firstOrNull { it.startsWith("id=") }?.let { part ->
+        return java.net.URLDecoder.decode(part.substringAfter('='), "UTF-8").takeIf { it.isNotEmpty() }
+    }
+    val parts = uri.path?.split('/')?.filter { it.isNotEmpty() } ?: return null
+    val at = parts.indexOfLast { it.equals("Audio", ignoreCase = true) }
+    val stream = parts.getOrNull(at + 2)?.startsWith("stream", ignoreCase = true) == true
+    return if (at >= 0 && stream) parts[at + 1] else null
+}
+
+/** [streamSongId] of [uri]. */
+fun streamSongId(uri: Uri): String? = streamSongId(uri.toString())
+
+/**
  * Cache keys leave out the per-session login token in stream URLs, so a song cached yesterday is
  * found again today. Originals and each Opus bitrate are kept apart.
  */
-fun songCacheKey(uri: Uri): String {
-    val id = uri.getQueryParameter("id") ?: return uri.toString()
-    val format = uri.getQueryParameter("format") ?: "raw"
-    val rate = uri.getQueryParameter("maxBitRate") ?: ""
+fun songCacheKey(uri: Uri): String = songCacheKey(uri.toString())
+
+/** [songCacheKey] of a stream address. */
+fun songCacheKey(url: String): String {
+    val id = streamSongId(url) ?: return url
+    val query = runCatching { java.net.URI(url).rawQuery }.getOrNull().orEmpty().split('&')
+    fun param(name: String) = query.firstOrNull { it.startsWith("$name=") }?.substringAfter('=')?.takeIf { it.isNotEmpty() }
+    val format = param("format") ?: "raw"
+    val rate = param("maxBitRate") ?: ""
     return "song:$id:$format:$rate"
 }
 
