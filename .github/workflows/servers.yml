@@ -1,0 +1,97 @@
+name: Servers
+
+# Siansa's own server code against real Navidrome, Emby and Jellyfin servers with the same test library (issue #903),
+# so a change written with one server in mind is checked on the others. scripts/servers/start.sh starts the three
+# (Emby and Jellyfin in Docker) and app/src/test/java/app/siansa/servers/RealServersTest.kt runs every test on each.
+# Always on GitHub's runners: Docker and the servers' downloads are there, and it runs next to CI instead of after it.
+on:
+  pull_request:
+  push:
+    branches: [mixer, main]
+  workflow_dispatch:
+    inputs:
+      emby:
+        description: Emby version (an emby/embyserver tag)
+        default: ""
+      jellyfin:
+        description: Jellyfin version (a jellyfin/jellyfin tag)
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: servers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  servers:
+    name: Navidrome, Emby and Jellyfin
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.14.3"
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+
+      - name: Start the servers with the test library
+        env:
+          EMBY_VERSION: ${{ inputs.emby }}
+          JELLYFIN_VERSION: ${{ inputs.jellyfin }}
+        run: |
+          [ -n "$EMBY_VERSION" ] || unset EMBY_VERSION
+          [ -n "$JELLYFIN_VERSION" ] || unset JELLYFIN_VERSION
+          scripts/servers/start.sh
+          cat "$RUNNER_TEMP/siansa-servers/servers.env" >> "$GITHUB_ENV"
+
+      - name: Test on every server
+        run: |
+          set -o pipefail
+          gradle :app:testDebugUnitTest --tests 'app.siansa.servers.*' --continue 2>&1 | tee gradle.txt
+
+      # Each failed test as an annotation, so the run's page says which server answered what without opening logs.
+      - name: Results
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          failed = passed = skipped = 0
+          for f in glob.glob("app/build/test-results/testDebugUnitTest/TEST-app.siansa.servers.*.xml"):
+              for case in ET.parse(f).getroot().iter("testcase"):
+                  bad = case.find("failure") if case.find("failure") is not None else case.find("error")
+                  if bad is not None:
+                      failed += 1
+                      msg = (bad.get("message") or bad.text or "").strip().splitlines()[0][:400]
+                      print(f"::error title={case.get('name')}::{msg}")
+                  elif case.find("skipped") is not None:
+                      skipped += 1
+                  else:
+                      passed += 1
+          print(f"::notice title=Servers::{passed} passed, {failed} failed, {skipped} skipped")
+          PY
+
+      - name: Server logs
+        if: failure()
+        run: |
+          tail -n 80 "$RUNNER_TEMP/siansa-servers/navidrome.log" || true
+          docker logs --tail 80 siansa-emby || true
+          docker logs --tail 80 siansa-jellyfin || true
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: servers-test-report
+          path: |
+            app/build/reports/tests/testDebugUnitTest/
+            ${{ runner.temp }}/siansa-servers/*.log
+          retention-days: 7
