@@ -100,6 +100,8 @@ not here.
   button slides**: whether sliding from the play button does anything, what each way does (DJ mix, Steady radio,
   Song path, Sonic match, Start a mix… or Nothing), and **Record grooves** on the play button while a DJ mix plays.
 - **Mini player** and **bottom bar**: hold a row and drag it to reorder; tap the eye to show or hide it.
+- **Home**: how many shortcuts the top of Home shows, 2 to 8 (8 from the start). They're what you played last, newest
+  first.
 - **Home Menu**: the order of the options under the round button at the top of Home (Roll the dice, Play on…,
   Sources, Arrange Home): hold a row and drag it. The mini player
   starts with **Play or pause**, **Next song** and **Add to playlist**.

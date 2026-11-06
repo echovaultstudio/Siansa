@@ -69,6 +69,7 @@ import app.siansa.data.MiniButton
 import androidx.compose.material.icons.rounded.Reorder
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.FilterList
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Casino
 import app.siansa.data.HomeMenuItem
 import app.siansa.data.NavTab
@@ -101,6 +102,7 @@ fun StyleScreen(nav: NavController) {
             HubRow(Icons.Rounded.PhoneAndroid, "Now Playing Style") { nav.navigate("settings/style/now-playing") }
             HubRow(Icons.Rounded.PlayCircle, "Mini Player") { nav.navigate("settings/style/mini-player") }
             HubRow(Icons.Rounded.Dashboard, "Nav Bar") { nav.navigate("settings/style/nav-bar") }
+            HubRow(Icons.Rounded.Home, "Home") { nav.navigate("settings/style/home") }
             HubRow(Icons.Rounded.FilterList, "Home Menu") { nav.navigate("settings/style/home-menu") }
             Spacer(Modifier.height(Space.Section))
             TopBarChoice(settings.topBar) {
@@ -339,6 +341,43 @@ fun NavBarStyleScreen(nav: NavController) {
                 canShowMore = shown.size < NavTab.MAX,
                 onChange = { order, on -> save(shownInOrder(order, on)) },
             )
+        }
+    }
+}
+
+/** Settings › Style › Home (issue #934): how many shortcuts Home shows at its top. */
+@Composable
+fun HomeStyleScreen(nav: NavController) {
+    val graph = LocalGraph.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    Screen(title = "Home", nav = nav) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
+            StyleHint("The shortcuts at the top of Home are what you played last, newest first.")
+            ShortcutCountRow(settings.homeShortcuts) {
+                AppLog.i("Style", "Home shortcuts: $it")
+                graph.settings.setHomeShortcuts(it)
+            }
+        }
+    }
+}
+
+/** How many shortcuts Home shows, 2 to 8, two to a row (issue #934). */
+@Composable
+internal fun ShortcutCountRow(count: Int, onDone: (Int) -> Unit) {
+    var value by remember(count) { androidx.compose.runtime.mutableFloatStateOf(count.toFloat()) }
+    Column(Modifier.fillMaxWidth().padding(horizontal = Space.Page)) {
+        Text("Shortcuts", style = MaterialTheme.typography.titleMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.Slider(
+                value = value,
+                onValueChange = { value = kotlin.math.round(it) },
+                onValueChangeFinished = { onDone(value.toInt()) },
+                valueRange = QUICK_MIN.toFloat()..QUICK_COUNT.toFloat(),
+                steps = QUICK_COUNT - QUICK_MIN - 1,
+                modifier = Modifier.weight(1f).testTag("homeShortcuts"),
+            )
+            Spacer(Modifier.width(Space.Medium))
+            Text("${value.toInt()}", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("homeShortcutsCount"))
         }
     }
 }
