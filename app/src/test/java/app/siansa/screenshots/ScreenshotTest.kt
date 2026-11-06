@@ -10,6 +10,7 @@ import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -410,16 +411,23 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             // to start (up, with its name) and not yet (left), on the player's colours.
             Scene("play_button_grooves_and_slides") {
                 OnPlayer {
-                    Row(Modifier.padding(horizontal = Space.Large * 2, vertical = Space.Large * 3), horizontalArrangement = Arrangement.spacedBy(Space.Large * 3)) {
-                        app.siansa.ui.PlayButton(playing = false, slides = app.siansa.ui.PlaySlides(), djMix = true, onToggle = {}, onStop = {}, onSlide = {})
-                        app.siansa.ui.PlayButton(
-                            playing = true, slides = app.siansa.ui.PlaySlides(), djMix = false, onToggle = {}, onStop = {}, onSlide = {},
-                            preview = app.siansa.ui.SlideState(app.siansa.ui.SlideWay.UP, armed = true),
-                        )
-                        app.siansa.ui.PlayButton(
-                            playing = true, slides = app.siansa.ui.PlaySlides(), djMix = false, onToggle = {}, onStop = {}, onSlide = {},
-                            preview = app.siansa.ui.SlideState(app.siansa.ui.SlideWay.LEFT, armed = false),
-                        )
+                    // Each in a band of its own, with room on the side its choice and name go.
+                    Column(Modifier.fillMaxWidth().padding(vertical = Space.Section)) {
+                        Box(Modifier.fillMaxWidth().padding(vertical = Space.Section), contentAlignment = Alignment.Center) {
+                            app.siansa.ui.PlayButton(playing = false, slides = app.siansa.ui.PlaySlides(), djMix = true, onToggle = {}, onStop = {}, onSlide = {})
+                        }
+                        Box(Modifier.fillMaxWidth().padding(top = Space.Large * 3, bottom = Space.Section), contentAlignment = Alignment.Center) {
+                            app.siansa.ui.PlayButton(
+                                playing = true, slides = app.siansa.ui.PlaySlides(), djMix = false, onToggle = {}, onStop = {}, onSlide = {},
+                                preview = app.siansa.ui.SlideState(app.siansa.ui.SlideWay.UP, armed = true),
+                            )
+                        }
+                        Box(Modifier.fillMaxWidth().padding(vertical = Space.Section, horizontal = Space.Large), contentAlignment = Alignment.CenterEnd) {
+                            app.siansa.ui.PlayButton(
+                                playing = true, slides = app.siansa.ui.PlaySlides(), djMix = false, onToggle = {}, onStop = {}, onSlide = {},
+                                preview = app.siansa.ui.SlideState(app.siansa.ui.SlideWay.LEFT, armed = false),
+                            )
+                        }
                     }
                 }
             },

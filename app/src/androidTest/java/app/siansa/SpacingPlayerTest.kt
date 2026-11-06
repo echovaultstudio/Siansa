@@ -22,7 +22,8 @@ import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.performClick
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.test.longClick
-import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.swipe
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
@@ -207,13 +208,13 @@ class SpacingPlayerTest : SpacingCheck() {
                 }
             }
         }
-        compose.onNodeWithTag("playButton", useUnmergedTree = true).performTouchInput { swipeUp() }
+        compose.onNodeWithTag("playButton", useUnmergedTree = true).performTouchInput { swipe(center, center + Offset(0f, -height.toFloat())) }
         compose.waitForIdle()
         assertEquals(listOf(app.siansa.ui.PlaySlide.DJ_MIX), slid)
-        compose.onNodeWithTag("playButton", useUnmergedTree = true).performTouchInput { swipeRight() }
+        compose.onNodeWithTag("playButton", useUnmergedTree = true).performTouchInput { swipe(center, center + Offset(width.toFloat(), 0f)) }
         compose.waitForIdle()
         assertEquals(listOf(app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.PlaySlide.SONIC_MATCH), slid)
-        compose.onNodeWithTag("playButton", useUnmergedTree = true).performTouchInput { swipeLeft() }
+        compose.onNodeWithTag("playButton", useUnmergedTree = true).performTouchInput { swipe(center, center + Offset(-width.toFloat(), 0f)) }
         compose.waitForIdle()
         assertEquals("Nothing on left", 2, slid.size)
         assertEquals("No slide plays or pauses", 0, toggled)
