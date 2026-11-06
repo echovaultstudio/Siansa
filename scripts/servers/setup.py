@@ -88,6 +88,26 @@ def emby_count(base, head, user, songs):
     return count
 
 
+def describe():
+    """What Emby and Jellyfin hold for the album with a cover and the song with lyrics: for reading a failed run."""
+    for name, base, header, scheme in (("Emby", EMBY, "X-Emby-Authorization", "Emby"), ("Jellyfin", JELLYFIN, "Authorization", "MediaBrowser")):
+        device = f'{scheme} Client="Siansa CI", Device="CI", DeviceId="siansa-ci", Version="1"'
+        _, r = call("POST", base + "/Users/AuthenticateByName", {"Username": USER, "Pw": PASSWORD}, {header: device})
+        head = {"X-Emby-Token": r["AccessToken"]}
+        user = r["User"]["Id"]
+        for kind, term in (("MusicAlbum", "First Light"), ("Audio", "Second Glow")):
+            q = urllib.parse.urlencode({"IncludeItemTypes": kind, "Recursive": "true", "SearchTerm": term,
+                                        "Fields": "MediaSources,MediaStreams,Path,ImageTags"})
+            _, found = call("GET", f"{base}/Users/{user}/Items?{q}", headers=head)
+            for item in found.get("Items", []):
+                streams = [(s.get("Type"), s.get("Codec"), s.get("IsExternal"), s.get("Path")) for src in item.get("MediaSources") or [] for s in src.get("MediaStreams") or []]
+                print(f"{name} {kind} {item.get('Name')}: id {item.get('Id')} images {item.get('ImageTags')} "
+                      f"album image {item.get('AlbumPrimaryImageTag')} streams {streams or item.get('MediaStreams')}")
+                if kind == "MusicAlbum":
+                    st, _ = call("GET", f"{base}/Items/{item['Id']}/Images/Primary?maxWidth=300", headers=head, ok_codes=(404,))
+                    print(f"{name} album picture: {st}")
+
+
 def main(library):
     songs = len(json.load(open(library))["songs"])
     navidrome(songs)
@@ -97,4 +117,4 @@ def main(library):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    describe() if sys.argv[1] == "--describe" else main(sys.argv[1])

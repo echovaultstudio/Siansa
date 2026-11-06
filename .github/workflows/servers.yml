@@ -83,6 +83,7 @@ jobs:
       - name: Server logs
         if: failure()
         run: |
+          python3 scripts/servers/setup.py --describe || true
           tail -n 80 "$RUNNER_TEMP/siansa-servers/navidrome.log" || true
           docker logs --tail 80 siansa-emby || true
           docker logs --tail 80 siansa-jellyfin || true
