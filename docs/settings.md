@@ -104,7 +104,8 @@ not here.
 - **Phone's top bar** (the clock and battery): **See-through** (the app shows behind it), **Black**, or **Hidden** for
   full screen. When it's hidden, swipe down from the top of the screen to see it for a moment; on phones with a camera hole at the top, pages stay just below it.
 - **Animated covers**: when an album folder has an animated cover (cover.gif or cover.webp), it moves on the album
-  page and in now playing.
+  page and in now playing. Lists and the Library show its first frame, read from the start of the file, so a big
+  animation is only downloaded where it plays.
 
 ## Scrobbling and history
 
