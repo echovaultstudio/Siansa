@@ -259,7 +259,11 @@ object CoverStore {
                 return null
             }
             makeStill(original, stillFile(key))
+            dedupe(key, original)
+            downloads.incrementAndGet()
             rememberVersion(id, key)
+            AppLog.i("Cover", "Kept animated cover $id (${image.kind} ${image.width}×${image.height}, ${mb(original.length())}) " +
+                "after ${System.currentTimeMillis() - started} ms; lists use a still of it")
             return local(key)?.let { serve(clean, it, wantsAnimation = false) }
         }
         val read = bytes.size
