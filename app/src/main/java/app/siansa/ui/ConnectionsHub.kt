@@ -237,7 +237,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 ) {
                     if (user.id == Users.active) {
                         ServerFields(graph, draft, { draft = it; problem = null }, serverName, { serverName = it }, nav)
-                        Button(onClick = ::save, modifier = Modifier.fillMaxWidth()) { Text("Save") }
+                        Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
                     } else {
                         Hint("Another login, with its own library, history and settings. Change it here; switch to it to use it (Siansa restarts).")
                         others[user.id]?.let { other ->
@@ -246,10 +246,10 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                                 otherNames[user.id].orEmpty(), { otherNames = otherNames + (user.id to it) }, nav, inUse = false,
                             )
                         }
-                        Button(onClick = ::save, modifier = Modifier.fillMaxWidth().testTag("saveUser-${user.id}")) { Text("Save") }
+                        Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth().testTag("saveUser-${user.id}")) { Text("Save") }
                         Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                            Button(onClick = { scope.launch { if (keysChecked() && saveOther(user)) Users.switchTo(context, user.id) } }) { Text("Switch to it") }
-                            OutlinedButton(onClick = { removing = user }) { Text("Remove") }
+                            Button(onClick = { scope.launch { if (keysChecked() && saveOther(user)) Users.switchTo(context, user.id) } }, modifier = Modifier.focusRing()) { Text("Switch to it") }
+                            OutlinedButton(onClick = { removing = user }, modifier = Modifier.focusRing()) { Text("Remove") }
                         }
                     }
                 }
@@ -263,7 +263,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 tag = "fold-books",
             ) {
                 AudiobookshelfFields(graph, draft) { draft = it; problem = null }
-                Button(onClick = ::save, modifier = Modifier.fillMaxWidth()) { Text("Save") }
+                Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
             }
             if (adding) {
                 FoldCard(
@@ -302,7 +302,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 tag = "fold-audiomuse",
             ) {
                 AudioMuseFields(graph, draft) { draft = it; problem = null }
-                Button(onClick = ::save, modifier = Modifier.fillMaxWidth()) { Text("Save") }
+                Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
             }
             FoldCard(
                 icon = Icons.Rounded.AutoAwesome,
@@ -313,7 +313,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 tag = "fold-ai",
             ) {
                 AiFields(graph, draft) { draft = it; problem = null }
-                Button(onClick = ::save, modifier = Modifier.fillMaxWidth()) { Text("Save") }
+                Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
             }
             problem?.let { ErrorText(it, Modifier) }
         }
@@ -325,14 +325,14 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
             title = { Text("Remove ${user.label}?") },
             text = { Text("Their library, history and settings are removed from this phone. Nothing changes on the server.") },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(modifier = Modifier.focusRing(), onClick = {
                     graph.guests.setShown(user.id, false)
                     Users.remove(context, user.id)
                     removing = null
                     changes++
                 }) { Text("Remove") }
             },
-            dismissButton = { TextButton(onClick = { removing = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { removing = null }, modifier = Modifier.focusRing()) { Text("Cancel") } },
         )
     }
 }
@@ -440,7 +440,7 @@ private fun ServerFields(
         Field("Proxy username", draft.proxyUser, keyboard = KeyboardType.Text) { onChange(draft.copy(proxyUser = it)) }
         SecretField("Proxy password", draft.proxyPassword) { onChange(draft.copy(proxyPassword = it)) }
     } else {
-        TextButton(onClick = { showProxy = true }) { Text("Server behind a login page? Add a proxy login") }
+        TextButton(onClick = { showProxy = true }, modifier = Modifier.focusRing()) { Text("Server behind a login page? Add a proxy login") }
     }
     TestRow(result) {
         test(graph, draft, scope, { result = it }, "the music server") { s -> testServer(graph, s, kind) }
@@ -687,7 +687,7 @@ internal fun ServerKindChips(kind: SourceKind, onKind: (SourceKind) -> Unit) {
 internal fun NewServerButtons(onSave: () -> Unit, onCancel: () -> Unit) {
     Hint("Saved, it shows above as another login. Switch to it there when you want to use it (Siansa restarts).")
     Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-        Button(onClick = onSave, modifier = Modifier.testTag("saveNewServer")) { Text("Save") }
-        OutlinedButton(onClick = onCancel) { Text("Cancel") }
+        Button(onClick = onSave, modifier = Modifier.focusRing().testTag("saveNewServer")) { Text("Save") }
+        OutlinedButton(onClick = onCancel, modifier = Modifier.focusRing()) { Text("Cancel") }
     }
 }

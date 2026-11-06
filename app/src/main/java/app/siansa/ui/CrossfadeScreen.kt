@@ -78,7 +78,7 @@ fun CrossfadeScreen(nav: NavController) {
                     Hint("Set up AudioMuse in Settings › Connections first. Until then, song tags are used.")
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                        OutlinedButton(onClick = {
+                        OutlinedButton(modifier = Modifier.focusRing(), onClick = {
                             test = "Testing…"
                             scope.launch {
                                 val result = graph.profiles.check()

@@ -104,7 +104,7 @@ fun WhatsNewScreen(nav: NavController) {
                 }
             }
             if (!list.isNullOrEmpty()) item(key = "all") {
-                TextButton(onClick = { openChangelog() }, modifier = Modifier.padding(horizontal = Space.Small)) {
+                TextButton(onClick = { openChangelog() }, modifier = Modifier.padding(horizontal = Space.Small).focusRing()) {
                     Text("Every version's changes")
                 }
             }

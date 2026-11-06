@@ -151,7 +151,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                 val context = LocalContext.current
                 val others = remember { Users.all(context).filter { it.id != Users.active && it.connected } }
                 others.forEach { user ->
-                    TextButton(onClick = { Users.switchTo(context, user.id) }) { Text("Switch back to ${user.label}") }
+                    TextButton(onClick = { Users.switchTo(context, user.id) }, modifier = Modifier.focusRing()) { Text("Switch back to ${user.label}") }
                 }
             }
 
@@ -166,7 +166,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                 Field("Proxy username", draft.proxyUser, keyboard = KeyboardType.Text) { draft = draft.copy(proxyUser = it) }
                 SecretField("Proxy password", draft.proxyPassword) { draft = draft.copy(proxyPassword = it) }
             } else {
-                TextButton(onClick = { showProxy = true }) { Text("Server behind a login page? Add a proxy login") }
+                TextButton(onClick = { showProxy = true }, modifier = Modifier.focusRing()) { Text("Server behind a login page? Add a proxy login") }
             }
             TestRow(navidromeTest) {
                 runTest({ navidromeTest = it }) { s -> testServer(graph, s, kind) }
@@ -194,7 +194,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
             }
 
             problem?.let { ErrorText(it, Modifier) }
-            Button(onClick = { save() }, modifier = Modifier.fillMaxWidth()) { Text("Save") }
+            Button(onClick = { save() }, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
         }
     }
 }
@@ -331,7 +331,7 @@ internal fun SecretField(label: String, value: String, onChange: (String) -> Uni
 @Composable
 internal fun TestRow(result: String?, onTest: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-        OutlinedButton(onClick = onTest) { Text("Test") }
+        OutlinedButton(onClick = onTest, modifier = Modifier.focusRing()) { Text("Test") }
         if (result != null) {
             Text(
                 result,

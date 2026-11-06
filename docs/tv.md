@@ -27,7 +27,7 @@ To sign out, go to **Settings › Sign out** on the TV. Your phone stays signed 
 
 ## Finding your way
 
-Everything works with the remote's arrows and the centre button. The tabs along the top (Home, Library, Search,
+Everything works with the remote's arrows and the centre button; what the remote is on is lit or ringed in the accent colour, buttons on the settings pages included. The tabs along the top (Home, Library, Search,
 Settings) always open that tab's own page, wherever you are.
 
 - **Home**: your notices first, as on the phone (what needs you, what you're partway through, what's new; shown or
