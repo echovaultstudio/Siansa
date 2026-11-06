@@ -92,14 +92,20 @@ fun TvLibrary() {
     var liked by remember { mutableStateOf<List<Song>?>(null) }
     var shown by remember { mutableStateOf<Shelf?>(null) }
     // As on Home: read again once a sync has stopped changing the library for a moment, keeping what's shown meanwhile.
-    LaunchedEffect(shelf, version, likes, favouriteAlbums, favouriteArtists) {
-        if (shown == shelf) delay(RELOAD_PAUSE_MS)
+    // Nothing is read again while a sync runs (issue #953), and a shelf that didn't change isn't drawn again.
+    val syncing = graph.sync.progress.collectAsStateWithLifecycle().value.running
+    LaunchedEffect(shelf, version, likes, favouriteAlbums, favouriteArtists, syncing) {
+        if (shown == shelf) {
+            if (syncing) return@LaunchedEffect
+            delay(RELOAD_PAUSE_MS)
+        }
         runCatching {
             if (shelf == Shelf.LIKED) {
                 // As the phone's Liked songs: Navidrome's list, which the library may not have marked yet.
-                liked = app.siansa.ui.likedSongs(graph)
+                val next = app.siansa.ui.likedSongs(graph)
+                if (next != liked) liked = next
             } else {
-                tiles = when (shelf) {
+                val next = when (shelf) {
                     Shelf.ALBUMS -> graph.library.albums("name").map { TvItem.OfAlbum(it) }
                     Shelf.ARTISTS -> graph.library.artists().map { TvItem.OfArtist(it) }
                     Shelf.PLAYLISTS -> graph.playlists.removed.visible(graph.library.playlists()).map { TvItem.OfPlaylist(it) }
@@ -109,6 +115,7 @@ fun TvLibrary() {
                     Shelf.GENRES -> graph.library.genres(GENRES).map { TvItem.OfGenre(it) }
                     Shelf.LIKED -> emptyList()
                 }
+                if (next != tiles) tiles = next
             }
             shown = shelf
         }.onFailure { AppLog.w("Tv", "Couldn't read the library's ${shelf.label.lowercase()}: ${it.message}") }
