@@ -106,7 +106,8 @@ fun NoticesSettingsScreen(nav: NavController) {
 /** "Shown · 1 pinned · 2 off", "Hidden": what's set, under Notices' row. */
 internal fun noticesLine(shown: Boolean, prefs: NoticePrefs): String {
     if (!shown) return "Hidden"
-    val off = NoticeKind.entries.count { prefs.modeOf(it) == NoticeMode.OFF }
+    // A kind that's off until you add it (Liked songs) isn't counted as turned off.
+    val off = NoticeKind.entries.count { prefs.modeOf(it) == NoticeMode.OFF && it.defaultMode != NoticeMode.OFF }
     return listOfNotNull(
         "Shown",
         prefs.pinned.size.takeIf { it > 0 }?.let { "$it pinned" },
