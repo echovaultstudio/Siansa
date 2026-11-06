@@ -283,7 +283,8 @@ internal fun PlayButton(
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            Modifier.fillMaxSize().clip(CircleShape).background(accent).then(gestures).testTag("playButton"),
+            // The touch is taken on the whole square, not only the round inside: a finger on the edge still counts.
+            Modifier.fillMaxSize().then(gestures).clip(CircleShape).background(accent).testTag("playButton"),
             contentAlignment = Alignment.Center,
         ) {
             if (djMix && slides.grooves) Grooves(playing, Modifier.fillMaxSize().testTag("playGrooves"))
