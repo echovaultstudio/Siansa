@@ -75,6 +75,7 @@ their own: a finished book, albums older than three days or last month's report 
 | **3 new albums** | Albums added to your library in the last 30 days. It shows as soon as Home opens. | Recently added |
 | **Your October** | The first week of a month: last month's listening. | The month's report |
 | **4 artists for you** | New artists to try were found today. | Artists for you |
+| **Liked songs** | Always, once you add it: it's **Off** until you set it to Automatic or Pinned. | Liked songs |
 
 At most five show. By default they're ordered for you: what needs you first, then what you're in the middle of, then
 what's new; among the new ones, the kinds you tap most come first. In **Settings › Notices and Cards › Notices** you can hide the

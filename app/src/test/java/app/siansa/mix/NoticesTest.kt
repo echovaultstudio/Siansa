@@ -147,4 +147,23 @@ class NoticesTest {
         val prefs = NoticePrefs().with(NoticeKind.CARRY_ON, NoticeMode.PINNED).with(NoticeKind.YOUR_MONTH, NoticeMode.OFF).with(NoticeKind.NEW_ARTISTS, NoticeMode.OFF)
         assertEquals("Shown · 1 pinned · 2 off", noticesLine(true, prefs))
     }
+
+    @Test fun likedSongsIsOffUntilAdded() {
+        // Issue #935: Liked songs is a notice you add yourself.
+        assertEquals(NoticeMode.OFF, NoticePrefs().modeOf(NoticeKind.LIKED))
+        assertEquals(emptyList<Notice>(), Notices.order(listOf(Notices.liked()), NoticePrefs(), emptyMap()))
+        // Added as Automatic, it stays added, saved and read back.
+        val auto = NoticePrefs().with(NoticeKind.LIKED, NoticeMode.AUTO)
+        assertEquals(NoticeMode.AUTO, auto.modeOf(NoticeKind.LIKED))
+        assertEquals("liked:auto", auto.format())
+        assertEquals(NoticeMode.AUTO, NoticePrefs.parse(auto.format()).modeOf(NoticeKind.LIKED))
+        assertEquals(listOf("liked"), Notices.order(listOf(Notices.liked()), auto, emptyMap()).map { it.route })
+        // Turned off again, it's back at its default and nothing is saved for it.
+        assertEquals("", auto.with(NoticeKind.LIKED, NoticeMode.OFF).format())
+        // Pinned, it comes first.
+        val pinned = NoticePrefs().with(NoticeKind.LIKED, NoticeMode.PINNED)
+        assertEquals(NoticeKind.LIKED, Notices.order(listOf(sync, Notices.liked()), pinned, emptyMap()).first().kind)
+        // It isn't counted as turned off while it's simply not added.
+        assertEquals("Shown", noticesLine(true, NoticePrefs()))
+    }
 }
