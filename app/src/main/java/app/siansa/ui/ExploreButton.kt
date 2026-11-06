@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -50,7 +49,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-/** What a slide from an album's Explore button shows (issue #965): up for similar albums, right onto Play for a DJ mix. */
+/** What a slide from an album's Explore button shows (issue #965): right onto Play for a DJ mix. */
 data class ExploreSlide(val way: SlideWay, val armed: Boolean)
 
 /** The two things a slide from Explore can start (issue #965). */
@@ -59,9 +58,11 @@ enum class ExploreChoice(val title: String, val hint: String, val ready: String)
     DJ_MIX("DJ mix this album", "Its songs only, in the order that blends best", "Let go to start");
 
     companion object {
-        /** The choice for a slide that way: up onto the cover, right onto Play; null any other way. */
+        /**
+         * The choice for a slide that way: right onto Play; null any other way. Similar albums is a tap only (the owner:
+         * no slide up for it).
+         */
         fun of(way: SlideWay?): ExploreChoice? = when (way) {
-            SlideWay.UP -> SIMILAR
             SlideWay.RIGHT -> DJ_MIX
             else -> null
         }
@@ -69,9 +70,8 @@ enum class ExploreChoice(val title: String, val hint: String, val ready: String)
 }
 
 /**
- * An album's Explore button (issue #965), where "Find similar albums" was, as an icon: a tap opens similar albums; sliding the finger
- * up (onto the cover) does too, and sliding right onto the Play button starts a DJ mix of the album's own songs in the
- * best order. The choice shows in the middle of the cover ([ExploreCoverLabel], from [onSliding]) and is armed once the
+ * An album's Explore button (issue #965), where "Find similar albums" was, as an icon: a tap opens similar albums,
+ * and sliding right onto the Play button starts a DJ mix of the album's own songs in the best order. The choice shows in the middle of the cover ([ExploreCoverLabel], from [onSliding]) and is armed once the
  * finger is far enough, with a click; letting go there starts it, with a stronger one. [rightArmPx] is how far right
  * the Play button is (its near edge), measured by the row; until then a fixed distance.
  */
@@ -86,7 +86,6 @@ internal fun ExploreButton(
     val context = LocalContext.current
     val density = LocalDensity.current
     val deadZone = with(density) { EXPLORE_DEAD_ZONE.toPx() }
-    val upArm = with(density) { EXPLORE_UP_ARM.toPx() }
     val rightArm = rightArmPx ?: with(density) { EXPLORE_RIGHT_ARM.toPx() }
     val similar by rememberUpdatedState(onSimilar)
     val djMix by rememberUpdatedState(onDjMix)
@@ -132,7 +131,7 @@ internal fun ExploreButton(
                         val way = slideWay(d.x, d.y, deadZone)
                         show(
                             if (ExploreChoice.of(way) == null) null
-                            else ExploreSlide(way!!, exploreArmed(way, d.x, d.y, upArm, armRight)),
+                            else ExploreSlide(way!!, exploreArmed(way, d.x, armRight)),
                         )
                     },
                 )
@@ -152,12 +151,8 @@ internal fun ExploreButton(
     }
 }
 
-/** Whether a slide is far enough to start its choice: up past [upArm], right past [rightArm] (onto Play), in px. */
-internal fun exploreArmed(way: SlideWay, dx: Float, dy: Float, upArm: Float, rightArm: Float): Boolean = when (way) {
-    SlideWay.UP -> -dy >= upArm
-    SlideWay.RIGHT -> dx >= rightArm
-    else -> false
-}
+/** Whether a slide is far enough to start its choice: right past [rightArm] (onto Play), in px. */
+internal fun exploreArmed(way: SlideWay, dx: Float, rightArm: Float): Boolean = way == SlideWay.RIGHT && dx >= rightArm
 
 /**
  * The choice of a slide from Explore, in the middle of the album's cover (issue #965), as now playing shows a slide
@@ -189,7 +184,7 @@ internal fun ExploreCoverLabel(slide: ExploreSlide?, modifier: Modifier = Modifi
                 Text(choice.hint, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f), textAlign = TextAlign.Center)
                 Spacer(Modifier.height(Space.Tight))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(if (shownSlide.way == SlideWay.UP) Icons.Rounded.KeyboardArrowUp else Icons.AutoMirrored.Rounded.KeyboardArrowRight, null,
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null,
                         tint = Accent, modifier = Modifier.size(EXPLORE_ARROW))
                     Text(if (ready) choice.ready else "Slide a little further", style = MaterialTheme.typography.bodyMedium, color = Color.White)
                 }
@@ -203,7 +198,6 @@ private val EXPLORE_ICON = 28.dp
 private val EXPLORE_LABEL_ICON = 36.dp
 private val EXPLORE_ARROW = 18.dp
 private val EXPLORE_DEAD_ZONE = 16.dp
-private val EXPLORE_UP_ARM = 56.dp
 private val EXPLORE_RIGHT_ARM = 96.dp
 private const val EXPLORE_FADE_MS = 140
 private const val EXPLORE_FAINT = 0.6f

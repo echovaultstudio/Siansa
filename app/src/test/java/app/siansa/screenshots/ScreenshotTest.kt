@@ -470,7 +470,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     Row(horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
                         listOf(
                             app.siansa.ui.ExploreSlide(app.siansa.ui.SlideWay.RIGHT, armed = true),
-                            app.siansa.ui.ExploreSlide(app.siansa.ui.SlideWay.UP, armed = false),
+                            app.siansa.ui.ExploreSlide(app.siansa.ui.SlideWay.RIGHT, armed = false),
                         ).forEach { slide ->
                             Box(
                                 Modifier.size(160.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))

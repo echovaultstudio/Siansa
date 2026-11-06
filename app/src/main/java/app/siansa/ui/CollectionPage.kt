@@ -474,8 +474,9 @@ internal fun ActionButtons(
             Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
         }
         Spacer(Modifier.width(Space.Small))
-        Box(Modifier.onGloballyPositioned { playLeft = it.positionInRoot().x }.alpha(if (explore != null && explore.way != SlideWay.RIGHT) dim else 1f)) {
-            BigPlayButton(enabled, playing = playing, onPlay = onPlay, grooves = explore?.way == SlideWay.RIGHT && explore.armed)
+        // Play darkens with the rest while Explore slides onto it (the owner, issue #965): the cover says what letting go does.
+        Box(Modifier.onGloballyPositioned { playLeft = it.positionInRoot().x }.alpha(dim)) {
+            BigPlayButton(enabled, playing = playing, onPlay = onPlay)
         }
     }
 }
@@ -495,7 +496,7 @@ fun PlayButtonRow(modifier: Modifier = Modifier, content: @Composable RowScope.(
 
 /** The big round Play button of album, playlist, mix and artist pages. Only ever inside a [PlayButtonRow]. */
 @Composable
-fun BigPlayButton(enabled: Boolean, playing: Boolean = false, grooves: Boolean = false, onPlay: () -> Unit) {
+fun BigPlayButton(enabled: Boolean, playing: Boolean = false, onPlay: () -> Unit) {
     Box(
         Modifier
             .size(56.dp)
@@ -505,8 +506,6 @@ fun BigPlayButton(enabled: Boolean, playing: Boolean = false, grooves: Boolean =
             .testTag("bigPlay"),
         contentAlignment = Alignment.Center,
     ) {
-        // Record grooves while an album's Explore is slid onto it for a DJ mix (issue #965).
-        if (grooves) Grooves(playing = false, Modifier.fillMaxSize().testTag("bigPlayGrooves"))
         // ⏸ while what the page shows is playing (a book's page, issue #626): the same button pauses it.
         Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (playing) "Pause" else "Play", tint = OnAccent, modifier = Modifier.size(32.dp))
     }
