@@ -97,9 +97,15 @@ def emby_like(name, base, auth_header, scheme):
 def emby_count(base, head, user, songs):
     """Whether the scan has every song. Jellyfin 12 refuses the old /Users/{user}/Items now and then (401), so
     Jellyfin is asked at /Items?userId= as the app does, and a 401 logs in again."""
-    state = {"head": {k: v for k, v in head.items() if not k.startswith("_")}}
+    state = {"head": {k: v for k, v in head.items() if not k.startswith("_")}, "start": time.time(), "asked": 0, "seen": None}
 
     def count():
+        # Jellyfin 12.4 sometimes doesn't start scanning a library it was just given: asked again every 30 s.
+        waited = time.time() - state["start"]
+        if waited > 30 * (state["asked"] + 1):
+            state["asked"] += 1
+            print(f"{base}: {state['seen']} of {songs} songs after {waited:.0f}s; asking for a scan")
+            call("POST", f"{base}/Library/Refresh", headers=state["head"])
         params = {"IncludeItemTypes": "Audio", "Recursive": "true", "Limit": "0"}
         if head["_jellyfin"]:
             url = f"{base}/Items?" + urllib.parse.urlencode({**params, "userId": user})
@@ -112,6 +118,7 @@ def emby_count(base, head, user, songs):
                 token, _ = head["_login"]()
                 state["head"] = {**state["head"], "X-Emby-Token": token}
             raise
+        state["seen"] = r["TotalRecordCount"]
         return r["TotalRecordCount"] >= songs
     return count
 
