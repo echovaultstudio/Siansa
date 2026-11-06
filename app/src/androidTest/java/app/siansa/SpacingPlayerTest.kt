@@ -291,4 +291,26 @@ class SpacingPlayerTest : SpacingCheck() {
         val name = compose.onNodeWithTag("slideName", useUnmergedTree = true).getBoundsInRoot()
         assertEven("Left and right of the name", name.left - cover.left, cover.right - name.right, 1.dp)
     }
+
+    /** Given the seek bar's place, the up choice's centre is exactly that far above the button's (issue #963). */
+    @Test fun upChoiceSitsOnTheSeekBar() {
+        val reachPx = 300
+        compose.setContent {
+            SiansaTheme {
+                Box(Modifier.size(400.dp), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+                    app.siansa.ui.PlayButton(
+                        playing = false, slides = app.siansa.ui.PlaySlides(), djMix = false,
+                        onToggle = {}, onStop = {}, onSlide = {},
+                        preview = app.siansa.ui.SlideState(app.siansa.ui.SlideWay.UP, armed = true),
+                        upReachPx = reachPx,
+                    )
+                }
+            }
+        }
+        val button = compose.onNodeWithTag("playButton", useUnmergedTree = true).getBoundsInRoot()
+        val up = compose.onNodeWithTag("slideChoice-up", useUnmergedTree = true).getBoundsInRoot()
+        val gap = (button.top + button.bottom) / 2 - (up.top + up.bottom) / 2
+        val expected = with(compose.density) { reachPx.toDp() }
+        assertEven("Up choice above the button's centre", gap, expected, 1.dp)
+    }
 }

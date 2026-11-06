@@ -174,7 +174,8 @@ Slide a finger from the play button to start something from the song playing: **
 Steady radio, **left** for its song path and **right** for songs that sound like it. Only the way you slide shows its
 choice: its icon beside the button, and its name in the middle of the cover, which blurs behind it so your thumb never
 hides it. Until you're far enough the name is faint and says "Slide a little further"; then it lights up in your
-colour, says "Let go to start" and the phone clicks, and letting go there starts it. Slide back to the middle to change your mind. A tap still plays and pauses, and pressing
+colour, says "Let go to start" and the phone clicks, and letting go there starts it. Everything else on the page dims while you
+slide, and going down, Play on makes way. Slide back to the middle to change your mind. A tap still plays and pauses, and pressing
 and holding still stops. What each way does can be changed, or the slides switched off, under **Settings › Style ›
 Now playing**. While a DJ mix plays, the play button has record grooves in its colour, with a glint that turns as it
 plays.
