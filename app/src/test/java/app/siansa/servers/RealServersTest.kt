@@ -153,13 +153,14 @@ class RealServersTest(private val server: String) {
     /** Covers as cover.jpg (First Light), folder.jpg (Two Discs) and only inside the files (Mixed Bag). */
     @Test fun albumCoversShowHoweverTheyAreKept() = runBlocking {
         val albums = source().albums("alphabeticalByName", 50, 0)
-        mapOf("First Light" to "cover.jpg", "Two Discs" to "folder.jpg", "Mixed Bag" to "the files").forEach { (name, how) ->
+        val missing = mapOf("First Light" to "cover.jpg", "Two Discs" to "folder.jpg", "Mixed Bag" to "the files").mapNotNull { (name, how) ->
             val album = albums.first { it.name == name }
             get(source().coverUrl(album.coverArt ?: album.id, 300)).use { r ->
-                assertEquals("$server: $name's cover (in $how)", 200, r.code)
-                assertTrue("$server: $name's cover is a picture (${r.header("Content-Type")})", r.header("Content-Type").orEmpty().startsWith("image/"))
+                val type = r.header("Content-Type").orEmpty()
+                if (r.code == 200 && type.startsWith("image/")) null else "$name's cover (in $how): ${r.code} $type"
             }
         }
+        assertEquals("$server: covers", emptyList<String>(), missing)
     }
 
     @Test fun syncedLyricsAreRead() = runBlocking {

@@ -78,8 +78,18 @@ def emby_like(name, base, auth_header, scheme):
         return r["AccessToken"], r["User"]["Id"]
     token, user = wait(f"{name} login", login)
     head = {auth_header: device + f', Token="{token}"', "X-Emby-Token": token}
+    # The library as the server's own web page makes it: with each kind of item's default metadata and picture
+    # readers switched on (without them Emby read no cover.jpg or folder.jpg at all).
+    _, available = call("GET", f"{base}/Libraries/AvailableOptions?LibraryContentType=music&IsNewLibrary=true", headers=head)
+    options = {"PathInfos": [{"Path": "/music"}], "EnableRealtimeMonitor": False, "TypeOptions": [
+        {"Type": t["Type"],
+         "MetadataFetchers": [f["Name"] for f in t.get("MetadataFetchers", []) if f.get("DefaultEnabled")],
+         "ImageFetchers": [f["Name"] for f in t.get("ImageFetchers", []) if f.get("DefaultEnabled")],
+         "ImageOptions": t.get("DefaultImageOptions", [])}
+        for t in available.get("TypeOptions", [])]}
+    print(f"{name} library options: " + "; ".join(f"{t['Type']}: images {t['ImageFetchers']}" for t in options["TypeOptions"]))
     q = urllib.parse.urlencode({"name": "Music", "collectionType": "music", "paths": "/music", "refreshLibrary": "true"})
-    call("POST", f"{base}/Library/VirtualFolders?{q}", {"LibraryOptions": {"PathInfos": [{"Path": "/music"}]}}, head)
+    call("POST", f"{base}/Library/VirtualFolders?{q}", {"LibraryOptions": options}, head)
     return head, user
 
 
