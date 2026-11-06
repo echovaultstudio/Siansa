@@ -95,8 +95,8 @@ def describe():
         _, r = call("POST", base + "/Users/AuthenticateByName", {"Username": USER, "Pw": PASSWORD}, {header: device})
         head = {"X-Emby-Token": r["AccessToken"]}
         user = r["User"]["Id"]
-        for kind, term in (("MusicAlbum", "First Light"), ("Audio", "Second Glow")):
-            q = urllib.parse.urlencode({"IncludeItemTypes": kind, "Recursive": "true", "SearchTerm": term,
+        for kind, term in (("MusicAlbum", ""), ("Audio", "Second Glow")):
+            q = urllib.parse.urlencode({"IncludeItemTypes": kind, "Recursive": "true", **({"SearchTerm": term} if term else {}),
                                         "Fields": "MediaSources,MediaStreams,Path,ImageTags"})
             _, found = call("GET", f"{base}/Users/{user}/Items?{q}", headers=head)
             for item in found.get("Items", []):
@@ -106,6 +106,15 @@ def describe():
                 if kind == "MusicAlbum":
                     st, _ = call("GET", f"{base}/Items/{item['Id']}/Images/Primary?maxWidth=300", headers=head, ok_codes=(404,))
                     print(f"{name} album picture: {st}")
+                for src in item.get("MediaSources") or []:
+                    for st in src.get("MediaStreams") or []:
+                        if st.get("Type") in ("Subtitle", "Lyrics"):
+                            url = f"{base}/Items/{item['Id']}/{src['Id']}/Subtitles/{st.get('Index')}/Stream.{st.get('Codec')}"
+                            try:
+                                code, text = call("GET", url, headers=head)
+                                print(f"{name} lyrics #{st.get('Index')}: {code} {str(text)[:120]!r}")
+                            except RuntimeError as e:
+                                print(f"{name} lyrics #{st.get('Index')}: {e}")
 
 
 def main(library):

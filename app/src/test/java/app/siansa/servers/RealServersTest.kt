@@ -150,11 +150,15 @@ class RealServersTest(private val server: String) {
         }
     }
 
-    @Test fun theAlbumWithACoverShowsIt() = runBlocking {
-        val album = source().albums("alphabeticalByName", 50, 0).first { it.name == "First Light" }
-        get(source().coverUrl(album.coverArt ?: album.id, 300)).use { r ->
-            assertEquals("$server: cover", 200, r.code)
-            assertTrue("$server: the cover is a picture (${r.header("Content-Type")})", r.header("Content-Type").orEmpty().startsWith("image/"))
+    /** Covers as cover.jpg (First Light), folder.jpg (Two Discs) and only inside the files (Mixed Bag). */
+    @Test fun albumCoversShowHoweverTheyAreKept() = runBlocking {
+        val albums = source().albums("alphabeticalByName", 50, 0)
+        mapOf("First Light" to "cover.jpg", "Two Discs" to "folder.jpg", "Mixed Bag" to "the files").forEach { (name, how) ->
+            val album = albums.first { it.name == name }
+            get(source().coverUrl(album.coverArt ?: album.id, 300)).use { r ->
+                assertEquals("$server: $name's cover (in $how)", 200, r.code)
+                assertTrue("$server: $name's cover is a picture (${r.header("Content-Type")})", r.header("Content-Type").orEmpty().startsWith("image/"))
+            }
         }
     }
 

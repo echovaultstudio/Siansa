@@ -4,8 +4,9 @@
     python3 scripts/servers/library.py <folder>
 
 Writes the songs (made with ffmpeg: tones, nobody's music) and library.json, which says what each server should find:
-the tests in app/src/test/java/app/siansa/servers/ read it. Four albums in four formats: FLAC with a cover and synced
-lyrics, MP3 on two discs, an AAC compilation by several artists, and an Opus single.
+the tests in app/src/test/java/app/siansa/servers/ read it. Four albums in four formats: FLAC with cover.jpg and synced
+lyrics, MP3 on two discs with folder.jpg, an AAC compilation by several artists with its cover inside the files, and
+an Opus single with no cover.
 """
 import json
 import os
@@ -52,8 +53,20 @@ def main(root):
         out.append({"path": path, "format": fmt, "title": title, "artist": artist, "albumArtist": album_artist, "album": album,
                     "year": year, "genre": genre, "disc": disc, "track": track, "seconds": secs, "lyrics": lyrics,
                     "bytes": os.path.getsize(os.path.join(root, path))})
-    # A cover for the album with one: a still picture, as cover.jpg (every server reads it).
+    # Covers the three ways libraries have them: cover.jpg (First Light), folder.jpg (Two Discs), and only inside the
+    # files (Mixed Bag). Loose Ends has none.
     run(["-f", "lavfi", "-i", "testsrc=size=600x600", "-frames:v", "1", os.path.join(root, "Aurora Test/First Light/cover.jpg")])
+    run(["-f", "lavfi", "-i", "testsrc2=size=600x600", "-frames:v", "1", os.path.join(root, "Bram Example/Two Discs/folder.jpg")])
+    art = os.path.join(root, "embedded.jpg")
+    run(["-f", "lavfi", "-i", "smptebars=size=600x600", "-frames:v", "1", art])
+    for song in out:
+        if song["album"] == "Mixed Bag":
+            path = os.path.join(root, song["path"])
+            tmp = path + ".tmp.m4a"
+            run(["-i", path, "-i", art, "-map", "0:a", "-map", "1", "-c", "copy", "-disposition:v", "attached_pic", tmp])
+            os.replace(tmp, path)
+            song["bytes"] = os.path.getsize(path)
+    os.remove(art)
     with open(os.path.join(root, "library.json"), "w") as f:
         json.dump({"songs": out}, f, indent=1)
     print(f"{len(out)} songs in {root}")
