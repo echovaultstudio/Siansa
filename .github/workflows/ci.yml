@@ -304,7 +304,8 @@ jobs:
       # One release per version with its notes. No files on it (#584): the app is had from the F-Droid repo and
       # Google Play's open testing, both below, and built from this source. The APK and bundle stay a workflow
       # artifact for 30 days (the Google Play workflow takes the bundle from there).
-      - uses: softprops/action-gh-release@v3
+      # Pinned to its exact commit (v3.0.4): the one outside action that publishes with write access. Dependabot keeps it current.
+      - uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         if: steps.version.outputs.exists != 'true'
         with:
           tag_name: v${{ steps.version.outputs.version }}
