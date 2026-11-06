@@ -419,12 +419,29 @@ fun Screen(
 
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier, top: Dp = LocalSectionGap.current) {
+    // A section of Home set to show no title (issue #961) keeps only the gap above it.
+    if (!LocalSectionTitleShown.current) {
+        Spacer(modifier.height(top))
+        return
+    }
     Text(
         text,
         style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Bold,
         modifier = modifier.padding(start = Space.Page, end = Space.Page, top = top, bottom = Space.Medium),
     )
+}
+
+/**
+ * Whether a section's title shows (issue #961): Home sets it per section from Arrange Home; everywhere else it's shown.
+ * Without it, a section keeps the gap above where its title was.
+ */
+val LocalSectionTitleShown = androidx.compose.runtime.compositionLocalOf { true }
+
+/** In place of a hidden title: the gap that was above it. */
+@Composable
+fun HiddenTitleGap() {
+    Spacer(Modifier.height(LocalSectionGap.current))
 }
 
 /** The space above a section's heading: between one section's last row and the next heading. */
@@ -881,7 +898,9 @@ fun <T> Shelf(
 ) {
     if (items.isEmpty()) return
     Column {
-        if (onOpenAll != null && homeRowOpensFullList(items.size)) {
+        if (!LocalSectionTitleShown.current) {
+            HiddenTitleGap()
+        } else if (onOpenAll != null && homeRowOpensFullList(items.size)) {
             Row(
                 Modifier
                     .fillMaxWidth()

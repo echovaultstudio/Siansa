@@ -168,7 +168,7 @@ private fun HomeBanner(id: String, title: String, items: List<HomeItem>, open: (
 @Composable
 private fun HomeList(title: String, items: List<HomeItem>, open: () -> Unit) {
     Column(Modifier.testTag("homeLookList")) {
-        Row(
+        if (!LocalSectionTitleShown.current) HiddenTitleGap() else Row(
             Modifier.fillMaxWidth().clickable(onClickLabel = "Show all", onClick = open)
                 .padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current, bottom = Space.Small),
             verticalAlignment = Alignment.CenterVertically,
