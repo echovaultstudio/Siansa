@@ -4,6 +4,7 @@ import androidx.media3.common.MimeTypes
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -11,6 +12,22 @@ import org.junit.Test
 class PassthroughTest {
     @After
     fun forget() = Passthrough.played.clear()
+
+    @Test
+    fun primedDolbyTracksJoinWhilePassthroughIsOn() {
+        // Issue #924: a priming frame made every Atmos song start with a jump, so the output was reopened between songs.
+        val atmos = androidx.media3.common.Format.Builder().setSampleMimeType(MimeTypes.AUDIO_E_AC3_JOC).setHasPrerollSamples(true).build()
+        assertFalse(Passthrough.joinable(atmos, on = true).hasPrerollSamples)
+        assertEquals(MimeTypes.AUDIO_E_AC3_JOC, Passthrough.joinable(atmos, on = true).sampleMimeType)
+        // Passthrough off: the TV decodes it, and the priming frame stays cut off.
+        assertTrue(Passthrough.joinable(atmos, on = false).hasPrerollSamples)
+        // Other formats keep theirs (AAC's priming is cut off when it's decoded).
+        val aac = androidx.media3.common.Format.Builder().setSampleMimeType(MimeTypes.AUDIO_AAC).setHasPrerollSamples(true).build()
+        assertSame(aac, Passthrough.joinable(aac, on = true))
+        // Nothing to change: the same format back.
+        val plain = androidx.media3.common.Format.Builder().setSampleMimeType(MimeTypes.AUDIO_E_AC3).build()
+        assertSame(plain, Passthrough.joinable(plain, on = true))
+    }
 
     @Test
     fun dolbyAndDtsAreBitstreams() {

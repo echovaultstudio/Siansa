@@ -8,7 +8,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material.icons.rounded.MusicOff
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import app.siansa.log.AppLog
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -140,6 +143,8 @@ fun CrossfadeScreen(nav: NavController) {
                     )
                 }
             }
+            HorizontalDivider()
+            MixingDocsLink()
         }
     }
 }
@@ -325,3 +330,24 @@ internal fun levellingNowText(title: String?, d: Levelling.Decision): Pair<andro
 }
 
 private const val LEVELLING_REFRESH_MS = 3_000L
+
+/** How mixing works, in the docs (issue #916): crossfades, smart crossfade and beat-matched blends, opened in the browser. */
+@Composable
+internal fun MixingDocsLink() {
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable { runCatching { uri.openUri(AboutLinks.MIXING) }.onFailure { AppLog.w("Settings", "Couldn't open the mixing docs: ${it.message}") } }
+            .padding(vertical = Space.Tight)
+            .testTag("mixingDocs"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.Medium),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Heading("How mixing works")
+            Hint("Crossfades, smart crossfade and DJ blends, in the docs")
+        }
+        Icon(Icons.AutoMirrored.Rounded.OpenInNew, "Opens in the browser", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}

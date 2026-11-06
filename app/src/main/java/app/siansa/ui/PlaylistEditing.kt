@@ -251,7 +251,11 @@ private fun NameDialog(
         title = { Text(title) },
         text = {
             Column {
-                OutlinedTextField(
+                // On the TV, Android's own text field, which a phone's keyboard can type into (issue #895).
+                if (app.siansa.BuildConfig.TV_APP) {
+                    TvTextBox(text, { text = it.take(PlaylistEditor.MAX_NAME) }, "Name", Modifier.fillMaxWidth().focusRequester(focus), opensOnFocus = true,
+                        onDone = { name?.let { onConfirm(it, onPhone) } })
+                } else OutlinedTextField(
                     value = text,
                     onValueChange = { text = it.take(PlaylistEditor.MAX_NAME) },
                     label = { Text("Name") },
