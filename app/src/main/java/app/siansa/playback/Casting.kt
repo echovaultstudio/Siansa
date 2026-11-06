@@ -472,16 +472,26 @@ class CastItems(private val api: MusicSource) : MediaItemConverter {
     override fun toMediaQueueItem(mediaItem: MediaItem): MediaQueueItem = toMediaQueueItem(mediaItem, null)
 
     /** As above, marked with the phone's key for its queue [entry] ([TvPlayer]), which the TV reports back. */
-    fun toMediaQueueItem(mediaItem: MediaItem, entry: Long?): MediaQueueItem {
+    fun toMediaQueueItem(mediaItem: MediaItem, entry: Long?): MediaQueueItem = toMediaQueueItem(mediaItem, entry, 0L)
+
+    /**
+     * As above, with the server's conversions starting [startMs] into the song (issue #901): a TV can't seek in a
+     * conversion as it's made, and went back to the start, so a seek there loads the song again from that point. The
+     * original file isn't offered then (it would start at the beginning), and the length given is what's left.
+     */
+    fun toMediaQueueItem(mediaItem: MediaItem, entry: Long?, startMs: Long): MediaQueueItem {
         val song = mediaItem.toSong()
         val custom = JSONObject().put(SONG_ID, mediaItem.mediaId)
         entry?.let { custom.put(TvPlayer.ENTRY_KEY, it) }
+        val from = { url: String -> if (startMs > 0) Streaming.startingAt(Uri.parse(url), startMs).toString() else url }
         // In lossless quality Siansa's TV screen plays the original file instead where every Cast device can (FLAC and
         // so on), or the server's FLAC conversion of it (ALAC…), and falls back to Opus, then MP3, when it can't.
-        CastOriginals.source(CastFormats.suffixOf(song), CastSettings.quality.value, api.streamUrl(mediaItem.mediaId))?.let { source ->
-            custom.put(ORIGINAL_URL, source.url).put(ORIGINAL_TYPE, source.type)
-            if (source.converted) custom.put(CONVERTED, true)
-        }
+        CastOriginals.source(CastFormats.suffixOf(song), CastSettings.quality.value, api.streamUrl(mediaItem.mediaId))
+            ?.takeIf { startMs <= 0 || it.converted }
+            ?.let { source ->
+                custom.put(ORIGINAL_URL, from(source.url)).put(ORIGINAL_TYPE, source.type)
+                if (source.converted) custom.put(CONVERTED, true)
+            }
         val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
             putString(MediaMetadata.KEY_TITLE, song.title)
             putString(MediaMetadata.KEY_ARTIST, song.artist)
@@ -492,15 +502,15 @@ class CastItems(private val api: MusicSource) : MediaItemConverter {
         // The lossy stream the TV falls back to: Opus 320 (MP3 320 in that quality, or where the server can't convert),
         // with MP3 320 after it for TVs that can't play Opus (Siansa's TV screen goes original → Opus → MP3).
         val raw = Uri.parse(api.streamUrl(mediaItem.mediaId))
-        val mp3 = Streaming.forCast(raw).toString()
-        val opus = Streaming.forCastOpus(raw).toString().takeIf { CastSettings.quality.value != CastQuality.Mp3 && it != raw.toString() }
+        val mp3 = from(Streaming.forCast(raw).toString())
+        val opus = Streaming.forCastOpus(raw).toString().takeIf { CastSettings.quality.value != CastQuality.Mp3 && it != raw.toString() }?.let(from)
         if (opus != null) custom.put(OPUS_URL, opus).put(MP3_URL, mp3)
         val info = MediaInfo.Builder(mediaItem.mediaId)
             .setContentUrl(opus ?: mp3)
             .setContentType(if (opus != null) Streaming.CAST_OPUS_MIME else Streaming.CAST_MIME)
             .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
             .setMetadata(metadata)
-            .apply { if (song.durationSec > 0) setStreamDuration(song.durationSec * 1000L) }
+            .apply { if (song.durationSec > 0) setStreamDuration((song.durationSec * 1000L - startMs.coerceAtLeast(0)).coerceAtLeast(1_000L)) }
             .setCustomData(custom)
             .build()
         // The TV loads the next song ahead (issue #689), so it can go straight on instead of fetching it once this one ends.

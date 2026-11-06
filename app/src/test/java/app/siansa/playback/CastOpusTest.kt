@@ -47,6 +47,33 @@ class CastOpusTest {
         }
     }
 
+    /** Issue #901: a TV can't seek in a conversion as it's made; the song is loaded again starting at the seek. */
+    @Test fun aSongStartedPartWayInStartsEveryConversionThere() {
+        CastSettings.setQuality(CastQuality.Lossless)
+        val item = CastItems(api).toMediaQueueItem(song.toMediaItem(api), 7L, 92_400L)
+        val info = item.media!!
+        val custom = info.customData!!
+        assertTrue(custom.getString("opusUrl").contains("timeOffset=92"))
+        assertTrue(custom.getString("mp3Url").contains("timeOffset=92"))
+        assertTrue(info.contentUrl!!.contains("timeOffset=92"))
+        // The original file would start at its beginning: not offered.
+        assertFalse(custom.has("originalUrl") && !custom.optBoolean("converted"))
+        if (song.durationSec > 0) assertEquals(song.durationSec * 1000L - 92_400L, info.streamDuration)
+        // From the start, nothing changes.
+        val whole = CastItems(api).toMediaQueueItem(song.toMediaItem(api), 7L, 0L).media!!
+        assertFalse(whole.contentUrl!!.contains("timeOffset"))
+    }
+
+    @Test fun onlyTheServersConversionsCountAsConversions() {
+        assertTrue(TvSeek.isConversion("http://nd/rest/stream?id=s1&format=opus&maxBitRate=320&u=a"))
+        assertTrue(TvSeek.isConversion("http://nd/rest/stream?id=s1&format=mp3&maxBitRate=320"))
+        assertTrue(TvSeek.isConversion("http://nd/rest/stream?id=s1&format=flac"))
+        assertFalse(TvSeek.isConversion("http://nd/rest/stream?id=s1&format=raw"))
+        assertFalse(TvSeek.isConversion("http://nd/rest/stream?id=s1"))
+        assertFalse(TvSeek.isConversion("http://emby/Audio/52131/stream?Static=true"))
+        assertFalse(TvSeek.isConversion(null))
+    }
+
     @Test fun mp3QualitySendsOnlyMp3() {
         CastSettings.setQuality(CastQuality.Mp3)
         val info = CastItems(api).toMediaQueueItem(song.toMediaItem(api)).media!!
