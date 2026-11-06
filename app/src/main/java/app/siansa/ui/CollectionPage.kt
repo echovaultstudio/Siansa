@@ -480,10 +480,11 @@ internal fun ActionButtons(
         }
         Spacer(Modifier.width(Space.Small))
         // While Explore slides, Play darkens with the rest; once the finger is on it, it lights up as a turning record, as
-        // now playing's does in a DJ mix, and keeps turning while the mix plays (the owner, issue #965).
+        // now playing's does in a DJ mix, and turns from the moment the mix plays, still while it's paused (the owner,
+        // issue #965).
         val onPlayButton = explore?.armed == true
         Box(Modifier.onGloballyPositioned { playLeft = it.positionInRoot().x }.alpha(if (onPlayButton) 1f else dim)) {
-            BigPlayButton(enabled, playing = playing, grooves = onPlayButton || mixOn, turning = onPlayButton || (mixOn && playing), onPlay = onPlay)
+            BigPlayButton(enabled, playing = playing, grooves = onPlayButton || mixOn, turning = mixOn && playing, onPlay = onPlay)
         }
     }
 }

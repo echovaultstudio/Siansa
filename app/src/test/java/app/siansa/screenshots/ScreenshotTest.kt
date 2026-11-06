@@ -469,7 +469,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = {}, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {},
                         explore = app.siansa.ui.ExploreSlide(app.siansa.ui.SlideWay.RIGHT, armed = true), dim = 0.3f)
                     app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = {}, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {},
-                        playing = true, mixOn = true)
+                        mixOn = true)  // paused: a turning glint never lets the picture settle
                     Row(horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
                         listOf(
                             app.siansa.ui.ExploreSlide(app.siansa.ui.SlideWay.RIGHT, armed = true),
