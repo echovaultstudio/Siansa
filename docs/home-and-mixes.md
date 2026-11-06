@@ -10,7 +10,8 @@ With no notices, or notices turned off, the button sits on its own.
 
 ## Home's menu
 
-The round button opens a short column of round buttons straight under it, each with its name beside it:
+The round button opens a short column of round buttons straight under it, each with its name beside it. The page
+behind blurs a little and darkens while it's open, so the names are easy to read (before Android 12 it only darkens):
 
 - **Roll the dice** plays a song you've never played (see [Roll the dice](discovery.md)). While it finds one, the
   dice tumbles in the menu button.

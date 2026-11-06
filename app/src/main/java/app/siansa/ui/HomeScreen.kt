@@ -282,7 +282,8 @@ fun HomeScreen(nav: NavController) {
     CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap)) {
     Box(Modifier.fillMaxSize()) {
     LazyColumn(
-        Modifier.fillMaxSize().aboveKeyboard(),
+        // The page blurs a little behind the open menu, so its labels read clearly (issue #959).
+        Modifier.fillMaxSize().aboveKeyboard().blurBehindMenu(menu),
         state = listState,
         contentPadding = PaddingValues(bottom = if (keyboardOpen()) Space.Page else bottomBarPadding(Space.Section)),
     ) {
