@@ -23,6 +23,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.MoreVert
@@ -44,6 +46,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -270,6 +273,7 @@ fun TvArtist(id: String) {
             graph.source.artistInfo(a.id).similar.mapNotNull { s -> s.id?.let { Artist(id = it, name = s.name, coverArt = s.coverArt) } }
         }.getOrDefault(emptyList())
     }
+    var topOpen by rememberSaveable(id) { mutableStateOf(false) }
     val a = artist ?: return Loading()
     val favourite = a.id in favourites
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = Space.Large), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
@@ -298,9 +302,22 @@ fun TvArtist(id: String) {
         }
         if (top.isNotEmpty()) {
             item("top-title") { SectionTitle("Top songs") }
-            itemsIndexed(top.take(TOP_SHOWN), key = { i, s -> "top:$i:${s.id}" }) { i, song ->
+            // Folded, as on the phone (issue #943): three, so the albums are a few presses down; Show all for the rest.
+            itemsIndexed(top.take(tvTopShown(top.size, topOpen)), key = { i, s -> "top:$i:${s.id}" }) { i, song ->
                 Box(Modifier.padding(horizontal = TV_EDGE)) {
                     SongRow(i + 1, song, playing = player.current?.id == song.id) { graph.player.play(top, startIndex = i) }
+                }
+            }
+            if (top.size > TOP_FOLDED) {
+                item("top-more") {
+                    Row(Modifier.padding(start = TV_EDGE, end = TV_EDGE, top = Space.Small)) {
+                        TvButton(
+                            if (topOpen) "Show fewer" else "Show all ${top.size}",
+                            if (topOpen) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                            onClick = { topOpen = !topOpen },
+                            modifier = Modifier.testTag("tvTopMore"),
+                        )
+                    }
                 }
             }
         }
@@ -541,6 +558,10 @@ private val LIKED_ICON = 20.dp
 private const val ROW_GROW = 1.02f
 private const val GENRES = 200
 private const val TOP_SONGS = 10
-private const val TOP_SHOWN = 5
+/** Top songs shown on an artist's page before Show all (issue #943). */
+internal const val TOP_FOLDED = 3
+
+/** How many top songs show: [TOP_FOLDED], or all of them once opened. */
+internal fun tvTopShown(available: Int, open: Boolean): Int = if (open) available else minOf(available, TOP_FOLDED)
 private const val MAX_ARTISTS = 6
 private const val RELOAD_PAUSE_MS = 4_000L
