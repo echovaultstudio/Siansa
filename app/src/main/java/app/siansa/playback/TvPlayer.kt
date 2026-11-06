@@ -66,6 +66,8 @@ class TvPlayer(
     /** The load the TV was last asked for, so the TV's word about an older one is ignored. */
     private var loadGeneration = 0
     private var loading = false
+    /** The queue entry playing as a conversion started part-way in after a seek, and where it starts (issue #901). */
+    private var startedPartWay: Pair<Long, Long>? = null
     /** The queue entry the phone last told the TV to jump to, and when: see [TvJump]. */
     private var jumpingTo: Long? = null
     private var jumpedAt = 0L
@@ -182,9 +184,18 @@ class TvPlayer(
         if (target == index && c != null && state != Player.STATE_IDLE && state != Player.STATE_ENDED) {
             this.positionMs = at
             positionAt = System.currentTimeMillis()
-            c.seek(com.google.android.gms.cast.MediaSeekOptions.Builder().setPosition(at).build())
+            // A conversion the server makes as it plays can't be sought in: the TV went back to the start (issue #901).
+            // It's loaded again from that point instead.
+            if (TvSeek.isConversion(c.mediaStatus?.mediaInfo?.contentUrl) && !loading) {
+                startedPartWay = keys[index] to at
+                AppLog.i("Cast", "Seek to ${at / 1000} s in a song the server converts: the TV loads it again from there")
+                return load("a seek in a converted song")
+            }
+            val partWay = startedPartWay?.takeIf { it.first == keys[index] }?.second ?: 0L
+            c.seek(com.google.android.gms.cast.MediaSeekOptions.Builder().setPosition((at - partWay).coerceAtLeast(0)).build())
             return Futures.immediateVoidFuture()
         }
+        startedPartWay = null
         index = target
         this.positionMs = at
         durationMs = C.TIME_UNSET
@@ -345,7 +356,8 @@ class TvPlayer(
                     .build(),
             )
             .setAutoplay(playWhenReady)
-            .setCurrentTime(positionMs)
+            // A song started part-way in by the server starts at its own beginning.
+            .setCurrentTime(if (startedPartWay?.first == keys.getOrNull(index)) 0L else positionMs)
             .build()
         val sentAt = System.currentTimeMillis()
         c.load(request).setResultCallback { r ->
@@ -364,7 +376,8 @@ class TvPlayer(
 
     /** A queue song for the TV, with this phone's key for its queue entry. */
     private fun toQueueItem(i: Int): MediaQueueItem {
-        val base = converter.toMediaQueueItem(items[i], keys[i])
+        val partWay = startedPartWay?.takeIf { it.first == keys[i] }?.second ?: 0L
+        val base = converter.toMediaQueueItem(items[i], keys[i], partWay)
         return MediaQueueItem.Builder(base)
             .setCustomData(JSONObject().put(ENTRY_KEY, keys[i]))
             .build()
@@ -412,8 +425,11 @@ class TvPlayer(
             AppLog.i("Cast", "The TV moved on to song ${at + 1} of ${items.size}")
             durationMs = C.TIME_UNSET
         }
-        s.mediaInfo?.streamDuration?.takeIf { it > 0 }?.let { durationMs = it }
-        positionMs = c.approximateStreamPosition.coerceAtLeast(0)
+        // A song the server started part-way in: the TV counts from there, the phone from the song's start.
+        if (startedPartWay != null && startedPartWay?.first != key) startedPartWay = null
+        val partWay = startedPartWay?.second ?: 0L
+        s.mediaInfo?.streamDuration?.takeIf { it > 0 }?.let { durationMs = it + partWay }
+        positionMs = c.approximateStreamPosition.coerceAtLeast(0) + partWay
         positionAt = System.currentTimeMillis()
         when (s.playerState) {
             MediaStatus.PLAYER_STATE_PLAYING -> { state = Player.STATE_READY; playing = true; playWhenReady = true }
@@ -495,6 +511,15 @@ class TvPlayer(
 }
 
 /** The few songs of the phone's queue the TV holds (issue #114), as index arithmetic. */
+/** Whether a TV stream is the server converting the song as it plays (Navidrome's stream with a format other than raw). */
+object TvSeek {
+    fun isConversion(url: String?): Boolean {
+        if (url == null || !url.substringBefore('?').endsWith("/rest/stream")) return false
+        val format = url.substringAfter('?', "").split('&').firstOrNull { it.startsWith("format=") }?.substringAfter('=')
+        return format != null && format != "raw"
+    }
+}
+
 /**
  * After the phone tells the TV to jump to a song, the TV's next status updates can still name the song it's leaving
  * (issue #901). Those are ignored until the TV names the song it was sent to, for up to [SETTLE_MS]; after that the
