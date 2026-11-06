@@ -73,6 +73,10 @@ jobs:
           cp "$(ls tv/build/outputs/apk/dev/*.apk | head -1)" "$apk"
           notes="Siansa TV Dev, built from \`${GITHUB_REF_NAME}\` at $short on $(date -u '+%Y-%m-%d %H:%M') UTC.
 
+          **Test build: only install it if you want to help find bugs and try features before they're finished.** Things may
+          break, change or disappear without warning, and it may lose its settings. For everyday listening, get Siansa from
+          its F-Droid repo or Google Play.
+
           The test build of Siansa for Android TV and Google TV (issue #860). Install it on the TV or Google TV box (for
           example with Downloader or adb install). It installs as its own app, next to any other Siansa build, and keeps
           its own settings, library and sign-in. Not for F-Droid or Google Play.
