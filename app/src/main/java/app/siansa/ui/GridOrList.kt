@@ -50,8 +50,14 @@ import androidx.compose.ui.unit.dp
 /** Tiles across in every grid of albums, artists and the like (issue #289). */
 const val GRID_COLUMNS = 3
 
-/** A grid of [GRID_COLUMNS] tiles, or one row per item for the list. */
-fun gridCells(grid: Boolean): GridCells = GridCells.Fixed(if (grid) GRID_COLUMNS else 1)
+/** Tiles across on the TV's wide screen (issue #980): as many as the TV's own Library. */
+const val TV_GRID_COLUMNS = 6
+
+/** Tiles across a grid: [GRID_COLUMNS] on the phone, [TV_GRID_COLUMNS] on the TV ([tv]). */
+fun gridColumns(tv: Boolean = app.siansa.BuildConfig.TV_APP): Int = if (tv) TV_GRID_COLUMNS else GRID_COLUMNS
+
+/** A grid of [gridColumns] tiles, or one row per item for the list. */
+fun gridCells(grid: Boolean): GridCells = GridCells.Fixed(if (grid) gridColumns() else 1)
 
 /**
  * Whether the list called [page] ("library", "artist", "albums"…) shows as a grid, kept on the phone so each
@@ -132,7 +138,7 @@ fun MediaRow(
 }
 
 /**
- * A page's albums as a grid of [GRID_COLUMNS] or as a list, with the switch at the top (issue #289). [subtitle]
+ * A page's albums as a grid of [gridColumns] or as a list, with the switch at the top (issue #289). [subtitle]
  * gives each album's second line.
  */
 @Composable
@@ -179,7 +185,7 @@ fun AlbumsGridOrList(
 }
 
 /**
- * Artists as a grid of [GRID_COLUMNS] or as a list, with round pictures and the switch at the top (the favourite
+ * Artists as a grid of [gridColumns] or as a list, with round pictures and the switch at the top (the favourite
  * artists page, issue #397).
  */
 @Composable

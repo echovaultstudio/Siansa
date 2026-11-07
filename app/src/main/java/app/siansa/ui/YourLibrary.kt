@@ -451,7 +451,7 @@ fun YourLibraryScreen(nav: NavController) {
                     Box(Modifier.fillMaxSize()) {
                         LazyVerticalGrid(
                             // Three across, like every grid (issue #289).
-                            columns = GridCells.Fixed(GRID_COLUMNS),
+                            columns = GridCells.Fixed(gridColumns()),
                             state = gridState,
                             contentPadding = PaddingValues(start = Space.Small, end = if (sideBar) AlphabetBarWidth + Space.Tight else Space.Small, bottom = bottomBarPadding(Space.Page)),
                             modifier = Modifier.fillMaxSize(),
