@@ -1,6 +1,6 @@
 # Maintaining the docs
 
-These pages are the user documentation for Siansa. They follow the newest beta.
+These pages are the user documentation for Siansa. They follow the newest version.
 
 ## The rule
 
