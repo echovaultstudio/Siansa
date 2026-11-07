@@ -3,6 +3,9 @@ version: 2
 updates:
   - package-ecosystem: gradle
     directory: "/"
+    # The app's libraries are tried in Siansa Dev first: their pull requests go to dev (the owner's decision,
+    # 7 November 2026). Security updates for them still go to main. The workflows' actions (below) stay on main.
+    target-branch: dev
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
