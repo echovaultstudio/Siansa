@@ -1,12 +1,12 @@
 name: Siansa Dev
 
-# Siansa Dev (issue #824): the test build of the new audio engine, from the mixer branch. It installs next to
+# Siansa Dev (issue #824): the test build of what's coming, from the dev branch. It installs next to
 # Siansa (its own app id app.siansa.dev, name and purple icon), and is published only here, as the APK of the
 # pre-release "dev-latest" on GitHub: never to F-Droid or Google Play, never as a release of Siansa (the release
-# history skips it). Each push to mixer replaces the APK.
+# history skips it). Each push to dev replaces the APK.
 on:
   push:
-    branches: [mixer]
+    branches: [dev]
   workflow_dispatch:
 
 permissions:
@@ -64,7 +64,7 @@ jobs:
           short=$(git rev-parse --short HEAD)
           apk="siansa-dev-$short.apk"
           cp "$(ls app/build/outputs/apk/dev/*.apk | head -1)" "$apk"
-          notes="Siansa Dev, built from \`mixer\` at $short on $(date -u '+%Y-%m-%d %H:%M') UTC.
+          notes="Siansa Dev, built from \`dev\` at $short on $(date -u '+%Y-%m-%d %H:%M') UTC.
 
           **Test build: only install it if you want to help find bugs and try features before they're finished.** Things may
           break, change or disappear without warning, and it may lose its settings. For everyday listening, get Siansa from

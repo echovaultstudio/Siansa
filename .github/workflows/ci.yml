@@ -263,9 +263,14 @@ jobs:
     # Your own runner when the RUNS_ON variable names it (e.g. ["self-hosted", "siansa"]), else GitHub's.
     runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
     steps:
+      # The release writes its own commits to main (CHANGELOG.md and version.txt, then RELEASES.md). main's rules
+      # require checks a direct push can't have, and GitHub lets no workflow token past them: the v1.0.0 commit was
+      # refused. So it pushes with a deploy key of its own (RELEASE_DEPLOY_KEY), which main's ruleset lets through.
+      # Without the secret it falls back to the workflow token, as before.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
       - uses: actions/download-artifact@v8
         with:
