@@ -330,6 +330,89 @@ class ShowcaseTest {
                 idle(3000)
                 shot("podcast")
             }
+            // Last, as they start mixes that change what's playing. The website's animations of the slides (issues
+            // #919 and #965): from now playing's play button up to a DJ mix and round to the other ways, and on an
+            // album from Shuffle across onto Play.
+            step("slides") {
+                playHarbourLights(30_000)
+                idle(1500)
+                compose.onAllNodesWithTag("miniPlayer").onFirst().performClick()
+                idle(3000)
+                val button = compose.onAllNodesWithTag("playButton").onFirst()
+                frame("slides", 1400)
+                button.performTouchInput { down(center) }
+                // Up, eased, until the DJ mix is chosen and its name is on the cover.
+                val reach = 120f * instrumentation.targetContext.resources.displayMetrics.density
+                for (i in 1..9) {
+                    val f = ((1 - kotlin.math.cos(Math.PI * i / 9)) / 2).toFloat()
+                    button.performTouchInput { moveTo(center + androidx.compose.ui.geometry.Offset(0f, -reach * f)) }
+                    frame("slides", 60)
+                }
+                frame("slides", 1800)
+                shot("slide-dj")
+                // Round to the right (songs that sound like it), to the left (a song path), then back up.
+                fun arc(fromDeg: Double, toDeg: Double, steps: Int) {
+                    for (i in 1..steps) {
+                        val a = Math.toRadians(fromDeg + (toDeg - fromDeg) * i / steps)
+                        button.performTouchInput {
+                            moveTo(center + androidx.compose.ui.geometry.Offset((reach * kotlin.math.sin(a)).toFloat(), (-reach * kotlin.math.cos(a)).toFloat()))
+                        }
+                        frame("slides", 50)
+                    }
+                }
+                arc(0.0, 90.0, 6)
+                frame("slides", 1500)
+                shot("slide-right")
+                arc(90.0, 270.0, 10)
+                frame("slides", 1500)
+                arc(270.0, 360.0, 6)
+                frame("slides", 900)
+                // Let go on the DJ mix: it starts, and the play button turns into a record.
+                button.performTouchInput { up() }
+                repeat(16) {
+                    SystemClock.sleep(250)
+                    compose.waitForIdle()
+                    frame("slides", 160)
+                }
+                idle(4000)
+                frame("slides", 2200)
+                shot("dj-mix")
+                back()
+                idle(800)
+                settle()
+            }
+            step("album dj mix") {
+                libraryAll()
+                chip("Music")
+                chip("Albums")
+                scrollTo("Low Tide")
+                click("Low Tide")
+                waitText("Harbour Lights")
+                idle(2500)
+                frame("album-dj", 1400)
+                val shuffle = compose.onAllNodesWithTag("shuffleAll").onFirst()
+                val width = compose.onRoot().fetchSemanticsNode().boundsInRoot.width
+                val from = shuffle.fetchSemanticsNode().boundsInRoot
+                // Play sits at the right end of the bar: the finger stops on it.
+                val onPlay = width - from.left - 44f * instrumentation.targetContext.resources.displayMetrics.density
+                shuffle.performTouchInput { down(center) }
+                for (i in 1..10) {
+                    val f = ((1 - kotlin.math.cos(Math.PI * i / 10)) / 2).toFloat()
+                    shuffle.performTouchInput { moveTo(center + androidx.compose.ui.geometry.Offset((onPlay - center.x) * f, 0f)) }
+                    frame("album-dj", 60)
+                }
+                frame("album-dj", 1800)
+                shot("album-dj-slide")
+                shuffle.performTouchInput { up() }
+                repeat(14) {
+                    SystemClock.sleep(250)
+                    compose.waitForIdle()
+                    frame("album-dj", 160)
+                }
+                idle(3000)
+                frame("album-dj", 2400)
+                shot("album-dj-mix")
+            }
         } finally {
             scenario.close()
         }
