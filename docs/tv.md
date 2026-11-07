@@ -43,22 +43,23 @@ Settings) always open that tab's own page, wherever you are.
 - **Artists**: Play, Shuffle, Artist radio and Add to favourites, then their top three songs (**Show all** for the rest), albums and similar artists.
 - **Search**: type with the on-screen keyboard or press the microphone button and say it. "Play … on Siansa" from
   Google TV's own search opens it too.
-- **Now playing**: the cover, the song and the controls, large enough to read from the sofa, over the cover blurred as
-  on the phone. Under the controls are round buttons for Like, Lyrics, Up next, Start a mix (Stop the mix while one
-  plays) and More, with Song path (with AudioMuse), Add to playlist, Similar songs and Song details; each says its name
-  as the remote reaches it. In Up next, songs Siansa added on its own (a radio, Keep
-  playing) have a star, as in the phone's queue. Synced lyrics follow the song; right from the buttons
-  reaches the lyrics, and up and down scroll through them. Animated covers can move here and on album pages, as on the
-  phone: they're off from the start on the TV, and **Settings › Animated covers** turns them on. The artists and the
-  album open their pages. The TV app has no sleep timer: the TV's own sleep setting
-  turns everything off.
+- **Now playing**: as simple as Siansa's Chromecast screen: the cover, the song, its artist and album, a thin line
+  for the time, over the cover blurred as on the phone, and Siansa's logo in the corner. There are no buttons: **OK**
+  plays and pauses (paused, the cover darkens under a pause sign), **left** and **right** go to the previous and next
+  song, and **down** opens the menu: Like, Shuffle and Repeat (each saying how it's set), Lyrics, Up next, Start a mix
+  (Stop the mix while one plays), Go to the artist, Go to the album, Song path (with AudioMuse), Add to playlist,
+  Similar songs and Song details. Lyrics and Up next open on the right: press right to move into them (up and down
+  scroll the lyrics; OK on a song in Up next plays from it) and Back to close them. In Up next, songs Siansa added on its
+  own (a radio, Keep playing) have a star, as in the phone's queue; synced lyrics follow the song. Animated covers can
+  move here and on album pages, as on the phone: they're off from the start on the TV, and **Settings › Animated
+  covers** turns them on. The **Now playing** chip at the top of the pages takes you here; its wave moves while the
+  music plays. The TV app has no sleep timer: the TV's own sleep setting turns everything off.
 - **Typing**: text fields are the TV's own, in the page: move to one (its border lights up) and press OK for the
   keyboard (in Search it comes up as soon as you open it). Type with the remote, say it with the microphone button, or
   type or paste on your phone with the Google TV app's keyboard. What you type shows straight away; Done (or Search)
   finishes.
 - **Skipping within a song**: rewind and fast forward on the remote go back and forward 10 seconds anywhere in the
-  app. On a remote without them, press up from the controls in Now playing to reach the progress bar, then left and
-  right.
+  app.
 
 ## AudioMuse
 

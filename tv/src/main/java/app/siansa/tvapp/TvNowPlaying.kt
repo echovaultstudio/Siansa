@@ -24,24 +24,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.QueueMusic
-import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.Lyrics
-import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.produceState
 import app.siansa.log.AppLog
 import app.siansa.ui.openSongDetails
 import app.siansa.ui.openSongPath
-import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Repeat
-import androidx.compose.material.icons.rounded.RepeatOne
-import androidx.compose.material.icons.rounded.Shuffle
-import androidx.compose.material.icons.rounded.SkipNext
-import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -53,8 +41,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -73,12 +62,11 @@ import app.siansa.ui.Space
 import kotlinx.coroutines.delay
 
 /**
- * The big now playing (issue #860): the cover, the song and its artist large enough to read across the room, the time,
- * the controls, and what's up next. The remote's media keys work everywhere through the media session; here rewind and
- * fast forward also skip back and forward 10 seconds.
- *
- * Kept calm: the cover, the song, the time and two rows of round buttons, the playing controls and then the rest, whose
- * name shows under them as the remote reaches each. Only the time and the lyrics redraw while a song plays.
+ * The big now playing (issue #860), as simple as Siansa's Chromecast screen (issue #974, the owner's choice): the cover,
+ * the song, its artist and album as plain words, a thin line for the time, and Siansa's logo in the corner. No buttons:
+ * OK plays and pauses, left and right go to the previous and next song, and down opens the menu with the rest ([menu]).
+ * The remote's media keys work everywhere through the media session; rewind and fast forward skip 10 seconds.
+ * Lyrics and Up next open on the right from the menu; right then goes into them, and Back closes them.
  */
 @Composable
 fun TvNowPlaying() {
@@ -90,25 +78,39 @@ fun TvNowPlaying() {
     // What the right side shows instead of the cover: the songs up next, or the lyrics.
     var panel by remember { mutableStateOf(Panel.NONE) }
     val queue = panel != Panel.NONE
-    // The name of the button the remote is on, in the row of other buttons.
-    var focusedName by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         while (true) {
             progress.value = graph.player.progress()
             delay(PROGRESS_TICK_MS)
         }
     }
-    val playButton = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { playButton.requestFocus() } }
     val song = state.current
     val liked = song != null && (likes[song.id] ?: song.starred)
     val nav = app.siansa.ui.LocalNav.current
     val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
-    var more by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
     var pickPlaylist by remember { mutableStateOf(false) }
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    androidx.activity.compose.BackHandler(enabled = queue) { panel = Panel.NONE }
+    // The remote rests on the page again once Lyrics or Up next closes.
+    val stage = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(queue) { if (!queue) runCatching { stage.requestFocus() } }
 
     val tint = app.siansa.ui.rememberCoverColor(song?.cover)
-    Box(Modifier.fillMaxSize().clipToBounds()) {
+    app.siansa.ui.TvRemoteStage(
+        onAction = { action ->
+            AppLog.d("Tv", "Now playing: ${action.name.lowercase().replace('_', ' ')}")
+            when (action) {
+                app.siansa.ui.RemoteAction.PLAY_PAUSE -> graph.player.togglePlay()
+                app.siansa.ui.RemoteAction.PREVIOUS -> graph.player.previous()
+                // With Lyrics or Up next open, right goes into them.
+                app.siansa.ui.RemoteAction.NEXT -> if (queue) focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Right) else graph.player.next()
+                app.siansa.ui.RemoteAction.MENU -> if (song != null) menu = true
+            }
+        },
+        modifier = Modifier.fillMaxSize().clipToBounds(),
+        focus = stage,
+    ) {
         TvBackdrop(song?.cover, app.siansa.ui.pageBottomColor(tint))
         Row(
             Modifier.fillMaxSize().padding(horizontal = TV_EDGE * 2, vertical = Space.Large),
@@ -116,10 +118,18 @@ fun TvNowPlaying() {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Animated covers move here as on the phone (Settings › Playback there: Animated covers), and a song's own
-            // picture shows when it has one.
-            if (!queue) app.siansa.ui.BigCover(song?.cover, song?.albumId, Modifier.size(COVER_SIZE), RoundedCornerShape(Space.Page))
+            // picture shows when it has one. Paused, the cover darkens under a pause sign, as on the Chromecast screen.
+            if (!queue) {
+                Box(Modifier.size(COVER_SIZE), contentAlignment = Alignment.Center) {
+                    app.siansa.ui.BigCover(song?.cover, song?.albumId, Modifier.size(COVER_SIZE), RoundedCornerShape(Space.Page))
+                    if (song != null && !state.isPlaying) {
+                        Box(Modifier.size(COVER_SIZE).background(Color.Black.copy(alpha = PAUSED_SHADE), RoundedCornerShape(Space.Page)))
+                        Icon(Icons.Rounded.Pause, "Paused", Modifier.size(PAUSE_SIGN).testTag("tvPaused"), tint = Color.White)
+                    }
+                }
+            }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
-                Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                     Text(
                         song?.title ?: "Nothing playing",
                         style = MaterialTheme.typography.displaySmall,
@@ -128,96 +138,15 @@ fun TvNowPlaying() {
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    // The artist and the album as plain words (the owner: no bubbles); the menu goes to them.
                     if (song != null) {
-                        // The song's artists and album, each opening its page.
-                        val artists = song.artists.ifEmpty { listOfNotNull(song.artistId?.let { app.siansa.data.ArtistRef(it, song.artist) }) }
-                        androidx.compose.foundation.layout.FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(Space.Medium),
-                            verticalArrangement = Arrangement.spacedBy(Space.Medium),
-                        ) {
-                            if (artists.isEmpty()) {
-                                Text(song.artist, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            for (a in artists.take(MAX_ARTISTS)) TvChip(a.name, onClick = { nav.navigate(TvRoutes.artist(a.id)) }, strong = true)
-                            val albumId = song.albumId
-                            if (albumId != null && song.album.isNotBlank()) TvChip(song.album, onClick = { nav.navigate(TvRoutes.album(albumId)) })
+                        Text(song.artist, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (song.album.isNotBlank()) {
+                            Text(song.album, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
                 ProgressBlock(progress, details(state.codec, state.transcodeKbps))
-                // Both rows of buttons on one grid (the owner: the five under the controls were off centre): every button
-                // in a slot as wide as Play, with the same gap, so each round button sits right under a control.
-                // Five slots of 76 dp fit beside the cover (448 dp on a 1080p TV) with 16 dp gaps, and beside Up next with 8.
-                val gap = if (queue) Space.Small else Space.Page
-                Row(Modifier.testTag("tvControls"), horizontalArrangement = Arrangement.spacedBy(gap), verticalAlignment = Alignment.CenterVertically) {
-                    ButtonSlot { TvIconButton(Icons.Rounded.Shuffle, "Shuffle", onClick = { graph.player.toggleShuffle() }, on = state.shuffle) }
-                    ButtonSlot { TvIconButton(Icons.Rounded.SkipPrevious, "Previous", onClick = { graph.player.previous() }) }
-                    ButtonSlot {
-                        TvIconButton(
-                            if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            if (state.isPlaying) "Pause" else "Play",
-                            onClick = { graph.player.togglePlay() },
-                            big = true,
-                            modifier = Modifier.focusRequester(playButton),
-                        )
-                    }
-                    ButtonSlot { TvIconButton(Icons.Rounded.SkipNext, "Next", onClick = { graph.player.next() }) }
-                    ButtonSlot {
-                        TvIconButton(
-                            if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat, "Repeat",
-                            onClick = { graph.player.cycleRepeat() },
-                            on = state.repeatMode != Player.REPEAT_MODE_OFF,
-                        )
-                    }
-                }
-                // The rest, as round buttons too; the one the remote is on says its name underneath.
-                val likeName = if (liked) "Liked" else "Like"
-                Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-                    // The same slots and gap as the controls above, so they line up column by column.
-                    Row(Modifier.testTag("tvActions"), horizontalArrangement = Arrangement.spacedBy(gap), verticalAlignment = Alignment.CenterVertically) {
-                        fun Modifier.named(name: String) = onFocusChanged { f ->
-                            if (f.isFocused) focusedName = name else if (focusedName == name) focusedName = null
-                        }
-                        ButtonSlot {
-                            TvIconButton(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, likeName,
-                                onClick = { song?.let { graph.favorites.toggle(it) } }, on = liked, modifier = Modifier.named(LIKE))
-                        }
-                        ButtonSlot {
-                            TvIconButton(Icons.Rounded.Lyrics, "Lyrics", onClick = { panel = if (panel == Panel.LYRICS) Panel.NONE else Panel.LYRICS },
-                                on = panel == Panel.LYRICS, modifier = Modifier.named("Lyrics"))
-                        }
-                        ButtonSlot {
-                            TvIconButton(Icons.AutoMirrored.Rounded.QueueMusic, "Up next", onClick = { panel = if (panel == Panel.QUEUE) Panel.NONE else Panel.QUEUE },
-                                on = panel == Panel.QUEUE, modifier = Modifier.named("Up next"))
-                        }
-                        // A mix from this song: AudioMuse's songs that sound like it when set up, Steady or DJ as on the phone;
-                        // while one plays, this stops it, as the phone's menu does (issue #895).
-                        ButtonSlot {
-                            TvIconButton(Icons.Rounded.Radio, if (radioSeed != null) "Stop the mix" else "Start a mix", on = radioSeed != null,
-                                onClick = {
-                                    if (radioSeed != null) graph.songRadio.stop() else song?.let { app.siansa.ui.RadioChooser.song.value = it }
-                                },
-                                modifier = Modifier.named(MIX))
-                        }
-                        // The rest of the phone's now playing menu, in one list, so the buttons stay five, one under each
-                        // control: song path, add to playlist, similar songs and song details (issue #895).
-                        ButtonSlot {
-                            TvIconButton(Icons.Rounded.MoreHoriz, "More", onClick = { if (song != null) more = true }, modifier = Modifier.named("More"))
-                        }
-                    }
-                    // Always there, so the page doesn't move as the name comes and goes.
-                    Text(
-                        when (focusedName) {
-                            LIKE -> likeName
-                            MIX -> if (radioSeed != null) "Stop the mix" else "Start a mix"
-                            else -> focusedName.orEmpty()
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
             }
             when (panel) {
                 Panel.QUEUE -> UpNext(state.queue, state.index, state.auto)
@@ -225,18 +154,38 @@ fun TvNowPlaying() {
                 Panel.NONE -> Unit
             }
         }
+        // What the remote does here, quietly at the foot of the page, and Siansa's logo in the corner.
+        Text(
+            if (queue) "Right  into the list  ·  Back  closes it  ·  ▼  more" else "OK  play / pause   ·   ◀ ▶  previous / next   ·   ▼  more",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = HINT_ALPHA),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Space.Section).testTag("tvRemoteHint"),
+        )
+        TvBrand(Modifier.align(Alignment.BottomEnd).padding(end = TV_EDGE * 2, bottom = Space.Section))
     }
     val snack = app.siansa.ui.LocalSnack.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    if (more && song != null) {
+    if (menu && song != null) {
+        val artistId = song.artistId ?: song.artists.firstOrNull()?.id
+        val albumId = song.albumId
         val choices = buildList<Pair<String, () -> Unit>> {
+            add((if (liked) "Liked ✓" else "Like") to { graph.favorites.toggle(song) })
+            add("Shuffle: ${if (state.shuffle) "on" else "off"}" to { graph.player.toggleShuffle() })
+            add("Repeat: ${when (state.repeatMode) { Player.REPEAT_MODE_ONE -> "this song"; Player.REPEAT_MODE_ALL -> "all"; else -> "off" }}" to { graph.player.cycleRepeat() })
+            add((if (panel == Panel.LYRICS) "Hide the lyrics" else "Lyrics") to { panel = if (panel == Panel.LYRICS) Panel.NONE else Panel.LYRICS })
+            add((if (panel == Panel.QUEUE) "Hide up next" else "Up next") to { panel = if (panel == Panel.QUEUE) Panel.NONE else Panel.QUEUE })
+            // A mix from this song: AudioMuse's songs that sound like it when set up, Steady or DJ as on the phone; while
+            // one plays, this stops it (issue #895).
+            add((if (radioSeed != null) "Stop the mix" else "Start a mix") to { if (radioSeed != null) graph.songRadio.stop() else app.siansa.ui.RadioChooser.song.value = song })
+            if (artistId != null) add("Go to the artist" to { nav.navigate(TvRoutes.artist(artistId)) })
+            if (albumId != null && song.album.isNotBlank()) add("Go to the album" to { nav.navigate(TvRoutes.album(albumId)) })
             // AudioMuse's song path from this song, queued after it once ready (as on the phone's player).
             if (graph.settings.current.audioMuseReady) add("Song path" to { nav.openSongPath(song.id, fromNowPlaying = true) })
             add("Add to playlist" to { pickPlaylist = true })
             add("Similar songs" to { nav.navigate("similar/songs/${android.net.Uri.encode(song.id)}") })
             add("Song details" to { nav.openSongDetails(song.id) })
         }
-        TvChoices(song.title, choices, onDismiss = { more = false })
+        TvChoices(song.title, choices, onDismiss = { menu = false })
     }
     // The phone's own playlist picker (issue #895).
     if (pickPlaylist && song != null) {
@@ -247,52 +196,48 @@ fun TvNowPlaying() {
     }
 }
 
-/**
- * The time: a bar, where the song is and how long it is. Up from the controls the remote reaches the bar, and left and
- * right then go back and forward 10 seconds, for remotes without rewind and fast-forward keys (those work anywhere in
- * the app, TvActivity).
- */
+/** Siansa's logo, quietly in the corner (issue #974): the icon and the wordmark, its S in amber, as on the Chromecast screen. */
+@Composable
+internal fun TvBrand(modifier: Modifier = Modifier) {
+    Row(modifier.alpha(BRAND_ALPHA).testTag("tvBrand"), horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalAlignment = Alignment.CenterVertically) {
+        // The launcher icon's own drawing (Siansa's frost and amber, in both builds), its middle two thirds.
+        androidx.compose.foundation.Image(
+            androidx.compose.ui.res.painterResource(app.siansa.R.drawable.ic_launcher_foreground), null,
+            Modifier.size(BRAND_ICON).clipToBounds().graphicsLayer { scaleX = ICON_ZOOM; scaleY = ICON_ZOOM },
+        )
+        Text(
+            androidx.compose.ui.text.buildAnnotatedString {
+                withStyle(androidx.compose.ui.text.SpanStyle(brush = androidx.compose.ui.graphics.Brush.verticalGradient(listOf(BRAND_AMBER_TOP, BRAND_AMBER_BOTTOM)))) { append("S") }
+                withStyle(androidx.compose.ui.text.SpanStyle(color = BRAND_TEXT)) { append("iansa") }
+            },
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.ExtraBold,
+        )
+    }
+}
+
+/** The time: a thin bar, where the song is and how long it is, and the file's kind between them. */
 @Composable
 private fun ProgressBlock(progress: androidx.compose.runtime.MutableState<app.siansa.playback.PlayerConnection.Progress>, details: String) {
-    val graph = LocalGraph.current
     val now = progress.value
     val fraction = if (now.durationMs > 0) (now.positionMs.toFloat() / now.durationMs).coerceIn(0f, 1f) else 0f
-    var seeking by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
         LinearProgressIndicator(
             progress = { fraction },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(if (seeking) SEEKING_HEIGHT else PROGRESS_HEIGHT)
-                .onFocusChanged { seeking = it.isFocused }
-                .onKeyEvent { e ->
-                    if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
-                    when (e.key) {
-                        Key.DirectionLeft -> { seekBy(graph, -SEEK_MS); progress.value = graph.player.progress(); true }
-                        Key.DirectionRight -> { seekBy(graph, SEEK_MS); progress.value = graph.player.progress(); true }
-                        else -> false
-                    }
-                }
-                .focusable(),
+            modifier = Modifier.fillMaxWidth().height(PROGRESS_HEIGHT),
             color = MaterialTheme.colorScheme.primary,
-            trackColor = if (seeking) MaterialTheme.colorScheme.onSurfaceVariant else Color.White.copy(alpha = TRACK_ALPHA),
+            trackColor = Color.White.copy(alpha = TRACK_ALPHA),
+            drawStopIndicator = {},
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(minutes(now.positionMs), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                if (seeking) "◀  10 s back   ·   10 s forward  ▶" else details,
-                style = MaterialTheme.typography.titleMedium,
-                color = if (seeking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text(details, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(minutes(now.durationMs), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 private enum class Panel { NONE, QUEUE, LYRICS }
-
-/** Like, whose name changes to Liked: kept by what it is, so the name under the buttons follows. */
-private const val LIKE = "like"
 
 /**
  * The song's lyrics from the server, as on the phone: synced ones follow the song, the line being sung lit and kept in
@@ -376,12 +321,6 @@ private fun LyricsPanel(song: app.siansa.data.Song?, positionMs: () -> Long) {
     }
 }
 
-/** A button's place in Now playing's rows: as wide as Play, the button in its middle, so both rows line up. */
-@Composable
-private fun ButtonSlot(content: @Composable () -> Unit) {
-    Box(Modifier.width(BUTTON_SLOT).testTag("tvButtonSlot"), contentAlignment = Alignment.Center) { content() }
-}
-
 /**
  * The songs after this one: OK plays from that song. Songs Siansa added on its own (AudioMuse's radio, Keep playing)
  * have the same star as on the phone's queue.
@@ -429,7 +368,6 @@ fun details(codec: String?, kbps: Int): String = when {
 }
 
 private const val PROGRESS_TICK_MS = 500L
-private const val SEEK_MS = 10_000L
 private val COVER_SIZE = 320.dp
 private const val TRACK_ALPHA = 0.25f
 private const val LINES_ABOVE = 2
@@ -439,15 +377,19 @@ private const val FOLLOW_AGAIN_MS = 4_000L
 private val LYRICS_RING = 2.dp
 private const val ROW_GROW = 1.02f
 private const val QUEUE_SHOWN = 100
-/** Each of Now playing's buttons sits in a slot this wide: Play's size, the largest. */
-private val BUTTON_SLOT = 76.dp
 /** The star on a song Siansa added on its own, a little larger than the phone's for the distance. */
 private val AUTO_MARK = 20.dp
-private const val MAX_ARTISTS = 3
-/** The mix button, whose name changes to Stop the mix while one plays. */
-private const val MIX = "mix"
-private val PROGRESS_HEIGHT = 6.dp
-private val SEEKING_HEIGHT = 12.dp
+private val PROGRESS_HEIGHT = 4.dp
+private const val PAUSED_SHADE = 0.45f
+private val PAUSE_SIGN = 96.dp
+private const val HINT_ALPHA = 0.7f
+private const val BRAND_ALPHA = 0.75f
+private val BRAND_ICON = 44.dp
+/** The launcher icon's drawing fills the middle two thirds of its square. */
+private const val ICON_ZOOM = 1.5f
+private val BRAND_AMBER_TOP = Color(0xFFFFE7C4)
+private val BRAND_AMBER_BOTTOM = Color(0xFFE8A55A)
+private val BRAND_TEXT = Color(0xFFEEF2F5)
 
 /** Back or forward [deltaMs] in the song playing, kept inside it. */
 fun seekBy(graph: app.siansa.AppGraph, deltaMs: Long) {

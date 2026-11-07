@@ -12,9 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -29,6 +26,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
 import androidx.compose.runtime.rememberCoroutineScope
@@ -144,6 +145,7 @@ fun TvRoot(searches: MutableStateFlow<String?>) {
                     TopBar(
                         current = tab,
                         playing = player.hasMedia,
+                        moving = player.isPlaying,
                         onTab = { nav.switchTab(it) },
                         onNowPlaying = { nav.navigate(TvRoutes.NOW_PLAYING) { launchSingleTop = true } },
                     )
@@ -204,7 +206,7 @@ fun NavController.switchTab(route: String) = navigate(route) {
 }
 
 @Composable
-private fun TopBar(current: String, playing: Boolean, onTab: (String) -> Unit, onNowPlaying: () -> Unit) {
+private fun TopBar(current: String, playing: Boolean, onTab: (String) -> Unit, onNowPlaying: () -> Unit, moving: Boolean = false) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = TV_EDGE, vertical = Space.Page),
         horizontalArrangement = Arrangement.spacedBy(Space.Small),
@@ -245,10 +247,49 @@ private fun TopBar(current: String, playing: Boolean, onTab: (String) -> Unit, o
                 horizontalArrangement = Arrangement.spacedBy(Space.Small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Rounded.GraphicEq, null, tint = MaterialTheme.colorScheme.primary)
+                NowPlayingWave(moving, MaterialTheme.colorScheme.primary)
                 Text("Now playing", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             }
         }
     }
 }
+
+/**
+ * The Now playing chip's wave (issue #974): five bars that rise and fall lightly while the music plays, still while
+ * it's paused. Only drawn again as they move, never composed again, so it costs the TV next to nothing.
+ */
+@Composable
+internal fun NowPlayingWave(moving: Boolean, color: androidx.compose.ui.graphics.Color) {
+    val phase = if (moving) {
+        val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "wave")
+        transition.animateFloat(
+            0f, (2 * Math.PI).toFloat(),
+            androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(WAVE_MS, easing = androidx.compose.animation.core.LinearEasing)),
+            label = "wavePhase",
+        )
+    } else null
+    androidx.compose.foundation.Canvas(Modifier.size(WAVE_SIZE).testTag(if (moving) "nowPlayingWaveMoving" else "nowPlayingWave")) {
+        val bars = WAVE_BARS.size
+        val gap = size.width / (bars * 2 - 1)
+        val t = phase?.value ?: 0f
+        WAVE_BARS.forEachIndexed { i, rest ->
+            // Each bar its own step behind the last, a gentle swing around its height at rest.
+            val swing = if (phase != null) WAVE_SWING * kotlin.math.sin(t + i * WAVE_STEP) else 0f
+            val h = size.height * (rest + swing).coerceIn(0.2f, 1f)
+            drawRoundRect(
+                color,
+                topLeft = androidx.compose.ui.geometry.Offset(i * gap * 2, (size.height - h) / 2),
+                size = androidx.compose.ui.geometry.Size(gap, h),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(gap / 2, gap / 2),
+            )
+        }
+    }
+}
+
+/** The wave's bars at rest, as Material's GraphicEq. */
+private val WAVE_BARS = listOf(0.45f, 0.8f, 1f, 0.7f, 0.4f)
+private const val WAVE_SWING = 0.18f
+private const val WAVE_STEP = 1.1f
+private const val WAVE_MS = 1_600
+private val WAVE_SIZE = 24.dp
 
