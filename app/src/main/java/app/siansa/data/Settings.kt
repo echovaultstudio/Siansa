@@ -131,6 +131,8 @@ data class AppSettings(
     /** Image cache limit in MB; 0 = no limit. */
     val imageCacheMb: Int = 500,
     val animatedCovers: Boolean = animatedCoversByDefault(app.siansa.BuildConfig.TV_APP),
+    /** Now playing's seek bar, Play button and device name in the cover's colours (issue #970). */
+    val dynamicPlayerColours: Boolean = false,
     /** Download every album, artist and playlist cover in the background. */
     val coverDownload: Boolean = false,
     /** ...on any Wi-Fi, rather than only on the same local network as Navidrome. */
@@ -427,6 +429,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         imageCacheMb = prefs.getInt("image_cache_mb", 500),
         // Off from the start on the TV app (issue #945): an animation costs a TV more than it gives.
         animatedCovers = prefs.getBoolean("animated_covers", animatedCoversByDefault(app.siansa.BuildConfig.TV_APP)),
+        dynamicPlayerColours = prefs.getBoolean("dynamic_player_colours", false),
         coverDownload = prefs.getBoolean("cover_download", false),
         coverDownloadAnyWifi = prefs.getBoolean("cover_download_any_wifi", false),
         coverDownloadWifiOnly = prefs.getBoolean("cover_download_wifi_only", true),
@@ -634,6 +637,12 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         val notices = _state.value.notices.with(kind, mode)
         prefs.edit().putString("notices", notices.format()).apply()
         _state.value = _state.value.copy(notices = notices)
+    }
+
+    /** Now playing in the cover's colours (issue #970). */
+    fun setDynamicPlayerColours(on: Boolean) {
+        prefs.edit().putBoolean("dynamic_player_colours", on).apply()
+        _state.value = _state.value.copy(dynamicPlayerColours = on)
     }
 
     fun setAnimatedCovers(on: Boolean) {
