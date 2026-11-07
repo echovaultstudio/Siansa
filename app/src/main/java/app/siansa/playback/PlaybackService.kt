@@ -72,6 +72,8 @@ private const val FALLBACK_KBPS = 320
 private const val END_GRACE_MS = 3_000L
 /** How long music stays on a TV that Cast lost touch with, waiting for it to come back (issue #114). */
 private const val CAST_RESUME_WAIT_MS = 30_000L
+/** How long after the TV screen closed by itself joining it again still carries the music on (issue #972). */
+private const val REJOIN_PLAY_MS = 30_000L
 
 /** How long songs may take to get ready for the TV (their file types asked from the server) before they go anyway. */
 private const val CAST_PREP_MS = 3_000L
@@ -100,6 +102,9 @@ class PlaybackService : MediaLibraryService() {
     private var castPlayer: TvPlayer? = null
     /** The phone lost touch with the TV for a moment (Cast suspended the session); it may come back (issue #114). */
     private var castSuspended = false
+    /** Whether the music was playing on a TV the phone is joining again (issue #972), and when it asked. */
+    private var rejoinPlay = false
+    private var rejoinAskedAt = 0L
     private var dlnaPlayer: DlnaPlayer? = null
     /** Follows the Wi-Fi while music plays on a DLNA device, to bring it back the moment the phone leaves (issue #624). */
     private var lanWatch: LanWatch? = null
@@ -246,6 +251,12 @@ class PlaybackService : MediaLibraryService() {
                 }
                 override fun onSessionStartFailed(castSession: CastSession, error: Int) {}
                 override fun onSessionEnded(castSession: CastSession, error: Int) {
+                    // The TV screen closing by itself is joined again, and the music carries on there (issue #972).
+                    val wasPlaying = session?.player === tv && tv.playWhenReady
+                    if (Cast.rejoinIfWorth(this@PlaybackService, castSession.castDevice?.deviceId, error)) {
+                        rejoinPlay = wasPlaying
+                        rejoinAskedAt = android.os.SystemClock.elapsedRealtime()
+                    }
                     tv.detach()
                     castEnded()
                 }
@@ -589,7 +600,14 @@ class PlaybackService : MediaLibraryService() {
     private fun castStarted(tv: Player) {
         if (session?.player === tv) return
         if (phone.mediaItemCount == 0) AppLog.i("Cast", "Nothing playing yet: the TV shows Siansa's screen, and music goes there when it starts")
+        val resume = rejoinPlay && android.os.SystemClock.elapsedRealtime() - rejoinAskedAt < REJOIN_PLAY_MS
+        rejoinPlay = false
         moveTo(tv)
+        // Joined again after the TV screen closed by itself: the music carries on where it was.
+        if (resume) {
+            AppLog.i("Cast", "Back on the TV after its screen closed: playing on")
+            tv.play()
+        }
     }
 
     /**

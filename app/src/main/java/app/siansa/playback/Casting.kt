@@ -183,6 +183,26 @@ object Cast {
 
     private const val ENDED_HERE_MS = 5_000L
 
+    /** When the phone last joined a TV screen again after it closed by itself (elapsedRealtime). */
+    @Volatile private var rejoinedAt = -CastRejoin.EVERY_MS
+
+    /**
+     * After the cast to [device] ended with [error]: picks that TV again when [CastRejoin.worth] (the music then goes back
+     * to it, see PlaybackService); whether it does.
+     */
+    fun rejoinIfWorth(app: Context, device: String?, error: Int): Boolean {
+        val now = android.os.SystemClock.elapsedRealtime()
+        val fromPhone = endedFromPhone(now - endedHereAt)
+        if (!CastRejoin.worth(error, device != null, fromPhone, now - rejoinedAt)) {
+            if (!fromPhone && error != CastStatusCodes.SUCCESS && device != null) AppLog.i("Cast", "The TV screen closed again within ${CastRejoin.EVERY_MS / 60_000} min: not joining it again")
+            return false
+        }
+        rejoinedAt = now
+        AppLog.i("Cast", "The TV screen closed by itself (${CastStatusCodes.getStatusCodeString(error)}): joining it again")
+        mainHandler.postDelayed({ reselect(app, device!!) }, RETRY_DELAY_MS)
+        return true
+    }
+
     /**
      * Finds every Cast device: those that can play Google's standard screen (all of them), and those offered
      * Siansa's own, so a TV shows up whether or not it can show Siansa's screen (issue #114).
@@ -554,6 +574,19 @@ const val CAST_PRELOAD_SECONDS = 20.0
 data class CastSpot<T>(val items: List<T>, val index: Int, val positionMs: Long)
 
 /** Hold to stop while casting (issue #491): set by the app, read once by the playback service as casting ends. */
+/** When the phone joins a TV again after its screen closed by itself (issue #972). */
+object CastRejoin {
+    /** At most once in this long, so a TV that keeps closing doesn't keep the phone trying. */
+    const val EVERY_MS = 120_000L
+
+    /**
+     * Whether to join the TV again after its cast ended with [error]: the TV screen closed by itself (not the phone
+     * ending it, [fromPhone]), the TV is known ([knownTv]), and not already in the last [EVERY_MS] ([sinceLastMs]).
+     */
+    fun worth(error: Int, knownTv: Boolean, fromPhone: Boolean, sinceLastMs: Long): Boolean =
+        error != CastStatusCodes.SUCCESS && knownTv && !fromPhone && sinceLastMs >= EVERY_MS
+}
+
 object StopCasting {
     @Volatile var requested: Boolean = false
 }
