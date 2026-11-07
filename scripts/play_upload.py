@@ -15,7 +15,7 @@ script never prints it.
 
 The TV app (--tv, issue #988) is the same app on Play, app.siansa, on Play's own Android TV tracks: one store page,
 and Play gives TVs the TV bundle and phones the phone's. Its tracks are PLAY_TV_TRACK, comma-separated; unset, the TV's
-internal testing ("tv:qa"). Play Console must have Android TV turned on first (Advanced settings › Form factors), and a
+internal testing ("tv:internal"). Play Console must have Android TV turned on first (Advanced settings › Form factors), and a
 closed test for TVs is a track of its own there, named "tv:" and its name (e.g. "tv:alpha").
 
 A bundle Play already has isn't an error: it's found by its SHA-256 and put on the tracks, so running this again
@@ -36,15 +36,17 @@ NOTES_MAX = 500
 # Closed testing ("alpha" in the API) and internal testing, both with every release (#557).
 DEFAULT_TRACKS = ("alpha", "internal")
 TRACK_NAMES = {"alpha": "closed testing", "internal": "internal testing", "beta": "open testing", "production": "production"}
-# The TV app's tracks (issue #988): Play's Android TV form factor, "tv:" and the track. Internal testing is "qa" there.
-DEFAULT_TV_TRACKS = ("tv:qa",)
+# The TV app's tracks (issue #988): Play's Android TV form factor, "tv:" and the track. Its internal testing is
+# "tv:internal": Play refused "tv:qa" ("Track not found", 1.1.0), though "qa" is an old name for internal testing.
+DEFAULT_TV_TRACKS = ("tv:internal",)
 
 
 def track_name(track):
-    """A track in words: "closed testing", or "TV internal testing" for "tv:qa"."""
+    """A track in words: "closed testing", or "TV internal testing" for "tv:internal"."""
     if track.startswith("tv:"):
         rest = track[3:]
-        return "TV " + {"qa": "internal testing", "beta": "open testing", "production": "production"}.get(rest, f"closed testing ({rest})")
+        return "TV " + {"internal": "internal testing", "qa": "internal testing", "beta": "open testing",
+                        "production": "production"}.get(rest, f"closed testing ({rest})")
     return TRACK_NAMES.get(track, track)
 
 
@@ -212,7 +214,15 @@ def upload(aab, version, notes_md, tracks, key_json):
 
     def put(status):
         for track in tracks:
-            call("PUT", f"{API}/edits/{edit}/tracks/{track}", tok, body=track_body(track, version, code, notes, status))
+            try:
+                call("PUT", f"{API}/edits/{edit}/tracks/{track}", tok, body=track_body(track, version, code, notes, status))
+            except PlayError as e:
+                if "not found" not in str(e).lower():
+                    raise
+                # A track Play doesn't have: say which it has, so a wrong name, or Android TV not yet turned on in
+                # Play Console (no "tv:" tracks at all), is plain from the run's log.
+                have = [t.get("track") for t in call("GET", f"{API}/edits/{edit}/tracks", tok).get("tracks", [])]
+                raise PlayError(f"{e} Play's tracks for {PACKAGE}: {', '.join(have) or 'none'}.") from None
         call("POST", f"{API}/edits/{edit}:commit", tok)
 
     status = "completed"
