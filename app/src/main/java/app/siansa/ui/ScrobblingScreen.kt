@@ -174,16 +174,18 @@ fun ScrobblingScreen(nav: NavController) {
             Hint("For Koito, enter its address (e.g. https://koito.example.com) and an API key from Koito's settings → API Keys. Leave the address empty for listenbrainz.org.")
             Field("Server address", lbUrl, placeholder = "https://koito.example.com") { lbUrl = it }
             Secret("Token / API key", lbToken) { lbToken = it }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                Button(modifier = Modifier.focusRing(), onClick = {
-                    result({ lbStatus = it }) {
-                        val message = graph.listenBrainz.validate(lbUrl, lbToken.trim())
-                        graph.settings.save(
-                            graph.settings.current.copy(listenBrainzEnabled = true, listenBrainzUrl = lbUrl.trim(), listenBrainzToken = lbToken.trim())
-                        )
-                        "$message · sending to ${ListenBrainzApi.apiRoot(lbUrl)}"
-                    }
-                }) { Text("Test and save") }
+            val testListenBrainz = {
+                result({ lbStatus = it }) {
+                    val message = graph.listenBrainz.validate(lbUrl, lbToken.trim())
+                    graph.settings.save(
+                        graph.settings.current.copy(listenBrainzEnabled = true, listenBrainzUrl = lbUrl.trim(), listenBrainzToken = lbToken.trim())
+                    )
+                    "$message · sending to ${ListenBrainzApi.apiRoot(lbUrl)}"
+                }
+            }
+            // On the TV the whole row is what the remote stops on, so it isn't skipped (issue #978).
+            TvActionRow(onClick = { testListenBrainz() }) { button ->
+                Button(modifier = button, onClick = { testListenBrainz() }) { Text("Test and save") }
             }
             lbStatus?.let { Status(it) }
             }

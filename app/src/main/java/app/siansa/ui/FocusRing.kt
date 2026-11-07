@@ -1,6 +1,8 @@
 package app.siansa.ui
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -9,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -30,3 +33,37 @@ fun Modifier.focusRing(shape: Shape = ButtonDefaults.shape): Modifier {
 
 /** As thick as the TV's own focus ring. */
 private val FOCUS_RING_WIDTH = 3.dp // spacing: exact
+
+/**
+ * A row with a button at its start (Test under a login, issue #978) that the remote reaches as the whole width of the
+ * page on the TV. The remote moves by distance, and on the TV's wide page a narrow button on the left counts as further
+ * away than a wide control beyond it: down from the last box went past Test to Save, and up from Save past it too.
+ * Here the row is what the remote stops on, OK on it does [onClick], and the button in it ([content]'s modifier, for
+ * the button) shows the ring. On a phone, an ordinary row whose button is pressed as usual.
+ */
+@Composable
+fun TvActionRow(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tv: Boolean = app.siansa.BuildConfig.TV_APP,
+    content: @Composable androidx.compose.foundation.layout.RowScope.(button: Modifier) -> Unit,
+) {
+    val arrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Space.Medium)
+    val middle = androidx.compose.ui.Alignment.CenterVertically
+    if (!tv) {
+        androidx.compose.foundation.layout.Row(modifier, horizontalArrangement = arrangement, verticalAlignment = middle) { content(Modifier) }
+        return
+    }
+    var focused by remember { mutableStateOf(false) }
+    val ring = if (focused) MaterialTheme.colorScheme.primary else Color.Transparent
+    androidx.compose.foundation.layout.Row(
+        modifier
+            .fillMaxWidth()
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(interactionSource = null, indication = null, onClick = onClick),
+        horizontalArrangement = arrangement,
+        verticalAlignment = middle,
+    ) {
+        content(Modifier.focusProperties { canFocus = false }.border(FOCUS_RING_WIDTH, ring, ButtonDefaults.shape))
+    }
+}

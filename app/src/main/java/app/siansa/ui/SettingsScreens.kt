@@ -330,8 +330,9 @@ internal fun SecretField(label: String, value: String, onChange: (String) -> Uni
 
 @Composable
 internal fun TestRow(result: String?, onTest: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-        OutlinedButton(onClick = onTest, modifier = Modifier.focusRing()) { Text("Test") }
+    // On the TV the whole row is what the remote stops on, so it isn't skipped (issue #978).
+    TvActionRow(onClick = onTest) { button ->
+        OutlinedButton(onClick = onTest, modifier = button) { Text("Test") }
         if (result != null) {
             Text(
                 result,

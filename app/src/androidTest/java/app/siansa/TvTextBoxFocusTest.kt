@@ -5,7 +5,13 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
@@ -18,6 +24,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.siansa.ui.SiansaTheme
+import app.siansa.ui.Space
+import app.siansa.ui.TvActionRow
 import app.siansa.ui.TvTextBox
 import app.siansa.ui.TvTextKind
 import org.junit.Assert.assertTrue
@@ -94,5 +102,67 @@ class TvTextBoxFocusTest {
         assertTrue("Up from Test reaches Password ($trail)", backUp == "on=Password")
         assertTrue("OK types in Password ($trail)", typing.endsWith("typing in Password"))
         assertTrue("Down while typing goes on to Test ($trail)", leftTyping == "on=Test")
+    }
+
+    /**
+     * Issue #978: as on the TV's settings, a wide page, a hint between the login and Test, and a wide Save under it. Going
+     * by distance, the narrow Test button lost to Save both ways, and the remote skipped it on the TV, while the phone's
+     * narrow screen above passed; Test's row ([TvActionRow]) is now as wide as the page. Drawn at a density of 1 so the
+     * phone's screen is as wide as a TV's page.
+     */
+    @Test fun downFromTheLastBoxOfAWidePageReachesTest() {
+        var tested = 0
+        compose.setContent {
+            SiansaTheme {
+                androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(1f)) {
+                    Column(
+                        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(Space.Page),
+                        verticalArrangement = Arrangement.spacedBy(Space.Medium),
+                    ) {
+                        TvTextBox("", {}, "Username", Modifier.fillMaxWidth())
+                        TvTextBox("", {}, "Password", Modifier.fillMaxWidth(), kind = TvTextKind.SECRET)
+                        Text("With several music servers in AudioMuse, each server's own name there is under Servers.")
+                        // As TestRow on the TV: the row is what the remote stops on.
+                        TvActionRow(onClick = { tested++ }, modifier = Modifier.testTag("test"), tv = true) { button ->
+                            OutlinedButton(onClick = {}, modifier = button) { Text("Test") }
+                        }
+                        Button(onClick = {}, modifier = Modifier.fillMaxWidth().testTag("save")) { Text("Save") }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        InstrumentationRegistry.getInstrumentation().setInTouchMode(false)
+        compose.onNodeWithTag("tvTextBox:Password").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
+        compose.waitForIdle()
+        fun on(): String = listOf("tvTextBox:Username" to "Username", "tvTextBox:Password" to "Password", "test" to "Test", "save" to "Save")
+            .firstOrNull { (tag, _) ->
+                compose.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.Focused, true) and androidx.compose.ui.test.hasTestTag(tag))
+                    .fetchSemanticsNodes().isNotEmpty()
+            }?.second ?: "none"
+        val start = on()
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        val down = on()
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        val downAgain = on()
+        press(KeyEvent.KEYCODE_DPAD_UP)
+        val up = on()
+        press(KeyEvent.KEYCODE_DPAD_UP)
+        val upAgain = on()
+        press(KeyEvent.KEYCODE_DPAD_UP)
+        val top = on()
+        val trail = "start: $start · down: $down · down: $downAgain · up: $up · up: $upAgain · up: $top"
+        println("TV wide form focus: $trail")
+        assertTrue("Starts on Password ($trail)", start == "Password")
+        assertTrue("Down from Password reaches Test, not Save ($trail)", down == "Test")
+        assertTrue("Down from Test reaches Save ($trail)", downAgain == "Save")
+        assertTrue("Up from Save reaches Test ($trail)", up == "Test")
+        assertTrue("Up from Test reaches Password ($trail)", upAgain == "Password")
+        assertTrue("Up from Password reaches Username ($trail)", top == "Username")
+        // OK on Test's row tests.
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        assertTrue("OK on Test tests (on ${on()})", tested == 1)
     }
 }
