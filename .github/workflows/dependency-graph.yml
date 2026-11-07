@@ -5,7 +5,7 @@ name: Dependency graph
 # Gradle wrapper, which Siansa doesn't have; this uses Gradle 8.14.3 as CI does.
 on:
   push:
-    branches: [main, mixer]
+    branches: [main, dev]
   workflow_dispatch:
 
 permissions:

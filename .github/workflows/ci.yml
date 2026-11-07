@@ -8,8 +8,14 @@ on:
   push:
     branches: [main]
   pull_request:
-  # Actions → CI → Run workflow: builds, checks and releases main on demand.
+  # Actions → CI → Run workflow: builds and checks main on demand. Tick "Release now" to publish the fixes
+  # waiting on main as one release, past .release-hold (the owner's batches, 7 November 2026).
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Release now: publish everything waiting in changelog.d/ as one release"
+        type: boolean
+        default: false
   # Nightly, so the emulator tests keep watching main even on quiet days.
   schedule:
     - cron: "17 1 * * *"
@@ -277,8 +283,8 @@ jobs:
           VERSION=$(tr -d '[:space:]' < notes/version.txt)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           # A file .release-hold on main holds releases back: merges keep collecting notes in changelog.d/,
-          # and deleting the file publishes them all as one release.
-          if [ -f .release-hold ]; then
+          # and Run workflow with "Release now" (or deleting the file) publishes them all as one release.
+          if [ -f .release-hold ] && [ "${{ github.event_name == 'workflow_dispatch' && inputs.release }}" != "true" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "::notice::Releases are on hold (.release-hold on main); v$VERSION will be published once it's removed."
           elif git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then

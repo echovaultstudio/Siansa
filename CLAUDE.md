@@ -3,18 +3,26 @@
 Personal Android music player for Navidrome (Kotlin, Jetpack Compose, Media3, Coil 3, Room).
 Source: `app/src/main/java/app/siansa/`. Unit tests: `app/src/test/`. Emulator tests: `app/src/androidTest/`.
 
-## Until v1.0: work on `mixer`
+## Branches: fixes on `main`, features on `dev`
 
-All work goes on the `mixer` branch until v1.0: the new audio engine (#826), every fix and every feature. Branch
-from `mixer` and open pull requests against `mixer`, not `main` (the owner decided, 0.52.0-dev). Each push to
-`mixer` builds Siansa Dev (`.github/workflows/dev-app.yml`) for the owner to test. `main` stays at 0.51.x with
-releases held (`.release-hold`); at v1.0 `mixer` goes to `main` in one pull request, the engine on for everyone.
-v1.0 keeps Siansa's own look: Siansa Dev's purple icon and name live only in `app/src/dev/` and never reach the
-normal app, and anything shared by both builds (such as the Cast TV screen, `cast-receiver/`) uses main's black, frost
-and amber colours and icon.
-A pull request against `mixer` doesn't close its issue on merge (GitHub only does that on `main`): leave the issue
-open with a comment that the fix is in Siansa Dev; it closes when v1.0 reaches `main`. Only an urgent fix for the
-released app goes to `main`, and only when the owner asks.
+Since v1.0 (the owner decided, 7 November 2026):
+
+- **Bug fixes** go to `main`: branch from `main` and open the pull request against `main`. It closes its issue on
+  merge. Fixes don't release one by one: `.release-hold` stays on `main`, and the owner releases them together when
+  they say so. Then run Actions › CI › Run workflow on `main` with **Release now** ticked: one patch release, F-Droid
+  first. `.play-hold` on `main` keeps Google Play out until the owner removes it.
+- **New features and big reworks** go to `dev`: branch from `dev` and open the pull request against `dev`. Each
+  push to `dev` builds Siansa Dev and Siansa TV Dev (`dev-app.yml`, `tv-dev.yml`) for the owner to test. A pull
+  request against `dev` doesn't close its issue on merge: leave a comment that it's in Siansa Dev. It closes when
+  `dev` reaches `main`.
+- **`dev` keeps up with `main` by itself:** `sync-dev.yml` merges `main` into `dev` after every push to `main`. If they
+  conflict, merge `main` into `dev` by hand, in a pull request against `dev`.
+- **When the owner is happy with what's on `dev`**, it goes to `main` in one pull request (a minor version, or major
+  when a note asks for it), and the fixes and the features are released together.
+- If unsure whether something is a fix or a feature, ask; anything with an `### Added` note is a feature.
+
+Siansa Dev's purple icon and name live only in `app/src/dev/` and never reach the normal app, and anything shared by
+both builds (such as the Cast TV screen, `cast-receiver/`) uses main's black, frost and amber colours and icon.
 
 ## Every change
 

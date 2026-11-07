@@ -7,7 +7,7 @@ name: Servers
 on:
   pull_request:
   push:
-    branches: [mixer, main]
+    branches: [dev, main]
   workflow_dispatch:
     inputs:
       emby:

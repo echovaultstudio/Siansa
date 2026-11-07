@@ -1,0 +1,43 @@
+# Keeps dev up to date with main (the owner's branches, 7 November 2026): bug fixes go to main, features and big reworks
+# to dev for Siansa Dev first, so every fix on main is merged into dev straight away. A conflict stops here with an
+# error: then merge main into dev by hand (a pull request against dev).
+name: Keep dev up to date
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: sync-dev
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  merge:
+    name: Merge main into dev
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: dev
+      - name: Merge
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git fetch -q origin main
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "::notice::dev already has everything on main."
+            exit 0
+          fi
+          if ! git merge --no-edit -m "Merge main into dev" origin/main; then
+            git merge --abort || true
+            echo "::error::main and dev conflict: merge main into dev by hand, in a pull request against dev."
+            exit 1
+          fi
+          git push origin HEAD:dev
+          echo "::notice::Merged main ($(git rev-parse --short origin/main)) into dev."

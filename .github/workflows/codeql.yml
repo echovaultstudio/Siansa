@@ -8,7 +8,7 @@ name: CodeQL
 on:
   pull_request:
   push:
-    branches: [main, mixer]
+    branches: [main, dev]
   schedule:
     # Weekly, so new queries also look at code nobody has changed.
     - cron: "41 3 * * 1"
@@ -63,7 +63,7 @@ jobs:
           gradle-version: "8.14.3"
 
       # Compiled from scratch (no build cache), so CodeQL sees every Kotlin file: the phone app, and the TV app where
-      # the branch has it (main gets it with v1.0). The same file is on main and mixer.
+      # the branch has it (main gets it with v1.0). The same file is on main and dev.
       - name: Compile the phone and TV apps
         if: matrix.language == 'java-kotlin'
         run: |

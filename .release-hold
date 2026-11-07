@@ -1,0 +1,2 @@
+Releases held back on request (7 November 2026): fixes merged into main are released together when the owner says so.
+Run Actions › CI › Run workflow on main with "Release now" ticked to publish everything waiting in changelog.d/ as one release.
