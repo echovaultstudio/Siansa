@@ -338,18 +338,25 @@ jobs:
         env:
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           PLAY_TRACK: ${{ vars.PLAY_TRACK }}
+          PLAY_TV: ${{ vars.PLAY_TV }}
+          PLAY_TV_TRACK: ${{ vars.PLAY_TV_TRACK }}
         run: |
           if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then echo "::notice::No Google Play key (PLAY_SERVICE_ACCOUNT_JSON); skipped."; exit 0; fi
           pip install --quiet google-auth==2.40.3 requests==2.32.4
           # Play shows 500 characters: a short note written for Play (play-notes/<version>.md) when there is one.
           notes="notes/${{ steps.version.outputs.version }}.md"
           [ -f "play-notes/${{ steps.version.outputs.version }}.md" ] && notes="play-notes/${{ steps.version.outputs.version }}.md"
-          python3 scripts/play_upload.py "siansa-${{ steps.version.outputs.version }}.aab" "${{ steps.version.outputs.version }}" "$notes"
+          # With PLAY_TV "true", the TV app goes into the same release (#988): Android TV shares the phone's tracks.
+          also=()
+          if [ "$PLAY_TV" = "true" ] && [ -z "$PLAY_TV_TRACK" ] && [ -f "siansa-tv-${{ steps.version.outputs.version }}.aab" ]; then
+            also=(--also "siansa-tv-${{ steps.version.outputs.version }}.aab")
+          fi
+          python3 scripts/play_upload.py "siansa-${{ steps.version.outputs.version }}.aab" "${{ steps.version.outputs.version }}" "$notes" "${also[@]}"
 
-      # The TV app, the same app on Play (app.siansa) on its Android TV tracks (issue #988), once the repository variable
-      # PLAY_TV is "true": Play refuses TV bundles until Android TV is turned on in Play Console (siansa-dev: docs/google-play.md).
+      # The TV app on a dedicated Android TV track of its own (issue #988): only when PLAY_TV_TRACK names one. Siansa's
+      # Android TV shares the phone's tracks, so the TV bundle goes in the phone's release above instead.
       - name: Upload the TV app to Google Play
-        if: steps.version.outputs.exists != 'true' && vars.PLAY_TV == 'true'
+        if: steps.version.outputs.exists != 'true' && vars.PLAY_TV == 'true' && vars.PLAY_TV_TRACK != ''
         continue-on-error: true
         env:
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}

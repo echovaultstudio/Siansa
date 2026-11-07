@@ -13,10 +13,11 @@ Needs PLAY_SERVICE_ACCOUNT_JSON: a Google Cloud service account's JSON key, invi
 "Release apps to testing tracks" for Siansa only. Without it nothing is sent. The key stays in that secret; this
 script never prints it.
 
-The TV app (--tv, issue #988) is the same app on Play, app.siansa, on Play's own Android TV tracks: one store page,
-and Play gives TVs the TV bundle and phones the phone's. Its tracks are PLAY_TV_TRACK, comma-separated; unset, the TV's
-internal testing ("tv:internal"). Play Console must have Android TV turned on first (Advanced settings › Form factors), and a
-closed test for TVs is a track of its own there, named "tv:" and its name (e.g. "tv:alpha").
+The TV app (issue #988) is the same app on Play, app.siansa: one store page, and Play gives TVs the TV bundle and
+phones the phone's. Siansa's Play Console has Android TV on "the same release track as your mobile app", so the TV
+bundle goes into the phone's release on the same tracks: --also <tv.aab> uploads both in one edit, one release with
+both version codes. With Android TV on a dedicated track instead, --tv sends a bundle to the TV's own tracks,
+PLAY_TV_TRACK, comma-separated ("tv:" added where left out; unset, "tv:internal").
 
 A bundle Play already has isn't an error: it's found by its SHA-256 and put on the tracks, so running this again
 for a release adds it to a track it wasn't on, and otherwise changes nothing.
@@ -75,9 +76,11 @@ def plain_notes(markdown):
     return text
 
 
-def track_body(track, version, version_code, notes, status="completed"):
-    """The release on [track]: the one bundle, named after the version, with its notes."""
-    release = {"name": version, "versionCodes": [str(version_code)], "status": status}
+def track_body(track, version, version_codes, notes, status="completed"):
+    """The release on [track]: its bundles (one version code, or the phone's and the TV's), named after the version,
+    with its notes."""
+    codes = version_codes if isinstance(version_codes, (list, tuple)) else [version_codes]
+    release = {"name": version, "versionCodes": [str(c) for c in codes], "status": status}
     if notes:
         release["releaseNotes"] = [{"language": "en-US", "text": notes}]
     return {"track": track, "releases": [release]}
@@ -181,41 +184,52 @@ def code_of_uploaded(bundles, sha256):
     return None
 
 
-def track_has(track, code):
-    """Whether a track (as Play's API gives it) has a release with this version code."""
-    return any(str(code) in (r.get("versionCodes") or []) for r in track.get("releases", []))
+def track_has(track, codes):
+    """Whether a track (as Play's API gives it) has a release with every one of these version codes."""
+    codes = codes if isinstance(codes, (list, tuple)) else [codes]
+    return any(all(str(c) in (r.get("versionCodes") or []) for c in codes) for r in track.get("releases", []))
 
 
-def upload(aab, version, notes_md, tracks, key_json):
-    """Uploads [aab] once and puts it on every one of [tracks] in one edit. A bundle Play already has (uploaded for
-    an earlier run) is found by its SHA-256 and put on the tracks it isn't on yet."""
+def upload(aabs, version, notes_md, tracks, key_json):
+    """Uploads the bundles in [aabs] (the phone's, and the TV's when Android TV shares the phone's tracks, #988) in one
+    edit and puts them, as one release, on every one of [tracks]. A bundle Play already has (uploaded for an earlier
+    run) is found by its SHA-256; tracks that already have every bundle are left alone."""
+    aabs = [aabs] if isinstance(aabs, str) else list(aabs)
     tok = token(key_json)
     edit = call("POST", f"{API}/edits", tok, body={})["id"]
-    print(f"Upload {aab} ({os.path.getsize(aab) // 1024} KB) for {version} to {', '.join(tracks)}")
-    try:
-        with open(aab, "rb") as f:
-            code = call("POST", f"{UPLOAD}/edits/{edit}/bundles?uploadType=media", tok, data=f.read(), content_type="application/octet-stream")["versionCode"]
-    except PlayError as e:
-        if not already_uploaded(str(e)):
-            raise
-        code = code_of_uploaded(call("GET", f"{API}/edits/{edit}/bundles", tok).get("bundles", []), sha256_of(aab))
-        if code is None:
-            print(f"::notice::Google Play already has {version}'s version code, from another file; nothing to do.")
-            call("DELETE", f"{API}/edits/{edit}", tok)
-            return "already"
-        # Only the tracks without it: one that has it (perhaps still in review) is left as it is.
-        tracks = [t for t in tracks if not track_has(call("GET", f"{API}/edits/{edit}/tracks/{t}", tok), code)]
-        if not tracks:
-            print(f"::notice::Google Play already has {version} (version code {code}) on every track; nothing to do.")
-            call("DELETE", f"{API}/edits/{edit}", tok)
-            return "already"
-        print(f"Google Play already has {version} (version code {code}); adding it to {', '.join(tracks)}.")
+    codes = []
+    for aab in aabs:
+        print(f"Upload {aab} ({os.path.getsize(aab) // 1024} KB) for {version} to {', '.join(tracks)}")
+        try:
+            with open(aab, "rb") as f:
+                codes.append(call("POST", f"{UPLOAD}/edits/{edit}/bundles?uploadType=media", tok, data=f.read(),
+                                  content_type="application/octet-stream")["versionCode"])
+        except PlayError as e:
+            if not already_uploaded(str(e)):
+                raise
+            code = code_of_uploaded(call("GET", f"{API}/edits/{edit}/bundles", tok).get("bundles", []), sha256_of(aab))
+            if code is None:
+                print(f"::notice::Google Play already has {os.path.basename(aab)}'s version code, from another file; left out.")
+                continue
+            print(f"Google Play already has {os.path.basename(aab)} (version code {code}).")
+            codes.append(code)
+    if not codes:
+        print(f"::notice::Google Play already has {version}; nothing to do.")
+        call("DELETE", f"{API}/edits/{edit}", tok)
+        return "already"
+    # Only the tracks without all of them: one that has them (perhaps still in review) is left as it is.
+    tracks = [t for t in tracks if not track_has(call("GET", f"{API}/edits/{edit}/tracks/{t}", tok), codes)]
+    if not tracks:
+        print(f"::notice::Google Play already has {version} (version codes {', '.join(map(str, codes))}) on every track; nothing to do.")
+        call("DELETE", f"{API}/edits/{edit}", tok)
+        return "already"
+    code = ", ".join(map(str, codes))
     notes = plain_notes(notes_md)
 
     def put(status):
         for track in tracks:
             try:
-                call("PUT", f"{API}/edits/{edit}/tracks/{track}", tok, body=track_body(track, version, code, notes, status))
+                call("PUT", f"{API}/edits/{edit}/tracks/{track}", tok, body=track_body(track, version, codes, notes, status))
             except PlayError as e:
                 if "not found" not in str(e).lower():
                     raise
@@ -235,7 +249,7 @@ def upload(aab, version, notes_md, tracks, key_json):
         # Same edit, so the bundle uploaded to it is still there.
         status = "draft"
         put(status)
-    print(f"::notice::Google Play: {version} (version code {code}) is on {', '.join(track_name(t) for t in tracks)} as {status}."
+    print(f"::notice::Google Play: {version} (version code{'s' if len(codes) > 1 else ''} {code}) is on {', '.join(track_name(t) for t in tracks)} as {status}."
           + (" Roll it out in Play Console." if status == "draft" else " Internal testing has it now; closed testing after Google's review."))
     return status
 
@@ -246,7 +260,14 @@ def main(argv):
         print("::notice::No Google Play key (PLAY_SERVICE_ACCOUNT_JSON); skipped.")
         return 0
     tv = "--tv" in argv[1:]
-    args = [a for a in argv[1:] if a != "--tv"]
+    args, also = [], []
+    rest = [a for a in argv[1:] if a != "--tv"]
+    while rest:
+        a = rest.pop(0)
+        if a == "--also" and rest:
+            also.append(rest.pop(0))
+        else:
+            args.append(a)
     if len(args) != 3:
         print(__doc__)
         return 2
@@ -255,7 +276,7 @@ def main(argv):
         notes_md = f.read()
     tracks = tracks_of(os.environ.get("PLAY_TV_TRACK" if tv else "PLAY_TRACK", ""), tv=tv)
     try:
-        upload(aab, version, notes_md, tracks, key)
+        upload([aab] + also, version, notes_md, tracks, key)
     except PlayError as e:
         print(f"::error::Google Play refused the upload: {e}")
         return 1

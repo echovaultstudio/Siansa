@@ -56,6 +56,16 @@ class PlayUploadTest(unittest.TestCase):
         self.assertEqual(["internal"], tracks_of(" internal "))
         self.assertEqual(["alpha", "internal"], tracks_of("alpha, internal,alpha"))
 
+    def test_the_phone_and_tv_bundles_are_one_release(self):
+        # Android TV shares the phone's tracks (#988): one release with both version codes.
+        body = track_body("alpha", "1.1.0", [1699, 1000001699], "• New")
+        self.assertEqual(["1699", "1000001699"], body["releases"][0]["versionCodes"])
+        self.assertEqual("1.1.0", body["releases"][0]["name"])
+        track = {"releases": [{"versionCodes": ["1699"]}]}
+        self.assertTrue(track_has(track, 1699))
+        self.assertFalse(track_has(track, [1699, 1000001699]))
+        self.assertTrue(track_has({"releases": [{"versionCodes": ["1699", "1000001699"]}]}, [1699, 1000001699]))
+
     def test_the_tv_app_goes_to_tv_tracks(self):
         # Issue #988: the TV app on Play's Android TV tracks of the same app, internal testing unless set.
         self.assertEqual(["tv:internal"], tracks_of("", tv=True))
