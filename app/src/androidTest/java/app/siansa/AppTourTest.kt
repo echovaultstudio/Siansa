@@ -79,7 +79,8 @@ class AppTourTest {
         graph.sync.start(full = true)
         val syncEnd = SystemClock.elapsedRealtime() + 120_000
         while (graph.sync.progress.value.phase !in setOf(SyncPhase.DONE, SyncPhase.FAILED) && SystemClock.elapsedRealtime() < syncEnd) SystemClock.sleep(500)
-        println("Tour: sync ${graph.sync.progress.value.phase}")
+        // With the reason when it failed: the log's "E/Sync: Failed" line alone doesn't say why.
+        graph.sync.progress.value.let { println("Tour: sync ${it.phase}" + (it.error?.let { e -> ": $e" } ?: "")) }
 
         scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
