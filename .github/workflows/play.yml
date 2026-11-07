@@ -58,5 +58,7 @@ jobs:
           mkdir -p play && gh run download "$RUN" --name apk --dir play
           cd play && ls siansa-*.aab
           gh release view "$TAG" --json body --jq .body > notes.md
+          # Play shows 500 characters: a short note written for Play (play-notes/<version>.md) when there is one.
+          if [ -f "../play-notes/$VERSION.md" ]; then cp "../play-notes/$VERSION.md" notes.md; fi
           pip install --quiet google-auth==2.40.3 requests==2.32.4
           python3 ../scripts/play_upload.py "$(ls siansa-*.aab | head -n 1)" "$VERSION" notes.md

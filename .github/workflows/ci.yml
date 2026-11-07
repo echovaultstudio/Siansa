@@ -337,7 +337,10 @@ jobs:
         run: |
           if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then echo "::notice::No Google Play key (PLAY_SERVICE_ACCOUNT_JSON); skipped."; exit 0; fi
           pip install --quiet google-auth==2.40.3 requests==2.32.4
-          python3 scripts/play_upload.py "$(ls siansa-*.aab | head -n 1)" "${{ steps.version.outputs.version }}" "notes/${{ steps.version.outputs.version }}.md"
+          # Play shows 500 characters: a short note written for Play (play-notes/<version>.md) when there is one.
+          notes="notes/${{ steps.version.outputs.version }}.md"
+          [ -f "play-notes/${{ steps.version.outputs.version }}.md" ] && notes="play-notes/${{ steps.version.outputs.version }}.md"
+          python3 scripts/play_upload.py "$(ls siansa-*.aab | head -n 1)" "${{ steps.version.outputs.version }}" "$notes"
 
       # The F-Droid repo on our server (issue #410; the server kit is in the private siansa-dev repo, #634): the APK
       # goes over SSH to a key that can only publish (siansa-publish there). Skipped until the FDROID_* secrets are set.
