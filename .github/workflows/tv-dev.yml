@@ -3,12 +3,12 @@ name: Siansa TV Dev
 # Siansa TV Dev (issue #860): a test build of the TV app only, for an Android TV or Google TV box. It installs as
 # app.siansa.tv.dev, next to any other Siansa build, and is published only here, as the APK of the pre-release
 # "tv-dev-latest" on GitHub: never to F-Droid or Google Play, never as a release of Siansa (the release history skips
-# pre-releases), and apart from Siansa Dev (dev-app.yml), which it leaves alone. Built from mixer into "tv-dev-latest",
+# pre-releases), and apart from Siansa Dev (dev-app.yml), which it leaves alone. Built from dev into "tv-dev-latest",
 # and from a TV branch (claude/tv-…) into a pre-release of its own, "tv-dev-<branch>", so a change can be tried on the TV
-# before it's merged without a push to mixer replacing it. Each push replaces that release's APK.
+# before it's merged without a push to dev replacing it. Each push replaces that release's APK.
 on:
   push:
-    branches: [mixer, "claude/tv-*"]
+    branches: [dev, "claude/tv-*"]
 
 permissions:
   contents: write
@@ -61,7 +61,7 @@ jobs:
         run: |
           set -euo pipefail
           short=$(git rev-parse --short HEAD)
-          if [ "$GITHUB_REF_NAME" = "mixer" ]; then
+          if [ "$GITHUB_REF_NAME" = "dev" ]; then
             tag=tv-dev-latest
             title="Siansa TV Dev ($short)"
           else

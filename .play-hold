@@ -1,3 +1,0 @@
-Google Play releases held back on request (7 November 2026): v1.0 goes to the F-Droid repo first. While this file is
-on main, releases skip the Google Play upload. Delete it to send releases to Google Play again; an earlier release's
-bundle can be sent with Actions › Google Play › Run workflow (within 30 days of its build).

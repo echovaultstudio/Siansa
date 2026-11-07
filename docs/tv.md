@@ -11,9 +11,12 @@ your phone: install it on the TV, and both keep their own settings, library and 
 
 ## Getting the TV app
 
-The TV app comes from Google Play, as the same Siansa as on your phone: Play gives your TV the TV app and your phone
-the phone app. While Siansa is a closed test on Google Play, [ask for a place](https://siansa.app/#join), then open the
-Play Store on your TV and search for Siansa. It isn't on F-Droid yet.
+The TV app is the same Siansa as on your phone, in the same places: your TV gets the TV app, your phone the phone app.
+
+- **F-Droid:** install an F-Droid app on the TV (F-Droid itself, or one made for TVs), add Siansa's repository
+  `https://siansa.app/fdroid/repo` as for the phone, and install Siansa. On a TV it installs the TV app.
+- **Google Play:** while Siansa is a closed test on Google Play, [ask for a place](https://siansa.app/#join), then open
+  the Play Store on your TV and search for Siansa.
 
 ## Signing in
 

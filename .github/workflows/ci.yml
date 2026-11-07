@@ -139,7 +139,7 @@ jobs:
           # Pull requests also compare the screenshot tests' pictures with the approved ones (issue #710). Only there:
           # they're recorded on GitHub's runners (screenshots.yml), and another machine may draw a pixel differently.
           VERIFY=""; [ "$EVENT" = "pull_request" ] && VERIFY="-Proborazzi.test.verify=true"
-          gradle :app:testDebugUnitTest $VERIFY :app:compileDebugAndroidTestKotlin :app:lintDebug :app:assembleRelease :app:bundleRelease :tv:testDebugUnitTest :tv:lintDebug :tv:assembleRelease --continue --stacktrace 2>&1 | tee gradle-build.txt
+          gradle :app:testDebugUnitTest $VERIFY :app:compileDebugAndroidTestKotlin :app:lintDebug :app:assembleRelease :app:bundleRelease :tv:testDebugUnitTest :tv:lintDebug :tv:assembleRelease :tv:bundleRelease --continue --stacktrace 2>&1 | tee gradle-build.txt
 
       - name: Test and lint results
         if: always()
@@ -213,6 +213,10 @@ jobs:
           APK=$(ls app/build/outputs/apk/release/app-release*.apk | head -1)
           mv "$APK" siansa-$VERSION.apk
           mv app/build/outputs/bundle/release/app-release.aab siansa-$VERSION.aab
+          # The TV app's bundle, for Play's Android TV tracks of the same app (issue #988), and its APK for the F-Droid repo.
+          mv tv/build/outputs/bundle/release/tv-release.aab siansa-tv-$VERSION.aab
+          TV_APK=$(ls tv/build/outputs/apk/release/tv-release*.apk | head -1)
+          mv "$TV_APK" siansa-tv-$VERSION.apk
 
       # Which key signed the release APK, in the run's summary: public information, and it proves a key change took.
       - name: Signing certificate
@@ -263,9 +267,14 @@ jobs:
     # Your own runner when the RUNS_ON variable names it (e.g. ["self-hosted", "siansa"]), else GitHub's.
     runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
     steps:
+      # The release writes its own commits to main (CHANGELOG.md and version.txt, then RELEASES.md). main's rules
+      # require checks a direct push can't have, and GitHub lets no workflow token past them: the v1.0.0 commit was
+      # refused. So it pushes with a deploy key of its own (RELEASE_DEPLOY_KEY), which main's ruleset lets through.
+      # Without the secret it falls back to the workflow token, as before.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
       - uses: actions/download-artifact@v8
         with:
@@ -329,13 +338,40 @@ jobs:
         env:
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           PLAY_TRACK: ${{ vars.PLAY_TRACK }}
+          PLAY_TV: ${{ vars.PLAY_TV }}
+          PLAY_TV_TRACK: ${{ vars.PLAY_TV_TRACK }}
         run: |
           if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then echo "::notice::No Google Play key (PLAY_SERVICE_ACCOUNT_JSON); skipped."; exit 0; fi
           pip install --quiet google-auth==2.40.3 requests==2.32.4
-          python3 scripts/play_upload.py "$(ls siansa-*.aab | head -n 1)" "${{ steps.version.outputs.version }}" "notes/${{ steps.version.outputs.version }}.md"
+          # Play shows 500 characters: a short note written for Play (play-notes/<version>.md) when there is one.
+          notes="notes/${{ steps.version.outputs.version }}.md"
+          [ -f "play-notes/${{ steps.version.outputs.version }}.md" ] && notes="play-notes/${{ steps.version.outputs.version }}.md"
+          # With PLAY_TV "true", the TV app goes into the same release (#988): Android TV shares the phone's tracks.
+          also=()
+          if [ "$PLAY_TV" = "true" ] && [ -z "$PLAY_TV_TRACK" ] && [ -f "siansa-tv-${{ steps.version.outputs.version }}.aab" ]; then
+            also=(--also "siansa-tv-${{ steps.version.outputs.version }}.aab")
+          fi
+          python3 scripts/play_upload.py "siansa-${{ steps.version.outputs.version }}.aab" "${{ steps.version.outputs.version }}" "$notes" "${also[@]}"
 
-      # The F-Droid repo on our server (issue #410; the server kit is in the private siansa-dev repo, #634): the APK
-      # goes over SSH to a key that can only publish (siansa-publish there). Skipped until the FDROID_* secrets are set.
+      # The TV app on a dedicated Android TV track of its own (issue #988): only when PLAY_TV_TRACK names one. Siansa's
+      # Android TV shares the phone's tracks, so the TV bundle goes in the phone's release above instead.
+      - name: Upload the TV app to Google Play
+        if: steps.version.outputs.exists != 'true' && vars.PLAY_TV == 'true' && vars.PLAY_TV_TRACK != ''
+        continue-on-error: true
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PLAY_TV_TRACK: ${{ vars.PLAY_TV_TRACK }}
+        run: |
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then echo "::notice::No Google Play key (PLAY_SERVICE_ACCOUNT_JSON); skipped."; exit 0; fi
+          pip install --quiet google-auth==2.40.3 requests==2.32.4
+          notes="notes/${{ steps.version.outputs.version }}.md"
+          [ -f "play-notes/${{ steps.version.outputs.version }}.md" ] && notes="play-notes/${{ steps.version.outputs.version }}.md"
+          python3 scripts/play_upload.py --tv "siansa-tv-${{ steps.version.outputs.version }}.aab" "${{ steps.version.outputs.version }}" "$notes"
+
+      # The F-Droid repo on our server (issue #410; the server kit is in the private siansa-dev repo, #634): the APKs
+      # go over SSH to a key that can only publish (siansa-publish there). Skipped until the FDROID_* secrets are set.
+      # The TV app goes too, under the same name as the phone's (app.siansa, issue #988): it needs Android TV
+      # (android.software.leanback), so F-Droid on a phone passes it by and offers the phone's, and a TV gets the TV's.
       - name: Publish to the F-Droid beta repo
         if: steps.version.outputs.exists != 'true'
         # A server that can't be reached mustn't stop the release notes and history below.
@@ -352,8 +388,13 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$FDROID_SSH_KEY" > ~/.ssh/fdroid && chmod 600 ~/.ssh/fdroid
           printf '%s\n' "$FDROID_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          apk=$(ls siansa-*.apk | head -n 1)
-          ssh -i ~/.ssh/fdroid -o BatchMode=yes -o StrictHostKeyChecking=yes "siansa-deploy@$FDROID_HOST" < "$apk"
+          v="${{ steps.version.outputs.version }}"
+          ssh -i ~/.ssh/fdroid -o BatchMode=yes -o StrictHostKeyChecking=yes "siansa-deploy@$FDROID_HOST" < "siansa-$v.apk"
+          echo "::notice::F-Droid repo: Siansa $v"
+          if [ -f "siansa-tv-$v.apk" ]; then
+            ssh -i ~/.ssh/fdroid -o BatchMode=yes -o StrictHostKeyChecking=yes "siansa-deploy@$FDROID_HOST" < "siansa-tv-$v.apk" \
+              && echo "::notice::F-Droid repo: Siansa TV $v" || echo "::warning::F-Droid repo: Siansa TV $v wasn't taken"
+          fi
           rm -f ~/.ssh/fdroid
 
       # Keeps the notes of every published version matching CHANGELOG.md, so fixes to the text show up too.
