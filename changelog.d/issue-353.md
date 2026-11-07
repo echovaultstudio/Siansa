@@ -1,2 +1,0 @@
-### Added
-- **Your Stations: internet radio and podcasts.** A new Stations chip in Your Library. It shows your server's radio stations (Navidrome keeps a list), and you can add your own with + › Add station: a stream link or a .m3u or .pls playlist. Podcasts you add by their RSS feed (+ › Add podcast) are under the Podcasts chip. Stations play live, with what's on when the station says; podcasts open their episodes. What you add stays on this phone.

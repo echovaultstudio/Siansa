@@ -3,6 +3,267 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 1.0.0 — 2026-11-07
+
+### Fixed
+- **Play on showed what the TV was doing instead of its name** ("Casting: Run Away", "SHIELD Android TV"). Each
+  Chromecast now shows its own name with "Chromecast" under it, or "Chromecast · speaker" and "· speaker group".
+- **Siansa's TV screen took a while to appear after picking a TV with nothing playing.** It now shows as soon as the
+  TV opens it and says "Connected. Pick a song on your phone." A song without a cover shows Siansa's icon on the TV
+  instead of an empty square.
+- **Ending a cast from the phone was logged as a Cast error ("status code 2161").** It now says the cast was ended from
+  the phone.
+- **Casting an Apple Lossless (ALAC) album ended the cast.** Songs in formats Chromecast and Google TV can't play,
+  such as ALAC and other .m4a files, now go to the TV as MP3 320; FLAC, MP3, Ogg, WAV and AAC still go as they are.
+- **After one failed start, the TV kept Google's plain screen until Siansa was restarted.** Only that one retry uses
+  it now; the next time you cast, Siansa's own TV screen is tried again.
+- **Songs in the queue showed blank while casting a long queue, and could stop the music.** Songs the TV doesn't
+  describe are filled in from your queue on the phone, and a song nobody can name is left out instead of being
+  played as an empty song.
+- **A short network drop moved the music to the phone and straight back to the TV, losing most of the queue.** The
+  music now stays on the TV while Cast reconnects, and only comes back to the phone if the TV doesn't return.
+- **Casting was unsteady: songs from an old queue played, "Now playing" went blank, the player vanished from the
+  phone while the TV played, and a long queue never reached the TV.** The queue now stays on the phone, and the TV
+  gets the song playing with a few around it, kept topped up as it plays. A new list replaces what the TV plays in
+  one go, the phone always shows its own queue, and the music comes back to the phone as it was.
+- **Apple Lossless albums still went to the TV as MP3 in "Lossless".** Songs played from your library now get their
+  file type from your server before they go to the TV, so ALAC is sent as FLAC and FLAC as it is.
+- **The player vanished from the phone while the TV kept playing**, after starting new music during a cast. The phone
+  now asks the TV for its queue again when it loses sight of it.
+- **Closing Siansa on the TV with its Back button brought an empty queue back to the phone.** The queue comes back as
+  the phone last saw it on the TV.
+- **Some songs' artists stayed joined in one name** ("ID, Camo & Krooked") when Navidrome had given the joined name the MusicBrainz ID of one of the artists in it. Such a name is now split into its artists like other joined names.
+- **Artists joined in one name were only split when they were album artists.** A name like "ID, Camo & Krooked" that's only ever a song's artist now offers its artists too. A part your library doesn't list is found on your server (Navidrome, Emby or Jellyfin), so "ID" on DJ mixes goes to the server's ID artist with its other songs; "ID" or "Unknown" with no artist anywhere isn't offered.
+- **DJ blends no longer start half a minute early on a song that's still going.** A song without a steady beat but loud to its end, or two such songs one after the other, now get a short blend instead of the whole crossfade length, so the song isn't cut short and the next song's beat doesn't play over it. A quiet, beatless intro still slides in under the old song for the whole length.
+- On Emby, albums whose cover is a cover.jpg or folder.jpg in their folder (and not inside the song files) now show it,
+  on the album page, in lists and in the player. Emby keeps that picture on the folder, not on the album.
+- On Emby, synced lyrics from .lrc files next to your songs now show. Emby sends them back empty when asked for
+  them as they are, so Siansa now asks for them in a form Emby does send, with the same lines and times.
+- **The app could crash in the background while playing.** When Android had taken playback out of the foreground (after a pause or a Bluetooth disconnect) and the notification then changed in the background, Siansa crashed. It now plays on, and the notification catches up on the next change.
+- **DJ blends came in at the wrong time when the plugin couldn't hear a song's bars.** A song made on a grid (a whole number of BPM, steady) now has its downbeats and 8-bar phrases counted from its first beat, so the blend starts on a phrase and the next song comes in on the one.
+- **Adding a music server stopped the music and left an empty server behind**, even when you never saved it. Now it's filled in on the Servers and services page and only added when you tap Save, without restarting Siansa; switch to it from its card when you want to use it.
+- **Siansa said it was offline after Android restarted it in the background**, until you force-stopped it. It now looks again as soon as you open it, or as soon as Android lets it use the network.
+- Text on the TV that was too dark to read, and buttons cut off at the bottom of album pages: an album's songs now
+  come straight after its buttons.
+- The TV's Home and Library jumping and losing the remote's place while the library synced.
+- 5.1 and 7.1 songs (Dolby or DTS decoded on the device, or multichannel FLAC) played without their centre and
+  surround channels, often missing the vocals. They're now folded into stereo, on the phone too.
+- Gaps between Dolby Atmos songs sent to the receiver (a DJ mix, a live album): the output now stays open from one
+  song to the next.
+- Dolby Atmos songs in `.m4a` or `.mp4` files on the TV: they now always stream as the original file while passthrough
+  is on, and a song the receiver can't take after all plays decoded on the TV instead of failing.
+- Dolby Atmos songs one after another on the TV (a DJ mix) now keep the output to the receiver open from one to the
+  next, so there's no gap while the receiver finds the signal again, and a song that stalls there is started again
+  instead of switching to a converted stream without Atmos.
+- Songs whose file says it's far longer than it is (some Dolby Atmos DJ mixes in `.m4a`) stopped at their end and
+  didn't load the next song in time, so a gapless mix had gaps, and the end of a song could switch to a converted
+  stream without Dolby Atmos. Siansa now goes by the song's length from your server, on the phone too.
+- The TV's Now playing: the cover is blurred much more, on TVs without Android 12 too (an NVIDIA SHIELD showed it
+  sharp), the page is calmer, with the other buttons round under the controls and their names shown as the remote
+  reaches them, and it runs more smoothly.
+- Buttons on the TV that looked joined to the one beside them when the remote was on them.
+- The TV's tabs along the top go back to that tab's own page: Library from an album opened in it shows the Library
+  again, not the album.
+- The TV's Library and Home rows show six covers across instead of four or five, and the lyrics in Now playing can be
+  scrolled with the remote.
+- Pausing for most of a second when making a mix (Today's mix, a daily mix), on the phone too; and the TV uses less memory for covers,
+  giving them back when the TV runs low (an NVIDIA SHIELD kept warning of low memory). The sleep timer is gone from
+  the TV app.
+- Liked songs on the TV showing nothing: they now come from your server, as on the phone.
+- Typing on the TV: text fields open Android's own text box with the keyboard up (Search as soon as you reach it), and
+  take what's typed or pasted on a phone with the Google TV app.
+- Siansa's settings showing the Siansa plugin as 0.3.3 whatever version was installed (update the plugin to 0.5.6).
+- On the TV (and phones low on memory), covers no longer all load again every minute or so, which made the app lag
+  and fetch the same covers over and over. While Siansa is on screen it keeps half of them when memory runs low.
+- While casting, skipping a song no longer jumps back to the song before for a moment (and no longer tells
+  ListenBrainz or Last.fm about both songs).
+- While casting in Opus or MP3, moving the seek bar now plays from that point instead of starting the song over:
+  the server starts the converted song where you moved to.
+- On Emby and Jellyfin, downloaded songs now play from the phone. Before, they still streamed from the server, so
+  with no connection a downloaded album skipped from song to song without playing.
+- Home's new albums notice took a while to appear after opening the app, and only showed after going to another page
+  and back. It now shows as soon as your library has loaded.
+- TV app: Dolby Atmos songs sent to the receiver now run into each other without a gap. Most Atmos files start with a
+  short priming frame, and the output to the receiver closed and reopened before each of those songs.
+- TV app: buttons on the settings pages (Test, Save, Remove, Show the log and others) now get the accent ring when the
+  remote is on them. Before, they worked but nothing showed you were on them.
+- The Library (on the TV especially) no longer stalls on albums with big animated covers. Lists used to download each
+  animation whole, some of them 20 to 60 MB, just to show its first picture; now they read only the start of the file,
+  and the animation downloads when you open the album or play it.
+- TV app: Dolby Atmos songs that follow straight on from the one before no longer stop for a moment about 3 seconds
+  in. Siansa took the silence in its own mix (the song goes to the receiver instead) for lost sound and started the
+  song's stream again.
+- TV app: songs no longer drop out for a moment in the middle (FLAC and other songs Siansa mixes) when the TV is busy
+  or low on memory. The TV now keeps half a second of sound ready instead of an eighth of a second.
+- TV: the remote moves through a login's boxes like through buttons, and down from the last one (such as the
+  AudioMuse password) reaches the Test button under it and stays there. Press OK on a box to type in it; up or down
+  while typing goes on to the next control.
+- TV app: the remote now moves down from a text box to the button under it, so Test under the AudioMuse login (and
+  the other Test and Save buttons under a login) can be pressed.
+- TV app: API keys, tokens and passwords show as dots while you type them, not as plain text. Last.fm's API key is
+  hidden too, on the phone and the TV.
+- TV: Similar albums on an album's page found nothing ("AudioMuse doesn't know this song"). It now asks AudioMuse
+  about one of the album's songs, as the phone does.
+- Casting to a Chromecast or Google TV: the phone no longer sends the TV songs it already has at every song change,
+  which made the TV's list longer and longer. If the TV's Siansa screen closes by itself, the phone joins the TV
+  again and the music carries on there, instead of coming back to the phone paused.
+- TV: the remote no longer skips the Test buttons under the AudioMuse and Koito logins: down from the last box goes to Test.
+- **Smart crossfade: a loud outro without a beat no longer plays half a minute under the next song.** Only an outro that winds down gets the long blend after its last beat; one that stays loud is blended over its last few seconds, so two songs don't play loud together.
+- On Emby and Jellyfin, renaming a playlist right after adding or removing songs no longer goes back to the old name
+  a moment later.
+- **TV: Dolby Atmos songs that run into each other no longer stall at the start of the next one.** A file that says it's longer than it is now plays to its real last frame, so the next song starts in step.
+- **TV: no more freeze as a song starts.** Small things Siansa saves while music plays (covers compared, a mix's place, notices tapped) no longer hold up the screen.
+- **TV: typing and pasting from your phone.** Text fields are the TV's own, in the page: OK brings up just the keyboard, with no box popping up, and the Google TV app's keyboard and pasting work as in other apps.
+- **TV: Up next marks the songs Siansa added on its own** with a star, as on the phone.
+- **TV: Now playing's buttons line up.** The round buttons under the controls (Like, Lyrics, Up next, Song radio, Song path) each sit right under a control.
+
+### Added
+- **Smart crossfades blend after the last beat.** When a song ends in a beatless outro, the next song now comes in right after the last beat, and the outro plays out underneath it with its own fade, the way a DJ would mix it. There's no beat to clash with, so it works whatever the two tempos are. Needs version 0.5.0 of the Siansa plugin for AudioMuse-AI. It doesn't measure your library again: songs are checked as they come up in what you play.
+- **Sound quality for Chromecast.** Tap the cog beside a Chromecast in **Play on** to choose **Lossless** (the
+  default) or **MP3 320**. In Lossless, Apple Lossless (ALAC) and other lossless files Chromecast can't play are now
+  turned into FLAC by your server instead of going as MP3. Navidrome needs its "flac" transcoding for this; recent
+  versions have it, and the docs say how to add it.
+- **Play on a TV or speaker from Home**, with **Play on…** in the menu at the top of Home.
+- **Put Home's menu in your order** in **Settings › Style › Home Menu**.
+- **A Siansa screen on the TV when casting.** A Chromecast or Google TV now shows Siansa while it connects, then the
+  song's cover, title, artist and album with a progress bar, instead of Google's black "Default Media Receiver"
+  screen. The TV remote's play/pause, next and previous buttons work, and TVs that can play your original files (FLAC
+  and so on) get them instead of MP3. Every Chromecast and Google TV is listed in **Play on**: one that can't show the Siansa
+  screen gets Google's plain screen instead, and if the Siansa screen fails to start, the cast tries again with
+  Google's by itself.
+- **Your Stations: internet radio and podcasts.** A new Stations chip in Your Library. It shows your server's radio stations (Navidrome keeps a list), and you can add your own with + › Add station: a stream link or a .m3u or .pls playlist. Podcasts you add by their RSS feed (+ › Add podcast) are under the Podcasts chip. Stations play live, with what's on when the station says; podcasts open their episodes. What you add stays on this phone.
+- **Sign in with an API key.** On an OpenSubsonic server that gives you an API key (such as newer Navidrome), enter it instead of your username and password under Settings › Servers and services. Siansa uses it once your server says it takes API keys, and Test and Save tell you plainly when it doesn't.
+- **Android Auto.** Siansa now shows up on the car's screen: browse Home (your mixes, mood radios and recently
+  played), Playlists, Albums and Artists, search by typing or by voice, and play. Picking a song plays its whole list
+  from there. Installed from F-Droid, GitHub or Siansa Dev? Turn on "Unknown sources" in Android Auto's developer
+  settings once, as the Playback page of the docs shows.
+- **More of Siansa on the TV.** The TV app's Home now has Today's mix, your mixes, radios, Rediscover, Jump back in and
+  the other rows of your phone's Home, in the same order. The Library has liked songs and genres. Songs have Play next,
+  Add to queue, Like and song radio. Now playing has Like and Up next.
+- **Favourites on the TV**: favourite albums and artists in the Library, and a heart on album and artist pages.
+- **Artist pages on the TV**: top songs, albums and similar artists, with Play, Shuffle and Artist radio; artists,
+  genres and albums on other pages open them.
+- **Several servers and users on the TV**: switch between them, add one, and pick whose music and which libraries
+  show, under Settings.
+- **Lyrics and song radio in Now playing on the TV**, over the cover blurred as on the phone, and today's daily mixes
+  on Home.
+- **AudioMuse's song path and song alchemy on the TV**.
+- **Animated covers on the TV**, in Now playing and on album pages, and playlists' own covers from the server.
+- **The TV opens Now playing when a song starts** (it can be switched off under Settings).
+- **Settings on the TV**: servers, library sync, playback, streaming quality, mixes, scrobbling, colours and help,
+  the same pages as on the phone.
+- **AudioMuse on the TV**: Your sound and Discover for you among your mixes, sound radios, similar songs, and songs
+  that sound like a few words you type or say in Search.
+- **Skipping within a song on the TV**: rewind and fast forward on the remote work anywhere, and the progress bar in
+  Now playing takes left and right for remotes without them.
+- **Report a problem from the TV.** Debug logs are on in the TV app from the start, and a report sends the log the
+  way the phone does.
+- **Set up the TV with your phone's services too.** When you sign in the TV with its QR code, a tick box on the phone
+  also sends AudioMuse, the AI service, Audiobookshelf, Last.fm and ListenBrainz (whichever are set up), so the TV
+  has them without typing.
+- **Siansa for Android TV and Google TV.** A TV app of its own that plays from your server without a phone casting
+  to it, built for the remote: Home rows, your Library, Search (by voice too) and a big now playing. It installs next
+  to the phone app and never replaces it.
+- **Sign in the TV from your phone.** Scan the code on the TV, tap Open in Siansa, and your phone sends the TV your
+  server and login over your home network. Typing it in on the TV still works.
+- **Audio passthrough on the TV.** Dolby Atmos and other Dolby and DTS music can go unchanged to your AV receiver or
+  soundbar: Settings › Audio passthrough on the TV.
+- **Add to playlist, Song details and Stop the mix on the TV**, in Now playing (under More) and in a song's actions, as
+  on the phone. A new playlist's name is typed in Android's own text box, so a phone's keyboard works there too.
+- **Slide from the play button** in now playing to start something from the song playing: up for a DJ mix, down for a
+  Steady radio, left for a song path and right for songs that sound like it. Only the way you slide shows its choice,
+  and a tap and a press-and-hold do what they did. Change what each way does, or switch the slides off, under
+  Settings › Style › Now playing.
+- While a DJ mix plays, the play button has record grooves in its own colour.
+- TV app: Dolby Atmos and Dolby Digital Plus songs sent to your receiver can play louder, so they match your other
+  music at the same volume. Pick 3 to 12 dB under Settings › Playback › Dolby songs on your receiver. The sound itself
+  isn't changed: the receiver just turns them down less.
+- Liked songs can be a notice at the top of Home, a tap away. It's off to begin with: turn it on under Settings ›
+  Notices and Cards › Notices, as Automatic or Pinned.
+- Hide the title of any section of Home: in Arrange Home, tap a section's cog and turn off Show its title. The section
+  keeps its place and spacing, just without the heading above it.
+- Slide right from an album's Shuffle all the way onto Play for a DJ mix of the album: all its songs, in an order that
+  blends well, with DJ blends. It doesn't always start from the same song. Play turns into a record while the mix
+  plays. Needs AudioMuse-AI.
+- Settings › Style › Now playing › Dynamic colours: the seek bar, the Play button and where it plays take the colour
+  of the cover of what's playing, fading from song to song. They're always easy to see, whether the cover is dark or
+  light; a black and white cover keeps your theme's colour. Off at first.
+- TV: hold left or right on the remote in Now playing to wind back or forward through the song, faster the longer you hold. A press still skips.
+- TV: Search shows your recent searches, radios and your genres before you type, as on the phone.
+- **TV: notices on Home**, as on the phone.
+
+### Changed
+- **Artist radios use AudioMuse-AI.** With AudioMuse-AI set up, an artist radio (from Home or an artist's page) plays songs that sound like the artist, with one of their own every fourth song. Before, it only used your music server's similar songs, and played just the artist's own songs when the server had none. Without AudioMuse-AI it still uses the server's similar songs. In the queue, the songs AudioMuse-AI picked carry its mark, as a song radio's do.
+- **More DJ blends are beat-matched.** House, techno and drum and bass made on a fixed tempo were often judged "not steady enough" and got only a short join. With the new audio engine they're now beat-matched over your blend length.
+- **Opus for Chromecast and DLNA.** Songs converted for a Chromecast now go as Opus 320 instead of MP3 320: better
+  sound for the same Wi-Fi. **Sound quality** (the cog beside a Chromecast in **Play on**) now has **Lossless** (the
+  default), **Opus** and **MP3 320** (for older TVs and speakers that can't play Opus). A TV that can't play Opus
+  switches to MP3 320 by itself. DLNA TVs and speakers that list Ogg among their formats get Opus too, and MP3 320 if
+  they don't start an Opus song.
+- **Smart crossfade: cold ends.** When a song ends loud and the next one starts loud, they no longer overlap for a moment (which sounded like a mistake). The first song plays to its last sound, then a short pause, then the next song from its start, as a radio DJ would. When both songs keep a beat (dance music), there's no pause: the next one starts right as the first ends. Only when both are hard: every other blend is as before.
+- **The crossfade length says what it does with Smart on.** A line under the slider explains that it's the longest a fade can be: most fades are shorter, because the songs decide, and the full length is only used for songs not measured yet and for quiet intros without a beat in DJ blends.
+- **A new song radio starts as Steady vibes with no surprises.** The shape and surprises you pick still apply while it plays, but each new radio starts calm and close to the song again. No surprises is also the default now.
+- **A fresh install uses Siansa's own colours**, with grey pages and cards and the accent matching the theme (Siansa's amber). A theme you already picked stays.
+- **DJ blends with a beatless intro or outro run your whole crossfade length.** When one of the two songs has no beat at all, there's nothing to clash with, so the next song now comes in under the old one over the full length you set, instead of a join of a few seconds.
+- **Echo at the end and Keep the key are off for now** and no longer in Settings › Playback. DJ blends play plain, and the next song's pitch follows its speed, by at most a fraction of a semitone.
+- **One menu at the top of Home.** The button beside the dice now opens a short column of round buttons under it: **Play on…**, **Sources** and **Arrange Home**, each with its name beside it. Each opens its usual menu. Press the button and slide down to one to open it in one go. While something plays on a TV or speaker, Play on… is amber and the button shows a small dot.
+- **The dice rolls.** Tap it and it tumbles, keeps turning while it finds a song, and lands on a new face when the song starts.
+- **A cleaner top of Home.** The greeting is gone: the notices are now the top of Home, with the menu as a round button at the end of their row, the chips' height and in line with them. Its lines are always amber, and it has a thin amber ring while the source filter hides something. The menu now opens a little further from the screen's edge.
+- **The dice is in Home's menu.** **Roll the dice** is the first option under the round button; the dice tumbles in the button while it finds a song.
+- The notices are no longer in Arrange Home, since they're always at the top.
+- In the queue, swipe a song to the left to take it out (it was to the right), and to the right to play it next. The
+  icon on the strip moves a little once it's done, and so does the queue icon when you swipe a song into the queue
+  from any list.
+- Starting a song radio, Steady and DJ each have an icon (a wave and a turntable) and no longer a description under
+  them, so the choice is clearer.
+- Settings › Playback › Crossfade and levelling has a link to the docs on how mixing works.
+- **Start song radio** is now called **Start a mix**, and Stop song radio **Stop the mix**.
+- The new albums notice counts the albums added in the last 30 days (it was the last three).
+- Sliding from the play button now shows the choice's name in the middle of the cover, which blurs behind it, so your
+  thumb no longer hides it. It's faint with "Slide a little further" until you're far enough, then lights up with
+  "Let go to start". The icon beside the play button stays.
+- Home's shortcuts are now just what you played last, newest first: Liked songs is no longer pinned first (it shows
+  when you've played it). Choose how many shortcuts Home shows, from 2 to 8, under Settings › Style › Home.
+- TV app: an artist's page shows their top three songs, with Show all for the rest, so their albums are only a few
+  presses down.
+- TV app: animated covers are off from the start, which makes the TV quicker. Turn them on under Settings › Animated
+  covers.
+- TV app: pages switch at once, without fading, so moving around feels quicker.
+- TV app: Time machine is no longer in the Library for now. It took the TV several seconds to show and could make the
+  music drop out. It's still on the phone.
+- TV app: covers take half the memory, load a few at a time and appear without fading in, so pages fill and move more
+  smoothly.
+- TV app: Home and the Library stay still while your library syncs, and are read again once it's done. Rows that
+  didn't change aren't drawn again, and Random picks keep their albums until you open Home again.
+- Home's menu is easier to read: while it's open, the page behind it blurs a little and darkens, so the names of
+  Play on…, Sources, Arrange Home and Roll the dice stand out. Phones before Android 12 darken it a bit more instead.
+- Sliding from the play button now dims the seek bar and the bottom row (lyrics, Play on and the queue) too, and
+  sliding down hides Play on completely so it doesn't peek out behind the choice. Sliding up puts the choice right on
+  the seek bar.
+- An album's buttons: add to a playlist and Download on the left, Similar albums, Shuffle and Play on the right, with the
+  first song close under them. The add to queue button is gone from the album's page, and so is the separate "Continue
+  from" button: Play itself carries on where you stopped, with a ring for how far you got, and the details line says
+  "Continue from 8". Hold Play to start from the first song.
+- TV: Now playing is as simple as the Chromecast screen: the cover, the song, its artist and album, and a thin line for
+  the time, with Siansa's logo in the corner. OK plays and pauses, left and right skip, and down opens a menu with
+  everything else (like, shuffle, repeat, lyrics, up next, start a mix, going to the artist or album, and more).
+- TV: the Now playing chip at the top of the pages has a wave that moves while the music plays.
+- TV: Similar albums and the other pages with many albums show six covers across, as the Library does.
+- TV: an artist's page shows their albums, EPs, singles and DJ-mixes each in their own row, as the phone does.
+- **A new audio engine.** Every song now plays through one output that Siansa mixes itself, so crossfades and DJ blends stay exactly in step, beat-matched blends hold their beat, and cold ends and blends after the last beat sound the way a DJ would mix them.
+- Dynamic colours on now playing look more like the cover: the colour is the one that fills most of it, so a sepia cover with a red light in it gets tan instead of red and muted colours stay muted, and a black and white or grey cover gets silver instead of your theme's colour.
+- TV: rows with only a few covers fill the screen as wide cards, Home's Today's mix, Shuffle, Liked songs and notices are one bar of pills (the Library's shelves too), and an album's artists, genre and label are plain words, with Play and the other buttons in line under them.
+- With Dynamic colours on, the filled heart of a liked song in now playing takes the colour of the cover too, like the seek bar and the Play button.
+- **Your Library remembers list or grid for each view.** Playlists, Albums, Artists and the rest each keep the look you picked, until you change it, also after Siansa restarts.
+- **The log notes how songs blend.** It now says what the crossfade, blend length, beat-matching and bass swap are set to when Siansa starts, and each time you change one, so a report shows which settings a blend was made with.
+- **The mini player starts with Play or pause, Next song and Add to playlist.** Cast moved to Home. A layout you already set up stays as it is.
+- **Settings, tidied for v1.0.** **Servers and services** is now **Connections**. **Playback** now has the streaming quality and the book player's skip buttons; the separate Audiobooks and podcasts page is gone (your Audiobookshelf server is under Connections). **Streaming and data** is now **Data** and has everything that was under Downloads: your downloads, how they download, the storage limit, and the covers kept on the phone. The **Home** group's pages are now **Notices and Cards** and **Auto Generated Mixes**.
+- **Beat-matched blends** are no longer marked experimental.
+- **Radio stations show their logo.** Siansa looks up each station's picture once (on Radio Browser, a free list of radio stations, or on the station's own website) and keeps it, so stations no longer all show the same radio icon. It shows in Your Library, in the player, in the notification and on the lock screen.
+- **Stations can be edited.** Tap ⋮ › Edit next to a station to change its name or link, or to give it a picture link of your own. For your server's stations you can set the picture.
+- **Stations and podcasts sit right in Your Library.** The Stations chip lists your radio stations straight away, without a separate Your Stations card, and podcasts you add by their RSS link are under the Podcasts chip with your other podcasts. Add them with + › Add station or Add podcast at the top of Your Library.
+- **Siansa 1.0.** Out of beta, with a new audio engine that mixes every song itself, so crossfades and DJ blends stay exactly in step; slides from the play button for a DJ mix, a radio, a song path or songs that sound like the one playing; a DJ mix of any album; Android Auto; Siansa's own screen on a Chromecast or Google TV; internet radio and podcasts in Your Stations; and Siansa for Android TV and Google TV, in beta.
+
 ## 0.51.1beta — 2026-11-02
 
 ### Fixed
