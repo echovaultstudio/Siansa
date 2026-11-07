@@ -354,6 +354,8 @@ fun AlbumScreen(nav: NavController, id: String) {
                     artistCover.valueOrNull(),
                     d.album.artistId?.let { artistId -> { openArtists { artistsNamedBy(graph, artistId, d.album.artist) } } },
                     albumHeadline(d.album, fromServer?.info ?: d.info),
+                    // Where Play carries on, in the details line (the owner, 7 Nov).
+                    note = pick?.let { "Continue from ${PickUps.trackLabel(d.songs, it.continueIndex)}" },
                 )
             }
         },

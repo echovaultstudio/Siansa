@@ -122,31 +122,34 @@ class SpacingLibraryTest : SpacingCheck() {
     }
 
     /**
-     * Album page (issue #965): Download, Similar albums, Shuffle and Play spread evenly, the same gap between each; the
-     * three icons on Play's middle line, and "from 10" under Play when it continues.
+     * Album page (the owner's layout, 7 Nov): the plus right in line with the details above, download beside it; similar
+     * albums, shuffle and Play to the right, Play at the row's end; all on one line; nothing under Play.
      */
-    @Test fun albumBarSpreadsEvenly() {
+    @Test fun albumBarLinesUp() {
         compose.setContent {
             SiansaTheme {
-                app.siansa.ui.ActionButtons(
-                    enabled = true, onQueue = {}, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true,
-                    download = { androidx.compose.foundation.layout.Box(Modifier.size(48.dp).testTag("download")) },
-                    resume = app.siansa.ui.PlayResume(9, "10") to 24,
-                )
+                Column {
+                    Text("Album · 2019", Modifier.testTag("details"))
+                    app.siansa.ui.ActionButtons(
+                        enabled = true, onQueue = {}, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true,
+                        download = { androidx.compose.foundation.layout.Box(Modifier.size(48.dp).testTag("download")) },
+                        resume = app.siansa.ui.PlayResume(7, "8") to 12,
+                        onAddToPlaylist = {},
+                    )
+                }
             }
         }
-        val download = compose.onNodeWithTag("download").getBoundsInRoot()
+        val details = compose.onNodeWithTag("details").getBoundsInRoot()
+        val plus = compose.onNodeWithTag("albumAddToPlaylist").getBoundsInRoot()
         val similar = compose.onNodeWithTag("findSimilarAlbums").getBoundsInRoot()
         val shuffle = compose.onNodeWithTag("shuffleAll", useUnmergedTree = true).getBoundsInRoot()
         val play = compose.onNodeWithTag("bigPlay").getBoundsInRoot()
-        val centres = listOf(download, similar, shuffle, play).map { (it.left + it.right) / 2 }
-        val gaps = centres.zipWithNext { a, b -> b - a }
-        gaps.zipWithNext().forEach { (a, b) -> assertEven("Even gaps across the bar", a, b, 1.dp) }
+        // The plus's icon (28 dp, centred in its 48 dp touch area) starts where the text above starts.
+        assertEven("The plus in line with the details", plus.left + 10.dp, details.left, 1.dp)
         val line = (play.top + play.bottom) / 2
-        listOf(download, similar, shuffle).forEach { assertEven("On Play's middle line", (it.top + it.bottom) / 2, line, 1.dp) }
-        val from = compose.onNodeWithTag("playFrom").getBoundsInRoot()
-        assertTrue("\"from 10\" under Play", from.top >= play.bottom)
-        assertEven("\"from 10\" centred under Play", (from.left + from.right) / 2, (play.left + play.right) / 2, 1.dp)
+        listOf(plus, similar, shuffle).forEach { assertEven("On Play's middle line", (it.top + it.bottom) / 2, line, 1.dp) }
+        assertTrue("Similar, shuffle, then Play, left to right", similar.right <= shuffle.left + 0.5.dp && shuffle.right <= play.left + 0.5.dp)
+        assertTrue("Nothing hangs under Play", compose.onAllNodesWithTag("playFrom").fetchSemanticsNodes().isEmpty())
     }
 
     /** Album page (issue #240): room under the big Play button before the first song, marked when it's playing. */

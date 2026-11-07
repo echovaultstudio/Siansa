@@ -464,17 +464,19 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.SectionTitleSwitch(false) {}
                 }
             },
-            // An album's bar (issue #965): at rest; continuing from song 10 (a ring and "from 10"); sliding shuffle onto Play
-            // (the rest dims, Play a record); while the album's DJ mix plays; and DJ mix on the cover, on Play and before.
+            // An album's details with "Continue from 8", and its bar (issue #965, the owner's layout): at rest; continuing (a ring
+            // round Play); sliding shuffle onto Play (the rest dims, Play a record); while the album's DJ mix plays; and DJ mix
+            // on the cover, on Play and before.
             Scene("album_bar") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                    app.siansa.ui.CollectionByline("Thornhill", null, null, "Album · 2019", note = "Continue from 8")
                     val download: @Composable () -> Unit = { androidx.compose.material3.Icon(Icons.Rounded.DownloadForOffline, "Download", Modifier.size(28.dp)) }
-                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true)
-                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true,
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {})
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {},
                         resume = app.siansa.ui.PlayResume(9, "10") to 24)
-                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true,
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {},
                         djSlide = app.siansa.ui.DjSlide(armed = true), dim = 0.3f)
-                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true,
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {},
                         mixOn = true)  // paused: a turning glint never lets the picture settle
                     Row(horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
                         listOf(true, false).forEach { armed ->
