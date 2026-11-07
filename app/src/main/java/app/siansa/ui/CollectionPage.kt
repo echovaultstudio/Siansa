@@ -587,6 +587,7 @@ fun BigPlayButton(
     onPlay: () -> Unit,
 ) {
     val ring = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
+    val accent = Accent
     Box(
         Modifier
             .size(BIG_PLAY_SIZE)
@@ -599,7 +600,7 @@ fun BigPlayButton(
                     val arc = Size(size.width - 2 * inset, size.height - 2 * inset)
                     val at = Offset(inset, inset)
                     drawArc(ring, 0f, 360f, false, at, arc, style = Stroke(stroke))
-                    drawArc(Accent, -90f, 360f * progress.coerceIn(0f, 1f), false, at, arc, style = Stroke(stroke, cap = StrokeCap.Round))
+                    drawArc(accent, -90f, 360f * progress.coerceIn(0f, 1f), false, at, arc, style = Stroke(stroke, cap = StrokeCap.Round))
                 },
             )
             .clip(CircleShape)
