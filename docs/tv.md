@@ -30,21 +30,24 @@ To sign out, go to **Settings › Sign out** on the TV. Your phone stays signed 
 Everything works with the remote's arrows and the centre button; what the remote is on is lit or ringed in the accent colour, buttons on the settings pages included. The tabs along the top (Home, Library, Search,
 Settings) always open that tab's own page, wherever you are.
 
-- **Home**: your notices first, as on the phone (what needs you, what you're partway through, what's new; shown or
-  hidden in Settings › Notices and Cards › Notices), then Today's mix, Shuffle your library and Liked songs, then the rows of your phone's Home, in the same order
+- **Home**: one bar of pills at the top: Today's mix, Shuffle your library and Liked songs, then your notices, as on
+  the phone (what needs you, what you're partway through, what's new; shown or hidden in Settings › Notices and Cards ›
+  Notices). Then the rows of your phone's Home, in the same order
   and with the same rows hidden: Today's mixes (the daily mixes made today), Jump back in, Your mixes, Rediscover, Radios, Your playlists, Recently played, Artist
-  radios, Recently added, Your genres and Random picks. A radio starts playing straight away.
-- **Library**: albums, artists, playlists and genres as covers, six across, your liked songs, favourite albums and
+  radios, Recently added, Your genres and Random picks. A radio starts playing straight away. Rows fill the screen: a
+  row of only two or three is wide cards, a third of the screen each, with the cover beside the name.
+- **Library**: the shelves in a bar of pills at the top; albums, artists, playlists and genres as covers, six across, your liked songs, favourite albums and
   favourite artists. Time machine is on the phone only for now. Similar albums and the other pages with many albums
   (a genre, a label, Appears on) are six across too.
-- **Albums, playlists and mixes**: the cover (a playlist's own cover from the server) and what it is at the top, with the artists, genre and label to open,
-  then Play, Shuffle and Add to favourites; down from them goes straight to the songs. The button at the end of each
+- **Albums, playlists and mixes**: the cover (a playlist's own cover from the server) and what it is at the top, with the artists, genre and label in
+  plain words to open, then Play, Shuffle and Add to favourites in line under them; down from them goes straight to the songs. The button at the end of each
   song has Play next, Add to queue, Add to playlist, Like, Start (or Stop) a mix, Similar songs, Go to album or
   artist, and Song details.
 - **Artists**: Play, Shuffle, Artist radio and Add to favourites, then their top three songs (**Show all** for the rest), a row for each kind of release (Albums, EPs, Singles,
   DJ-mixes…) and similar artists.
 - **Search**: type with the on-screen keyboard or press the microphone button and say it. "Play … on Siansa" from
-  Google TV's own search opens it too.
+  Google TV's own search opens it too. With nothing typed, it shows your recent searches (the phone's, kept when you
+  search or go into the results; **Clear** forgets them), then radios (with AudioMuse) and your genres, as on the phone.
 - **Now playing**: as simple as Siansa's Chromecast screen: the cover, the song, its artist and album, a thin line
   for the time, over the cover blurred as on the phone, and Siansa's logo in the corner. There are no buttons: **OK**
   plays and pauses (paused, the cover darkens under a pause sign), **left** and **right** go to the previous and next

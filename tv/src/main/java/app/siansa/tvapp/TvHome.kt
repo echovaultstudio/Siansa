@@ -3,6 +3,12 @@ package app.siansa.tvapp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -179,30 +185,27 @@ fun TvHome() {
         contentPadding = PaddingValues(top = Space.Small, bottom = Space.Large),
         verticalArrangement = Arrangement.spacedBy(Space.Section),
     ) {
-        if (notices.isNotEmpty()) {
-            item("notices") {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = TV_EDGE, vertical = Space.Small),
-                    horizontalArrangement = Arrangement.spacedBy(Space.Medium),
-                    modifier = Modifier.testTag("tvNotices"),
-                ) {
-                    items(notices, key = { it.key }) { notice ->
-                        TvButton(notice.text, app.siansa.ui.noticeIcon(notice.kind), onClick = {
-                            AppLog.i("Tv", "Notice opened: ${notice.kind.id}")
-                            graph.notices.tap(notice.kind)
-                            runCatching { nav.navigate(notice.route) }.onFailure { AppLog.w("Tv", "Couldn't open notice ${notice.route}: ${it.message}") }
-                        })
-                    }
-                }
-            }
-        }
+        // One bar of pills (issue #996): Today's mix, Shuffle and Liked songs, then the notices, side by side in one
+        // track instead of a row of notices over a row of buttons.
         item("quick") {
-            Row(Modifier.padding(horizontal = TV_EDGE), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                TvButton("Today's mix", Icons.Rounded.AutoAwesome, strong = true, onClick = { play.todaysMix() }, modifier = Modifier.initialFocus())
-                TvButton("Shuffle your library", Icons.Rounded.Shuffle, onClick = { play.label("your library") { graph.library.randomSongs(SHUFFLE_SONGS) } })
-                TvButton("Liked songs", Icons.Rounded.Favorite, onClick = {
-                    play.label("your liked songs", shuffle = true) { app.siansa.ui.likedSongs(graph) }
-                })
+            TvPillBar(Modifier.testTag("tvPillBar")) {
+                item("today") { TvButton("Today's mix", Icons.Rounded.AutoAwesome, strong = true, onClick = { play.todaysMix() }, modifier = Modifier.initialFocus()) }
+                item("shuffle") { TvButton("Shuffle your library", Icons.Rounded.Shuffle, quiet = true, onClick = { play.label("your library") { graph.library.randomSongs(SHUFFLE_SONGS) } }) }
+                item("liked") {
+                    TvButton("Liked songs", Icons.Rounded.Favorite, quiet = true, onClick = {
+                        play.label("your liked songs", shuffle = true) { app.siansa.ui.likedSongs(graph) }
+                    })
+                }
+                if (notices.isNotEmpty()) {
+                    item("divider") { TvPillDivider() }
+                }
+                items(notices, key = { "notice:" + it.key }) { notice ->
+                    TvButton(notice.text, app.siansa.ui.noticeIcon(notice.kind), quiet = true, modifier = Modifier.testTag("tvNotice"), onClick = {
+                        AppLog.i("Tv", "Notice opened: ${notice.kind.id}")
+                        graph.notices.tap(notice.kind)
+                        runCatching { nav.navigate(notice.route) }.onFailure { AppLog.w("Tv", "Couldn't open notice ${notice.route}: ${it.message}") }
+                    })
+                }
             }
         }
         if (sync.phase != SyncPhase.IDLE && !sync.quiet) {
@@ -229,38 +232,69 @@ fun TvHome() {
     }
 }
 
-/** A titled row of covers that scrolls sideways as the remote moves along it. */
+/** How a row of [count] covers fills the screen (issue #996). */
+enum class RowLook { WIDE_CARDS, FILLED, SCROLLING }
+
+/**
+ * Six covers fill a TV's width: a row with fewer used to leave the rest empty (issue #996). Up to [WIDE_SLOTS], they're
+ * wide cards, a third of the width each; four or five, covers sharing the width; six or more, covers that scroll.
+ */
+internal fun rowLook(count: Int): RowLook = when {
+    count <= WIDE_SLOTS -> RowLook.WIDE_CARDS
+    count < GRID_COLUMNS -> RowLook.FILLED
+    else -> RowLook.SCROLLING
+}
+
+/** A wide card is a third of the screen: one or two leave room for the rest, as a third card would. */
+internal const val WIDE_SLOTS = 3
+
+/** A titled row of covers that fills the screen, scrolling sideways as the remote moves along it when there are many. */
 @Composable
 fun TvItemRow(row: TvRow) {
     Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
         Text(row.title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = TV_EDGE))
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = TV_EDGE, vertical = Space.Small),
-            horizontalArrangement = Arrangement.spacedBy(Space.Page),
-        ) {
-            items(row.items, key = { it.key }) { item -> TvItemTile(item) }
+        when (rowLook(row.items.size)) {
+            RowLook.SCROLLING -> LazyRow(
+                contentPadding = PaddingValues(horizontal = TV_EDGE, vertical = Space.Small),
+                horizontalArrangement = Arrangement.spacedBy(Space.Page),
+            ) {
+                items(row.items, key = { it.key }) { item -> TvItemTile(item) }
+            }
+            RowLook.FILLED -> Row(
+                Modifier.fillMaxWidth().padding(horizontal = TV_EDGE, vertical = Space.Small),
+                horizontalArrangement = Arrangement.spacedBy(Space.Page),
+            ) {
+                row.items.forEach { item -> TvItemTile(item, Modifier.weight(1f), width = Dp.Unspecified) }
+            }
+            RowLook.WIDE_CARDS -> Row(
+                Modifier.fillMaxWidth().padding(horizontal = TV_EDGE, vertical = Space.Small).testTag("tvWideRow"),
+                horizontalArrangement = Arrangement.spacedBy(Space.Page),
+            ) {
+                row.items.forEach { item -> TvItemTile(item, Modifier.weight(1f), wide = true) }
+                repeat(WIDE_SLOTS - row.items.size) { Spacer(Modifier.weight(1f)) }
+            }
         }
     }
 }
 
-/** One item as a cover: OK opens it (an album, a playlist…) or plays it (a radio). */
+/** One item as a cover (or a [wide] card): OK opens it (an album, a playlist…) or plays it (a radio). */
 @Composable
-fun TvItemTile(item: TvItem, modifier: Modifier = Modifier) {
+fun TvItemTile(item: TvItem, modifier: Modifier = Modifier, width: Dp = TILE_WIDTH, wide: Boolean = false) {
     val nav = LocalNav.current
     val play = rememberTvPlay()
     when (item) {
-        is TvItem.OfAlbum -> TvTile(item.album.name, item.subtitle, item.album.coverArt, { nav.navigate(TvRoutes.album(item.album.id)) }, modifier)
-        is TvItem.OfArtist -> TvTile(item.artist.name, null, item.artist.coverArt, { nav.navigate(TvRoutes.artist(item.artist.id)) }, modifier, round = true)
-        is TvItem.OfArtistRadio -> TvTile("${item.artist.name} radio", "With similar artists", item.artist.coverArt, { play.artistRadio(item.artist) }, modifier, round = true)
-        is TvItem.OfPlaylist -> TvTile(item.playlist.name, "${item.playlist.songCount} songs", item.playlist.coverArt, { nav.navigate(TvRoutes.playlist(item.playlist.id)) }, modifier)
-        is TvItem.OfMix -> TvTile(item.mix.title, "${item.mix.songs.size} songs", item.mix.songs.firstOrNull()?.cover, { nav.navigate(TvRoutes.mix(item.mix.id)) }, modifier)
-        is TvItem.OfMood -> TvTile(item.radio.name, "Sound radio", null, { play.moodRadio(item.radio) }, modifier,
-            colors = Color(item.radio.colors.first) to Color(item.radio.colors.second))
-        is TvItem.OfGenre -> TvTile(item.genre.name, "${item.genre.songCount} songs", null, { play.genreRadio(item.genre.name) }, modifier, colors = tileColors(item.genre.name))
-        is TvItem.OfShortcut -> TvTile(item.play.title, shortcutKind(item.play.route), item.play.cover, { nav.navigate(item.play.route) }, modifier)
-        TvItem.MakeToday -> TvTile("Make today's mix", "From what you play at this time of day", null, { play.todaysMix() }, modifier,
-            colors = tileColors("Today's mix"))
-        is TvItem.OfPersonal -> TvTile(item.kind.title, "Made for you today", null, { play.personal(item.kind) }, modifier, colors = tileColors(item.kind.title))
+        is TvItem.OfAlbum -> TvTile(item.album.name, item.subtitle, item.album.coverArt, { nav.navigate(TvRoutes.album(item.album.id)) }, modifier, width = width, wide = wide)
+        is TvItem.OfArtist -> TvTile(item.artist.name, null, item.artist.coverArt, { nav.navigate(TvRoutes.artist(item.artist.id)) }, modifier, width = width, round = true, wide = wide)
+        is TvItem.OfArtistRadio -> TvTile("${item.artist.name} radio", "With similar artists", item.artist.coverArt, { play.artistRadio(item.artist) }, modifier, width = width, round = true, wide = wide)
+        is TvItem.OfPlaylist -> TvTile(item.playlist.name, "${item.playlist.songCount} songs", item.playlist.coverArt, { nav.navigate(TvRoutes.playlist(item.playlist.id)) }, modifier, width = width, wide = wide)
+        is TvItem.OfMix -> TvTile(item.mix.title, "${item.mix.songs.size} songs", item.mix.songs.firstOrNull()?.cover, { nav.navigate(TvRoutes.mix(item.mix.id)) }, modifier, width = width, wide = wide)
+        is TvItem.OfMood -> TvTile(item.radio.name, "Sound radio", null, { play.moodRadio(item.radio) }, modifier, width = width,
+            colors = Color(item.radio.colors.first) to Color(item.radio.colors.second), wide = wide)
+        is TvItem.OfGenre -> TvTile(item.genre.name, "${item.genre.songCount} songs", null, { play.genreRadio(item.genre.name) }, modifier, width = width, colors = tileColors(item.genre.name), wide = wide)
+        is TvItem.OfShortcut -> TvTile(item.play.title, shortcutKind(item.play.route), item.play.cover, { nav.navigate(item.play.route) }, modifier, width = width, wide = wide)
+        TvItem.MakeToday -> TvTile("Make today's mix", "From what you play at this time of day", null, { play.todaysMix() }, modifier, width = width,
+            colors = tileColors("Today's mix"), wide = wide)
+        is TvItem.OfPersonal -> TvTile(item.kind.title, "Made for you today", null, { play.personal(item.kind) }, modifier, width = width, colors = tileColors(item.kind.title), wide = wide)
     }
 }
 

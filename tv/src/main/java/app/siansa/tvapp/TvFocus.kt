@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -65,7 +67,11 @@ fun Modifier.tvFocus(shape: Shape, onClick: () -> Unit, grow: Float = FOCUS_GROW
         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
 }
 
-/** A cover with a title and a line under it, for Home's rows and the Library's grids. */
+/**
+ * A cover with a title and a line under it, for Home's rows and the Library's grids. [width] unspecified: as wide as
+ * [modifier] makes it (a share of a row that fills the screen). [wide]: a card instead, the cover at its left and the
+ * words beside it, for a row of only a few (issue #996), so they fill the screen instead of leaving it half empty.
+ */
 @Composable
 fun TvTile(
     title: String,
@@ -77,9 +83,14 @@ fun TvTile(
     round: Boolean = false,
     /** A radio or genre has no cover: its two colours instead, with its name on them. */
     colors: Pair<Color, Color>? = null,
+    wide: Boolean = false,
 ) {
     val shape: Shape = if (round) CircleShape else RoundedCornerShape(TILE_CORNER)
-    Column(modifier.width(width), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+    if (wide) {
+        WideTile(title, subtitle, coverId, onClick, modifier, round, colors)
+        return
+    }
+    Column(if (width != Dp.Unspecified) modifier.width(width) else modifier, verticalArrangement = Arrangement.spacedBy(Space.Small)) {
         val art = Modifier.fillMaxWidth().aspectRatio(1f).tvFocus(shape, onClick)
         if (colors != null) {
             Box(art.background(Brush.linearGradient(listOf(colors.first, colors.second)), shape).padding(Space.Medium), contentAlignment = Alignment.BottomStart) {
@@ -103,11 +114,42 @@ fun TvTile(
     }
 }
 
-/** A pill-shaped button: an icon and a word. */
+/** [TvTile] as a card: the cover (or the colours) at the left, the title and its line beside it. */
 @Composable
-fun TvButton(text: String, icon: ImageVector?, onClick: () -> Unit, modifier: Modifier = Modifier, strong: Boolean = false) {
+private fun WideTile(title: String, subtitle: String?, coverId: String?, onClick: () -> Unit, modifier: Modifier, round: Boolean, colors: Pair<Color, Color>?) {
+    val shape = RoundedCornerShape(TILE_CORNER)
+    val card = modifier.height(WIDE_TILE_HEIGHT).tvFocus(shape, onClick, grow = BUTTON_GROW)
+    if (colors != null) {
+        // A radio, a genre or a mix made for you: the whole card in its colours, its name on them.
+        Box(card.background(Brush.linearGradient(listOf(colors.first, colors.second)), shape).padding(Space.Page), contentAlignment = Alignment.BottomStart) {
+            Column(verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = WIDE_SUBTITLE_ALPHA), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        return
+    }
+    Row(card.background(MaterialTheme.colorScheme.surfaceVariant, shape), verticalAlignment = Alignment.CenterVertically) {
+        Cover(coverId, SMALL_COVER, Modifier.fillMaxHeight().aspectRatio(1f), if (round) CircleShape else shape)
+        Column(Modifier.weight(1f).padding(horizontal = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/**
+ * A pill-shaped button: an icon and a word. [quiet]: no background of its own, for a pill inside a bar of pills (Home's
+ * notices, issue #996); the bar is the background, and the remote's ring shows which one it's on.
+ */
+@Composable
+fun TvButton(text: String, icon: ImageVector?, onClick: () -> Unit, modifier: Modifier = Modifier, strong: Boolean = false, quiet: Boolean = false) {
     val shape = RoundedCornerShape(percent = 50)
-    val back = if (strong) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+    val back = when {
+        strong -> MaterialTheme.colorScheme.primary
+        quiet -> Color.Transparent
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
     val fore = if (strong) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
     Row(
         modifier.tvFocus(shape, onClick, grow = BUTTON_GROW).background(back, shape).padding(horizontal = Space.Section, vertical = Space.Medium),
@@ -202,19 +244,42 @@ fun Modifier.initialFocus(): Modifier {
     return focusRequester(requester)
 }
 
-/** A small value that opens something: an artist's name, a genre. */
+/**
+ * A value as plain words that opens something (issue #996): an artist's name, a genre, a label, on an album's page.
+ * The remote's ring goes round it; [strong] for the main one (the artist), the rest a little quieter, both easy to read.
+ */
 @Composable
-fun TvChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, strong: Boolean = false) {
-    val shape = RoundedCornerShape(percent = 50)
+fun TvTextLink(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, strong: Boolean = false) {
     Text(
         text,
         style = MaterialTheme.typography.titleMedium,
-        color = if (strong) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        fontWeight = if (strong) FontWeight.SemiBold else FontWeight.Normal,
+        color = if (strong) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = LINK_QUIET_ALPHA),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = modifier.tvFocus(shape, onClick, grow = BUTTON_GROW).background(MaterialTheme.colorScheme.surfaceVariant, shape)
-            .padding(horizontal = Space.Page, vertical = Space.Tight),
+        modifier = modifier.tvFocus(RoundedCornerShape(Space.Small), onClick, grow = BUTTON_GROW).padding(horizontal = Space.Tight),
     )
+}
+
+/**
+ * Pills side by side in one track, like a selector (issue #996): Home's Today's mix, Shuffle, Liked songs and notices, and
+ * the Library's shelves. The pills inside are [TvButton]s with `quiet = true`, the chosen or main one `strong`.
+ */
+@Composable
+fun TvPillBar(modifier: Modifier = Modifier, content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
+    androidx.compose.foundation.lazy.LazyRow(
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(Space.Tight),
+        horizontalArrangement = Arrangement.spacedBy(Space.Tight),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.padding(horizontal = TV_EDGE).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(percent = 50)),
+        content = content,
+    )
+}
+
+/** A thin line between groups of pills in a [TvPillBar]. */
+@Composable
+fun TvPillDivider() {
+    Box(Modifier.padding(horizontal = Space.Small).size(width = PILL_DIVIDER_WIDTH, height = PILL_DIVIDER_HEIGHT).background(MaterialTheme.colorScheme.outline))
 }
 
 /** The room at a TV page's left and right edges: TVs may cut off the edge of the picture (overscan). */
@@ -231,6 +296,13 @@ val TILE_WIDTH = 136.dp
 /** The Library's covers across. */
 const val GRID_COLUMNS = 6
 private val TILE_CORNER = 10.dp
+/** A wide card's height: its cover is this tall and as wide. */
+private val WIDE_TILE_HEIGHT = 112.dp
+private const val WIDE_SUBTITLE_ALPHA = 0.85f
+/** Genres and labels on an album's page: quieter than the artist, still well above what accessibility asks. */
+private const val LINK_QUIET_ALPHA = 0.82f
+private val PILL_DIVIDER_WIDTH = 1.dp
+private val PILL_DIVIDER_HEIGHT = 24.dp
 private val CONTROL = 56.dp
 private val BIG_CONTROL = 76.dp
 private val CONTROL_ICON = 28.dp

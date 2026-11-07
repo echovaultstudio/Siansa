@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.offset
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.siansa.data.Album
 import app.siansa.data.category
@@ -122,16 +123,18 @@ fun TvLibrary() {
         }.onFailure { AppLog.w("Tv", "Couldn't read the library's ${shelf.label.lowercase()}: ${it.message}") }
     }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-        Row(
-            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = TV_EDGE, vertical = Space.Medium),
-            horizontalArrangement = Arrangement.spacedBy(Space.Medium),
-        ) {
-            for (s in Shelf.entries) {
-                TvButton(s.label, null, onClick = { shelf = s }, strong = s == shelf, modifier = if (s == Shelf.ALBUMS) Modifier.initialFocus() else Modifier)
+        // The shelves in one bar of pills, as Home's (issue #996).
+        TvPillBar(Modifier.padding(vertical = Space.Small)) {
+            items(Shelf.entries.size) { i ->
+                val s = Shelf.entries[i]
+                TvButton(s.label, null, onClick = { shelf = s }, strong = s == shelf, quiet = s != shelf, modifier = if (s == Shelf.ALBUMS) Modifier.initialFocus() else Modifier)
             }
             // The phone's page for this: (with AudioMuse) the sound of your library. Time machine isn't on the TV for now
             // (issue #949): laying it out froze a SHIELD for seconds.
-            if (settings.audioMuseReady) TvButton("Your sound", null, onClick = { nav.navigate("fingerprint") })
+            if (settings.audioMuseReady) {
+                item { TvPillDivider() }
+                item { TvButton("Your sound", null, quiet = true, onClick = { nav.navigate("fingerprint") }) }
+            }
         }
         val empty = when (shelf) {
             Shelf.FAVOURITE_ALBUMS -> "No favourite albums yet. Press the heart on an album's page to add it."
@@ -157,7 +160,7 @@ fun TvLibrary() {
                 horizontalArrangement = Arrangement.spacedBy(Space.Page),
                 verticalArrangement = Arrangement.spacedBy(Space.Section),
             ) {
-                items(tiles.orEmpty(), key = { it.key }) { item -> TvItemTile(item, Modifier.fillMaxWidth()) }
+                items(tiles.orEmpty(), key = { it.key }) { item -> TvItemTile(item, Modifier.fillMaxWidth(), width = androidx.compose.ui.unit.Dp.Unspecified) }
             }
         }
     }
@@ -189,14 +192,24 @@ fun TvAlbum(id: String) {
         shortcut = Shortcut("album/$id", album.name, album.coverArt),
         about = listOfNotNull(album.year?.toString(), "${songs.size} songs", "$total min".takeIf { total > 0 }).joinToString(" · "),
         animated = true,
+        // Plain words, not pills (issue #996): the artists, then the genre and the label, each opening its page.
         values = {
             if (artists.isEmpty()) {
-                Text(album.artist, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                Text(album.artist, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = Space.Tight))
             } else {
-                for (a in artists) TvChip(a.name, onClick = { nav.navigate(TvRoutes.artist(a.id)) }, strong = true)
+                artists.forEachIndexed { i, a ->
+                    TvTextLink(if (i < artists.lastIndex) a.name + "," else a.name, onClick = { nav.navigate(TvRoutes.artist(a.id)) }, strong = true)
+                }
             }
-            album.genre?.takeIf { it.isNotBlank() }?.let { g -> TvChip(g, onClick = { nav.navigate(albumTagRoute(AlbumTag.GENRE, g)) }) }
-            album.labels.firstOrNull()?.let { l -> TvChip(l, onClick = { nav.navigate(albumTagRoute(AlbumTag.LABEL, l)) }) }
+            album.genre?.takeIf { it.isNotBlank() }?.let { g ->
+                ValueSeparator()
+                TvTextLink(g, onClick = { nav.navigate(albumTagRoute(AlbumTag.GENRE, g)) })
+            }
+            album.labels.firstOrNull()?.let { l ->
+                ValueSeparator()
+                TvTextLink(l, onClick = { nav.navigate(albumTagRoute(AlbumTag.LABEL, l)) })
+            }
         },
         buttons = {
             TvButton(
@@ -304,7 +317,7 @@ fun TvArtist(id: String) {
                     Text(a.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
                     albums?.let { Text(if (it.size == 1) "1 release" else "${it.size} releases", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Space.Tight, vertical = Space.Medium), horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
+                    ButtonsInLine {
                         PlayButtons(play = { graph.library.songsOf(a).ifEmpty { top } }, note = null, shortcut = Shortcut("artist/$id", a.name, a.coverArt), focusFirst = true)
                         TvButton("Artist radio", Icons.Rounded.Radio, onClick = { play.artistRadio(a) })
                         TvButton(
@@ -397,11 +410,13 @@ private fun CollectionPage(
                     Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (values != null) {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Medium)) { values() }
+                        // Each value has a little room for the remote's ring: moved left by it, the words start in line
+                        // with the title.
+                        FlowRow(Modifier.offset(x = -Space.Tight), verticalArrangement = Arrangement.spacedBy(Space.Tight)) { values() }  // spacing: exact
                     }
                     Text(about, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     note?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis) }
-                    Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Space.Tight, vertical = Space.Medium), horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
+                    ButtonsInLine {
                         PlayButtons(play = { songs }, note = null, shortcut = shortcut, focusFirst = true)
                         buttons?.invoke()
                     }
@@ -416,6 +431,25 @@ private fun CollectionPage(
         }
         songRows(songs, player.current?.id, shortcut)
     }
+}
+
+/**
+ * A page's buttons under its title (issue #996): Play's left edge exactly in line with the words above. The row has room
+ * at its sides for a button to grow when the remote is on it, and is moved left by that room.
+ */
+@Composable
+private fun ButtonsInLine(content: @Composable () -> Unit) {
+    Row(
+        Modifier.offset(x = -Space.Tight)  // spacing: exact (the room for growing, taken back)
+            .horizontalScroll(rememberScrollState()).padding(horizontal = Space.Tight, vertical = Space.Medium),
+        horizontalArrangement = Arrangement.spacedBy(Space.Page),
+    ) { content() }
+}
+
+/** Before an album's genre and its label. */
+@Composable
+private fun ValueSeparator() {
+    Text("·", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = Space.Tight))
 }
 
 /** The songs of a list, for a LazyColumn: OK plays from that song. */
