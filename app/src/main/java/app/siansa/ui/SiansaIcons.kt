@@ -58,40 +58,4 @@ object SiansaIcons {
             }
         }.build()
     }
-
-    /**
-     * A record with AudioMuse's sparkle, for an album's Explore button (issue #965): finding albums by their sound and
-     * mixing the album's songs by theirs.
-     */
-    val RecordSparkle: ImageVector by lazy {
-        ImageVector.Builder(name = "Siansa.RecordSparkle", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
-            val line = SolidColor(Color.Black)
-            // The record.
-            path(stroke = line, strokeLineWidth = 1.8f) {
-                moveTo(3.5f, 13f)
-                arcTo(7.5f, 7.5f, 0f, true, true, 18.5f, 13f)
-                arcTo(7.5f, 7.5f, 0f, true, true, 3.5f, 13f)
-                close()
-            }
-            // Its label.
-            path(stroke = line, strokeLineWidth = 1.6f) {
-                moveTo(8.6f, 13f)
-                arcTo(2.4f, 2.4f, 0f, true, true, 13.4f, 13f)
-                arcTo(2.4f, 2.4f, 0f, true, true, 8.6f, 13f)
-                close()
-            }
-            // The sparkle, top right.
-            path(fill = line) {
-                moveTo(19f, 1.8f)
-                lineTo(19.9f, 4.1f)
-                lineTo(22.2f, 5f)
-                lineTo(19.9f, 5.9f)
-                lineTo(19f, 8.2f)
-                lineTo(18.1f, 5.9f)
-                lineTo(15.8f, 5f)
-                lineTo(18.1f, 4.1f)
-                close()
-            }
-        }.build()
-    }
 }

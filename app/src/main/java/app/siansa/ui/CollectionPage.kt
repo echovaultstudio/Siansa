@@ -62,6 +62,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import app.siansa.log.AppLog
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -79,8 +85,6 @@ import app.siansa.data.discHeaders
 import app.siansa.offline.OfflineItem
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.ButtonDefaults
 
 /**
  * The page used for albums, playlists, mixes and radios, laid out like Spotify: the cover's colour
@@ -113,6 +117,10 @@ fun CollectionPage(
     songMenu: (@Composable (index: Int, song: Song, close: () -> Unit) -> Unit)? = null,
     // The song heard last on an album you stopped part way (issue #367), by position, with its note.
     lastPlayed: Pair<Int, String>? = null,
+    // An album's own bar (issue #965): Download, Similar albums, Shuffle and Play spread evenly, no queue button.
+    albumBar: Boolean = false,
+    // Where Play continues an album you stopped part way (issue #965, was "Continue from" #367): Play shows it.
+    resume: PlayResume? = null,
     // What the quick-scroll handle says for a song (a letter, a month); by default where it is in the list.
     scrollLabel: ((index: Int, song: Song) -> String?)? = null,
     footer: LazyListScope.() -> Unit = {},
@@ -129,9 +137,9 @@ fun CollectionPage(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    // A slide from the album's Explore button (issue #965): shown on the cover, the rest of the page dimmed.
-    var explore by remember { mutableStateOf<ExploreSlide?>(null) }
-    val exploreDim by androidx.compose.animation.core.animateFloatAsState(if (explore != null) EXPLORE_OTHERS else 1f, label = "exploreDim")
+    // A slide from an album's shuffle button onto Play (issue #965): DJ mix on the cover, the rest of the page dimmed.
+    var djSlide by remember { mutableStateOf<DjSlide?>(null) }
+    val slideDim by androidx.compose.animation.core.animateFloatAsState(if (djSlide != null) SLIDE_OTHERS else 1f, label = "slideDim")
     val coverSize = (LocalConfiguration.current.screenWidthDp * 0.62f).dp
     val coverPx = with(density) { coverSize.toPx() }
     val scrolled by remember {
@@ -199,14 +207,14 @@ fun CollectionPage(
                     ) {
                         Box(Modifier.size(coverSize).shadow(18.dp, RoundedCornerShape(6.dp)).clip(RoundedCornerShape(6.dp))) {
                             // The same name on the cover as now playing's play button slides (the owner, issue #965).
-                            val label = explore?.let { SlideLabel(PlaySlide.DJ_MIX, it.way, it.armed) }
-                            val blur by androidx.compose.animation.core.animateDpAsState(slideBlur(label), label = "exploreBlur")
+                            val label = djSlide?.let { SlideLabel(PlaySlide.DJ_MIX, it.way, it.armed) }
+                            val blur by androidx.compose.animation.core.animateDpAsState(slideBlur(label), label = "slideBlur")
                             cover(Modifier.size(coverSize).then(if (blur > 0.dp) Modifier.blur(blur) else Modifier))
                             SlideCoverLabel(label, Modifier.fillMaxSize())
                         }
                     }
                     Spacer(Modifier.height(Space.Page))
-                    Column(Modifier.alpha(exploreDim)) {
+                    Column(Modifier.alpha(slideDim)) {
                         Text(
                             title,
                             style = MaterialTheme.typography.headlineMedium,
@@ -220,9 +228,10 @@ fun CollectionPage(
                     Spacer(Modifier.height(Space.Tight))
                     ActionRow(
                         songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed, saveAs = title.takeIf { saveAsPlaylist },
-                        // An album's Explore slides right onto Play for a DJ mix of its own songs (issue #965).
-                        onDjMix = if (onSimilar != null) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } }) else null,
-                        explore = explore, onExplore = { explore = it }, dim = exploreDim,
+                        // An album's shuffle slides right onto Play for a DJ mix of its own songs (issue #965); it needs
+                        // AudioMuse, as similar albums does.
+                        onDjMix = if (albumBar && onSimilar != null) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } }) else null,
+                        djSlide = djSlide, onDjSlide = { djSlide = it }, dim = slideDim, albumBar = albumBar, resume = resume,
                     )
                 }
             }
@@ -397,9 +406,11 @@ private fun ActionRow(
     onPlayed: () -> Unit = {},
     saveAs: String? = null,
     onDjMix: (() -> Unit)? = null,
-    explore: ExploreSlide? = null,
-    onExplore: (ExploreSlide?) -> Unit = {},
+    djSlide: DjSlide? = null,
+    onDjSlide: (DjSlide?) -> Unit = {},
     dim: Float = 1f,
+    albumBar: Boolean = false,
+    resume: PlayResume? = null,
 ) {
     val graph = LocalGraph.current
     var saving by remember { mutableStateOf(false) }
@@ -417,13 +428,24 @@ private fun ActionRow(
         download = { if (offline != null) DownloadButton(offline, songs) },
         onSimilar = onSimilar,
         onShuffle = { graph.player.play(songs, shuffle = true); onPlayed() },
-        onPlay = { playback.press { graph.player.play(songs); onPlayed() } },
+        // Play continues where you stopped, when you did (issue #965); held, it starts from the top.
+        onPlay = {
+            playback.press {
+                val at = resume?.index?.takeIf { it in songs.indices } ?: 0
+                if (at > 0) AppLog.i("Album", "Continue from ${at + 1} of ${songs.size}")
+                graph.player.play(songs, at)
+                onPlayed()
+            }
+        },
+        onPlayFromStart = if (resume != null) ({ AppLog.i("Album", "Play from the start"); graph.player.play(songs); onPlayed() }) else null,
         playing = playback.playing,
         onDjMix = onDjMix?.let { mix -> { mix(); onPlayed() } },
-        explore = explore,
-        onExplore = onExplore,
+        djSlide = djSlide,
+        onDjSlide = onDjSlide,
         dim = dim,
         mixOn = mixOn,
+        albumBar = albumBar,
+        resume = resume?.takeIf { !playback.loaded && it.index in songs.indices }?.let { it to songs.size },
     )
 }
 
@@ -438,17 +460,80 @@ internal fun ActionButtons(
     onPlay: () -> Unit,
     onSave: (() -> Unit)? = null,
     playing: Boolean = false,
-    // An album's Explore (issue #965): with [onDjMix], the similar albums button becomes Explore, which slides.
+    // An album's DJ mix (issue #965): sliding from shuffle onto Play starts it.
     onDjMix: (() -> Unit)? = null,
-    explore: ExploreSlide? = null,
-    onExplore: (ExploreSlide?) -> Unit = {},
+    djSlide: DjSlide? = null,
+    onDjSlide: (DjSlide?) -> Unit = {},
     dim: Float = 1f,
     // The album's DJ mix is playing: Play has the record grooves, turning while it plays.
     mixOn: Boolean = false,
+    // An album's bar (issue #965): Download, Similar albums, Shuffle and Play spread evenly, no queue button.
+    albumBar: Boolean = false,
+    // Where Play continues, with the album's length: Play shows a ring for how far you got and "from 10" under it.
+    resume: Pair<PlayResume, Int>? = null,
+    onPlayFromStart: (() -> Unit)? = null,
 ) {
-    // How far right of Explore's middle the Play button's near edge is: sliding there starts the DJ mix.
-    var exploreX by remember { mutableStateOf<Float?>(null) }
+    // How far right of shuffle's middle Play's near edge is: sliding there starts the DJ mix.
+    var shuffleX by remember { mutableStateOf<Float?>(null) }
     var playLeft by remember { mutableStateOf<Float?>(null) }
+    // Once the finger is on Play, it lights up as now playing's record and turns from the moment the mix plays, still
+    // while it's paused (the owner, issue #965).
+    val onPlayButton = djSlide?.armed == true
+    val playButton: @Composable () -> Unit = {
+        Box(Modifier.onGloballyPositioned { playLeft = it.positionInRoot().x }.alpha(if (onPlayButton) 1f else dim)) {
+            BigPlayButton(
+                enabled, playing = playing, grooves = onPlayButton || mixOn, turning = mixOn && playing,
+                progress = resume?.let { (at, of) -> if (of > 0) at.index.toFloat() / of else 0f }?.takeIf { !onPlayButton && !mixOn },
+                onLongPlay = onPlayFromStart,
+                onPlay = onPlay,
+            )
+        }
+    }
+    val shuffleButton: @Composable () -> Unit = {
+        if (onDjMix != null) {
+            ShuffleDjButton(
+                enabled = enabled,
+                onShuffle = onShuffle,
+                onDjMix = onDjMix,
+                onSliding = onDjSlide,
+                playLeftPx = shuffleX?.let { x -> playLeft?.let { it - x } },
+                modifier = Modifier.onGloballyPositioned { shuffleX = it.positionInRoot().x + it.size.width / 2f },
+            )
+        } else {
+            IconButton(onClick = onShuffle, enabled = enabled, modifier = Modifier.testTag("shuffleAll")) {
+                Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
+            }
+        }
+    }
+    val similarButton: @Composable () -> Unit = {
+        // The waveform with an "A", as "Similar albums" in the now playing menu (issue #239).
+        if (onSimilar != null) IconButton(onClick = onSimilar, modifier = Modifier.testTag("findSimilarAlbums")) {
+            Icon(rememberSimilarAlbumsIcon(), "Find similar albums", tint = Accent, modifier = Modifier.size(28.dp))
+        }
+    }
+    if (albumBar) {
+        // Spread evenly across the page (the owner, issue #965). Each sits in a box as tall as Play, so they line up
+        // with its middle while "from 10" hangs under Play.
+        PlayButtonRow(horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Top) {
+            Box(Modifier.height(PLAY_SIZE).alpha(dim), contentAlignment = Alignment.Center) { download() }
+            if (onSimilar != null) Box(Modifier.height(PLAY_SIZE).alpha(dim), contentAlignment = Alignment.Center) { similarButton() }
+            Box(Modifier.height(PLAY_SIZE).alpha(if (djSlide != null) 1f else dim), contentAlignment = Alignment.Center) { shuffleButton() }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                playButton()
+                resume?.let { (at, _) ->
+                    Text(
+                        "from ${at.label}",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Accent,
+                        maxLines = 1,
+                        modifier = Modifier.alpha(dim).padding(top = Space.Tight).testTag("playFrom"),
+                    )
+                }
+            }
+        }
+        return
+    }
     PlayButtonRow {
         IconButton(onClick = onQueue, enabled = enabled, modifier = Modifier.alpha(dim).testTag("queueAll")) {
             Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add all to queue", Modifier.size(28.dp))
@@ -461,31 +546,10 @@ internal fun ActionButtons(
         }
         Box(Modifier.alpha(dim)) { download() }
         Spacer(Modifier.weight(1f))
-        if (onSimilar != null && onDjMix != null && enabled) {
-            ExploreButton(
-                onSimilar = onSimilar,
-                onDjMix = onDjMix,
-                onSliding = onExplore,
-                rightArmPx = exploreX?.let { x -> playLeft?.let { it - x } },
-                modifier = Modifier.onGloballyPositioned { exploreX = it.positionInRoot().x + it.size.width / 2f },
-            )
-        } else if (onSimilar != null) {
-            // The waveform with an "A", as "Similar albums" in the now playing menu (issue #239).
-            IconButton(onClick = onSimilar, modifier = Modifier.testTag("findSimilarAlbums")) {
-                Icon(rememberSimilarAlbumsIcon(), "Find similar albums", tint = Accent, modifier = Modifier.size(28.dp))
-            }
-        }
-        IconButton(onClick = onShuffle, enabled = enabled, modifier = Modifier.alpha(dim).testTag("shuffleAll")) {
-            Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
-        }
+        similarButton()
+        Box(Modifier.alpha(dim)) { shuffleButton() }
         Spacer(Modifier.width(Space.Small))
-        // While Explore slides, Play darkens with the rest; once the finger is on it, it lights up as a turning record, as
-        // now playing's does in a DJ mix, and turns from the moment the mix plays, still while it's paused (the owner,
-        // issue #965).
-        val onPlayButton = explore?.armed == true
-        Box(Modifier.onGloballyPositioned { playLeft = it.positionInRoot().x }.alpha(if (onPlayButton) 1f else dim)) {
-            BigPlayButton(enabled, playing = playing, grooves = onPlayButton || mixOn, turning = mixOn && playing, onPlay = onPlay)
-        }
+        playButton()
     }
 }
 
@@ -494,30 +558,70 @@ internal fun ActionButtons(
  * policy), so the first song below, marked when it's playing, never touches the button.
  */
 @Composable
-fun PlayButtonRow(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
+fun PlayButtonRow(
+    modifier: Modifier = Modifier,
+    horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
+    verticalAlignment: Alignment.Vertical = Alignment.CenterVertically,
+    content: @Composable RowScope.() -> Unit,
+) {
     Row(
         modifier.fillMaxWidth().padding(bottom = Space.BelowPlayButton),
-        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = horizontalArrangement,
+        verticalAlignment = verticalAlignment,
         content = content,
     )
 }
 
 /** The big round Play button of album, playlist, mix and artist pages. Only ever inside a [PlayButtonRow]. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun BigPlayButton(enabled: Boolean, playing: Boolean = false, grooves: Boolean = false, turning: Boolean = false, onPlay: () -> Unit) {
+fun BigPlayButton(
+    enabled: Boolean,
+    playing: Boolean = false,
+    grooves: Boolean = false,
+    turning: Boolean = false,
+    // How far into an album you stopped, 0..1 (issue #965): a ring round the button shows it.
+    progress: Float? = null,
+    // Held: the album from the top, when Play would continue it.
+    onLongPlay: (() -> Unit)? = null,
+    onPlay: () -> Unit,
+) {
+    val ring = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
     Box(
         Modifier
-            .size(56.dp)
+            .size(PLAY_SIZE)
+            .then(
+                if (progress == null) Modifier
+                else Modifier.drawBehind {
+                    // Just outside the button: the whole track faint, how far you got in the accent.
+                    val stroke = PLAY_RING.toPx()
+                    val inset = -PLAY_RING_GAP.toPx() - stroke / 2
+                    val arc = Size(size.width - 2 * inset, size.height - 2 * inset)
+                    val at = Offset(inset, inset)
+                    drawArc(ring, 0f, 360f, false, at, arc, style = Stroke(stroke))
+                    drawArc(Accent, -90f, 360f * progress.coerceIn(0f, 1f), false, at, arc, style = Stroke(stroke, cap = StrokeCap.Round))
+                },
+            )
             .clip(CircleShape)
             .background(if (enabled) Accent else Accent.copy(alpha = 0.4f))
-            .clickable(enabled = enabled, onClick = onPlay)
+            .combinedClickable(
+                enabled = enabled,
+                onClick = onPlay,
+                onLongClick = onLongPlay,
+                onLongClickLabel = onLongPlay?.let { "Play from the start" },
+            )
             .testTag("bigPlay"),
         contentAlignment = Alignment.Center,
     ) {
         // Record grooves for an album's DJ mix (issue #965), as now playing's play button has.
         if (grooves) Grooves(playing = turning, Modifier.fillMaxSize().testTag("bigPlayGrooves"))
         // ⏸ while what the page shows is playing (a book's page, issue #626): the same button pauses it.
-        Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (playing) "Pause" else "Play", tint = OnAccent, modifier = Modifier.size(32.dp))
+        Icon(
+            if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+            when { playing -> "Pause"; progress != null -> "Continue"; else -> "Play" },
+            tint = OnAccent,
+            modifier = Modifier.size(32.dp),
+        )
     }
 }
 
@@ -601,23 +705,13 @@ fun Modifier.lastPlayedLine(color: Color): Modifier = drawBehind {
 
 private val LAST_PLAYED_LINE = 3.dp
 
-/**
- * "Continue from 5" under an album's details, to carry on where you stopped (issue #367). The button's
- * touch area reaches [Space.Tight] above what you see, so it looks [Space.Small] under the details, like
- * the artist above them.
- */
-@Composable
-fun ContinueButton(track: String, onClick: () -> Unit) {
-    FilledTonalButton(
-        onClick = onClick,
-        contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-        modifier = Modifier.padding(top = Space.Tight).testTag("continueFrom"),
-    ) {
-        Icon(Icons.Rounded.PlayArrow, null, Modifier.size(ButtonDefaults.IconSize))
-        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-        Text("Continue from $track")
-    }
-}
 
-/** The page around an album's Explore, while it slides (issue #965): dimmed like now playing's controls. */
-private const val EXPLORE_OTHERS = 0.3f
+/** The page around an album's shuffle while it slides onto Play (issue #965): dimmed like now playing's controls. */
+private const val SLIDE_OTHERS = 0.3f
+
+/** Where Play continues an album you stopped part way (issue #965): the song's position and its label ("10", "2-3"). */
+data class PlayResume(val index: Int, val label: String)
+
+private val PLAY_SIZE = 56.dp
+private val PLAY_RING = 3.dp
+private val PLAY_RING_GAP = 3.dp

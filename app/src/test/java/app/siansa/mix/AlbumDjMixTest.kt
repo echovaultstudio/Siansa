@@ -38,6 +38,35 @@ class AlbumDjMixTest {
         assertEquals(two, bestAlbumOrder(two))
     }
 
+    @Test
+    fun theMixStartsFromDifferentSongs() {
+        val album = listOf(t("a", 90.0, "C"), t("b", 128.0, "G"), t("c", 92.0, "D"), t("d", 126.0, "A"), t("e", 91.0, "E"), t("f", 124.0, "B"))
+        val starts = (1..60).map { seed -> pickAlbumOrder(album, kotlin.random.Random(seed)).first().id }.toSet()
+        // Not always the same first song (the owner): at least three to pick from.
+        assertTrue("$starts", starts.size >= 3)
+        // Every pick is the whole album, each song once.
+        (1..20).forEach { seed -> assertEquals(album.map { it.id }.sorted(), pickAlbumOrder(album, kotlin.random.Random(seed)).map { it.id }.sorted()) }
+    }
+
+    @Test
+    fun theMixNeverStartsWhereItDidLastTime() {
+        val album = listOf(t("a", 90.0), t("b", 128.0), t("c", 92.0), t("d", 126.0), t("e", 91.0))
+        val last = pickAlbumOrder(album, kotlin.random.Random(1)).first().id
+        (1..40).forEach { seed -> assertTrue(pickAlbumOrder(album, kotlin.random.Random(seed), avoidFirst = last).first().id != last) }
+    }
+
+    @Test
+    fun theMixPicksOnlyAmongTheBestBlends() {
+        // Two slow songs and two fast: the picks are among the orders with one tempo jump where there are enough.
+        val album = listOf(t("a", 90.0), t("b", 128.0), t("c", 92.0), t("d", 126.0), t("e", 91.0))
+        val bestScore = flowScore(bestAlbumOrder(album))
+        (1..30).forEach { seed ->
+            val pick = pickAlbumOrder(album, kotlin.random.Random(seed))
+            val ranked = albumOrders(album).map { flowScore(it) }
+            assertTrue(flowScore(pick) >= ranked.take(5).last() - 1e-9 && flowScore(pick) <= bestScore + 1e-9)
+        }
+    }
+
     private fun songs(vararg ids: String) = ids.map { Song(id = it, title = it) }
 
     @Test
