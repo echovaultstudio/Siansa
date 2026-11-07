@@ -113,15 +113,16 @@ fun TvTextBox(
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
         // Compose sees the remote's keys before Android's field does (the emulator test: the field's own key listener
-        // never heard up or down, and the focus didn't move), so up and down are taken here first.
+        // never heard up or down, and the focus didn't move), so up and down are taken here first. The move starts from
+        // the field's invisible edge point ([leave]), not the field: from Android's field Compose took the field to be
+        // somewhere else, and down from Password went up to Username (an emulator run) or nowhere (the TV, issue #955).
         androidx.compose.foundation.layout.Box(
             Modifier.onPreviewKeyEvent { event ->
                 if (event.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 val way = textBoxExit(event.nativeKeyEvent.keyCode, kind == TvTextKind.LONG_TEXT) ?: return@onPreviewKeyEvent false
-                val moved = runCatching { focusManager.moveFocus(way) }.getOrDefault(false)
-                AppLog.d("TvTextBox", "\"$label\" ${if (way == androidx.compose.ui.focus.FocusDirection.Down) "down" else "up"}: ${if (moved) "moved on" else "nothing that way"}")
-                if (moved) field?.let(::holdOut)
-                moved
+                val edit = field ?: return@onPreviewKeyEvent false
+                leave(way, edit)
+                true
             },
         ) {
             AndroidView(
