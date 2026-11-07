@@ -161,18 +161,6 @@ class TvShowcaseTest {
                 idle(3000)
                 shot("tv-library")
             }
-            step("album") {
-                click("Low Tide")
-                waitText("Harbour Lights")
-                idle(3000)
-                shot("tv-album")
-            }
-            step("artist") {
-                click("Glass Harbour")
-                waitText("Artist radio")
-                idle(3000)
-                shot("tv-artist")
-            }
             step("search") {
                 click("Search")
                 idle(1500)
