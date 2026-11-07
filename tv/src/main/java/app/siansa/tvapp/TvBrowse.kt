@@ -203,7 +203,15 @@ fun TvAlbum(id: String) {
                 if (favourite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                 onClick = { graph.favouriteAlbums.toggle(album) },
             )
-            if (settings.audioMuseReady) TvButton("Similar albums", null, onClick = { nav.navigate("similar/albums/${android.net.Uri.encode(id)}") })
+            // Through one of its songs, as on the phone: AudioMuse knows songs, and the album's own id it answered with
+            // "doesn't know this song" (issue #967).
+            val seed = similarAlbumsSeed(songs)
+            if (settings.audioMuseReady && seed != null) {
+                TvButton("Similar albums", null, onClick = {
+                    AppLog.i("Tv", "Similar albums to \"${album.name}\" through its song $seed")
+                    nav.navigate("similar/albums/${android.net.Uri.encode(seed)}")
+                })
+            }
         },
     )
 }
@@ -572,3 +580,6 @@ internal const val TOP_FOLDED = 3
 internal fun tvTopShown(available: Int, open: Boolean): Int = if (open) available else minOf(available, TOP_FOLDED)
 private const val MAX_ARTISTS = 6
 private const val RELOAD_PAUSE_MS = 4_000L
+
+/** The song similar albums asks AudioMuse about for an album (issue #967): its first; none for an album with no songs. */
+internal fun similarAlbumsSeed(songs: List<Song>): String? = songs.firstOrNull { it.id.isNotBlank() }?.id
