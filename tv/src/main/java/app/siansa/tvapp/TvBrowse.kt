@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.siansa.data.Album
+import app.siansa.data.category
 import app.siansa.data.Artist
 import app.siansa.data.ArtistRef
 import app.siansa.data.Song
@@ -302,7 +303,7 @@ fun TvArtist(id: String) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                     Text(a.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    albums?.let { Text("${it.size} albums", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    albums?.let { Text(if (it.size == 1) "1 release" else "${it.size} releases", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Space.Tight, vertical = Space.Medium), horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
                         PlayButtons(play = { graph.library.songsOf(a).ifEmpty { top } }, note = null, shortcut = Shortcut("artist/$id", a.name, a.coverArt), focusFirst = true)
                         TvButton("Artist radio", Icons.Rounded.Radio, onClick = { play.artistRadio(a) })
@@ -336,10 +337,13 @@ fun TvArtist(id: String) {
                 }
             }
         }
-        albums?.takeIf { it.isNotEmpty() }?.let { list ->
-            item("albums") {
-                Box(Modifier.padding(top = Space.Section)) {
-                    TvItemRow(TvRow("Albums", list.sortedByDescending { it.year ?: 0 }.map { TvItem.OfAlbum(it, it.year?.toString()) }))
+        // A row for each release type (Albums, EPs, Singles, DJ-mixes…), as the phone's discography (issue #982).
+        albums?.let { list ->
+            tvReleaseRows(list).forEach { (type, releases) ->
+                item("releases:${type.name}") {
+                    Box(Modifier.padding(top = Space.Section)) {
+                        TvItemRow(TvRow(type.plural, releases.map { TvItem.OfAlbum(it, it.year?.toString()) }))
+                    }
                 }
             }
         }
@@ -580,6 +584,13 @@ internal const val TOP_FOLDED = 3
 internal fun tvTopShown(available: Int, open: Boolean): Int = if (open) available else minOf(available, TOP_FOLDED)
 private const val MAX_ARTISTS = 6
 private const val RELOAD_PAUSE_MS = 4_000L
+
+/**
+ * An artist's releases on the TV (issue #982): a row for each type (Albums, EPs, Singles, DJ-mixes…) in the phone's
+ * order, newest first in each.
+ */
+internal fun tvReleaseRows(albums: List<Album>): List<Pair<app.siansa.data.AlbumCategory, List<Album>>> =
+    albums.groupBy { it.category }.toList().sortedBy { it.first.ordinal }.map { (type, list) -> type to list.sortedByDescending { it.year ?: 0 } }
 
 /** The song similar albums asks AudioMuse about for an album (issue #967): its first; none for an album with no songs. */
 internal fun similarAlbumsSeed(songs: List<Song>): String? = songs.firstOrNull { it.id.isNotBlank() }?.id
