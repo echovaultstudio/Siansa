@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -518,7 +519,8 @@ internal fun ActionButtons(
             Box(Modifier.height(BIG_PLAY_SIZE).alpha(dim), contentAlignment = Alignment.Center) { download() }
             if (onSimilar != null) Box(Modifier.height(BIG_PLAY_SIZE).alpha(dim), contentAlignment = Alignment.Center) { similarButton() }
             Box(Modifier.height(BIG_PLAY_SIZE).alpha(if (djSlide != null) 1f else dim), contentAlignment = Alignment.Center) { shuffleButton() }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // As wide as Play only, so "from 10" (wider with large text) never moves the other buttons.
+            Column(Modifier.width(BIG_PLAY_SIZE), horizontalAlignment = Alignment.CenterHorizontally) {
                 playButton()
                 resume?.let { (at, _) ->
                     Text(
@@ -527,7 +529,7 @@ internal fun ActionButtons(
                         fontWeight = FontWeight.SemiBold,
                         color = Accent,
                         maxLines = 1,
-                        modifier = Modifier.alpha(dim).padding(top = Space.Tight).testTag("playFrom"),
+                        modifier = Modifier.wrapContentWidth(unbounded = true).alpha(dim).padding(top = Space.Tight).testTag("playFrom"),
                     )
                 }
             }
