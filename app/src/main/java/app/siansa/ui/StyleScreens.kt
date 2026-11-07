@@ -166,6 +166,16 @@ fun NowPlayingStyleScreen(nav: NavController) {
                     modifier = Modifier.testTag("lyricsButtonSwitch"),
                 )
             }
+            // The cover's colours for the seek bar, Play and the device name (issue #970).
+            StyleSwitchRow(
+                "Dynamic colours",
+                "The seek bar, Play and where it plays take the colour of the cover, always easy to see",
+                settings.dynamicPlayerColours,
+                "dynamicColoursSwitch",
+            ) { on ->
+                AppLog.i("Style", "Now playing: dynamic colours ${if (on) "on" else "off"}")
+                graph.settings.setDynamicPlayerColours(on)
+            }
             Spacer(Modifier.height(Space.Section))
             PlaySlidesSettings(settings.playSlides) { slides ->
                 AppLog.i("Style", "Play button slides: ${slides.format()}")
