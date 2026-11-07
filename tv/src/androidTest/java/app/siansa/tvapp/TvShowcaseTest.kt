@@ -5,12 +5,15 @@ import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Base64
 import android.view.KeyEvent
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -87,7 +90,8 @@ class TvShowcaseTest {
                     aiProvider = AiProvider.OTHER, aiAddress = "$services/v1", aiModel = "showcase", aiKey = "",
                 ),
             )
-            graph.sync.start(full = true)
+            // Quietly, as the app does at start: Home has no line about it.
+            graph.sync.start(full = true, quiet = true)
             val syncEnd = SystemClock.elapsedRealtime() + 180_000
             while (graph.sync.progress.value.phase !in setOf(SyncPhase.DONE, SyncPhase.FAILED) && SystemClock.elapsedRealtime() < syncEnd) SystemClock.sleep(500)
             println("Showcase: sync ${graph.sync.progress.value.phase}")
@@ -100,9 +104,14 @@ class TvShowcaseTest {
                     runCatching { graph.generator.ensurePersonal(kind) }.onFailure { println("Showcase: ${kind.title}: $it") }
                 }
             }
-            // Opened again, so Home is made with the library and the mixes there.
+            // Opened again, so Home is made with the library and the mixes there. Opening syncs the library again:
+            // Home shows a line for that until it's done.
             scenario.close()
             scenario = ActivityScenario.launch(TvActivity::class.java)
+            SystemClock.sleep(3000)
+            val again = SystemClock.elapsedRealtime() + 180_000
+            while (graph.sync.progress.value.phase !in setOf(SyncPhase.DONE, SyncPhase.FAILED, SyncPhase.IDLE) && SystemClock.elapsedRealtime() < again) SystemClock.sleep(500)
+            println("Showcase: sync on opening ${graph.sync.progress.value.phase}")
 
             val album = songs.filter { it.album == "Low Tide" }.sortedBy { it.track ?: 0 }
             val start = album.indexOfFirst { it.title == "Harbour Lights" }.coerceAtLeast(0)
@@ -298,9 +307,12 @@ class TvShowcaseTest {
 
     private fun node(text: String): SemanticsNodeInteraction = compose.onAllNodes(hasText(text)).onFirst()
 
+    /** What shows [text] pressed, by its click action: also when it's partly off the screen, where a tap would miss. */
     private fun click(text: String) {
         waitText(text)
-        node(text).performClick()
+        val pressable = compose.onAllNodes(hasClickAction() and hasText(text))
+        if (pressable.fetchSemanticsNodes().isNotEmpty()) pressable.onFirst().performSemanticsAction(SemanticsActions.OnClick)
+        else node(text).performClick()
         idle(600)
     }
 
