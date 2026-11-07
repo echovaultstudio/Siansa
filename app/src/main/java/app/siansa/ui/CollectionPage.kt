@@ -513,14 +513,15 @@ internal fun ActionButtons(
         }
     }
     if (albumBar) {
-        // Spread evenly across the page (the owner, issue #965). Each sits in a box as tall as Play, so they line up
-        // with its middle while "from 10" hangs under Play.
-        PlayButtonRow(horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Top) {
-            Box(Modifier.height(BIG_PLAY_SIZE).alpha(dim), contentAlignment = Alignment.Center) { download() }
-            if (onSimilar != null) Box(Modifier.height(BIG_PLAY_SIZE).alpha(dim), contentAlignment = Alignment.Center) { similarButton() }
-            Box(Modifier.height(BIG_PLAY_SIZE).alpha(if (djSlide != null) 1f else dim), contentAlignment = Alignment.Center) { shuffleButton() }
-            // As wide as Play only, so "from 10" (wider with large text) never moves the other buttons.
-            Column(Modifier.width(BIG_PLAY_SIZE), horizontalAlignment = Alignment.CenterHorizontally) {
+        // Spread evenly across the page (the owner, issue #965): each in an equal share of the row, centred, so their
+        // middles are evenly apart though Play is bigger. Each is as tall as Play, so they line up with its middle while
+        // "from 10" hangs under Play.
+        PlayButtonRow(verticalAlignment = Alignment.Top) {
+            Box(Modifier.weight(1f).height(BIG_PLAY_SIZE).alpha(dim), contentAlignment = Alignment.Center) { download() }
+            if (onSimilar != null) Box(Modifier.weight(1f).height(BIG_PLAY_SIZE).alpha(dim), contentAlignment = Alignment.Center) { similarButton() }
+            Box(Modifier.weight(1f).height(BIG_PLAY_SIZE).alpha(if (djSlide != null) 1f else dim), contentAlignment = Alignment.Center) { shuffleButton() }
+            // "from 10" (wider with large text) never moves the other buttons: each share is the same.
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 playButton()
                 resume?.let { (at, _) ->
                     Text(
