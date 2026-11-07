@@ -16,7 +16,7 @@ Plus Android 8.0 or newer on your phone, or Android TV or Google TV for [the TV 
 ## Install
 
 - **Google Play** (in testing): [join Siansa's testers](https://siansa.app/#join), then install Siansa from Google
-  Play with the same Google account. On a TV, search for Siansa in the TV's Play Store.
+  Play with the same Google account. For a TV, see [Siansa on your TV](tv.md#getting-it).
 - **F-Droid**: in the F-Droid app, **Settings › Repositories › +**, add `https://siansa.app/fdroid/repo`, then install
   Siansa.
 

@@ -8,8 +8,7 @@ settings, library and sign-ins, apart from your phone's.
 
 It's the same Siansa, in the same places: your TV gets the TV app, your phone the phone app.
 
-- **Google Play**: once you're a tester ([join here](https://siansa.app/#join)), open the Play Store on your TV and
-  search for Siansa.
+- **Google Play**: once you're a tester ([join here](https://siansa.app/#join)), open [Siansa on Google Play](https://play.google.com/store/apps/details?id=app.siansa) on a computer or phone, signed in with your TV's Google account, tap **Install** and pick your TV. Searching on the TV may not find it while Siansa is in testing.
 - **F-Droid**: install an F-Droid app on the TV, add `https://siansa.app/fdroid/repo`, and install Siansa.
 
 ## Signing in

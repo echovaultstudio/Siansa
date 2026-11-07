@@ -37,7 +37,7 @@ Siansa and install it.
 F-Droid needs no sign-up. Google Play is a closed test for now, as Google asks of new apps (12 testers for 14 days
 before it opens to everyone): every tester brings Siansa on Google Play for everyone closer.
 
-**On a TV.** Search for Siansa in the TV's Play Store, or use F-Droid there too: see [Siansa on your TV](tv.md#getting-it).
+**On a TV.** Install it from Google Play to your TV from a computer or phone, or use F-Droid on the TV: see [Siansa on your TV](tv.md#getting-it).
 
 **Had Siansa from the earlier private F-Droid address?** Remove that repository, add the open one above, then
 uninstall Siansa once and install it again: the app has a new signing key since the project went public, and
