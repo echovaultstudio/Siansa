@@ -3,6 +3,12 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 1.1.0 — 2026-11-07
+
+### Added
+- Siansa for Android TV and Google TV: install Siansa from the F-Droid repo on your TV (or from Google Play once it's
+  there) and you get the TV app, made for the remote. Your phone keeps getting the phone app.
+
 ## 1.0.0 — 2026-11-07
 
 ### Fixed
