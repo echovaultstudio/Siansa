@@ -31,6 +31,8 @@ android {
         versionCode = TV_CODES + buildNumber
         versionName = appVersion
         // The TV app plays through the new audio engine (issue #826), the engine v1.0 brings to everyone.
+        // The TV's showcase screenshots (TvShowcaseTest, .github/workflows/showcase.yml) run on a TV emulator.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "MIXER_ENGINE", "true")
         buildConfigField("boolean", "TV_APP", "true")
         val castReceiverId = (System.getenv("CAST_RECEIVER_ID")?.takeIf { it.isNotBlank() }
@@ -151,6 +153,14 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
 
     testImplementation("junit:junit:4.13.2")
+
+    // The TV's showcase screenshots on a TV emulator (src/androidTest), at the phone app's versions.
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
 kotlin {
