@@ -18,4 +18,11 @@ class TvTextBoxExitTest {
         // A box of several lines keeps up and down for its lines.
         assertNull(textBoxExit(KeyEvent.KEYCODE_DPAD_DOWN, multiLine = true))
     }
+
+    @Test
+    fun okTypes() {
+        assertEquals(true, textBoxTypes(KeyEvent.KEYCODE_DPAD_CENTER))
+        assertEquals(true, textBoxTypes(KeyEvent.KEYCODE_ENTER))
+        assertEquals(false, textBoxTypes(KeyEvent.KEYCODE_DPAD_DOWN))
+    }
 }
