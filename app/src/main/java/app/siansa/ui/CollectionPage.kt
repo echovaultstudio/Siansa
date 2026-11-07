@@ -515,9 +515,9 @@ internal fun ActionButtons(
         // Spread evenly across the page (the owner, issue #965). Each sits in a box as tall as Play, so they line up
         // with its middle while "from 10" hangs under Play.
         PlayButtonRow(horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Top) {
-            Box(Modifier.height(PLAY_SIZE).alpha(dim), contentAlignment = Alignment.Center) { download() }
-            if (onSimilar != null) Box(Modifier.height(PLAY_SIZE).alpha(dim), contentAlignment = Alignment.Center) { similarButton() }
-            Box(Modifier.height(PLAY_SIZE).alpha(if (djSlide != null) 1f else dim), contentAlignment = Alignment.Center) { shuffleButton() }
+            Box(Modifier.height(BIG_PLAY_SIZE).alpha(dim), contentAlignment = Alignment.Center) { download() }
+            if (onSimilar != null) Box(Modifier.height(BIG_PLAY_SIZE).alpha(dim), contentAlignment = Alignment.Center) { similarButton() }
+            Box(Modifier.height(BIG_PLAY_SIZE).alpha(if (djSlide != null) 1f else dim), contentAlignment = Alignment.Center) { shuffleButton() }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 playButton()
                 resume?.let { (at, _) ->
@@ -589,13 +589,13 @@ fun BigPlayButton(
     val ring = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
     Box(
         Modifier
-            .size(PLAY_SIZE)
+            .size(BIG_PLAY_SIZE)
             .then(
                 if (progress == null) Modifier
                 else Modifier.drawBehind {
                     // Just outside the button: the whole track faint, how far you got in the accent.
-                    val stroke = PLAY_RING.toPx()
-                    val inset = -PLAY_RING_GAP.toPx() - stroke / 2
+                    val stroke = BIG_PLAY_RING.toPx()
+                    val inset = -BIG_PLAY_RING_GAP.toPx() - stroke / 2
                     val arc = Size(size.width - 2 * inset, size.height - 2 * inset)
                     val at = Offset(inset, inset)
                     drawArc(ring, 0f, 360f, false, at, arc, style = Stroke(stroke))
@@ -712,6 +712,6 @@ private const val SLIDE_OTHERS = 0.3f
 /** Where Play continues an album you stopped part way (issue #965): the song's position and its label ("10", "2-3"). */
 data class PlayResume(val index: Int, val label: String)
 
-private val PLAY_SIZE = 56.dp
-private val PLAY_RING = 3.dp
-private val PLAY_RING_GAP = 3.dp
+private val BIG_PLAY_SIZE = 56.dp
+private val BIG_PLAY_RING = 3.dp
+private val BIG_PLAY_RING_GAP = 3.dp
