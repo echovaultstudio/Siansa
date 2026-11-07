@@ -70,7 +70,7 @@ android {
             // Apart from the phone app's own debug build.
             applicationIdSuffix = ".tv.debug"
         }
-        // Siansa TV Dev: built from the mixer branch (.github/workflows/tv-dev.yml), installed next to the TV app as
+        // Siansa TV Dev: built from the dev branch (.github/workflows/tv-dev.yml), installed next to the TV app as
         // app.siansa.tv.dev, as before. Never sent to Google Play.
         create("dev") {
             initWith(getByName("release"))

@@ -213,8 +213,10 @@ jobs:
           APK=$(ls app/build/outputs/apk/release/app-release*.apk | head -1)
           mv "$APK" siansa-$VERSION.apk
           mv app/build/outputs/bundle/release/app-release.aab siansa-$VERSION.aab
-          # The TV app's bundle, for Play's Android TV tracks of the same app (issue #988).
+          # The TV app's bundle, for Play's Android TV tracks of the same app (issue #988), and its APK for the F-Droid repo.
           mv tv/build/outputs/bundle/release/tv-release.aab siansa-tv-$VERSION.aab
+          TV_APK=$(ls tv/build/outputs/apk/release/tv-release*.apk | head -1)
+          mv "$TV_APK" siansa-tv-$VERSION.apk
 
       # Which key signed the release APK, in the run's summary: public information, and it proves a key change took.
       - name: Signing certificate
@@ -359,8 +361,10 @@ jobs:
           [ -f "play-notes/${{ steps.version.outputs.version }}.md" ] && notes="play-notes/${{ steps.version.outputs.version }}.md"
           python3 scripts/play_upload.py --tv "siansa-tv-${{ steps.version.outputs.version }}.aab" "${{ steps.version.outputs.version }}" "$notes"
 
-      # The F-Droid repo on our server (issue #410; the server kit is in the private siansa-dev repo, #634): the APK
-      # goes over SSH to a key that can only publish (siansa-publish there). Skipped until the FDROID_* secrets are set.
+      # The F-Droid repo on our server (issue #410; the server kit is in the private siansa-dev repo, #634): the APKs
+      # go over SSH to a key that can only publish (siansa-publish there). Skipped until the FDROID_* secrets are set.
+      # The TV app goes too, under the same name as the phone's (app.siansa, issue #988): it needs Android TV
+      # (android.software.leanback), so F-Droid on a phone passes it by and offers the phone's, and a TV gets the TV's.
       - name: Publish to the F-Droid beta repo
         if: steps.version.outputs.exists != 'true'
         # A server that can't be reached mustn't stop the release notes and history below.
@@ -377,8 +381,13 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$FDROID_SSH_KEY" > ~/.ssh/fdroid && chmod 600 ~/.ssh/fdroid
           printf '%s\n' "$FDROID_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          apk=$(ls siansa-*.apk | head -n 1)
-          ssh -i ~/.ssh/fdroid -o BatchMode=yes -o StrictHostKeyChecking=yes "siansa-deploy@$FDROID_HOST" < "$apk"
+          v="${{ steps.version.outputs.version }}"
+          ssh -i ~/.ssh/fdroid -o BatchMode=yes -o StrictHostKeyChecking=yes "siansa-deploy@$FDROID_HOST" < "siansa-$v.apk"
+          echo "::notice::F-Droid repo: Siansa $v"
+          if [ -f "siansa-tv-$v.apk" ]; then
+            ssh -i ~/.ssh/fdroid -o BatchMode=yes -o StrictHostKeyChecking=yes "siansa-deploy@$FDROID_HOST" < "siansa-tv-$v.apk" \
+              && echo "::notice::F-Droid repo: Siansa TV $v" || echo "::warning::F-Droid repo: Siansa TV $v wasn't taken"
+          fi
           rm -f ~/.ssh/fdroid
 
       # Keeps the notes of every published version matching CHANGELOG.md, so fixes to the text show up too.

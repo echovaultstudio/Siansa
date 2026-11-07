@@ -1,3 +1,4 @@
-### Changed
+### Added
 
-- The TV app is ready for Google Play: there it will be the same Siansa as on your phone, and Play gives a TV the TV app and a phone the phone app. Siansa TV Dev stays as it is.
+- Siansa for Android TV and Google TV: install Siansa from the F-Droid repo on your TV (or from Google Play once it's
+  there) and you get the TV app, made for the remote. Your phone keeps getting the phone app.
