@@ -29,6 +29,8 @@ import androidx.compose.runtime.produceState
 import app.siansa.log.AppLog
 import app.siansa.ui.openSongDetails
 import app.siansa.ui.openSongPath
+import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -96,6 +98,10 @@ fun TvNowPlaying() {
     val stage = remember { androidx.compose.ui.focus.FocusRequester() }
     LaunchedEffect(queue) { if (!queue) runCatching { stage.requestFocus() } }
 
+    // Holding left or right winds through the song (issue #984): where to, shown on the bar, played from on letting go.
+    var windTo by remember(song?.id) { mutableStateOf<Long?>(null) }
+    var windForward by remember { mutableStateOf(true) }
+
     val tint = app.siansa.ui.rememberCoverColor(song?.cover)
     app.siansa.ui.TvRemoteStage(
         onAction = { action ->
@@ -110,6 +116,20 @@ fun TvNowPlaying() {
         },
         modifier = Modifier.fillMaxSize().clipToBounds(),
         focus = stage,
+        onWind = { delta ->
+            if (song != null) {
+                if (windTo == null) AppLog.d("Tv", "Now playing: winding ${if (delta < 0) "back" else "forward"}")
+                windForward = delta >= 0
+                windTo = windTarget(windTo ?: graph.player.positionMs(), delta, graph.player.progress().durationMs)
+            }
+        },
+        onWindDone = {
+            windTo?.let { to ->
+                AppLog.d("Tv", "Now playing: wound to ${minutes(to)}")
+                graph.player.seekTo(to)
+            }
+            windTo = null
+        },
     ) {
         TvBackdrop(song?.cover, app.siansa.ui.pageBottomColor(tint))
         Row(
@@ -146,7 +166,7 @@ fun TvNowPlaying() {
                         }
                     }
                 }
-                ProgressBlock(progress, details(state.codec, state.transcodeKbps))
+                ProgressBlock(progress, details(state.codec, state.transcodeKbps), windTo, windForward)
             }
             when (panel) {
                 Panel.QUEUE -> UpNext(state.queue, state.index, state.auto)
@@ -216,11 +236,20 @@ internal fun TvBrand(modifier: Modifier = Modifier) {
     }
 }
 
-/** The time: a thin bar, where the song is and how long it is, and the file's kind between them. */
+/**
+ * The time: a thin bar, where the song is and how long it is, and the file's kind between them. While winding
+ * ([windTo], issue #984) the bar and the time show where it's wound to, in the accent, with which way in the middle.
+ */
 @Composable
-private fun ProgressBlock(progress: androidx.compose.runtime.MutableState<app.siansa.playback.PlayerConnection.Progress>, details: String) {
+private fun ProgressBlock(
+    progress: androidx.compose.runtime.MutableState<app.siansa.playback.PlayerConnection.Progress>,
+    details: String,
+    windTo: Long? = null,
+    windForward: Boolean = true,
+) {
     val now = progress.value
-    val fraction = if (now.durationMs > 0) (now.positionMs.toFloat() / now.durationMs).coerceIn(0f, 1f) else 0f
+    val at = windTo ?: now.positionMs
+    val fraction = if (now.durationMs > 0) (at.toFloat() / now.durationMs).coerceIn(0f, 1f) else 0f
     Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
         LinearProgressIndicator(
             progress = { fraction },
@@ -229,9 +258,19 @@ private fun ProgressBlock(progress: androidx.compose.runtime.MutableState<app.si
             trackColor = Color.White.copy(alpha = TRACK_ALPHA),
             drawStopIndicator = {},
         )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(minutes(now.positionMs), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(details, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(minutes(at), style = MaterialTheme.typography.titleMedium,
+                color = if (windTo != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+            if (windTo != null) {
+                Icon(
+                    if (windForward) Icons.Rounded.FastForward else Icons.Rounded.FastRewind,
+                    if (windForward) "Winding forward" else "Winding back",
+                    Modifier.size(WIND_SIGN).testTag("tvWinding"),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                Text(details, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Text(minutes(now.durationMs), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -393,11 +432,16 @@ private val BRAND_TEXT = Color(0xFFEEF2F5)
 
 /** Back or forward [deltaMs] in the song playing, kept inside it. */
 fun seekBy(graph: app.siansa.AppGraph, deltaMs: Long) {
-    val duration = graph.player.progress().durationMs
-    val to = (graph.player.positionMs() + deltaMs).coerceAtLeast(0L)
-    graph.player.seekTo(if (duration > 0) to.coerceAtMost((duration - END_MARGIN_MS).coerceAtLeast(0L)) else to)
+    graph.player.seekTo(windTarget(graph.player.positionMs(), deltaMs, graph.player.progress().durationMs))
 }
 
 private const val END_MARGIN_MS = 1_000L
+private val WIND_SIGN = 28.dp
+
+/** Where winding by [deltaMs] from [fromMs] lands (issue #984): inside the song, short of its end so it doesn't skip. */
+internal fun windTarget(fromMs: Long, deltaMs: Long, durationMs: Long): Long {
+    val to = (fromMs + deltaMs).coerceAtLeast(0L)
+    return if (durationMs > 0) to.coerceAtMost((durationMs - END_MARGIN_MS).coerceAtLeast(0L)) else to
+}
 /** Leaves the controls room for their five slots in a row beside it (5 × 76 dp and four 8 dp gaps). */
 private val QUEUE_WIDTH = 340.dp

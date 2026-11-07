@@ -46,7 +46,8 @@ Settings) always open that tab's own page, wherever you are.
 - **Now playing**: as simple as Siansa's Chromecast screen: the cover, the song, its artist and album, a thin line
   for the time, over the cover blurred as on the phone, and Siansa's logo in the corner. There are no buttons: **OK**
   plays and pauses (paused, the cover darkens under a pause sign), **left** and **right** go to the previous and next
-  song, and **down** opens the menu: Like, Shuffle and Repeat (each saying how it's set), Lyrics, Up next, Start a mix
+  song (hold them to wind back or forward through the song, faster the longer you hold; it plays from there when you
+  let go), and **down** opens the menu: Like, Shuffle and Repeat (each saying how it's set), Lyrics, Up next, Start a mix
   (Stop the mix while one plays), Go to the artist, Go to the album, Song path (with AudioMuse), Add to playlist,
   Similar songs and Song details. Lyrics and Up next open on the right: press right to move into them (up and down
   scroll the lyrics; OK on a song in Up next plays from it) and Back to close them. In Up next, songs Siansa added on its
