@@ -6,12 +6,12 @@ import android.os.SystemClock
 import android.util.Base64
 import android.view.KeyEvent
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -151,23 +151,13 @@ class TvShowcaseTest {
                 idle(3000)
                 shot("tv-library")
             }
-            step("album") {
-                waitText("Low Tide")
-                click("Low Tide")
-                waitText("Harbour Lights")
-                idle(3000)
-                shot("tv-album")
-            }
-            step("artist") {
-                click("Glass Harbour")
-                waitText("Top songs")
-                idle(3000)
-                shot("tv-artist")
-            }
             step("search") {
                 click("Search")
                 idle(1500)
-                compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("harbour")
+                // Android's own text box: typing starts as Search opens; the keys go to it as a keyboard's would.
+                runCatching { compose.onAllNodes(hasContentDescription("Search,", substring = true)).onFirst().performClick() }
+                idle(800)
+                instrumentation.sendStringSync("harbour")
                 idle(1500)
                 closeKeyboard()
                 waitText("Harbour Lights")
@@ -182,11 +172,12 @@ class TvShowcaseTest {
             step("now playing") {
                 if (graph.player.state.value.current?.title != "Harbour Lights") play(20_000)
                 click("Now playing")
+                waitTag("tvRemoteHint")
                 idle(3000)
                 shot("tv-now-playing")
                 // The animation: the song playing on, then the lyrics coming in beside it, following the song.
                 frame("player", 1400)
-                click("Lyrics")
+                menu("Lyrics")
                 idle(600)
                 repeat(14) {
                     SystemClock.sleep(650)
@@ -194,11 +185,21 @@ class TvShowcaseTest {
                 }
                 frame("player", 1600)
                 shot("tv-lyrics")
-                click("Hide the lyrics")
-                idle(400)
-                click("Up next")
+                menu("Up next")
                 idle(2000)
                 shot("tv-up-next")
+            }
+            step("album") {
+                menu("Go to the album")
+                waitText("Harbour Lights")
+                idle(3000)
+                shot("tv-album")
+            }
+            step("artist") {
+                click("Glass Harbour")
+                waitText("Top songs")
+                idle(3000)
+                shot("tv-artist")
             }
         } finally {
             scenario.close()
@@ -264,6 +265,18 @@ class TvShowcaseTest {
         SystemClock.sleep(ms)
         compose.waitForIdle()
     }
+
+    /** Now playing's menu (the remote's down), and [choice] in it. */
+    private fun menu(choice: String) {
+        if (!exists(choice)) {
+            key(KeyEvent.KEYCODE_DPAD_DOWN)
+            idle(600)
+        }
+        click(choice)
+    }
+
+    private fun waitTag(tag: String, timeoutMs: Long = 20_000) =
+        compose.waitUntil(timeoutMs) { compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() }
 
     private fun exists(text: String) = compose.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty()
 

@@ -23,8 +23,9 @@ def main(logcat: str, out: str, notes_name: str = "notes.txt") -> int:
         if m:
             parts[m[1]][int(m[2])] = m[4]
             totals[m[1]] = int(m[3])
-        elif "System.out: Showcase: " in line:
-            notes.append(line.split("System.out: ", 1)[1].strip())
+        elif (n := re.search(r"System\.out[^:]*: (Showcase: .*)", line)):
+            # "I System.out: Showcase: …" (a managed device's log) or "I/System.out( 123): Showcase: …" (adb's).
+            notes.append(n[1].strip())
         elif re.search(r" [WE] Siansa/|Siansa/(Books|Library|Audiobookshelf)", line):
             notes.append("app: " + line.strip()[:300])
     for name, d in sorted(parts.items()):
