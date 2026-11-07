@@ -316,13 +316,14 @@ jobs:
           make_latest: true
 
       # Google Play's open testing (issue #557, #584): the .aab with the version's notes, through a service account that
-      # can only release to testing tracks. Skipped until PLAY_SERVICE_ACCOUNT_JSON is set.
+      # can only release to testing tracks. Skipped until PLAY_SERVICE_ACCOUNT_JSON is set, and while a file .play-hold is
+      # on main (v1.0 went to F-Droid first, the owner's decision of 7 November 2026).
       - uses: actions/setup-python@v7
         if: steps.version.outputs.exists != 'true'
         with:
           python-version: "3.12"
       - name: Upload to Google Play
-        if: steps.version.outputs.exists != 'true'
+        if: steps.version.outputs.exists != 'true' && hashFiles('.play-hold') == ''
         # Play out of reach or refusing mustn't stop the release notes and history below; the error shows on the run.
         continue-on-error: true
         env:
