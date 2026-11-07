@@ -77,17 +77,18 @@ fun TvTextBox(
     val bottom = remember { androidx.compose.ui.focus.FocusRequester() }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var field by remember { mutableStateOf<EditText?>(null) }
-    // Once the remote has left the field for a control of the page, the field takes no focus for a moment (issue #955):
-    // on the TV (NVIDIA Shield, Android 11) the focus reached Test under the Password field and was pulled straight back
-    // into the field, again and again, though the move itself worked ("moved on" in the log).
+    // Once the remote has left the field for a control of the page, the field turns down any request for the focus for a
+    // moment (issue #955): on the TV (NVIDIA Shield, Android 11) the focus reached Test under the Password field and was
+    // pulled straight back into the field, again and again, though the move itself worked ("moved on" in the log). The
+    // field stays focusable all along: made unfocusable for that moment, up from Test never got back into it.
+    val hold = remember { longArrayOf(0L) }
+    val refused = remember { intArrayOf(0) }
     fun holdOut(edit: EditText) {
-        edit.isFocusable = false
-        edit.isFocusableInTouchMode = false
+        hold[0] = android.os.SystemClock.uptimeMillis() + HOLD_OUT_MS
+        refused[0] = 0
         scope.launch {
             kotlinx.coroutines.delay(HOLD_OUT_MS)
-            edit.isFocusable = true
-            edit.isFocusableInTouchMode = true
-            AppLog.d("TvTextBox", "\"$label\" takes the focus again (has it: ${edit.hasFocus()})")
+            AppLog.d("TvTextBox", "\"$label\" takes the focus again (has it: ${edit.hasFocus()}, pulls back turned down: ${refused[0]})")
         }
     }
     fun leave(way: androidx.compose.ui.focus.FocusDirection, field: EditText) {
@@ -125,7 +126,15 @@ fun TvTextBox(
         ) {
             AndroidView(
                 factory = { context ->
-                    EditText(context).apply {
+                    object : EditText(context) {
+                        override fun requestFocus(direction: Int, previouslyFocusedRect: android.graphics.Rect?): Boolean {
+                            if (android.os.SystemClock.uptimeMillis() < hold[0]) {
+                                refused[0]++
+                                return false
+                            }
+                            return super.requestFocus(direction, previouslyFocusedRect)
+                        }
+                    }.apply {
                         field = this
                         setText(value)
                         setSelection(value.length)
