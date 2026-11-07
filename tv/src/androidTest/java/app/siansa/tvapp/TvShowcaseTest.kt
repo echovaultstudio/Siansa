@@ -6,7 +6,6 @@ import android.os.SystemClock
 import android.util.Base64
 import android.view.KeyEvent
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -154,10 +153,8 @@ class TvShowcaseTest {
             step("search") {
                 click("Search")
                 idle(1500)
-                // Android's own text box: typing starts as Search opens; the keys go to it as a keyboard's would.
-                runCatching { compose.onAllNodes(hasContentDescription("Search,", substring = true)).onFirst().performClick() }
-                idle(800)
-                instrumentation.sendStringSync("harbour")
+                // Android's own text box (the TV's keyboard types into it): the words put in it as typing would.
+                type("harbour")
                 idle(1500)
                 closeKeyboard()
                 waitText("Harbour Lights")
@@ -197,7 +194,7 @@ class TvShowcaseTest {
             }
             step("artist") {
                 click("Glass Harbour")
-                waitText("Top songs")
+                waitText("Artist radio")
                 idle(3000)
                 shot("tv-artist")
             }
@@ -263,6 +260,21 @@ class TvShowcaseTest {
     private fun idle(ms: Long = 300) {
         compose.waitForIdle()
         SystemClock.sleep(ms)
+        compose.waitForIdle()
+    }
+
+    /** [words] in the page's text box, Android's own EditText, as if typed: its listener tells the page. */
+    private fun type(words: String) {
+        fun find(view: android.view.View): android.widget.EditText? = when (view) {
+            is android.widget.EditText -> view
+            is android.view.ViewGroup -> (0 until view.childCount).firstNotNullOfOrNull { find(view.getChildAt(it)) }
+            else -> null
+        }
+        var typed = false
+        scenario.onActivity { activity ->
+            find(activity.window.decorView)?.let { it.setText(words); it.setSelection(words.length); typed = true }
+        }
+        if (!typed) error("No text box to type in")
         compose.waitForIdle()
     }
 
