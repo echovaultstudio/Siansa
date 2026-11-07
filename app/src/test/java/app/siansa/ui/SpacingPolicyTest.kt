@@ -42,8 +42,9 @@ class SpacingPolicyTest {
      */
     @Test fun bigPlayButtonOnlyFromItsRow() {
         val root = roots.firstOrNull { it.isDirectory } ?: return fail("UI sources not found")
-        // The button's icon: ▶, or ⏸ while what the page shows plays (a book's page, issue #626).
-        val button = Regex("""Icons\.Rounded\.PlayArrow,\s*(if \(playing\) "Pause" else )?"Play",\s*tint\s*=\s*OnAccent""")
+        // The button's icon: ▶, or ⏸ while what the page shows plays (a book's page, issue #626); "Continue" when it
+        // carries on an album (issue #965).
+        val button = Regex("""Icons\.Rounded\.PlayArrow,\s*((if \(playing\) "Pause" else )?"Play",|when \{[^}]*"Play" \},)\s*tint\s*=\s*OnAccent""")
         val found = root.walkTopDown().filter { it.extension == "kt" }.flatMap { f ->
             button.findAll(f.readText()).map { f.name }
         }.toList()

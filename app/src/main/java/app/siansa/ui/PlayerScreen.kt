@@ -745,6 +745,8 @@ internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
+    // An album's DJ mix (issue #965) gives the play button its grooves too.
+    val albumDj by app.siansa.mix.AlbumDjMix.playing.collectAsStateWithLifecycle()
     // While a finger slides from the play button, the other controls make way: dimmed, and the one on the slide's
     // side out of the way.
     var sliding by remember { mutableStateOf<SlideWay?>(null) }
@@ -783,7 +785,8 @@ internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null
             upReachPx = upReach(playCentre, upTo),
             playing = state.isPlaying,
             slides = slides,
-            djMix = radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ,
+            djMix = (radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ) ||
+                (song != null && song.id in albumDj),
             onToggle = { graph.player.togglePlay() },
             onStop = { graph.player.stop() },
             onSlide = { onSlide?.invoke(it) },

@@ -355,15 +355,12 @@ fun AlbumScreen(nav: NavController, id: String) {
                     d.album.artistId?.let { artistId -> { openArtists { artistsNamedBy(graph, artistId, d.album.artist) } } },
                     albumHeadline(d.album, fromServer?.info ?: d.info),
                 )
-                if (pick != null) {
-                    ContinueButton(PickUps.trackLabel(d.songs, pick.continueIndex)) {
-                        AppLog.i("Album", "Continue from ${pick.continueIndex + 1} of ${d.songs.size}")
-                        graph.player.play(d.songs, pick.continueIndex)
-                    }
-                }
             }
         },
         lastPlayed = pick?.let { it.lastIndex to "Last played · ${PickUps.whenLabel(it.at)}" },
+        // The album's own bar, and Play continuing where you stopped (issue #965; was "Continue from", #367).
+        albumBar = true,
+        resume = d?.let { album -> pick?.let { PlayResume(it.continueIndex, PickUps.trackLabel(album.songs, it.continueIndex)) } },
         offline = d?.album?.offlineItem(),
         // A heart for favourite albums, starred in Navidrome (issue #275).
         actions = { d?.album?.let { FavouriteAlbumButton(it) } },

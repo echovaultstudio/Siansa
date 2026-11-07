@@ -37,7 +37,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.siansa.data.AlbumCategory
 import app.siansa.ui.CHIPS_GAP
 import app.siansa.ui.CollectionByline
-import app.siansa.ui.ContinueButton
 import app.siansa.ui.FastScrollBar
 import app.siansa.ui.HeroPage
 import app.siansa.ui.MoreChipsHint
@@ -120,6 +119,34 @@ class SpacingLibraryTest : SpacingCheck() {
         assertTrue("Find similar is left of Shuffle and doesn't overlap it", similar.right <= shuffle.left + 0.5.dp)
         // Icon buttons keep 4 dp of touch room on each side of their 40 dp, so neighbours sit 8 dp apart.
         assertTrue("Find similar right next to Shuffle (${(shuffle.left - similar.right).value} dp)", shuffle.left - similar.right <= app.siansa.ui.Space.Small + 0.5.dp)
+    }
+
+    /**
+     * Album page (issue #965): Download, Similar albums, Shuffle and Play spread evenly, the same gap between each; the
+     * three icons on Play's middle line, and "from 10" under Play when it continues.
+     */
+    @Test fun albumBarSpreadsEvenly() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.ActionButtons(
+                    enabled = true, onQueue = {}, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true,
+                    download = { androidx.compose.foundation.layout.Box(Modifier.size(48.dp).testTag("download")) },
+                    resume = app.siansa.ui.PlayResume(9, "10") to 24,
+                )
+            }
+        }
+        val download = compose.onNodeWithTag("download").getBoundsInRoot()
+        val similar = compose.onNodeWithTag("findSimilarAlbums").getBoundsInRoot()
+        val shuffle = compose.onNodeWithTag("shuffleAll", useUnmergedTree = true).getBoundsInRoot()
+        val play = compose.onNodeWithTag("bigPlay").getBoundsInRoot()
+        val centres = listOf(download, similar, shuffle, play).map { (it.left + it.right) / 2 }
+        val gaps = centres.zipWithNext { a, b -> b - a }
+        gaps.zipWithNext().forEach { (a, b) -> assertEven("Even gaps across the bar", a, b, 1.dp) }
+        val line = (play.top + play.bottom) / 2
+        listOf(download, similar, shuffle).forEach { assertEven("On Play's middle line", (it.top + it.bottom) / 2, line, 1.dp) }
+        val from = compose.onNodeWithTag("playFrom").getBoundsInRoot()
+        assertTrue("\"from 10\" under Play", from.top >= play.bottom)
+        assertEven("\"from 10\" centred under Play", (from.left + from.right) / 2, (play.left + play.right) / 2, 1.dp)
     }
 
     /** Album page (issue #240): room under the big Play button before the first song, marked when it's playing. */
@@ -267,24 +294,6 @@ class SpacingLibraryTest : SpacingCheck() {
         val heart = compose.onNodeWithTag("heart").getBoundsInRoot()
         assertEven("Heart and back arrow on one line", back.top, heart.top, 1.dp)
         assertEven("Heart and back arrow the same size", back.bottom - back.top, heart.bottom - heart.top, 1.dp)
-    }
-
-    /** Album page (issue #367): Continue sits the same step under the details as the details under the artist. */
-    @Test fun continueButtonSitsAStepUnderTheDetails() {
-        compose.setContent {
-            SiansaTheme {
-                Column {
-                    CollectionByline("Various Artists", null, null, "DJ-mix · 2024 · 7 songs")
-                    ContinueButton("5") { }
-                }
-            }
-        }
-        val artist = compose.onNodeWithText("Various Artists").getBoundsInRoot()
-        val details = compose.onNodeWithText("DJ-mix · 2024 · 7 songs").getBoundsInRoot()
-        val button = compose.onNodeWithTag("continueFrom").getBoundsInRoot()
-        // The button you see is 40 dp tall, centred in its taller touch area.
-        val seenTop = button.top + ((button.bottom - button.top) - 40.dp) / 2
-        assertEven("Continue under the details", details.top - artist.bottom, seenTop - details.bottom, 1.dp)
     }
 
     /** Album page (issue #367): the last-played line is drawn behind its row, so the title keeps its even room. */
