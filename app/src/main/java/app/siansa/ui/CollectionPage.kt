@@ -599,7 +599,7 @@ fun BigPlayButton(
                 else Modifier.drawBehind {
                     // Just outside the button: the whole track faint, how far you got in the accent.
                     val stroke = BIG_PLAY_RING.toPx()
-                    val inset = -BIG_PLAY_RING_GAP.toPx() - stroke / 2
+                    val inset = -BIG_PLAY_RING_OUTSET.toPx() - stroke / 2
                     val arc = Size(size.width - 2 * inset, size.height - 2 * inset)
                     val at = Offset(inset, inset)
                     drawArc(ring, 0f, 360f, false, at, arc, style = Stroke(stroke))
@@ -718,4 +718,4 @@ data class PlayResume(val index: Int, val label: String)
 
 private val BIG_PLAY_SIZE = 56.dp
 private val BIG_PLAY_RING = 3.dp
-private val BIG_PLAY_RING_GAP = 3.dp
+private val BIG_PLAY_RING_OUTSET = 3.dp
