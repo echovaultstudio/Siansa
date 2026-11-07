@@ -492,13 +492,14 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // Now playing's dynamic colours (issue #970): a seek bar and Play in each cover's colour, on its backdrop; a grey
-            // cover keeps the theme's.
+            // Now playing's dynamic colours (issue #970): a seek bar and Play in each cover's colour, on its backdrop; a cool
+            // grey cover, a sepia one and a black and white one (issue #994) are a blueish silver, tan and silver.
             Scene("dynamic_colours") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                     listOf(
                         Color(0xFFB2CE05) to Color(0xFFB8C64F), Color(0xFF09A2E5) to Color(0xFF203440), Color(0xFFAD6B41) to Color(0xFF6A4E31),
                         Color(0xFF6A4744) to Color(0xFFCDC9C7), Color(0xFFE9E1CF) to Color(0xFFF4F1EA), Color(0xFF808080) to Color(0xFF808080),
+                        Color(0xFFB8BCC4) to Color(0xFF9A9CA4), Color(0xFF947D72) to Color(0xFF4A3F3A), Color(0xFF7F7F7F) to Color(0xFF1C1C1C),
                     ).forEach { (seed, average) ->
                         val backdrop = app.siansa.ui.DynamicAccent.backdropOf(average)
                         val c = app.siansa.ui.DynamicAccent.of(seed, backdrop)

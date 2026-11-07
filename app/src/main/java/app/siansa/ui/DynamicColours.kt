@@ -33,25 +33,37 @@ import kotlin.math.min
  */
 data class DynamicColours(val controls: Color, val text: Color, val onControls: Color)
 
+/** One of a cover's colours and how much of the cover it covers (Android's palette swatch), for [DynamicAccent.seedOf]. */
+data class CoverSwatch(val color: Color, val population: Int)
+
 /**
  * The cover's colour made to stand out on now playing (issue #970). The page behind the controls is the cover itself,
- * blurred and darkened ([backdropOf]), so the colour is the cover's liveliest ([of]'s seed, Android's vibrant swatch),
- * lightened until it stands out from that by [CONTROLS_CONTRAST] (the seek bar, Play) and [TEXT_CONTRAST] (the device
- * name), as accessibility asks of controls and text. A cover with no colour of its own (black and white, grey) has
- * none: the theme's colour stays.
+ * blurred and darkened ([backdropOf]), so the colour is the cover's own ([seedOf]), lightened until it stands out from
+ * that by [CONTROLS_CONTRAST] (the seek bar, Play) and [TEXT_CONTRAST] (the device name), as accessibility asks of
+ * controls and text.
+ *
+ * The colour is the one that fills most of the cover, as much as its liveliest (issue #994): a sepia cover with a red
+ * light in it is tan, not red, and a muted colour stays muted. A cover in black, white and grey gets silver, from its
+ * own greys: the theme's amber came from nowhere on it. Only a cover that couldn't be read keeps the theme's colour.
  */
 object DynamicAccent {
     const val CONTROLS_CONTRAST = 3.0
     const val TEXT_CONTRAST = 4.5
 
-    /** Below this saturation a colour is grey: the theme's colour stays. */
-    private const val GREY = 0.08f
+    /** Below this chroma (the most and least of red, green and blue apart) a colour is grey: its hue means nothing. */
+    private const val GREY = 0.04f
 
-    /** A faint colour is given at least this much, so it reads as a colour, not as grey. */
-    private const val FAINT = 0.18f
-    private const val SOFT_SATURATION = 0.45f
-    private const val SATURATION = 0.55f
+    /** A cover's colour is livened a little, so it reads as a colour on the dark page; never past [MOST_SATURATION]. */
+    private const val LIVEN = 1.15f
+    private const val MOST_SATURATION = 0.85f
     private const val LIGHTNESS_FROM = 0.40f
+
+    /** A muted colour (below [MUTED] saturation) starts lighter, like the cover's own highlights, so it isn't muddy. */
+    private const val MUTED = 0.35f
+    private const val MUTED_LIGHTNESS_FROM = 0.62f
+
+    /** Silver for a cover in black, white and grey: a light grey, lightened from here as needed. */
+    private const val SILVER_FROM = 0.78f
     // Up to white: on the lightest covers, text may need it.
     private const val LIGHTNESS_TOP = 1.0f
     private const val STEP = 0.01f
@@ -60,15 +72,34 @@ object DynamicAccent {
     private val ON_DARK = Color(0xFF120D00)
 
     /**
-     * The colours for a cover whose liveliest colour is [seed], on now playing's [backdrop] (see [backdropOf]); null
-     * for a cover without a colour of its own.
+     * The cover's colour from its [swatches] (issue #994): of the ones with a colour of their own, the one with the
+     * most of the cover and of colour together (its share × √chroma, so a big muted area beats a small bright spot, and a
+     * bright logo on a black cover still counts). With none (black, white and grey), a grey: [of] makes it silver. Null
+     * without swatches.
+     */
+    fun seedOf(swatches: List<CoverSwatch>): Color? {
+        if (swatches.isEmpty()) return null
+        val coloured = swatches.filter { chroma(it.color) >= GREY }
+        if (coloured.isEmpty()) return Color(0.5f, 0.5f, 0.5f)
+        return coloured.maxBy { it.population * kotlin.math.sqrt(chroma(it.color)) }.color
+    }
+
+    /**
+     * The colours for a cover whose own colour is [seed] ([seedOf]), on now playing's [backdrop] (see [backdropOf]). A
+     * grey [seed] gives silver. Null only for a colour that can't be read.
      */
     fun of(seed: Color, backdrop: Color): DynamicColours? {
+        if (seed.alpha <= 0f) return null
         val (h, s0, l0) = hsl(seed)
-        if (hsvSaturation(seed) < GREY) return null
-        val s = max(s0, if (s0 < FAINT) SOFT_SATURATION else SATURATION)
-        val controls = lightenUntil(h, s, max(l0, LIGHTNESS_FROM), backdrop, CONTROLS_CONTRAST)
-        val text = lightenUntil(h, s, max(l0, LIGHTNESS_FROM), backdrop, TEXT_CONTRAST)
+        val grey = chroma(seed) < GREY
+        val s = if (grey) 0f else min(MOST_SATURATION, s0 * LIVEN)
+        val from = when {
+            grey -> SILVER_FROM
+            s < MUTED -> max(l0, MUTED_LIGHTNESS_FROM)
+            else -> max(l0, LIGHTNESS_FROM)
+        }
+        val controls = lightenUntil(h, s, from, backdrop, CONTROLS_CONTRAST)
+        val text = lightenUntil(h, s, from, backdrop, TEXT_CONTRAST)
         val on = if (contrast(controls, ON_DARK) >= contrast(controls, Color.White)) ON_DARK else Color.White
         return DynamicColours(controls, text, on)
     }
@@ -96,11 +127,8 @@ object DynamicAccent {
         return (max(x, y) + 0.05) / (min(x, y) + 0.05)
     }
 
-    private fun hsvSaturation(c: Color): Float {
-        val hi = max(c.red, max(c.green, c.blue))
-        val lo = min(c.red, min(c.green, c.blue))
-        return if (hi <= 0f) 0f else (hi - lo) / hi
-    }
+    /** How much colour there is: the most and least of red, green and blue apart, 0 for grey to 1. */
+    fun chroma(c: Color): Float = max(c.red, max(c.green, c.blue)) - min(c.red, min(c.green, c.blue))
 
     private fun hsl(c: Color): Triple<Float, Float, Float> {
         val r = c.red
@@ -137,7 +165,7 @@ object DynamicAccent {
     }
 }
 
-/** A cover's liveliest colour and its average, as now playing's colours need them (issue #970). */
+/** A cover's own colour ([DynamicAccent.seedOf]) and its average, as now playing's colours need them (issue #970). */
 private data class CoverTones(val seed: Color?, val average: Color)
 
 private val tonesCache = ConcurrentHashMap<String, CoverTones>()
@@ -165,9 +193,11 @@ fun rememberDynamicColours(coverId: String?, on: Boolean): DynamicColours? {
                     .build()
                 val result = SingletonImageLoader.get(context).execute(request) as? SuccessResult ?: return@runCatching null
                 val bitmap = result.image.toBitmap()
-                val palette = Palette.from(bitmap).maximumColorCount(16).generate()
+                // Every colour, black and white too (the palette leaves them out at first): a black and white cover is
+                // silver, and how much of a cover is black counts against a small bright spot (issue #994).
+                val palette = Palette.from(bitmap).maximumColorCount(16).clearFilters().generate()
                 val one = android.graphics.Bitmap.createScaledBitmap(bitmap, 1, 1, true).getPixel(0, 0)
-                CoverTones((palette.vibrantSwatch ?: palette.lightVibrantSwatch ?: palette.darkVibrantSwatch ?: palette.dominantSwatch)?.rgb?.let { Color(it) }, Color(one))
+                CoverTones(DynamicAccent.seedOf(palette.swatches.map { CoverSwatch(Color(it.rgb), it.population) }), Color(one))
             }.onFailure { AppLog.w("Colours", "Couldn't read the colours of cover $coverId: ${it.message}") }.getOrNull()
         }
         if (read != null) {
@@ -179,8 +209,8 @@ fun rememberDynamicColours(coverId: String?, on: Boolean): DynamicColours? {
     LaunchedEffect(colours) {
         if (colours != null) AppLog.d("Colours", "Now playing in the cover's colours: controls ${hex(colours.controls)}, text ${hex(colours.text)}")
     }
-    // While the next cover is read, the last song's colours stay, so the theme's doesn't flash in between; a cover read
-    // and found without a colour of its own gives the theme's.
+    // While the next cover is read, the last song's colours stay, so the theme's doesn't flash in between; a cover that
+    // couldn't be read gives the theme's.
     var last by remember { mutableStateOf<DynamicColours?>(null) }
     androidx.compose.runtime.SideEffect { if (tones != null) last = colours }
     if (!on) return null
