@@ -66,7 +66,7 @@ Same page. **Off**, a **fixed** length (1–30 seconds, 6 by default), or **Smar
   whole. When both songs keep a beat (dance music, a DJ radio), there's no pause: the next song starts right as the
   old one's last sound ends, so the music doesn't stop. Only when both edges are hard: a soft ending or a soft start
   blends as above. A beat-matched DJ blend still
-  comes first. Needs the new audio engine (Siansa Dev); otherwise the two play straight back to back.
+  comes first.
 - With Smart, the length (**Up to**) is the longest a fade can be, not the length of every fade: most are shorter,
   as the songs decide. The full length is used for songs the plugin hasn't measured yet, and in DJ blends for a
   quiet intro without a beat. The setting says so under the slider.
@@ -106,7 +106,7 @@ blend them the way a DJ mixes:
   length, so the song is back at its own speed sooner.
 - **Everywhere**: the same in every smart crossfade.
 - **Off** (the default): fades don't follow the beat. On many phones a beat-matched blend still drifts out of step,
-  so it's off until you choose it; a new audio engine that keeps both songs exactly in step is being built.
+  so it's off until you choose it.
 
 In DJ radio (when beat-matched blends apply there), a blend where one end has no beat at all (a beatless
 intro, an ambient outro) runs the whole crossfade length: there's nothing to clash with, so the next song comes in

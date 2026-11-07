@@ -6,6 +6,15 @@ SHIELD, or a TV with Google TV built in). It plays from your server on its own, 
 It's an app of its own, **Siansa** on the TV's home screen. It doesn't replace the phone app or change anything on
 your phone: install it on the TV, and both keep their own settings, library and sign-ins.
 
+> The TV app is in beta: it does most of what the phone app does, and it's still growing. Problems and ideas are very
+> welcome: **Settings › Help › Report a problem** on the TV sends one with its log.
+
+## Getting the TV app
+
+The TV app comes from Google Play, as the same Siansa as on your phone: Play gives your TV the TV app and your phone
+the phone app. While Siansa is a closed test on Google Play, [ask for a place](https://siansa.app/#join), then open the
+Play Store on your TV and search for Siansa. It isn't on F-Droid yet.
+
 ## Signing in
 
 The first time you open it, the TV shows a QR code.
