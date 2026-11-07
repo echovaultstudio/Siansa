@@ -206,7 +206,10 @@ class ShowcaseTest {
                 compose.onAllNodesWithTag("miniPlayer").onFirst().performClick()
                 idle(3000)
                 // Now playing is a window of its own: the finger goes to the screen, as a real one would.
-                val middle = compose.onAllNodesWithTag("playButton").onFirst().fetchSemanticsNode().boundsInWindow.center
+                // The big play button (its tag is merged into it, so by what it says), not the mini player's.
+                val middle = (compose.onAllNodesWithTag("playButton", useUnmergedTree = true).fetchSemanticsNodes() +
+                    compose.onAllNodesWithContentDescription("Play or pause").fetchSemanticsNodes())
+                    .maxByOrNull { it.boundsInWindow.width }?.boundsInWindow?.center ?: error("No play button in now playing")
                 frame("slides", 1400)
                 finger(MotionEvent.ACTION_DOWN, middle.x, middle.y)
                 // Up, eased, until the DJ mix is chosen and its name is on the cover.
