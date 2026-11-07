@@ -3,18 +3,21 @@
 Personal Android music player for Navidrome (Kotlin, Jetpack Compose, Media3, Coil 3, Room).
 Source: `app/src/main/java/app/siansa/`. Unit tests: `app/src/test/`. Emulator tests: `app/src/androidTest/`.
 
-## Until v1.0: work on `mixer`
+## Branches: `main` and `dev`
 
-All work goes on the `mixer` branch until v1.0: the new audio engine (#826), every fix and every feature. Branch
-from `mixer` and open pull requests against `mixer`, not `main` (the owner decided, 0.52.0-dev). Each push to
-`mixer` builds Siansa Dev (`.github/workflows/dev-app.yml`) for the owner to test. `main` stays at 0.51.x with
-releases held (`.release-hold`); at v1.0 `mixer` goes to `main` in one pull request, the engine on for everyone.
-v1.0 keeps Siansa's own look: Siansa Dev's purple icon and name live only in `app/src/dev/` and never reach the
-normal app, and anything shared by both builds (such as the Cast TV screen, `cast-receiver/`) uses main's black, frost
-and amber colours and icon.
-A pull request against `mixer` doesn't close its issue on merge (GitHub only does that on `main`): leave the issue
-open with a comment that the fix is in Siansa Dev; it closes when v1.0 reaches `main`. Only an urgent fix for the
-released app goes to `main`, and only when the owner asks.
+- **Big work and new features go to `dev`** (the owner decided, after v1.0): branch from `dev` and open the pull
+  request against `dev`. Each push to `dev` builds Siansa Dev (`.github/workflows/dev-app.yml`) and Siansa TV Dev
+  (`tv-dev.yml`), test builds installed next to the real apps, for the owner to try before they reach everyone.
+  A pull request against `dev` doesn't close its issue on merge (GitHub only does that on `main`): leave the issue
+  open with a comment that it's in Siansa Dev; it closes when `dev` reaches `main`.
+- **Bug fixes and security fixes go straight to `main`**, as they're urgent: branch from `main` and open the pull
+  request against `main`. Each merge with a note in `changelog.d/` is released.
+- After a fix lands on `main`, merge `main` into `dev` (a pull request "main into dev"), so `dev` never falls behind.
+- When `dev` is ready for everyone, it goes to `main` in one pull request.
+- Siansa Dev's purple icon and name live only in `app/src/dev/` and never reach the normal app; anything shared by
+  both builds (such as the Cast TV screen, `cast-receiver/`) uses main's black, frost and amber colours and icon.
+- The release writes its own commits to `main` with the `RELEASE_DEPLOY_KEY` deploy key, the one thing `main`'s
+  rules let past without a pull request.
 
 ## Every change
 

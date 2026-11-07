@@ -71,7 +71,7 @@ android {
         }
         // Siansa Dev (issue #824): a release build of a test branch, installed next to Siansa with its own app id,
         // name and purple icon (src/dev/res), so a new audio engine can be tried without touching the app in use.
-        // Built by .github/workflows/dev-app.yml from the mixer branch; never sent to F-Droid or Google Play.
+        // Built by .github/workflows/dev-app.yml from the dev branch; never sent to F-Droid or Google Play.
         create("dev") {
             initWith(getByName("release"))
             applicationIdSuffix = ".dev"
