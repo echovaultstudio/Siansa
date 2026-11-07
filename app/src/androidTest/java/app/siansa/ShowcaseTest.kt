@@ -4,6 +4,7 @@ import android.Manifest
 import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Base64
+import android.view.MotionEvent
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -120,6 +121,7 @@ class ShowcaseTest {
             val until = SystemClock.elapsedRealtime() + 20_000
             while (SystemClock.elapsedRealtime() < until && !graph.player.state.value.isPlaying) SystemClock.sleep(200)
         }
+        replay = { playHarbourLights(40_000) }
         // The same song in the mini player on every page: started again when it has run on to the next.
         fun keepPlaying() {
             if (graph.player.state.value.current?.title != "Harbour Lights") runCatching { playHarbourLights(40_000) }
@@ -194,6 +196,99 @@ class ShowcaseTest {
                 back()
                 idle(800)
                 settle()
+            }
+            // The website's animations of the slides (issues #919 and #965): from now playing's play button up to a DJ
+            // mix and round to the other ways, and on an album from Shuffle across onto Play. Before the books, whose
+            // player would be open over them; they start mixes, so Harbour Lights plays again after.
+            step("slides") {
+                playHarbourLights(30_000)
+                idle(1500)
+                compose.onAllNodesWithTag("miniPlayer").onFirst().performClick()
+                idle(3000)
+                // Now playing is a window of its own: the finger goes to the screen, as a real one would.
+                // The big play button (its tag is merged into it, so by what it says), not the mini player's.
+                val middle = (compose.onAllNodesWithTag("playButton", useUnmergedTree = true).fetchSemanticsNodes() +
+                    compose.onAllNodesWithContentDescription("Play or pause").fetchSemanticsNodes())
+                    .maxByOrNull { it.boundsInWindow.width }?.boundsInWindow?.center ?: error("No play button in now playing")
+                frame("slides", 1400)
+                finger(MotionEvent.ACTION_DOWN, middle.x, middle.y)
+                // Up, eased, until the DJ mix is chosen and its name is on the cover.
+                val reach = 120f * instrumentation.targetContext.resources.displayMetrics.density
+                for (i in 1..9) {
+                    val f = ((1 - kotlin.math.cos(Math.PI * i / 9)) / 2).toFloat()
+                    finger(MotionEvent.ACTION_MOVE, middle.x, middle.y - reach * f)
+                    frame("slides", 60)
+                }
+                frame("slides", 1800)
+                shot("slide-dj")
+                // Round to the right (songs that sound like it), to the left (a song path), then back up.
+                fun arc(fromDeg: Double, toDeg: Double, steps: Int) {
+                    for (i in 1..steps) {
+                        val a = Math.toRadians(fromDeg + (toDeg - fromDeg) * i / steps)
+                        finger(MotionEvent.ACTION_MOVE, middle.x + (reach * kotlin.math.sin(a)).toFloat(), middle.y - (reach * kotlin.math.cos(a)).toFloat())
+                        frame("slides", 50)
+                    }
+                }
+                arc(0.0, 90.0, 6)
+                frame("slides", 1500)
+                shot("slide-right")
+                arc(90.0, 270.0, 10)
+                frame("slides", 1500)
+                arc(270.0, 360.0, 6)
+                frame("slides", 900)
+                // Let go on the DJ mix: it starts, and the play button turns into a record that turns while it plays.
+                finger(MotionEvent.ACTION_UP, middle.x, middle.y - reach)
+                whileTurning {
+                    repeat(16) {
+                        SystemClock.sleep(250)
+                        compose.mainClock.advanceTimeBy(250)
+                        frame("slides", 160)
+                    }
+                    SystemClock.sleep(3000)
+                    compose.mainClock.advanceTimeBy(3000)
+                    frame("slides", 2200)
+                    shot("dj-mix")
+                }
+                back()
+                idle(800)
+                settle()
+            }
+            step("album dj mix") {
+                libraryAll()
+                chip("Music")
+                chip("Albums")
+                scrollTo("Low Tide")
+                click("Low Tide")
+                waitText("Harbour Lights")
+                idle(2500)
+                frame("album-dj", 1400)
+                val shuffle = compose.onAllNodesWithTag("shuffleAll").onFirst()
+                val width = compose.onRoot().fetchSemanticsNode().boundsInRoot.width
+                val from = shuffle.fetchSemanticsNode().boundsInRoot
+                // Play sits at the right end of the bar: the finger stops on it.
+                val onPlay = width - from.left - 44f * instrumentation.targetContext.resources.displayMetrics.density
+                shuffle.performTouchInput { down(center) }
+                for (i in 1..10) {
+                    val f = ((1 - kotlin.math.cos(Math.PI * i / 10)) / 2).toFloat()
+                    shuffle.performTouchInput { moveTo(center + androidx.compose.ui.geometry.Offset((onPlay - center.x) * f, 0f)) }
+                    frame("album-dj", 60)
+                }
+                frame("album-dj", 1800)
+                shot("album-dj-slide")
+                whileTurning {
+                    shuffle.performTouchInput { up() }
+                    repeat(14) {
+                        SystemClock.sleep(250)
+                        compose.mainClock.advanceTimeBy(250)
+                        frame("album-dj", 160)
+                    }
+                    SystemClock.sleep(3000)
+                    compose.mainClock.advanceTimeBy(3000)
+                    frame("album-dj", 2400)
+                    shot("album-dj-mix")
+                }
+                back()
+                idle(800)
             }
             step("search") {
                 tab("Search")
@@ -485,6 +580,39 @@ class ShowcaseTest {
         println("Showcase: $text from ${before.toInt()} to ${top().toInt()} px of ${height.toInt()} ($swipes swipes)")
         idle(800)
     }
+
+    private var fingerDown = 0L
+
+    /** A finger on the screen at ([x], [y]), in the window's pixels: down, a move, or up. */
+    private fun finger(action: Int, x: Float, y: Float) {
+        val now = SystemClock.uptimeMillis()
+        if (action == MotionEvent.ACTION_DOWN) fingerDown = now
+        val event = MotionEvent.obtain(fingerDown, now, action, x, y, 0).apply { source = android.view.InputDevice.SOURCE_TOUCHSCREEN }
+        instrumentation.sendPointerSync(event)
+        event.recycle()
+        if (action != MotionEvent.ACTION_UP) SystemClock.sleep(16)
+    }
+
+    /**
+     * [block] while a DJ mix's record turns, which never lets the page be idle: the test's clock moves only when told.
+     * After it, Harbour Lights plays again (no record) and the clock runs on its own.
+     */
+    private fun whileTurning(block: () -> Unit) {
+        compose.mainClock.autoAdvance = false
+        try {
+            block()
+        } finally {
+            val until = SystemClock.elapsedRealtime() + 20_000
+            runCatching { replay() }
+            while (SystemClock.elapsedRealtime() < until && graph.player.state.value.current?.title != "Harbour Lights") {
+                SystemClock.sleep(200)
+                compose.mainClock.advanceTimeBy(200)
+            }
+            compose.mainClock.autoAdvance = true
+        }
+    }
+
+    private var replay: () -> Unit = {}
 
     private val frameCount = HashMap<String, Int>()
 
