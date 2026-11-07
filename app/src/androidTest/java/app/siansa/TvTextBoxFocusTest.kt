@@ -72,8 +72,16 @@ class TvTextBoxFocusTest {
         val afterOne = where(boxes)
         press(KeyEvent.KEYCODE_DPAD_DOWN)
         val afterTwo = where(boxes)
-        val trail = "start: $start · after one down: $afterOne · after two: $afterTwo"
+        // It stays there (on the TV it was pulled back into Password), and up goes back once the box takes focus again.
+        Thread.sleep(app.siansa.ui.HOLD_OUT_MS * 2)
+        compose.waitForIdle()
+        val later = where(boxes)
+        press(KeyEvent.KEYCODE_DPAD_UP)
+        val backUp = where(boxes)
+        val trail = "start: $start · after one down: $afterOne · after two: $afterTwo · later: $later · up: $backUp"
         println("TV text box focus: $trail")
         assertTrue("Down from Password reaches Test ($trail)", afterTwo.endsWith("test button focused=true"))
+        assertTrue("Test keeps the focus ($trail)", later.endsWith("test button focused=true"))
+        assertTrue("Up from Test reaches Password ($trail)", backUp.startsWith("view=Password"))
     }
 }

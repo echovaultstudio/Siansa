@@ -76,6 +76,20 @@ fun TvTextBox(
     val top = remember { androidx.compose.ui.focus.FocusRequester() }
     val bottom = remember { androidx.compose.ui.focus.FocusRequester() }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var field by remember { mutableStateOf<EditText?>(null) }
+    // Once the remote has left the field for a control of the page, the field takes no focus for a moment (issue #955):
+    // on the TV (NVIDIA Shield, Android 11) the focus reached Test under the Password field and was pulled straight back
+    // into the field, again and again, though the move itself worked ("moved on" in the log).
+    fun holdOut(edit: EditText) {
+        edit.isFocusable = false
+        edit.isFocusableInTouchMode = false
+        scope.launch {
+            kotlinx.coroutines.delay(HOLD_OUT_MS)
+            edit.isFocusable = true
+            edit.isFocusableInTouchMode = true
+            AppLog.d("TvTextBox", "\"$label\" takes the focus again (has it: ${edit.hasFocus()})")
+        }
+    }
     fun leave(way: androidx.compose.ui.focus.FocusDirection, field: EditText) {
         leaving = true
         scope.launch {
@@ -84,6 +98,7 @@ fun TvTextBox(
             androidx.compose.runtime.withFrameNanos { }
             val point = if (way == androidx.compose.ui.focus.FocusDirection.Down) bottom else top
             val moved = runCatching { point.requestFocus(); focusManager.moveFocus(way) }.getOrDefault(false)
+            if (moved) holdOut(field)
             AppLog.d("TvTextBox", "Leaving \"$label\" ${if (way == androidx.compose.ui.focus.FocusDirection.Down) "down" else "up"}: ${if (moved) "moved on" else "nothing that way, stays"}")
             if (!moved) field.requestFocus()
             // Once the focus has moved on, the points go back to not taking it.
@@ -104,12 +119,14 @@ fun TvTextBox(
                 val way = textBoxExit(event.nativeKeyEvent.keyCode, kind == TvTextKind.LONG_TEXT) ?: return@onPreviewKeyEvent false
                 val moved = runCatching { focusManager.moveFocus(way) }.getOrDefault(false)
                 AppLog.d("TvTextBox", "\"$label\" ${if (way == androidx.compose.ui.focus.FocusDirection.Down) "down" else "up"}: ${if (moved) "moved on" else "nothing that way"}")
+                if (moved) field?.let(::holdOut)
                 moved
             },
         ) {
             AndroidView(
                 factory = { context ->
                     EditText(context).apply {
+                        field = this
                         setText(value)
                         setSelection(value.length)
                         if (kind == TvTextKind.LONG_TEXT) {
@@ -207,6 +224,9 @@ fun TvTextBox(
 private val BORDER = 1.dp
 private val FOCUSED_BORDER = 2.dp
 private const val LONG_LINES = 3
+
+/** How long a TV text box takes no focus after the remote has left it (issue #955): past the key's release. */
+internal const val HOLD_OUT_MS = 400L
 
 /**
  * Which way the remote's [keyCode] leaves a TV text box (issue #955): up and down to the control above or below, unless
