@@ -22,6 +22,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddCircleOutline
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Cast
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.FavoriteBorder
@@ -61,6 +66,12 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.data.MiniButton
+import androidx.compose.material.icons.rounded.Reorder
+import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.FilterList
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Casino
+import app.siansa.data.HomeMenuItem
 import app.siansa.data.NavTab
 import app.siansa.data.moved
 import app.siansa.log.AppLog
@@ -91,6 +102,8 @@ fun StyleScreen(nav: NavController) {
             HubRow(Icons.Rounded.PhoneAndroid, "Now Playing Style") { nav.navigate("settings/style/now-playing") }
             HubRow(Icons.Rounded.PlayCircle, "Mini Player") { nav.navigate("settings/style/mini-player") }
             HubRow(Icons.Rounded.Dashboard, "Nav Bar") { nav.navigate("settings/style/nav-bar") }
+            HubRow(Icons.Rounded.Home, "Home") { nav.navigate("settings/style/home") }
+            HubRow(Icons.Rounded.FilterList, "Home Menu") { nav.navigate("settings/style/home-menu") }
             Spacer(Modifier.height(Space.Section))
             TopBarChoice(settings.topBar) {
                 AppLog.i("Style", "Phone's top bar: ${it.name.lowercase()}")
@@ -153,15 +166,120 @@ fun NowPlayingStyleScreen(nav: NavController) {
                     modifier = Modifier.testTag("lyricsButtonSwitch"),
                 )
             }
+            // The cover's colours for the seek bar, Play, the liked heart and the device name (issues #970, #998).
+            StyleSwitchRow(
+                "Dynamic colours",
+                "The seek bar, Play, the heart and where it plays take the colour of the cover, always easy to see",
+                settings.dynamicPlayerColours,
+                "dynamicColoursSwitch",
+            ) { on ->
+                AppLog.i("Style", "Now playing: dynamic colours ${if (on) "on" else "off"}")
+                graph.settings.setDynamicPlayerColours(on)
+            }
             Spacer(Modifier.height(Space.Section))
-            Text(
-                "More now playing looks will come here.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            PlaySlidesSettings(settings.playSlides) { slides ->
+                AppLog.i("Style", "Play button slides: ${slides.format()}")
+                graph.settings.setPlaySlides(slides)
+            }
+            Spacer(Modifier.height(Space.Section))
         }
     }
 }
+
+/**
+ * Play button slides (issue #919): whether a slide from now playing's play button does anything, what each way does,
+ * and whether the button gets record grooves while a DJ mix plays.
+ */
+@Composable
+internal fun PlaySlidesSettings(slides: PlaySlides, onChange: (PlaySlides) -> Unit) {
+    Column {
+        Text("Play button slides", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+        StyleSwitchRow("Slide from the play button", "Up, down, left or right starts a mix or finds songs", slides.on, "playSlidesSwitch") {
+            onChange(slides.copy(on = it))
+        }
+        if (slides.on) {
+            SlideWay.entries.forEach { way ->
+                SlideWayRow(way, slides.of(way)) { onChange(slides.with(way, it)) }
+            }
+            Text(
+                "A tap still plays and pauses, and pressing and holding still stops.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = Space.Small),
+            )
+        }
+        StyleSwitchRow("Record grooves", "The play button looks like a record while a DJ mix plays", slides.grooves, "playGroovesSwitch") {
+            onChange(slides.copy(grooves = it))
+        }
+    }
+}
+
+@Composable
+private fun StyleSwitchRow(title: String, hint: String, on: Boolean, tag: String, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable { onChange(!on) }.padding(vertical = Space.Medium),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(Space.Medium))
+        Switch(checked = on, onCheckedChange = onChange, modifier = Modifier.testTag(tag))
+    }
+}
+
+/** One way to slide: its arrow and name, and what it does, picked from a menu. */
+@Composable
+private fun SlideWayRow(way: SlideWay, slide: PlaySlide, onPick: (PlaySlide) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().clickable { open = true }.padding(vertical = Space.Small).testTag("slideWay-${way.name.lowercase()}"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.Medium),
+    ) {
+        Icon(way.arrow, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Slide ${way.label}", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Box {
+            Row(
+                Modifier.clip(RoundedCornerShape(percent = 50)).background(MaterialTheme.colorScheme.primary.copy(alpha = CHIP_TINT))
+                    .padding(horizontal = Space.Medium, vertical = Space.Tight),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Space.Small),
+            ) {
+                slide.icon?.let { Icon(it, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(CHIP_ICON)) }
+                Text(slide.label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+                Icon(Icons.Rounded.ArrowDropDown, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(CHIP_ICON))
+            }
+            androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                PlaySlide.entries.forEach { choice ->
+                    val icon = choice.icon
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(choice.label) },
+                        leadingIcon = icon?.let { i -> @Composable { Icon(i, null) } },
+                        onClick = {
+                            open = false
+                            if (choice != slide) onPick(choice)
+                        },
+                        modifier = Modifier.testTag("slideOption-${way.name.lowercase()}-${choice.name.lowercase()}"),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The arrow for a way to slide. */
+private val SlideWay.arrow: ImageVector
+    get() = when (this) {
+        SlideWay.UP -> Icons.Rounded.ArrowUpward
+        SlideWay.DOWN -> Icons.Rounded.ArrowDownward
+        SlideWay.LEFT -> Icons.AutoMirrored.Rounded.ArrowBack
+        SlideWay.RIGHT -> Icons.AutoMirrored.Rounded.ArrowForward
+    }
+
+private const val CHIP_TINT = 0.14f
+private val CHIP_ICON = 18.dp
 
 private fun setLyricsButton(graph: app.siansa.AppGraph, on: Boolean) {
     AppLog.i("Style", "Now playing: ${if (on) "lyrics button" else "classic"}")
@@ -237,6 +355,85 @@ fun NavBarStyleScreen(nav: NavController) {
     }
 }
 
+/** Settings › Style › Home (issue #934): how many shortcuts Home shows at its top. */
+@Composable
+fun HomeStyleScreen(nav: NavController) {
+    val graph = LocalGraph.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    Screen(title = "Home", nav = nav) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
+            StyleHint("The shortcuts at the top of Home are what you played last, newest first.")
+            ShortcutCountRow(settings.homeShortcuts) {
+                AppLog.i("Style", "Home shortcuts: $it")
+                graph.settings.setHomeShortcuts(it)
+            }
+        }
+    }
+}
+
+/** How many shortcuts Home shows, 2 to 8, two to a row (issue #934). */
+@Composable
+internal fun ShortcutCountRow(count: Int, onDone: (Int) -> Unit) {
+    var value by remember(count) { androidx.compose.runtime.mutableFloatStateOf(count.toFloat()) }
+    Column(Modifier.fillMaxWidth().padding(horizontal = Space.Page)) {
+        Text("Shortcuts", style = MaterialTheme.typography.titleMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.Slider(
+                value = value,
+                onValueChange = { value = kotlin.math.round(it) },
+                onValueChangeFinished = { onDone(value.toInt()) },
+                valueRange = QUICK_MIN.toFloat()..QUICK_COUNT.toFloat(),
+                steps = QUICK_COUNT - QUICK_MIN - 1,
+                modifier = Modifier.weight(1f).testTag("homeShortcuts"),
+            )
+            Spacer(Modifier.width(Space.Medium))
+            Text("${value.toInt()}", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("homeShortcutsCount"))
+        }
+    }
+}
+
+/**
+ * Home Menu (issue #872): the options in Home's menu, top to bottom as they hang under its button. Hold a row or grab
+ * its 6-dot handle to move it. All of them always show: each is the only way to it from Home.
+ */
+@Composable
+fun HomeMenuStyleScreen(nav: NavController) {
+    val graph = LocalGraph.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    val order = settings.homeMenu
+    fun save(items: List<HomeMenuItem>) {
+        AppLog.i("Style", "Home menu: ${HomeMenuItem.format(items)}")
+        graph.settings.setHomeMenu(items)
+    }
+    Screen(
+        title = "Home Menu",
+        nav = nav,
+        actions = { TextButton(onClick = { save(HomeMenuItem.default) }, enabled = order != HomeMenuItem.default) { Text("Reset") } },
+    ) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
+            StyleHint("The round button at the top of Home. Hold a row and drag it: top to bottom as they open under the button.")
+            ArrangeList(
+                order = order,
+                shown = order.toSet(),
+                label = { it.label },
+                icon = { it.icon() },
+                key = { it.id },
+                canHide = { false },
+                canShowMore = false,
+                onChange = { items, _ -> save(items) },
+                eyes = false,
+            )
+        }
+    }
+}
+
+internal fun HomeMenuItem.icon(): ImageVector = when (this) {
+    HomeMenuItem.DICE -> Icons.Rounded.Casino
+    HomeMenuItem.PLAY_ON -> Icons.Rounded.Cast
+    HomeMenuItem.SOURCES -> Icons.Rounded.LibraryMusic
+    HomeMenuItem.ARRANGE -> Icons.Rounded.Reorder
+}
+
 @Composable
 private fun StyleHint(text: String) {
     Text(
@@ -262,6 +459,8 @@ internal fun <T> ArrangeList(
     canHide: (T) -> Boolean,
     canShowMore: Boolean,
     onChange: (order: List<T>, shown: Set<T>) -> Unit,
+    /** Whether rows have the eye at all: Home's menu only puts its options in order (issue #872). */
+    eyes: Boolean = true,
 ) {
     val haptics = LocalHapticFeedback.current
     val pitchPx = with(LocalDensity.current) { ARRANGE_PITCH.toPx() }
@@ -348,7 +547,7 @@ internal fun <T> ArrangeList(
                         color = if (isShown) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f).padding(start = Space.Page).alpha(if (isShown) 1f else 0.6f),
                     )
-                    IconButton(
+                    if (eyes) IconButton(
                         enabled = toggleable,
                         onClick = { change(items, if (isShown) on - item else on + item) },
                     ) {

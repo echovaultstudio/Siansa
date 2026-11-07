@@ -156,14 +156,183 @@ class CrossfadePlanTest {
         assertEquals(2_000L, plan.fadeInMs)
     }
 
+    @Test fun aHardEndingIntoAHardStartIsAColdEndWithAShortPause() {
+        // 0.52.0-dev, 09:19: a 400 ms tail into a 0 ms intro overlapped for 400 ms, two loud edges colliding.
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, profile("a1", 0, 400), profile("b1", 0, 0))!!
+        assertTrue(plan.why, plan.gapMs > 0)
+        // No overlap: the old song's own last 400 ms (its tail) play out, the next song comes in after them and the pause.
+        assertEquals(400L, plan.overlapMs)
+        assertEquals(Crossfade.MIN_FADE_IN_MS, plan.fadeInMs)
+        assertNull(plan.beat)
+        assertTrue(plan.why, plan.why.contains("hard ending into a hard start"))
+        // A song loud to its very last sound still fades over a moment, only so it can't click.
+        assertEquals(Crossfade.COLD_OUT_MS, Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, profile("a1", 0, 0), profile("b1", 100, 0))!!.overlapMs)
+    }
+
+    @Test fun onlyBothEdgesHardMakeAColdEnd() {
+        // A soft start under a hard ending, or a hard start after a soft ending, blends as before.
+        val softStart = Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, profile("a1", 0, 400), profile("b1", 1_400, 0))!!
+        assertEquals(0L, softStart.gapMs)
+        assertEquals(1_800L, softStart.overlapMs)
+        val softEnd = Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, profile("a1", 0, 3_000), profile("b1", 0, 0))!!
+        assertEquals(0L, softEnd.gapMs)
+        assertEquals(3_000L, softEnd.overlapMs)
+        // Just past the edges: a 1 s tail, a 300 ms intro.
+        assertNull(Crossfade.coldEnd(Crossfade.COLD_TAIL_MS, 0, 0, null, null))
+        assertNull(Crossfade.coldEnd(0, Crossfade.COLD_HEAD_MS, 0, null, null))
+        assertNotNull(Crossfade.coldEnd(Crossfade.COLD_TAIL_MS - 1, Crossfade.COLD_HEAD_MS - 1, 0, null, null))
+        // Within one album running straight on it stays gapless, and fixed or off are untouched.
+        assertNull(Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, a2, minutes4, minutes4, profile("a1", 0, 0), profile("a2", 0, 0)))
+        assertEquals(0L, Crossfade.plan(CrossfadeMode.FIXED, 6_000, a1, b1, minutes4, minutes4, profile("a1", 0, 0), profile("b1", 0, 0))!!.gapMs)
+    }
+
+    @Test fun aColdEndBetweenTwoBeatsHasNoPause() {
+        // 0.52.0-dev, 20:19, a DJ radio: a 132 BPM house track loud to its end into 176 BPM drum and bass loud from its
+        // start (too far apart to match) got 0.6 s of silence between them. Two beats run straight on instead.
+        val house = BeatEnd(bpm = 132.0, beatMs = 230_000.0, barMs = 230_000.0, rhythm = 0.88f, steady = 0.88f)
+        val dnb = BeatEnd(bpm = 176.0, beatMs = 0.0, barMs = null, rhythm = 0.84f, steady = 0.86f)
+        val out = TrackProfile("a1", -10.0, listOf(RampPoint(-18, 0)), listOf(RampPoint(-18, 0)), outro = house)
+        val inn = TrackProfile("b1", -10.0, listOf(RampPoint(-18, 0)), emptyList(), intro = dnb)
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, out, inn, beatMatch = true)!!
+        assertTrue(plan.why, plan.coldEnd)
+        assertEquals(0L, plan.gapMs)
+        assertEquals(Crossfade.COLD_OUT_MS, plan.overlapMs)
+        assertTrue(plan.why, plan.why.contains("no pause"))
+        // One side without a beat (Yor Zarad's 0.15 into a beat): the pause, as before.
+        val beatless = out.copy(outro = house.copy(rhythm = 0.15f, steady = 0.0f))
+        assertTrue(Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, beatless, inn, beatMatch = true)!!.gapMs > 0)
+    }
+
+    @Test fun aColdEndPausesLongerWhenTheTemposAreFarApart() {
+        assertEquals(Crossfade.COLD_GAP_MS, Crossfade.coldGap(120.0, 126.0))
+        assertEquals(Crossfade.COLD_GAP_FAR_MS, Crossfade.coldGap(145.0, 191.5))
+        assertEquals(Crossfade.COLD_GAP_FAR_MS, Crossfade.coldGap(null, 120.0))
+        assertTrue(Crossfade.COLD_GAP_MS < Crossfade.COLD_GAP_FAR_MS)
+    }
+
     @Test fun smartFadeIsNeverLongerThanTheSetting() {
         val plan = Crossfade.plan(CrossfadeMode.SMART, 4_000, a1, b1, minutes4, minutes4, profile("a1", 0, 9_000), profile("b1", 3_000, 0))!!
         assertEquals(4_000L, plan.overlapMs)
         assertTrue(plan.fadeInMs <= plan.overlapMs)
     }
 
-    @Test fun aHardEndingIntoAHardHitPlaysBackToBack() {
-        assertNull(Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, b1, minutes4, minutes4, profile("a1", 0, 100), profile("b1", 100, 0)))
+    @Test fun aBeatlessOutroBlendsAfterTheLastBeat() {
+        // The beat stops at 3:40 of a 4:00 song at 120 BPM, then 18 s of outro and 2 s of silence: the next song
+        // comes in a beat after the last (3:40.5), over the outro to the end of its sound, fade and all.
+        // The outro winds down: quiet (under −18 dB) for its last 10 s before the silence.
+        val outro = BeatEnd(bpm = 120.0, beatMs = 219_500.0, barMs = null, rhythm = 0.9f, steady = 0.9f)
+        val current = TrackProfile("a1", -10.0, listOf(RampPoint(-18, 0)), listOf(RampPoint(-48, 2_000), RampPoint(-18, 12_000)), outro = outro, beatsUntilMs = 220_000)
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, b1, minutes4, minutes4, current, profile("b1", 0, 0), beatMatch = true)!!
+        assertEquals(17_500L, plan.overlapMs)
+        assertEquals(2_000L, plan.cutMs)
+        assertNull(plan.beat)
+        assertTrue(plan.why, plan.why.contains("after the last beat (3:40)"))
+    }
+
+    @Test fun aLoudBeatlessOutroGetsOnlyAShortBlendAtItsEnd() {
+        // 0.52.0-dev, 20:06: a loud track's 33.6 s beatless outro played 30 s under the next song's start, both loud.
+        // Loud to its last 0.1 s before the silence: only its last 6 s are blended.
+        val outro = BeatEnd(bpm = 120.0, beatMs = 219_500.0, barMs = null, rhythm = 0.9f, steady = 0.9f)
+        val loud = TrackProfile("a1", -10.0, listOf(RampPoint(-18, 0)), listOf(RampPoint(-48, 2_000), RampPoint(-18, 2_100)), outro = outro, beatsUntilMs = 220_000)
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, b1, minutes4, minutes4, loud, profile("b1", 0, 0), beatMatch = true)!!
+        assertEquals(Crossfade.BEATLESS_LOUD_MS, plan.overlapMs)
+        assertEquals(2_000L, plan.cutMs)
+        assertTrue(plan.why, plan.why.contains("stays loud"))
+        // A long loud outro the same: never the half minute.
+        val long = TrackProfile("a1", -10.0, emptyList(), listOf(RampPoint(-18, 1_000)), beatsUntilMs = 150_000)
+        assertEquals(Crossfade.BEATLESS_LOUD_MS, Crossfade.afterLastBeat(long, minutes4, minutes4)!!.overlapMs)
+        // Not measured: counts as loud.
+        assertEquals(Crossfade.BEATLESS_LOUD_MS, Crossfade.afterLastBeat(TrackProfile("a1", -10.0, emptyList(), emptyList(), beatsUntilMs = 150_000), minutes4, minutes4)!!.overlapMs)
+    }
+
+    @Test fun aLongBeatlessOutroIsJoinedForItsLastHalfMinute() {
+        // An ambient outro that winds down: quiet for its last minute.
+        val current = TrackProfile("a1", -10.0, emptyList(), listOf(RampPoint(-18, 60_000)), beatsUntilMs = 150_000)
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, b1, minutes4, minutes4, current, profile("b1", 0, 0))!!
+        assertEquals(Crossfade.AFTER_BEAT_MAX_MS, plan.overlapMs)
+        // Never more than a third of a short next song.
+        val short = Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, b1, minutes4, 60_000, current, profile("b1", 0, 0))!!
+        assertEquals(20_000L, short.overlapMs)
+    }
+
+    @Test fun aShortBeatlessEndIsLeftToTheOtherBlends() {
+        assertNull(Crossfade.afterLastBeat(TrackProfile("a1", -10.0, emptyList(), emptyList(), beatsUntilMs = 236_000), minutes4, minutes4))
+        // Within one album running straight on, it stays gapless.
+        assertNull(Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, a2, minutes4, minutes4, TrackProfile("a1", -10.0, emptyList(), emptyList(), beatsUntilMs = 150_000)))
+    }
+
+    @Test fun theLastBeatIsReadFromTheProfile() {
+        val body = kotlinx.serialization.json.Json.parseToJsonElement(
+            """{"schema_version":1,"profiles":[{"track_id":"x","ref_lufs":-9.0,"start_ramp":"","end_ramp":"","beats_until_ms":201234.5}]}""",
+        ) as JsonObject
+        assertEquals(201_234L, PluginProfiles.parse(body).single().beatsUntilMs)
+    }
+
+    @Test fun aDjBlendWithABeatlessEndRunsTheWholeCrossfadeLength() {
+        // 0.52.0-dev, 16:51: a beat-driven outro (not steady enough to match) into a beatless intro got 3.3 s with
+        // 30 s set. In a DJ blend nothing can clash, so it runs the whole length; the next song fades in over half.
+        val out = BeatEnd(bpm = 124.6, beatMs = 230_000.0, barMs = null, rhythm = 0.85f, steady = 0.2f)
+        val inn = BeatEnd(bpm = 130.8, beatMs = 500.0, barMs = null, rhythm = 0.0f, steady = 0.0f)
+        val current = TrackProfile("a1", -10.0, listOf(RampPoint(-18, 0)), listOf(RampPoint(-18, 3_000)), outro = out)
+        val next = TrackProfile("b1", -10.0, listOf(RampPoint(-18, 300)), emptyList(), intro = inn)
+        val dj = Crossfade.plan(CrossfadeMode.SMART, 30_000, a1, b1, minutes4, minutes4, current, next, beatMatch = true)!!
+        assertEquals(30_000L, dj.overlapMs)
+        assertEquals(15_000L, dj.fadeInMs)
+        assertTrue(dj.why, dj.why.contains("nothing to clash"))
+        // Outside DJ blends it follows the songs' shapes as before.
+        assertEquals(3_300L, Crossfade.plan(CrossfadeMode.SMART, 30_000, a1, b1, minutes4, minutes4, current, next)!!.overlapMs)
+        // Two beats that can't be matched still get a short blend.
+        val beaty = next.copy(intro = inn.copy(rhythm = 0.9f))
+        assertEquals(BeatMatch.CLASH_MS, Crossfade.plan(CrossfadeMode.SMART, 30_000, a1, b1, minutes4, minutes4, current, beaty, beatMatch = true)!!.overlapMs)
+    }
+
+    @Test fun aDjBlendWithABeatJustShortOfBeatDrivenStaysShort() {
+        // 0.52.0-dev: Jon Hopkins (George Fitzgerald remix), outro read beat 0.46 steady 0.16, into Cubicolor
+        // (beat 0.87) got the whole 30 s, out of step. It has a beat, just not a steady one: a short blend.
+        val out = BeatEnd(bpm = 123.2, beatMs = 300_000.0, barMs = null, rhythm = 0.46f, steady = 0.16f)
+        val inn = BeatEnd(bpm = 121.0, beatMs = 500.0, barMs = 500.0, rhythm = 0.87f, steady = 0.88f)
+        val current = TrackProfile("a1", -10.0, listOf(RampPoint(-18, 0)), listOf(RampPoint(-18, 2_000)), outro = out)
+        val next = TrackProfile("b1", -10.0, listOf(RampPoint(-18, 0)), emptyList(), intro = inn)
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 30_000, a1, b1, minutes4, minutes4, current, next, beatMatch = true)!!
+        assertEquals(BeatMatch.CLASH_MS, plan.overlapMs)
+        assertTrue(plan.why, plan.why.contains("both ends have some beat"))
+        // Truly beatless (0.10) and winding down: the whole length.
+        val ambient = current.copy(outro = out.copy(rhythm = 0.10f), endRamp = listOf(RampPoint(-18, 8_000)))
+        assertEquals(30_000L, Crossfade.plan(CrossfadeMode.SMART, 30_000, a1, b1, minutes4, minutes4, ambient, next, beatMatch = true)!!.overlapMs)
+    }
+
+    @Test fun aLoudBeatlessEndingGetsAShortBlendNotTheWholeLength() {
+        // 0.52.0-dev, morning drive: a song with no steady beat (0.10) but loud to its end (1.9 s tail) into a
+        // beat-driven intro got the whole 30 s, starting at 3:00 of 3:32, the next song's beat over the old song.
+        val out = BeatEnd(bpm = 161.1, beatMs = 200_000.0, barMs = null, rhythm = 0.10f, steady = 0.0f)
+        val inn = BeatEnd(bpm = 116.0, beatMs = 500.0, barMs = 500.0, rhythm = 0.65f, steady = 0.46f)
+        val current = TrackProfile("a1", -10.0, listOf(RampPoint(-18, 0)), listOf(RampPoint(-18, 1_900)), outro = out)
+        val next = TrackProfile("b1", -10.0, listOf(RampPoint(-18, 1_500)), emptyList(), intro = inn)
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 30_000, a1, b1, minutes4, minutes4, current, next, beatMatch = true)!!
+        assertEquals(Crossfade.BEATLESS_LOUD_MS, plan.overlapMs)
+        assertTrue(plan.why, plan.why.contains("still going, so a short blend"))
+        // Two beatless folk songs, loud at both ends (0.4 s each), got 15 s over each other: short too.
+        val folkOut = current.copy(outro = out.copy(rhythm = 0.19f), endRamp = listOf(RampPoint(-18, 400)))
+        val folkIn = next.copy(intro = inn.copy(rhythm = 0.23f, steady = 0.0f), startRamp = listOf(RampPoint(-18, 400)))
+        assertEquals(Crossfade.BEATLESS_LOUD_MS, Crossfade.plan(CrossfadeMode.SMART, 15_000, a1, b1, minutes4, minutes4, folkOut, folkIn, beatMatch = true)!!.overlapMs)
+    }
+
+    @Test fun whichBeatlessBlendsRunTheWholeLength() {
+        // A beatless intro under a song that has a beat: always.
+        assertTrue(Crossfade.beatlessRunsLong(outBeatless = false, inBeatless = true, tailMs = 0, headMs = 0))
+        // A beatless song going out: only when it winds down.
+        assertFalse(Crossfade.beatlessRunsLong(outBeatless = true, inBeatless = false, tailMs = 1_900, headMs = 1_500))
+        assertTrue(Crossfade.beatlessRunsLong(outBeatless = true, inBeatless = false, tailMs = 6_000, headMs = 0))
+        // Both beatless: when one of them is quiet there.
+        assertFalse(Crossfade.beatlessRunsLong(outBeatless = true, inBeatless = true, tailMs = 400, headMs = 400))
+        assertTrue(Crossfade.beatlessRunsLong(outBeatless = true, inBeatless = true, tailMs = 400, headMs = 7_000))
+    }
+
+    @Test fun aHardEndingIntoAHardHitIsAColdEnd() {
+        // Once played straight back to back; now the old song's last sound, a short pause, then the next song.
+        val plan = Crossfade.plan(CrossfadeMode.SMART, 8_000, a1, b1, minutes4, minutes4, profile("a1", 0, 100), profile("b1", 100, 0))!!
+        assertEquals(Crossfade.COLD_GAP_FAR_MS, plan.gapMs)
+        assertEquals(100L, plan.overlapMs)
     }
 
     @Test fun aHardHitStillFadesInBriefly() {

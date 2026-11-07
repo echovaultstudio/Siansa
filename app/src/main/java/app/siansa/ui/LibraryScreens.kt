@@ -108,6 +108,22 @@ import app.siansa.data.favouriteArtistList
 import app.siansa.data.Artist
 import app.siansa.data.PickUps
 
+/**
+ * The liked songs, as the Liked songs page shows them (and the TV app, issue #860): Navidrome's list, as the library has
+ * them, or the library's own when Navidrome can't be reached. Songs liked just now are at the top even before Navidrome
+ * lists them, unliked ones are gone, and the rest are newest liked first.
+ */
+suspend fun likedSongs(graph: app.siansa.AppGraph): List<Song> =
+    runCatching { graph.source.starredSongs() }
+        .map { list ->
+            val local = graph.library.songs(list.map { it.id }).associateBy { it.id }
+            graph.library.keepSyncedSongs(list.map { local[it.id] ?: it }, "Liked songs")
+        }
+        .getOrElse { if (graph.library.isSynced) graph.library.starredSongs() else throw it }
+        .let { graph.favorites.mergeLiked(it) }
+        // Songs liked just now (no date from Navidrome yet) at the very top.
+        .sortedByDescending { isoMillis(SongDatesCache[it.id]?.starred) ?: Long.MAX_VALUE }
+
 /** Songs with a heart, newest first as Navidrome lists them. */
 @Composable
 fun LikedScreen(nav: NavController) {
@@ -117,18 +133,7 @@ fun LikedScreen(nav: NavController) {
     val saved by graph.favorites.saved.collectAsStateWithLifecycle()
     var sort by remember { mutableStateOf(graph.listSort.get("liked")) }
     val heard by loadState("heard-at" to saved) { lastHeard(graph) }
-    val loaded by loadState(changes to saved) {
-        runCatching { graph.source.starredSongs() }
-            .map { list ->
-                val local = graph.library.songs(list.map { it.id }).associateBy { it.id }
-                graph.library.keepSyncedSongs(list.map { local[it.id] ?: it }, "Liked songs")
-            }
-            .getOrElse { if (graph.library.isSynced) graph.library.starredSongs() else throw it }
-            // Songs liked just now show at the top even before Navidrome lists them; unliked ones go.
-            .let { graph.favorites.mergeLiked(it) }
-            // Newest liked first; songs liked just now (no date from Navidrome yet) at the very top.
-            .sortedByDescending { isoMillis(SongDatesCache[it.id]?.starred) ?: Long.MAX_VALUE }
-    }
+    val loaded by loadState(changes to saved) { likedSongs(graph) }
     val songs = when (val l = loaded) {
         is Load.Ok -> Load.Ok(sortSongs(l.value, sort, { it }, { SongDatesCache[it] }, { heard.valueOrNull()?.get(it) }))
         else -> l
@@ -278,7 +283,7 @@ fun SyncPrompt(nav: NavController) {
     ) {
         Text("Your library isn't on the phone yet", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         Text(
-            "Sync it once to browse albums and artists. You choose which libraries on your server to include (Settings › Servers and services, under your server).",
+            "Sync it once to browse albums and artists. You choose which libraries on your server to include (Settings › Connections, under your server).",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -349,16 +354,15 @@ fun AlbumScreen(nav: NavController, id: String) {
                     artistCover.valueOrNull(),
                     d.album.artistId?.let { artistId -> { openArtists { artistsNamedBy(graph, artistId, d.album.artist) } } },
                     albumHeadline(d.album, fromServer?.info ?: d.info),
+                    // Where Play carries on, in the details line (the owner, 7 Nov).
+                    note = pick?.let { "Continue from ${PickUps.trackLabel(d.songs, it.continueIndex)}" },
                 )
-                if (pick != null) {
-                    ContinueButton(PickUps.trackLabel(d.songs, pick.continueIndex)) {
-                        AppLog.i("Album", "Continue from ${pick.continueIndex + 1} of ${d.songs.size}")
-                        graph.player.play(d.songs, pick.continueIndex)
-                    }
-                }
             }
         },
         lastPlayed = pick?.let { it.lastIndex to "Last played · ${PickUps.whenLabel(it.at)}" },
+        // The album's own bar, and Play continuing where you stopped (issue #965; was "Continue from", #367).
+        albumBar = true,
+        resume = d?.let { album -> pick?.let { PlayResume(it.continueIndex, PickUps.trackLabel(album.songs, it.continueIndex)) } },
         offline = d?.album?.offlineItem(),
         // A heart for favourite albums, starred in Navidrome (issue #275).
         actions = { d?.album?.let { FavouriteAlbumButton(it) } },

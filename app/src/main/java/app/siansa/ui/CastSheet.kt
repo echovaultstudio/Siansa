@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -48,7 +50,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.mediarouter.media.MediaRouter
 import app.siansa.playback.Cast
+import com.google.android.gms.cast.CastDevice
 import app.siansa.playback.AudioOutput
+import app.siansa.playback.CastQuality
+import app.siansa.playback.CastSettings
 import app.siansa.playback.CastStatus
 import app.siansa.playback.OutputDevice
 import app.siansa.playback.dlna.Dlna
@@ -58,6 +63,7 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 
@@ -152,14 +158,30 @@ fun CastDeviceButton(tint: Color, modifier: Modifier = Modifier) {
     if (open) CastSheet(onDismiss = { open = false })
 }
 
-private class CastTarget(val route: MediaRouter.RouteInfo, val name: String, val detail: String?, val selected: Boolean, val icon: ImageVector)
+private class CastTarget(val route: MediaRouter.RouteInfo, val name: String, val detail: String, val selected: Boolean, val icon: ImageVector)
+
+/** What a Cast device in Play on is, for the line under its name (issue #114). */
+internal enum class CastKind(val detail: String) {
+    Tv("Chromecast"),
+    Speaker("Chromecast · speaker"),
+    Group("Chromecast · speaker group");
+
+    companion object {
+        /** A speaker group; a speaker (by the route, or sound but no picture); else a TV or Chromecast. */
+        fun of(group: Boolean, speakerRoute: Boolean, audioOnly: Boolean): CastKind = when {
+            group -> Group
+            speakerRoute || audioOnly -> Speaker
+            else -> Tv
+        }
+    }
+}
 
 /**
  * Lists the phone, every Cast device and every DLNA TV or speaker on the Wi-Fi; tapping one moves the
  * music there.
  */
 @Composable
-private fun CastSheet(onDismiss: () -> Unit) {
+internal fun CastSheet(onDismiss: () -> Unit) {
     val context = LocalContext.current
     val router = remember { MediaRouter.getInstance(context) }
     val status by Cast.status.collectAsStateWithLifecycle()
@@ -169,10 +191,13 @@ private fun CastSheet(onDismiss: () -> Unit) {
     val dlnaConnecting by Dlna.connecting.collectAsStateWithLifecycle()
     // The DLNA device whose settings are open (the cog beside it).
     var settingsOf by remember { mutableStateOf<DlnaDevice?>(null) }
+    // The Chromecast whose cog was tapped: its settings are shared by every Chromecast.
+    var castSettingsOf by remember { mutableStateOf<String?>(null) }
 
     // DLNA devices are searched for only while the sheet is open.
     DisposableEffect(Unit) {
         Dlna.startSearch(context)
+        CastSettings.load(context)
         onDispose { Dlna.stopSearch() }
     }
 
@@ -182,12 +207,20 @@ private fun CastSheet(onDismiss: () -> Unit) {
             targets = router.routes
                 .filter { !it.isDefault && !it.isBluetooth && it.isEnabled && it.matchesSelector(Cast.selector) }
                 .map { route ->
+                    val device = CastDevice.getFromBundle(route.extras)
+                    val kind = CastKind.of(
+                        group = device?.hasCapability(CastDevice.CAPABILITY_MULTIZONE_GROUP) == true,
+                        speakerRoute = route.deviceType == MediaRouter.RouteInfo.DEVICE_TYPE_SPEAKER,
+                        audioOnly = device != null && device.hasCapability(CastDevice.CAPABILITY_AUDIO_OUT) && !device.hasCapability(CastDevice.CAPABILITY_VIDEO_OUT),
+                    )
                     CastTarget(
                         route = route,
-                        name = route.name,
-                        detail = route.description?.takeIf { it.isNotBlank() },
+                        // The device's own name ("SHIELD"); never the route's description, which is what the TV is
+                        // showing ("Casting: Run Away") or its model ("SHIELD Android TV").
+                        name = device?.friendlyName?.takeIf { it.isNotBlank() } ?: route.name,
+                        detail = kind.detail,
                         selected = route.isSelected,
-                        icon = if (route.deviceType == MediaRouter.RouteInfo.DEVICE_TYPE_SPEAKER) Icons.Rounded.Speaker else Icons.Rounded.Tv,
+                        icon = if (kind == CastKind.Tv) Icons.Rounded.Tv else Icons.Rounded.Speaker,
                     )
                 }
         }
@@ -219,8 +252,14 @@ private fun CastSheet(onDismiss: () -> Unit) {
             }
             targets.forEach { target ->
                 val connecting = status.connecting && target.selected
-                TargetRow(target.icon, target.name, if (connecting) "Connecting…" else target.detail ?: "Chromecast", selected = target.selected && !connecting && dlna == null) {
-                    if (!target.selected) target.route.select()
+                TargetRow(
+                    target.icon,
+                    target.name,
+                    if (connecting) "Connecting…" else target.detail,
+                    selected = target.selected && !connecting && dlna == null,
+                    onSettings = { castSettingsOf = target.name },
+                ) {
+                    if (!target.selected) Cast.select(target.route)
                     onDismiss()
                 }
             }
@@ -250,7 +289,7 @@ private fun CastSheet(onDismiss: () -> Unit) {
                 }
             }
             Text(
-                "TVs and speakers show up when they're on the same Wi-Fi as this phone: Chromecast and Google TV, and DLNA ones (most smart TVs, Sonos, AV receivers). They play straight from your server, as MP3 320 kbit/s. A DLNA one can get your original files instead: tap the cog beside it.",
+                "TVs and speakers show up when they're on the same Wi-Fi as this phone: Chromecast and Google TV, and DLNA ones (most smart TVs, Sonos, AV receivers). They play straight from your server. Tap the cog beside one for its settings.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Space.Section, vertical = Space.Medium),
@@ -258,6 +297,65 @@ private fun CastSheet(onDismiss: () -> Unit) {
         }
     }
     settingsOf?.let { device -> DlnaDeviceSettings(device) { settingsOf = null } }
+    castSettingsOf?.let { name -> ChromecastSettings(name) { castSettingsOf = null } }
+}
+
+/** The Chromecast settings (the cog beside a Chromecast in Play on, issue #114), shared by every Chromecast. */
+@Composable
+private fun ChromecastSettings(name: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        text = { Column(Modifier.verticalScroll(rememberScrollState())) { ChromecastSettingsContent() } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+    )
+}
+
+/** What the Chromecast settings show, in their own function so the screenshot tests can draw them. */
+@Composable
+internal fun ChromecastSettingsContent() {
+    val quality by CastSettings.quality.collectAsStateWithLifecycle()
+    Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+        Text("Sound quality", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        CastQuality.entries.forEach { option ->
+            SettingChoice(
+                label = option.label,
+                detail = when (option) {
+                    CastQuality.Lossless -> "Your music as it is. Files the TV can't play, such as Apple Lossless, are turned into FLAC by your server, the rest into Opus."
+                    CastQuality.Opus -> "Everything as Opus 320. Uses less Wi-Fi."
+                    CastQuality.Mp3 -> "Everything as MP3 320, for older TVs and speakers that can't play Opus."
+                },
+                selected = quality == option,
+                tag = "castQuality-${option.key}",
+            ) { CastSettings.setQuality(option) }
+        }
+        Text(
+            "For every Chromecast. Applies to music you start playing after this.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** One choice of a setting: a radio button, its name and a line on what it does. */
+@Composable
+private fun SettingChoice(label: String, detail: String, selected: Boolean, tag: String, onPick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(Space.Small))
+            .clickable(onClick = onPick).testTag(tag),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+    ) {
+        RadioButton(selected = selected, onClick = onPick)
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 /**
@@ -292,7 +390,7 @@ internal fun DlnaSettingsContent(device: DlnaDevice) {
         }
         Text(
             if (possible) {
-                "Plays your music as it is (for example FLAC) instead of MP3 320, when it can play that format. " +
+                "Plays your music as it is (for example FLAC) instead of converted (Opus or MP3 320), when it can play that format. " +
                     "Better sound, and songs follow without even a tiny gap. Uses more Wi-Fi. Changes from the next song."
             } else {
                 "It didn't say it plays anything but MP3, so it gets MP3 320."

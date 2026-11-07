@@ -9,6 +9,9 @@ All work goes on the `mixer` branch until v1.0: the new audio engine (#826), eve
 from `mixer` and open pull requests against `mixer`, not `main` (the owner decided, 0.52.0-dev). Each push to
 `mixer` builds Siansa Dev (`.github/workflows/dev-app.yml`) for the owner to test. `main` stays at 0.51.x with
 releases held (`.release-hold`); at v1.0 `mixer` goes to `main` in one pull request, the engine on for everyone.
+v1.0 keeps Siansa's own look: Siansa Dev's purple icon and name live only in `app/src/dev/` and never reach the
+normal app, and anything shared by both builds (such as the Cast TV screen, `cast-receiver/`) uses main's black, frost
+and amber colours and icon.
 A pull request against `mixer` doesn't close its issue on merge (GitHub only does that on `main`): leave the issue
 open with a comment that the fix is in Siansa Dev; it closes when v1.0 reaches `main`. Only an urgent fix for the
 released app goes to `main`, and only when the owner asks.
@@ -18,6 +21,11 @@ released app goes to `main`, and only when the owner asks.
 - Build and test before opening a pull request: `gradle :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:assembleRelease :app:bundleRelease`.
   Lint errors fail the build.
 - Add or update unit tests in `app/src/test/` for any logic you change.
+- Siansa plays from Navidrome, Emby and Jellyfin. Test anything that takes a server's addresses or answers (the
+  player, downloads, the song cache, covers, scrobbling) on all three with `EveryServer.all`
+  (`app/src/test/java/app/siansa/servers/`), and don't read a song from `?id=` alone: use `streamSongId` (issue #903).
+  The Servers workflow (`.github/workflows/servers.yml`) runs `RealServersTest` against real Navidrome, Emby and
+  Jellyfin with the test library in `scripts/servers/`: add a check there for anything new the app asks of a server.
 - Add a note file in `changelog.d/` (e.g. `changelog.d/issue-42.md`, see its README) with `### Fixed` /
   `### Added` / `### Changed`, written for the app's user in plain words. Don't edit `CHANGELOG.md` or
   `version.txt`: the release does that, so pull requests never conflict over them. Use `### Added` only for

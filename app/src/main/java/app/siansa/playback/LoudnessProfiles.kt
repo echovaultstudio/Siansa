@@ -42,6 +42,13 @@ data class BeatEnd(
     val steady: Float,
     val phraseMs: Double? = null,
     val phraseBars: Int? = null,
+    /** The bars or phrases weren't measured but assumed from the song's grid (issue #820, [BeatMatch.assumedGrid]). */
+    val assumed: Boolean = false,
+    /**
+     * Taken as a track made on a grid ([BeatMatch.gridded]): its tempo, read within a little of a whole number, is
+     * that number, and its beat counts as steady though the plugin's reading of it wandered a little.
+     */
+    val grid: Boolean = false,
 ) {
     val beatLengthMs: Double get() = 60_000.0 / bpm
 
@@ -49,13 +56,13 @@ data class BeatEnd(
     val phraseLengthMs: Double? get() = phraseBars?.let { it * BeatMatch.BEATS_PER_BAR * beatLengthMs }
 
     /** A beat-driven, steady end: one a blend can be laid on, beat for beat. */
-    val matchable: Boolean get() = bpm > 0 && rhythm >= BeatMatch.MIN_RHYTHM && steady >= BeatMatch.MIN_STEADY
+    val matchable: Boolean get() = bpm > 0 && rhythm >= BeatMatch.MIN_RHYTHM && (steady >= BeatMatch.MIN_STEADY || grid)
 
     /**
      * As the start of the next song (issue #759): a quiet build-up that keeps a steady beat with clear bars can be
      * laid on the old song's beats too, so when its drums come in they're in step; it needn't be beat-driven yet.
      */
-    val matchableAsIntro: Boolean get() = matchable || (bpm > 0 && steady >= BeatMatch.MIN_STEADY && barMs != null)
+    val matchableAsIntro: Boolean get() = matchable || (bpm > 0 && (steady >= BeatMatch.MIN_STEADY || grid) && barMs != null)
 
     /**
      * The same grid counted the way a DJ counts (issue #807): a tempo the plugin read at half time (drum and bass at
@@ -72,9 +79,11 @@ data class BeatEnd(
     }
 
     /** For the log (issue #744): "128.0 BPM, beat 0.82, steady 0.91, bars found". */
-    fun describe(): String = "%.1f BPM, beat %.2f, steady %.2f, %s".format(
-        java.util.Locale.ROOT, bpm, rhythm, steady,
+    fun describe(): String = "%.1f BPM%s, beat %.2f, steady %.2f, %s".format(
+        java.util.Locale.ROOT, bpm, if (grid) " (taken as a grid's)" else "", rhythm, steady,
         when {
+            assumed && phraseBars != null -> "bars and $phraseBars-bar phrases assumed from the first beat"
+            assumed -> "bars assumed from the first beat"
             phraseBars != null -> "$phraseBars-bar phrases found"
             barMs != null -> "bars found, no phrases"
             else -> "no bars found"
@@ -100,6 +109,11 @@ data class TrackProfile(
     val intro: BeatEnd? = null,
     /** The beat grid at the end. */
     val outro: BeatEnd? = null,
+    /**
+     * Where the beat stops, well before the end (ms from the start: the last beat), when the song ends in a beatless
+     * outro (plugin 0.5.0); null when it beats to the end, has no beat, or wasn't measured for it.
+     */
+    val beatsUntilMs: Long? = null,
 ) {
     /** How long after the start the song first gets up to [db] (relative), or null if it never does. */
     fun reachesAfterMs(db: Int): Long? = startRamp.firstOrNull { it.db >= db }?.ms
@@ -184,6 +198,7 @@ object PluginProfiles {
             durationMs = p.int("duration_ms")?.toLong() ?: 0,
             intro = beatEnd(p, "intro"),
             outro = beatEnd(p, "outro"),
+            beatsUntilMs = p.dbl("beats_until_ms")?.takeIf { it.isFinite() && it > 0 }?.toLong(),
         )
     }
 

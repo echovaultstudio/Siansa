@@ -63,7 +63,7 @@ const val SMALL_COVER = 300
  *   animates that; everything else uses a still made from its first frame;
  * - big GIF: animates Navidrome's 300 px version, which it can convert, and never asks for bigger sizes;
  * - remembers the outcome across app starts.
- * Like Symfonium, covers only move on the album page and in now playing; lists show still frames.
+ * Covers only move on the album page and in now playing; lists show still frames.
  */
 object AnimatedCovers {
     private const val MAX_ORIGINAL_BYTES = 3L * 1024 * 1024
@@ -121,7 +121,7 @@ object AnimatedCovers {
             Kind.Local -> "local"
             is Kind.Animated -> if (kind.size == 0) "local" else "anim:${kind.size}"
         }
-        prefs(graph).edit().putString(id, text).apply()
+        app.siansa.data.QuietWrites.save(prefs(graph)) { putString(id, text) }
     }
 
     /** What kind of cover this album has, or null when it couldn't be checked (try again later). */

@@ -27,6 +27,16 @@ android {
         versionCode = buildNumber
         versionName = appVersion
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // The new audio engine (issue #826): one output all players are mixed into. On for everyone from v1.0.
+        buildConfigField("boolean", "MIXER_ENGINE", "true")
+        // The TV app (issue #860, the tv module) builds the same code with this on; the phone app never does.
+        buildConfigField("boolean", "TV_APP", "false")
+        // Siansa's own TV screen while casting (issue #114, cast-receiver/): its Cast app id from the Google Cast
+        // console, from CAST_RECEIVER_ID (CI fills it from the repository variable) or siansa.castReceiverId in
+        // gradle.properties (for builds from source, such as F-Droid's). Empty: Google's standard TV screen.
+        val castReceiverId = (System.getenv("CAST_RECEIVER_ID")?.takeIf { it.isNotBlank() }
+            ?: providers.gradleProperty("siansa.castReceiverId").orNull).orEmpty().filter { it.isLetterOrDigit() }
+        buildConfigField("String", "CAST_RECEIVER_ID", "\"$castReceiverId\"")
     }
 
     // The release key comes from outside the repository (public since #584): SIANSA_KEYSTORE (a path),
@@ -103,6 +113,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     // Lint errors fail the build (CI shows each with its file and line); warnings are reported only.
@@ -140,6 +151,8 @@ dependencies {
 
     // Media3 stays on the version the FFmpeg decoder below is built for (Jellyfin's build); update both together.
     implementation("androidx.media3:media3-exoplayer:1.9.0")
+    // HLS radio streams (issue #353), the same Media3 version as the rest.
+    implementation("androidx.media3:media3-exoplayer-hls:1.9.0")
     implementation("androidx.media3:media3-session:1.9.0")
     implementation("androidx.media3:media3-datasource-okhttp:1.9.0")
     implementation("androidx.media3:media3-database:1.9.0")

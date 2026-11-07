@@ -83,7 +83,7 @@ fun VibesScreen(nav: NavController) {
     LaunchedEffect(Unit) { graph.selectors.all() }
 
     Screen(
-        title = "Mixes and vibes",
+        title = "Auto Generated Mixes",
         nav = nav,
         actions = {
             IconButton(onClick = { nav.navigate("selector/new") }) { Icon(Icons.Rounded.Add, "Add vibe") }
@@ -361,7 +361,7 @@ fun SelectorEditor(nav: NavController, id: String) {
                 .padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
-            OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth().keyboardOnTvFocus())
             // Days (issue #348): none picked means every day.
             Text("Days", style = MaterialTheme.typography.bodyLarge)
             DayChips(days, onAllWeek = { days = emptySet() }) { day -> days = if (day in days) days - day else days + day }
@@ -373,14 +373,14 @@ fun SelectorEditor(nav: NavController, id: String) {
                     label = { Text("From hour") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).keyboardOnTvFocus(),
                 )
                 OutlinedTextField(
                     end, { end = it.filter(Char::isDigit).take(2) },
                     label = { Text("To hour") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).keyboardOnTvFocus(),
                 )
             }
             if (!anyTime) Hint("Hours are 0–23. A vibe from 22 to 5 runs past midnight.")
@@ -389,20 +389,20 @@ fun SelectorEditor(nav: NavController, id: String) {
                 guidance, { guidance = it },
                 label = { Text("Guidance for the AI") },
                 minLines = 2,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().keyboardOnTvFocus(),
             )
             Hint("How this time of day should feel. The AI writes a title and a sound search from it.")
             OutlinedTextField(
                 baseQuery, { baseQuery = it },
                 label = { Text("Fallback sound search") },
                 minLines = 2,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().keyboardOnTvFocus(),
             )
             Hint("Used when AI is off or unavailable, e.g. \"calm atmospheric night music, soft and slow\".")
             OutlinedTextField(
                 avoid, { avoid = it },
                 label = { Text("Never use these words") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().keyboardOnTvFocus(),
             )
             Hint("Comma separated. An AI answer containing one is thrown away.")
             Text("Mix length: ${length.roundToInt()} tracks", style = MaterialTheme.typography.bodyLarge)
@@ -412,7 +412,7 @@ fun SelectorEditor(nav: NavController, id: String) {
                 label = { Text("Don't repeat songs played in the last … days") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().keyboardOnTvFocus(),
             )
             // Less of what you always hear (issue #236).
             Text(

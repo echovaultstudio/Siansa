@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The TV app's name (issue #860); app_name stays the phone app's, which this app's code shares. -->
+    <string name="tv_app_name">Siansa</string>
+</resources>

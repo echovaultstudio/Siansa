@@ -17,8 +17,8 @@ or days; and while it runs, AudioMuse-AI doesn't start its own jobs (analysis, c
 is what the rounds leave a gap for. **Stop now** ends any run that's measuring songs after the song it's on, and
 turns Measure all off. Without Measure all, the tick measures one batch in at most 4 minutes.
 
-The **tick** is a scheduled task (`plugin.siansa_analysis.tick`, every 15 minutes, set up when the plugin is
-installed). Change or switch it off under Administration › Scheduled Tasks. The settings page (Plugins ›
+The **tick** is the plugin's only scheduled task (`plugin.siansa_analysis.tick`, every 15 minutes, set up when
+the plugin is installed; it needs no cron expression from you). Change or switch it off under Administration › Scheduled Tasks. The settings page (Plugins ›
 Siansa Analysis › Settings) shows the three sections, Library, Volume & fade profiles and Similar albums &
 artists, each with its own status, and buttons to measure or build now.
 

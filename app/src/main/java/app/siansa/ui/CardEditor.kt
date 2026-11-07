@@ -142,14 +142,14 @@ fun CardEditorScreen(nav: NavController, id: String) {
             }
 
             if (c.contents.fromBooks) {
-                if (!graph.settings.current.booksReady) Hint("Needs Audiobookshelf, set up in Settings › Servers and services.")
+                if (!graph.settings.current.booksReady) Hint("Needs Audiobookshelf, set up in Settings › Connections.")
                 EditorHeading("Order")
                 ChipRow(BOOK_SORTS, c.sort, { it.label }, "sort") { change(c.copy(sort = it)) }
                 NumberField("How many, at most", c.size.toString(), Modifier.fillMaxWidth().testTag("cardSize")) { v ->
                     change(c.copy(size = v.toIntOrNull()?.coerceIn(0, MAX_SIZE) ?: 0))
                 }
             } else if (c.source == CardSource.SOUND && c.contents == CardContents.SONGS) {
-                if (!audioMuseReady) Hint("Needs AudioMuse-AI, set up in Settings › Servers and services.")
+                if (!audioMuseReady) Hint("Needs AudioMuse-AI, set up in Settings › Connections.")
                 OutlinedTextField(c.sound, { change(c.copy(sound = it)) }, label = { Text("The sound") }, placeholder = { Text("rainy jazz piano") }, modifier = Modifier.fillMaxWidth().testTag("pinnedSound"))
             } else {
                 EditorHeading("Rules")

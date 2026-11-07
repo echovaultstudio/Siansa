@@ -308,9 +308,19 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
         send("Load") {
             val (url, metadata) = streamFor(item)
             currentUrl = url
+            loadedAt = System.currentTimeMillis()
             // Some devices refuse a new song while one plays.
             if (stopFirst) runCatching { transport("Stop", "InstanceID" to "0") }
-            transport("SetAVTransportURI", "InstanceID" to "0", "CurrentURI" to url, "CurrentURIMetaData" to metadata)
+            try {
+                transport("SetAVTransportURI", "InstanceID" to "0", "CurrentURI" to url, "CurrentURIMetaData" to metadata)
+            } catch (e: Exception) {
+                // Refused as Opus: MP3 from now on, and this song again.
+                if (isOpus(url) && opusFailedNow("it refused the song (${e.message})")) {
+                    main.post { if (loadIndex == index) load(play) }
+                    return@send
+                }
+                throw e
+            }
             if (startAt > 1000) {
                 runCatching { transport("Seek", "InstanceID" to "0", "Unit" to "REL_TIME", "Target" to Upnp.time(startAt)) }
             }
@@ -326,13 +336,20 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
 
     /**
      * The address the device gets for [item] and its DIDL description: the original file when that's turned on
-     * for this device (the cog in the device list) and it lists the file's format, else MP3 320 (beta testers #23).
+     * for this device (the cog in the device list) and it lists the file's format (beta testers #23), else Opus 320 in
+     * Ogg when it lists Ogg or Opus and hasn't failed to play it, else MP3 320 (issue #114).
      */
     private suspend fun streamFor(item: MediaItem): Pair<String, String> {
         val song = item.toSong()
         val raw = api.streamUrl(item.mediaId)
         var url = Streaming.forCast(Uri.parse(raw)).toString()
         var mime = Streaming.CAST_MIME
+        val opus = Streaming.forCastOpus(Uri.parse(raw)).toString()
+        if (DlnaFormats.takesOpus(device.formats) && device.id !in Dlna.opusFailed && opus != raw) {
+            url = opus
+            mime = Streaming.CAST_OPUS_MIME
+            if (loggedOriginal.add("opus")) AppLog.i("DLNA", "${device.name} lists Ogg: songs that are converted go as Opus 320")
+        }
         if (device.id in Dlna.original.value) {
             val type = Dlna.originalType(item.mediaId, raw, song.suffix) { api.songDetails(item.mediaId).codec }
             if (type != null && DlnaFormats.accepts(device.formats, type)) {
@@ -345,6 +362,17 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
         }
         val cover = song.cover?.let { api.coverUrl(it, COVER_PX) }
         return url to Upnp.didl(item.mediaId, song.title, song.artist, song.album, url, mime, song.durationSec, cover)
+    }
+
+    private var loadedAt = 0L
+
+    private fun isOpus(url: String?): Boolean = url != null && url.contains("format=opus")
+
+    /** The device can't play Opus: MP3 320 for it from now on (this app run). True the first time. */
+    private fun opusFailedNow(why: String): Boolean {
+        if (!Dlna.opusFailed.add(device.id)) return false
+        AppLog.w("DLNA", "${device.name} didn't play Opus ($why): MP3 320 from now on")
+        return true
     }
 
     /** Formats already logged, so each shows once. */
@@ -424,7 +452,13 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
                 relMs?.let { positionMs = it }
                 playingSince = 0
             }
-            "STOPPED", "NO_MEDIA_PRESENT" -> if (sawPlaying && playWhenReady) {
+            "STOPPED", "NO_MEDIA_PRESENT" -> if (!sawPlaying && playWhenReady && isOpus(currentUrl) &&
+                System.currentTimeMillis() - loadedAt > OPUS_START_MS && opusFailedNow("it stopped without playing the song")
+            ) {
+                // Never got going as Opus (a device whose Ogg is Vorbis only): MP3 from now on, and this song again.
+                load(play = true)
+                return
+            } else if (sawPlaying && playWhenReady) {
                 // The song ended on the device and it didn't move on by itself: on to the next one.
                 sawPlaying = false
                 if (sentNext != null) AppLog.i("DLNA", "${device.name} stopped instead of playing the next song it was given")
@@ -558,5 +592,7 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
     private companion object {
         const val COVER_PX = 800
         const val VOLUME_STEP = 5
+        /** A device that hasn't started an Opus song this long after getting it can't play Opus. */
+        const val OPUS_START_MS = 8_000L
     }
 }

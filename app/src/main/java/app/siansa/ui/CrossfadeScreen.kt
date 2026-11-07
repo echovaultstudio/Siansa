@@ -8,7 +8,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material.icons.rounded.MusicOff
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import app.siansa.log.AppLog
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -75,10 +78,10 @@ fun CrossfadeScreen(nav: NavController) {
             Hint(settings.loudnessSource.detail + ".")
             if (settings.loudnessSource == LoudnessSource.PLUGIN) {
                 if (!settings.audioMuseReady) {
-                    Hint("Set up AudioMuse in Settings › Servers and services first. Until then, song tags are used.")
+                    Hint("Set up AudioMuse in Settings › Connections first. Until then, song tags are used.")
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                        OutlinedButton(onClick = {
+                        OutlinedButton(modifier = Modifier.focusRing(), onClick = {
                             test = "Testing…"
                             scope.launch {
                                 val result = graph.profiles.check()
@@ -99,6 +102,20 @@ fun CrossfadeScreen(nav: NavController) {
             }
             LevellingNow(settings)
             HorizontalDivider()
+            // Dolby songs go to the receiver unchanged, so levelling can't reach them (issue #930).
+            if (app.siansa.BuildConfig.TV_APP && settings.audioPassthrough != app.siansa.playback.PassthroughMode.OFF) {
+                val louder = settings.dolbyLouderDb
+                FoldSection("Dolby songs on your receiver", if (louder == 0) "As they are" else "+$louder dB", tag = "dolby-louder") {
+                    DolbyLouderRow(louder, graph.settings::setDolbyLouder)
+                    Hint(
+                        "Dolby Atmos and Dolby Digital Plus songs go to your receiver as they are, and most play quieter than other " +
+                            "music at the same volume. Raise them until they match: the receiver plays them louder, the sound itself " +
+                            "isn't changed. A song can't go past the receiver's full level, so some get less. Not for Dolby TrueHD, " +
+                            "DTS or plain Dolby Digital.",
+                    )
+                }
+                HorizontalDivider()
+            }
             // The sections below fold (issue #776): their heading and what's set show; tap to open.
             val levellingSummary = if (settings.replayGain == ReplayGainMode.OFF) "Off" else "${settings.replayGain.label} · −${-settings.loudnessTarget} LUFS"
             FoldSection("Levelling", levellingSummary) {
@@ -120,14 +137,19 @@ fun CrossfadeScreen(nav: NavController) {
                     CrossfadeLengthRow(settings.crossfadeSeconds, smart = settings.crossfade == CrossfadeMode.SMART) {
                         graph.settings.setCrossfade(seconds = it)
                     }
-                    Hint("Only on this phone: on a TV or speaker, songs play back to back. Not used with Repeat one, or while the sleep timer lets a song finish.")
+                    crossfadeLengthHint(settings)?.let { Hint(it) }
+                    Hint(
+                        // The TV app plays on the TV itself and has no sleep timer (issue #860).
+                        if (app.siansa.BuildConfig.TV_APP) "Not used with Repeat one, or for Dolby and DTS songs sent to your receiver."
+                        else "Only on this phone: on a TV or speaker, songs play back to back. Not used with Repeat one, or while the sleep timer lets a song finish.",
+                    )
                 }
             }
             if (settings.crossfade == CrossfadeMode.SMART && settings.loudnessSource == LoudnessSource.PLUGIN) {
                 HorizontalDivider()
                 val blendSummary = if (settings.beatMatch == BeatMatchMode.OFF) "Off" else "${settings.beatMatch.label} · ${settings.blendBars} bars" +
-                    (if (settings.bassSwap) " · bass swap" else "") + (if (settings.echoTail) " · echo" else "")
-                FoldSection("Beat-matched blends (experimental)", blendSummary, tag = "beat-matched-blends") {
+                    (if (settings.bassSwap) " · bass swap" else "") + (if (AppSettings.BLEND_EXTRAS && settings.echoTail) " · echo" else "")
+                FoldSection("Beat-matched blends", blendSummary, tag = "beat-matched-blends") {
                     BeatMatchSection(
                         settings.beatMatch, settings.blendBars, settings.echoTail, settings.bassSwap, settings.keepKey,
                         graph.settings::setBeatMatch, graph.settings::setBlendBars, graph.settings::setEchoTail, graph.settings::setBassSwap,
@@ -135,6 +157,8 @@ fun CrossfadeScreen(nav: NavController) {
                     )
                 }
             }
+            HorizontalDivider()
+            MixingDocsLink()
         }
     }
 }
@@ -147,6 +171,15 @@ private fun levellingHint(s: AppSettings): String = when {
         "Each song is levelled one way only: by the plugin's measurement, or by its ReplayGain tags until the plugin has measured it."
     else -> "Uses the songs' ReplayGain tags (${s.replayGain.label.lowercase()})."
 }
+
+/**
+ * What the length means with Smart on: a ceiling, not the length of every fade (the owner, 0.52.0-dev: "do we still
+ * need the fade length?"). Null when the mode's own hint already says it.
+ */
+internal fun crossfadeLengthHint(s: AppSettings): String? =
+    if (s.crossfade != CrossfadeMode.SMART || s.loudnessSource != LoudnessSource.PLUGIN) null
+    else "The longest a fade can be. Most are shorter: the songs decide. The full length is used for songs not measured yet" +
+        if (s.beatMatch != BeatMatchMode.OFF) " and for a quiet intro without a beat in DJ blends." else "."
 
 private fun crossfadeHint(s: AppSettings): String = when (s.crossfade) {
     CrossfadeMode.OFF -> "Songs play back to back, with no gap."
@@ -184,10 +217,12 @@ internal fun BeatMatchSection(
         Hint("Apart from the crossfade length: 8 bars is about 15 seconds at 128 BPM. A blend never takes more than a third of a song.")
         SwitchRow("Bass swap", bassSwap, onBassSwap)
         Hint("Over the first half of a blend the old song's bass is taken away as the new song's comes in, as a DJ does with the EQ, so two kick drums never play at once.")
-        SwitchRow("Echo at the end", echo, onEcho)
-        Hint("Over the last bar of a blend the old song rings out in a hall, as a DJ echoes a track out, so the join is softer. Phones without the effect play the blend plain.")
-        SwitchRow("Keep the key", keepKey, onKeepKey)
-        Hint("The next song plays a touch faster or slower to match. Off, its pitch moves with it, like a DJ's pitch fader: at most two thirds of a semitone. On, the key is kept by stretching the sound instead, which can stutter on drums.")
+        if (AppSettings.BLEND_EXTRAS) {
+            SwitchRow("Echo at the end", echo, onEcho)
+            Hint("Over the last bar of a blend the old song's last beats repeat on the beat and die away, as a DJ echoes a track out.")
+            SwitchRow("Keep the key", keepKey, onKeepKey)
+            Hint("The next song plays a touch faster or slower to match. Off, its pitch moves with it, like a DJ's pitch fader. On, its key is kept by stretching the sound.")
+        }
     }
 }
 
@@ -222,6 +257,16 @@ private fun LoudnessTargetRow(selected: Int, onPick: (Int) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         Levelling.TARGETS.sorted().forEach { target ->
             FilterChip(selected = selected == target, onClick = { onPick(target) }, label = { Text("−${-target} LUFS") })
+        }
+    }
+}
+
+/** How much louder Dolby songs play on the receiver (issue #930). */
+@Composable
+private fun DolbyLouderRow(selected: Int, onPick: (Int) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        app.siansa.playback.DolbyLevel.CHOICES.forEach { db ->
+            FilterChip(selected = selected == db, onClick = { onPick(db) }, label = { Text(if (db == 0) "Off" else "+$db dB") })
         }
     }
 }
@@ -309,3 +354,24 @@ internal fun levellingNowText(title: String?, d: Levelling.Decision): Pair<andro
 }
 
 private const val LEVELLING_REFRESH_MS = 3_000L
+
+/** How mixing works, in the docs (issue #916): crossfades, smart crossfade and beat-matched blends, opened in the browser. */
+@Composable
+internal fun MixingDocsLink() {
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable { runCatching { uri.openUri(AboutLinks.MIXING) }.onFailure { AppLog.w("Settings", "Couldn't open the mixing docs: ${it.message}") } }
+            .padding(vertical = Space.Tight)
+            .testTag("mixingDocs"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.Medium),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Heading("How mixing works")
+            Hint("Crossfades, smart crossfade and DJ blends, in the docs")
+        }
+        Icon(Icons.AutoMirrored.Rounded.OpenInNew, "Opens in the browser", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}

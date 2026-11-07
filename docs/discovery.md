@@ -2,7 +2,8 @@
 
 ## Song radio
 
-Long-press a song (or use its menu) and pick **Start song radio**. The radio always starts with its song, then
+Long-press a song (or use its menu) and pick **Start a mix**, or slide from the play button in now playing (see
+[Playback](playback.md#now-playing-and-the-mini-player)). The radio always starts with its song, then
 adds songs that sound like it and share its mood. When only a few are left, it finds more, so it keeps going.
 Playing anything else ends the radio.
 
@@ -14,7 +15,7 @@ Playing anything else ends the radio.
 | **A little** (default) | Mostly like the first song, with a few steps away from it. |
 | **Wander** | Each new batch follows the song playing, so the radio drifts. |
 
-When you start a radio you can also pick **Steady** or **DJ** order (see Keep playing below).
+When you start a radio you pick **Steady** (the wave) or **DJ** (the turntable) order; Keep playing below says what each does.
 
 ### Shape the mix
 
@@ -38,8 +39,8 @@ stray further.
 
 **Surprises** (None, A few, Some, Lots): at None every song is a close neighbour of the last in tempo and how
 alike it is; the further right, the further a song may stray, though its key still has to go with the last
-song's, so a surprise still mixes in. The shape and surprises also apply to Keep playing in DJ mode, and are kept
-in Settings. Energy and brightness come from AudioMuse-AI's analysis; a song it hasn't analysed counts as
+song's, so a surprise still mixes in. It starts at None. The shape and surprises also apply to Keep playing in DJ
+mode, and are kept in Settings; each new song radio starts again from Steady vibes with no surprises. Energy and brightness come from AudioMuse-AI's analysis; a song it hasn't analysed counts as
 middling.
 
 Without AudioMuse-AI, song radio uses Navidrome's similar songs, or Emby's Instant Mix.
@@ -60,6 +61,21 @@ queue.
 ## Similar songs, albums and artists
 
 From a song's menu: **Similar songs** and **Similar albums**. On an artist's page: **Fans also like**.
+
+On an album's page, the buttons under its details: **add to a playlist** (the plus) and **Download** on the left,
+**Similar albums** (with AudioMuse-AI), **Shuffle** and **Play** on the right.
+
+- **Play** carries on where you stopped, when you left the album part way: a ring round it shows how far you got,
+  and the details line says **Continue from 8**. Press and hold Play to start from the first song instead.
+- The **plus** adds the whole album to a playlist you pick.
+- **Shuffle** plays the album shuffled. With AudioMuse-AI, **slide right** from it all the way onto Play for a **DJ mix
+  of the album**: its own songs only, in an order that blends well (tempo and key, as a DJ mix orders them), played
+  with DJ blends. It picks among the orders that blend best, so it doesn't always start from the same song. Nothing
+  else is added, so the mix ends with the album.
+
+While you slide, the cover says **DJ mix**, as in now playing, and the rest of the page dims. Once your finger is on
+Play, it turns into a record and the phone clicks; letting go starts the mix. Play stays a turning record while the
+album's mix plays.
 
 - **Similar songs** come from the best source your setup has: Navidrome's sonic similarity (if the AudioMuse-AI
   Navidrome plugin is installed), else AudioMuse-AI directly, else Navidrome's similar songs (or Emby's Instant
@@ -98,6 +114,10 @@ match on a page of its own, with Play and Shuffle at the top for songs.
 One song from your library you've never played, at random. "Never played" means your server has no play for it
 and it isn't in Siansa's own history. With some music hidden or other users shown, it rolls only from what the
 source filter shows.
+
+Roll the dice is in Home's menu (the round button at the top of Home): tap it there, or slide down to it from the
+button. While the song is found, the dice tumbles in the menu button and lands on a new face when the song starts.
+With animations turned off on the phone, it only fades.
 
 ## Artists you might like
 

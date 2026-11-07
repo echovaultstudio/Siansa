@@ -54,8 +54,6 @@ import app.siansa.mix.audioMuseCheck
 import app.siansa.net.ApiException
 import app.siansa.net.AudioMuseApi
 import app.siansa.net.AudiobookshelfApi
-import app.siansa.net.SubsonicApi
-import app.siansa.net.EmbyApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.text.DateFormat
@@ -94,7 +92,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
         }
     }
 
-    fun save() {
+    fun saveNow() {
         try {
             // Only the connection fields come from this page; everything else keeps its current value.
             val d = draft
@@ -116,8 +114,21 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
         }
     }
 
+    fun save() {
+        // An API key is checked with the server first (issue #493).
+        scope.launch {
+            try {
+                draft = keyChecked(graph, draft, kind, graph.settings.current.takeIf { !firstRun })
+            } catch (e: ApiException) {
+                problem = e.message
+                return@launch
+            }
+            saveNow()
+        }
+    }
+
     Screen(
-        title = if (firstRun) "Connect your servers" else "Servers and services",
+        title = if (firstRun) "Connect your servers" else "Connections",
         nav = if (firstRun && !fromPicker) null else nav,
         actions = { IconButton(onClick = { save() }) { Icon(Icons.Rounded.Check, "Save") } },
     ) { padding ->
@@ -140,7 +151,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                 val context = LocalContext.current
                 val others = remember { Users.all(context).filter { it.id != Users.active && it.connected } }
                 others.forEach { user ->
-                    TextButton(onClick = { Users.switchTo(context, user.id) }) { Text("Switch back to ${user.label}") }
+                    TextButton(onClick = { Users.switchTo(context, user.id) }, modifier = Modifier.focusRing()) { Text("Switch back to ${user.label}") }
                 }
             }
 
@@ -149,18 +160,16 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
             Field("Server address", draft.navidromeUrl, if (kind.embyLike) "192.168.1.10:8096" else "192.168.1.10:4533") { draft = draft.copy(navidromeUrl = it) }
             Field("Username", draft.navidromeUser, keyboard = KeyboardType.Text) { draft = draft.copy(navidromeUser = it) }
             SecretField("Password", draft.navidromePassword) { draft = draft.copy(navidromePassword = it) }
+            if (!kind.embyLike) ApiKeyField(draft) { draft = it }
             if (showProxy) {
                 Hint("Only for a reverse proxy that asks for its own login before your server.")
                 Field("Proxy username", draft.proxyUser, keyboard = KeyboardType.Text) { draft = draft.copy(proxyUser = it) }
                 SecretField("Proxy password", draft.proxyPassword) { draft = draft.copy(proxyPassword = it) }
             } else {
-                TextButton(onClick = { showProxy = true }) { Text("Server behind a login page? Add a proxy login") }
+                TextButton(onClick = { showProxy = true }, modifier = Modifier.focusRing()) { Text("Server behind a login page? Add a proxy login") }
             }
             TestRow(navidromeTest) {
-                runTest({ navidromeTest = it }) { s ->
-                    val server = if (kind.embyLike) EmbyApi(graph.http, { s }, jellyfin = kind == SourceKind.JELLYFIN) else SubsonicApi(graph.http) { s }
-                    "Connected to " + server.ping()
-                }
+                runTest({ navidromeTest = it }) { s -> testServer(graph, s, kind) }
             }
             // Smart extras turned down on the first run (issue #113): only the server. They're here later in Settings.
             if (extras || !firstRun) {
@@ -185,7 +194,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
             }
 
             problem?.let { ErrorText(it, Modifier) }
-            Button(onClick = { save() }, modifier = Modifier.fillMaxWidth()) { Text("Save") }
+            Button(onClick = { save() }, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
         }
     }
 }
@@ -279,6 +288,12 @@ internal fun Field(
     keyboard: KeyboardType = KeyboardType.Uri,
     onChange: (String) -> Unit,
 ) {
+    // On the TV, Android's own text box, which a phone's keyboard can type into (issue #860).
+    if (app.siansa.BuildConfig.TV_APP) {
+        TvTextBox(value, onChange, label, Modifier.fillMaxWidth(), placeholder = placeholder,
+            kind = if (keyboard == KeyboardType.Uri) TvTextKind.ADDRESS else TvTextKind.TEXT)
+        return
+    }
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
@@ -292,6 +307,10 @@ internal fun Field(
 
 @Composable
 internal fun SecretField(label: String, value: String, onChange: (String) -> Unit) {
+    if (app.siansa.BuildConfig.TV_APP) {
+        TvTextBox(value, onChange, label, Modifier.fillMaxWidth(), kind = TvTextKind.SECRET)
+        return
+    }
     var visible by remember { mutableStateOf(false) }
     OutlinedTextField(
         value = value,
@@ -311,8 +330,9 @@ internal fun SecretField(label: String, value: String, onChange: (String) -> Uni
 
 @Composable
 internal fun TestRow(result: String?, onTest: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-        OutlinedButton(onClick = onTest) { Text("Test") }
+    // On the TV the whole row is what the remote stops on, so it isn't skipped (issue #978).
+    TvActionRow(onClick = onTest) { button ->
+        OutlinedButton(onClick = onTest, modifier = button) { Text("Test") }
         if (result != null) {
             Text(
                 result,

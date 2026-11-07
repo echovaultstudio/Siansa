@@ -7,6 +7,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -155,6 +157,28 @@ object Dlna {
         }
     }
 
+    /**
+     * Asks the TVs and speakers found before, once, whether they're there (a fraction of a second each), without a
+     * search: for Home's cast button, which shows only when something to play on is around. No multicast, nothing
+     * repeating, nothing in the background.
+     */
+    fun checkKnown(context: Context) {
+        if (search?.isActive == true || known?.isActive == true) return
+        val app = context.applicationContext
+        load(app)
+        val locations = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getStringSet(KNOWN, emptySet()).orEmpty()
+        if (locations.isEmpty()) return
+        known = scope.launch {
+            val answered = locations.map { location -> async { runCatching { describe(location) }.getOrNull() } }.awaitAll().filterNotNull()
+            if (answered.isNotEmpty()) {
+                _devices.update { old -> (old.filterNot { o -> answered.any { it.id == o.id } } + answered).sortedBy { it.name.lowercase() } }
+            }
+            AppLog.d("DLNA", "Home's cast button: ${answered.size} of ${locations.size} known TVs and speakers answered")
+        }
+    }
+
+    private var known: Job? = null
+
     fun stopSearch() {
         search?.cancel()
         search = null
@@ -227,6 +251,9 @@ object Dlna {
         }
 
     private val types = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /** Devices (by id) that failed to play Opus this app run: they get MP3 320 instead (issue #114). */
+    val opusFailed: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     private const val PREFS = "dlna"
     private const val KNOWN = "known_locations"

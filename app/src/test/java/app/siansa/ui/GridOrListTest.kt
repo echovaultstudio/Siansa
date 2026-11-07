@@ -11,4 +11,10 @@ class GridOrListTest {
         assertEquals(GridCells.Fixed(3), gridCells(grid = true))
         assertEquals(GridCells.Fixed(1), gridCells(grid = false))
     }
+
+    /** On the TV's wide screen, six across, as its own Library (issue #980). */
+    @Test fun theTvIsSixAcross() {
+        assertEquals(6, gridColumns(tv = true))
+        assertEquals(3, gridColumns(tv = false))
+    }
 }

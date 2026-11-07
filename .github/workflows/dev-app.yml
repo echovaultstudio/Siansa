@@ -52,6 +52,8 @@ jobs:
           SIANSA_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
           SIANSA_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIANSA_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          # Siansa's own TV screen while casting (issue #114): the Cast app id, a repository variable (not a secret).
+          CAST_RECEIVER_ID: ${{ vars.CAST_RECEIVER_ID }}
         run: gradle :app:testDebugUnitTest :app:assembleDev --continue --stacktrace
 
       - name: Publish the APK
@@ -63,6 +65,10 @@ jobs:
           apk="siansa-dev-$short.apk"
           cp "$(ls app/build/outputs/apk/dev/*.apk | head -1)" "$apk"
           notes="Siansa Dev, built from \`mixer\` at $short on $(date -u '+%Y-%m-%d %H:%M') UTC.
+
+          **Test build: only install it if you want to help find bugs and try features before they're finished.** Things may
+          break, change or disappear without warning, and it may lose its settings. For everyday listening, get Siansa from
+          its F-Droid repo or Google Play.
 
           The test build of the new audio engine. It installs next to Siansa (purple icon) and keeps its own settings,
           library and sign-ins. Not for F-Droid or Google Play.

@@ -76,4 +76,62 @@ class CombinedArtistsTest {
         assertEquals(listOf("c"), CombinedArtists.containing(koffee, found).map { it.id })
         assertTrue(CombinedArtists.containing(combined, found).isEmpty())
     }
+
+    @Test fun aNameGivenOneOfItsArtistsMusicBrainzIdIsStillSplit() {
+        // 0.52.0-dev: "ID, Camo & Krooked" came from Navidrome with Camo & Krooked's ID, so it stayed one artist.
+        val ck = Artist("ck", "Camo & Krooked", mbid = "5a5f0c3e-8d3c-4e5c-9b8f-2b8a6d0a0c01")
+        val joined = Artist("j", "ID, Camo & Krooked", mbid = "5A5F0C3E-8D3C-4E5C-9B8F-2B8A6D0A0C01")
+        val c = CombinedArtists.find(listOf(ck, joined)).getValue("j")
+        assertEquals(listOf("ck"), c.parts.map { it.id })
+        assertEquals(listOf("ID"), c.unknown)
+    }
+
+    @Test fun aBandWithItsOwnMusicBrainzIdStaysWhole() {
+        val earth = Artist("e", "Earth, Wind & Fire", mbid = "535afeda-2538-435d-9dd1-5e10be586774")
+        val wind = Artist("w2", "Wind", mbid = "11111111-2222-3333-4444-555555555555")
+        assertTrue(CombinedArtists.find(listOf(earth, wind)).isEmpty())
+    }
+
+    @Test fun aSongsArtistOutsideTheArtistListIsSplitToo() {
+        // 0.52.0-dev: "ID, Camo & Krooked" is only ever a song's artist, so Navidrome's artist list (album artists)
+        // didn't have it and it was never checked.
+        val ck = Artist("ck", "Camo & Krooked", mbid = "5a5f0c3e-8d3c-4e5c-9b8f-2b8a6d0a0c01")
+        val fred = Artist("f", "Fred V")
+        val index = CombinedArtists.Index(listOf(ck, fred))
+        val c = CombinedArtists.of(Artist("j", "ID, Camo & Krooked"), index)!!
+        assertEquals(listOf("ck"), c.parts.map { it.id })
+        assertEquals(listOf("ID"), c.unknown)
+    }
+
+    private val ck = Artist("ck", "Camo & Krooked", mbid = "5a5f0c3e-8d3c-4e5c-9b8f-2b8a6d0a0c01")
+    private val joinedId = Artist("j", "ID, Camo & Krooked")
+    private fun joinedIdSplit() = CombinedArtists.of(joinedId, CombinedArtists.Index(listOf(ck)))!!
+
+    @Test fun aPartTheServerHasBecomesThatArtist() {
+        // "ID" is only on songs (DJ mixes), so the library's artist list (album artists) doesn't have it; the music
+        // server does (MusicBrainz keeps "ID" as an artist for uncredited tracks), with its other ID songs.
+        val id = Artist("srv-id", "ID", mbid = "11111111-2222-3333-4444-555555555555")
+        val c = CombinedArtists.withServer(joinedIdSplit(), mapOf("id" to listOf(id)))
+        assertTrue(c.complete)
+        assertEquals(listOf("ck", "srv-id"), CombinedArtists.expand(listOf(joinedId), mapOf("j" to c)).map { it.id })
+    }
+
+    @Test fun aPlaceholderNobodyHasIsLeftOut() {
+        val c = CombinedArtists.withServer(joinedIdSplit(), emptyMap())
+        assertTrue(c.complete)
+        assertEquals(listOf("ck"), CombinedArtists.expand(listOf(joinedId), mapOf("j" to c)).map { it.id })
+    }
+
+    @Test fun aRealNameNobodyHasKeepsTheJoinedName() {
+        val rudimental = Artist("r", "Rudimental", mbid = "40cc8ea4-0f9b-4a1b-9b6c-6f0b1d3a1f11")
+        val joined = Artist("c2", "Rudimental & Winny")
+        val c = CombinedArtists.withServer(CombinedArtists.of(joined, CombinedArtists.Index(listOf(rudimental)))!!, emptyMap())
+        assertEquals(listOf("Winny"), c.unknown)
+        assertEquals(listOf("r", "c2"), CombinedArtists.expand(listOf(joined), mapOf("c2" to c)).map { it.id })
+    }
+
+    @Test fun twoServerArtistsByOneNameStayUnknown() {
+        val c = CombinedArtists.withServer(joinedIdSplit(), mapOf("id" to listOf(Artist("a", "ID"), Artist("b", "ID"))))
+        assertEquals(listOf("ID"), c.unknown)
+    }
 }

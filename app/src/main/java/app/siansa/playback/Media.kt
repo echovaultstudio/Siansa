@@ -17,7 +17,11 @@ import kotlin.math.pow
 /** Songs currently queued, by id, so the player and the screens share the full song details. */
 object SongRegistry {
     private val songs = ConcurrentHashMap<String, Song>()
-    fun register(list: List<Song>) = list.forEach { songs[it.id] = it }
+    fun register(list: List<Song>) {
+        // The library keeps no file types: a song registered from it keeps the type known from the server (issue #114).
+        list.forEach { s -> songs[s.id] = if (s.suffix == null) songs[s.id]?.suffix?.let { s.copy(suffix = it) } ?: s else s }
+        CastFormats.record(list)
+    }
     fun get(id: String): Song? = songs[id]
 }
 
@@ -117,3 +121,15 @@ fun queueInsertIndex(currentIndex: Int, count: Int, isQueued: (Int) -> Boolean):
  */
 fun queueRemoveUpTo(index: Int, count: Int): IntRange =
     if (index <= 0 || index >= count) IntRange.EMPTY else 0 until index
+
+/**
+ * Where a queued song at [index] goes to play next, with the song at [current] playing: straight after it. Null when
+ * there's nothing to move: it's the song playing, it's already next, or the index isn't in the queue of [count].
+ * A song from before the one playing lands at [current], as the songs after it move up one when it's taken out.
+ */
+fun queuePlayNextIndex(index: Int, current: Int, count: Int): Int? = when {
+    index !in 0 until count || current !in 0 until count -> null
+    index == current || index == current + 1 -> null
+    index < current -> current
+    else -> current + 1
+}

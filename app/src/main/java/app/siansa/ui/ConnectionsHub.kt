@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -75,7 +76,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
- * Settings › Servers and services (issue #665): everything Siansa connects to, on one page, where Users and Connections were
+ * Settings › Connections (issue #665): everything Siansa connects to, on one page, where Users and Connections were
  * two. **Servers**: each music server login (a "user": its own library, history and settings), with its address,
  * login, its name in AudioMuse-AI and its library sync, then Audiobookshelf. **Services**: AudioMuse-AI and the AI
  * service that writes mix titles and sound searches. Each folds open with its arrow, folded to start with; [open]
@@ -98,7 +99,38 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
     val othersSaved = remember(changes) { users.filter { it.id != Users.active }.associate { it.id to SettingsRepository(context, it.id).current } }
     var others by remember(changes) { mutableStateOf(othersSaved) }
     var otherNames by remember(changes) { mutableStateOf(users.filter { it.id != Users.active }.associate { it.id to it.serverName.orEmpty() }) }
+    // A server being added (issue #828): only on this page until it's saved, so nothing is added, switched to or
+    // restarted before then, and the music plays on.
+    var adding by rememberSaveable { mutableStateOf(false) }
+    var newServer by remember { mutableStateOf(AppSettings()) }
+    var newName by remember { mutableStateOf("") }
     fun toggle(key: String) { opened = if (key in opened) opened - key else opened + key }
+
+    /** Keeps the server being added as another login; false (with [problem] set) when it can't be. */
+    fun saveNew(): Boolean {
+        if (newServer.navidromeUrl.isBlank() || newServer.navidromeUser.isBlank() && !newServer.hasApiKey) {
+            problem = "New server: enter its address and username first"
+            return false
+        }
+        val id = try {
+            Users.add(context) { id ->
+                val store = SettingsRepository(context, id)
+                store.save(store.current.withServerFrom(newServer).copy(sourceKind = newServer.sourceKind))
+            }
+        } catch (e: Exception) {
+            problem = "New server: ${e.message}"
+            return false
+        }
+        if (newName.isNotBlank()) Users.setServerName(context, id, newName)
+        AppLog.i("Settings", "Server added as another login: ${newServer.sourceKind.label} ${AppLog.redact(newServer.navidromeUrl)} as ${newServer.navidromeUser}")
+        adding = false
+        newServer = AppSettings()
+        newName = ""
+        problem = null
+        opened = opened + "user-$id"
+        changes++
+        return true
+    }
 
     /** Keeps another login's changed server settings and name; false (with [problem] set) when they can't be. */
     fun saveOther(user: UserEntry): Boolean {
@@ -120,8 +152,32 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
         return true
     }
 
-    fun save() {
-        // Other logins first: each save writes the shared AudioMuse and AI settings too, and the page's own come last.
+    /**
+     * API keys checked with their servers before anything is kept (issue #493): false (with [problem] set) when a
+     * server doesn't take keys or doesn't know the key. A key's user fills an empty username.
+     */
+    suspend fun keysChecked(): Boolean {
+        val label = users.associate { it.id to it.label }
+        var step = "New server"
+        return try {
+            if (adding) newServer = keyChecked(graph, newServer, newServer.sourceKind, null)
+            for ((id, other) in others) {
+                step = label[id].orEmpty()
+                others = others + (id to keyChecked(graph, other, other.sourceKind, othersSaved[id]))
+            }
+            step = ""
+            draft = keyChecked(graph, draft, graph.settings.current.sourceKind, graph.settings.current)
+            true
+        } catch (e: ApiException) {
+            problem = if (step.isEmpty()) e.message else "$step: ${e.message}"
+            false
+        }
+    }
+
+    fun saveNow() {
+        // A server being added, then the other logins: each save writes the shared AudioMuse and AI settings too, and
+        // the page's own come last.
+        if (adding && !saveNew()) return
         for (user in users) if (user.id != Users.active && !saveOther(user)) return
         val before = graph.settings.current
         try {
@@ -146,8 +202,12 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
         nav.popBackStack()
     }
 
+    fun save() {
+        scope.launch { if (keysChecked()) saveNow() }
+    }
+
     Screen(
-        title = "Servers and services",
+        title = "Connections",
         nav = nav,
         actions = { IconButton(onClick = ::save, modifier = Modifier.testTag("connectionsSave")) { Icon(Icons.Rounded.Check, "Save") } },
     ) { padding ->
@@ -177,7 +237,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 ) {
                     if (user.id == Users.active) {
                         ServerFields(graph, draft, { draft = it; problem = null }, serverName, { serverName = it }, nav)
-                        Button(onClick = ::save, modifier = Modifier.fillMaxWidth()) { Text("Save") }
+                        Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
                     } else {
                         Hint("Another login, with its own library, history and settings. Change it here; switch to it to use it (Siansa restarts).")
                         others[user.id]?.let { other ->
@@ -186,10 +246,10 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                                 otherNames[user.id].orEmpty(), { otherNames = otherNames + (user.id to it) }, nav, inUse = false,
                             )
                         }
-                        Button(onClick = ::save, modifier = Modifier.fillMaxWidth().testTag("saveUser-${user.id}")) { Text("Save") }
+                        Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth().testTag("saveUser-${user.id}")) { Text("Save") }
                         Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                            Button(onClick = { if (saveOther(user)) Users.switchTo(context, user.id) }) { Text("Switch to it") }
-                            OutlinedButton(onClick = { removing = user }) { Text("Remove") }
+                            Button(onClick = { scope.launch { if (keysChecked() && saveOther(user)) Users.switchTo(context, user.id) } }, modifier = Modifier.focusRing()) { Text("Switch to it") }
+                            OutlinedButton(onClick = { removing = user }, modifier = Modifier.focusRing()) { Text("Remove") }
                         }
                     }
                 }
@@ -203,16 +263,32 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 tag = "fold-books",
             ) {
                 AudiobookshelfFields(graph, draft) { draft = it; problem = null }
-                Button(onClick = ::save, modifier = Modifier.fillMaxWidth()) { Text("Save") }
+                Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
             }
-            Row(
-                Modifier.fillMaxWidth().clickable { Users.addAndSwitch(context) }.padding(vertical = Space.Medium).testTag("addServer"),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Rounded.Add, null, tint = MaterialTheme.colorScheme.primary)
-                Column(Modifier.weight(1f).padding(start = Space.Page)) {
-                    Text("Add a music server", style = MaterialTheme.typography.bodyLarge)
-                    Hint("Another login on a server, or another server, with its own library. Siansa restarts and asks for it. To show several together, use the filter button on Home.")
+            if (adding) {
+                FoldCard(
+                    icon = Icons.Rounded.Add,
+                    title = "New server",
+                    subtitle = "Not saved yet",
+                    accent = false,
+                    expanded = true,
+                    onToggle = {},
+                    tag = "fold-newServer",
+                ) {
+                    ServerKindChips(newServer.sourceKind) { newServer = newServer.copy(sourceKind = it); problem = null }
+                    ServerFields(graph, newServer, { newServer = it; problem = null }, newName, { newName = it }, nav, inUse = false)
+                    NewServerButtons(onSave = { scope.launch { if (keysChecked()) saveNew() } }, onCancel = { adding = false; newServer = AppSettings(); newName = ""; problem = null })
+                }
+            } else {
+                Row(
+                    Modifier.fillMaxWidth().clickable { adding = true }.padding(vertical = Space.Medium).testTag("addServer"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Rounded.Add, null, tint = MaterialTheme.colorScheme.primary)
+                    Column(Modifier.weight(1f).padding(start = Space.Page)) {
+                        Text("Add a music server", style = MaterialTheme.typography.bodyLarge)
+                        Hint("Another login on a server, or another server, with its own library. Nothing is added until you save it, and the music keeps playing. To show several together, use the filter button on Home.")
+                    }
                 }
             }
 
@@ -226,7 +302,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 tag = "fold-audiomuse",
             ) {
                 AudioMuseFields(graph, draft) { draft = it; problem = null }
-                Button(onClick = ::save, modifier = Modifier.fillMaxWidth()) { Text("Save") }
+                Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
             }
             FoldCard(
                 icon = Icons.Rounded.AutoAwesome,
@@ -237,7 +313,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 tag = "fold-ai",
             ) {
                 AiFields(graph, draft) { draft = it; problem = null }
-                Button(onClick = ::save, modifier = Modifier.fillMaxWidth()) { Text("Save") }
+                Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
             }
             problem?.let { ErrorText(it, Modifier) }
         }
@@ -249,14 +325,14 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
             title = { Text("Remove ${user.label}?") },
             text = { Text("Their library, history and settings are removed from this phone. Nothing changes on the server.") },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(modifier = Modifier.focusRing(), onClick = {
                     graph.guests.setShown(user.id, false)
                     Users.remove(context, user.id)
                     removing = null
                     changes++
                 }) { Text("Remove") }
             },
-            dismissButton = { TextButton(onClick = { removing = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { removing = null }, modifier = Modifier.focusRing()) { Text("Cancel") } },
         )
     }
 }
@@ -315,19 +391,23 @@ internal fun FoldCard(
     }
 }
 
-/** Runs a Test with what's typed, before it's saved, and shows "✓ …" or "✗ …". */
-private fun test(graph: AppGraph, draft: AppSettings, scope: kotlinx.coroutines.CoroutineScope, set: (String) -> Unit, block: suspend (AppSettings) -> String) {
+/**
+ * Runs a Test with what's typed, before it's saved, and shows "✓ …" or "✗ …". Each Test and its result is logged
+ * (which card, not what's typed), so a report shows which one didn't work and why (the TV app, 0.52.0-dev).
+ */
+private fun test(graph: AppGraph, draft: AppSettings, scope: kotlinx.coroutines.CoroutineScope, set: (String) -> Unit, what: String = "connection", block: suspend (AppSettings) -> String) {
     set("Testing…")
+    AppLog.i("Settings", "Testing $what")
     scope.launch {
-        set(
-            try {
-                "✓ " + block(graph.settings.clean(draft))
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                "✗ " + (e.message ?: e.javaClass.simpleName)
-            },
-        )
+        val result = try {
+            "✓ " + block(graph.settings.clean(draft))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            "✗ " + (e.message ?: e.javaClass.simpleName)
+        }
+        AppLog.i("Settings", "Test of $what: ${AppLog.redact(result)}")
+        set(result)
     }
 }
 
@@ -354,18 +434,16 @@ private fun ServerFields(
     Field("Server address", draft.navidromeUrl, if (kind.embyLike) "192.168.1.10:8096" else "192.168.1.10:4533") { onChange(draft.copy(navidromeUrl = it)) }
     Field("Username", draft.navidromeUser, keyboard = KeyboardType.Text) { onChange(draft.copy(navidromeUser = it)) }
     SecretField("Password", draft.navidromePassword) { onChange(draft.copy(navidromePassword = it)) }
+    if (!kind.embyLike) ApiKeyField(draft, onChange)
     if (showProxy) {
         Hint("Only for a reverse proxy that asks for its own login before your server.")
         Field("Proxy username", draft.proxyUser, keyboard = KeyboardType.Text) { onChange(draft.copy(proxyUser = it)) }
         SecretField("Proxy password", draft.proxyPassword) { onChange(draft.copy(proxyPassword = it)) }
     } else {
-        TextButton(onClick = { showProxy = true }) { Text("Server behind a login page? Add a proxy login") }
+        TextButton(onClick = { showProxy = true }, modifier = Modifier.focusRing()) { Text("Server behind a login page? Add a proxy login") }
     }
     TestRow(result) {
-        test(graph, draft, scope, { result = it }) { s ->
-            val server = if (kind.embyLike) EmbyApi(graph.http, { s }, jellyfin = kind == SourceKind.JELLYFIN) else SubsonicApi(graph.http) { s }
-            "Connected to " + server.ping()
-        }
+        test(graph, draft, scope, { result = it }, "the music server") { s -> testServer(graph, s, kind) }
     }
     Field("Name shown in Siansa", serverName, "Like Home or Kids", keyboard = KeyboardType.Text) { onServerName(it.replace("\n", " ").take(UserFiles.SERVER_NAME_MAX)) }
     Hint("Shown instead of the address, so two logins can be told apart. Leave empty to show the address.")
@@ -389,6 +467,69 @@ private fun ServerFields(
     }
 }
 
+/** The OpenSubsonic API key (issue #493), with what it's for. */
+@Composable
+internal fun ApiKeyField(draft: AppSettings, onChange: (AppSettings) -> Unit) {
+    Hint("API key, if your server gives you one, instead of a username and password.")
+    Box(Modifier.testTag("apiKey")) { SecretField("API key", draft.navidromeApiKey) { onChange(draft.copy(navidromeApiKey = it)) } }
+}
+
+/**
+ * The music server's Test with what's typed: whether it answers, and with an API key (issue #493) whether the server
+ * takes keys and whose this one is.
+ */
+internal suspend fun testServer(graph: AppGraph, s: AppSettings, kind: SourceKind): String {
+    if (kind.embyLike) return "Connected to " + EmbyApi(graph.http, { s }, jellyfin = kind == SourceKind.JELLYFIN).ping()
+    val login = s.copy(sourceKind = kind)
+    val api = SubsonicApi(graph.http) { login }
+    val connected = "Connected to " + api.ping()
+    if (!login.hasApiKey) return connected
+    // With a password too, the ping logged in with it: say plainly that the key isn't used.
+    if (!api.takesApiKey()) throw ApiException(SubsonicApi.NO_API_KEYS, 42)
+    val who = try {
+        api.keyUser()
+    } catch (e: ApiException) {
+        null
+    }
+    AppLog.i("Settings", "Server test: the API key works" + (who?.let { " (user $it)" } ?: ""))
+    return "$connected with the API key" + (who?.let { " as $it" } ?: "")
+}
+
+/**
+ * A server login checked before it's saved (issue #493). With an API key that's new or changed since [saved]:
+ * refused with a plain message when the server doesn't take keys (42) or doesn't know this one (44), and an empty
+ * username gets the key's user. Unchanged without a key, or when the server can't be reached or answers otherwise
+ * (saving doesn't need the server).
+ */
+internal suspend fun keyChecked(graph: AppGraph, s: AppSettings, kind: SourceKind, saved: AppSettings?): AppSettings {
+    val login = graph.settings.clean(s).copy(sourceKind = kind)
+    if (!login.hasApiKey) return s
+    val same = saved != null && saved.navidromeApiKey == login.navidromeApiKey && saved.navidromeUrl == login.navidromeUrl
+    if (same && login.navidromeUser.isNotBlank()) return s
+    val api = SubsonicApi(graph.http) { login }
+    try {
+        api.ping()
+        if (!api.takesApiKey()) throw ApiException(SubsonicApi.NO_API_KEYS, 42)
+    } catch (e: ApiException) {
+        if (e.code == 42 || e.code == 44) throw e
+        AppLog.w("Settings", "API key not checked: ${e.message}")
+        return s
+    } catch (e: java.io.IOException) {
+        AppLog.w("Settings", "API key not checked, the server can't be reached: ${e.message}")
+        return s
+    }
+    if (login.navidromeUser.isNotBlank()) return s
+    val who = try {
+        api.keyUser()
+    } catch (e: ApiException) {
+        null
+    } catch (e: java.io.IOException) {
+        null
+    }
+    AppLog.i("Settings", "API key checked" + (who?.let { "; its user is $it" } ?: ""))
+    return if (who != null) s.copy(navidromeUser = who) else s
+}
+
 /** Audiobookshelf: its address and login, Test, and with an admin login a scan for new books. */
 @Composable
 private fun AudiobookshelfFields(graph: AppGraph, draft: AppSettings, onChange: (AppSettings) -> Unit) {
@@ -404,7 +545,7 @@ private fun AudiobookshelfFields(graph: AppGraph, draft: AppSettings, onChange: 
     Field("Username", draft.audiobookshelfUser, keyboard = KeyboardType.Text) { onChange(draft.copy(audiobookshelfUser = it)) }
     SecretField("Password", draft.audiobookshelfPassword) { onChange(draft.copy(audiobookshelfPassword = it)) }
     TestRow(result) {
-        test(graph, draft, scope, { result = it }) { s ->
+        test(graph, draft, scope, { result = it }, "Audiobookshelf") { s ->
             if (!s.booksReady) throw ApiException("Enter the server address and a token, or a username and password")
             val api = AudiobookshelfApi(graph.http) { s }
             val who = api.ping()
@@ -467,7 +608,7 @@ internal fun AudioMuseFields(graph: AppGraph, draft: AppSettings, onChange: (App
     Field("Username", draft.audioMuseUser, keyboard = KeyboardType.Text) { onChange(draft.copy(audioMuseUser = it)) }
     SecretField("Password", draft.audioMusePassword) { onChange(draft.copy(audioMusePassword = it)) }
     Hint("With several music servers in AudioMuse, each server's own name there is under Servers.")
-    TestRow(result) { test(graph, draft, scope, { result = it }) { s -> testAudioMuse(graph, s) } }
+    TestRow(result) { test(graph, draft, scope, { result = it }, "AudioMuse") { s -> testAudioMuse(graph, s) } }
 }
 
 /** AudioMuse's Test: a sound search, and whether its songs are this server's (only known once it's synced). */
@@ -516,7 +657,7 @@ internal fun AiFields(graph: AppGraph, draft: AppSettings, onChange: (AppSetting
     Field("Model", draft.aiModel, draft.aiProvider.defaultModel.ifEmpty { null }, keyboard = KeyboardType.Text) { onChange(draft.copy(aiModel = it)) }
     SwitchRow("AI titles and sound searches", draft.aiTitles) { onChange(draft.copy(aiTitles = it)) }
     TestRow(result) {
-        test(graph, draft, scope, { result = it }) { s ->
+        test(graph, draft, scope, { result = it }, "the AI service") { s ->
             val answer = ChatApi(graph.http) { s }.complete("Reply with one word.", "Say hello.")
             "${s.aiProvider.label} answered: ${answer.trim().take(40)}"
         }
@@ -528,3 +669,25 @@ internal fun aiModelFor(provider: AiProvider, typed: String): String = provider.
 
 /** The Audiobookshelf card's line: the kind of server, and whether it's set up. */
 internal fun absLine(ready: Boolean): String = if (ready) "Audiobooks and podcasts · set up" else "Audiobooks and podcasts · not set up"
+
+/** The new server's type (issue #828): the servers Siansa can play from, as chips. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun ServerKindChips(kind: SourceKind, onKind: (SourceKind) -> Unit) {
+    Text("Server type", style = MaterialTheme.typography.bodyLarge)
+    FlowRow(Modifier.testTag("serverKinds"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        SourceKind.entries.filter { it.ready }.forEach { k ->
+            FilterChip(selected = kind == k, onClick = { onKind(k) }, label = { Text(k.label) }, modifier = Modifier.testTag("serverKind-${k.name}"))
+        }
+    }
+}
+
+/** Save or cancel the server being added (issue #828): switching to it is a separate step, once it's saved. */
+@Composable
+internal fun NewServerButtons(onSave: () -> Unit, onCancel: () -> Unit) {
+    Hint("Saved, it shows above as another login. Switch to it there when you want to use it (Siansa restarts).")
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        Button(onClick = onSave, modifier = Modifier.focusRing().testTag("saveNewServer")) { Text("Save") }
+        OutlinedButton(onClick = onCancel, modifier = Modifier.focusRing()) { Text("Cancel") }
+    }
+}

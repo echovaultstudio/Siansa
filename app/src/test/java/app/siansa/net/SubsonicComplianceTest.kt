@@ -254,4 +254,103 @@ class SubsonicComplianceTest {
         assertEquals(null, plays[1].playedAt)
         assertTrue(server.seen.any { it.endpoint == "getAlbumList2" && it.params.contains("type" to "recent") })
     }
+
+    // ---- API keys (issue #493) ----
+
+    private val withKey = settings.copy(navidromeUser = "", navidromePassword = "", navidromeApiKey = "k3y/+1")
+
+    @Test fun authParametersForEachWayOfLoggingIn() {
+        val key = SubsonicApi.authQuery(withKey, AuthMethod.API_KEY, "salt", "")
+        assertEquals("apiKey=k3y%2F%2B1&v=1.16.1&c=siansa&f=json", key)
+        assertEquals("u=max&t=abc&s=salt&v=1.16.1&c=siansa&f=json", SubsonicApi.authQuery(settings, AuthMethod.TOKEN, "salt", "abc"))
+        assertEquals("u=max&p=enc:736573616d65&v=1.16.1&c=siansa&f=json", SubsonicApi.authQuery(settings, AuthMethod.PASSWORD, "salt", ""))
+    }
+
+    @Test fun theKeyIsUsedOnceTheServerTakesIt() {
+        val both = settings.copy(navidromeApiKey = "k3y")
+        // Known to take keys: always the key.
+        assertEquals(AuthMethod.API_KEY, SubsonicApi.authMethod(both, keySupported = true, passwordOnly = false))
+        assertEquals(AuthMethod.API_KEY, SubsonicApi.authMethod(both, keySupported = true, passwordOnly = true))
+        // Not known yet, or not taken: the password while there is one.
+        assertEquals(AuthMethod.TOKEN, SubsonicApi.authMethod(both, keySupported = null, passwordOnly = false))
+        assertEquals(AuthMethod.TOKEN, SubsonicApi.authMethod(both, keySupported = false, passwordOnly = false))
+        assertEquals(AuthMethod.PASSWORD, SubsonicApi.authMethod(both, keySupported = false, passwordOnly = true))
+        // Only a key: nothing else to send.
+        assertEquals(AuthMethod.API_KEY, SubsonicApi.authMethod(withKey, keySupported = null, passwordOnly = false))
+        // No key, or a key for Emby (which has its own login): the token.
+        assertEquals(AuthMethod.TOKEN, SubsonicApi.authMethod(settings, keySupported = true, passwordOnly = false))
+        assertEquals(AuthMethod.TOKEN, SubsonicApi.authMethod(both.copy(sourceKind = SourceKind.EMBY), keySupported = true, passwordOnly = false))
+    }
+
+    @Test fun extensionCheckFindsApiKeys() {
+        assertTrue(SubsonicApi.takesKeys(mapOf("apiKeyAuthentication" to listOf(1))))
+        assertFalse(SubsonicApi.takesKeys(mapOf("formPost" to listOf(1))))
+        assertFalse(SubsonicApi.takesKeys(mapOf("apiKeyAuthentication" to listOf(2))))
+        assertFalse(SubsonicApi.takesKeys(emptyMap()))
+    }
+
+    @Test fun withAKeyEveryRequestSendsItAndNoUser() = runBlocking {
+        val server = FakeServer {
+            when (it.endpoint) {
+                "getOpenSubsonicExtensions" -> extensions("apiKeyAuthentication" to "1")
+                "tokenInfo" -> ok(""""tokenInfo":{"username":"max"}""")
+                else -> ok()
+            }
+        }
+        val login = settings.copy(navidromeApiKey = "k3y")
+        val api = SubsonicApi(server.client) { login }
+        api.ping()
+        assertTrue(api.takesApiKey())
+        assertEquals("max", api.keyUser())
+        val calls = server.seen.filter { it.endpoint != "getOpenSubsonicExtensions" }
+        assertEquals(listOf("ping", "tokenInfo"), calls.map { it.endpoint })
+        for (seen in calls) {
+            assertEquals("k3y", seen.one("apiKey"))
+            assertEquals(null, seen.one("u"))
+            assertEquals(null, seen.one("t"))
+            assertEquals(null, seen.one("s"))
+            assertEquals(null, seen.one("p"))
+        }
+        // Song and cover addresses too, once the server is known to take keys.
+        val stream = api.streamUrl("s1")
+        assertTrue(stream, stream.contains("apiKey=k3y"))
+        assertFalse(stream, Regex("[?&][utsp]=").containsMatchIn(stream))
+    }
+
+    @Test fun aServerWithoutApiKeysKeepsThePassword() = runBlocking {
+        val server = FakeServer { if (it.endpoint == "getOpenSubsonicExtensions") extensions("formPost" to "1") else ok() }
+        val api = SubsonicApi(server.client) { settings.copy(navidromeApiKey = "k3y") }
+        api.ping()
+        assertFalse(api.takesApiKey())
+        val ping = server.seen.single { it.endpoint == "ping" }
+        assertEquals("max", ping.one("u"))
+        assertEquals(null, ping.one("apiKey"))
+    }
+
+    @Test fun onlyAKeyAndAServerWithoutApiKeysSaysSoPlainly() = runBlocking {
+        val server = FakeServer { if (it.endpoint == "getOpenSubsonicExtensions") extensions("formPost" to "1") else ok() }
+        val api = SubsonicApi(server.client) { withKey }
+        try {
+            api.ping()
+            fail("a server without API keys can't be asked with only a key")
+        } catch (e: ApiException) {
+            assertEquals(SubsonicApi.NO_API_KEYS, e.message)
+        }
+        assertTrue(server.seen.none { it.endpoint == "ping" })
+    }
+
+    @Test fun aWrongKeyIsSaidPlainly() = runBlocking {
+        val server = FakeServer {
+            if (it.endpoint == "getOpenSubsonicExtensions") extensions("apiKeyAuthentication" to "1") else failed(44, "Invalid API key")
+        }
+        try {
+            SubsonicApi(server.client) { withKey }.ping()
+            fail("a wrong key fails")
+        } catch (e: ApiException) {
+            assertEquals(44, e.code)
+            assertEquals("Your server doesn't know this API key.", e.message)
+        }
+        // No other way of logging in is tried with the key (the token needs the password).
+        assertEquals(1, server.seen.count { it.endpoint == "ping" })
+    }
 }

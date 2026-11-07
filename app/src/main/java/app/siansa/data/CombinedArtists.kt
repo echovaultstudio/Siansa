@@ -8,7 +8,9 @@ package app.siansa.data
  * name only when it's safe:
  *
  * - The combined artist has no MusicBrainz ID of its own: one that has is a real artist ("Earth, Wind & Fire",
- *   "Crosby, Stills, Nash & Young") and is never split.
+ *   "Crosby, Stills, Nash & Young") and is never split. Unless that ID is another library artist's: Navidrome gives
+ *   a name tagged with several artists' IDs the first of them ("ID, Camo & Krooked" got Camo & Krooked's), so the
+ *   ID says which artist it is, not that the whole name is one.
  * - Its name splits where names are joined (",", "&", "feat."…; see [splitArtists]) into at least two parts,
  *   keeping a part whole when it's one library artist ("Chase & Status").
  * - Every part found in the library is exactly one artist. Two library artists with the same name are two
@@ -31,19 +33,47 @@ data class CombinedArtist(
 }
 
 object CombinedArtists {
+    /**
+     * Names that usually stand for no artist: an unreleased "ID", an unknown or various artists. Only left out when
+     * the music server has no artist by that name either; when it has one (MusicBrainz keeps "ID" as an artist for
+     * uncredited tracks in DJ mixes, and an artist may really be called that), it's offered like any other.
+     */
+    private val PLACEHOLDERS = setOf("id", "ids", "unknown", "unknown artist", "various", "various artists", "va", "n a", "tba", "tbc")
+        .map { normalizeKey(it) }.toSet()
+
     /** The combined artists among [artists], by the combined artist's id. */
     fun find(artists: List<Artist>): Map<String, CombinedArtist> {
-        val byKey = artists.groupBy { normalizeKey(it.name) }
+        val index = Index(artists)
         val out = LinkedHashMap<String, CombinedArtist>()
         for (artist in artists) {
-            check(artist, byKey)?.let { out[artist.id] = it }
+            check(artist, index.byKey, index.byMbid)?.let { out[artist.id] = it }
         }
         return out
     }
 
+    /** The library's artists by name and by MusicBrainz ID, to check names against. */
+    class Index(artists: List<Artist>) {
+        val byKey: Map<String, List<Artist>> = artists.groupBy { normalizeKey(it.name) }
+        val byMbid: Map<String, List<Artist>> = artists.filter { !it.mbid.isNullOrBlank() }.groupBy { it.mbid!!.lowercase() }
+    }
+
+    /**
+     * [artist] as a [CombinedArtist] when it's safe to split, checked against the library [index]: for a song's
+     * artist that isn't in the library's artist list (Navidrome lists album artists there, so "ID, Camo & Krooked",
+     * only ever a song's artist, was never checked: 0.52.0-dev).
+     */
+    fun of(artist: Artist, index: Index): CombinedArtist? = check(artist, index.byKey, index.byMbid)
+
+    /** Whether [artist]'s MusicBrainz ID is its own: no other library artist (by another name) has it. */
+    private fun ownMbid(artist: Artist, byMbid: Map<String, List<Artist>>): Boolean {
+        val id = artist.mbid?.takeIf { it.isNotBlank() }?.lowercase() ?: return false
+        val key = normalizeKey(artist.name)
+        return byMbid[id].orEmpty().none { it.id != artist.id && normalizeKey(it.name) != key }
+    }
+
     /** [artist] as a [CombinedArtist] when it's safe to split, else null. */
-    internal fun check(artist: Artist, byKey: Map<String, List<Artist>>): CombinedArtist? {
-        if (!artist.mbid.isNullOrBlank()) return null
+    internal fun check(artist: Artist, byKey: Map<String, List<Artist>>, byMbid: Map<String, List<Artist>> = emptyMap()): CombinedArtist? {
+        if (ownMbid(artist, byMbid)) return null
         val ownKey = normalizeKey(artist.name)
         val names = splitArtists(artist.name) { name -> normalizeKey(name).let { it != ownKey && byKey.containsKey(it) } }
         if (names.size < 2) return null
@@ -61,6 +91,52 @@ object CombinedArtists {
         val safe = unknown.isEmpty() || parts.any { !it.mbid.isNullOrBlank() }
         if (!safe) return null
         return CombinedArtist(artist, parts.distinctBy { it.id }, unknown)
+    }
+
+    /**
+     * [c] with its names the library doesn't have looked up on the music server ([server]: the artists it has by
+     * each name, by [normalizeKey]): a name the server has exactly one artist for becomes that artist (Navidrome
+     * lists only album artists in the library, so an artist only ever on songs, "ID" on DJ mixes, wasn't found);
+     * a name it has none for is dropped when it stands for no artist ("ID", "Unknown"), else kept, and with it the
+     * joined name, so its songs can still be reached. Two artists by one name stay unknown: which is meant can't be
+     * told.
+     */
+    fun withServer(c: CombinedArtist, server: Map<String, List<Artist>>): CombinedArtist {
+        if (c.unknown.isEmpty()) return c
+        val parts = ArrayList(c.parts)
+        val unknown = ArrayList<String>()
+        for (name in c.unknown) {
+            val key = normalizeKey(name)
+            val found = server[key].orEmpty().filter { it.id != c.combined.id && normalizeKey(it.name) == key }.distinctBy { it.id }
+            when {
+                found.size == 1 -> parts += found.first()
+                found.isEmpty() && key in PLACEHOLDERS -> Unit
+                else -> unknown += name
+            }
+        }
+        return c.copy(parts = parts.distinctBy { it.id }, unknown = unknown)
+    }
+
+    /**
+     * For the log: why [artist], whose name looks like several artists, is kept as one ([find] didn't split it), or
+     * null when its name doesn't split at all.
+     */
+    fun whyKept(artist: Artist, artists: List<Artist>): String? {
+        val byKey = artists.groupBy { normalizeKey(it.name) }
+        val byMbid = artists.filter { !it.mbid.isNullOrBlank() }.groupBy { it.mbid!!.lowercase() }
+        val ownKey = normalizeKey(artist.name)
+        val names = splitArtists(artist.name) { name -> normalizeKey(name).let { it != ownKey && byKey.containsKey(it) } }
+        if (names.size < 2) return null
+        if (ownMbid(artist, byMbid)) return "it has its own MusicBrainz ID"
+        val matches = names.map { n -> byKey[normalizeKey(n)].orEmpty().filter { it.id != artist.id } }
+        if (matches.any { it.size > 1 }) return "a name in it belongs to more than one artist"
+        val known = matches.filter { it.size == 1 }.map { it.first() }
+        if (known.isEmpty()) return "none of ${names.joinToString(" | ")} is an artist in the library"
+        if (known.none { !it.mbid.isNullOrBlank() }) {
+            val unknown = names.filterIndexed { i, _ -> matches[i].isEmpty() }
+            return "${unknown.joinToString(" | ")} isn't in the library, and none of ${known.joinToString(" | ") { it.name }} has a MusicBrainz ID"
+        }
+        return null
     }
 
     /**

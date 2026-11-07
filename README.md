@@ -13,17 +13,23 @@ Siansa is **open source** under the GNU GPL, version 3 or later ([LICENSE](LICEN
 <p align="center">
 <a href="https://siansa.app/fdroid/repo"><img src="docs/brand/get-fdroid.svg" alt="Get it on F-Droid" width="220" height="66"></a>
 &nbsp;
-<a href="https://siansa.app/#join"><img src="docs/brand/play-beta.svg" alt="Join the beta on Google Play" width="220" height="66"></a>
+<a href="https://siansa.app/#join"><img src="docs/brand/play-beta.svg" alt="Join the test on Google Play" width="220" height="66"></a>
 </p>
 
 - **F-Droid**, open to everyone, no sign-up: in the F-Droid app, go to **Settings › Repositories › +** and add
   `https://siansa.app/fdroid/repo`, then search for Siansa.
-- **Google Play**: a small closed beta. [Ask for a place](https://siansa.app/#join) and we'll add your Google account.
+- **Google Play**: a closed test for now, as Google asks of new apps (12 testers for 14 days before it opens to
+  everyone). [Ask for a place](https://siansa.app/#join) and we'll add your Google account.
+- **On your TV**: Siansa for Android TV and Google TV, in beta. See [Siansa on your TV](docs/tv.md).
 
 More in the [install guide](docs/testing.md).
 
 ## What it does
 
+- **New in 1.0**: slide from the play button to start a DJ mix, a radio, a song path or songs that sound like the one
+  playing; a DJ mix of any album, slid from its Shuffle onto Play; a new audio engine with beat-matched DJ blends;
+  Android Auto; Siansa's own screen on a Chromecast or Google TV; internet radio and podcasts in Your Stations; and
+  Siansa for Android TV and Google TV ([in beta](docs/tv.md)).
 - **Library**: albums (A–Z, recently added, most played, random), artists, album and artist pages, search.
 - **Player**: background playback with notification and lock-screen controls, gapless playback, shuffle and repeat, a queue, ReplayGain (track or album, with pre-amp), and scrobbling back to Navidrome.
 - **Lyrics**: synced lyrics from Navidrome's OpenSubsonic API that scroll and highlight along with the song (tap a line to jump), plain lyrics otherwise.
@@ -65,10 +71,10 @@ More in the [install guide](docs/testing.md).
 
 ## Getting it
 
-Siansa is in beta. There's no APK to download here: the app comes from
+There's no APK to download here: the app comes from
 
-- **Google Play's beta**: sign up at [siansa.app](https://siansa.app), or
-- the **Siansa F-Droid repository** for testers, also from [siansa.app](https://siansa.app).
+- **Google Play**, a closed test for now: sign up at [siansa.app](https://siansa.app), or
+- the **Siansa F-Droid repository**, open to everyone: the address is at [siansa.app](https://siansa.app).
 
 Both update on their own. Or build it from this source (below): a build of your own is signed with your own key, so it can't update an installed copy from Play or F-Droid, and the other way round.
 
@@ -78,7 +84,7 @@ Both update on their own. Or build it from this source (below): a build of your 
    - **Your server**: address (e.g. `http://192.168.1.10:4533`), username, password.
    - **AudioMuse-AI**: address of its web/API port (e.g. `http://192.168.1.10:8000`) and its API token if authentication is on. Text search (CLAP) must be enabled.
    - **OpenRouter** (optional): API key and model id (default `google/gemini-2.5-flash`; any OpenRouter model id works).
-   - **Audiobookshelf** (optional, under Settings › Servers and services): address and an API token or login.
+   - **Audiobookshelf** (optional, under Settings › Connections): address and an API token or login.
 2. Use **Test** next to each section, then **Save**.
 3. Optional: install the **Siansa plugin** on AudioMuse-AI (see [`audiomuse-plugin/`](audiomuse-plugin/README.md)) and choose it
    under Settings › Crossfade and levelling. It measures each song's loudness and how it starts and ends, for

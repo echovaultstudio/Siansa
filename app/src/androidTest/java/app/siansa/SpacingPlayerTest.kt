@@ -2,6 +2,7 @@ package app.siansa
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
@@ -19,8 +20,15 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.performClick
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.swipe
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.siansa.ui.SiansaTheme
 import app.siansa.ui.Space
@@ -57,27 +65,49 @@ class SpacingPlayerTest : SpacingCheck() {
     }
 
     /**
-     * Swipe to remove in the queue goes left to right (issue #809), the reverse of swipe to queue: a right swipe
-     * takes the song out, with the red strip's bin and label at the left edge, where the row slid away from; a left
-     * swipe does nothing.
+     * The queue's swipes (issue #915): right to left takes the song out, the way a song is swiped into the queue, once
+     * the bin has shaken; left to right moves it to play next.
      */
-    @Test fun aQueuedSongIsRemovedBySwipingRight() {
+    @Test fun aQueuedSongIsRemovedBySwipingLeftAndPlaysNextBySwipingRight() {
         var removed = 0
+        var next = 0
         compose.setContent {
             SiansaTheme {
                 Box(Modifier.width(360.dp).testTag("queued")) {
-                    app.siansa.ui.SwipeToRemove(rowColour = app.siansa.ui.QUEUE_ROW, onRemove = { removed++ }) { background ->
+                    app.siansa.ui.QueueSwipes(rowColour = app.siansa.ui.QUEUE_ROW, onRemove = { removed++ }, onPlayNext = { next++ }) { background ->
                         Box(Modifier.then(background).fillMaxWidth().height(56.dp))
                     }
                 }
             }
         }
-        compose.onNodeWithTag("queued").performTouchInput { swipeLeft() }
-        compose.waitForIdle()
-        assertEquals("A left swipe leaves the queue alone", 0, removed)
         compose.onNodeWithTag("queued").performTouchInput { swipeRight() }
         compose.waitForIdle()
-        assertEquals("A right swipe takes the song out", 1, removed)
+        assertEquals("A right swipe moves the song to play next", 1, next)
+        assertEquals("A right swipe doesn't take it out", 0, removed)
+        compose.onNodeWithTag("queued").performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        assertEquals("A left swipe takes the song out", 1, removed)
+        assertEquals("A left swipe doesn't move it", 1, next)
+    }
+
+    /** Without play next (the song playing), a right swipe in the queue does nothing; a left one still takes it out. */
+    @Test fun thePlayingSongOnlySwipesOut() {
+        var removed = 0
+        compose.setContent {
+            SiansaTheme {
+                Box(Modifier.width(360.dp).testTag("queued")) {
+                    app.siansa.ui.QueueSwipes(rowColour = app.siansa.ui.QUEUE_ROW, onRemove = { removed++ }, onPlayNext = null) { background ->
+                        Box(Modifier.then(background).fillMaxWidth().height(56.dp))
+                    }
+                }
+            }
+        }
+        compose.onNodeWithTag("queued").performTouchInput { swipeRight() }
+        compose.waitForIdle()
+        assertEquals(0, removed)
+        compose.onNodeWithTag("queued").performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        assertEquals(1, removed)
     }
 
     /** Shape the mix (issue #649): the shape chips sit evenly between their title and the hint under them. */
@@ -166,4 +196,121 @@ class SpacingPlayerTest : SpacingCheck() {
         listOf(prev, back, fwd, next).forEach { assertEven("Centred on play", (it.top + it.bottom) / 2 - (play.top + play.bottom) / 2, 0.dp, 1.dp) }
     }
 
+
+    /** Song radio's choices (issue #916): two rows of the same height, each name centred in its row beside its icon. */
+    @Test fun radioChoicesAreEvenRows() {
+        compose.setContent { SiansaTheme { Box(Modifier.width(320.dp)) { app.siansa.ui.RadioModeChoices {} } } }
+        val steady = compose.onNodeWithTag("radioMode-steady").getBoundsInRoot()
+        val dj = compose.onNodeWithTag("radioMode-dj").getBoundsInRoot()
+        assertEven("Row heights", steady.bottom - steady.top, dj.bottom - dj.top, 1.dp)
+        for ((row, name) in listOf(steady to "Steady", dj to "DJ")) {
+            val label = compose.onNodeWithText(name, useUnmergedTree = true).getBoundsInRoot()
+            assertEven("$name above and below", label.top - row.top, row.bottom - label.bottom, 2.dp)
+        }
+    }
+
+    /**
+     * Sliding from the play button (issue #919): up runs up's choice, a way with Nothing on it does nothing, a tap still
+     * plays and pauses, and pressing and holding still stops.
+     */
+    @Test fun playButtonSlidesTapsAndHolds() {
+        val slid = mutableListOf<app.siansa.ui.PlaySlide>()
+        var toggled = 0
+        var stopped = 0
+        compose.setContent {
+            SiansaTheme {
+                Box(Modifier.size(300.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                    app.siansa.ui.PlayButton(
+                        playing = true,
+                        slides = app.siansa.ui.PlaySlides(left = app.siansa.ui.PlaySlide.NOTHING),
+                        djMix = false,
+                        onToggle = { toggled++ },
+                        onStop = { stopped++ },
+                        onSlide = { slid += it },
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("playButton", useUnmergedTree = true).performTouchInput { swipe(center, center + Offset(0f, -height.toFloat())) }
+        compose.waitForIdle()
+        assertEquals(listOf(app.siansa.ui.PlaySlide.DJ_MIX), slid)
+        compose.onNodeWithTag("playButton", useUnmergedTree = true).performTouchInput { swipe(center, center + Offset(width.toFloat(), 0f)) }
+        compose.waitForIdle()
+        assertEquals(listOf(app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.PlaySlide.SONIC_MATCH), slid)
+        compose.onNodeWithTag("playButton", useUnmergedTree = true).performTouchInput { swipe(center, center + Offset(-width.toFloat(), 0f)) }
+        compose.waitForIdle()
+        assertEquals("Nothing on left", 2, slid.size)
+        assertEquals("No slide plays or pauses", 0, toggled)
+        compose.onNodeWithTag("playButton", useUnmergedTree = true).performClick()
+        compose.waitForIdle()
+        assertEquals(1, toggled)
+        compose.onNodeWithTag("playButton", useUnmergedTree = true).performTouchInput { longClick() }
+        compose.waitForIdle()
+        assertEquals(1, stopped)
+        assertEquals("A hold doesn't play or pause", 1, toggled)
+    }
+
+    /** A slide's choice sits the same gap from the play button's edge, up and to the side (issue #919). */
+    @Test fun slideChoicesAreEvenlyAway() {
+        var way by androidx.compose.runtime.mutableStateOf(app.siansa.ui.SlideWay.UP)
+        compose.setContent {
+            SiansaTheme {
+                Box(Modifier.size(300.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                    app.siansa.ui.PlayButton(
+                        playing = false, slides = app.siansa.ui.PlaySlides(), djMix = false,
+                        onToggle = {}, onStop = {}, onSlide = {},
+                        preview = app.siansa.ui.SlideState(way, armed = true),
+                    )
+                }
+            }
+        }
+        val button = compose.onNodeWithTag("playButton", useUnmergedTree = true).getBoundsInRoot()
+        val up = compose.onNodeWithTag("slideChoice-up", useUnmergedTree = true).getBoundsInRoot()
+        val upGap = button.top - (up.top + up.bottom) / 2
+        way = app.siansa.ui.SlideWay.LEFT
+        compose.waitForIdle()
+        val left = compose.onNodeWithTag("slideChoice-left", useUnmergedTree = true).getBoundsInRoot()
+        val leftGap = button.left - (left.left + left.right) / 2
+        assertEven("Up and left", upGap, leftGap, 1.dp)
+    }
+
+    /** A slide's name sits in the middle of the cover, out from under the thumb (issue #933). */
+    @Test fun slideNameIsCentredInTheCover() {
+        compose.setContent {
+            SiansaTheme {
+                Box(Modifier.size(300.dp)) {
+                    app.siansa.ui.SlideCoverLabel(
+                        app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.SlideWay.UP, armed = true),
+                        Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        val cover = compose.onNodeWithTag("slideLabel", useUnmergedTree = true).getBoundsInRoot()
+        val name = compose.onNodeWithTag("slideName", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Left and right of the name", name.left - cover.left, cover.right - name.right, 1.dp)
+    }
+
+    /** Given the seek bar's place, the up choice's centre is exactly that far above the button's (issue #963). */
+    @Test fun upChoiceSitsOnTheSeekBar() {
+        val reachPx = 300
+        compose.setContent {
+            SiansaTheme {
+                Box(Modifier.size(400.dp), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+                    app.siansa.ui.PlayButton(
+                        playing = false, slides = app.siansa.ui.PlaySlides(), djMix = false,
+                        onToggle = {}, onStop = {}, onSlide = {},
+                        preview = app.siansa.ui.SlideState(app.siansa.ui.SlideWay.UP, armed = true),
+                        upReachPx = reachPx,
+                    )
+                }
+            }
+        }
+        val button = compose.onNodeWithTag("playButton", useUnmergedTree = true).getBoundsInRoot()
+        val up = compose.onNodeWithTag("slideChoice-up", useUnmergedTree = true).getBoundsInRoot()
+        val gap = (button.top + button.bottom) / 2 - (up.top + up.bottom) / 2
+        val expected = with(compose.density) { reachPx.toDp() }
+        assertEven("Up choice above the button's centre", gap, expected, 1.dp)
+    }
 }

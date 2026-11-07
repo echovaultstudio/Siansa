@@ -246,7 +246,8 @@ class MixGenerator(private val graph: AppGraph) {
         val leaveOut = taste?.favouriteSongs.orEmpty().take(selector.leaveOutTopPlayed.coerceAtLeast(0)).toSet()
         val candidates = graph.library.randomSongs(LIBRARY_CANDIDATES)
         val text = listOf(plan.query, plan.title, selector.baseQuery, selector.guidance, selector.name).joinToString(" ")
-        val more = LibraryMix.pick(
+        // Weighing a few thousand songs is real work: off the main thread, which a mix started from a page is on.
+        val more = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { LibraryMix.pick(
             candidates,
             vibeText = text,
             hourGenres = taste?.hourGenres.orEmpty(),
@@ -254,7 +255,7 @@ class MixGenerator(private val graph: AppGraph) {
             avoid = recent + leaveOut + taste?.skipped.orEmpty(),
             exclude = exclude + first.map { it.id },
             otherArtists = otherArtists + graph.mixes.lastArtists(selector.id, excludeId = id),
-        )
+        ) }
         val vibe = LibraryMix.words(text)
         AppLog.i(
             "Mix",
@@ -797,7 +798,7 @@ fun parseSteering(element: kotlinx.serialization.json.JsonElement?, concepts: Li
  * What a vibe or mood playlist says when none of AudioMuse's songs could be found on this server, instead of an
  * empty list (beta testers #40). The AudioMuse test in Settings says which case it is.
  */
-const val NOT_ON_THIS_SERVER = "None of the songs AudioMuse found are on this server. Test AudioMuse in Settings › Servers and services to see why."
+const val NOT_ON_THIS_SERVER = "None of the songs AudioMuse found are on this server. Test AudioMuse in Settings › Connections to see why."
 
 /**
  * A sound search's [hits], and which of them are songs here ([here], by AudioMuse's id); [foreign] when none of

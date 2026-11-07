@@ -1,5 +1,8 @@
 package app.siansa.screenshots
 
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
@@ -7,9 +10,13 @@ import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +45,7 @@ import app.siansa.mix.RuleOp
 import app.siansa.playback.dlna.DlnaDevice
 import app.siansa.ui.ArrangeList
 import app.siansa.ui.BottomTabs
+import app.siansa.ui.ChromecastSettingsContent
 import app.siansa.ui.DlnaSettingsContent
 import app.siansa.ui.GradientTile
 import app.siansa.ui.HomeItem
@@ -46,9 +54,21 @@ import app.siansa.ui.MixShapeControls
 import app.siansa.ui.ProgressCard
 import app.siansa.playback.BeatMatchMode
 import app.siansa.ui.BeatMatchSection
+import app.siansa.net.SourceKind
+import app.siansa.ui.Hint
+import app.siansa.ui.NewServerButtons
+import app.siansa.ui.ApiKeyField
+import app.siansa.ui.TestRow
+import app.siansa.data.AppSettings
+import app.siansa.net.SubsonicApi
+import app.siansa.ui.ServerKindChips
 import app.siansa.ui.MenuRow
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.DownloadForOffline
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material.icons.rounded.Speaker
+import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material.icons.rounded.Shuffle
 import app.siansa.ui.FoldSection
 import app.siansa.ui.SwitchRow
@@ -277,11 +297,72 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     )
                 }
             },
+            // Play on's rows (issue #114): a Cast device's own name with what it is under it, never what the TV shows.
+            Scene("cast_play_on_rows") {
+                Column {
+                    app.siansa.ui.TargetRow(Icons.Rounded.Tv, "Living Room SHIELD with an uncharacteristically long name", app.siansa.ui.CastKind.Tv.detail, selected = true, onSettings = {}) {}
+                    app.siansa.ui.TargetRow(Icons.Rounded.Speaker, "Kitchen and living room speakers", app.siansa.ui.CastKind.Group.detail, selected = false, onSettings = {}) {}
+                    app.siansa.ui.TargetRow(Icons.Rounded.Speaker, "JBL BAR 800MK2", "DLNA · JBL", selected = false, onSettings = {}) {}
+                }
+            },
+            // The Chromecast settings behind the cog in Play on (issue #114): sound quality, lossless by default.
+            Scene("cast_chromecast_settings") {
+                Column(Modifier.padding(Space.Section)) {
+                    ChromecastSettingsContent()
+                }
+            },
+            // The top of Home (issue #872): the notices with the round menu button in line at their end, while casting;
+            // then with no notices and the source filter on (a ring round the button, its lines in the accent colour).
+            Scene("home_header_menu") {
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.HomeTopBar(
+                        listOf(app.siansa.mix.Notices.yourMonth(java.time.LocalDate.of(2026, 11, 2))!!, app.siansa.mix.Notices.newAlbums(6, "a")!!, app.siansa.mix.Notices.carryOn("b", "Dune")),
+                        onOpen = {},
+                    ) {
+                        app.siansa.ui.HomeMenuButton(app.siansa.ui.rememberHomeMenuState(), casting = true, filterActive = false, onPick = {})
+                    }
+                    app.siansa.ui.HomeTopBar(emptyList(), onOpen = {}) {
+                        app.siansa.ui.HomeMenuButton(app.siansa.ui.rememberHomeMenuState(), casting = false, filterActive = true, onPick = {})
+                    }
+                }
+            },
+            // Home's menu (issue #872), its bubbles in line: Sources lit under the finger of a glide; and while casting
+            // with the source filter on, Play on… and Sources in the accent colour, each with only its name.
+            Scene("home_menu") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                    app.siansa.ui.HomeMenuPanel(
+                        app.siansa.ui.HomeMenuInfo(app.siansa.ui.PlayOnLine("Play on…", "TV or speaker", false), "All libraries", false),
+                        highlighted = app.siansa.data.HomeMenuItem.SOURCES, onPick = {},
+                    )
+                    app.siansa.ui.HomeMenuPanel(
+                        app.siansa.ui.HomeMenuInfo(
+                            app.siansa.ui.PlayOnLine("Playing on Living Room SHIELD with an uncharacteristically long name", "Chromecast", true),
+                            "Downloaded only · 2 users · 2 of 3 libraries", true,
+                        ),
+                        highlighted = null, onPick = {},
+                    )
+                }
+            },
             // Menu rows (issue #778): no badge on shuffle, a word badge where one says something.
             Scene("menu_rows") {
                 Column {
                     MenuRow(Icons.Rounded.Shuffle, "Shuffle: off") {}
                     MenuRow(Icons.Rounded.Bedtime, "Sleep at the end of the chapter, uncharacteristically", badge = "on") {}
+                }
+            },
+            // A music server being added (issue #828): its type, then Save or Cancel; nothing is added before Save.
+            Scene("new_server") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    ServerKindChips(SourceKind.JELLYFIN) {}
+                    Hint(SourceKind.JELLYFIN.detail)
+                    NewServerButtons(onSave = {}, onCancel = {})
+                }
+            },
+            // The OpenSubsonic API key on the server form (issue #493), with Test saying plainly the server doesn't take keys.
+            Scene("server_api_key") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    ApiKeyField(AppSettings(navidromeApiKey = "a-very-long-api-key-from-the-server-0123456789")) {}
+                    TestRow("✗ " + SubsonicApi.NO_API_KEYS) {}
                 }
             },
             // Beat-matched blends with the echo switch (issue #759).
@@ -296,7 +377,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     TuningRow("Songs", 40, DailyMix.LENGTHS, { "$it" }, "dailyLength") {}
                     TuningRow("Leave out most played", null, DailyMix.LEAVE_OUT, { if (it == 0) "None" else "Top $it" }, "dailyLeaveOut") {}
                     FoldSection("Streaming quality", "Wi-Fi Original · mobile Opus 128", tag = "quality", startOpen = false) { Text("Body") }
-                    FoldSection("Beat-matched blends (experimental)", "DJ radio · 16 bars · echo", tag = "blends", startOpen = true) {
+                    FoldSection("Beat-matched blends", "DJ radio · 16 bars · echo", tag = "blends", startOpen = true) {
                         Text("Incomprehensibilities of the uncharacteristically long settings body")
                     }
                 }
@@ -320,29 +401,196 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             },
             // The notices row at the top of Home (issue #784), with a long book title cut off.
             Scene("home_notices") {
-                app.siansa.ui.NoticeChips(
+                app.siansa.ui.HomeTopBar(
                     listOf(
                         app.siansa.mix.Notice(app.siansa.mix.NoticeKind.NEEDS_YOU, "n", "Library sync failed", "x"),
                         app.siansa.mix.Notices.carryOn("b", "The Extraordinarily Long Chronicles of Wandering Mapmakers"),
                         app.siansa.mix.Notices.newAlbums(3, "a")!!,
                     ),
                     onOpen = {},
-                )
+                ) {
+                    app.siansa.ui.HomeMenuButton(app.siansa.ui.rememberHomeMenuState(), casting = false, filterActive = false, onPick = {})
+                }
             },
-            // The Settings start page in groups (issue #780), and Settings › Home's rows with what's set.
+            // Now playing's play button (issue #919): record grooves while a DJ mix plays, and a slide's choice, far enough
+            // to start (up, with its name) and not yet (left), on the player's colours.
+            Scene("play_button_grooves_and_slides") {
+                OnPlayer {
+                    // Each in a band of its own, with room on the side its choice and name go.
+                    Column(Modifier.fillMaxWidth().padding(vertical = Space.Section)) {
+                        Box(Modifier.fillMaxWidth().padding(vertical = Space.Section), contentAlignment = Alignment.Center) {
+                            app.siansa.ui.PlayButton(playing = false, slides = app.siansa.ui.PlaySlides(), djMix = true, onToggle = {}, onStop = {}, onSlide = {})
+                        }
+                        Box(Modifier.fillMaxWidth().padding(top = Space.Large * 3, bottom = Space.Section), contentAlignment = Alignment.Center) {
+                            app.siansa.ui.PlayButton(
+                                playing = true, slides = app.siansa.ui.PlaySlides(), djMix = false, onToggle = {}, onStop = {}, onSlide = {},
+                                preview = app.siansa.ui.SlideState(app.siansa.ui.SlideWay.UP, armed = true),
+                            )
+                        }
+                        Box(Modifier.fillMaxWidth().padding(vertical = Space.Section, horizontal = Space.Large), contentAlignment = Alignment.CenterEnd) {
+                            app.siansa.ui.PlayButton(
+                                playing = true, slides = app.siansa.ui.PlaySlides(), djMix = false, onToggle = {}, onStop = {}, onSlide = {},
+                                preview = app.siansa.ui.SlideState(app.siansa.ui.SlideWay.LEFT, armed = false),
+                            )
+                        }
+                    }
+                }
+            },
+            // A slide's choice in the middle of the cover (issue #933): far enough to start, not yet, and one that can't run.
+            Scene("slide_label_in_cover") {
+                OnPlayer {
+                    Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                        listOf(
+                            app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.SlideWay.UP, armed = true),
+                            app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.SONIC_MATCH, app.siansa.ui.SlideWay.RIGHT, armed = false),
+                            app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.SONG_PATH, app.siansa.ui.SlideWay.LEFT, armed = false, why = "Needs AudioMuse"),
+                        ).forEach { label ->
+                            Box(
+                                Modifier.size(220.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                                    .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFFB0476A), Color(0xFF3A1D6E)))),
+                            ) { app.siansa.ui.SlideCoverLabel(label, Modifier.fillMaxSize()) }
+                        }
+                    }
+                }
+            },
+            // Settings › Style › Home: how many shortcuts Home shows (issue #934).
+            Scene("home_style_shortcuts") {
+                Column(Modifier.padding(vertical = Space.Page)) { app.siansa.ui.ShortcutCountRow(6) {} }
+            },
+            // Arrange Home's switch for a section's title (issue #961), on and off.
+            Scene("home_section_title_switch") {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.SectionTitleSwitch(true) {}
+                    app.siansa.ui.SectionTitleSwitch(false) {}
+                }
+            },
+            // An album's details with "Continue from 8", and its bar (issue #965, the owner's layout): at rest; continuing (a ring
+            // round Play); sliding shuffle onto Play (the rest dims, Play a record); while the album's DJ mix plays; and DJ mix
+            // on the cover, on Play and before.
+            Scene("album_bar") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                    app.siansa.ui.CollectionByline("Thornhill", null, null, "Album · 2019", note = "Continue from 8")
+                    val download: @Composable () -> Unit = { androidx.compose.material3.Icon(Icons.Rounded.DownloadForOffline, "Download", Modifier.size(28.dp)) }
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {})
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {},
+                        resume = app.siansa.ui.PlayResume(9, "10") to 24)
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {},
+                        djSlide = app.siansa.ui.DjSlide(armed = true), dim = 0.3f)
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {},
+                        mixOn = true)  // paused: a turning glint never lets the picture settle
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
+                        listOf(true, false).forEach { armed ->
+                            Box(
+                                Modifier.size(160.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                                    .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFFD4813A), Color(0xFF1E2A6B)))),
+                            ) {
+                                app.siansa.ui.SlideCoverLabel(
+                                    app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.SlideWay.RIGHT, armed), Modifier.fillMaxSize(),
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            // Now playing's dynamic colours (issue #970): a seek bar and Play in each cover's colour, on its backdrop; a cool
+            // grey cover, a sepia one and a black and white one (issue #994) are a blueish silver, tan and silver.
+            Scene("dynamic_colours") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    listOf(
+                        Color(0xFFB2CE05) to Color(0xFFB8C64F), Color(0xFF09A2E5) to Color(0xFF203440), Color(0xFFAD6B41) to Color(0xFF6A4E31),
+                        Color(0xFF6A4744) to Color(0xFFCDC9C7), Color(0xFFE9E1CF) to Color(0xFFF4F1EA), Color(0xFF808080) to Color(0xFF808080),
+                        Color(0xFFB8BCC4) to Color(0xFF9A9CA4), Color(0xFF947D72) to Color(0xFF4A3F3A), Color(0xFF7F7F7F) to Color(0xFF1C1C1C),
+                    ).forEach { (seed, average) ->
+                        val backdrop = app.siansa.ui.DynamicAccent.backdropOf(average)
+                        val c = app.siansa.ui.DynamicAccent.of(seed, backdrop)
+                        Row(
+                            Modifier.fillMaxWidth().background(backdrop).padding(Space.Medium),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Space.Medium),
+                        ) {
+                            app.siansa.ui.WithAccent(c?.controls, c?.onControls) {
+                                Box(Modifier.weight(1f).height(3.dp).background(app.siansa.ui.Accent))
+                                Box(Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape).background(app.siansa.ui.Accent), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                                    androidx.compose.material3.Icon(Icons.Rounded.PlayArrow, null, tint = app.siansa.ui.OnAccent)
+                                }
+                            }
+                            app.siansa.ui.WithAccent(c?.text, c?.onControls) { Text("Living room TV", color = app.siansa.ui.Accent) }
+                        }
+                    }
+                }
+            },
+            // Settings › Style › Now playing: the play button slides, each way and what it does.
+            Scene("play_slides_settings") {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.PlaySlidesSettings(app.siansa.ui.PlaySlides(left = app.siansa.ui.PlaySlide.START_A_MIX)) {}
+                }
+            },
+            // Song radio's choices (issue #916): an icon and the name each, no descriptions; and the mixing docs link under
+            // Crossfade and levelling.
+            Scene("radio_choices_and_mixing_docs") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.RadioModeChoices {}
+                    app.siansa.ui.MixingDocsLink()
+                }
+            },
+            // The Settings start page in groups (issue #780, renamed for v1.0), and Settings › Notices and Cards' rows.
             Scene("settings_groups") {
                 Column {
                     app.siansa.ui.HubGroup("Sources", first = true)
-                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Dns, "Servers and services") {}
+                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Dns, "Connections") {}
                     app.siansa.ui.HubGroup("Listening")
                     app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Playback") {}
-                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.MenuBook, "Audiobooks and podcasts") {}
-                    app.siansa.ui.HubGroup("Home and mixes")
+                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.SwapVert, "Data") {}
+                    app.siansa.ui.HubGroup("Home")
+                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Home, "Notices and Cards") {}
+                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Schedule, "Auto Generated Mixes") {}
                     Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
                         app.siansa.ui.PageLink("Notices", app.siansa.ui.noticesLine(true, app.siansa.mix.NoticePrefs()), "n") {}
                         app.siansa.ui.PageLink("Cards", "Made for you and your own cards", "c") {}
                     }
                 }
+            },
+            // Stations and podcast feeds in Your Library (issue #353): rows with their ⋮ menu, long names cut off.
+            Scene("stations_list") {
+                Column {
+                    app.siansa.ui.LibraryStationRowForTest("Radio Paradise", "Radio · From your server", "server-1")
+                    app.siansa.ui.LibraryStationRowForTest("Unbelievably Long Community Radio Station Name for Rainy Evenings", "Radio · On this phone", "own-2")
+                    app.siansa.ui.LibraryStationRowForTest("Rocket Hour", "Podcast · Ada Lovelace · 479 episodes", "pod-3", podcast = true)
+                }
+            },
+            // A podcast's page (issue #353): its header and episodes, one playing, a long title on two lines.
+            Scene("podcast_page") {
+                Column {
+                    app.siansa.ui.PodcastHeader("The Extraordinarily Long Chronicles of Wandering Mapmakers", "Ada Lovelace and Friends", null, "pod-1", 479)
+                    app.siansa.ui.EpisodeRow("Ep. 479 · Exploring the Dopamine Chamber with Uncharacteristically Long Words", "5 Mar 2024 · 58 min", playing = true) {}
+                    app.siansa.ui.EpisodeRow("Ep. 478 · Short one", "4 Mar 2024 · 1 h 2 min", playing = false) {}
+                }
+            },
+            // Adding a station or podcast (issue #353): the fields with their hint, then with an error.
+            Scene("add_station") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.AddStationFields("https://somafm.com/groovesalad.pls", "", busy = false, error = null, hint = app.siansa.ui.AddKind.STATION.hint, onLink = {}, onName = {}, onDone = {})
+                    app.siansa.ui.AddStationFields("https://example.com/", "Mine", busy = false, error = "That link isn't a radio stream or a podcast feed", hint = app.siansa.ui.AddKind.PODCAST.hint, onLink = {}, onName = {}, onDone = {})
+                }
+            },
+            // Editing a station (issue #353): one added on this phone with long words and a picture link, then one from
+            // the server, whose name and link can't be changed here.
+            Scene("edit_station") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.AddStationFields(
+                        "http://mp3channels.webradio.rockantenne.de/heavy-metal-with-an-unbelievably-long-address", "Rock Antenne Heavy Metal Unbelievably Long Station Name",
+                        busy = false, error = null, hint = app.siansa.ui.editHint(false),
+                        picture = "https://www.rockantenne.de/logos/station-heavy-metal/apple-touch-icon.png", onLink = {}, onName = {}, onDone = {},
+                    )
+                    app.siansa.ui.AddStationFields(
+                        "https://stream.radioparadise.com/aac-320", "Radio Paradise", busy = false, error = null, hint = app.siansa.ui.editHint(true),
+                        picture = "", fixed = true, onLink = {}, onName = {}, onDone = {},
+                    )
+                }
+            },
+            // Now playing for a live station (issue #353): no seek bar, only that it's live.
+            Scene("player_live") {
+                OnPlayer { Box(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium)) { app.siansa.ui.LiveBar() } }
             },
             // Custom card editor: a rule (issue #663).
             Scene("card_rule") {

@@ -12,6 +12,7 @@ import coil3.disk.DiskCache
 import coil3.disk.directory
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.request.allowRgb565
 import coil3.request.transitionFactory
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -78,7 +79,7 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
     }
 
     /**
-     * Covers are kept on disk as they load, up to the size chosen in Settings › Streaming and data (or without a
+     * Covers are kept on disk as they load, up to the size chosen in Settings › Data (or without a
      * limit), so scrolling back is instant and works offline. With no limit they're kept in the app's
      * files rather than its cache, so Android doesn't remove them when it runs short of space.
      *
@@ -104,18 +105,29 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
                 // Animated covers shown as stills: their first frame (Android's still decoder fails on some).
                 add(app.siansa.covers.FirstFrameDecoder.Factory())
             }
-            // Room for a few hundred decoded list covers, so scrolling back shows them at once.
-            .memoryCache { MemoryCache.Builder().maxSizePercent(context, 0.30).build() }
+            // Room for a few hundred decoded list covers, so scrolling back shows them at once. Half that on a TV
+            // (issue #860): an NVIDIA SHIELD kept warning of low memory, and its covers come from the disk cache quickly.
+            .memoryCache { MemoryCache.Builder().maxSizePercent(context, if (BuildConfig.TV_APP) 0.15 else 0.30).build() }
             .diskCache {
                 DiskCache.Builder()
                     .directory(directory)
                     .maxSizeBytes(bytes)
                     .build()
             }
-            // Fade in only covers that just came over the network. One read from the phone's own cache
-            // appears straight away, as it would if it were still in memory.
+            .apply {
+                if (BuildConfig.TV_APP) {
+                    // Lighter covers on a TV (issue #951): a cover without see-through parts takes half the memory
+                    // (16 bits a pixel, which a cover on a TV doesn't show), and a few load at a time, so a row of
+                    // six doesn't hold up the screen or the music.
+                    allowRgb565(true)
+                    fetcherCoroutineContext(kotlinx.coroutines.Dispatchers.IO.limitedParallelism(TV_COVER_LOADS))
+                    decoderCoroutineContext(kotlinx.coroutines.Dispatchers.Default.limitedParallelism(TV_COVER_DECODES))
+                }
+            }
+            // Fade in only covers that just came over the network, and never on a TV (issue #951). One read from the
+            // phone's own cache appears straight away, as it would if it were still in memory.
             .transitionFactory { target, result ->
-                if (result is coil3.request.SuccessResult && result.dataSource == coil3.decode.DataSource.NETWORK) {
+                if (!BuildConfig.TV_APP && result is coil3.request.SuccessResult && result.dataSource == coil3.decode.DataSource.NETWORK) {
                     coil3.transition.CrossfadeTransition(target, result, 110)
                 } else {
                     coil3.transition.Transition.Factory.NONE.create(target, result)
@@ -156,6 +168,8 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
             "Navidrome ${if (s.navidromeReady) "set" else "not set"}, AudioMuse ${if (s.audioMuseReady) "set" else "not set"}, AI ${if (s.aiReady) "on" else "off"}",
             "quality Wi-Fi ${if (s.transcodeWifiKbps > 0) "Opus ${s.transcodeWifiKbps}" else "original"}, mobile ${if (s.transcodeMobileKbps > 0) "Opus ${s.transcodeMobileKbps}" else "original"}",
             "ReplayGain ${s.replayGain.label}",
+            // How songs blend, so a DJ session's log says what it was set to (0.52.0-dev).
+            "crossfade ${s.crossfade.name.lowercase()} ${s.crossfadeSeconds} s, beat-matched ${s.beatMatch.name.lowercase()}, ${s.blendBars} bars, bass swap ${if (s.bassSwap) "on" else "off"}",
             "song cache ${mb(s.songCacheMb)}, image cache ${mb(s.imageCacheMb)}",
             "animated covers ${if (s.animatedCovers) "on" else "off"}, download all covers ${if (s.coverDownload) (if (s.coverDownloadAnyWifi) "any Wi-Fi" else "home") else "off"}",
             "scrobbling: " + listOfNotNull("Navidrome".takeIf { s.scrobbleNavidrome }, "Last.fm".takeIf { s.lastFmReady }, "ListenBrainz/Koito".takeIf { s.listenBrainzReady }).joinToString(", ").ifEmpty { "off" },
@@ -168,6 +182,9 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
         if (level >= TRIM_MEMORY_RUNNING_LOW && level < TRIM_MEMORY_UI_HIDDEN || level >= TRIM_MEMORY_BACKGROUND) {
             AppLog.w("Phone", "Low memory signal (level $level) · ${Diagnostics.snapshot(this)}")
         }
+        // Give back decoded covers, the biggest thing the app keeps that it can do without ([CoverTrim]).
+        val covers = runCatching { coil3.SingletonImageLoader.get(this).memoryCache }.getOrNull() ?: return
+        CoverTrim.keep(level, covers.maxSize)?.let { keep -> if (keep == 0L) covers.clear() else covers.trimToSize(keep) }
     }
 
     companion object {
@@ -178,3 +195,23 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
             if (unlimited) context.filesDir.resolve(IMAGE_CACHE_DIR) else context.cacheDir.resolve(IMAGE_CACHE_DIR)
     }
 }
+
+/**
+ * How much of the cover memory cache to keep when Android asks for memory back (issue #892): all of it goes once the
+ * app is out of sight, half while it's on screen and memory runs low or critical, as the covers showing load again
+ * from the disk cache otherwise. The NVIDIA SHIELD says "critical" about once a minute while Siansa uses a quarter of
+ * what it may, and emptying the whole cache each time made every cover on the TV load again: the lag, and the same
+ * covers fetched over and over. Null: leave it as it is.
+ */
+object CoverTrim {
+    fun keep(level: Int, maxSize: Long): Long? = when {
+        level >= android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND -> 0L
+        level == android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> maxSize / 2
+        level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW -> maxSize / 2
+        else -> null
+    }
+}
+
+/** Covers a TV loads and decodes at a time (issue #951). */
+private const val TV_COVER_LOADS = 4
+private const val TV_COVER_DECODES = 2

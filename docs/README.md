@@ -3,8 +3,8 @@
 Everything you need to know about Siansa: how to set it up, what each part of the app does, how it works under
 the hood, and what to do when something goes wrong.
 
-> Siansa is in beta, so things change quickly. These pages follow the newest beta. When something here doesn't
-> match your app, check [What changed](../CHANGELOG.md) or update the app.
+> These pages follow the newest version of Siansa. When something here doesn't match your app, check
+> [What changed](../CHANGELOG.md) or update the app. The TV app is still in beta.
 
 ## Start here
 
@@ -17,9 +17,12 @@ the hood, and what to do when something goes wrong.
 
 - [Home and your mixes](home-and-mixes.md): today's mix, vibes, Made for you, radios, shortcuts.
 - [Discovery](discovery.md): song radio, Keep playing, similar music, Song path, Flow, the dice.
-- [Playback](playback.md): quality, cache, downloads, levelling, crossfades, equaliser, lyrics, sleep timer, casting.
+- [Playback](playback.md): quality, cache, downloads, levelling, crossfades, equaliser, lyrics, sleep timer, casting,
+  Android Auto.
 - [Your listening](your-listening.md): your month and year, Time Machine, sonic fingerprint, scrobbling.
 - [Audiobooks and podcasts](books.md): Audiobookshelf, the Books panel and chips, the book player.
+- [Your Stations](stations.md): internet radio from your server and your own links, and podcasts by their feed.
+- [Siansa on your TV](tv.md): the Android TV and Google TV app (in beta), signing in from your phone, audio passthrough.
 - [AI features](ai.md): what the optional AI does, what it's sent, and the Situation panel.
 - [Settings](settings.md): every settings page, one by one.
 

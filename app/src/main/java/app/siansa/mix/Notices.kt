@@ -8,19 +8,27 @@ import java.util.Locale
  * The kinds of notice in the chips row at the top of Home (issue #784). [tier] orders them when they're automatic:
  * what needs you first, then what you're partway through, then what's new.
  */
-enum class NoticeKind(val id: String, val label: String, val hint: String, val tier: Int) {
+enum class NoticeKind(
+    val id: String,
+    val label: String,
+    val hint: String,
+    val tier: Int,
+    /** How it shows until it's set: Automatic, or Off for one you add yourself (Liked songs, issue #935). */
+    val defaultMode: NoticeMode = NoticeMode.AUTO,
+) {
     NEEDS_YOU("needs", "Needs you", "When the library sync failed", 0),
     CARRY_ON("carry_on", "Carry on", "A book or episode you're partway through", 1),
-    NEW_ALBUMS("new_albums", "New in your library", "Albums added in the last few days", 2),
+    NEW_ALBUMS("new_albums", "New in your library", "Albums added in the last 30 days", 2),
     YOUR_MONTH("month", "Your month", "Last month's listening, in the first week", 2),
-    NEW_ARTISTS("artists", "Artists for you", "Today's new artists to try", 2);
+    NEW_ARTISTS("artists", "Artists for you", "Today's new artists to try", 2),
+    LIKED("liked", "Liked songs", "Your liked songs, a tap away. Off until you add it", 3, NoticeMode.OFF);
 
     companion object {
         fun byId(id: String): NoticeKind? = entries.firstOrNull { it.id == id.trim() }
     }
 }
 
-/** How a kind of notice shows (Settings › Home › Notices): always first, ordered for you, or never. */
+/** How a kind of notice shows (Settings › Notices and Cards › Notices): always first, ordered for you, or never. */
 enum class NoticeMode(val id: String, val label: String) {
     PINNED("pinned", "Pinned"),
     AUTO("auto", "Automatic"),
@@ -36,11 +44,11 @@ enum class NoticeMode(val id: String, val label: String) {
  * pinned, which is the order they show.
  */
 data class NoticePrefs(val modes: Map<NoticeKind, NoticeMode> = emptyMap(), val pinned: List<NoticeKind> = emptyList()) {
-    fun modeOf(kind: NoticeKind): NoticeMode = modes[kind] ?: NoticeMode.AUTO
+    fun modeOf(kind: NoticeKind): NoticeMode = modes[kind] ?: kind.defaultMode
 
     /** [kind] set to [mode]; a newly pinned kind goes after the ones already pinned. */
     fun with(kind: NoticeKind, mode: NoticeMode): NoticePrefs {
-        val newModes = if (mode == NoticeMode.AUTO) modes - kind else modes + (kind to mode)
+        val newModes = if (mode == kind.defaultMode) modes - kind else modes + (kind to mode)
         val newPinned = when {
             mode != NoticeMode.PINNED -> pinned - kind
             kind in pinned -> pinned
@@ -49,7 +57,7 @@ data class NoticePrefs(val modes: Map<NoticeKind, NoticeMode> = emptyMap(), val 
         return NoticePrefs(newModes, newPinned)
     }
 
-    /** "carry_on:pinned,month:off": pinned ones first in their order, then the rest. */
+    /** "carry_on:pinned,month:off,liked:auto": pinned ones first in their order, then the rest (each not at its default). */
     fun format(): String = (pinned.map { it to NoticeMode.PINNED } + modes.filter { it.value != NoticeMode.PINNED }.toList().sortedBy { it.first.ordinal })
         .joinToString(",") { (kind, mode) -> "${kind.id}:${mode.id}" }
 
@@ -60,7 +68,7 @@ data class NoticePrefs(val modes: Map<NoticeKind, NoticeMode> = emptyMap(), val 
             for (part in saved.split(',')) {
                 val kind = NoticeKind.byId(part.substringBefore(':')) ?: continue
                 val mode = NoticeMode.byId(part.substringAfter(':', "")) ?: continue
-                if (kind !in modes && mode != NoticeMode.AUTO) modes[kind] = mode
+                if (kind !in modes && mode != kind.defaultMode) modes[kind] = mode
             }
             return NoticePrefs(modes, modes.filterValues { it == NoticeMode.PINNED }.keys.toList())
         }
@@ -77,8 +85,11 @@ object Notices {
     /** A book counts as "carry on" when it was played this recently. */
     const val CARRY_ON_DAYS = 7
 
-    /** Albums this new count as new in your library. */
-    const val NEW_ALBUM_DAYS = 3
+    /** Albums this new count as new in your library (issue #922, the owner: the last 30 days). */
+    const val NEW_ALBUM_DAYS = 30
+
+    /** The newest albums looked at for New in your library: enough for a month of new albums. */
+    const val NEW_ALBUM_LOOK = 200
 
     /** Your month shows in the first days of the next month. */
     const val MONTH_DAYS = 7
@@ -136,6 +147,9 @@ object Notices {
         val name = last.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
         return Notice(NoticeKind.YOUR_MONTH, "month:${last.year}-${last.monthValue}", "Your $name", "report/${ReportRange.LAST_MONTH.id}")
     }
+
+    /** Liked songs, always there once you've added it (issue #935). */
+    fun liked(): Notice = Notice(NoticeKind.LIKED, "liked", "Liked songs", "liked")
 
     fun newArtists(count: Int, today: LocalDate): Notice? = if (count <= 0) null else
         Notice(NoticeKind.NEW_ARTISTS, "artists:$today", if (count == 1) "1 artist for you" else "$count artists for you", "discover/artists")

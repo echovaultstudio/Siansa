@@ -44,10 +44,10 @@ def all_round_text(all_minutes):
     """How measuring all runs, in words for the page."""
     minutes = all_round_minutes(all_minutes)
     if not minutes:
-        return ("It goes on without a break until every song is measured. Meanwhile AudioMuse waits with its own jobs "
-                "(analysis of new songs, clustering, scheduled tasks).")
-    return (f"It goes in rounds of {minutes} minutes every 15 until every song is measured. While a round runs, "
-            "AudioMuse waits with its own jobs (analysis, clustering, scheduled tasks); between rounds they run.")
+        return ("It runs without a break until every song is measured; AudioMuse waits with its own jobs meanwhile "
+                "(analysing new songs, clustering).")
+    return (f"It runs in rounds of {minutes} minutes every 15; AudioMuse waits with its own jobs during a round "
+            "and runs them in between.")
 
 
 def next_rate(rate, songs, seconds, keep=500):
@@ -154,6 +154,13 @@ def beats(counts, job):
         detail += f", {failed:,} couldn't be read yet"
     if songs == 0:
         return Status("Waiting for profiles", WORKING, 0, "Songs get their beat grids with their volume and fade profile")
+    until = min(counts.get("until_waiting", 0), done)
+    if counts["to_measure"] == 0 and until:
+        # Every grid is there, but songs measured before 0.5.0 wait to be checked for where their beat stops: the bar
+        # shows that check's progress (0.5.1 showed 100 % while Measure all worked through them).
+        checked = done - until
+        detail += f"; {checked:,} of {done:,} checked for where the beat stops"
+        return Status("Measuring" if running else "Not complete", WORKING, percent(checked, done), detail)
     if counts["to_measure"] == 0:
         return Status("Ready", READY, 100, detail)
     if running:
@@ -190,10 +197,11 @@ def _utcnow():
 
 # ---- where the rounds are (Siansa issue #765) ---------------------------------------------------------------------
 
-# A job still "running" this long after its last word (it writes every 10 songs, and when it starts) has stopped:
-# the worker was restarted or the round was cut off. Its state is then shown as stopped, so the page doesn't wait
-# on it for ever and the buttons work again.
-STALE_SECONDS = ALL_ROUND_SECONDS + 5 * 60
+# A job still "running" this long after its last word (it writes every 10 songs or every minute, and when it starts;
+# one song takes at most 3 minutes) has stopped: the worker was restarted (a plugin update) or the round was cut off.
+# Its state is then shown as stopped, so the page doesn't wait on it and the buttons work again. It was a whole round
+# plus 5 minutes (17), which kept the page on "Measuring" that long after an update stopped the run (0.5.3).
+STALE_SECONDS = 5 * 60
 
 
 def _seconds_since(iso, now):

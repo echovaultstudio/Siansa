@@ -74,6 +74,19 @@ class NetLogTest {
         assertTrue(text, text.contains("method=track.scrobble"))
     }
 
+    @Test fun hidesOpenSubsonicApiKeys() {
+        // Issue #493: the key is in every address and form body, first or not.
+        for (text in listOf(
+            "http://nd.local:4533/rest/stream?apiKey=K3Y-s3cret&v=1.16.1&c=siansa&f=json&id=s1",
+            "http://nd.local:4533/rest/ping?v=1.16.1&apiKey=K3Y-s3cret",
+            "apiKey=K3Y-s3cret&v=1.16.1&c=siansa&f=json&playlistId=p1",
+        )) {
+            val redacted = AppLog.redact(text)
+            assertFalse(redacted, redacted.contains("K3Y-s3cret"))
+            assertTrue(redacted, redacted.contains("apiKey=•••"))
+        }
+    }
+
     @Test fun hidesEmbysLoginToken() {
         val emby = Request.Builder()
             .url("http://192.168.1.20:8096/Sessions/Playing")

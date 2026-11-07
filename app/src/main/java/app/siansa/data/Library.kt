@@ -25,6 +25,8 @@ import java.util.Locale
 
 private val MARKS = Regex("\\p{M}+")
 private val NON_WORD = Regex("[^\\p{L}\\p{N}]+")
+/** A name with a join in it (", ", " & ", " feat"…): it may be several artists in one. */
+private val JOINED = Regex(",\\s|\\s&\\s|\\s(feat|ft|vs|x)\\.?\\s", RegexOption.IGNORE_CASE)
 
 /**
  * Whether every one of [terms] (from [normalizeKey]) is in [key], as it is or with its spaces left out: a name's
@@ -265,7 +267,12 @@ class LibraryRepository(context: Context) {
      */
     suspend fun combinedArtists(all: List<Artist>? = null): Map<String, CombinedArtist> {
         combined?.let { return it }
-        val found = CombinedArtists.find(all ?: dao.artists().map { it.toArtist() })
+        val artists = all ?: dao.artists().map { it.toArtist() }
+        val found = CombinedArtists.find(artists)
+        // Names that look like several artists but stay one, and why, so a wrong one can be traced (0.52.0-dev).
+        val kept = artists.asSequence().filter { it.id !in found && JOINED.containsMatchIn(it.name) }
+            .mapNotNull { a -> CombinedArtists.whyKept(a, artists)?.let { "${a.name} (${it})" } }.take(5).toList()
+        if (kept.isNotEmpty()) AppLog.d("Library", "Kept as one artist: ${kept.joinToString("; ")}")
         if (found.isNotEmpty()) {
             AppLog.i(
                 "Library",
@@ -274,8 +281,46 @@ class LibraryRepository(context: Context) {
             )
         }
         combined = found
+        combinedIndex = CombinedArtists.Index(artists)
         return found
     }
+
+    @Volatile private var combinedIndex: CombinedArtists.Index? = null
+
+    /**
+     * [refs] (a song's artists) as the artists to offer: a name that's several artists in one is replaced by them
+     * (issue #359), also when it isn't in the library's artist list (only a song's artist, never an album's).
+     */
+    suspend fun expandArtists(refs: List<Artist>, server: (suspend (String) -> List<Artist>)? = null): List<Artist> {
+        val found = combinedArtists()
+        val index = combinedIndex ?: CombinedArtists.Index(dao.artists().map { it.toArtist() }).also { combinedIndex = it }
+        val extra = refs.filter { it.id !in found && artist(it.id) == null }
+            .mapNotNull { ref -> CombinedArtists.of(ref, index)?.let { ref.id to it } }
+        var all = if (extra.isEmpty()) found else found + extra
+        // Names the library doesn't have are looked up on the server, once each (remembered until the next sync).
+        if (server != null) {
+            val wanted = refs.mapNotNull { all[it.id] }.filter { it.unknown.isNotEmpty() }
+            if (wanted.isNotEmpty()) {
+                val names = wanted.flatMap { it.unknown }.map { normalizeKey(it) to it }.distinctBy { it.first }
+                for ((key, name) in names) {
+                    if (serverArtists.containsKey(key)) continue
+                    serverArtists[key] = runCatching { server(name) }
+                        .onFailure { AppLog.d("Library", "Couldn't look up the artist \"$name\" on the server: ${it.message}") }
+                        .getOrNull() ?: continue
+                }
+                val resolved = wanted.associate { c -> c.combined.id to CombinedArtists.withServer(c, serverArtists) }
+                resolved.values.filter { it.unknown.isEmpty() || it != all[it.combined.id] }.takeIf { it.isNotEmpty() }?.let { list ->
+                    AppLog.d("Library", "Song artists with the server's: ${list.joinToString("; ") { c -> "${c.combined.name} → ${(c.parts.map { it.name } + c.unknown).joinToString(" | ")}" }}")
+                }
+                all = all + resolved
+            }
+        }
+        if (extra.isNotEmpty()) AppLog.d("Library", "Song artists split: ${extra.joinToString("; ") { (_, c) -> "${c.combined.name} → ${(c.parts.map { it.name } + c.unknown).joinToString(" | ")}" }}")
+        return CombinedArtists.expand(refs, all)
+    }
+
+    /** Artists the music server has by name ([normalizeKey]), as looked up for joined names. */
+    private val serverArtists = java.util.concurrent.ConcurrentHashMap<String, List<Artist>>()
 
     /** The artist's albums, with those of names it's tagged in together with others (issue #359). */
     suspend fun albumsOf(artist: Artist): List<Album> {
@@ -418,6 +463,7 @@ class LibraryRepository(context: Context) {
 
     suspend fun replaceArtists(artists: List<Artist>) = db.withTransaction {
         combined = null
+        serverArtists.clear()
         dao.deleteAllArtists()
         artists.distinctBy { it.id }.chunked(CHUNK).forEach { chunk ->
             dao.forgetSources(chunk.map { it.id })
@@ -465,6 +511,7 @@ class LibraryRepository(context: Context) {
     /** Removes everything that came from [user]. */
     suspend fun removeSource(user: Int) {
         combined = null
+        serverArtists.clear()
         db.withTransaction {
             dao.deleteSongsOfSource(user)
             dao.deleteAlbumsOfSource(user)
@@ -482,6 +529,7 @@ class LibraryRepository(context: Context) {
      */
     suspend fun putSource(user: Int, music: GuestMusic): Int {
         combined = null
+        serverArtists.clear()
         val added = db.withTransaction {
             dao.deleteSongsOfSource(user)
             dao.deleteAlbumsOfSource(user)
@@ -538,6 +586,7 @@ class LibraryRepository(context: Context) {
         val merged = recomputePrimaries()
         putMeta(META_FOLDERS, if (every) "*" else chosen.sorted().joinToString(","))
         combined = null
+        serverArtists.clear()
         refreshStatus()
         bump()
         AppLog.i("Library", if (every) "Showing every library" else "Showing ${chosen.size} of ${all.size} libraries")

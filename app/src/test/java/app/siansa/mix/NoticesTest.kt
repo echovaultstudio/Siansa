@@ -104,15 +104,15 @@ class NoticesTest {
         assertNull(Notices.yourMonth(LocalDate.of(2026, 3, Notices.MONTH_DAYS + 1)))
     }
 
-    @Test fun newAlbumsCountsOnlyTheLastFewDays() {
+    @Test fun newAlbumsCountsTheLast30Days() {
         val today = LocalDate.of(2026, 11, 1)
         val utc = java.time.ZoneId.of("UTC")
-        // The last three days are today and the two before: 30 October and 1 November count, 29 October doesn't.
-        val created = listOf("2026-11-01T08:00:00Z", "2026-10-30T10:00:00.000Z", "2026-10-29T10:00:00Z", null, "junk", "2026-11-05")
+        // The last 30 days (issue #922) are today and the 29 before: 3 October to 1 November count, 2 October doesn't.
+        val created = listOf("2026-11-01T08:00:00Z", "2026-10-03T10:00:00.000Z", "2026-10-02T10:00:00Z", null, "junk", "2026-11-05")
         assertEquals(2, Notices.newAlbumCount(created, today, utc))
-        // Read on the phone's calendar: 22:30 UTC on 29 October is already the 30th in Berlin (+1).
-        assertEquals(1, Notices.newAlbumCount(listOf("2026-10-29T23:30:00Z"), today, java.time.ZoneId.of("Europe/Berlin")))
-        assertEquals(0, Notices.newAlbumCount(listOf("2026-10-29T23:30:00Z"), today, utc))
+        // Read on the phone's calendar: 23:30 UTC on 2 October is already the 3rd in Berlin (+2).
+        assertEquals(1, Notices.newAlbumCount(listOf("2026-10-02T23:30:00Z"), today, java.time.ZoneId.of("Europe/Berlin")))
+        assertEquals(0, Notices.newAlbumCount(listOf("2026-10-02T23:30:00Z"), today, utc))
         assertNull(Notices.newAlbums(0, "a"))
         assertEquals("1 new album", Notices.newAlbums(1, "a")!!.text)
         assertEquals("home/newest", albums.route)
@@ -146,5 +146,24 @@ class NoticesTest {
         assertEquals("Shown", noticesLine(true, NoticePrefs()))
         val prefs = NoticePrefs().with(NoticeKind.CARRY_ON, NoticeMode.PINNED).with(NoticeKind.YOUR_MONTH, NoticeMode.OFF).with(NoticeKind.NEW_ARTISTS, NoticeMode.OFF)
         assertEquals("Shown · 1 pinned · 2 off", noticesLine(true, prefs))
+    }
+
+    @Test fun likedSongsIsOffUntilAdded() {
+        // Issue #935: Liked songs is a notice you add yourself.
+        assertEquals(NoticeMode.OFF, NoticePrefs().modeOf(NoticeKind.LIKED))
+        assertEquals(emptyList<Notice>(), Notices.order(listOf(Notices.liked()), NoticePrefs(), emptyMap()))
+        // Added as Automatic, it stays added, saved and read back.
+        val auto = NoticePrefs().with(NoticeKind.LIKED, NoticeMode.AUTO)
+        assertEquals(NoticeMode.AUTO, auto.modeOf(NoticeKind.LIKED))
+        assertEquals("liked:auto", auto.format())
+        assertEquals(NoticeMode.AUTO, NoticePrefs.parse(auto.format()).modeOf(NoticeKind.LIKED))
+        assertEquals(listOf("liked"), Notices.order(listOf(Notices.liked()), auto, emptyMap()).map { it.route })
+        // Turned off again, it's back at its default and nothing is saved for it.
+        assertEquals("", auto.with(NoticeKind.LIKED, NoticeMode.OFF).format())
+        // Pinned, it comes first.
+        val pinned = NoticePrefs().with(NoticeKind.LIKED, NoticeMode.PINNED)
+        assertEquals(NoticeKind.LIKED, Notices.order(listOf(sync, Notices.liked()), pinned, emptyMap()).first().kind)
+        // It isn't counted as turned off while it's simply not added.
+        assertEquals("Shown", noticesLine(true, NoticePrefs()))
     }
 }

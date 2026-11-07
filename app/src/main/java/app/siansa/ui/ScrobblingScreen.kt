@@ -132,12 +132,13 @@ fun ScrobblingScreen(nav: NavController) {
                 graph.settings.save(graph.settings.current.copy(lastFmEnabled = it))
             }
             Hint("Uses your own Last.fm API account: create one at last.fm/api/account/create and copy the API key and shared secret here. Hearts are sent to Last.fm as loved tracks.")
-            Field("API key", lfmKey) { lfmKey = it }
+            // A key, so hidden like the secret (issue #957).
+            Secret("API key", lfmKey) { lfmKey = it }
             Secret("Shared secret", lfmSecret) { lfmSecret = it }
             Field("Last.fm username", lfmUser) { lfmUser = it }
             Secret("Last.fm password (used once to sign in, not stored)", lfmPassword) { lfmPassword = it }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                Button(onClick = {
+                Button(modifier = Modifier.focusRing(), onClick = {
                     result({ lfmStatus = it }) {
                         val session = graph.lastFm.mobileSession(lfmKey.trim(), lfmSecret.trim(), lfmUser.trim(), lfmPassword)
                         graph.settings.save(
@@ -154,7 +155,7 @@ fun ScrobblingScreen(nav: NavController) {
                     }
                 }) { Text(if (settings.lastFmSession.isBlank()) "Sign in" else "Sign in again") }
                 if (settings.lastFmSession.isNotBlank()) {
-                    OutlinedButton(onClick = {
+                    OutlinedButton(modifier = Modifier.focusRing(), onClick = {
                         graph.settings.save(graph.settings.current.copy(lastFmSession = "", lastFmEnabled = false))
                         lfmStatus = "Signed out"
                     }) { Text("Sign out") }
@@ -173,16 +174,18 @@ fun ScrobblingScreen(nav: NavController) {
             Hint("For Koito, enter its address (e.g. https://koito.example.com) and an API key from Koito's settings → API Keys. Leave the address empty for listenbrainz.org.")
             Field("Server address", lbUrl, placeholder = "https://koito.example.com") { lbUrl = it }
             Secret("Token / API key", lbToken) { lbToken = it }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                Button(onClick = {
-                    result({ lbStatus = it }) {
-                        val message = graph.listenBrainz.validate(lbUrl, lbToken.trim())
-                        graph.settings.save(
-                            graph.settings.current.copy(listenBrainzEnabled = true, listenBrainzUrl = lbUrl.trim(), listenBrainzToken = lbToken.trim())
-                        )
-                        "$message · sending to ${ListenBrainzApi.apiRoot(lbUrl)}"
-                    }
-                }) { Text("Test and save") }
+            val testListenBrainz = {
+                result({ lbStatus = it }) {
+                    val message = graph.listenBrainz.validate(lbUrl, lbToken.trim())
+                    graph.settings.save(
+                        graph.settings.current.copy(listenBrainzEnabled = true, listenBrainzUrl = lbUrl.trim(), listenBrainzToken = lbToken.trim())
+                    )
+                    "$message · sending to ${ListenBrainzApi.apiRoot(lbUrl)}"
+                }
+            }
+            // On the TV the whole row is what the remote stops on, so it isn't skipped (issue #978).
+            TvActionRow(onClick = { testListenBrainz() }) { button ->
+                Button(modifier = button, onClick = { testListenBrainz() }) { Text("Test and save") }
             }
             lbStatus?.let { Status(it) }
             }
@@ -208,6 +211,10 @@ private fun Status(text: String) {
 
 @Composable
 private fun Field(label: String, value: String, placeholder: String? = null, onChange: (String) -> Unit) {
+    if (app.siansa.BuildConfig.TV_APP) {
+        TvTextBox(value, onChange, label, Modifier.fillMaxWidth(), placeholder = placeholder, kind = TvTextKind.ADDRESS)
+        return
+    }
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
@@ -221,6 +228,10 @@ private fun Field(label: String, value: String, placeholder: String? = null, onC
 
 @Composable
 private fun Secret(label: String, value: String, onChange: (String) -> Unit) {
+    if (app.siansa.BuildConfig.TV_APP) {
+        TvTextBox(value, onChange, label, Modifier.fillMaxWidth(), kind = TvTextKind.SECRET)
+        return
+    }
     OutlinedTextField(
         value = value,
         onValueChange = onChange,

@@ -1,7 +1,36 @@
 # Home and your mixes
 
-Home is built from sections you can reorder and hide (**Arrange Home**, from the filter button at the top of Home).
-Its **Spacing** slider sets the gap between every section at once, from Tight to Airy; **Reset** puts the order,
+Home is built from sections you can reorder and hide (**Arrange Home**, in the menu at the top of Home).
+
+## The top of Home
+
+The top of Home is the row of notices (see [Notices](#notices)) with a round menu button at its end, in line with
+the chips and the same height. When there are more chips than fit, they scroll and fade out just before the button.
+With no notices, or notices turned off, the button sits on its own.
+
+## Home's menu
+
+The round button opens a short column of round buttons straight under it, each with its name beside it. The page
+behind blurs a little and darkens while it's open, so the names are easy to read (before Android 12 it only darkens):
+
+- **Roll the dice** plays a song you've never played (see [Roll the dice](discovery.md)). While it finds one, the
+  dice tumbles in the menu button.
+- **Play on…** opens the list of TVs and speakers to play on: Chromecast, Google TV, Cast speakers and DLNA ones.
+  While something plays on one, the bubble is in the accent colour (amber unless you picked another in Themes) and
+  the menu button has a small dot in the same colour; to stop, open Play on… and pick **This phone**.
+- **Sources** opens the source filter. Its bubble is in the accent colour while the filter hides something.
+- **Arrange Home** opens Arrange, for the order and looks of Home's sections.
+
+Tap the button and then one of them, or do it in one go: press the button, slide your finger down to one (it lights
+up, with a light tick as you pass each) and let go. Letting go anywhere else closes the menu. The button's three
+lines are always in the accent colour; the button has a thin ring in the same colour while the source filter hides
+something.
+
+Their order is yours: **Settings › Style › Home Menu**, hold a row and drag it.
+
+## Arrange Home
+
+Arrange's **Spacing** slider sets the gap between every section at once, from Tight to Airy; **Reset** puts the order,
 the hidden sections, the spacing and the looks back.
 
 The **cog** on a section changes its look, to any of the custom cards' looks:
@@ -18,12 +47,14 @@ The **cog** on a section changes its look, to any of the custom cards' looks:
 A section in another look says which under its name. **Play** in a banner or the ▶ of a play button card plays the section:
 today's mix or the carousel's first mix where they left off, or the albums of Rediscover, Recently played, Recently
 added and Random picks in order. Sections of radios, playlists, genres, books and Made for you open instead. **Your
-cards** keep their own looks: their cog opens **Settings › Home › Cards**.
+cards** keep their own looks: their cog opens **Settings › Notices and Cards › Cards**.
+
+The same cog has **Show its title**: turn it off and the section shows without the heading above it ("Your evening",
+"Recently played"), keeping the gap where it was.
 
 | Section | What it shows |
 |---|---|
-| **Notices** | A row of chips at the top when there's something to say (see [Notices](#notices)). |
-| **Shortcuts** | Liked songs first, then the albums, playlists and mixes you played from last. Until there's enough of that, today's mixes, your playlists and recent albums. |
+| **Shortcuts** | The albums, playlists, mixes and Liked songs you played from last, newest first: 8 of them, or as many as you pick from 2 to 8 under **Settings › Style › Home**. Until there's enough of that, today's mixes, your playlists and recent albums. |
 | **Today's mix** | The day's mix, made for the vibe of the hour it's made in (see below). |
 | **Your mixes carousel** | Three or four mixes of your own for each part of the day, side by side. |
 | **Made for you** | Your sound, On repeat, Discover for you, then cards of your own. |
@@ -38,27 +69,28 @@ cards** keep their own looks: their cog opens **Settings › Home › Cards**.
 
 ## Notices
 
-A row of chips at the top of Home, only when there's something to say. Tap a chip to open it. Chips come and go on
+A row of chips at the top of Home, before the menu button, only when there's something to say. Tap a chip to open it. Chips come and go on
 their own: a finished book, albums older than three days or last month's report once the week is over drop out.
 
 | Notice | When it shows | Opens |
 |---|---|---|
-| **Library sync failed** | The last library sync didn't finish. | Servers and services |
+| **Library sync failed** | The last library sync didn't finish. | Connections |
 | **Carry on: …** | A book or podcast episode you played in the last week and haven't finished. | The book |
-| **3 new albums** | Albums added to your library in the last three days. | Recently added |
+| **3 new albums** | Albums added to your library in the last 30 days. It shows as soon as Home opens. | Recently added |
 | **Your October** | The first week of a month: last month's listening. | The month's report |
 | **4 artists for you** | New artists to try were found today. | Artists for you |
+| **Liked songs** | Always, once you add it: it's **Off** until you set it to Automatic or Pinned. | Liked songs |
 
 At most five show. By default they're ordered for you: what needs you first, then what you're in the middle of, then
-what's new; among the new ones, the kinds you tap most come first. In **Settings › Home › Notices** you can hide the
+what's new; among the new ones, the kinds you tap most come first. In **Settings › Notices and Cards › Notices** you can hide the
 row, or set each kind to **Pinned**, **Automatic** or **Off**. Pinned kinds always show, first and in the order you
-pin them, and are never pushed out by other notices; the automatic ones fill the places left. The cog on Notices in
-Arrange Home opens the same page.
+pin them, and are never pushed out by other notices; the automatic ones fill the places left. The notices are
+always at the top of Home, so they're not in Arrange Home.
 
 ## Vibes and today's mix
 
 A **vibe** covers part of the day. Siansa starts with Morning, Daytime, Evening and Night. When you open the app,
-the vibe for the current hour builds **today's mix**. **Settings › Mixes and vibes** lets you change them:
+the vibe for the current hour builds **today's mix**. **Settings › Auto Generated Mixes** lets you change them:
 
 - **Name**, **Days** (or every day), and **hours** (0–23; a vibe from 22 to 5 runs past midnight). When several
   vibes fit, the most specific wins: one set for a day before an everyday one, one for some hours before an
@@ -74,7 +106,7 @@ the vibe for the current hour builds **today's mix**. **Settings › Mixes and v
 
 How the songs are picked is explained in [How it works](how-it-works.md#todays-mix-and-vibes).
 
-**Today's mix** has settings of its own at the top of **Settings › Mixes and vibes**, which apply to it whichever
+**Today's mix** has settings of its own at the top of **Settings › Auto Generated Mixes**, which apply to it whichever
 vibe makes it:
 
 - **Auto update** (on by default): the mix follows the time of day. A new one is made as the day or the hour's vibe
@@ -119,12 +151,12 @@ same day; Siansa tells you which one already has them.
   Koito, ListenBrainz or Last.fm when you use them. It opens straight away and checks your server for changes while
   the cog turns, like a playlist. Until there's enough to go on, it isn't shown.
 - **Discover for you**: songs that sound like your taste, from artists you don't play much (only with AudioMuse-AI).
-- **Cards of your own** (**Settings › Home › Cards › Made for you**): pick what a card shows (for example a genre or a
+- **Cards of your own** (**Settings › Notices and Cards › Cards › Made for you**): pick what a card shows (for example a genre or a
   period) and name it. Each card gets new songs every day.
 
 ## Your cards
 
-Custom cards you make yourself (**Settings › Home › Cards › Custom cards**), shown on Home in its **Your cards** section
+Custom cards you make yourself (**Settings › Notices and Cards › Cards › Custom cards**), shown on Home in its **Your cards** section
 (move it under Arrange Home; the cards' own order is set in Settings). **Add a custom card** or tap one to change it,
 on a page of its own:
 
@@ -186,18 +218,30 @@ Home with its switch in Settings.
 
 - **Mood radios** are AudioMuse-AI sound searches, kept varied.
 - **Genre radios** take songs of that genre from your synced library.
-- **Artist radios** start from an artist and add artists like them.
+- **Artist radios** start with a few of the artist's songs. With AudioMuse-AI set up, the rest are songs that
+  sound like the artist (AudioMuse blends a dozen of their songs), with one of their own every fourth song. Without
+  it, they're your music server's similar songs (Navidrome's come from Last.fm or other agents it has); if the
+  server has none, the artist's own songs. The same from Home and from an artist's page. In the queue, the songs
+  AudioMuse-AI picked carry its mark, as a song radio's do.
 
 ## Your Library
 
-The chips at the top narrow the list down: **Playlists**, **Music**, **Mixes**, **Favourites** and **Your listening**.
+The chips at the top narrow the list down: **Playlists**, **Music**, **Mixes**, **Favourites**, **Your listening**
+and **Stations**.
 
 - **Music** holds your albums, artists and songs; tap **Albums**, **Artists** or **Songs** under it to see one kind.
   **Songs** lists every song in the libraries you sync; tap one to play it and the songs after it.
+- **Stations** lists your radio stations ([Your Stations](stations.md)): your server's and the ones you added, each
+  with its logo. Tap one to play it live; **⋮** has **Edit** and **Remove**. Podcasts you add by their RSS link are
+  under **Podcasts**, which shows whenever you have a podcast. Add either with **+ › Add station** or
+  **+ › Add podcast** at the top of Your Library.
 - **The chips come in the order you last opened them**, so the ones you use most are at the front. When more chips
   are hidden to the right, the row fades there with a **›** button that scrolls on.
 - **Each chip keeps its own sort** (Recents, Alphabetical, Most played…) until you change it, also after Siansa
   restarts. Sorting Music by name doesn't change how Playlists are sorted.
+- **Each view keeps its own list or grid** (the button next to the sort) until you change it, also after Siansa
+  restarts: Playlists can be a grid while Music's Artists stay a list. Albums, Artists and Songs under Music each
+  keep their own.
 
 ## Long lists
 

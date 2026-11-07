@@ -85,7 +85,7 @@ fun PinnedCardSection(nav: NavController, card: PinnedCard, aiDown: String?) {
         else {
             SectionTitle(card.title)
             Text(
-                if (card.contents.fromBooks) "Nothing here yet." else "No songs match yet. Change the card in Settings › Home › Cards.",
+                if (card.contents.fromBooks) "Nothing here yet." else "No songs match yet. Change the card in Settings › Notices and Cards › Cards.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Space.Page).testTag("pinnedProblem"),
@@ -107,7 +107,7 @@ private fun PinnedCardLook(card: PinnedCard, content: CardContent, open: () -> U
     if (card.contents == CardContents.ALBUMS && card.look in setOf(CardLook.TILES, CardLook.ALBUMS, CardLook.LIST)) {
         if (card.look == CardLook.LIST) {
             Column {
-                Row(
+                if (!LocalSectionTitleShown.current) HiddenTitleGap() else Row(
                     Modifier.fillMaxWidth().clickable(onClickLabel = "Show all", onClick = open)
                         .padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current, bottom = Space.Small),
                     verticalAlignment = Alignment.CenterVertically,
@@ -143,7 +143,7 @@ private fun PinnedCardLook(card: PinnedCard, content: CardContent, open: () -> U
         }
         CardLook.BANNER -> PinnedBanner(card, songs, open, play, rememberListPlayback(songs))
         CardLook.LIST -> Column {
-            Row(
+            if (!LocalSectionTitleShown.current) HiddenTitleGap() else Row(
                 Modifier.fillMaxWidth().clickable(onClickLabel = "Show all", onClick = open)
                     .padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current, bottom = Space.Small),
                 verticalAlignment = Alignment.CenterVertically,
@@ -274,7 +274,7 @@ fun PinnedCardScreen(nav: NavController, id: String) {
             LoadBox(content, Modifier.padding(top = padding.calculateTopPadding())) { found ->
                 val albums = found?.albums.orEmpty()
                 if (albums.isEmpty()) {
-                    Text("No albums match yet. Change the card in Settings › Home › Cards.", style = MaterialTheme.typography.bodyMedium,
+                    Text("No albums match yet. Change the card in Settings › Notices and Cards › Cards.", style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(Space.Page).testTag("pinnedProblem"))
                 } else {
                     AlbumsGridOrList(albums, page = "pinned-albums", onOpen = { nav.navigate("album/${it.id}") }, modifier = Modifier.fillMaxSize(),

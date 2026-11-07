@@ -28,6 +28,8 @@ class NavidromeNativeApi(
         val s = settings()
         val who = s.navidromeUrl + "|" + s.navidromeUser
         token?.let { if (it.first == who) return@withContext it.second }
+        // Navidrome's own API has no API keys (issue #493): it needs the username and password.
+        if (s.navidromePassword.isEmpty()) throw ApiException("This needs your username and password in Settings, not only an API key")
         val body = buildJsonObject {
             put("username", s.navidromeUser)
             put("password", s.navidromePassword)

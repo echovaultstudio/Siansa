@@ -202,7 +202,7 @@ fun ArtistScreen(nav: NavController, id: String) {
         LazyVerticalGrid(
             state = gridState,
             // Three across, or one release per row in the list (issue #289).
-            columns = GridCells.Fixed(GRID_COLUMNS),
+            columns = GridCells.Fixed(gridColumns()),
             contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section)),
             modifier = Modifier.fillMaxSize().then(cardModifier),
         ) {
@@ -221,7 +221,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                     Spacer(Modifier.height(Space.Medium))
                     PlayButtonRow {
                         OutlinedButton(onClick = {
-                            launch.progressive("${p.artist.name} radio", { graph.radios.artistStart(p.artist) }) {
+                            launch.progressivePicks("${p.artist.name} radio", { graph.radios.artistStart(p.artist) }) {
                                 graph.radios.artistMore(p.artist, it)
                             }
                         }) {

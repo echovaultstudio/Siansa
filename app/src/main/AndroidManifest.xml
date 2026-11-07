@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -36,6 +37,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Signing in the TV app (issue #860): the page its QR code opens hands the TV's address and key to Siansa. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="siansa" android:host="pair" />
+            </intent-filter>
         </activity>
 
         <!-- Lets the Logs page hand the log file to another app (mail, chat) for sharing. -->
@@ -54,12 +62,34 @@
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
             android:value="app.siansa.playback.CastSetup" />
 
+        <!-- Android Auto (issue #62): Siansa is a media app the car can browse and play from. -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
+        <!-- Covers for Android Auto's lists (issue #62): the car loads them from here, read-only. -->
+        <provider
+            android:name=".car.CarCoverProvider"
+            android:authorities="${applicationId}.covers"
+            android:exported="true"
+            tools:ignore="ExportedContentProvider" />
+
         <service
             android:name=".playback.PlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+            <!-- A library to browse, for Android Auto (issue #62); the second is the name the car looks for. -->
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaLibraryService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+            <!-- "Play … on Siansa": the car's voice search reaches the session's search (issue #62). -->
+            <intent-filter>
+                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </service>
     </application>

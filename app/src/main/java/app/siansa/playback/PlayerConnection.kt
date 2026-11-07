@@ -140,7 +140,8 @@ class PlayerConnection(
     fun pause() = withController { c -> if (c.isPlaying) c.pause() }
 
     /** Plays [songs] from [startIndex]; [startMs] starts that song part-way (a mix carried on, issue #269). */
-    fun play(songs: List<Song>, startIndex: Int = 0, shuffle: Boolean = false, startMs: Long = 0L) {
+    /** [picked]: songs among them AudioMuse picked (an artist radio's sound-alikes), marked in the queue (issue #337). */
+    fun play(songs: List<Song>, startIndex: Int = 0, shuffle: Boolean = false, startMs: Long = 0L, picked: Set<String> = emptySet()) {
         if (songs.isEmpty()) return
         val why = limited()
         if (why != null) {
@@ -155,15 +156,15 @@ class PlayerConnection(
                 return playNow(pick.songs, pick.start, shuffle)
             }
         }
-        playNow(songs, startIndex, shuffle, startMs)
+        playNow(songs, startIndex, shuffle, startMs, picked)
     }
 
-    private fun playNow(songs: List<Song>, startIndex: Int, shuffle: Boolean, startMs: Long = 0L) {
+    private fun playNow(songs: List<Song>, startIndex: Int, shuffle: Boolean, startMs: Long = 0L, picked: Set<String> = emptySet()) {
         queueGeneration++
         onPlayStarted()
         onNewQueue?.invoke()
         SongRegistry.register(songs)
-        val items = songs.map { it.toMediaItem(api) }
+        val items = songs.map { it.toMediaItem(api, auto = it.id in picked) }
         val start = if (shuffle) Random.nextInt(songs.size) else startIndex.coerceIn(0, songs.size - 1)
         withController { c ->
             c.shuffleModeEnabled = shuffle
@@ -226,6 +227,21 @@ class PlayerConnection(
     }
 
     /**
+     * Moves a queued song to play straight after the one playing (a swipe to the right in the queue, issue #915).
+     * False when there's nothing to move: it's playing, or already next.
+     */
+    fun moveToPlayNext(index: Int, onMoved: (Boolean) -> Unit = {}) = withController { c ->
+        val target = queuePlayNextIndex(index, c.currentMediaItemIndex, c.mediaItemCount)
+        if (target == null) {
+            onMoved(false)
+            return@withController
+        }
+        AppLog.i("Queue", "Moved ${c.getMediaItemAt(index).mediaId} from ${index + 1} to play next (${target + 1} of ${c.mediaItemCount})")
+        c.moveMediaItem(index, target)
+        onMoved(true)
+    }
+
+    /**
      * "Remove songs up to here" on a queue row: every song before it goes, so it becomes the first in the queue.
      * When the song playing is among them, the row's song starts playing.
      */
@@ -263,6 +279,13 @@ class PlayerConnection(
         if (songs.isEmpty()) return
         SongRegistry.register(songs)
         withController { c -> c.addMediaItems(songs.map { it.toMediaItem(api, auto = auto) }) }
+    }
+
+    /** Adds [songs], marking those AudioMuse [picked] (an artist radio's sound-alikes) as the queue does a radio's. */
+    fun addAll(songs: List<Song>, picked: Set<String>) {
+        if (songs.isEmpty()) return
+        SongRegistry.register(songs)
+        withController { c -> c.addMediaItems(songs.map { it.toMediaItem(api, auto = it.id in picked) }) }
     }
 
     /**
@@ -365,7 +388,10 @@ class PlayerConnection(
         val c = controller ?: return
         val queue = (0 until c.mediaItemCount).map { c.getMediaItemAt(it).toSong() }
         val index = c.currentMediaItemIndex
-        val current = queue.getOrNull(index)
+        // A radio station shows what its stream says it's playing, with the station's name under it (issue #353).
+        val streamTitle = c.sessionExtras.takeIf { it.getString(StreamQuality.EXTRA_SONG_ID) == queue.getOrNull(index)?.id }
+            ?.getString(StreamQuality.EXTRA_STREAM_TITLE)
+        val current = queue.getOrNull(index)?.let { app.siansa.data.OutsideMedia.nowOnAir(it, streamTitle) }
         val duration = songDurationMs(c.duration, current?.durationSec ?: 0)
         _state.value = PlayerState(
             current = current,

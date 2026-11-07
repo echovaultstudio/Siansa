@@ -2,7 +2,6 @@ package app.siansa.ui
 
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.rounded.Dashboard
@@ -32,7 +31,6 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.DownloadForOffline
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.GraphicEq
@@ -109,18 +107,18 @@ fun SettingsHub(nav: NavController) {
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
             HubGroup("Sources", first = true)
             // Servers (each login with its own library and sync) and services, on one page (issue #665).
-            HubRow(Icons.Rounded.Dns, "Servers and services") { nav.navigate("settings/connections") }
+            HubRow(Icons.Rounded.Dns, "Connections") { nav.navigate("settings/connections") }
             HubGroup("Listening")
+            // How music plays: equaliser, crossfade, streaming quality, song radio, keep playing, wind down and the
+            // book player's skips (v1.0 settings, the owner).
             HubRow(Icons.Rounded.Equalizer, "Playback") { nav.navigate("settings/playback") }
-            // Streaming quality, loading ahead and the song cache: what decides data use and offline play.
-            HubRow(Icons.Rounded.SwapVert, "Streaming and data") { nav.navigate("settings/streaming") }
-            HubRow(Icons.Rounded.DownloadForOffline, "Downloads") { nav.navigate("downloads") }
-            HubRow(Icons.AutoMirrored.Rounded.MenuBook, "Audiobooks and podcasts") { nav.navigate("settings/books") }
-            HubGroup("Home and mixes")
+            // Loading ahead, the song cache, downloads and covers: what's kept on the phone and what it costs in data.
+            HubRow(Icons.Rounded.SwapVert, "Data") { nav.navigate("settings/streaming") }
+            HubGroup("Home")
             // Notices and Cards; Source filter and Arrange Home are behind Home's own button.
-            HubRow(Icons.Rounded.Home, "Home") { nav.navigate("settings/home") }
+            HubRow(Icons.Rounded.Home, "Notices and Cards") { nav.navigate("settings/home") }
             // Today's mix, the daily vibes and the moment (was Daily Vibe settings, issue #339).
-            HubRow(Icons.Rounded.Schedule, "Mixes and vibes") { nav.navigate("vibes") }
+            HubRow(Icons.Rounded.Schedule, "Auto Generated Mixes") { nav.navigate("vibes") }
             HubGroup("Look")
             // Theme, now playing, mini player, nav bar, the phone's top bar and animated covers (issue #346).
             HubRow(Icons.Rounded.Palette, "Style") { nav.navigate("settings/style") }
@@ -171,11 +169,11 @@ fun HelpScreen(nav: NavController) {
                 "While on, Siansa records what it does, to trace problems. Nothing leaves the phone unless you send a " +
                     "report or share the log. Passwords, tokens and API keys are removed.",
             )
-            OutlinedButton(onClick = { nav.navigate("settings/logs") }, modifier = Modifier.testTag("helpLogs")) { Text("Show the log") }
+            OutlinedButton(onClick = { nav.navigate("settings/logs") }, modifier = Modifier.focusRing().testTag("helpLogs")) { Text("Show the log") }
             HorizontalDivider()
             Heading("Report a problem")
             Hint("1. Turn on debug logs above.\n2. Make the problem happen a few times.\n3. Send a report: the log goes with it.")
-            Button(onClick = { nav.navigate("settings/report") }, modifier = Modifier.testTag("helpReport")) {
+            Button(onClick = { nav.navigate("settings/report") }, modifier = Modifier.focusRing().testTag("helpReport")) {
                 Icon(Icons.Rounded.BugReport, null)
                 Spacer(Modifier.width(Space.Small))
                 Text("Report a problem")
@@ -253,8 +251,15 @@ fun PlaybackSettingsScreen(nav: NavController) {
                 }
             }
             HorizontalDivider()
-            // Each section folds (issue #776); open by default, folded ones stay folded (issue #780). Streaming
-            // quality and loading ahead moved to Streaming and data, the books' skips to Audiobooks and podcasts.
+            // Each section folds (issue #776); open by default, folded ones stay folded (issue #780). Streaming quality
+            // is here, as it's what you hear (v1.0, the owner); loading ahead and the caches are under Data.
+            FoldSection("Streaming quality", "Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}") {
+                Hint(ServerWords.streamingHint(settings.sourceKind))
+                QualityRow("On Wi-Fi", settings.transcodeWifiKbps) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
+                QualityRow("On mobile data", settings.transcodeMobileKbps) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
+                Hint("Siansa always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
+            }
+            HorizontalDivider()
             FoldSection("Song radio", settings.radioDrift.label) {
                 Hint("A song radio always starts with its song. How far may it wander from it?")
                 RadioDriftChips(settings.radioDrift) { graph.settings.setRadioDrift(it) }
@@ -266,10 +271,23 @@ fun PlaybackSettingsScreen(nav: NavController) {
                 ContinuousChips(settings.continuousPlay) { graph.settings.setContinuousPlay(it) }
                 Hint(continuousHint(settings.continuousPlay, settings.audioMuseReady))
             }
+            // The TV app has no sleep timer (issue #860), so nothing to wind down.
+            if (!app.siansa.BuildConfig.TV_APP) {
+                HorizontalDivider()
+                FoldSection("Wind down", "${settings.windDownSongs} songs") {
+                    Hint("With the sleep timer's Wind down switched on and no time picked, how many calmer songs play before the music ends?")
+                    WindDownChips(settings.windDownSongs) { graph.settings.save(graph.settings.current.copy(windDownSongs = it)) }
+                }
+            }
             HorizontalDivider()
-            FoldSection("Wind down", "${settings.windDownSongs} songs") {
-                Hint("With the sleep timer's Wind down switched on and no time picked, how many calmer songs play before the music ends?")
-                WindDownChips(settings.windDownSongs) { graph.settings.save(graph.settings.current.copy(windDownSongs = it)) }
+            // The book player's skips (v1.0, the owner: was its own page, Audiobooks and podcasts). The Audiobookshelf
+            // server itself is under Connections.
+            FoldSection("Audiobooks and podcasts", "Back ${settings.bookSkipBackSec} s · forward ${settings.bookSkipForwardSec} s") {
+                Hint("How far the book player's skip buttons jump.")
+                Text("Back", style = MaterialTheme.typography.bodyMedium)
+                SkipChips(settings.bookSkipBackSec, "bookSkipBack") { graph.settings.save(graph.settings.current.copy(bookSkipBackSec = it)) }
+                Text("Forward", style = MaterialTheme.typography.bodyMedium)
+                SkipChips(settings.bookSkipForwardSec, "bookSkipForward") { graph.settings.save(graph.settings.current.copy(bookSkipForwardSec = it)) }
             }
         }
     }
@@ -385,9 +403,9 @@ private data class StorageUsage(val images: Long, val songs: Long, val downloads
 /** Image and song cache sizes and usage, and what else the app keeps on the phone. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 /**
- * Settings › Streaming and data (issue #780, was Storage): the quality songs stream at, how many load ahead and the
- * song cache: what decides data use and playing on without a connection. The image cache is under Downloads ›
- * Covers on the phone, animated covers under Style.
+ * Settings › Data (issue #780, was Storage, then Streaming and data): how many songs load ahead, the song cache, the
+ * downloads with their settings and the covers kept on the phone: what decides data use and playing on without a
+ * connection. Streaming quality is under Playback, animated covers under Style.
  */
 @Composable
 fun StreamingDataScreen(nav: NavController) {
@@ -409,20 +427,13 @@ fun StreamingDataScreen(nav: NavController) {
         }
     }
 
-    Screen(title = "Streaming and data", nav = nav) { padding ->
+    Screen(title = "Data", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             // Each section folds (issue #776); open by default, folded ones stay folded (issue #780).
             val u = usage.valueOrNull()
-            FoldSection("Streaming quality", "Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}") {
-                Hint(ServerWords.streamingHint(settings.sourceKind))
-                QualityRow("On Wi-Fi", settings.transcodeWifiKbps) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
-                QualityRow("On mobile data", settings.transcodeMobileKbps) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
-                Hint("Siansa always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
-            }
-            HorizontalDivider()
             val preloadChoices = Preload.choices(settings)
             FoldSection("Load songs ahead", "Wi-Fi ${settings.preloadWifi.coerceIn(preloadChoices)} · mobile ${settings.preloadMobile.coerceIn(preloadChoices)}") {
                 Hint("While a song plays, Siansa loads the next ones, one at a time, so they start at once and keep playing if the connection drops. Fewer means less data. Only original files are loaded ahead.")
@@ -463,7 +474,7 @@ fun StreamingDataScreen(nav: NavController) {
                     )
                 }
             }
-            OutlinedButton(onClick = {
+            OutlinedButton(modifier = Modifier.focusRing(), onClick = {
                 scope.launch {
                     withContext(Dispatchers.IO) {
                         val cache = graph.songCache
@@ -480,10 +491,14 @@ fun StreamingDataScreen(nav: NavController) {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                         Text("New cache sizes apply after the app restarts.", style = MaterialTheme.typography.bodyMedium)
-                        Button(onClick = { restartApp(context) }) { Text("Restart now") }
+                        Button(onClick = { restartApp(context) }, modifier = Modifier.focusRing()) { Text("Restart now") }
                     }
                 }
             }
+
+            HorizontalDivider()
+            // Everything Downloads had (v1.0, the owner): the music kept on the phone, how it downloads, and the covers.
+            DownloadSettings(nav)
 
             HorizontalDivider()
             FoldSection("Other data on this phone", u?.let { "Library ${formatBytes(it.library)} · logs ${formatBytes(it.logs)}" }) {
@@ -497,7 +512,9 @@ fun StreamingDataScreen(nav: NavController) {
 }
 
 internal fun restartApp(context: Context) {
-    val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+    // The TV app (issue #860) has only a TV launcher entry.
+    val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        ?: context.packageManager.getLeanbackLaunchIntentForPackage(context.packageName) ?: return
     val component = launch.component ?: return
     context.startActivity(Intent.makeRestartActivityTask(component))
     Runtime.getRuntime().exit(0)
@@ -565,26 +582,32 @@ fun LogsScreen(nav: NavController) {
                         horizontalArrangement = Arrangement.spacedBy(Space.Small),
                         verticalArrangement = Arrangement.spacedBy(Space.Small),
                     ) {
-                        Button(onClick = {
-                            val stamp = java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.ROOT).format(Date())
-                            saver.launch("siansa-logs-$stamp.txt")
-                        }) {
-                            Icon(Icons.Rounded.Download, null)
-                            Spacer(Modifier.width(Space.Small))
-                            Text("Save logs")
+                        // A TV has no file picker or apps to share with (issue #860): its log goes in a report.
+                        val tv = app.siansa.BuildConfig.TV_APP
+                        if (!tv) {
+                            Button(modifier = Modifier.focusRing(), onClick = {
+                                val stamp = java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.ROOT).format(Date())
+                                saver.launch("siansa-logs-$stamp.txt")
+                            }) {
+                                Icon(Icons.Rounded.Download, null)
+                                Spacer(Modifier.width(Space.Small))
+                                Text("Save logs")
+                            }
                         }
-                        Button(onClick = { nav.navigate("settings/report") }) { Text("Report a problem") }
-                        OutlinedButton(onClick = { scope.launch { shareLogs(context) } }) {
-                            Icon(Icons.Rounded.Share, null)
-                            Spacer(Modifier.width(Space.Small))
-                            Text("Share")
+                        Button(onClick = { nav.navigate("settings/report") }, modifier = Modifier.focusRing()) { Text("Report a problem") }
+                        if (!tv) {
+                            OutlinedButton(onClick = { scope.launch { shareLogs(context) } }, modifier = Modifier.focusRing()) {
+                                Icon(Icons.Rounded.Share, null)
+                                Spacer(Modifier.width(Space.Small))
+                                Text("Share")
+                            }
                         }
-                        OutlinedButton(onClick = {
+                        OutlinedButton(modifier = Modifier.focusRing(), onClick = {
                             AppLog.clear()
                             refresh++
                         }) { Text("Clear") }
                         // Every error and warning with its details, ready to paste into a message or an issue.
-                        OutlinedButton(onClick = {
+                        OutlinedButton(modifier = Modifier.focusRing(), onClick = {
                             scope.launch {
                                 val text = withContext(Dispatchers.IO) {
                                     problemsForClipboard(logEntries(AppLog.allLines()), AppLog.header)
@@ -606,7 +629,7 @@ fun LogsScreen(nav: NavController) {
                             Text("Copy problems")
                         }
                         // The whole log, ready to paste; the newest part when it's too big for the clipboard.
-                        OutlinedButton(onClick = {
+                        OutlinedButton(modifier = Modifier.focusRing(), onClick = {
                             scope.launch {
                                 val entries = withContext(Dispatchers.IO) { logEntries(AppLog.allLines()) }
                                 val text = withContext(Dispatchers.Default) { logForClipboard(entries, AppLog.header) }

@@ -18,6 +18,12 @@ class ForegroundStartTest {
         assertTrue(mayStartForeground(startInForegroundRequired = true, playing = true, importance = service))
     }
 
+    @Test fun `playing sound in the background, no longer in the foreground, does not ask again`() {
+        // 0.52.0-dev: a cast update arrived after Android had taken the foreground away; asking crashed the app.
+        assertFalse(mayStartForeground(startInForegroundRequired = true, playing = true, importance = 300))
+        assertFalse(mayStartForeground(startInForegroundRequired = true, playing = true, importance = cached))
+    }
+
     @Test fun `with the app open it may ask for the foreground`() {
         assertTrue(mayStartForeground(startInForegroundRequired = true, playing = false, importance = foreground))
     }

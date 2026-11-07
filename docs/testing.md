@@ -1,10 +1,7 @@
 # Install Siansa and report a problem
 
-> **Siansa is in beta.** It's still in active development. It has been tested a lot with Navidrome to iron out most
-> bugs, but it isn't perfect yet, so expect some. If you find one, please report it from the app
-> (Settings › Help › Report a problem). Thank you!
-
-Siansa is a music player for your own Navidrome or Emby server, with mixes made for the moment.
+Siansa is a music player for your own Navidrome, Emby or Jellyfin server, with mixes made for the moment. Found a
+problem? Please report it from the app (Settings › Help › Report a problem). Thank you!
 Problems and ideas go in the [Siansa repository on GitHub](https://github.com/echovaultstudio/Siansa/issues), where the code is too.
 
 Website and sign-up: <https://siansa.app>
@@ -16,7 +13,7 @@ What changed in each version: [CHANGELOG.md](../CHANGELOG.md)
 ## What you need
 
 - A phone with **Android 8.0 or newer**.
-- Your own **Navidrome** or **Emby** server that your phone can reach (at home on Wi-Fi is fine; away from home
+- Your own **Navidrome** (or another OpenSubsonic server), **Emby** or **Jellyfin** (10.9 or later) server that your phone can reach (at home on Wi-Fi is fine; away from home
   use a VPN such as WireGuard or Tailscale, or your own secure address).
 - **[AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) 3.6.4 or newer**, connected to that server, with
   text search (CLAP) turned on. It makes the mixes and the "search by sound".
@@ -36,7 +33,10 @@ Use the Google account whose email you gave us, and stay in the test for 14 days
 `https://siansa.app/fdroid/repo` (the page also shows a QR code and the repo's fingerprint). Then search for
 Siansa and install it.
 
-F-Droid needs no invite. For Google Play, [ask for a place in the beta](https://siansa.app/#join).
+F-Droid needs no invite. Google Play is a closed test for now, as Google asks of new apps (12 testers for 14 days
+before it opens to everyone): [ask for a place](https://siansa.app/#join).
+
+**On a TV.** The TV app is in beta: see [Siansa on your TV](tv.md#getting-the-tv-app).
 
 **Had Siansa from the earlier private F-Droid address?** Remove that repository, add the open one above, then
 uninstall Siansa once and install it again: the app has a new signing key since the project went public, and

@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.data.OutsideMedia
 import androidx.compose.ui.graphics.vector.ImageVector
 
 import androidx.compose.material.icons.rounded.AddCircle
@@ -22,7 +23,11 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.zIndex
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
@@ -193,6 +198,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     val scroll = rememberScrollState()
     // The cover's colour, for the page, the cards under the player and the lyrics screen.
     val tint = rememberCoverColor(song?.cover)
+    // With Style's Dynamic colours, the seek bar, Play, the liked heart and where it plays take the cover's colour (issues #970, #998).
+    val dynamic = rememberDynamicColours(song?.cover, style.dynamicPlayerColours)
     // The song's lyrics, for the lyrics button and the preview card. Cleared as the song changes, so the
     // button doesn't stay lit for a song without lyrics.
     val lyrics by loadStateFresh("lyrics-${song?.id}") { song?.let { graph.source.lyrics(it) } }
@@ -228,6 +235,20 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
         onClose()
         // From now playing, the path is queued straight after this song once it's ready (#212).
         nav.openSongPath(id, fromNowPlaying = true)
+    }
+
+    // A slide from the play button (issue #919): a mix from this song, its song path or songs that sound like it.
+    fun slide(action: PlaySlide) {
+        val from = song ?: return
+        AppLog.i("Player", "Slid from the play button: ${action.label} from ${from.id}")
+        when (action) {
+            PlaySlide.DJ_MIX -> RadioChooser.startNow(graph, from, app.siansa.mix.ContinuousMode.DJ) { message -> scope.launch { snack.showSnackbar(message) } }
+            PlaySlide.STEADY -> RadioChooser.startNow(graph, from, app.siansa.mix.ContinuousMode.STEADY) { message -> scope.launch { snack.showSnackbar(message) } }
+            PlaySlide.SONG_PATH -> openSongPath()
+            PlaySlide.SONIC_MATCH -> openSimilarSongs()
+            PlaySlide.START_A_MIX -> RadioChooser.ask(from)
+            PlaySlide.NOTHING -> Unit
+        }
     }
 
     // Dragging down (at the top of the page) moves the whole player with the finger; let go far or fast
@@ -297,6 +318,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
             )
 
             val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            // A slide from the play button shows its choice in the middle of the cover (issue #933).
+            var slideLabel by remember { mutableStateOf<SlideLabel?>(null) }
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 // The player fills the screen; the cards below only come into view when scrolling, so none
                 // sits under the phone's own buttons (#294). The classic style leaves the top of the lyrics card
@@ -330,34 +353,45 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         TopRow(song, onClose = onClose, onAlbum = ::openAlbum, onMenu = { menuOpen = true }, onSleep = { sleepOpen = true })
 
                         Box(Modifier.weight(1f).fillMaxWidth().padding(top = Space.Page, bottom = Space.Medium), contentAlignment = Alignment.Center) {
-                            SwipeCover(song, onTap = ::openAlbum)
+                            SwipeCover(song, onTap = ::openAlbum, slideLabel = slideLabel)
                         }
 
-                        TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
-                            song?.let { graph.favorites.toggle(it) }
+                        // The filled heart of a liked song takes the cover's colour too, with Dynamic colours on (issue #998).
+                        WithAccent(dynamic?.controls, dynamic?.onControls) {
+                            TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
+                                song?.let { graph.favorites.toggle(it) }
+                            }
                         }
-                        SeekBar(state)
-                        Controls(state)
+                        // A radio station has no seek bar, only that it's live (issue #353).
+                        // While a finger slides from the play button, everything around it dims (issue #963), and going down,
+                        // Play on (right under the button) makes way completely.
+                        val slideDim by animateFloatAsState(if (slideLabel != null) SLIDING_OTHERS else 1f, label = "pageDim")
+                        val castAlpha = if (slideLabel?.way == SlideWay.DOWN) 0f else slideDim
+                        var trackY by remember { mutableStateOf<Float?>(null) }
+                        WithAccent(dynamic?.controls, dynamic?.onControls) {
+                            if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state, Modifier.alpha(slideDim)) { trackY = it }
+                            Controls(state, onSlide = ::slide, onSlideLabel = { slideLabel = it }, upTo = trackY)
+                        }
                         // The lyrics bottom left (greyed out when the song has none), where the music plays in
                         // the middle (with the TV, speaker or headphones' name), and the queue bottom right: tap
                         // it, or swipe up from it (#294).
                         if (classic) {
                             // The classic style (before #294): where the music plays bottom left, the queue bottom right.
                             Row(Modifier.fillMaxWidth().padding(top = Space.Medium, bottom = Space.Small).testTag("classicBottomRow"), verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                                    CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
+                                Box(Modifier.weight(1f).alpha(castAlpha), contentAlignment = Alignment.CenterStart) {
+                                    WithAccent(dynamic?.text, dynamic?.onControls) { CastDeviceButton(tint = Color.White.copy(alpha = 0.8f)) }
                                 }
-                                queueButton()
+                                Box(Modifier.alpha(slideDim)) { queueButton() }
                             }
                         } else Row(Modifier.fillMaxWidth().padding(top = Space.Medium, bottom = Space.Small), verticalAlignment = Alignment.CenterVertically) {
                             // The device name gets all the room between the two buttons (issue #311).
-                            Box(Modifier.width(SIDE_BUTTON_WIDTH), contentAlignment = Alignment.Center) {
+                            Box(Modifier.width(SIDE_BUTTON_WIDTH).alpha(slideDim), contentAlignment = Alignment.Center) {
                                 LyricsButton(enabled = hasLyrics(songLyrics)) { lyricsOpen = true }
                             }
-                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
+                            Box(Modifier.weight(1f).alpha(castAlpha), contentAlignment = Alignment.Center) {
+                                WithAccent(dynamic?.text, dynamic?.onControls) { CastDeviceButton(tint = Color.White.copy(alpha = 0.8f)) }
                             }
-                            Box(Modifier.width(SIDE_BUTTON_WIDTH), contentAlignment = Alignment.Center) {
+                            Box(Modifier.width(SIDE_BUTTON_WIDTH).alpha(slideDim), contentAlignment = Alignment.Center) {
                                 queueButton()
                             }
                         }
@@ -385,9 +419,11 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 exit = slideOutVertically(tween(180, easing = FastOutLinearInEasing)) { it },
             ) {
                 LyricsScreen(song, tint, onClose = { lyricsOpen = false }, menu = { menuOpen = true }) {
-                    Column {
-                        SeekBar(state)
-                        Controls(state)
+                    WithAccent(dynamic?.controls, dynamic?.onControls) {
+                        Column {
+                            if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state)
+                            Controls(state, onSlide = ::slide)
+                        }
                     }
                 }
             }
@@ -500,11 +536,12 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
  * slides out, and the new cover slides in from the other side. Tap opens the album.
  */
 @Composable
-private fun SwipeCover(song: Song?, onTap: () -> Unit) {
+private fun SwipeCover(song: Song?, onTap: () -> Unit, slideLabel: SlideLabel? = null) {
     val graph = LocalGraph.current
     val scope = rememberCoroutineScope()
     val offset = remember { Animatable(0f) }
     val currentId by rememberUpdatedState(song?.id)
+    val blur by androidx.compose.animation.core.animateDpAsState(slideBlur(slideLabel), label = "coverBlur")
     BoxWithConstraints(Modifier.fillMaxWidth().aspectRatio(1f)) {
         val width = constraints.maxWidth.toFloat().coerceAtLeast(1f)
 
@@ -525,6 +562,7 @@ private fun SwipeCover(song: Song?, onTap: () -> Unit) {
                     alpha = 1f - (kotlin.math.abs(offset.value) / width).coerceIn(0f, 1f) * 0.5f
                 }
                 .shadow(24.dp, RoundedCornerShape(10.dp))
+                .then(if (blur > 0.dp) Modifier.blur(blur, androidx.compose.ui.draw.BlurredEdgeTreatment(RoundedCornerShape(10.dp))) else Modifier)
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
@@ -545,6 +583,7 @@ private fun SwipeCover(song: Song?, onTap: () -> Unit) {
                 }
                 .clickable(enabled = song?.albumId != null, onClick = onTap)
         BigCover(song?.cover, song?.albumId, coverModifier, RoundedCornerShape(10.dp))
+        SlideCoverLabel(slideLabel, Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)))
     }
 }
 
@@ -600,6 +639,8 @@ private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart:
                 modifier = Modifier.clickable(enabled = song?.artistId != null || song?.artists?.isNotEmpty() == true, onClick = onArtist),
             )
         }
+        // A radio station or podcast episode isn't on the music server, so it can't be liked (issue #353).
+        if (song != null && OutsideMedia.isOutside(song.id)) return@Row
         IconButton(onClick = onHeart, enabled = song != null) {
             Icon(
                 if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
@@ -616,7 +657,7 @@ private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart:
  * while you drag, and the time shown follows your finger.
  */
 @Composable
-private fun SeekBar(state: PlayerState) {
+private fun SeekBar(state: PlayerState, modifier: Modifier = Modifier, onTrackCentre: (Float) -> Unit = {}) {
     val graph = LocalGraph.current
     val tracker = remember { SeekTracker() }
     var shown by remember { mutableStateOf(graph.player.progress().let { SeekTracker.Shown(it.positionMs, it.durationMs) }) }
@@ -647,11 +688,13 @@ private fun SeekBar(state: PlayerState) {
         graph.player.seekTo(ms)
     }
     val thumb by animateDpAsState(if (dragging != null) 16.dp else 11.dp, tween(100), label = "thumb")
-    Column(Modifier.padding(top = Space.Medium)) {
+    Column(modifier.padding(top = Space.Medium)) {
         BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
                 .height(28.dp)
+                // Where its line is, for the slide's up choice to sit on (issue #963).
+                .onGloballyPositioned { onTrackCentre(it.positionInRoot().y + it.size.height / 2f) }
                 .pointerInput(duration) {
                     detectTapGestures { offset -> seek((offset.x / size.width).coerceIn(0f, 1f)) }
                 }
@@ -696,20 +739,32 @@ private fun SeekBar(state: PlayerState) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+/**
+ * Repeat, previous, play, next and add to playlist. [onSlide]: what a slide from the play button runs (issue #919),
+ * null for none; [onSlideLabel] gets what the slide shows, for the cover (issue #933).
+ */
 @Composable
-internal fun Controls(state: PlayerState) {
+internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null, onSlideLabel: (SlideLabel?) -> Unit = {}, upTo: Float? = null) {
     val graph = LocalGraph.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
+    // An album's DJ mix (issue #965) gives the play button its grooves too.
+    val albumDj by app.siansa.mix.AlbumDjMix.playing.collectAsStateWithLifecycle()
+    // While a finger slides from the play button, the other controls make way: dimmed, and the one on the slide's
+    // side out of the way.
+    var sliding by remember { mutableStateOf<SlideWay?>(null) }
+    val others by animateFloatAsState(if (sliding != null) SLIDING_OTHERS else 1f, label = "controlsDim")
+    fun alphaOf(side: SlideWay?) = if (sliding != null && sliding == side) 0f else others
     // A short buzz for repeat and add to playlist (issue #771), as for the mini player's swipe (#763); the phone's
     // touch-feedback setting decides whether it's felt.
     val haptics = LocalHapticFeedback.current
     Row(
-        Modifier.fillMaxWidth().padding(vertical = Space.Small),
+        Modifier.fillMaxWidth().zIndex(if (sliding != null) 1f else 0f).padding(vertical = Space.Small),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Repeat on the left, add to playlist on the right (issue #370); shuffle is in the ⋮ menu.
-        StateButton(
+        Box(Modifier.alpha(others)) { StateButton(
             icon = if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
             label = repeatLabel(state.repeatMode),
             on = state.repeatMode != Player.REPEAT_MODE_OFF,
@@ -718,40 +773,43 @@ internal fun Controls(state: PlayerState) {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             graph.player.cycleRepeat()
             AppLog.i("Player", "Repeat: " + repeatLabel(nextRepeat(state.repeatMode)).lowercase())
-        }
-        IconButton(onClick = { graph.player.previous() }, modifier = Modifier.size(56.dp)) {
+        } }
+        IconButton(onClick = { graph.player.previous() }, modifier = Modifier.size(56.dp).alpha(alphaOf(SlideWay.LEFT))) {
             Icon(Icons.Rounded.SkipPrevious, "Previous", Modifier.size(40.dp))
         }
-        // Tap to play or pause; press and hold to stop and clear the queue.
-        Box(
-            Modifier
-                .size(68.dp)
-                .clip(CircleShape)
-                .background(Accent)
-                .combinedClickable(
-                    onClick = { graph.player.togglePlay() },
-                    onLongClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        graph.player.stop()
-                    },
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                "Play or pause",
-                tint = OnAccent,
-                modifier = Modifier.size(38.dp),
-            )
-        }
-        IconButton(onClick = { graph.player.next() }, modifier = Modifier.size(56.dp)) {
+        // Tap to play or pause; press and hold to stop and clear the queue; slide for a mix (issue #919). A radio
+        // station or podcast has nothing to mix from.
+        val song = state.current
+        val slides = settings.playSlides.let { if (onSlide == null || song == null || OutsideMedia.isOutside(song.id)) it.copy(on = false) else it }
+        // The up choice sits on the seek bar's line when there is one (issue #963).
+        var playCentre by remember { mutableStateOf<Float?>(null) }
+        PlayButton(
+            modifier = Modifier.onGloballyPositioned { playCentre = it.positionInRoot().y + it.size.height / 2f },
+            upReachPx = upReach(playCentre, upTo),
+            playing = state.isPlaying,
+            slides = slides,
+            djMix = (radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ) ||
+                (song != null && song.id in albumDj),
+            onToggle = { graph.player.togglePlay() },
+            onStop = { graph.player.stop() },
+            onSlide = { onSlide?.invoke(it) },
+            unavailable = { slideUnavailable(it, settings, graph.connection.current.aiProblem(settings)) },
+            onSliding = { shown ->
+                sliding = shown?.way
+                onSlideLabel(shown?.let {
+                    val slide = slides.of(it.way)
+                    SlideLabel(slide, it.way, it.armed, slideUnavailable(slide, settings, graph.connection.current.aiProblem(settings)))
+                })
+            },
+        )
+        IconButton(onClick = { graph.player.next() }, modifier = Modifier.size(56.dp).alpha(alphaOf(SlideWay.RIGHT))) {
             Icon(Icons.Rounded.SkipNext, "Next", Modifier.size(40.dp))
         }
         var picking by remember { mutableStateOf(false) }
-        StateButton(icon = Icons.Rounded.AddCircleOutline, label = "Add to playlist", on = false, tag = "addToPlaylistButton") {
+        Box(Modifier.alpha(others)) { StateButton(icon = Icons.Rounded.AddCircleOutline, label = "Add to playlist", on = false, tag = "addToPlaylistButton") {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             if (state.current != null) picking = true
-        }
+        } }
         if (picking) {
             val launch = rememberPlayLauncher()
             state.current?.let { song ->
@@ -852,8 +910,10 @@ private fun QueueView(state: PlayerState) {
                         onClick = { graph.player.skipTo(index) },
                         highlighted = playing,
                         swipeToQueue = false,
-                        // Swipe to queue in reverse, left to right: a red strip takes the song out (issue #809).
+                        // Right to left, the way a song is swiped into the queue: a red strip takes it out; left to
+                        // right: an amber one moves it to play next, unless it's playing or next already (issue #915).
                         swipeToRemove = { graph.player.removeFromQueue(index) },
+                        swipeToPlayNext = if (index == state.index || index == state.index + 1) null else ({ graph.player.moveToPlayNext(index) }),
                         swipeRowColour = QUEUE_ROW,
                         subtitle = artistAndAlbum(song),
                         nowPlaying = playing,
@@ -863,6 +923,12 @@ private fun QueueView(state: PlayerState) {
                                 close()
                                 graph.player.removeFromQueue(index)
                             })
+                            if (index != state.index && index != state.index + 1) {
+                                DropdownMenuItem(text = { Text("Play next") }, onClick = {
+                                    close()
+                                    graph.player.moveToPlayNext(index)
+                                })
+                            }
                             if (index > 0) {
                                 DropdownMenuItem(text = { Text("Remove songs up to here") }, onClick = {
                                     close()
@@ -939,6 +1005,24 @@ object LyricsShortcut {
 
 /** How strongly the song playing now is marked in the queue (#212). */
 private const val NOW_PLAYING_TINT = 0.14f
+
+/** How faint the other controls go while a finger slides from the play button (issue #919). */
+private const val SLIDING_OTHERS = 0.3f
+
+/**
+ * How far above the play button's centre its up choice goes (issue #963): to the seek bar's line ([trackY]) when that's
+ * where it would land anyway, so the choice sits centred on it; null (its usual reach) when either isn't known or the
+ * bar is too close or too far.
+ */
+internal fun upReach(playCentreY: Float?, trackY: Float?): Int? {
+    if (playCentreY == null || trackY == null) return null
+    val reach = playCentreY - trackY
+    return reach.takeIf { it in UP_REACH_PX_MIN..UP_REACH_PX_MAX }?.toInt()
+}
+
+/** The seek bar is used as the up choice's place only between these distances from the button's centre (px). */
+private const val UP_REACH_PX_MIN = 80f
+private const val UP_REACH_PX_MAX = 600f
 
 /** How far up the queue button has to be pulled to open the queue. */
 private const val QUEUE_PULL_PX = 40f

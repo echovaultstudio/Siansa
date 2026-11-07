@@ -11,6 +11,12 @@ internal object LibraryChips {
     /** The sort key for the page shown: a chip's name, or "ALL" with no chip chosen. */
     fun sortKey(chip: String?): String = chip ?: "ALL"
 
+    /**
+     * The key list-or-grid is kept under for the view shown (the owner, 0.52.0-dev: each view its own, kept until
+     * changed): a chip's name, under Music also the part shown (Albums, Artists, Songs), or "ALL" with no chip.
+     */
+    fun viewKey(chip: String?, part: String? = null): String = "library:" + (chip ?: "ALL") + (part?.let { ":$it" } ?: "")
+
     /** [all] chips in the order last opened ([lastUsed], most recent first), the rest in [DEFAULT] order after them. */
     fun order(lastUsed: List<String>, all: List<String>): List<String> {
         val used = lastUsed.filter { it in all }.distinct()

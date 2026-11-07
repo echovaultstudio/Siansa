@@ -61,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -77,6 +78,7 @@ import android.os.Vibrator
 import android.os.VibrationEffect
 import android.content.Context
 import android.os.Build
+import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -215,7 +217,11 @@ class PlayLauncher(
         }
     }
 
-    fun progressive(label: String, first: suspend () -> List<Song>, more: suspend (List<Song>) -> List<Song>) {
+    fun progressive(label: String, first: suspend () -> List<Song>, more: suspend (List<Song>) -> List<Song>) =
+        progressivePicks(label, first) { app.siansa.mix.RadioSongs(more(it)) }
+
+    /** As [progressive], with the songs AudioMuse picked among the later ones marked in the queue. */
+    fun progressivePicks(label: String, first: suspend () -> List<Song>, more: suspend (List<Song>) -> app.siansa.mix.RadioSongs) {
         scope.launch {
             val started = System.currentTimeMillis()
             val firstSongs = try {
@@ -231,14 +237,15 @@ class PlayLauncher(
             val generation = graph.player.queueGeneration
             AppLog.i("Radio", "$label started with ${firstSongs.size} songs in ${System.currentTimeMillis() - started}ms")
             appScope.launch {
-                val rest = runCatching { more(firstSongs) }
+                val batch = runCatching { more(firstSongs) }
                     .onFailure { AppLog.w("Radio", "$label: more songs failed: ${it.message}") }
-                    .getOrDefault(emptyList())
+                    .getOrDefault(app.siansa.mix.RadioSongs(emptyList()))
+                val rest = batch.songs
                 AppLog.i("Radio", "$label added ${rest.size} more after ${System.currentTimeMillis() - started}ms")
                 withContext(Dispatchers.Main) {
                     when (radioMore(firstSongs.isEmpty(), rest.isEmpty(), generation, graph.player.queueGeneration)) {
-                        RadioMore.PLAY -> graph.player.play(rest)
-                        RadioMore.ADD -> graph.player.addAll(rest)
+                        RadioMore.PLAY -> graph.player.play(rest, picked = batch.picked)
+                        RadioMore.ADD -> graph.player.addAll(rest, batch.picked)
                         RadioMore.DROP -> AppLog.i("Radio", "$label: ${rest.size} more songs dropped, something else plays now (or playback was stopped)")
                         RadioMore.NOTHING -> Unit
                     }
@@ -363,7 +370,7 @@ fun Cover(
 
 /**
  * Loads the covers just beyond what's on screen into memory while a list scrolls, so they're ready
- * (drawn in the same frame) when they come into view, as Symfonium and Glide-based apps do.
+ * (drawn in the same frame) when they come into view, as Glide-based apps do.
  */
 @Composable
 fun PrefetchCovers(firstVisible: Int, visibleCount: Int, covers: List<String?>, size: Int, ahead: Int = 24) {
@@ -412,12 +419,29 @@ fun Screen(
 
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier, top: Dp = LocalSectionGap.current) {
+    // A section of Home set to show no title (issue #961) keeps only the gap above it.
+    if (!LocalSectionTitleShown.current) {
+        Spacer(modifier.height(top))
+        return
+    }
     Text(
         text,
         style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Bold,
         modifier = modifier.padding(start = Space.Page, end = Space.Page, top = top, bottom = Space.Medium),
     )
+}
+
+/**
+ * Whether a section's title shows (issue #961): Home sets it per section from Arrange Home; everywhere else it's shown.
+ * Without it, a section keeps the gap above where its title was.
+ */
+val LocalSectionTitleShown = androidx.compose.runtime.compositionLocalOf { true }
+
+/** In place of a hidden title: the gap that was above it. */
+@Composable
+fun HiddenTitleGap() {
+    Spacer(Modifier.height(LocalSectionGap.current))
 }
 
 /** The space above a section's heading: between one section's last row and the next heading. */
@@ -500,9 +524,11 @@ fun SongRow(
     subtitle: String? = artistAndAlbum(song),
     // Swipe from right to left adds the song to the queue (not in the queue itself).
     swipeToQueue: Boolean = true,
-    // In the queue: swipe from right to left takes the song out of it (the swipe to queue in reverse, red).
+    // In the queue: swipe from right to left takes the song out of it (red, issue #915).
     swipeToRemove: (() -> Unit)? = null,
-    /** What a row swiped to remove covers the red strip with: now playing's queue is on a see-through surface. */
+    // In the queue: swipe from left to right moves the song to play next (amber, issue #915).
+    swipeToPlayNext: (() -> Unit)? = null,
+    /** What a swiped queue row covers its strip with: now playing's queue is on a see-through surface. */
     swipeRowColour: Color = MaterialTheme.colorScheme.surface,
     // Extra items at the end of the ⋮ menu (such as removing it from a playlist); call close() when picked.
     extraMenu: @Composable (close: () -> Unit) -> Unit = {},
@@ -614,9 +640,9 @@ fun SongRow(
                         menu = false
                         pickPlaylist = true
                     })
-                    DropdownMenuItem(text = { Text("Start song radio") }, onClick = {
+                    DropdownMenuItem(text = { Text("Start a mix") }, onClick = {
                         menu = false
-                        if (graph.connection.current.offline) launch.notify("You're offline: song radio needs the server")
+                        if (graph.connection.current.offline) launch.notify("You're offline: a mix needs the server")
                         else RadioChooser.ask(song)
                     })
                     if (graph.settings.current.audioMuseReady) {
@@ -662,8 +688,8 @@ fun SongRow(
             }
         }
     }
-    if (swipeToRemove != null) {
-        SwipeToRemove(rowColour = swipeRowColour, onRemove = swipeToRemove, content = row)
+    if (swipeToRemove != null || swipeToPlayNext != null) {
+        QueueSwipes(rowColour = swipeRowColour, onRemove = swipeToRemove, onPlayNext = swipeToPlayNext, content = row)
     } else {
         SwipeToQueue(song, enabled = swipeToQueue, onQueued = { launch.notify("Added to the queue") }, content = row)
     }
@@ -872,7 +898,9 @@ fun <T> Shelf(
 ) {
     if (items.isEmpty()) return
     Column {
-        if (onOpenAll != null && homeRowOpensFullList(items.size)) {
+        if (!LocalSectionTitleShown.current) {
+            HiddenTitleGap()
+        } else if (onOpenAll != null && homeRowOpensFullList(items.size)) {
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -918,37 +946,54 @@ fun SwipeToQueue(song: Song, enabled: Boolean, onQueued: () -> Unit, content: @C
     val current by rememberUpdatedState(song)
     val queued by rememberUpdatedState(onQueued)
     SongSwipe(
-        label = "Add to queue",
-        icon = Icons.AutoMirrored.Rounded.QueueMusic,
-        colour = Accent,
-        onColour = OnAccent,
-        done = QueueHaptics.Kind.ADDED,
-        onDone = {
-            AppLog.i("Queue", "Swiped ${current.id} into the queue")
-            graph.player.addToQueue(current)
-            queued()
-        },
+        endToStart = SwipeAction(
+            label = "Add to queue",
+            icon = Icons.AutoMirrored.Rounded.QueueMusic,
+            colour = Accent,
+            onColour = OnAccent,
+            done = QueueHaptics.Kind.ADDED,
+            motion = SwipeMotion.ADDED,
+            onDone = {
+                AppLog.i("Queue", "Swiped ${current.id} into the queue")
+                graph.player.addToQueue(current)
+                queued()
+            },
+        ),
         content = content,
     )
 }
 
 /**
- * The same gesture inside the queue, in reverse: drag a queued song from left to right (the opposite way to the
- * swipe that put it there) and it's taken out of the queue, behind a red strip with a bin instead of the amber one
- * (issue #809). [rowColour] is what the row covers the strip with: now playing's surface is see-through.
+ * The swipes inside the queue (issue #915): from right to left, the way a song is swiped into the queue, takes it out,
+ * behind a red strip whose bin gives a little shake once it's done; from left to right moves it to play next, behind
+ * an amber strip whose arrow nudges forward. Either may be null, leaving that way alone. [rowColour] is what the row
+ * covers the strip with: now playing's surface is see-through.
  */
 @Composable
-fun SwipeToRemove(rowColour: Color, onRemove: () -> Unit, content: @Composable (Modifier) -> Unit) {
+fun QueueSwipes(rowColour: Color, onRemove: (() -> Unit)?, onPlayNext: (() -> Unit)?, content: @Composable (Modifier) -> Unit) {
     val remove by rememberUpdatedState(onRemove)
+    val next by rememberUpdatedState(onPlayNext)
     SongSwipe(
-        label = "Remove from queue",
-        icon = Icons.Rounded.Delete,
-        colour = RemoveRed,
-        onColour = Color.White,
-        done = QueueHaptics.Kind.REMOVED,
-        direction = SwipeToDismissBoxValue.StartToEnd,
+        endToStart = if (onRemove == null) null else SwipeAction(
+            label = "Remove from queue",
+            icon = Icons.Rounded.Delete,
+            colour = RemoveRed,
+            onColour = Color.White,
+            done = QueueHaptics.Kind.REMOVED,
+            motion = SwipeMotion.REMOVED,
+            removes = true,
+            onDone = { remove?.invoke() },
+        ),
+        startToEnd = if (onPlayNext == null) null else SwipeAction(
+            label = "Play next",
+            icon = Icons.AutoMirrored.Rounded.PlaylistPlay,
+            colour = Accent,
+            onColour = OnAccent,
+            done = QueueHaptics.Kind.ADDED,
+            motion = SwipeMotion.NEXT,
+            onDone = { next?.invoke() },
+        ),
         rowColour = rowColour,
-        onDone = { remove() },
         content = content,
     )
 }
@@ -956,64 +1001,125 @@ fun SwipeToRemove(rowColour: Color, onRemove: () -> Unit, content: @Composable (
 /** The red behind a queued song swiped away: a warning, unlike the amber of anything that plays. */
 val RemoveRed = Color(0xFFE5534B)
 
+/** How a swipe's icon moves once the swipe is done (issue #915). */
+enum class SwipeMotion {
+    /** Added to the queue: the icon pops up and settles. */
+    ADDED,
+    /** Taken out: the bin shakes. */
+    REMOVED,
+    /** Moved to play next: the icon nudges forward and back. */
+    NEXT;
+
+    /** The icon's scale, turn (degrees) and move (in icon widths, across and down) at [progress] 0..1 of the motion. */
+    fun at(progress: Float): Triple<Float, Float, Pair<Float, Float>> {
+        val p = progress.coerceIn(0f, 1f)
+        val swell = kotlin.math.sin(p * Math.PI).toFloat()
+        return when (this) {
+            ADDED -> Triple(1f + 0.35f * swell, 0f, 0f to -0.25f * swell)
+            REMOVED -> Triple(1f + 0.2f * swell, 16f * kotlin.math.sin(p * 3 * Math.PI).toFloat() * (1f - p), 0f to 0f)
+            NEXT -> Triple(1f + 0.2f * swell, 0f, 0.35f * swell to 0f)
+        }
+    }
+}
+
+/** One way of a [SongSwipe]: its strip, its buzz and icon motion, and what it does. [removes]: the row goes with it. */
+class SwipeAction(
+    val label: String,
+    val icon: ImageVector,
+    val colour: Color,
+    val onColour: Color,
+    val done: QueueHaptics.Kind,
+    val motion: SwipeMotion,
+    val removes: Boolean = false,
+    val onDone: () -> Unit,
+)
+
 /**
- * A swipe on a song row in [direction] past [SWIPE_TO_QUEUE_FRACTION] of its width: [onDone] runs with the [done]
- * buzz, and the row slides back. A strip in [colour] with [label] and [icon] shows behind it while dragging, on the
- * side the row slides away from, with a click as it appears. [content] gets a background for the row, [rowColour]
- * (the theme's surface by default), solid only while it's dragged, so the strip shows only where the row has moved.
+ * A swipe on a song row past [SWIPE_TO_QUEUE_FRACTION] of its width, from right to left ([endToStart]) or left to
+ * right ([startToEnd]). A strip in the action's colour with its label and icon shows behind the row while dragging, on
+ * the side the row slides away from, with a click as it appears. Let go past the line, and the row stays aside a
+ * moment while the action runs with its buzz and the icon moves ([SwipeMotion]); then the row slides back, or, for an
+ * action that [SwipeAction.removes] the song, the action runs once the motion is over and the row goes with the song.
+ * [content] gets a background for the row, [rowColour] (the theme's surface by default), solid only while the strip
+ * shows, so the strip shows only where the row has moved.
  */
 @Composable
 private fun SongSwipe(
-    label: String,
-    icon: ImageVector,
-    colour: Color,
-    onColour: Color,
-    done: QueueHaptics.Kind,
-    onDone: () -> Unit,
-    direction: SwipeToDismissBoxValue = SwipeToDismissBoxValue.EndToStart,
+    endToStart: SwipeAction? = null,
+    startToEnd: SwipeAction? = null,
     rowColour: Color = MaterialTheme.colorScheme.surface,
     content: @Composable (Modifier) -> Unit,
 ) {
     val context = LocalContext.current
-    val finish by rememberUpdatedState(onDone)
+    val leftward by rememberUpdatedState(endToStart)
+    val rightward by rememberUpdatedState(startToEnd)
+    fun actionFor(value: SwipeToDismissBoxValue): SwipeAction? = when (value) {
+        SwipeToDismissBoxValue.EndToStart -> leftward
+        SwipeToDismissBoxValue.StartToEnd -> rightward
+        SwipeToDismissBoxValue.Settled -> null
+    }
     val state = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            if (value == direction) {
-                // A firmer buzz when the song is added or removed.
-                QueueHaptics.vibrate(context, done)
-                finish()
-            }
-            // Never stays swiped away: the row slides back.
-            false
-        },
+        confirmValueChange = { value -> value == SwipeToDismissBoxValue.Settled || actionFor(value) != null },
         positionalThreshold = { width -> width * SWIPE_TO_QUEUE_FRACTION },
     )
-    val swiping = state.dismissDirection == direction
+    val motion = remember { androidx.compose.animation.core.Animatable(0f) }
+    // Let go past the line: the action, its buzz and the icon's motion, then the row comes back (or goes, removed).
+    LaunchedEffect(state.currentValue) {
+        val action = actionFor(state.currentValue) ?: return@LaunchedEffect
+        QueueHaptics.vibrate(context, action.done)
+        if (!action.removes) action.onDone()
+        motion.snapTo(0f)
+        motion.animateTo(1f, androidx.compose.animation.core.tween(SWIPE_MOTION_MS))
+        if (action.removes) {
+            action.onDone()
+            // The row goes as the queue changes, a moment later: until then it stays aside, rather than coming back
+            // only to vanish.
+            kotlinx.coroutines.withTimeoutOrNull(SWIPE_REMOVE_WAIT_MS) { kotlinx.coroutines.awaitCancellation() }
+        }
+        // Still here (not removed, or the action changed nothing): back in place.
+        state.reset()
+        motion.snapTo(0f)
+    }
+    val action = actionFor(state.dismissDirection)
+    val swiping = action != null
     // A clear tap the moment the strip shows, as the swipe starts.
     LaunchedEffect(swiping) {
         if (swiping) QueueHaptics.vibrate(context, QueueHaptics.Kind.START)
     }
-    val fromStart = direction == SwipeToDismissBoxValue.StartToEnd
     SwipeToDismissBox(
         state = state,
-        enableDismissFromStartToEnd = fromStart,
-        enableDismissFromEndToStart = !fromStart,
+        enableDismissFromStartToEnd = startToEnd != null,
+        enableDismissFromEndToStart = endToStart != null,
         backgroundContent = {
+            val fromStart = state.dismissDirection == SwipeToDismissBoxValue.StartToEnd
             Row(
-                Modifier.fillMaxSize().background(if (swiping) colour else Color.Transparent).padding(horizontal = Space.Section).testTag("swipeStrip"),
+                Modifier.fillMaxSize().background(action?.colour ?: Color.Transparent).padding(horizontal = Space.Section).testTag("swipeStrip"),
                 verticalAlignment = Alignment.CenterVertically,
                 // The label and icon sit on the side the row slides away from, where the strip shows first.
                 horizontalArrangement = if (fromStart) Arrangement.Start else Arrangement.End,
             ) {
-                if (swiping) {
+                if (action != null) {
+                    val icon: @Composable () -> Unit = {
+                        val (scale, turn, move) = action.motion.at(motion.value)
+                        Icon(
+                            action.icon, null, tint = action.onColour,
+                            modifier = Modifier.testTag("swipeIcon").graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                rotationZ = turn
+                                translationX = move.first * size.width
+                                translationY = move.second * size.height
+                            },
+                        )
+                    }
                     if (fromStart) {
-                        Icon(icon, null, tint = onColour)
+                        icon()
                         Spacer(Modifier.width(Space.Medium))
-                        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = onColour)
+                        Text(action.label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = action.onColour)
                     } else {
-                        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = onColour)
+                        Text(action.label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = action.onColour)
                         Spacer(Modifier.width(Space.Medium))
-                        Icon(icon, null, tint = onColour)
+                        icon()
                     }
                 }
             }
@@ -1067,6 +1173,12 @@ object QueueHaptics {
 
 /** How far a song row has to be dragged (part of its width) to be added to the queue. */
 const val SWIPE_TO_QUEUE_FRACTION = 0.35f
+
+/** How long a swipe's icon moves once it's done, the row held aside meanwhile (issue #915). */
+const val SWIPE_MOTION_MS = 380
+
+/** How long a row swiped out of the queue waits aside for the queue to drop it before it comes back. */
+private const val SWIPE_REMOVE_WAIT_MS = 1_500L
 
 /**
  * Shown instead of an AI tool (mixes, mood playlists, sound search) while AudioMuse can't be used: a sad

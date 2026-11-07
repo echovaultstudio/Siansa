@@ -24,7 +24,7 @@ how it starts and ends, and similar albums and artists.
 
 ## Set up AudioMuse-AI in Siansa
 
-**Settings › Servers and services › Services › AudioMuse-AI**:
+**Settings › Connections › Services › AudioMuse-AI**:
 
 1. **Server address**, for example `http://192.168.1.10:8000`.
 2. If AudioMuse-AI has a login: either an **API token**, or its **user name and password**.
@@ -59,7 +59,7 @@ It needs AudioMuse-AI 3.6.4 or later and works on the standalone builds too.
 Until a song is measured, Siansa uses its ReplayGain tags, and crossfades use the fixed length.
 
 Plugin 0.3.0 also measures the beat grid at each end of a song (tempo, where the beats and bars fall, how
-beat-driven and how steady the end is), for [beat-matched blends](playback.md#beat-matched-blends-experimental);
+beat-driven and how steady the end is), for [beat-matched blends](playback.md#beat-matched-blends);
 0.4.0 finds the phrases too (which bar of every 4 or 8 starts one, from where the parts of the song come in or
 drop out, read over the song's last minute and its first 40 s), so blends go phrase on phrase. A song whose bars
 don't change from one to the next gets no phrase, and blends bar on bar; so does one whose last minute changes
@@ -81,6 +81,13 @@ want them to get a turn, set **Measure all runs** to rounds of 12, 10 or 5 minut
 15-minute task): the run ends after the song it's on, Measure all goes off for both parts, and the songs measured so
 far are kept.
 
+From 0.5.0 the plugin also notes where a song's beat stops when it ends in a beatless outro, so Siansa can bring the
+next song in after the last beat and let the outro play out under it (see [Playback › Crossfade](playback.md#crossfade)).
+New songs get it with their profile. Songs measured before are checked as they come up in what you play, a few at a
+time, or all of them with **Measure all** on for the beat grids: only the beats are read again, and everything already
+measured stays in use meanwhile. Set Measure all to rounds (10 minutes every 15, say) so AudioMuse-AI's own jobs keep
+their turn. The page says how many songs still wait for the check.
+
 From 0.4.2 the tempo of drum and bass and other breakbeats is read right. It often came out at two thirds (113 BPM for
 170), with the beats off the music, so those songs were never beat-matched. Updating measures every song's beat
 grids again in the background, songs Siansa is about to play first; the loudness and fades stay in use meanwhile.
@@ -96,7 +103,7 @@ AudioMuse-AI 3 can serve several music servers (for example Navidrome and Emby).
 name** in AudioMuse-AI (Setup › Music Servers). Siansa must name the right server in every request, or AudioMuse
 answers with the other server's songs or says it doesn't know the song.
 
-In **Settings › Servers and services**, in the card of your music server, **Server name in AudioMuse** is its name,
+In **Settings › Connections**, in the card of your music server, **Server name in AudioMuse** is its name,
 as AudioMuse-AI shows it (capitals don't matter). Leave it empty for AudioMuse-AI's default server. Each user keeps
 their own: enter the Emby server's name in your Emby user's card, and Navidrome's in your Navidrome user's.
 

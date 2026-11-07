@@ -13,7 +13,8 @@ enum class MiniButton(val id: String, val label: String) {
     LIKE("like", "Like");
 
     companion object {
-        val default: List<MiniButton> = listOf(PLAY, CAST, NEXT)
+        /** A fresh install's (the owner, 0.52.0-dev): play or pause, next song, add to playlist. Cast is on Home. */
+        val default: List<MiniButton> = listOf(PLAY, NEXT, ADD)
 
         /** At most this many, so the song's title keeps room beside them. */
         const val MAX = 4
@@ -93,3 +94,34 @@ fun <T> arrangeOrder(shown: List<T>, all: List<T>): List<T> = shown.distinct() +
 
 /** What an arrange list saves: the items in [order] that are [shown], in that order. */
 fun <T> shownInOrder(order: List<T>, shown: Set<T>): List<T> = order.filter { it in shown }
+
+/**
+ * The options in Home's menu (issue #872), top to bottom as a new install shows them. Their order is set in
+ * Settings › Style › Home Menu; all four always show, since each is the only way to it from Home.
+ */
+enum class HomeMenuItem(val id: String, val label: String) {
+    DICE("dice", "Roll the dice"),
+    PLAY_ON("play_on", "Play on…"),
+    SOURCES("sources", "Sources"),
+    ARRANGE("arrange", "Arrange Home");
+
+    companion object {
+        val default: List<HomeMenuItem> = entries.toList()
+
+        /**
+         * Reads a saved order ("sources,dice,…"): unknown ids dropped, each once, and any option the saved order
+         * doesn't have (new in a later version) put back where it is by default, so none can go missing.
+         */
+        fun parse(saved: String?): List<HomeMenuItem> {
+            if (saved.isNullOrBlank()) return default
+            val order = saved.split(',').mapNotNull { id -> entries.firstOrNull { it.id == id.trim() } }.distinct().toMutableList()
+            for (item in entries) {
+                if (item in order) continue
+                order.add(item.ordinal.coerceAtMost(order.size), item)
+            }
+            return order
+        }
+
+        fun format(order: List<HomeMenuItem>): String = order.joinToString(",") { it.id }
+    }
+}

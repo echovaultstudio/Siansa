@@ -40,6 +40,7 @@ class Scrobbler(
     private val flushLock = Mutex()
 
     fun nowPlaying(song: Song) {
+        if (!scrobblesSong(song.id)) return
         val s = settings.current
         scope.launch {
             if (!scrobbles(song, s.scrobbleOffUsers)) return@launch
@@ -61,6 +62,7 @@ class Scrobbler(
     fun stopped(song: Song, positionMs: Long) = timeline(song) { source.playbackStopped(song.id, positionMs) }
 
     private fun timeline(song: Song, send: suspend () -> Unit) {
+        if (!scrobblesSong(song.id)) return
         val s = settings.current
         if (!s.scrobbleNavidrome) return
         scope.launch {
@@ -71,6 +73,7 @@ class Scrobbler(
 
     /** Called when a song stops being the current one, with how long it was actually heard. */
     fun finished(song: Song, startedAtMs: Long, listenedMs: Long) {
+        if (!scrobblesSong(song.id)) return
         val durationMs = song.durationSec * 1000L
         val percent = settings.current.scrobblePercent
         val needed = scrobbleNeededMs(durationMs, percent)
@@ -152,3 +155,6 @@ fun scrobbleNeededMs(durationMs: Long, percent: Int): Long =
 
 /** Whether songs from [user]'s library are scrobbled, given the users set not to be (issue #356). */
 fun scrobblesFrom(user: Int, off: Set<Int>): Boolean = user !in off
+
+/** Whether a song is ever scrobbled: radio stations and podcast episodes (issue #353) never are. */
+fun scrobblesSong(id: String): Boolean = !app.siansa.data.OutsideMedia.isOutside(id)

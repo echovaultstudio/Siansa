@@ -124,7 +124,7 @@ private fun SectionRow(item: SectionItem, nav: NavController, launch: PlayLaunch
         is SectionItem.ArtistItem -> {
             val artist = item.artist
             MediaRow("${artist.name} radio", "With similar artists", artist.coverArt, round = true, onClick = {
-                launch.progressive("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
+                launch.progressivePicks("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
             })
         }
         is SectionItem.Radio -> MediaRow(item.radio.name, "Sound radio", null, colors = Color(item.radio.colors.first) to Color(item.radio.colors.second), onClick = { nav.openMoodRadio(item.radio.id) })
@@ -186,7 +186,7 @@ private fun SectionTile(item: SectionItem, nav: NavController, launch: PlayLaunc
                 name = "${artist.name} radio",
                 subtitle = "With similar artists",
                 coverArt = artist.coverArt,
-                onClick = { launch.progressive("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) } },
+                onClick = { launch.progressivePicks("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) } },
                 modifier = fill,
                 round = true,
             )

@@ -11,15 +11,17 @@ The Subsonic API (`/rest/…`, version 1.16.1, JSON), with OpenSubsonic extensio
 
 | Purpose | Calls |
 |---|---|
-| Connect and check | `ping`, `getOpenSubsonicExtensions`, `getMusicFolders`, `getScanStatus` |
+| Connect and check | `ping`, `getOpenSubsonicExtensions`, `getMusicFolders`, `getScanStatus`, `tokenInfo` (with an API key) |
 | Library sync and browsing | `getArtists`, `getArtist`, `getArtistInfo2`, `getAlbum`, `getAlbumList2`, `getSong`, `search3`, `getTopSongs`, `getRandomSongs`, `getStarred2` |
 | Playback | `stream` (original with `format=raw`, or Opus with `format=opus&maxBitRate=…`), `getCoverArt` |
 | Lyrics | `getLyricsBySongId` (with word timings when the server has them), `getLyrics` |
 | Favourites and plays | `star`, `unstar`, `scrobble` |
 | Playlists | `getPlaylists`, `getPlaylist`, `createPlaylist`, `updatePlaylist` |
 | Similar music | `getSimilarSongs`, `getSimilarSongs2`, and `getSonicSimilarTracks` / `findSonicPath` when the AudioMuse-AI Navidrome plugin is installed |
+| Radio stations | `getInternetRadioStations` (read only, for [Your Stations](stations.md)) |
 
-Siansa logs in with a salted token (`u`, `t`, `s`), never the plain password.
+Siansa logs in with a salted token (`u`, `t`, `s`), never the plain password. With an API key, on a server that
+lists the `apiKeyAuthentication` extension, every request sends `apiKey` instead, and no `u`, `t` or `s`.
 
 ### Emby
 
@@ -72,9 +74,12 @@ its own server.
 
 | Service | When | What's sent |
 |---|---|---|
-| Audiobookshelf (your own server) | Set up in Servers and services | Your login; which book you play and where you are in it (progress, bookmarks) |
+| Audiobookshelf (your own server) | Set up in Connections | Your login; which book you play and where you are in it (progress, bookmarks) |
 | The AI service you pick: OpenRouter (`openrouter.ai`), OpenAI (`api.openai.com`), Anthropic (`api.anthropic.com`), Google Gemini (`generativelanguage.googleapis.com`), Mistral (`api.mistral.ai`), Groq (`api.groq.com`), or Ollama or another at the address you enter | AI on, for each vibe | See [AI features](ai.md) |
 | Last.fm | Connected | Plays, now playing, loved tracks; top artists and songs for your taste |
 | ListenBrainz / Koito | Connected | Plays, now playing; top artists and songs |
 | Open-Meteo | Weather in Use the moment on | Your location rounded to about 10 km |
 | Deezer (`api.deezer.com`) | Artists you might like | Artist names only |
+| Radio stations and podcast feeds you add, and your server's radio stations | You add a link, open a podcast, or play a station or episode | A normal web request to that address (your IP address and "Siansa (Android)" as the app); nothing about you or your music |
+| Radio Browser (`all.api.radio-browser.info`, or one of its servers) | Once for each radio station without a picture | The station's stream address, then its name if that finds nothing ("Siansa/" and the app's version as the app) |
+| A radio station's website | Once for each radio station without a picture, when its address is known | A normal request for the page, and for the logo it names, to check it's a picture |

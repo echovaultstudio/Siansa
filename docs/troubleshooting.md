@@ -5,11 +5,14 @@ few times, then use **Report a problem** there. See [Reporting problems](privacy
 
 ## Can't connect to my server
 
-- Use **Test** in **Settings › Servers and services**. It shows what the server answered.
+- Use **Test** in **Settings › Connections**. It shows what the server answered.
 - Try the address in the phone's browser. If that doesn't load either, it's the network: are you on the same
   Wi-Fi, or on your VPN when away from home?
 - Include the port (`:4533` for Navidrome, `:8096` for Emby) and `http://` or `https://`.
 - Behind a login page (Authelia, Authentik, a proxy's basic auth)? Add the **proxy login**.
+- "Your server doesn't take API keys": your server doesn't support OpenSubsonic API keys yet. Clear the **API key**
+  and use your user name and password. "Your server doesn't know this API key": the key is wrong or was revoked;
+  make a new one on your server.
 
 ## "Not found on Navidrome. It may have been removed."
 
@@ -23,7 +26,7 @@ The album, artist or song isn't on the server Siansa asked. Common reasons:
 Song radio, similar songs or similar albums say "AudioMuse doesn't know this song".
 
 1. **Has AudioMuse-AI analysed it?** New songs need its analysis first. Check in AudioMuse-AI, or run an analysis.
-2. **Several music servers in AudioMuse-AI?** Each server's name must be set in **Settings › Servers and services**, in the
+2. **Several music servers in AudioMuse-AI?** Each server's name must be set in **Settings › Connections**, in the
    card of that music server (Server name in AudioMuse), exactly as AudioMuse-AI shows it. See
    [Several music servers](audiomuse.md#several-music-servers-in-one-audiomuse-ai).
 3. **Does AudioMuse-AI know the song on that server?** It links a second server's songs by analysis or by
@@ -80,3 +83,12 @@ closed. Siansa tries once more by itself; it's only a problem if the second try 
 
 The TV or speaker must be on the same Wi-Fi as the phone, and able to reach your music server's address. It plays
 straight from your server.
+
+If a Chromecast or Google TV shows Google's black **Default Media Receiver** screen instead of Siansa's, that copy of
+Siansa was built without Siansa's TV screen (it needs to be registered with Google first). Songs still play the same;
+use the phone for the controls. The log says which screen casting uses.
+
+## Siansa doesn't show up in Android Auto
+
+Android Auto hides apps that weren't installed from Google Play. Turn on **Unknown sources** in Android Auto's
+developer settings, as [Playback › Android Auto](playback.md#android-auto) shows, then connect the phone again.

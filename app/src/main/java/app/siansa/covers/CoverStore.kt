@@ -50,6 +50,13 @@ object CoverStore {
     const val PEEK = "X-Siansa-Peek"
 
     const val STILL_PX = 1000
+
+    /**
+     * How much of an animated cover is read when only a still of it is wanted (a list, the Library's grid): its first
+     * frame is at the start of the file. Some of these files are 20 to 60 MB, and the TV's Library downloaded each one
+     * whole just to show its first frame (issue #928).
+     */
+    const val STILL_FROM_BYTES = 8L * 1024 * 1024
     // Apple Music motion covers converted to WebP can be well over 100 MB.
     private const val MAX_BYTES = 400L * 1024 * 1024
 
@@ -115,7 +122,7 @@ object CoverStore {
             original.delete()
             stillFile(key).delete()
             versions.remove(key)
-            prefs().edit().remove("v:$key").apply()
+            app.siansa.data.QuietWrites.save(prefs()) { remove("v:$key") }
             return null
         }
         return Local(original, stillFile(key).takeIf { it.exists() })
@@ -156,6 +163,7 @@ object CoverStore {
         var gate = CompletableFuture<Boolean>()
         while (true) {
             local(id)?.let { return serve(clean, it, wantsAnimation) }
+            if (!wantsAnimation) stillOnly(id)?.let { return serveStill(clean, it) }
             gate = CompletableFuture<Boolean>()
             val other = pending.putIfAbsent(gateKey, gate) ?: break
             waitFor(other)
@@ -188,6 +196,19 @@ object CoverStore {
             response.close()
             return serve(clean, it, wantsAnimation)
         }
+        if (!wantsAnimation && readsOnlyTheStart(length)) {
+            stillFromStart(clean, response, key, id, image)?.let { return it }
+            // Its first frame couldn't be read from the start: download it whole, as before.
+            val again = withoutServerError(chain, clean, id, size)
+            if (!again.isSuccessful) return again
+            return keep(clean, again, id, key, image, wantsAnimation)
+        }
+        return keep(clean, response, id, key, image, wantsAnimation)
+    }
+
+    /** Downloads and keeps the whole animated original, with its still, and answers from them. */
+    private fun keep(clean: Request, response: Response, id: String, key: String, image: Sniffed, wantsAnimation: Boolean): Response {
+        val length = response.body?.contentLength() ?: -1L
         val started = System.currentTimeMillis()
         try {
             save(key, response)
@@ -195,10 +216,7 @@ object CoverStore {
             throw if (e is IOException) e else IOException(e)
         }
         downloads.incrementAndGet()
-        version(id).takeIf { it.isNotEmpty() && key == canonical(id) }?.let {
-            versions[key] = it
-            prefs().edit().putString("v:$key", it).apply()
-        }
+        rememberVersion(id, key)
         AppLog.i(
             "Cover",
             "Kept animated cover $id (${image.kind} ${image.width}×${image.height}, ${mb(originalFile(key).length())}) " +
@@ -208,6 +226,102 @@ object CoverStore {
         )
         return local(key)?.let { serve(clean, it, wantsAnimation) } ?: throw IOException("Cover $id couldn't be saved")
     }
+
+    /** Whether a still is made from the start of an animated cover of [length] bytes (-1: not sent) rather than all of it. */
+    internal fun readsOnlyTheStart(length: Long): Boolean = length < 0 || length > STILL_FROM_BYTES
+
+    /**
+     * A still of an animated cover from the start of its download, without the rest: the first [STILL_FROM_BYTES] are
+     * read, the download is stopped, and the first frame becomes the cover's still (`<id>.jpg`, with no original kept).
+     * The animation itself is downloaded only when something asks for it (the album page, Now playing). A file that ends
+     * within those bytes is kept whole, as before. Null when the first frame couldn't be read from them.
+     */
+    private fun stillFromStart(clean: Request, response: Response, key: String, id: String, image: Sniffed): Response? {
+        val started = System.currentTimeMillis()
+        val bytes = okio.Buffer()
+        var whole = false
+        response.use {
+            val source = it.body?.source() ?: return null
+            while (bytes.size < STILL_FROM_BYTES) {
+                if (source.read(bytes, 256L * 1024) == -1L) {
+                    whole = true
+                    break
+                }
+            }
+        }
+        if (whole) {
+            // All of it arrived: keep it as any other.
+            val original = originalFile(key)
+            val tmp = File(dir, safe(key) + ".part")
+            tmp.sink().buffer().use { it.writeAll(bytes) }
+            if (!tmp.renameTo(original)) {
+                tmp.delete()
+                return null
+            }
+            makeStill(original, stillFile(key))
+            dedupe(key, original)
+            downloads.incrementAndGet()
+            rememberVersion(id, key)
+            AppLog.i("Cover", "Kept animated cover $id (${image.kind} ${image.width}×${image.height}, ${mb(original.length())}) " +
+                "after ${System.currentTimeMillis() - started} ms; lists use a still of it")
+            return local(key)?.let { serve(clean, it, wantsAnimation = false) }
+        }
+        val read = bytes.size
+        val frame = firstFrame(bytes.readByteArray(), STILL_PX) ?: run {
+            AppLog.w("Cover", "Couldn't read the first frame of cover $id from its first ${mb(read)}; downloading all of it")
+            return null
+        }
+        val still = stillFile(key)
+        try {
+            val tmp = File(still.path + ".part")
+            tmp.outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+            if (!tmp.renameTo(still)) return null
+        } finally {
+            frame.recycle()
+        }
+        rememberVersion(id, key)
+        AppLog.i(
+            "Cover",
+            "Still of animated cover $id (${image.kind} ${image.width}×${image.height}) from its first ${mb(read)} in " +
+                "${System.currentTimeMillis() - started} ms; the animation downloads only where it plays",
+            event = "cover.still_from_start", fields = mapOf("cover_id" to id, "read_bytes" to read),
+        )
+        return serveStill(clean, still)
+    }
+
+    /** Keeps the `_<last change>` part a cover was saved under, to notice when it changes on the server. */
+    private fun rememberVersion(id: String, key: String) {
+        version(id).takeIf { it.isNotEmpty() && key == canonical(id) }?.let {
+            versions[key] = it
+            app.siansa.data.QuietWrites.save(prefs()) { putString("v:$key", it) }
+        }
+    }
+
+    /** The still made for this cover from the start of its file, when only that was kept (see [stillFromStart]). */
+    private fun stillOnly(id: String): File? {
+        val key = resolve(id)
+        val still = stillFile(key).takeIf { it.exists() } ?: return null
+        val kept = versions[key]
+        val version = version(id)
+        if (version.isNotEmpty() && !kept.isNullOrEmpty() && version != kept && canonical(id) == key) {
+            AppLog.i("Cover", "Cover $key changed on the server; making its still again")
+            still.delete()
+            versions.remove(key)
+            app.siansa.data.QuietWrites.save(prefs()) { remove("v:$key") }
+            return null
+        }
+        return still
+    }
+
+    private fun serveStill(request: Request, still: File): Response = Response.Builder()
+        .request(request)
+        .protocol(Protocol.HTTP_1_1)
+        .code(200)
+        .message("OK")
+        .header("Content-Type", "image/jpeg")
+        .header("Content-Length", still.length().toString())
+        .body(still.source().buffer().asResponseBody("image/jpeg".toMediaType(), still.length()))
+        .build()
 
     /**
      * Navidrome sometimes answers a cover request with an error message (`{"subsonic-response": … "failed"}`,
@@ -288,7 +402,7 @@ object CoverStore {
     private fun link(from: String, to: String) {
         if (from == to) return
         aliases[from] = to
-        prefs().edit().putString(from, to).apply()
+        app.siansa.data.QuietWrites.save(prefs()) { putString(from, to) }
     }
 
     private fun save(key: String, response: Response) {

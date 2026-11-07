@@ -98,7 +98,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import app.siansa.log.AppLog
@@ -278,113 +277,7 @@ fun SiansaRoot() {
                 popEnterTransition = { fadeIn(tween(140)) },
                 popExitTransition = { fadeOut(tween(90)) },
             ) {
-                composable("home") { HomeScreen(nav) }
-                composable("search") { SearchScreen(nav) }
-                composable(
-                    "search/more/{kind}?q={q}",
-                    arguments = listOf(androidx.navigation.navArgument("q") { defaultValue = "" }),
-                ) { SearchMoreScreen(nav, it.arguments?.getString("kind"), it.arguments?.getString("q").orEmpty()) }
-                composable("library") { YourLibraryScreen(nav) }
-                composable("vibes") { VibesScreen(nav) }
-                composable("dscvr") { DscvrScreen(nav) }
-                composable("vibe/{id}") { VibeScreen(nav, it.arguments?.getString("id").orEmpty()) }
-                composable("settings/cards") { CardsSettingsScreen(nav) }
-                composable("settings/cards/edit/{id}") { CardEditorScreen(nav, it.arguments?.getString("id") ?: "new") }
-                composable("card/{id}") { CardScreen(nav, it.arguments?.getString("id").orEmpty()) }
-                composable("pinned/{id}") { PinnedCardScreen(nav, it.arguments?.getString("id").orEmpty()) }
-                composable("settings") { SettingsHub(nav) }
-                composable(
-                    "settings/connections?source={source}&extras={extras}",
-                    arguments = listOf(
-                        androidx.navigation.navArgument("source") { type = androidx.navigation.NavType.StringType; nullable = true; defaultValue = null },
-                        androidx.navigation.navArgument("extras") { defaultValue = "true" },
-                    ),
-                ) {
-                    val source = it.arguments?.getString("source")
-                    // Setting up a server (the first run, or a user being added) is its own form; after that, one page
-                    // for every server and service (issue #665).
-                    if (source == null && LocalGraph.current.settings.current.navidromeReady) ConnectionsHub(nav)
-                    else ConnectionsScreen(nav, source, it.arguments?.getString("extras") != "false")
-                }
-                composable("welcome") { SourcePickerScreen(nav) }
-                composable("welcome/extras/{source}") { SmartExtrasScreen(nav, it.arguments?.getString("source").orEmpty()) }
-                composable("settings/users") { ConnectionsHub(nav, open = "server") }
-                composable("settings/playback") { PlaybackSettingsScreen(nav) }
-                composable("settings/themes") { ThemesScreen(nav) }
-                composable("settings/style") { StyleScreen(nav) }
-                composable("settings/style/now-playing") { NowPlayingStyleScreen(nav) }
-                composable("settings/style/mini-player") { MiniPlayerStyleScreen(nav) }
-                composable("settings/style/nav-bar") { NavBarStyleScreen(nav) }
-                composable("settings/equaliser") { EqualiserScreen(nav) }
-                composable("settings/crossfade") { CrossfadeScreen(nav) }
-                // Storage became Streaming and data (issue #780); the old address opens it.
-                composable("settings/storage") { StreamingDataScreen(nav) }
-                composable("settings/streaming") { StreamingDataScreen(nav) }
-                composable("settings/books") { BooksSettingsScreen(nav) }
-                composable("settings/home") { HomeSettingsScreen(nav) }
-                composable("settings/home/notices") { NoticesSettingsScreen(nav) }
-                composable("downloads") { DownloadsScreen(nav) }
-                composable("downloads/add") { DownloadPickerScreen(nav) }
-                composable("downloads/songs") { DownloadedSongsScreen(nav) }
-                composable("settings/help") { HelpScreen(nav) }
-                composable("settings/audiobookshelf") { ConnectionsHub(nav, open = "books") }
-                composable("settings/logs") { LogsScreen(nav) }
-                composable("settings/report") { ProblemReportScreen(nav) }
-                composable("settings/backup") { BackupScreen(nav) }
-                composable("settings/scrobbling") { ScrobblingScreen(nav) }
-                composable("settings/whatsnew") { WhatsNewScreen(nav) }
-                composable("settings/about") { AboutScreen(nav) }
-                composable("home/{section}") { HomeSectionScreen(nav, it.arguments?.getString("section").orEmpty()) }
-                composable("liked") { LikedScreen(nav) }
-                composable("radio/{kind}/{key}") {
-                    RadioScreen(nav, it.arguments?.getString("kind").orEmpty(), it.arguments?.getString("key").orEmpty())
-                }
-                composable("blend/{id}") { BlendScreen(nav, it.arguments?.getString("id").orEmpty()) }
-                composable("mood/{text}") { MoodScreen(nav, it.arguments?.getString("text").orEmpty()) }
-                composable(
-                    "songpath/{id}?live={live}",
-                    arguments = listOf(androidx.navigation.navArgument("live") { defaultValue = "false" }),
-                ) { SongPathPicker(nav, it.arguments?.getString("id").orEmpty(), it.arguments?.getString("live") == "true") }
-                composable(
-                    "songpath/{from}/{to}/{length}?lyrics={lyrics}&live={live}",
-                    arguments = listOf(
-                        androidx.navigation.navArgument("lyrics") { defaultValue = "false" },
-                        androidx.navigation.navArgument("live") { defaultValue = "false" },
-                    ),
-                ) {
-                    val args = it.arguments
-                    SongPathScreen(
-                        nav,
-                        args?.getString("from").orEmpty(),
-                        args?.getString("to").orEmpty(),
-                        args?.getString("length")?.toIntOrNull() ?: 20,
-                        args?.getString("lyrics") == "true",
-                        args?.getString("live") == "true",
-                    )
-                }
-                composable("sync") { SyncScreen(nav) }
-                composable("report/{range}") { ReportScreen(nav, it.arguments?.getString("range").orEmpty()) }
-                composable("discover/artists") { ArtistDiscoveryScreen(nav) }
-                composable("timemachine") { TimeMachineScreen(nav) }
-                composable("favourite-albums") { FavouriteAlbumsScreen(nav) }
-                composable("favourite-artists") { FavouriteArtistsScreen(nav) }
-                composable("fingerprint") { FingerprintScreen(nav) }
-                composable("song/{id}/details") { SongDetailsScreen(nav, it.arguments?.getString("id").orEmpty()) }
-                composable("album/{id}") { AlbumScreen(nav, it.arguments?.getString("id").orEmpty()) }
-                // Every album with a genre or record label, from an album page's tags (#558).
-                composable(
-                    "albums/{tag}?value={value}",
-                    arguments = listOf(androidx.navigation.navArgument("value") { defaultValue = "" }),
-                ) { AlbumsWithTagScreen(nav, it.arguments?.getString("tag"), it.arguments?.getString("value").orEmpty()) }
-                composable("similar/songs/{id}") { SimilarSongsScreen(nav, it.arguments?.getString("id").orEmpty()) }
-                composable("similar/albums/{id}") { SimilarAlbumsScreen(nav, it.arguments?.getString("id").orEmpty()) }
-                composable("artist/{id}") { ArtistScreen(nav, it.arguments?.getString("id").orEmpty()) }
-                composable("book/{id}") { BookScreen(nav, it.arguments?.getString("id").orEmpty()) }
-                composable("artist/{id}/appears-on") { AppearsOnScreen(nav, it.arguments?.getString("id").orEmpty()) }
-                composable("playlist/{id}") { PlaylistScreen(nav, it.arguments?.getString("id").orEmpty()) }
-                composable("mix/{id}") { MixScreen(nav, it.arguments?.getString("id").orEmpty()) }
-                composable("selector/{id}") { SelectorEditor(nav, it.arguments?.getString("id").orEmpty()) }
-                composable("carousel/{id}") { CarouselEditor(nav, it.arguments?.getString("id").orEmpty()) }
+                siansaRoutes(nav)
             }
           }
         }

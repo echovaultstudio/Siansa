@@ -123,7 +123,9 @@ object Diagnostics {
         val mem = ActivityManager.MemoryInfo().also { am?.getMemoryInfo(it) }
         val battery = power?.isPowerSaveMode == true
         val unrestricted = power?.isIgnoringBatteryOptimizations(context.packageName) == true
-        return "App memory ${usedMb}/${maxMb} MB · phone free ${mem.availMem / (1024 * 1024)} MB" +
+        // Pictures and the player's buffers live outside the app's Java memory: counted too, as "pictures and audio".
+        val nativeMb = android.os.Debug.getNativeHeapAllocatedSize() / (1024 * 1024)
+        return "App memory ${usedMb}/${maxMb} MB, pictures and audio $nativeMb MB · phone free ${mem.availMem / (1024 * 1024)} MB" +
             (if (mem.lowMemory) " (LOW)" else "") +
             " · battery saver ${if (battery) "ON" else "off"} · battery optimisation ${if (unrestricted) "off for Siansa" else "on for Siansa"}"
     }

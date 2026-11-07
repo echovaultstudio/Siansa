@@ -7,7 +7,7 @@ import org.junit.Test
 /** Settings › Style: the mini player's buttons and the bottom bar's tabs (issue #346). */
 class StyleLayoutTest {
     @Test fun miniPlayerStartsWithPlayCastNext() {
-        assertEquals(listOf(MiniButton.PLAY, MiniButton.CAST, MiniButton.NEXT), MiniButton.parse(null))
+        assertEquals(listOf(MiniButton.PLAY, MiniButton.NEXT, MiniButton.ADD), MiniButton.parse(null))
     }
 
     @Test fun miniPlayerOrderRoundTripsAndDropsUnknowns() {
@@ -23,8 +23,8 @@ class StyleLayoutTest {
         val three = MiniButton.default
         val four = MiniButton.toggle(three, MiniButton.LIKE)
         assertEquals(three + MiniButton.LIKE, four)
-        assertEquals(four, MiniButton.toggle(four, MiniButton.ADD))
-        assertEquals(listOf(MiniButton.PLAY, MiniButton.NEXT, MiniButton.LIKE), MiniButton.toggle(four, MiniButton.CAST))
+        assertEquals(four, MiniButton.toggle(four, MiniButton.CAST))
+        assertEquals(listOf(MiniButton.PLAY, MiniButton.ADD, MiniButton.LIKE), MiniButton.toggle(four, MiniButton.NEXT))
     }
 
     @Test fun navBarDefaultsWithDscvrBeforeSettings() {
@@ -85,5 +85,19 @@ class StyleLayoutTest {
         // Like dragged above Play and shown: it goes on the bar in that place.
         val order = listOf(MiniButton.NEXT, MiniButton.LIKE, MiniButton.PLAY, MiniButton.CAST)
         assertEquals(listOf(MiniButton.NEXT, MiniButton.LIKE, MiniButton.PLAY), shownInOrder(order, setOf(MiniButton.PLAY, MiniButton.NEXT, MiniButton.LIKE)))
+    }
+
+    @Test fun homeMenuStartsWithTheDiceAndKeepsEveryOption() {
+        // Home's menu (issue #872): the dice first, then Play on…, Sources and Arrange Home.
+        assertEquals(listOf(HomeMenuItem.DICE, HomeMenuItem.PLAY_ON, HomeMenuItem.SOURCES, HomeMenuItem.ARRANGE), HomeMenuItem.parse(null))
+        assertEquals(HomeMenuItem.default, HomeMenuItem.parse(""))
+        val order = listOf(HomeMenuItem.SOURCES, HomeMenuItem.ARRANGE, HomeMenuItem.DICE, HomeMenuItem.PLAY_ON)
+        assertEquals(order, HomeMenuItem.parse(HomeMenuItem.format(order)))
+        // Unknown and repeated ids are dropped; a missing option goes back in its default place, so none is lost.
+        assertEquals(
+            listOf(HomeMenuItem.DICE, HomeMenuItem.SOURCES, HomeMenuItem.PLAY_ON, HomeMenuItem.ARRANGE),
+            HomeMenuItem.parse("sources,gone,sources,play_on,arrange"),
+        )
+        assertEquals(4, HomeMenuItem.parse("arrange").size)
     }
 }

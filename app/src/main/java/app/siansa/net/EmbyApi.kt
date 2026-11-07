@@ -278,10 +278,12 @@ class EmbyApi(
         val album = call(itemPath(id))
         if (album.str("Id") == null) throw ApiException("Album not found")
         // Emby can't sort by disc and track number (not among its sort fields), so they're put in order here.
-        val songs = items("ParentId" to id, "IncludeItemTypes" to "Audio", "SortBy" to "SortName")
-            .map(::parseSong)
-            .sortedWith(compareBy({ it.disc ?: 1 }, { it.track ?: Int.MAX_VALUE }))
-        return AlbumDetail(albumWithSongCover(parseAlbum(album), songs), songs, info = Tags.embyAlbum(album))
+        val raw = items("ParentId" to id, "IncludeItemTypes" to "Audio", "SortBy" to "SortName")
+        val songs = raw.map(::parseSong).sortedWith(compareBy({ it.disc ?: 1 }, { it.track ?: Int.MAX_VALUE }))
+        var shown = albumWithSongCover(parseAlbum(album), songs)
+        // Neither the album nor its songs have a picture: the folder's cover.jpg or folder.jpg, when it has one.
+        if (shown.coverArt == null) folderWithPicture(raw, id)?.let { shown = shown.copy(coverArt = it) }
+        return AlbumDetail(shown, songs, info = Tags.embyAlbum(album))
     }
 
     override suspend fun artists(folderId: String?): List<Artist> =
@@ -400,9 +402,13 @@ class EmbyApi(
         if (streams.isEmpty()) return null
         val options = streams.mapNotNull { stream ->
             val index = stream.int("Index") ?: return@mapNotNull null
-            val raw = runCatching {
-                text("/Items/" + enc(song.id) + "/" + enc(sourceId) + "/Subtitles/$index/Stream." + lyricsFormat(stream.str("Codec")))
-            }.onFailure { AppLog.w("Lyrics", "Emby lyrics ${song.id} #$index not read: ${it.message}") }.getOrNull()
+            val formats = lyricsFormats(stream.str("Codec"))
+            val raw = formats.firstNotNullOfOrNull { format ->
+                runCatching { text("/Items/" + enc(song.id) + "/" + enc(sourceId) + "/Subtitles/$index/Stream.$format") }
+                    .onFailure { AppLog.w("Lyrics", "Emby lyrics ${song.id} #$index as .$format not read: ${it.message}") }
+                    .getOrNull()?.takeIf { it.removePrefix("\uFEFF").isNotBlank() }
+                    ?.also { if (format != formats.first()) AppLog.d("Lyrics", "Emby lyrics ${song.id} #$index: .${formats.first()} came back empty, read as .$format") }
+            }
             readLyrics(raw)?.let { stream.str("Language") to it }
         }
         return LyricsFormats.best(options)
@@ -470,7 +476,22 @@ class EmbyApi(
         return Playlist(id = id, name = name, songCount = songIds.size)
     }
 
+    /**
+     * Renames a playlist, and checks it stuck: right after songs were added or removed, the server's own refresh of the
+     * playlist can put the old name back a moment later (Emby 4.10 and Jellyfin 12, found by the real-server tests).
+     * Then it's renamed again, up to [RENAME_TRIES] times.
+     */
     override suspend fun renamePlaylist(playlistId: String, name: String) {
+        repeat(RENAME_TRIES) { attempt ->
+            sendRename(playlistId, name)
+            kotlinx.coroutines.delay(RENAME_CHECK_MS)
+            val now = runCatching { call(itemPath(playlistId)).str("Name") }.getOrNull()
+            if (now == null || now == name) return
+            AppLog.w("Playlists", "${if (jellyfin) "Jellyfin" else "Emby"} put playlist $playlistId's old name back; renaming again (${attempt + 1})")
+        }
+    }
+
+    private suspend fun sendRename(playlistId: String, name: String) {
         // Jellyfin lets a playlist's owner rename it here; editing the item itself is for admins.
         if (jellyfin) {
             call("/Playlists/" + enc(playlistId), method = "POST", body = buildJsonObject { put("Name", name) }.toString())
@@ -574,8 +595,16 @@ class EmbyApi(
 
     private fun hasImage(o: JsonObject): Boolean = o.obj("ImageTags")?.containsKey("Primary") == true
 
-    /** The id whose picture is the song's cover: its own, else its album's. */
-    private fun songCover(o: JsonObject): String? = if (hasImage(o)) o.str("Id") else o.str("AlbumId")
+    /**
+     * The id whose picture is the song's cover: its own; else its album's, when the album has one
+     * (AlbumPrimaryImageTag); else its folder's, as Emby keeps an album folder's cover.jpg or folder.jpg on the folder
+     * (found by the real-server tests); else the album's anyway.
+     */
+    private fun songCover(o: JsonObject): String? = when {
+        hasImage(o) -> o.str("Id")
+        o.str("AlbumPrimaryImageTag") != null -> o.str("AlbumId")
+        else -> o.str("ParentId")?.takeIf { it != o.str("AlbumId") } ?: o.str("AlbumId")
+    }
 
     internal fun parseSong(o: JsonObject): Song {
         val user = o.obj("UserData")
@@ -637,10 +666,25 @@ class EmbyApi(
         return albums.map { a -> if (a.coverArt != null) a else songCovers[a.id]?.takeIf { it.isNotEmpty() }?.let { a.copy(coverArt = it) } ?: a }
     }
 
-    /** The first of an album's songs with a picture of its own, by id; null when none of the first few has one. */
-    private suspend fun firstSongCover(albumId: String): String? =
-        items("ParentId" to albumId, "IncludeItemTypes" to "Audio", "SortBy" to "SortName", "Limit" to SONGS_LOOKED_AT)
-            .firstNotNullOfOrNull { o -> o.str("Id")?.takeIf { hasImage(o) && it != albumId } }
+    /**
+     * The first of an album's songs with a picture of its own, by id; else the picture of the folder its songs are in;
+     * null when there's neither. Emby makes albums from tags, so a cover.jpg or folder.jpg in the album's folder is
+     * the folder item's picture, never the album's (found by the real-server tests): albums with their cover only
+     * there showed none.
+     */
+    private suspend fun firstSongCover(albumId: String): String? {
+        val songs = items("ParentId" to albumId, "IncludeItemTypes" to "Audio", "SortBy" to "SortName", "Limit" to SONGS_LOOKED_AT)
+        songs.firstNotNullOfOrNull { o -> o.str("Id")?.takeIf { hasImage(o) && it != albumId } }?.let { return it }
+        val folder = folderWithPicture(songs, albumId) ?: return null
+        AppLog.d("Covers", "${if (jellyfin) "Jellyfin" else "Emby"}: album $albumId shows its folder's picture ($folder)")
+        return folder
+    }
+
+    /** The folder (by id) that holds [songs], when it has a picture: their shared ParentId other than the album's. */
+    private suspend fun folderWithPicture(songs: List<JsonObject>, albumId: String): String? {
+        val folder = folderOf(songs, albumId) ?: return null
+        return folder.takeIf { runCatching { hasImage(call(itemPath(folder))) }.getOrDefault(false) }
+    }
 
     internal fun parseAlbum(o: JsonObject): Album {
         val albumArtist = o.arr("AlbumArtists").firstOrNull()
@@ -688,6 +732,9 @@ class EmbyApi(
         const val FIELDS = "Genres,DateCreated,ProductionYear,ChildCount,ProviderIds,Overview,Container,AlbumArtist,ParentId,Studios"
         /** How many albums without a picture are asked about their songs at once, and how many songs each (issue #811). */
         const val LOOKUPS_AT_ONCE = 6
+        /** How many times a playlist is renamed when the server puts its old name back, and how long before each check. */
+        const val RENAME_TRIES = 3
+        const val RENAME_CHECK_MS = 700L
         const val SONGS_LOOKED_AT = 3
 
         /** `{user}` once it has been through [enc] as a parameter value. */
@@ -718,8 +765,19 @@ class EmbyApi(
         }
 
         /** Lyrics from Emby's text: timed when it is LRC or subtitles, else plain lines; null when empty. */
+        /**
+         * The formats to ask Emby for a lyrics stream in, best first: its own, then SRT. Emby 4.8 answers `.lrc` and
+         * `.vtt` with nothing at all for a song's .lrc file, and its SRT has the same lines and times (found by the
+         * real-server tests).
+         */
+        fun lyricsFormats(codec: String?): List<String> = listOf(lyricsFormat(codec), "srt").distinct()
+
+        /** The folder [songs] share (their ParentId), when it isn't the album itself; null when they're spread out. */
+        fun folderOf(songs: List<JsonObject>, albumId: String): String? =
+            songs.mapNotNull { it["ParentId"]?.let { p -> (p as? JsonPrimitive)?.content } }.distinct().singleOrNull()?.takeIf { it != albumId }
+
         fun readLyrics(raw: String?): Lyrics? {
-            val text = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+            val text = raw?.removePrefix("\uFEFF")?.trim()?.takeIf { it.isNotEmpty() } ?: return null
             return LyricsFormats.parse(text) ?: Lyrics(false, text.lines().map { LyricLine(null, it.trimEnd()) })
         }
 

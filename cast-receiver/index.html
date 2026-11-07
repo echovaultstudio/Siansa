@@ -3,98 +3,184 @@
 <head>
 <meta charset="utf-8">
 <title>Siansa</title>
-<script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Siansa's TV screen while casting (issue #114). The only outside file is Google's Cast receiver library, loaded at
+     the end of the page so the splash shows as soon as the TV opens the page, not once the library has arrived. -->
 <style>
   :root {
-    --amber: #FFB547; --violet: #B69CFF; --plum: #110D1C; --plum-raised: #1C1630;
-    --text: #EDE7F6; --muted: #B9B0CC;
+    /* Siansa's colours, as the app's icon and siansa.app: black, frost and amber. The same page serves Siansa and
+       Siansa Dev, so it never takes the Dev build's purple. */
+    --page: #000000; --raised: #12171C; --text: #EEF2F5; --muted: #AFC2D3; --frost: #9DB4C8;
+    --amber: #FFB547; --mid-top: #FFE7C4; --mid-bottom: #E8A55A;
   }
   * { box-sizing: border-box; margin: 0; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--plum); color: var(--text);
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--page); color: var(--text);
     font-family: "Google Sans", Roboto, "Helvetica Neue", Arial, sans-serif; }
   .screen { position: absolute; inset: 0; transition: opacity .6s ease; }
   .hidden { opacity: 0; pointer-events: none; }
+  /* Sizes are in vh, so the page looks the same on TVs that draw it at 1280x720 and at 1920x1080. Everything stays
+     inside the TV's safe area (5% at each edge), where some TVs cut the picture. */
 
   /* Splash: shown when the TV connects and while nothing is loaded. */
-  #splash { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
-    background: var(--plum); }
-  .icon { width: 260px; height: 190px; }
-  .logo { font-size: 72px; font-weight: 700; letter-spacing: -1px; }
-  #splash-note { font-size: 30px; color: var(--muted); }
+  #splash { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.6vh; }
+  .icon { width: 30vh; height: 30vh; }
+  .logo { font-size: 6.7vh; font-weight: 750; letter-spacing: -.17vh; }
+  /* The wordmark: Siansa with its S in the amber of the icon's middle bar, as on siansa.app. */
+  .s { background: linear-gradient(180deg, var(--mid-top), var(--mid-bottom)); -webkit-background-clip: text;
+    background-clip: text; color: transparent; }
+  #splash-note { font-size: 2.8vh; color: var(--muted); }
 
-  /* Now playing */
-  #backdrop { position: absolute; inset: -60px; background-size: cover; background-position: center;
-    filter: blur(60px) brightness(.35) saturate(1.3); transition: background-image .8s ease; }
-  #player { display: flex; align-items: center; gap: 80px; padding: 0 120px; }
-  #cover { position: relative; width: 560px; height: 560px; flex: none; border-radius: 24px;
-    background: var(--plum-raised) center/cover; box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+  /* Now playing: the cover, the song, a thin line for where it is. No buttons: the remote's left and right go to
+     the previous and next song, OK plays and pauses. */
+  #backdrop { position: absolute; inset: -8vh; background-size: cover; background-position: center;
+    filter: blur(8vh) brightness(.28) saturate(1.2); transition: background-image .8s ease; }
+  #shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.15), rgba(0,0,0,.55)); }
+  #player { display: flex; align-items: center; gap: 8vh; padding: 0 11vh; }
+  #cover { position: relative; width: 58vh; height: 58vh; flex: none; border-radius: 1.6vh; overflow: hidden;
+    background: var(--raised) center/cover; box-shadow: 0 3vh 8vh rgba(0,0,0,.55); }
+  #cover.none { background-image: none; }
+  /* A song without a cover: Siansa's icon on the raised square. */
+  #cover .ph { display: none; position: absolute; left: 22%; top: 22%; width: 56%; height: 56%; opacity: .9; }
+  #cover.none .ph { display: block; }
   #info { position: relative; flex: 1; min-width: 0; }
-  #device { font-size: 22px; letter-spacing: 3px; color: var(--amber); text-transform: uppercase; margin-bottom: 24px; }
-  #title { font-size: 72px; font-weight: 700; line-height: 1.1; overflow: hidden; display: -webkit-box;
-    -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  #artist { font-size: 38px; margin-top: 18px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #album { font-size: 30px; margin-top: 8px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #bar { margin-top: 56px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.18); overflow: hidden; }
-  #fill { height: 100%; width: 0; background: var(--amber); }
-  #times { display: flex; justify-content: space-between; font-size: 24px; color: var(--muted); margin-top: 12px; }
+  #title { font-size: 7vh; font-weight: 700; line-height: 1.08; letter-spacing: -.12vh; overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+  #artist { font-size: 3.6vh; margin-top: 2vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #album { font-size: 2.6vh; margin-top: .8vh; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #bar { margin-top: 6vh; height: .5vh; border-radius: .25vh; background: rgba(255,255,255,.16); overflow: hidden; }
+  #fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--mid-bottom), var(--amber)); transition: width .5s linear; }
+  #times { display: flex; justify-content: space-between; font-size: 2vh; color: var(--muted); margin-top: 1.2vh;
+    font-variant-numeric: tabular-nums; }
+  /* Paused: the cover darkens under the pause sign (an overlay, so the sign itself stays bright). */
+  #cover::after { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,.45); opacity: 0; transition: opacity .4s ease; }
+  .paused #cover::after { opacity: 1; }
+  .paused #fill { background: var(--frost); }
 
-  #controls { display: flex; align-items: center; gap: 40px; margin-top: 40px; }
-  .btn { width: 96px; height: 96px; border-radius: 50%; border: 3px solid transparent; background: rgba(255,255,255,.1);
-    display: flex; align-items: center; justify-content: center; transition: transform .15s, border-color .15s, background .15s; }
-  .btn svg { width: 48px; height: 48px; fill: var(--text); }
-  .btn.main { width: 128px; height: 128px; background: var(--amber); }
-  .btn.main svg { width: 64px; height: 64px; fill: #2A1700; }
-  .btn.focus { border-color: var(--text); transform: scale(1.12); }
-  #hint { font-size: 22px; color: var(--muted); margin-top: 28px; }
-  #spinner { position: absolute; right: 24px; bottom: 24px; width: 48px; height: 48px; border-radius: 50%;
-    border: 5px solid rgba(255,255,255,.2); border-top-color: var(--amber); animation: spin 1s linear infinite; }
+  /* What the remote just did (pause, play, previous, next), shown briefly over the cover; paused stays. */
+  #sign { position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; }
+  #sign svg { width: 13vh; height: 13vh; fill: var(--text); filter: drop-shadow(0 .6vh 2vh rgba(0,0,0,.6)); }
+  #sign { opacity: 0; transition: opacity .3s ease; }
+  #sign.on { opacity: 1; }
+  #spinner { position: absolute; right: 2.2vh; bottom: 2.2vh; width: 4.4vh; height: 4.4vh; border-radius: 50%;
+    border: .46vh solid rgba(255,255,255,.2); border-top-color: var(--amber); animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Siansa in the corner, quietly. */
+  #brand { position: absolute; right: 7vh; bottom: 5vh; display: flex; align-items: center; gap: 1vh; opacity: .75; }
+  #brand .icon { width: 6.4vh; height: 6.4vh; }
+  #brand .logo { font-size: 3vh; }
 </style>
 </head>
 <body>
 <div id="splash" class="screen">
-  <!-- Same as the phone app's launch screen: the launcher icon's sound bars on plum. -->
-  <svg class="icon" viewBox="27 34 58 42">
-    <path fill="#B9A4FF" d="M33,62a3,3 0 0,1 6,0v8a3,3 0 0,1 -6,0z"/>
-    <path fill="#C9B8FF" d="M43,50a3,3 0 0,1 6,0v20a3,3 0 0,1 -6,0z"/>
-    <path fill="#FFD38A" d="M53,40a3,3 0 0,1 6,0v30a3,3 0 0,1 -6,0z"/>
-    <path fill="#C9B8FF" d="M63,48a3,3 0 0,1 6,0v22a3,3 0 0,1 -6,0z"/>
-    <path fill="#B9A4FF" d="M73,58a3,3 0 0,1 6,0v12a3,3 0 0,1 -6,0z"/>
+  <svg class="icon" viewBox="18 18 72 72" aria-hidden="true">
+    <defs>
+      <linearGradient id="arcIn" x1="0" y1="36.98" x2="0" y2="71.02" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#AFC2D3" stop-opacity=".303"/><stop offset=".5" stop-color="#AFC2D3" stop-opacity=".55"/><stop offset="1" stop-color="#AFC2D3" stop-opacity=".303"/></linearGradient>
+      <linearGradient id="arcOut" x1="0" y1="31.06" x2="0" y2="76.94" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#AFC2D3" stop-opacity=".132"/><stop offset=".5" stop-color="#AFC2D3" stop-opacity=".24"/><stop offset="1" stop-color="#AFC2D3" stop-opacity=".132"/></linearGradient>
+      <linearGradient id="reflectFrost" x1="0" y1="62.5" x2="0" y2="76.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#9DB4C8" stop-opacity=".46"/><stop offset=".35" stop-color="#B5C7D6" stop-opacity=".207"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+      <linearGradient id="reflectAmber" x1="0" y1="62.5" x2="0" y2="76.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#E8A55A" stop-opacity=".46"/><stop offset=".35" stop-color="#F0BC80" stop-opacity=".207"/><stop offset="1" stop-color="#FFE7C4" stop-opacity="0"/></linearGradient>
+      <linearGradient id="barFrost" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#9DB4C8"/></linearGradient>
+      <linearGradient id="barAmber" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE7C4"/><stop offset="1" stop-color="#E8A55A"/></linearGradient>
+    </defs>
+    <path d="M38.46,36.98A24.42,24.42 0 0,0 38.46,71.02" fill="none" stroke="url(#arcIn)" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M69.54,36.98A24.42,24.42 0 0,1 69.54,71.02" fill="none" stroke="url(#arcIn)" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M32.54,31.06A32.56,32.56 0 0,0 32.54,76.94" fill="none" stroke="url(#arcOut)" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M75.46,31.06A32.56,32.56 0 0,1 75.46,76.94" fill="none" stroke="url(#arcOut)" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M40,69.5v-5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#reflectFrost)"/>
+    <path d="M46,74.5v-10a2,2 0 0,1 4,0v10a2,2 0 0,1 -4,0z" fill="url(#reflectFrost)"/>
+    <path d="M52,74.5v-10a2,2 0 0,1 4,0v10a2,2 0 0,1 -4,0z" fill="url(#reflectAmber)"/>
+    <path d="M58,74.5v-10a2,2 0 0,1 4,0v10a2,2 0 0,1 -4,0z" fill="url(#reflectFrost)"/>
+    <path d="M64,69.5v-5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#reflectFrost)"/>
+    <path d="M40,54.5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#barFrost)"/>
+    <path d="M46,47.5a2,2 0 0,1 4,0v12a2,2 0 0,1 -4,0z" fill="url(#barFrost)"/>
+    <path d="M52,39.5a2,2 0 0,1 4,0v20a2,2 0 0,1 -4,0z" fill="url(#barAmber)"/>
+    <path d="M58,47.5a2,2 0 0,1 4,0v12a2,2 0 0,1 -4,0z" fill="url(#barFrost)"/>
+    <path d="M64,54.5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#barFrost)"/>
   </svg>
-  <div class="logo">Siansa</div>
-  <div id="splash-note">Connected. Pick a song on your phone.</div>
+  <div class="logo"><span class="s">S</span>iansa</div>
+  <div id="splash-note">Connecting…</div>
 </div>
 
 <div id="now" class="screen hidden">
   <div id="backdrop"></div>
+  <div id="shade"></div>
   <div id="player" class="screen">
-    <div id="cover"><div id="spinner" class="hidden"></div></div>
+    <div id="cover"><div id="sign"><svg id="sign-icon" viewBox="0 0 24 24"></svg></div><div id="spinner" class="hidden"></div></div>
     <div id="info">
-      <div id="device">Playing on this TV</div>
       <div id="title"></div>
       <div id="artist"></div>
       <div id="album"></div>
       <div id="bar"><div id="fill"></div></div>
       <div id="times"><span id="pos">0:00</span><span id="dur">0:00</span></div>
-      <div id="controls">
-        <div class="btn" data-act="prev"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></div>
-        <div class="btn main focus" data-act="toggle"><svg id="toggle-icon" viewBox="0 0 24 24"></svg></div>
-        <div class="btn" data-act="next"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></div>
-      </div>
-      <div id="hint">Use the arrows and OK on your remote, or control it from your phone.</div>
     </div>
   </div>
+  <div id="brand">  <svg class="icon" viewBox="18 18 72 72" aria-hidden="true">
+    <defs>
+      <linearGradient id="arcIn2" x1="0" y1="36.98" x2="0" y2="71.02" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#AFC2D3" stop-opacity=".303"/><stop offset=".5" stop-color="#AFC2D3" stop-opacity=".55"/><stop offset="1" stop-color="#AFC2D3" stop-opacity=".303"/></linearGradient>
+      <linearGradient id="arcOut2" x1="0" y1="31.06" x2="0" y2="76.94" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#AFC2D3" stop-opacity=".132"/><stop offset=".5" stop-color="#AFC2D3" stop-opacity=".24"/><stop offset="1" stop-color="#AFC2D3" stop-opacity=".132"/></linearGradient>
+      <linearGradient id="reflectFrost2" x1="0" y1="62.5" x2="0" y2="76.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#9DB4C8" stop-opacity=".46"/><stop offset=".35" stop-color="#B5C7D6" stop-opacity=".207"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+      <linearGradient id="reflectAmber2" x1="0" y1="62.5" x2="0" y2="76.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#E8A55A" stop-opacity=".46"/><stop offset=".35" stop-color="#F0BC80" stop-opacity=".207"/><stop offset="1" stop-color="#FFE7C4" stop-opacity="0"/></linearGradient>
+      <linearGradient id="barFrost2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#9DB4C8"/></linearGradient>
+      <linearGradient id="barAmber2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE7C4"/><stop offset="1" stop-color="#E8A55A"/></linearGradient>
+    </defs>
+    <path d="M38.46,36.98A24.42,24.42 0 0,0 38.46,71.02" fill="none" stroke="url(#arcIn2)" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M69.54,36.98A24.42,24.42 0 0,1 69.54,71.02" fill="none" stroke="url(#arcIn2)" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M32.54,31.06A32.56,32.56 0 0,0 32.54,76.94" fill="none" stroke="url(#arcOut2)" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M75.46,31.06A32.56,32.56 0 0,1 75.46,76.94" fill="none" stroke="url(#arcOut2)" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M40,69.5v-5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#reflectFrost2)"/>
+    <path d="M46,74.5v-10a2,2 0 0,1 4,0v10a2,2 0 0,1 -4,0z" fill="url(#reflectFrost2)"/>
+    <path d="M52,74.5v-10a2,2 0 0,1 4,0v10a2,2 0 0,1 -4,0z" fill="url(#reflectAmber2)"/>
+    <path d="M58,74.5v-10a2,2 0 0,1 4,0v10a2,2 0 0,1 -4,0z" fill="url(#reflectFrost2)"/>
+    <path d="M64,69.5v-5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#reflectFrost2)"/>
+    <path d="M40,54.5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#barFrost2)"/>
+    <path d="M46,47.5a2,2 0 0,1 4,0v12a2,2 0 0,1 -4,0z" fill="url(#barFrost2)"/>
+    <path d="M52,39.5a2,2 0 0,1 4,0v20a2,2 0 0,1 -4,0z" fill="url(#barAmber2)"/>
+    <path d="M58,47.5a2,2 0 0,1 4,0v12a2,2 0 0,1 -4,0z" fill="url(#barFrost2)"/>
+    <path d="M64,54.5a2,2 0 0,1 4,0v5a2,2 0 0,1 -4,0z" fill="url(#barFrost2)"/>
+  </svg><div class="logo"><span class="s">S</span>iansa</div></div>
 </div>
-
-<!-- CAF plays through this element; the page draws its own controls. -->
 <audio id="audio"></audio>
-
+<script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 <script>
-const PLAY = '<path d="M8 5v14l11-7z"/>';
-const PAUSE = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+const ICONS = {
+  play: '<path d="M8 5v14l11-7z"/>',
+  pause: '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>',
+  next: '<path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>',
+  prev: '<path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>',
+  forward: '<path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/>',
+  back: '<path d="M11 18V6l-8.5 6 8.5 6zm.5-6 8.5 6V6l-8.5 6z"/>',
+};
 const $ = id => document.getElementById(id);
+// The cover's placeholder: Siansa's icon, as on the splash.
+(() => { const ph = document.querySelector('#splash .icon').cloneNode(true); ph.setAttribute('class', 'ph'); $('cover').insertBefore(ph, $('cover').firstChild); })();
 
 const context = cast.framework.CastReceiverContext.getInstance();
+
+// What happens here goes to the phone's log ("CastTV"), for tracing problems: the keys the page gets, the TV's own
+// seeks and what the page made of them, the queues loaded, and songs that fail to play.
+const LOG_NS = 'urn:x-cast:app.siansa.log';
+function tvlog(text) {
+  try { context.sendCustomMessage(LOG_NS, undefined, String(text)); } catch (e) { /* no phone listening yet */ }
+}
+
+// How much memory the page uses (Chrome's own figure, where it gives one), for the log: at each queue and when it
+// grows, to tell a TV screen that ran out of memory (the SHIELD's closed a few seconds after a 37-song queue,
+// 0.52.0-dev).
+let heapLogged = 0;
+function heap(why) {
+  const m = window.performance && performance.memory;
+  if (!m) return;
+  const mb = Math.round(m.usedJSHeapSize / 1048576);
+  if (why || mb - heapLogged >= 16) {
+    heapLogged = mb;
+    tvlog('memory ' + mb + ' of ' + Math.round(m.jsHeapSizeLimit / 1048576) + ' MB' + (why ? ' (' + why + ')' : ''));
+  }
+}
+setInterval(() => heap(), 30000);
+
+// A mistake in this page is logged rather than lost.
+window.addEventListener('error', e => tvlog('page error: ' + (e.message || e.type) + (e.filename ? ' at ' + String(e.filename).split('/').pop() + ':' + e.lineno : '')));
+window.addEventListener('unhandledrejection', e => tvlog('page error: ' + (e.reason && e.reason.message || e.reason)));
 const player = context.getPlayerManager();
 player.setMediaElement($('audio'));
 
@@ -109,23 +195,51 @@ function showNow(show) {
   $('splash').classList.toggle('hidden', show);
 }
 
+// What the splash says: connecting, then waiting for a song, then the queue's end.
+let played = false;
+let failed = false;
+function note() {
+  if (failed) return 'This song couldn\u2019t play. Pick another on your phone.';
+  if (played) return 'Nothing playing. Pick a song on your phone.';
+  return 'Connected. Pick a song on your phone.';
+}
+
+// A sign over the cover: what the remote just did. Paused keeps its sign; the others fade after a moment.
+let signTimer = 0;
+function sign(name, stay) {
+  clearTimeout(signTimer);
+  $('sign-icon').innerHTML = ICONS[name];
+  $('sign').classList.add('on');
+  if (!stay) signTimer = setTimeout(() => {
+    if ($('now').classList.contains('paused')) sign('pause', true); else $('sign').classList.remove('on');
+  }, 900);
+}
+
 function render() {
   const media = player.getMediaInformation();
   const state = player.getPlayerState();
   const S = cast.framework.messages.PlayerState;
-  if (!media || state === S.IDLE) { showNow(false); return; }
+  if (!media || state === S.IDLE) { $('splash-note').textContent = note(); showNow(false); return; }
+  played = true;
+  failed = false;
   showNow(true);
+  const paused = state === S.PAUSED;
+  const was = $('now').classList.contains('paused');
+  $('now').classList.toggle('paused', paused);
+  if (paused && !was) sign('pause', true);
+  if (!paused && was) sign('play');
   const m = media.metadata || {};
   $('title').textContent = m.title || '';
   $('artist').textContent = m.artist || m.albumArtist || '';
   $('album').textContent = m.albumName || '';
   const art = m.images && m.images.length ? m.images[0].url : '';
-  const bg = art ? 'url("' + art.replace(/"/g, '%22') + '")' : 'none';
-  if ($('cover').style.backgroundImage !== bg) {
+  const bg = art ? 'url("' + art.replace(/["\\\n\r]/g, encodeURIComponent) + '")' : '';
+  $('cover').classList.toggle('none', !art);
+  if ($('cover').dataset.art !== art) {
+    $('cover').dataset.art = art;
     $('cover').style.backgroundImage = bg;
     $('backdrop').style.backgroundImage = bg;
   }
-  $('toggle-icon').innerHTML = state === S.PLAYING || state === S.BUFFERING ? PAUSE : PLAY;
   $('spinner').classList.toggle('hidden', state !== S.BUFFERING);
 }
 
@@ -142,98 +256,314 @@ const E = cast.framework.events.EventType;
   .forEach(t => player.addEventListener(t, render));
 setInterval(tick, 500);
 
-// Remote control: left/right move between buttons, OK presses the focused one,
-// media keys (play/pause, next, previous) work directly.
-const buttons = [...document.querySelectorAll('.btn')];
-let focus = 1;
-function setFocus(i) {
-  focus = Math.max(0, Math.min(buttons.length - 1, i));
-  buttons.forEach((b, j) => b.classList.toggle('focus', j === focus));
-}
+// The remote: a press of left or right goes to the previous or next song, holding it winds back or forward
+// through the song (faster the longer it's held), OK plays and pauses, and the media keys do what they say.
+// A press is told from a hold by the key repeating: a held key sends repeats after about half a second. A press
+// acts when the key is let go, or 600 ms after it if the TV never says so.
+let lastAct = 0;
+let arrowAt = 0;  // the last left or right, from a key or from the TV's seeks
+let keyAt = 0;    // the last left or right that reached the page as a key
 function jump(by) {
   const req = new cast.framework.messages.QueueUpdateRequestData();
   req.jump = by;
   player.sendLocalMediaRequest(req);
 }
 function act(name) {
+  const now = Date.now();
+  if (now - lastAct < 600) { tvlog('ignored ' + name + ' (just did one)'); return; }
+  tvlog('does ' + name);
+  lastAct = now;
   const S = cast.framework.messages.PlayerState;
-  if (name === 'toggle') player.getPlayerState() === S.PAUSED ? player.play() : player.pause();
-  if (name === 'next') jump(1);
-  if (name === 'prev') player.getCurrentTimeSec() > 5 ? player.seek(0) : jump(-1);
+  if (name === 'toggle') name = player.getPlayerState() === S.PAUSED ? 'play' : 'pause';
+  if (name === 'play') player.play();
+  if (name === 'pause') player.pause();
+  if (name === 'next') { sign('next'); jump(1); }
+  // Previous goes back to the start of the song after its first 5 seconds, else to the song before.
+  if (name === 'prev') { sign('prev'); player.getCurrentTimeSec() > 5 ? seekTo(0) : jump(-1); }
 }
+
+// Winding: steps of 5 s, then 10 s after two seconds held, then 20 s after five.
+let windStart = 0;
+let windAt = 0;
+let windTo = null;   // where the last step went: the player's time lags behind a seek
+let ownSeekAt = 0;   // the page's own seeks pass the seek interceptor below
+function seekTo(sec) { ownSeekAt = Date.now(); player.seek(sec); }
+function wind(dir) {
+  const now = Date.now();
+  if (!windStart) windStart = now;
+  if (now - windAt < 200) return;
+  windAt = now;
+  const held = now - windStart;
+  const step = held > 5000 ? 20 : held > 2000 ? 10 : 5;
+  const dur = player.getDurationSec();
+  let to = (windTo !== null ? windTo : player.getCurrentTimeSec()) + dir * step;
+  to = Math.max(0, dur > 0 ? Math.min(dur - 1, to) : to);
+  sign(dir < 0 ? 'back' : 'forward');
+  tvlog('winds to ' + Math.round(to) + ' s');
+  windTo = to;
+  seekTo(to);
+  tick();
+}
+
+// One arrow at a time: which way, whether it's being held, and the timer that settles a press.
+// A hold is a second key-down the same way before the key comes up: Google TV repeats the key-down while it's held
+// without marking it as a repeat (0.52.0-dev, the owner's SHIELD), so the repeat flag alone isn't enough.
+let arrow = 0;
+let holding = false;
+let settle = 0;
+function arrowDone() {
+  clearTimeout(settle);
+  if (arrow && !holding) act(arrow < 0 ? 'prev' : 'next');
+  if (holding) tvlog('stopped winding');
+  arrow = 0;
+  holding = false;
+  windStart = 0;
+  windTo = null;
+}
+function arrowDown(dir, repeat) {
+  arrowAt = Date.now();
+  if (dir !== arrow) { if (arrow) arrowDone(); arrow = dir; holding = false; if (repeat) { holding = true; wind(dir); } }
+  else { holding = true; wind(dir); }
+  clearTimeout(settle);
+  // No key-up from some TVs: a press settles 600 ms after the last key event.
+  settle = setTimeout(arrowDone, 600);
+}
+
+// OK and the play/pause keys: Google TV plays or pauses by itself as well (a PLAY or PAUSE request a few ms after the
+// key), so doing it here too paused and played again at once. The page waits a moment and only acts when the TV
+// didn't.
+let pending = 0;
+function later(name) {
+  clearTimeout(pending);
+  pending = setTimeout(() => { pending = 0; act(name); }, 350);
+}
+function tvDidIt() {
+  if (!pending) return;
+  clearTimeout(pending);
+  pending = 0;
+  tvlog('the TV played or paused itself');
+}
+
+const KEYS = { 37: 'ArrowLeft', 39: 'ArrowRight', 13: 'Enter', 179: 'MediaPlayPause', 176: 'MediaTrackNext',
+  177: 'MediaTrackPrevious', 415: 'MediaPlay', 19: 'MediaPause', 417: 'MediaTrackNext', 412: 'MediaTrackPrevious' };
+const keyOf = e => e.key && e.key !== 'Unidentified' ? e.key : KEYS[e.keyCode];
 document.addEventListener('keydown', e => {
+  tvlog('key down ' + e.key + ' (' + e.keyCode + ')' + (e.repeat ? ' repeat' : ''));
   if ($('now').classList.contains('hidden')) return;
-  switch (e.key) {
-    case 'ArrowLeft': setFocus(focus - 1); break;
-    case 'ArrowRight': setFocus(focus + 1); break;
-    case 'Enter': act(buttons[focus].dataset.act); break;
-    case 'MediaPlayPause': act('toggle'); break;
-    case 'MediaTrackNext': act('next'); break;
+  switch (keyOf(e)) {
+    case 'ArrowLeft': keyAt = Date.now(); arrowDown(-1, e.repeat); break;
+    case 'ArrowRight': keyAt = Date.now(); arrowDown(1, e.repeat); break;
     case 'MediaTrackPrevious': act('prev'); break;
+    case 'MediaTrackNext': act('next'); break;
+    case 'MediaRewind': wind(-1); break;
+    case 'MediaFastForward': wind(1); break;
+    case 'Enter': case ' ': case 'MediaPlayPause': later('toggle'); break;
+    case 'MediaPlay': later('play'); break;
+    case 'MediaPause': later('pause'); break;
     default: return;
   }
   e.preventDefault();
 });
+document.addEventListener('keyup', e => {
+  tvlog('key up ' + e.key + ' (' + e.keyCode + ')');
+  const key = keyOf(e);
+  if ((key === 'ArrowLeft' && arrow < 0) || (key === 'ArrowRight' && arrow > 0)) { arrowAt = Date.now(); arrowDone(); }
+  if (key === 'MediaRewind' || key === 'MediaFastForward') { windStart = 0; windTo = null; }
+});
 
-// Original quality: siansa sends an MP3 320 stream plus the original file's address in customData.
-// The TV plays the original (FLAC and so on). If it can't, the queue reloads as MP3 and later
-// songs go straight to MP3.
+// What each song plays as. Siansa sends the song's lossy stream (Opus 320 in Ogg, or MP3 320) as its address, and in
+// customData: the MP3 320 address when the lossy one is Opus (mp3Url, with opusUrl naming the Opus one), and for
+// lossless quality the original file's address and type for files every Cast device plays (FLAC, MP3, Ogg, WAV, AAC),
+// or of the server's FLAC conversion for lossless files it can't (ALAC, .m4a, Monkey's Audio…; marked "converted").
+// The TV plays the best it has: the original (or conversion), else Opus, else MP3. When a kind fails to play, the queue
+// loads again from where it was with that kind dropped, and later songs skip it too: originals → Opus → MP3 (a few
+// older Cast devices lack Opus; a failed FLAC conversion usually means the server has no "flac" transcoding).
 const M = cast.framework.messages;
-let originalsFail = false;
+const failedKinds = { original: false, converted: false, opus: false };
 let retrying = false;
 
-function useOriginal(media) {
+const KIND_NAMES = { original: 'original files', converted: 'FLAC conversions', opus: 'Opus', mp3: 'MP3' };
+
+// Remembers what the phone sent, once: the lossy address it came with, and the MP3 one.
+function sent(media) {
   const c = media && media.customData;
-  if (originalsFail || !c || !c.originalUrl) return;
-  if (!c.mp3Url) c.mp3Url = media.contentUrl || media.contentId;
-  media.contentUrl = c.originalUrl;
-  media.contentType = c.originalType || 'audio/*';
+  if (!c) return null;
+  if (!c.baseUrl) {
+    c.baseUrl = media.contentUrl || media.contentId;
+    c.baseType = media.contentType || 'audio/mpeg';
+  }
+  // From an older Siansa: the lossy address is the MP3.
+  if (!c.mp3Url && !c.opusUrl) c.mp3Url = c.baseUrl;
+  return c;
 }
 
-function useMp3(media) {
+// What the song plays as now.
+function kindOf(media) {
   const c = media && media.customData;
-  if (!c || !c.mp3Url) return media;
-  media.contentUrl = c.mp3Url;
-  media.contentType = 'audio/mpeg';
-  return media;
+  const url = media && (media.contentUrl || media.contentId);
+  if (!c) return 'mp3';
+  if (c.originalUrl && url === c.originalUrl) return c.converted ? 'converted' : 'original';
+  if (c.opusUrl && url === c.opusUrl) return 'opus';
+  return 'mp3';
+}
+
+// Sets the song to the best kind that hasn't failed; returns that kind.
+function pick(media) {
+  const c = sent(media);
+  if (!c) return 'mp3';
+  if (c.originalUrl && !failedKinds[c.converted ? 'converted' : 'original']) {
+    media.contentUrl = c.originalUrl;
+    media.contentType = c.originalType || 'audio/*';
+    return c.converted ? 'converted' : 'original';
+  }
+  if (c.opusUrl && !failedKinds.opus) {
+    media.contentUrl = c.opusUrl;
+    media.contentType = 'audio/ogg';
+    return 'opus';
+  }
+  if (c.mp3Url) {
+    media.contentUrl = c.mp3Url;
+    media.contentType = 'audio/mpeg';
+  }
+  return 'mp3';
+}
+
+function counts(items) {
+  const n = { original: 0, converted: 0, opus: 0, mp3: 0 };
+  items.forEach(i => { n[pick(i.media)]++; });
+  return n.original + ' as their original file, ' + n.converted + ' converted to FLAC by the server, ' + n.opus + ' as Opus, ' + n.mp3 + ' as MP3';
+}
+
+function failedNote() {
+  const f = Object.keys(failedKinds).filter(k => failedKinds[k]).map(k => KIND_NAMES[k]);
+  return f.length ? ' (' + f.join(', ') + ' failed before: skipped)' : '';
 }
 
 player.setMessageInterceptor(M.MessageType.LOAD, req => {
-  useOriginal(req.media);
-  if (req.queueData && req.queueData.items) req.queueData.items.forEach(i => useOriginal(i.media));
+  heap('a load');
+  try {
+    const items = req.queueData && req.queueData.items || [];
+    const said = counts(items);
+    if (req.media) pick(req.media);
+    // Cast's own loads of the next song (ahead of time, and at the change) come with no queue and no phone: say so,
+    // rather than "0 songs" (issue #972).
+    if (!items.length && !req.senderId) tvlog('the TV loads the next song itself: ' + songOf(req.media));
+    else tvlog('load from ' + (req.senderId || 'the TV') + ': ' + items.length + ' songs, starting at ' +
+      ((req.queueData && req.queueData.startIndex || 0) + 1) + ', ' + said + failedNote());
+  } catch (e) { tvlog('load: ' + e.message); }
   return req;
 });
 player.setMessageInterceptor(M.MessageType.QUEUE_INSERT, req => {
-  (req.items || []).forEach(i => useOriginal(i.media));
+  try {
+    const items = req.items || [];
+    tvlog('queue insert: ' + items.length + ' songs, ' + counts(items));
+  } catch (e) { tvlog('queue insert: ' + e.message); }
   return req;
 });
 
-player.addEventListener(E.ERROR, () => {
-  const queue = player.getQueueManager();
-  const items = queue && queue.getItems();
-  const media = player.getMediaInformation();
-  if (originalsFail || retrying || !items || !items.length || !media || !media.customData || !media.customData.mp3Url) return;
-  originalsFail = true;
-  retrying = true;
-  const req = new M.LoadRequestData();
-  req.autoplay = true;
-  req.currentTime = player.getCurrentTimeSec() || 0;
-  req.queueData = new M.QueueData();
-  req.queueData.items = items.map(i => {
-    const item = new M.QueueItem();
-    item.media = useMp3(i.media);
-    item.customData = i.customData;
-    return item;
-  });
-  req.queueData.startIndex = Math.max(0, queue.getCurrentItemIndex());
-  req.media = req.queueData.items[req.queueData.startIndex].media;
-  player.load(req).finally(() => { retrying = false; });
+function songOf(media) {
+  const c = media && media.customData || {};
+  return (c.siansaSongId || media && media.contentId || '?') + ' (' + (media && media.contentType || '?') +
+    (c.converted ? ', converted by the server' : '') + ')';
+}
+
+// A song that can't play: the queue loads again from where it was, with that kind dropped for every song; once a song
+// is down to MP3, the splash says so. Nothing here may throw or leave the page waiting: the session must carry on.
+player.addEventListener(E.ERROR, event => {
+  let media = null;
+  let kind = 'mp3';
+  try {
+    media = player.getMediaInformation();
+    kind = kindOf(media);
+    tvlog('media error ' + (event && event.detailedErrorCode) + (event && event.reason ? ' (' + event.reason + ')' : '') +
+      ' on ' + songOf(media) + ' as ' + KIND_NAMES[kind] + (retrying ? ', while loading again' : ''));
+    if (kind === 'converted') tvlog('the server’s FLAC conversion didn’t play: does it have a "flac" transcoding?');
+  } catch (e) { tvlog('media error: ' + e.message); }
+  try {
+    const queue = player.getQueueManager();
+    const items = queue && queue.getItems();
+    if (retrying || kind === 'mp3' || !items || !items.length || !media || !media.customData) {
+      // Already MP3, or nothing to fall back to: say so on the splash instead of a silent screen.
+      if (!retrying) { failed = true; render(); }
+      return;
+    }
+    failedKinds[kind] = true;
+    const req = new M.LoadRequestData();
+    req.autoplay = true;
+    req.currentTime = player.getCurrentTimeSec() || 0;
+    req.queueData = new M.QueueData();
+    req.queueData.items = items.filter(i => i && i.media).map(i => {
+      const item = new M.QueueItem();
+      item.media = i.media;
+      pick(item.media);
+      item.customData = i.customData;
+      return item;
+    });
+    if (!req.queueData.items.length) { failed = true; render(); return; }
+    req.queueData.startIndex = Math.min(Math.max(0, queue.getCurrentItemIndex()), req.queueData.items.length - 1);
+    req.media = req.queueData.items[req.queueData.startIndex].media;
+    retrying = true;
+    tvlog('playing the queue without ' + KIND_NAMES[kind] + ' (now ' + KIND_NAMES[kindOf(req.media)] + '): ' + req.queueData.items.length +
+      ' songs, from song ' + (req.queueData.startIndex + 1) + ' at ' + Math.round(req.currentTime) + ' s');
+    Promise.resolve(player.load(req))
+      .catch(e => { tvlog('loading again failed: ' + (e && (e.message || e.type) || e)); failed = true; render(); })
+      .finally(() => { retrying = false; });
+  } catch (e) {
+    retrying = false;
+    failed = true;
+    tvlog('falling back failed: ' + e.message);
+    try { render(); } catch (e2) { /* the splash stays as it was */ }
+  }
 });
 
+// A relative seek ("a few seconds back or forward") comes from the TV's own remote handling, never from Siansa,
+// which always seeks to a point in the song: take it as previous or next instead.
+// A seek that arrives together with a left or right press is the TV's too, so it's dropped.
+// They're handled like the keys: one on its own is a press (previous or next), several in a row are a hold
+// (winding through the song).
+player.setMessageInterceptor(M.MessageType.SEEK, req => {
+  if (Date.now() - ownSeekAt < 200) return req;
+  tvlog('seek from ' + (req.senderId || 'the TV') + ': to ' + req.currentTime + ', by ' + req.relativeTime + ', at ' + Math.round(player.getCurrentTimeSec()) + ' s');
+  const relative = typeof req.relativeTime === 'number' && typeof req.currentTime !== 'number';
+  if (relative) {
+    // When the keys reach the page too, they already count: the TV's seek is dropped.
+    // A second one the same way while the first is still settling is a hold.
+    const dir = req.relativeTime < 0 ? -1 : 1;
+    if (Date.now() - keyAt >= 1500) arrowDown(dir, arrow === dir);
+    return null;
+  }
+  if (Date.now() - arrowAt < 1500) return null;
+  return req;
+});
+
+// Other commands, only logged: to see what the TV's remote sends besides keys and seeks.
+[M.MessageType.PLAY, M.MessageType.PAUSE, M.MessageType.QUEUE_UPDATE, M.MessageType.STOP].forEach(type =>
+  player.setMessageInterceptor(type, req => {
+    tvlog(type + ' from ' + (req.senderId || 'the TV') + (req.jump ? ', jump ' + req.jump : ''));
+    if (type === M.MessageType.PLAY || type === M.MessageType.PAUSE) tvDidIt();
+    return req;
+  }));
+
+// Why the session ends, as far as the page sees it (2161 on the phone is the phone ending the cast itself: Play on ›
+// This phone, or hold to stop).
+const SE = cast.framework.system.EventType;
+if (SE.SENDER_DISCONNECTED) context.addEventListener(SE.SENDER_DISCONNECTED, e => tvlog('the phone let go (' + (e && e.reason) + ')'));
+if (SE.SHUTDOWN) context.addEventListener(SE.SHUTDOWN, () => tvlog('the TV screen is closing'));
+
+// Previous and next work on the songs the phone sends: the one playing, one before and a few after (the phone keeps the
+// queue, issue #114), the next loaded ahead.
 const options = new cast.framework.CastReceiverOptions();
+options.statusText = 'Siansa';
+options.customNamespaces = { [LOG_NS]: cast.framework.system.MessageType.STRING };
 options.supportedCommands = M.Command.ALL_BASIC_MEDIA | M.Command.QUEUE_NEXT | M.Command.QUEUE_PREV;
+// The splash says "Connecting…" until the TV has started the page, then waits for the phone's first song.
+const pageAt = Date.now();
+context.addEventListener(cast.framework.system.EventType.READY, () => {
+  render();
+  tvlog('TV screen ready ' + (Date.now() - pageAt) + ' ms after the page opened: ' +
+    ($('now').classList.contains('hidden') ? 'the splash ("' + $('splash-note').textContent + '")' : 'now playing'));
+});
 context.start(options);
-render();
 </script>
 </body>
 </html>

@@ -1,0 +1,98 @@
+package app.siansa.playback
+
+import androidx.media3.common.MimeTypes
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** Audio passthrough on the TV app (issue #860). */
+class PassthroughTest {
+    @After
+    fun forget() = Passthrough.played.clear()
+
+    @Test
+    fun primedDolbyTracksJoinWhilePassthroughIsOn() {
+        // Issue #924: a priming frame made every Atmos song start with a jump, so the output was reopened between songs.
+        val atmos = androidx.media3.common.Format.Builder().setSampleMimeType(MimeTypes.AUDIO_E_AC3_JOC).setHasPrerollSamples(true).build()
+        assertFalse(Passthrough.joinable(atmos, on = true).hasPrerollSamples)
+        assertEquals(MimeTypes.AUDIO_E_AC3_JOC, Passthrough.joinable(atmos, on = true).sampleMimeType)
+        // Passthrough off: the TV decodes it, and the priming frame stays cut off.
+        assertTrue(Passthrough.joinable(atmos, on = false).hasPrerollSamples)
+        // Other formats keep theirs (AAC's priming is cut off when it's decoded).
+        val aac = androidx.media3.common.Format.Builder().setSampleMimeType(MimeTypes.AUDIO_AAC).setHasPrerollSamples(true).build()
+        assertSame(aac, Passthrough.joinable(aac, on = true))
+        // Nothing to change: the same format back.
+        val plain = androidx.media3.common.Format.Builder().setSampleMimeType(MimeTypes.AUDIO_E_AC3).build()
+        assertSame(plain, Passthrough.joinable(plain, on = true))
+    }
+
+    @Test
+    fun onlyASongSentUnchangedGoesPastTheMix() {
+        // Issue #939: the mix is silent by design while Atmos goes to the receiver; its silence checks must leave it be.
+        assertTrue(Passthrough.pastTheMix(true, MimeTypes.AUDIO_E_AC3_JOC))
+        // A FLAC after it goes through the mix again, though the output was last opened for a bitstream.
+        assertFalse(Passthrough.pastTheMix(true, MimeTypes.AUDIO_FLAC))
+        // Atmos decoded on the TV (no receiver, or passthrough off) goes through the mix.
+        assertFalse(Passthrough.pastTheMix(false, MimeTypes.AUDIO_E_AC3_JOC))
+        assertFalse(Passthrough.pastTheMix(true, null))
+    }
+
+    @Test
+    fun dolbyAndDtsAreBitstreams() {
+        for (mime in listOf(
+            MimeTypes.AUDIO_AC3, MimeTypes.AUDIO_E_AC3, MimeTypes.AUDIO_E_AC3_JOC, MimeTypes.AUDIO_TRUEHD,
+            MimeTypes.AUDIO_DTS, MimeTypes.AUDIO_DTS_HD,
+        )) {
+            assertTrue(mime, Passthrough.isBitstream(mime))
+        }
+    }
+
+    @Test
+    fun everythingElsePlaysAsUsual() {
+        for (mime in listOf(MimeTypes.AUDIO_FLAC, MimeTypes.AUDIO_AAC, MimeTypes.AUDIO_MPEG, MimeTypes.AUDIO_OPUS, MimeTypes.AUDIO_ALAC, null)) {
+            assertFalse(mime.toString(), Passthrough.isBitstream(mime))
+        }
+    }
+
+    @Test
+    fun dolbyFilesStreamUntouchedOnlyWhilePassthroughIsOn() {
+        assertTrue(Passthrough.keepsOriginal(PassthroughMode.DOLBY_DTS, "eac3"))
+        assertTrue(Passthrough.keepsOriginal(PassthroughMode.DOLBY_DTS, ".MKA"))
+        assertTrue(Passthrough.keepsOriginal(PassthroughMode.DOLBY_DTS, " thd "))
+        assertFalse(Passthrough.keepsOriginal(PassthroughMode.OFF, "eac3"))
+        assertFalse(Passthrough.keepsOriginal(PassthroughMode.DOLBY_DTS, "flac"))
+        // Dolby Atmos music is mostly sold as .m4a or .mp4: those stream untouched too, but only while passthrough is on.
+        assertTrue(Passthrough.keepsOriginal(PassthroughMode.DOLBY_DTS, "m4a"))
+        assertTrue(Passthrough.keepsOriginal(PassthroughMode.DOLBY_DTS, "MP4"))
+        assertFalse(Passthrough.keepsOriginal(PassthroughMode.OFF, "m4a"))
+        // An .m4a isn't taken for Dolby when deciding about blends until it went to the receiver.
+        assertFalse(Passthrough.likely(PassthroughMode.DOLBY_DTS, "m4a"))
+        assertFalse(Passthrough.keepsOriginal(PassthroughMode.DOLBY_DTS, null))
+    }
+
+    @Test
+    fun anM4aIsKnownOnceItWentToTheReceiver() {
+        assertFalse(Passthrough.involves(PassthroughMode.DOLBY_DTS, "song-1", "m4a"))
+        Passthrough.played.add("song-1")
+        assertTrue(Passthrough.involves(PassthroughMode.DOLBY_DTS, "song-1", "m4a"))
+        // Off means nothing is a bitstream, whatever played before.
+        assertFalse(Passthrough.involves(PassthroughMode.OFF, "song-1", "m4a"))
+        assertFalse(Passthrough.involves(PassthroughMode.DOLBY_DTS, null, "eac3"))
+    }
+
+    @Test
+    fun settingReadsBackAndDefaultsToOff() {
+        assertEquals(PassthroughMode.DOLBY_DTS, PassthroughMode.parse("DOLBY_DTS"))
+        assertEquals(PassthroughMode.OFF, PassthroughMode.parse(null))
+        assertEquals(PassthroughMode.OFF, PassthroughMode.parse("SOMETHING_ELSE"))
+    }
+
+    @Test
+    fun formatsHavePlainNames() {
+        assertEquals("Dolby Atmos (E-AC-3 JOC)", Passthrough.name(MimeTypes.AUDIO_E_AC3_JOC))
+        assertEquals("Dolby TrueHD", Passthrough.name(MimeTypes.AUDIO_TRUEHD))
+    }
+}

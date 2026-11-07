@@ -5,7 +5,8 @@ API (JSON, for any logged-in user or API token):
 * ``GET api/health``: the plugin is there and working;
 * ``GET api/profiles?ids=a,b,…``: loudness and fade profiles of up to 500 songs (the layout Siansa reads), with
   the beat grid at each end (``intro_bpm``, ``intro_beat_ms``, ``intro_bar_ms``, ``intro_rhythm``,
-  ``intro_steady`` and the same for ``outro``) once a song has been measured for them;
+  ``intro_steady`` and the same for ``outro``) once a song has been measured for them, and ``beats_until_ms`` when
+  the beat stops well before the end (the last beat, ms from the start);
 * ``GET api/status``: how far each part is;
 * ``GET api/similar/albums?track_id=…``: albums that sound like the album of that song;
 * ``GET api/similar/artists?track_id=…`` or ``?artist=…``: artists that sound like that one.
@@ -26,7 +27,7 @@ from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url,
 from . import generations, jobs, similarity, status, store
 
 PLUGIN_ID = "siansa_analysis"
-VERSION = "0.3.3"
+VERSION = "0.5.7"  # the newest in plugin.json: AudioMuse-AI and the Siansa app show it (test_version.py)
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
@@ -44,6 +45,12 @@ def collect(db):
     similar_job = store.get_state("similar_job", {}, db) or {}
     built = store.get_state("similar_built", {}, db) or {}
     beat_counts = status.beats_counts(*store.beats_counts(db))
+    try:
+        beat_counts["until_waiting"] = store.until_waiting(db)
+    except Exception:  # the page shows without it
+        if db is not None:
+            db.rollback()
+        beat_counts["until_waiting"] = 0
     beats_job = store.get_state("beats_job", {}, db) or {}
     return {
         "inputs": inputs,
@@ -125,9 +132,11 @@ def health():
             "plugin": PLUGIN_ID, "plugin_version": VERSION, "schema_version": SCHEMA_VERSION, "status": "ok",
             "profiles": state["profiles"].to_json(), "similar": state["similar"].to_json(),
         })
-    except Exception as e:
+    except Exception:
+        # The details stay in AudioMuse's log: an error's text can say things about the server (CodeQL).
         logger.exception("siansa_analysis health check failed")
-        return jsonify({"plugin": PLUGIN_ID, "plugin_version": VERSION, "status": "error", "error": str(e)[:200]})
+        return jsonify({"plugin": PLUGIN_ID, "plugin_version": VERSION, "status": "error",
+                        "error": "The plugin's health check failed: the details are in AudioMuse-AI's log"})
 
 
 @bp.route("/api/profiles")
@@ -147,6 +156,8 @@ def profiles():
             out.append({"track_id": asked_id, **profile})
             if "intro_bpm" not in profile and "outro_bpm" not in profile:
                 no_beats.append(asked_id)  # measured before the beat tracker, maybe: its beats come first then
+            elif store.UNTIL_KEY not in profile:
+                no_beats.append(asked_id)  # measured before 0.5.0: checked for where its beat stops, as it's about to play
     if pending or no_beats:
         try:
             store.mark_wanted(db, {canonical.get(i, i) for i in pending + no_beats})
@@ -274,7 +285,7 @@ def _stop_now(measuring, all_on):
         return ""
     after = " and Measure all goes off" if all_on else ""
     return f"""<div class="mx-warning" role="status"><strong>Measuring songs now.</strong>
-  <p class="mx-help">Stop now ends this run after the song it's on{after}. Songs measured so far are kept.</p>
+  <p class="mx-help">Stop now ends it after the current song{after}. What's measured is kept.</p>
   <form method="post" class="mx-actions"><button type="submit" name="action" value="cancel">Stop now</button></form></div>"""
 
 
@@ -297,9 +308,8 @@ def _all_block(part, to_measure, busy, on, what, round_note, rounds=("", False),
       <form method="post" class="mx-actions"><button type="submit" name="action" value="{stop}">Stop measuring all</button></form></div>"""
     if not to_measure:
         return ""
-    warning = ("Measuring every song downloads each one from your music server and reads it in full. "
-               "With a large library this takes hours or days and keeps the AudioMuse worker busy. "
-               + how + " You can stop at any time; measured songs are kept." + round_note)
+    warning = ("Each song is downloaded from your music server and read again: hours or days for a large library. "
+               + how + " You can stop any time; what's measured is kept." + round_note)
     return f"""<div class="mx-warning"><strong>Measure all songs at once</strong>
       <p class="mx-help">{escape(warning)}</p>
       <form method="post" class="mx-actions" onsubmit="return confirm({escape(json.dumps(warning + ' Start now?'))});">
@@ -344,13 +354,17 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
     left_line = f'<p class="mx-help">At this pace, every song is measured in {escape(left)}.</p>' if left else ""
     all_block = _all_block("profiles", counts["to_measure"], busy, measure_all, "", "", rounds, last_round, all_minutes)
     beats_all = bool(state.get("beats_all"))
-    beats_left = status.time_left(beat_counts["to_measure"], state.get("rate"), beats_all, max(beats_batch_size, 1), all_minutes) if (beats_batch_size or beats_all) else None
+    beats_waiting = beat_counts["to_measure"] + beat_counts.get("until_waiting", 0)
+    beats_left = status.time_left(beats_waiting, state.get("rate"), beats_all, max(beats_batch_size, 1), all_minutes) if (beats_batch_size or beats_all) else None
     beats_left_line = (f'<p class="mx-help">At this pace, every song has its beat grid in {escape(beats_left)}.</p>'
                        if beats_left else "")
     if not beats_batch_size and not beats_all and beat_counts["to_measure"]:
-        beats_left_line = '<p class="mx-help">Songs per run is 0: songs are measured for their beats only when you press a button here (and new songs as AudioMuse analyses them).</p>'
-    beats_all_block = _all_block("beats", beat_counts["to_measure"], busy, beats_all, " for their beats",
-                                 " Their loudness and fades stay in use meanwhile.", rounds, last_round, all_minutes)
+        beats_left_line = '<p class="mx-help">Songs per run is 0: older songs are measured only when you press a button here (new songs still are).</p>'
+    # Songs measured before 0.5.0 wait to be checked for where their beat stops: they count for the buttons too
+    # (0.5.0 showed the beat grids as done, with no Measure all).
+    beats_open = beat_counts["to_measure"] + beat_counts.get("until_waiting", 0)
+    beats_all_block = _all_block("beats", beats_open, busy, beats_all, " for their beats",
+                                 " What's measured stays in use meanwhile.", rounds, last_round, all_minutes)
     beats_error = beats_job.get("error")
     beats_failures = ""
     if beat_counts["failed"]:
@@ -360,7 +374,7 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
                         for i, t, a, e in state.get("beats_failures") or [])
         beats_failures = f"""<details><summary>Why {beat_counts['failed']:,} songs couldn't be read yet</summary>
     {f"<ul>{reasons}</ul>" if reasons else ""}{f"<p class='mx-help'>The last ones:</p><ul>{songs}</ul>" if songs else ""}
-    <p class="mx-help">Each is tried again by itself, after an hour, then 6 hours, a day, and 3 days.</p>
+    <p class="mx-help">Each is tried again after an hour, 6 hours, a day and 3 days.</p>
     <form method="post" class="mx-actions"><button type="submit" name="action" value="retry_beats"{busy}>Try them all again now</button></form>
   </details>"""
     elsewhere_line = ""
@@ -374,17 +388,15 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
 <section class="mx-section" aria-label="Library">
   <div class="mx-head"><h3>1. Library</h3></div>
   <p>{inputs.library_songs:,} songs in AudioMuse, {inputs.analysis_songs:,} with sound analysis.</p>
-  <p class="mx-help">Every part below reads from here and keeps its own progress.</p>
+
 </section>
 
 <section class="mx-section" aria-label="Volume and fade profiles">
   <div class="mx-head"><h3>2. Volume &amp; fade profiles</h3>{_badge(p)}</div>
   {_meter(p, "Songs measured")}
   <p><strong>{escape(p.detail)}.</strong> {counts['to_measure']:,} still to measure{f", {counts['asked_for']:,} asked for by the app first" if counts['asked_for'] else ""}.</p>
-  <p class="mx-help">Loudness levels the volume and the fade profile lets Siansa fade songs the way they
-    start and end (SmoothFade). New songs are measured right after AudioMuse analyses them; older ones a
-    batch at a time every 15 minutes. This runs on its own: it doesn't wait for the similar lists, and
-    they don't wait for it.</p>
+  <p class="mx-help">Loudness for levelling, and how each song starts and ends for Siansa's fades. New songs are
+    measured after AudioMuse analyses them, older ones a batch every 15 minutes.</p>
   {f'<p class="mx-help mx-attention">Last run: {escape(profiles_error)}</p>' if profiles_error else ''}
   {failures}
   {left_line}
@@ -400,24 +412,19 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
   <div class="mx-head"><h3>3. Beat grids</h3>{_badge(b)}</div>
   {_meter(b, "Songs measured for their beats")}
   <p><strong>{escape(b.detail)}.</strong> {beat_counts['to_measure']:,} still to measure.</p>
+  {f"<p>{beat_counts['until_waiting']:,} songs measured before 0.5.0 still to be checked for where their beat stops. Measure all does them all; otherwise each is checked as Siansa is about to play it.</p>" if beat_counts.get('until_waiting') else ""}
   {elsewhere_line}
-  <p class="mx-help">The tempo, beats, bars and phrases at each end of a song, for beat-matched blends in
-    Siansa's DJ radio (experimental): with the phrases (plugin 0.4.0: the 4 or 8 bars a song is built from, read
-    over its last minute) the blends go phrase on phrase, as a DJ mixes. Plugin 0.4.2 reads the tempo of drum and
-    bass and other breakbeats right, where it often read two thirds of it. New songs get theirs with their volume
-    and fade profile. Songs measured before plugin 0.4.2 are read again (the sound isn't kept, only what was
-    measured), a batch at a time after the profiles each 15 minutes, songs the app is about to play first.
-    Their loudness, fades and earlier beat grids stay in use meanwhile; a song without its phrases blends bar on
-    bar, one without its grid the plain way. Songs per run can be any number: a round stops when its time is up (4
-    minutes; measuring all goes on as set below), so a big number means "as many as fit". 0 measures them only when
-    you ask.</p>
+  <p class="mx-help">The tempo, beats, bars and phrases at each end of a song, and where the beat stops before a
+    beatless outro, for Siansa's DJ blends. New songs get them with their profile; older ones a batch every 15
+    minutes, songs Siansa is about to play first. What's measured stays in use meanwhile. A round stops when its
+    time is up (4 minutes), so a big Songs per run means "as many as fit"; 0 means only when you ask.</p>
   {f'<p class="mx-help mx-attention">Last run: {escape(beats_error)}</p>' if beats_error else ''}
   {beats_failures}
   {beats_left_line}
   <form method="post" class="mx-actions">
     <label>Songs per run <input name="beats_batch_size" value="{beats_batch_size}" inputmode="numeric"></label>
     <button type="submit" name="action" value="save_beats">Save</button>
-    <button type="submit" name="action" value="measure_beats"{busy if beat_counts['to_measure'] else " disabled"}>Measure a batch now</button>
+    <button type="submit" name="action" value="measure_beats"{busy if beats_open else " disabled"}>Measure a batch now</button>
   </form>
   {beats_all_block}
 </section>
@@ -426,8 +433,8 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
   <div class="mx-head"><h3>4. Similar albums &amp; artists</h3>{_badge(sim)}</div>
   {_meter(sim, "Build progress")}
   <p><strong>{escape(sim.detail)}.</strong></p>
-  <p class="mx-help">Built from the library and AudioMuse's sound analysis. It builds again by itself
-    when either of them changes, and the last lists stay in use until a new build is finished.</p>
+  <p class="mx-help">Built from the library and AudioMuse's sound analysis, again by itself when either changes.
+    The last lists stay in use meanwhile.</p>
   {f'<p class="mx-help mx-attention">Last build: {escape(similar_error)}</p>' if similar_error else ''}
   <details><summary>Technical details</summary>
     <p class="mx-help">Built from library generation {int(built.get('library_generation') or 0)} of
@@ -445,15 +452,15 @@ def render_settings(state, batch_size, message="", beats_batch_size=None):
 MESSAGES = {
     "saved": "Saved.",
     "measuring": "Measuring started. This page updates by itself.",
-    "all": "Measuring every song. It goes on until all are done; you can stop it here.",
-    "cancelled": "Stopping: the run ends after the song it's on. Songs measured so far are kept, and Measure all is off.",
-    "all_waiting": "Measuring every song starts with the next round, within 15 minutes: another AudioMuse job is running.",
-    "stopped": "Stopped. The songs measured so far are kept; the rest are measured a batch at a time again.",
+    "all": "Measuring every song, until all are done. You can stop it here.",
+    "cancelled": "Stopping after the current song. What's measured is kept; Measure all is off.",
+    "all_waiting": "Another AudioMuse job is running: measuring every song starts with the next round, within 15 minutes.",
+    "stopped": "Stopped. What's measured is kept; the rest go a batch at a time again.",
     "beats_measuring": "Measuring a batch for their beats. This page updates by itself.",
     "beats_retry": "{n} songs are tried again for their beats, starting now. This page updates by itself.",
-    "beats_retry_waiting": "{n} songs are tried again for their beats with the next round, within 15 minutes: another AudioMuse job is running.",
-    "beats_all": "Measuring every song for its beats. It goes on until all are done; you can stop it here.",
-    "beats_all_waiting": "Measuring every song for its beats starts with the next round, within 15 minutes: another AudioMuse job is running.",
+    "beats_retry_waiting": "Another AudioMuse job is running: {n} songs are tried again with the next round, within 15 minutes.",
+    "beats_all": "Measuring every song for its beats, until all are done. You can stop it here.",
+    "beats_all_waiting": "Another AudioMuse job is running: measuring every song for its beats starts with the next round, within 15 minutes.",
     "building": "Build started. This page updates by itself.",
     "busy": "Another AudioMuse job is running, so this waits for the next round (within 15 minutes).",
 }

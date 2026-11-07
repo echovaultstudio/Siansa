@@ -166,7 +166,7 @@ class SpacingSettingsTest : SpacingCheck() {
         app.siansa.ui.FoldMemory.setFolded(context, "radio", false)
     }
 
-    /** Downloads › Image cache (issue #780, moved from Storage): the size chips sit evenly between their label and Clear. */
+    /** Settings › Data › Image cache (issue #780, moved from Storage; in Data since v1.0): the size chips sit evenly between their label and Clear. */
     @Test fun imageCacheChipsAreEvenlySpaced() {
         val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
         compose.setContent {
@@ -200,6 +200,38 @@ class SpacingSettingsTest : SpacingCheck() {
         val chips = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("8 bars")), useUnmergedTree = true).getBoundsInRoot()
         val hint = compose.onNode(hasText("Apart from the crossfade length", substring = true)).getBoundsInRoot()
         assertEven("Blend length chips", chips.top - label.bottom, hint.top - chips.bottom)
+    }
+
+    /** A music server being added (issue #828): the server type chips sit evenly between their label and the hint. */
+    @Test fun newServerTypeChipsAreEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                Column(verticalArrangement = Arrangement.spacedBy(app.siansa.ui.Space.Small)) {
+                    app.siansa.ui.ServerKindChips(app.siansa.net.SourceKind.JELLYFIN) { }
+                    app.siansa.ui.Hint(app.siansa.net.SourceKind.JELLYFIN.detail)
+                }
+            }
+        }
+        val label = compose.onNodeWithText("Server type").getBoundsInRoot()
+        val chips = compose.onNodeWithTag("serverKinds").getBoundsInRoot()
+        val hint = compose.onNodeWithText(app.siansa.net.SourceKind.JELLYFIN.detail).getBoundsInRoot()
+        assertEven("Server type chips", chips.top - label.bottom, hint.top - chips.bottom)
+    }
+
+    /** The server form's API key (issue #493): its hint sits evenly between the password and the key field. */
+    @Test fun apiKeyHintIsEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    Box(Modifier.testTag("password")) { app.siansa.ui.SecretField("Password", "") { } }
+                    app.siansa.ui.ApiKeyField(app.siansa.data.AppSettings()) { }
+                }
+            }
+        }
+        val password = compose.onNodeWithTag("password").getBoundsInRoot()
+        val hint = compose.onNodeWithText("API key, if your server gives you one", substring = true).getBoundsInRoot()
+        val key = compose.onNodeWithTag("apiKey").getBoundsInRoot()
+        assertEven("API key hint", hint.top - password.bottom, key.top - hint.bottom)
     }
 
     /** Style › Phone's top bar (issue #681): its chips sit evenly between the heading and the hint. */
@@ -318,7 +350,7 @@ class SpacingSettingsTest : SpacingCheck() {
             SiansaTheme {
                 Column {
                     app.siansa.ui.HubGroup("Sources", first = true)
-                    HubRow(Icons.Rounded.Palette, "Servers and services") { }
+                    HubRow(Icons.Rounded.Palette, "Connections") { }
                     app.siansa.ui.HubGroup("Look")
                     HubRow(Icons.Rounded.Palette, "Style") { }
                 }
@@ -340,7 +372,7 @@ class SpacingSettingsTest : SpacingCheck() {
         gaps.forEach { assertEven("Gap between source rows", gaps[0], it, 1.dp) }
     }
 
-    /** Settings › Servers and services (issue #665): folded cards are one height, evenly spaced, the page margin from the edges. */
+    /** Settings › Connections (issue #665): folded cards are one height, evenly spaced, the page margin from the edges. */
     @Test fun connectionCardsAreEven() {
         compose.setContent {
             SiansaTheme {
@@ -361,5 +393,21 @@ class SpacingSettingsTest : SpacingCheck() {
     @androidx.compose.runtime.Composable
     private fun MusicSourceRows() {
         SiansaTheme { Column { SourceKind.entries.forEach { SourceRow(it) { } } } }
+    }
+
+    /** How mixing works (issue #916): the open-in-browser icon sits centred beside the heading and hint. */
+    @Test fun mixingDocsLinkIsCentred() {
+        compose.setContent { SiansaTheme { Column(Modifier.padding(Space.Page)) { app.siansa.ui.MixingDocsLink() } } }
+        val row = compose.onNodeWithTag("mixingDocs").getBoundsInRoot()
+        val icon = compose.onNode(hasContentDescription("Opens in the browser"), useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Icon above and below", icon.top - row.top, row.bottom - icon.bottom, 2.dp)
+    }
+
+    /** Settings › Style › Home: the shortcut count sits level with its slider (issue #934). */
+    @Test fun shortcutCountIsLevelWithItsSlider() {
+        compose.setContent { SiansaTheme { app.siansa.ui.ShortcutCountRow(6) {} } }
+        val slider = compose.onNodeWithTag("homeShortcuts").getBoundsInRoot()
+        val count = compose.onNodeWithTag("homeShortcutsCount").getBoundsInRoot()
+        assertEven("Count above and below", count.top - slider.top, slider.bottom - count.bottom, 2.dp)
     }
 }

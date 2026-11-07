@@ -37,7 +37,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.siansa.data.AlbumCategory
 import app.siansa.ui.CHIPS_GAP
 import app.siansa.ui.CollectionByline
-import app.siansa.ui.ContinueButton
 import app.siansa.ui.FastScrollBar
 import app.siansa.ui.HeroPage
 import app.siansa.ui.MoreChipsHint
@@ -74,6 +73,23 @@ class SpacingLibraryTest : SpacingCheck() {
         assertEven("Release-type chips", chip.top - (song.bottom - 6.dp), title.top - chip.bottom)
     }
 
+    /** Stations in Your Library (issue #353): a station's row has the same room above and below its picture, with its ⋮ menu. */
+    @Test fun stationRowIsEvenlyPadded() {
+        compose.setContent {
+            SiansaTheme {
+                Column {
+                    app.siansa.ui.LibraryStationRowForTest("Radio Paradise", "Radio · On this phone", "own-1")
+                }
+            }
+        }
+        val row = compose.onNodeWithTag("libraryRow").getBoundsInRoot()
+        val cover = compose.onNodeWithTag("libraryRowCover", useUnmergedTree = true).getBoundsInRoot()
+        val menu = compose.onNodeWithTag("stationMenu").getBoundsInRoot()
+        assertEven("Station row", cover.top - row.top, row.bottom - cover.bottom)
+        // The ⋮ button sits centred with the picture.
+        assertEven("Station row's ⋮", menu.top - cover.top, cover.bottom - menu.bottom)
+    }
+
     /** Downloads: Pause sits on the same line as the totals, centred with them, not squeezed into the buttons. */
     @Test fun downloadPauseSitsWithTheTotals() {
         compose.setContent {
@@ -103,6 +119,38 @@ class SpacingLibraryTest : SpacingCheck() {
         assertTrue("Find similar is left of Shuffle and doesn't overlap it", similar.right <= shuffle.left + 0.5.dp)
         // Icon buttons keep 4 dp of touch room on each side of their 40 dp, so neighbours sit 8 dp apart.
         assertTrue("Find similar right next to Shuffle (${(shuffle.left - similar.right).value} dp)", shuffle.left - similar.right <= app.siansa.ui.Space.Small + 0.5.dp)
+    }
+
+    /**
+     * Album page (the owner's layout, 7 Nov): the plus right in line with the details above, download beside it; similar
+     * albums, shuffle and Play to the right, Play at the row's end; all on one line; nothing under Play.
+     */
+    @Test fun albumBarLinesUp() {
+        compose.setContent {
+            SiansaTheme {
+                Column {
+                    Text("Album · 2019", Modifier.testTag("details"))
+                    app.siansa.ui.ActionButtons(
+                        enabled = true, onQueue = {}, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true,
+                        download = { androidx.compose.foundation.layout.Box(Modifier.size(48.dp).testTag("download")) },
+                        resume = app.siansa.ui.PlayResume(7, "8") to 12,
+                        onAddToPlaylist = {},
+                    )
+                }
+            }
+        }
+        val details = compose.onNodeWithTag("details").getBoundsInRoot()
+        val plus = compose.onNodeWithTag("albumAddToPlaylist").getBoundsInRoot()
+        val similar = compose.onNodeWithTag("findSimilarAlbums").getBoundsInRoot()
+        val shuffle = compose.onNodeWithTag("shuffleAll", useUnmergedTree = true).getBoundsInRoot()
+        val play = compose.onNodeWithTag("bigPlay").getBoundsInRoot()
+        // The plus's circle (28 dp, centred on the button, with 2 of its drawing's 24 units round it) starts where the text
+        // above starts. From the button's middle: its bounds are the 40 dp button, not the 48 dp touch area.
+        assertEven("The plus in line with the details", (plus.left + plus.right) / 2 - 14.dp + 28.dp * 2 / 24, details.left, 1.dp)
+        val line = (play.top + play.bottom) / 2
+        listOf(plus, similar, shuffle).forEach { assertEven("On Play's middle line", (it.top + it.bottom) / 2, line, 1.dp) }
+        assertTrue("Similar, shuffle, then Play, left to right", similar.right <= shuffle.left + 0.5.dp && shuffle.right <= play.left + 0.5.dp)
+        assertTrue("Nothing hangs under Play", compose.onAllNodesWithTag("playFrom").fetchSemanticsNodes().isEmpty())
     }
 
     /** Album page (issue #240): room under the big Play button before the first song, marked when it's playing. */
@@ -250,24 +298,6 @@ class SpacingLibraryTest : SpacingCheck() {
         val heart = compose.onNodeWithTag("heart").getBoundsInRoot()
         assertEven("Heart and back arrow on one line", back.top, heart.top, 1.dp)
         assertEven("Heart and back arrow the same size", back.bottom - back.top, heart.bottom - heart.top, 1.dp)
-    }
-
-    /** Album page (issue #367): Continue sits the same step under the details as the details under the artist. */
-    @Test fun continueButtonSitsAStepUnderTheDetails() {
-        compose.setContent {
-            SiansaTheme {
-                Column {
-                    CollectionByline("Various Artists", null, null, "DJ-mix · 2024 · 7 songs")
-                    ContinueButton("5") { }
-                }
-            }
-        }
-        val artist = compose.onNodeWithText("Various Artists").getBoundsInRoot()
-        val details = compose.onNodeWithText("DJ-mix · 2024 · 7 songs").getBoundsInRoot()
-        val button = compose.onNodeWithTag("continueFrom").getBoundsInRoot()
-        // The button you see is 40 dp tall, centred in its taller touch area.
-        val seenTop = button.top + ((button.bottom - button.top) - 40.dp) / 2
-        assertEven("Continue under the details", details.top - artist.bottom, seenTop - details.bottom, 1.dp)
     }
 
     /** Album page (issue #367): the last-played line is drawn behind its row, so the title keeps its even room. */

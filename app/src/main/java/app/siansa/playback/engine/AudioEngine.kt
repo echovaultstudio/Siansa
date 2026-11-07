@@ -1,0 +1,308 @@
+package app.siansa.playback.engine
+
+import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioManager
+import android.media.AudioTimestamp
+import android.media.AudioTrack
+import android.os.Process
+import app.siansa.log.AppLog
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
+
+/**
+ * Siansa's own audio output (issue #826): one AudioTrack that every music player's sound is mixed into. Each player
+ * still decodes and processes its songs (Media3, the equaliser), but hands the result to a [MixCore.Deck] instead of
+ * an AudioTrack of its own ([MixerOutputProvider]); this thread mixes the decks and writes the mix out.
+ *
+ * Both songs of a crossfade are then on one clock: where each is, is a count of frames this engine took from it,
+ * the same for both and exact to the sample. The old way, two AudioTracks each reporting a position that was off by
+ * 50 to 250 ms for seconds after a start or a seek, is what kept beat-matched blends out of step (#807, #813, #818).
+ *
+ * The output runs at [OUTPUT_RATE]: most music is 44.1 kHz and is copied through untouched; other rates and a song
+ * sped up or slowed down in a blend are read through [SincTable]'s filter.
+ */
+class AudioEngine(context: Context) {
+    val outRate = OUTPUT_RATE
+    val core = MixCore(outRate)
+    val sessionId: Int = (context.getSystemService(Context.AUDIO_SERVICE) as AudioManager).generateAudioSessionId()
+
+    private val wakeLock = ReentrantLock()
+    private val woken = wakeLock.newCondition()
+    @Volatile private var running = true
+    private var thread: Thread? = null
+    @Volatile private var track: AudioTrack? = null
+    @Volatile private var trackPlaying = false
+
+    /** Mix frames written to the output in all; the current AudioTrack's frame 0 is mix frame [trackBase]. */
+    @Volatile var writtenMix = 0L
+        private set
+    private var trackBase = 0L
+    // The output's last timestamp: the mix frame being heard at a moment (System.nanoTime()).
+    @Volatile private var stampMix = Long.MIN_VALUE
+    @Volatile private var stampNanos = 0L
+    @Volatile private var stampLive = false
+    private val stamp = AudioTimestamp()
+    private var failures = 0
+    /** Where the output goes now (for the log), and how often it ran dry, as last seen. */
+    @Volatile private var route = "not open"
+    private var underruns = 0
+    private var underrunsLoggedAt = 0L
+    private var blocksSinceStamp = 0
+    // When the output's timestamp last moved on while it played: an output that plays but doesn't move is stuck.
+    private var stampFrame = -1L
+    @Volatile private var movedNs = 0L
+    @Volatile private var reopenWanted = false
+
+    /** The player output each stream belongs to, told when its stream first sounds. */
+    internal val outputs = ConcurrentHashMap<DeckStream, DeckOutput>()
+
+    fun deck(name: String): MixCore.Deck = core.deck(name).also { d -> d.note = { AppLog.w("Engine", it) } }
+
+    fun provider(deck: MixCore.Deck): MixerOutputProvider = MixerOutputProvider(this, deck)
+
+    /** Something may have something to play: the thread starts or wakes. */
+    fun wake() {
+        if (thread == null) start()
+        wakeLock.withLock { woken.signalAll() }
+    }
+
+    @Synchronized
+    private fun start() {
+        if (thread != null || !running) return
+        thread = Thread({ loop() }, "siansa-mixer").apply {
+            isDaemon = true
+            start()
+        }
+        AppLog.i("Engine", "Mixer started: $outRate Hz, one output for all players (session $sessionId)")
+    }
+
+    fun release() {
+        running = false
+        wake()
+        thread?.join(500)
+        track?.let { runCatching { it.stop() }; it.release() }
+        track = null
+    }
+
+    /**
+     * The mix frame being heard now: from the output's timestamp, on at its rate while it plays, and less what the
+     * mix's limiter holds back. Never past what was written.
+     */
+    fun heardMix(nanos: Long = System.nanoTime()): Double {
+        val at = stampMix
+        val heard = if (at == Long.MIN_VALUE) {
+            // No timestamp yet (just started): what was written less the output's buffer.
+            (writtenMix - (track?.bufferSizeInFrames ?: 0)).toDouble()
+        } else {
+            at + if (stampLive) (nanos - stampNanos) * outRate / 1e9 else 0.0
+        }
+        return (minOf(heard, writtenMix.toDouble()) - core.latencyFrames).coerceAtLeast(0.0)
+    }
+
+    private fun loop() {
+        Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
+        val block = FloatArray(BLOCK * 2)
+        while (running) {
+            if (!core.active) {
+                rest()
+                continue
+            }
+            if (reopenWanted) {
+                reopenWanted = false
+                AppLog.w("Engine", "Opening the output again")
+                close()
+            }
+            val t = track ?: open() ?: run {
+                Thread.sleep(RETRY_MS)
+                null
+            } ?: continue
+            if (!trackPlaying) {
+                t.play()
+                trackPlaying = true
+                movedNs = System.nanoTime()
+            }
+            val started = try {
+                core.render(block, BLOCK, writtenMix)
+            } catch (e: Throwable) {
+                // A fault in the mixing mustn't stop the music app: this block is silence, the next is tried again.
+                if (failures++ % 500 == 0) AppLog.e("Engine", "Mixing failed (${failures}×): ${e.stackTraceToString().lines().take(4).joinToString(" | ")}")
+                java.util.Arrays.fill(block, 0f)
+                emptyList()
+            }
+            var off = 0
+            var dead = false
+            while (off < block.size && running && !reopenWanted) {
+                val n = t.write(block, off, block.size - off, AudioTrack.WRITE_BLOCKING)
+                if (n < 0) {
+                    AppLog.w("Engine", "Output write failed ($n); opening it again")
+                    dead = true
+                    break
+                }
+                off += n
+            }
+            writtenMix += BLOCK
+            for (stream in started) outputs[stream]?.advancing()
+            if (dead) {
+                close()
+                continue
+            }
+            if (++blocksSinceStamp >= STAMP_EVERY) {
+                blocksSinceStamp = 0
+                takeStamp(t)
+            }
+        }
+        close()
+    }
+
+    /** Nothing to play: the output pauses (what it holds plays out first) and the thread waits to be woken. */
+    private fun rest() {
+        track?.let { t ->
+            if (trackPlaying) {
+                takeStamp(t)
+                t.pause()
+                trackPlaying = false
+                stampLive = false
+            }
+        }
+        wakeLock.withLock { woken.await(IDLE_WAIT_MS, TimeUnit.MILLISECONDS) }
+    }
+
+    /** How long (ms) the output has been playing without its position moving on. */
+    fun stalledMs(): Long = if (!trackPlaying || track == null) 0 else (System.nanoTime() - movedNs) / 1_000_000
+
+    /** Closes the output and opens it again (on the mixer's thread, between blocks). */
+    fun reopen() {
+        reopenWanted = true
+        // A write waiting on an output that's stuck returns once it's paused.
+        runCatching { track?.pause() }
+        wake()
+    }
+
+    /** The output for the log: playing or not, where to, dropouts, and how far behind the heard sound is. */
+    fun status(): String {
+        val t = track
+        val state = when (t?.playState) {
+            AudioTrack.PLAYSTATE_PLAYING -> "playing"
+            AudioTrack.PLAYSTATE_PAUSED -> "paused"
+            AudioTrack.PLAYSTATE_STOPPED -> "stopped"
+            null -> "not open"
+            else -> "state ${t.playState}"
+        }
+        val heard = heardMix()
+        return "output $state to $route, $underruns dropouts, ${((writtenMix - heard) * 1000 / outRate).toLong()} ms written ahead of what's heard, " +
+            "position ${if (stalledMs() > 500) "still for ${stalledMs()} ms" else "moving"}"
+    }
+
+    private fun takeStamp(t: AudioTrack) {
+        val stamped = t.getTimestamp(stamp)
+        // Whether the output moved on: by its timestamp, or its play head where it gives none.
+        val at = if (stamped) stamp.framePosition else t.playbackHeadPosition.toLong() and 0xFFFFFFFFL
+        if (at != stampFrame) {
+            stampFrame = at
+            movedNs = System.nanoTime()
+        }
+        if (stamped) {
+            stampMix = trackBase + stamp.framePosition
+            stampNanos = stamp.nanoTime
+            stampLive = trackPlaying
+        }
+        // Dropouts (the output ran dry): logged, at most every 10 s, so a stutter shows in a report.
+        val count = t.underrunCount
+        if (count > underruns) {
+            val now = System.currentTimeMillis()
+            if (now - underrunsLoggedAt > 10_000) {
+                underrunsLoggedAt = now
+                AppLog.w("Engine", "The output ran dry ${count - underruns}× (${count} since it opened)")
+            }
+            underruns = count
+        }
+    }
+
+    private fun open(): AudioTrack? = try {
+        val min = AudioTrack.getMinBufferSize(outRate, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_FLOAT)
+        val size = maxOf(min, outRate * BUFFER_MS / 1_000 * 8)
+        AudioTrack.Builder()
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build(),
+            )
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
+                    .setSampleRate(outRate)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
+                    .build(),
+            )
+            .setBufferSizeInBytes(size)
+            .setTransferMode(AudioTrack.MODE_STREAM)
+            .setSessionId(sessionId)
+            .build()
+            .also {
+                track = it
+                trackBase = writtenMix
+                stampMix = Long.MIN_VALUE
+                trackPlaying = false
+                stampFrame = -1L
+                underruns = 0
+                route = deviceName(it.routedDevice)
+                // Where the sound goes (the phone, a car's Bluetooth, headphones): each change in the log.
+                it.addOnRoutingChangedListener({ router ->
+                    route = deviceName(router.routedDevice)
+                    AppLog.i("Engine", "Output now to $route")
+                }, null)
+                AppLog.i("Engine", "Output open: $outRate Hz float stereo, buffer ${it.bufferSizeInFrames * 1000 / outRate} ms, to $route")
+            }
+    } catch (e: Exception) {
+        AppLog.e("Engine", "Couldn't open the output: ${e.message}")
+        null
+    }
+
+    private fun deviceName(device: android.media.AudioDeviceInfo?): String {
+        if (device == null) return "the phone's default"
+        val kind = when (device.type) {
+            android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "Bluetooth"
+            android.media.AudioDeviceInfo.TYPE_BLE_HEADSET, android.media.AudioDeviceInfo.TYPE_BLE_SPEAKER -> "Bluetooth LE"
+            android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "the phone's speaker"
+            android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES, android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET -> "wired headphones"
+            android.media.AudioDeviceInfo.TYPE_USB_HEADSET, android.media.AudioDeviceInfo.TYPE_USB_DEVICE -> "USB audio"
+            else -> "device type ${device.type}"
+        }
+        val name = device.productName?.toString()?.takeIf { it.isNotBlank() }
+        return if (name != null) "$kind ($name)" else kind
+    }
+
+    private fun close() {
+        track?.let { runCatching { it.stop() }; it.release() }
+        track = null
+        trackPlaying = false
+        stampMix = Long.MIN_VALUE
+    }
+
+    companion object {
+        /** The output's rate: most music is 44.1 kHz and plays through untouched. */
+        const val OUTPUT_RATE = 44_100
+        /** Frames mixed at a time: 5.8 ms. A volume or a filter moves at most once a block. */
+        const val BLOCK = 256
+        /**
+         * The output's buffer: what's written ahead of what's heard. On a phone it's short, so a volume change or a pause
+         * is heard straight away. A TV (issue #941) can stall for longer than that while it lays out a page or frees
+         * memory, and the music had a silence each time; nobody hears half a second's delay there, so it holds more.
+         */
+        val BUFFER_MS: Int = bufferMs(app.siansa.BuildConfig.TV_APP)
+
+        /** [BUFFER_MS] for a phone or for a TV. */
+        internal fun bufferMs(tv: Boolean): Int = if (tv) TV_BUFFER_MS else PHONE_BUFFER_MS
+        const val PHONE_BUFFER_MS = 120
+        const val TV_BUFFER_MS = 480
+        const val IDLE_WAIT_MS = 250L
+        const val RETRY_MS = 300L
+        /** How often (in blocks) the output's timestamp is read again: about every 50 ms. */
+        const val STAMP_EVERY = 8
+    }
+}

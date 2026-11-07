@@ -220,6 +220,16 @@ val ThemeAccent: Color
     @Composable @ReadOnlyComposable get() = LocalThemeAccent.current
 
 private val LocalAccent = staticCompositionLocalOf { Brand.Amber }
+
+/**
+ * [content] in its own accent, [accent] with [onAccent] on it, when given (now playing's colours from the cover, issue
+ * #970); otherwise the theme's.
+ */
+@Composable
+fun WithAccent(accent: Color?, onAccent: Color?, content: @Composable () -> Unit) {
+    if (accent == null || onAccent == null) content()
+    else CompositionLocalProvider(LocalAccent provides accent, LocalOnAccent provides onAccent, content = content)
+}
 private val LocalThemeAccent = staticCompositionLocalOf { Brand.Amber }
 private val LocalOnAccent = staticCompositionLocalOf { Color(0xFF2A1700) }
 private val LocalDarkColours = staticCompositionLocalOf { SiansaDark }

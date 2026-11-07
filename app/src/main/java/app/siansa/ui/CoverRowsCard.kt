@@ -192,7 +192,7 @@ internal fun CoverRowsCard(nav: NavController, card: PinnedCard, content: CardCo
 @Composable
 internal fun CoverRowsShelf(title: String, actions: List<CoverRowAction>, open: () -> Unit) {
     Column(Modifier.testTag("coverRows")) {
-        Row(
+        if (!LocalSectionTitleShown.current) HiddenTitleGap() else Row(
             Modifier.fillMaxWidth().clickable(onClickLabel = "Show all", onClick = open)
                 .padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current, bottom = Space.Small),
             verticalAlignment = Alignment.CenterVertically,

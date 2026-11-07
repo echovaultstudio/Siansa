@@ -29,6 +29,9 @@ const val WIND_DOWN_QUERY = "calm slow quiet soft gentle peaceful relaxing sleep
 fun <T> evenly(items: List<T>, max: Int): List<T> =
     if (items.size <= max) items else List(max) { i -> items[i * items.size / max] }
 
+/** A radio's songs, and which of them AudioMuse picked ([picked], marked in the queue like a song radio's). */
+data class RadioSongs(val songs: List<Song>, val picked: Set<String> = emptySet())
+
 /** Builds radio queues. Every function returns songs ready to play, or throws with a readable reason. */
 class Radios(private val graph: AppGraph) {
 
@@ -87,15 +90,43 @@ class Radios(private val graph: AppGraph) {
     /** A few of the artist's own songs, from the phone, so the radio starts at once. */
     suspend fun artistStart(artist: Artist): List<Song> = graph.library.songsOf(artist).shuffled().take(6)
 
-    /** Songs by the artist and similar artists from Navidrome, added after the start. */
-    suspend fun artistMore(artist: Artist, already: List<Song>): List<Song> {
+    /**
+     * The rest of an artist radio, added after the start: songs that sound like the artist from AudioMuse-AI when
+     * it's set up, with the artist's own songs among them; otherwise the music server's similar songs (Navidrome's
+     * from Last.fm and the like); otherwise the artist's own songs.
+     */
+    suspend fun artistMore(artist: Artist, already: List<Song>): RadioSongs {
         AppLog.i("Radio", "Artist radio ${artist.id} ${artist.name}")
         val have = already.map { it.id }.toSet()
+        val own = graph.library.songsOf(artist).shuffled()
+        if (graph.settings.current.audioMuseReady && own.isNotEmpty()) {
+            val alike = runCatching { soundsLike(own) }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; AppLog.w("Radio", "AudioMuse couldn't make the artist radio: ${it.message}; asking the music server") }
+                .getOrDefault(emptyList())
+            if (alike.isNotEmpty()) {
+                val songs = ArtistRadioMix.mix(own, alike, have, 60)
+                val ownIds = own.map { it.id }.toSet()
+                AppLog.i("Radio", "Artist radio ${artist.name}: ${songs.size} songs, ${songs.count { it.id in ownIds }} of theirs, the rest sound like them (AudioMuse, from ${minOf(own.size, ArtistRadioMix.SEEDS)} of their songs)")
+                // AudioMuse's picks are marked in the queue; the artist's own songs aren't.
+                return RadioSongs(songs, ArtistRadioMix.picked(songs, own))
+            }
+        }
         val similar = runCatching { graph.source.artistRadio(artist.id, 60) }
-            .onFailure { AppLog.w("Radio", "getSimilarSongs2 failed", it) }
+            .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; AppLog.w("Radio", "The music server's similar songs failed", it) }
             .getOrDefault(emptyList())
-        if (similar.isNotEmpty()) return varied(local(similar), 60).filter { it.id !in have }
-        return graph.library.songsOf(artist).shuffled().filter { it.id !in have }.take(60)
+        if (similar.isNotEmpty()) {
+            AppLog.i("Radio", "Artist radio ${artist.name}: the music server's similar songs (${similar.size})")
+            return RadioSongs(varied(local(similar), 60).filter { it.id !in have })
+        }
+        AppLog.i("Radio", "Artist radio ${artist.name}: no similar songs anywhere; their own songs")
+        return RadioSongs(own.filter { it.id !in have }.take(60))
+    }
+
+    /** Songs that sound like a blend of [own] (some of an artist's songs), from AudioMuse, best first. */
+    private suspend fun soundsLike(own: List<Song>): List<Song> {
+        val seeds = evenly(own.map { it.id }.distinct(), ArtistRadioMix.SEEDS)
+        val hits = graph.audioMuse.alchemy(seeds, count = 120).filter { it.id !in seeds }
+        return graph.library.keepSyncedSongs(graph.generator.resolveHits(hits), "Radio")
     }
 
     /** The synced copies of songs from the server, which carry hearts and ReplayGain as stored; none from unchecked libraries. */

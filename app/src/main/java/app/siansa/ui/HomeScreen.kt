@@ -4,7 +4,6 @@ import app.siansa.data.normalizeKey
 import app.siansa.mix.mixArtistRadios
 import app.siansa.mix.ArtistRadioPicks
 import androidx.compose.ui.platform.testTag
-import androidx.compose.material.icons.rounded.Casino
 
 import app.siansa.mix.resumeStart
 import app.siansa.mix.MixRules
@@ -51,7 +50,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -69,6 +72,7 @@ import androidx.navigation.NavController
 import app.siansa.AppGraph
 import app.siansa.data.Album
 import app.siansa.data.HomeLook
+import app.siansa.data.HomeMenuItem
 import app.siansa.data.HomeSection
 import app.siansa.data.Artist
 import app.siansa.data.Mix
@@ -118,7 +122,22 @@ fun HomeScreen(nav: NavController) {
     val homeSettings by graph.settings.state.collectAsStateWithLifecycle()
     val homeOrder = homeSettings.homeOrder
     val homeHidden = homeSettings.homeHidden
-    var arranging by remember { mutableStateOf(false) }
+    // The Home settings panel, open on Sources (true) or Arrange (false); null while closed.
+    var panel by remember { mutableStateOf<Boolean?>(null) }
+    // Home's menu (Roll the dice, Play on…, Sources, Arrange Home) and the Play on sheet it opens.
+    val menu = rememberHomeMenuState()
+    val menuInfo = rememberHomeMenuInfo()
+    val dice = rememberDice()
+    var castOpen by remember { mutableStateOf(false) }
+    fun pick(item: HomeMenuItem) {
+        AppLog.d("Home", "Menu: ${item.id}")
+        when (item) {
+            HomeMenuItem.DICE -> dice.roll()
+            HomeMenuItem.PLAY_ON -> castOpen = true
+            HomeMenuItem.SOURCES -> panel = true
+            HomeMenuItem.ARRANGE -> panel = false
+        }
+    }
 
     // While AudioMuse can't be reached (offline, or it's down), mixes aren't attempted: a clear message instead.
     val aiProblem = rememberAiProblem()
@@ -261,20 +280,33 @@ fun HomeScreen(nav: NavController) {
 
     // The gap between sections, from Arrange Home's spacing slider (#554).
     CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap)) {
+    Box(Modifier.fillMaxSize()) {
     LazyColumn(
-        Modifier.fillMaxSize().aboveKeyboard(),
+        // The page blurs a little behind the open menu, so its labels read clearly (issue #959).
+        Modifier.fillMaxSize().aboveKeyboard().blurBehindMenu(menu),
         state = listState,
         contentPadding = PaddingValues(bottom = if (keyboardOpen()) Space.Page else bottomBarPadding(Space.Section)),
     ) {
-        item {
-            // One button for the source filter and arranging Home (issue #152): both are tabs of one panel.
-            HomeHeader(greeting(), Modifier.statusBarsPadding()) {
-                // Left of the source filter and Arrange (issue #347).
-                DiceButton()
-                SourceFilterButton { arranging = true }
+        item(key = "top") {
+            // The top of Home (issue #872): the notices, then one round menu button for the dice, Play on…, the
+            // source filter and arranging Home, in line with them. No greeting: the chips and the button are the header.
+            val notices = rememberNotices(graph, homeSettings, shown = HomeSection.NOTICES !in homeHidden)
+            HomeTopBar(
+                notices,
+                onOpen = { notice ->
+                    AppLog.i("Home", "Notice opened: ${notice.kind.id}")
+                    graph.notices.tap(notice.kind)
+                    nav.navigate(notice.route)
+                },
+                modifier = Modifier.statusBarsPadding().padding(top = Space.Medium),
+            ) {
+                HomeMenuButton(
+                    menu, casting = menuInfo.playOn.active, filterActive = menuInfo.filterActive, onPick = ::pick,
+                    rolling = dice.rolling, rolls = dice.rolls,
+                )
             }
         }
-        item(key = "sources") { SourceChips { arranging = true } }
+        item(key = "sources") { SourceChips { panel = true } }
 
         if (loaded && !synced) {
             item(key = "sync") { Card(Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Small)) { SyncPrompt(nav) } }
@@ -284,12 +316,14 @@ fun HomeScreen(nav: NavController) {
         for (section in HomeSection.visible(homeOrder, homeHidden)) {
             val look = homeSettings.homeLooks[section] ?: HomeLook.AS_IS
             when (section) {
-                // The chips row (issue #784); its kinds are set in Settings › Home › Notices.
-                HomeSection.NOTICES -> item(key = "notices") { NoticesRow(nav, graph, homeSettings) }
+                // The chips row (issue #784); its kinds are set in Settings › Notices and Cards › Notices.
+                // The notices are the top of Home now (issue #872), not a section of their own.
+                HomeSection.NOTICES -> Unit
                 HomeSection.QUICK -> {
-                    // Quick access, like the top grid in Spotify (issue #271): Liked songs always first, then what
-                    // you played last; until there's enough of that, today's mixes, playlists and recent albums.
-                    item(key = "quick") {
+                    // Quick access, like the top grid in Spotify (issue #271): what you played last, newest first, as
+                    // many as Settings › Style › Home says (issue #934); until there's enough of that, today's mixes,
+                    // playlists and recent albums. Liked songs is one of them only when you played it.
+                    titledItem(section !in homeSettings.homeUntitled, key = "quick") {
                         val mixIds = mixes.orEmpty().mapTo(HashSet()) { it.id }
                         val fill = buildList {
                             todaysMixes.take(2).forEach { m -> add(RecentPlay("mix/${m.id}", m.title, m.songs.firstOrNull()?.cover)) }
@@ -298,25 +332,20 @@ fun HomeScreen(nav: NavController) {
                         }
                         val played = shownRecents(recentPlays.orEmpty(), shownRecentAlbums)
                             .filter { !it.route.startsWith("mix/") || it.route.removePrefix("mix/") in mixIds }
-                        val quick = buildList<Triple<String, String?, () -> Unit>> {
-                            add(Triple("Liked songs", null) { nav.navigate("liked") })
-                            quickShortcuts(played, fill, QUICK_COUNT - 1).forEach { r -> add(Triple(r.title, r.cover) { nav.navigate(r.route) }) }
-                        }
+                        val quick = quickShortcuts(played, fill, homeSettings.homeShortcuts)
+                        fun colorsOf(r: RecentPlay) = if (r.route == "liked") Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(r.title)
                         if (look != HomeLook.AS_IS) {
-                            HomeLookRow(look, "quick", "Shortcuts", quick.mapIndexed { i, (title, cover, open) ->
-                                val liked = title == "Liked songs" && cover == null
-                                HomeItem("quick-$i", title, coverArt = cover, colors = if (liked) Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(title), open = open)
+                            HomeLookRow(look, "quick", "Shortcuts", quick.mapIndexed { i, r ->
+                                HomeItem("quick-$i", r.title, coverArt = r.cover, colors = colorsOf(r), open = { nav.navigate(r.route) })
                             })
                         } else if (quick.isNotEmpty()) {
-                            Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                            Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium).testTag("quickShortcuts"), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                                 quick.chunked(2).forEach { row ->
                                     Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                                        row.forEach { (title, cover, open) ->
-                                            val liked = title == "Liked songs" && cover == null
-                                            val colors = if (liked) Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(title)
+                                        row.forEach { r ->
                                             QuickTile(
-                                                title, cover, colors, open, Modifier.weight(1f),
-                                                icon = if (liked) Icons.Rounded.Favorite else null,
+                                                r.title, r.cover, colorsOf(r), { nav.navigate(r.route) }, Modifier.weight(1f),
+                                                icon = if (r.route == "liked" && r.cover == null) Icons.Rounded.Favorite else null,
                                             )
                                         }
                                         if (row.size == 1) Spacer(Modifier.weight(1f))
@@ -327,7 +356,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.TODAY -> {
-                    item(key = "today") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "today") {
                         val mix = current
                         when {
                             mix != null && look != HomeLook.AS_IS -> HomeLookRow(
@@ -362,7 +391,7 @@ fun HomeScreen(nav: NavController) {
                     // While AudioMuse can't be reached the card above says so; no error and Try again as well. Without
                     // AudioMuse at all there's no today's mix (issue #486).
                     error?.takeIf { aiDown == null && aiMixes }?.let { message ->
-                        item(key = "today_error") {
+                        titledItem(section !in homeSettings.homeUntitled, key = "today_error") {
                             Column(Modifier.padding(horizontal = Space.Page)) {
                                 ErrorText(message, Modifier)
                                 TextButton(onClick = { build(null, force = false, open = false) }) { Text("Try again") }
@@ -373,14 +402,14 @@ fun HomeScreen(nav: NavController) {
                 HomeSection.CAROUSEL -> {
                     // Your own mixes for this part of the day, set in Vibes (issue #253): AI mixes, so only with
                     // AudioMuse (issue #486).
-                    if (homeSettings.navidromeReady && aiMixes) item(key = "carousel") { HomeCarousel(nav, aiDown, look) }
+                    if (homeSettings.navidromeReady && aiMixes) titledItem(section !in homeSettings.homeUntitled, key = "carousel") { HomeCarousel(nav, aiDown, look) }
                 }
                 // Audiobookshelf's books and podcasts (issue #521): only with a server set up.
-                HomeSection.BOOKS -> if (homeSettings.booksReady) item(key = "books") { BooksCarousel(nav, podcasts = false, look = look) }
-                HomeSection.PODCASTS -> if (homeSettings.booksReady) item(key = "podcasts") { BooksCarousel(nav, podcasts = true, look = look) }
+                HomeSection.BOOKS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, key = "books") { BooksCarousel(nav, podcasts = false, look = look) }
+                HomeSection.PODCASTS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, key = "podcasts") { BooksCarousel(nav, podcasts = true, look = look) }
                 HomeSection.MADE_FOR_YOU -> {
                     // Made for you: the vibe for this hour, then mixes from your own listening.
-                    item(key = "made") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "made") {
                         // The same tiles as plain items, for the other looks (issue #655).
                         val made: List<HomeItem> = buildList {
                             applicable.filter { aiMixes }.forEach { selector ->
@@ -448,14 +477,14 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.CARDS -> {
-                    // Your cards (issue #622), in the order set in Settings › Home › Cards; each is its own row.
+                    // Your cards (issue #622), in the order set in Settings › Notices and Cards › Cards; each is its own row.
                     pinnedCards.orEmpty().filter { it.shown }.forEach { card ->
-                        item(key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
+                        titledItem(section !in homeSettings.homeUntitled, key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
                     }
                 }
                 HomeSection.REDISCOVER -> {
                     // Albums you loved a while ago but haven't played since.
-                    item(key = "rediscover") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "rediscover") {
                         val albums = lovedBefore.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "rediscover", "Rediscover", albums.map { r -> albumItem(r.album, rediscoverSubtitle(r), play = { playAlbums(r.album.name, listOf(r.album)) }) { nav.navigate("album/${r.album.id}") } },
@@ -472,7 +501,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.RADIOS -> {
-                    item(key = "radios") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "radios") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "radios", "Radios", moodRadios.map { radio ->
                                 HomeItem(radio.id, radio.name, colors = Color(radio.colors.first) to Color(radio.colors.second), open = { nav.openMoodRadio(radio.id) })
@@ -489,7 +518,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.PLAYLISTS -> {
-                    item(key = "playlists") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "playlists") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "playlists", "Your playlists", playlists.valueOrNull().orEmpty().map { p ->
                                 HomeItem(p.id, p.name, if (p.songCount > 0) "${p.songCount} songs" else "", p.coverArt, open = { nav.navigate("playlist/${p.id}") })
@@ -500,7 +529,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.RECENT -> {
-                    item(key = "recent") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "recent") {
                         val albums = recentAlbums.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "recent", "Recently played", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
@@ -511,11 +540,11 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.ARTIST_RADIOS -> {
-                    item(key = "artist_radios") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "artist_radios") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "artist_radios", "Artist radios", recentArtists.valueOrNull().orEmpty().map { artist ->
                                 HomeItem(artist.id, "${artist.name} radio", "With similar artists", freshCovers[artist.id] ?: artist.coverArt, round = true, open = {
-                                    launch.progressive("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
+                                    launch.progressivePicks("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
                                 })
                             }, openAll = nav.openAll(app.siansa.ui.HomeSection.ArtistRadios))
                         } else Shelf("Artist radios", recentArtists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.ArtistRadios)) { artist ->
@@ -524,7 +553,7 @@ fun HomeScreen(nav: NavController) {
                                 subtitle = "With similar artists",
                                 coverArt = freshCovers[artist.id] ?: artist.coverArt,
                                 onClick = {
-                                    launch.progressive("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
+                                    launch.progressivePicks("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
                                 },
                                 modifier = Modifier.width(140.dp),
                                 round = true,
@@ -533,7 +562,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.ADDED -> {
-                    item(key = "added") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "added") {
                         val albums = newest.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "added", "Recently added", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
@@ -544,7 +573,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.GENRES -> {
-                    item(key = "genres") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "genres") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "genres", "Your genres", genres.valueOrNull().orEmpty().map { genre ->
                                 HomeItem(genre.name, genre.name, open = { nav.openGenreRadio(genre.name) })
@@ -561,7 +590,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.RANDOM -> {
-                    item(key = "random") {
+                    titledItem(section !in homeSettings.homeUntitled, key = "random") {
                         val albums = rediscover.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "random", "Random picks", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
@@ -574,11 +603,14 @@ fun HomeScreen(nav: NavController) {
             }
         }
     }
+    HomeMenuOverlay(menu, menuInfo, homeSettings.homeMenu, onPick = ::pick)
     }
-    if (arranging) {
+    }
+    panel?.let { sources ->
         // The same panel opens from Settings › Home (issue #780).
-        HomeSettingsSheet(nav, startOnSources = true) { arranging = false }
+        HomeSettingsSheet(nav, startOnSources = sources) { panel = null }
     }
+    if (castOpen) CastSheet(onDismiss = { castOpen = false })
 }
 
 internal suspend fun recentlyPlayedAlbums(graph: AppGraph, limit: Int = 15): List<Album> {
@@ -646,16 +678,6 @@ private fun albumItem(album: Album, subtitle: String, play: (() -> Unit)? = null
 
 /** A row of albums played as one plays this many of them, in order. */
 private const val PLAY_ALBUMS = 10
-
-private fun greeting(): String {
-    val hour = LocalTime.now().hour
-    return when (hour) {
-        in 5..11 -> "Good morning"
-        in 12..16 -> "Good afternoon"
-        in 17..21 -> "Good evening"
-        else -> "Good night"
-    }
-}
 
 @Composable
 fun PlaylistTile(playlist: Playlist, onClick: () -> Unit) {
@@ -746,7 +768,7 @@ internal fun MakeTodayCard(onMake: () -> Unit) {
         Row(Modifier.padding(Space.Page), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Today's mix", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("None made yet. Auto update is off in Settings › Mixes and vibes, so it's made when you ask.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("None made yet. Auto update is off in Settings › Auto Generated Mixes, so it's made when you ask.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(Space.Page))
             FilledTonalButton(onClick = onMake) { Text("Make it") }
@@ -808,56 +830,53 @@ fun MixRow(mix: Mix, onClick: () -> Unit) {
     }
 }
 
-/** Home's top line: the greeting, and the one button for the source filter and arranging Home. */
-/** Roll the dice (issue #347): plays a song from your library you've never played, straight away. */
+/** Roll the dice (issue #347): whether it's rolling, how many rolls so far (for the die's tumble) and [roll]. */
+@Stable
+internal class DiceRoller {
+    var rolling by mutableStateOf(false)
+    var rolls by mutableIntStateOf(0)
+    internal var start: () -> Unit = {}
+
+    /** Plays a song from your library you've never played, straight away. Nothing while a roll is under way. */
+    fun roll() = start()
+}
+
+/** [DiceRoller] for Home's menu (issue #872): the die tumbles in the menu button while it rolls. */
 @Composable
-private fun DiceButton() {
+private fun rememberDice(): DiceRoller {
     val graph = LocalGraph.current
     val launch = rememberPlayLauncher()
     val scope = rememberCoroutineScope()
-    var rolling by remember { mutableStateOf(false) }
-    IconButton(
-        enabled = !rolling,
-        onClick = {
-            if (graph.connection.current.offline) {
-                launch.notify("You're offline: rolling the dice needs the server")
-                return@IconButton
-            }
-            rolling = true
-            scope.launch {
-                try {
-                    val song = graph.dice.roll()
-                    if (song == null) launch.notify("No songs you haven't played turned up")
-                    else {
-                        graph.player.play(listOf(song))
-                        launch.notify("Rolled: ${song.title}" + if (song.artist.isNotBlank()) " – ${song.artist}" else "")
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    AppLog.w("Dice", "Couldn't roll: ${e.message}")
-                    launch.notify("Couldn't roll the dice: ${e.message}")
-                } finally {
-                    rolling = false
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val dice = remember { DiceRoller() }
+    dice.start = start@{
+        if (dice.rolling) return@start
+        if (graph.connection.current.offline) {
+            launch.notify("You're offline: rolling the dice needs the server")
+            return@start
+        }
+        dice.rolling = true
+        dice.rolls++
+        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+        scope.launch {
+            try {
+                val song = graph.dice.roll()
+                if (song == null) launch.notify("No songs you haven't played turned up")
+                else {
+                    graph.player.play(listOf(song))
+                    launch.notify("Rolled: ${song.title}" + if (song.artist.isNotBlank()) " – ${song.artist}" else "")
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("Dice", "Couldn't roll: ${e.message}")
+                launch.notify("Couldn't roll the dice: ${e.message}")
+            } finally {
+                dice.rolling = false
             }
-        },
-        modifier = Modifier.testTag("dice"),
-    ) {
-        if (rolling) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) // spacing: exact
-        else Icon(Icons.Rounded.Casino, "Roll the dice: play a song you've never played")
+        }
     }
-}
-
-@Composable
-internal fun HomeHeader(title: String, modifier: Modifier = Modifier, action: @Composable () -> Unit) {
-    Row(
-        modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Tight, top = Space.Medium),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-        action()
-    }
+    return dice
 }
 
 /**
@@ -870,13 +889,10 @@ internal fun madeForYouCaption(trackCount: Int?, aiDown: Boolean, prompt: String
     else -> prompt
 }
 
-/** Shortcuts on Home in all, Liked songs included (issue #271). */
+/** The most shortcuts on Home, and the fewest (Settings › Style › Home, issue #934). */
 internal const val QUICK_COUNT = 8
+internal const val QUICK_MIN = 2
 
-/**
- * The shortcuts after Liked songs: what was played last first, then [fill] (today's mixes, playlists, recent
- * albums) until there are [count], each page once. Liked songs is never among them: it always comes first.
- */
 /** The album a shortcut opens ("album/123"), or null for any other page. */
 internal fun recentAlbumId(route: String): String? =
     route.takeIf { it.startsWith("album/") }?.removePrefix("album/")?.substringBefore('?')?.takeIf { it.isNotBlank() }
@@ -885,5 +901,21 @@ internal fun recentAlbumId(route: String): String? =
 internal fun shownRecents(played: List<RecentPlay>, shownAlbums: Set<String>?): List<RecentPlay> =
     if (shownAlbums == null) played else played.filter { r -> recentAlbumId(r.route)?.let { it in shownAlbums } ?: true }
 
+/**
+ * Home's shortcuts (issue #934): what was played last first, newest first, then [fill] (today's mixes, playlists,
+ * recent albums) until there are [count] (2 to 8), each page once. Nothing is pinned: Liked songs is there only when it
+ * was played.
+ */
 internal fun quickShortcuts(played: List<RecentPlay>, fill: List<RecentPlay>, count: Int): List<RecentPlay> =
-    (played + fill).filter { it.route != "liked" }.distinctBy { it.route }.take(count)
+    (played + fill).distinctBy { it.route }.take(count.coerceIn(QUICK_MIN, QUICK_COUNT))
+
+/**
+ * A section of Home as one list item, with its title shown or not as set in Arrange Home (issue #961).
+ */
+internal fun androidx.compose.foundation.lazy.LazyListScope.titledItem(
+    titleShown: Boolean,
+    key: Any,
+    content: @Composable androidx.compose.foundation.lazy.LazyItemScope.() -> Unit,
+) = item(key = key) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalSectionTitleShown provides titleShown) { content() }
+}

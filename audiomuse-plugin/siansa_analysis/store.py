@@ -19,6 +19,9 @@ ANALYZER_VERSION = 1
 # loudness and ramps (so levelling and SmoothFade go on working) and is measured again, in the background, for
 # its beats. Raise this to measure every song's beats again.
 BEATS_VERSION = 3  # 2: the phrases (Siansa issue #757); 3: related tempos (Siansa issue #802)
+# Where the beat stops (0.5.0) isn't worth reading the whole library again for: a song measured before it is checked
+# for it only when the app asks for it (it's about to play), a few at a time, and every new song gets it anyway.
+UNTIL_KEY = "beats_until_checked"
 RETRY_HOURS = (1, 6, 24, 72)  # wait after the 1st, 2nd, 3rd, later failure
 
 
@@ -449,7 +452,19 @@ def beats_counts(db):
     return int(done or 0), int(with_beat or 0), int(failed or 0), int(waiting or 0), int(elsewhere or 0)
 
 
-def songs_to_measure(db, limit, beats=False):
+def until_waiting(db):
+    """Songs measured before 0.5.0 still to be checked for where their beat stops."""
+    cur = db.cursor()
+    cur.execute(f"""
+        SELECT count(*) FROM {table('profiles')} p JOIN score s USING (item_id)
+         WHERE p.status='ready' AND p.analyzer_version=%s AND p.beats_version=%s
+           AND NOT (COALESCE(p.beats, '{{}}'::jsonb) ? %s)""", (ANALYZER_VERSION, BEATS_VERSION, UNTIL_KEY))
+    n = cur.fetchone()[0]
+    cur.close()
+    return int(n or 0)
+
+
+def songs_to_measure(db, limit, beats=False, fill=False):
     """Up to ``limit`` songs to measure, newest first.
 
     Without ``beats``, songs without a current volume and fade profile (none yet, an older analyser, or due to be
@@ -460,7 +475,11 @@ def songs_to_measure(db, limit, beats=False):
     cur = db.cursor()
     if beats:
         # Songs that failed come back once their wait is over; songs waiting their first try come first.
-        where = """p.status='ready' AND p.analyzer_version = %s AND p.beats_version <> %s
+        # Also songs measured before 0.5.0 looked for where the beat stops: asked-for ones always, the rest only with
+        # Measure all on (``fill``), when the owner chose to have the whole library done.
+        missing = f"NOT (COALESCE(p.beats, '{{}}'::jsonb) ? '{UNTIL_KEY}')"
+        where = f"""p.status='ready' AND p.analyzer_version = %s
+                AND (p.beats_version <> %s OR ({missing} AND {"TRUE" if fill else "w.item_id IS NOT NULL"}))
                 AND (p.beats_retry_after IS NULL OR p.beats_retry_after <= now())"""
         params = (ANALYZER_VERSION, BEATS_VERSION)
     else:

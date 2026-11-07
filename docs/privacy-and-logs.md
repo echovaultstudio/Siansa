@@ -5,11 +5,20 @@
 Siansa has no account with us, no ads, no analytics and no tracking. We don't run a server that receives your
 data. Everything Siansa sends goes to services **you** set up or switch on: your music server, AudioMuse-AI, and
 optionally Audiobookshelf, the AI service you pick (OpenRouter, OpenAI, Anthropic, Google Gemini, Mistral, Groq, or Ollama
-or another on your own network), Last.fm, ListenBrainz or Koito, Open-Meteo (weather) and Deezer (artist photos). What each
-one gets is in [API › Other services](api.md#other-services).
+or another on your own network), Last.fm, ListenBrainz or Koito, Open-Meteo (weather), Deezer (artist photos), and the radio
+stations and podcast feeds you add in [Your Stations](stations.md). For a radio station's logo, Siansa asks
+[Radio Browser](https://www.radio-browser.info) (a free, open list of radio stations) with only the station's address
+or name, and reads the station's own website for its logo. What each one gets is in
+[API › Other services](api.md#other-services).
 
 Your settings, passwords (encrypted with Android's keystore), history, downloads and caches stay on your phone.
 Uninstalling Siansa removes them.
+
+When you cast to a Chromecast or Google TV, the TV loads Siansa's TV screen from siansa.app (a page, nothing sent
+back) and Google's Cast library, then plays straight from your music server as the phone would.
+
+Signing in [Siansa on your TV](tv.md) from your phone sends the TV your server address and login over your home
+network, sealed with a key that's only in the QR code on the TV's screen. Nothing goes anywhere else.
 
 The full privacy policy: <https://siansa.app/privacy.html>
 

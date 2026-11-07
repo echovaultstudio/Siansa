@@ -7,8 +7,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
 import androidx.annotation.OptIn
-import androidx.media3.cast.RemoteCastPlayer
-import androidx.media3.cast.SessionAvailabilityListener
 import app.siansa.playback.dlna.Dlna
 import app.siansa.playback.dlna.DlnaDevice
 import app.siansa.playback.dlna.DlnaPlayer
@@ -30,13 +28,22 @@ import androidx.media3.decoder.ffmpeg.FfmpegLibrary
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
+import app.siansa.car.CarCoverProvider
+import app.siansa.car.CarSessionCallback
+import app.siansa.car.CarTree
+import app.siansa.car.GraphCarLibrary
 import app.siansa.AppGraph
-import app.siansa.MainActivity
+import app.siansa.BuildConfig
+import app.siansa.playback.engine.AudioEngine
+import app.siansa.AppEntry
 import app.siansa.SiansaApp
+import app.siansa.data.OutsideMedia
 import app.siansa.data.PlayEvent
 import app.siansa.data.Song
 import app.siansa.log.AppLog
@@ -45,8 +52,6 @@ import app.siansa.log.Level
 import app.siansa.log.Trace
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.SessionManagerListener
-import com.google.common.util.concurrent.Futures
-import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -54,6 +59,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -61,21 +67,44 @@ import java.io.InterruptedIOException
 import java.util.Collections
 
 private const val FALLBACK_KBPS = 320
+
+/** The stuck-song rescue leaves the last seconds of a song alone: the player is finishing it (issue #860). */
+private const val END_GRACE_MS = 3_000L
+/** How long music stays on a TV that Cast lost touch with, waiting for it to come back (issue #114). */
+private const val CAST_RESUME_WAIT_MS = 30_000L
+/** How long after the TV screen closed by itself joining it again still carries the music on (issue #972). */
+private const val REJOIN_PLAY_MS = 30_000L
+
+/** How long songs may take to get ready for the TV (their file types asked from the server) before they go anyway. */
+private const val CAST_PREP_MS = 3_000L
+
+/** A queue message this big is near Cast's 64 KB limit. */
+private const val CAST_MESSAGE_WARN_BYTES = 56 * 1024
+
 /** How often a server with a playback timeline (Emby) hears where the playing song is (issue #113). */
 private const val TIMELINE_MS = 30_000L
 
 
 /**
  * Background playback with a media notification, lock-screen controls, ReplayGain, transcoding and scrobbling.
- * While casting, the media session drives a [RemoteCastPlayer] instead of the phone's own player.
+ * While casting, the media session drives a [TvPlayer] instead of the phone's own player.
+ * A library service, so Android Auto can browse the music and play from it (issue #62, see [CarTree]).
  */
 @OptIn(UnstableApi::class)
-class PlaybackService : MediaSessionService() {
-    private var session: MediaSession? = null
+class PlaybackService : MediaLibraryService() {
+    private var session: MediaLibrarySession? = null
     private lateinit var exo: ExoPlayer
+    /** Whether the last output opened was a bitstream to the receiver (issue #860), so a stall is never "fixed" by converting. */
+    @Volatile private var bitstreamOut = false
     /** [exo] as the rest of the app sees it: converted songs seek on Navidrome (issue #162). */
     private lateinit var phone: ServerSeekPlayer
-    private var castPlayer: RemoteCastPlayer? = null
+    /** The Chromecast or Google TV, playing the phone's queue (issue #114). */
+    private var castPlayer: TvPlayer? = null
+    /** The phone lost touch with the TV for a moment (Cast suspended the session); it may come back (issue #114). */
+    private var castSuspended = false
+    /** Whether the music was playing on a TV the phone is joining again (issue #972), and when it asked. */
+    private var rejoinPlay = false
+    private var rejoinAskedAt = 0L
     private var dlnaPlayer: DlnaPlayer? = null
     /** Follows the Wi-Fi while music plays on a DLNA device, to bring it back the moment the phone leaves (issue #624). */
     private var lanWatch: LanWatch? = null
@@ -84,7 +113,9 @@ class PlaybackService : MediaSessionService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var graph: AppGraph
     private var events: Events? = null
-    private var crossfader: Crossfader? = null
+    private var crossfader: Fader? = null
+    /** The new audio engine (issue #826), in Siansa Dev: one output every music player is mixed into. */
+    private var engine: AudioEngine? = null
     private var cacheFactory: CacheDataSource.Factory? = null
     private var precacheJob: Job? = null
     private var precacheWriter: CacheWriter? = null
@@ -99,18 +130,42 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         graph = (application as SiansaApp).graph
 
-        val built = PlayerFactory.build(this, graph, ::kbpsFor)
+        val mixer = if (BuildConfig.MIXER_ENGINE) AudioEngine(this) else null
+        engine = mixer
+        val mainMix = mixer?.deck("main")
+        val tailMix = mixer?.deck("tail")
+        val built = PlayerFactory.build(this, graph, ::kbpsFor, engine = mixer, mixDeck = mainMix, passthrough = BuildConfig.TV_APP)
         exo = built.player
         val player = ServerSeekPlayer(
             exo,
-            converted = { id -> graph.downloads.fileFor(id) == null && (chosenKbps[id] ?: Streaming.bitrate(this, graph.settings.current)) > 0 },
+            converted = { id -> !OutsideMedia.isOutside(id) && graph.downloads.fileFor(id) == null && (chosenKbps[id] ?: Streaming.bitrate(this, graph.settings.current)) > 0 },
             durationMsOf = { id -> SongRegistry.get(id)?.durationSec?.takeIf { it > 0 }?.let { it * 1000L } },
         )
         phone = player
         cacheFactory = built.cacheFactory
         events = Events(player).also { player.addListener(it) }
         // Crossfades work on the ExoPlayer itself: only songs it can jump in (originals, downloads, the cache) fade.
-        crossfader = Crossfader(
+        crossfader = if (mixer != null && mainMix != null && tailMix != null) MixedCrossfader(
+            main = exo,
+            handler = handler,
+            engine = mixer,
+            mainMix = mainMix,
+            newTail = { PlayerFactory.build(this, graph, ::kbpsFor, handleAudioFocus = false, engine = mixer, mixDeck = tailMix) },
+            settings = { graph.settings.current },
+            profiles = graph.profiles,
+            levelOf = { song -> Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id)) },
+            sleepLevel = { sleepLevel },
+            // A Dolby or DTS song going to the receiver as a bitstream can't be mixed (issue #860): no blend into or out of it.
+            allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true && !passthroughNearby() },
+            onLevel = { if (session?.player === phone) applyVolume(phone) },
+            bitstream = { Passthrough.pastTheMix(bitstreamOut, exo.audioFormat?.sampleMimeType) },
+            inDjRadio = {
+                (graph.songRadio.seed.value != null && graph.songRadio.mode == ContinuousMode.DJ) ||
+                    graph.settings.current.continuousPlay == ContinuousMode.DJ ||
+                    // An album's DJ mix blends as one (issue #965).
+                    app.siansa.mix.AlbumDjMix.isOn(exo.currentMediaItem?.mediaId)
+            },
+        ).also { it.start() } else Crossfader(
             main = exo,
             handler = handler,
             newTail = { PlayerFactory.build(this, graph, ::kbpsFor, handleAudioFocus = false) },
@@ -119,11 +174,14 @@ class PlaybackService : MediaSessionService() {
             mainDeck = built.deck,
             levelOf = { song -> Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id)) },
             sleepLevel = { sleepLevel },
-            allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true },
+            // A Dolby or DTS song going to the receiver as a bitstream can't be mixed (issue #860): no blend into or out of it.
+            allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true && !passthroughNearby() },
             onLevel = { if (session?.player === phone) applyVolume(phone) },
             inDjRadio = {
                 (graph.songRadio.seed.value != null && graph.songRadio.mode == ContinuousMode.DJ) ||
-                    graph.settings.current.continuousPlay == ContinuousMode.DJ
+                    graph.settings.current.continuousPlay == ContinuousMode.DJ ||
+                    // An album's DJ mix blends as one (issue #965).
+                    app.siansa.mix.AlbumDjMix.isOn(exo.currentMediaItem?.mediaId)
             },
         ).also { it.start() }
         exo.addAnalyticsListener(PlaybackDiagnostics(exo, this))
@@ -131,32 +189,34 @@ class PlaybackService : MediaSessionService() {
             override fun onAudioDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
                 AppLog.i("Audio", "Decoder $decoderName")
             }
+            // A song sent to the receiver unchanged (issue #860): noted, so it never blends with its neighbours.
+            override fun onAudioTrackInitialized(eventTime: AnalyticsListener.EventTime, audioTrackConfig: AudioSink.AudioTrackConfig) {
+                bitstreamOut = !androidx.media3.common.util.Util.isEncodingLinearPcm(audioTrackConfig.encoding)
+                if (!bitstreamOut) return
+                val id = exo.currentMediaItem?.mediaId ?: return
+                Passthrough.played.add(id)
+                AppLog.i("Audio", "Song $id: ${Passthrough.name(exo.audioFormat?.sampleMimeType)} sent to the receiver unchanged (passthrough)")
+            }
         })
 
         val openApp = PendingIntent.getActivity(
             this,
             0,
-            Intent(this, MainActivity::class.java),
+            AppEntry.intent(this),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        session = MediaSession.Builder(this, player)
+        // The app's queue changes, and Android Auto's browsing, search and playback (issue #62).
+        val car = CarTree(GraphCarLibrary(graph)) { cover -> CarCoverProvider.uriFor(this, cover) }
+        session = MediaLibrarySession.Builder(this, player, CarSessionCallback(graph, car))
             .setSessionActivity(openApp)
             .setBitmapLoader(CoverBitmapLoader(this, graph.scope))
-            .setCallback(object : MediaSession.Callback {
-                // Items arrive from the app's controller without their URI, so it's restored here.
-                override fun onAddMediaItems(
-                    mediaSession: MediaSession,
-                    controller: MediaSession.ControllerInfo,
-                    mediaItems: MutableList<MediaItem>,
-                ): ListenableFuture<MutableList<MediaItem>> {
-                    val resolved = mediaItems.map { item ->
-                        val uri = item.requestMetadata.mediaUri ?: Uri.parse(graph.source.streamUrl(item.mediaId))
-                        item.buildUpon().setUri(uri).build()
-                    }.toMutableList()
-                    return Futures.immediateFuture(resolved)
-                }
-            })
             .build()
+        // A late notification's foreground start, refused in the background, no longer crashes the app (0.52.0-dev).
+        setMediaNotificationProvider(
+            SafeNotificationProvider(androidx.media3.session.DefaultMediaNotificationProvider.Builder(applicationContext).build()) {
+                AppLog.w("Player", "Android would not put playback in the foreground from the background; it plays on, and the notification catches up on the next change")
+            },
+        )
         // Android may refuse to start the service in the foreground; the player waits instead of the app crashing (issue #602).
         setListener(object : Listener {
             override fun onForegroundServiceStartNotAllowedException() {
@@ -176,32 +236,51 @@ class PlaybackService : MediaSessionService() {
         // Casting: playback moves to the TV when a Cast session starts and back when it ends.
         Cast.whenReady(this) { cast ->
             if (session == null) return@whenReady
-            val remote = RemoteCastPlayer.Builder(this).setMediaItemConverter(CastItems(graph.source)).build()
-            castPlayer = remote
-            remote.setSessionAvailabilityListener(object : SessionAvailabilityListener {
-                override fun onCastSessionAvailable() {
-                    moveTo(remote)
-                    // Only one place plays at a time: a TV picked through DLNA lets go.
-                    Dlna.select(null)
-                }
-                override fun onCastSessionUnavailable() {
-                    if (session?.player === remote) moveTo(phone)
-                }
-            })
+            CastSettings.load(this)
+            // The TV plays the phone's queue a few songs at a time; the phone keeps the queue (issue #114).
+            val tv = TvPlayer(CastItems(graph.source), { Cast.currentSession() }, castPrep)
+            castPlayer = tv
             cast.sessionManager.addSessionManagerListener(object : SessionManagerListener<CastSession> {
                 override fun onSessionEnding(castSession: CastSession) {
-                    if (session?.player === remote) castSaved = spotOf(remote)
+                    if (session?.player === tv) castSaved = spotOf(tv)
                 }
                 override fun onSessionStarting(castSession: CastSession) { castSaved = null }
-                override fun onSessionStarted(castSession: CastSession, sessionId: String) {}
+                override fun onSessionStarted(castSession: CastSession, sessionId: String) {
+                    tv.attach(castSession)
+                    castAvailable(tv)
+                }
                 override fun onSessionStartFailed(castSession: CastSession, error: Int) {}
-                override fun onSessionEnded(castSession: CastSession, error: Int) {}
+                override fun onSessionEnded(castSession: CastSession, error: Int) {
+                    // The TV screen closing by itself is joined again, and the music carries on there (issue #972).
+                    val wasPlaying = session?.player === tv && tv.playWhenReady
+                    if (Cast.rejoinIfWorth(this@PlaybackService, castSession.castDevice?.deviceId, error)) {
+                        rejoinPlay = wasPlaying
+                        rejoinAskedAt = android.os.SystemClock.elapsedRealtime()
+                    }
+                    tv.detach()
+                    castEnded()
+                }
                 override fun onSessionResuming(castSession: CastSession, sessionId: String) {}
-                override fun onSessionResumed(castSession: CastSession, wasSuspended: Boolean) {}
-                override fun onSessionResumeFailed(castSession: CastSession, error: Int) {}
-                override fun onSessionSuspended(castSession: CastSession, reason: Int) {}
+                override fun onSessionResumed(castSession: CastSession, wasSuspended: Boolean) {
+                    castSuspended = false
+                    handler.removeCallbacks(castGaveUp)
+                    tv.attach(castSession)
+                    castAvailable(tv)
+                }
+                override fun onSessionResumeFailed(castSession: CastSession, error: Int) {
+                    tv.detach()
+                    castEnded()
+                }
+                override fun onSessionSuspended(castSession: CastSession, reason: Int) {
+                    castSuspended = true
+                    if (session?.player === tv) castSaved = spotOf(tv)
+                    handler.post(castGone)
+                }
             }, CastSession::class.java)
-            if (remote.isCastSessionAvailable) moveTo(remote)
+            Cast.currentSession()?.takeIf { it.isConnected }?.let { cs ->
+                tv.attach(cs)
+                castAvailable(tv)
+            }
         }
 
         // DLNA (TVs and speakers without Chromecast): follows the device picked in the app.
@@ -235,12 +314,25 @@ class PlaybackService : MediaSessionService() {
         scope.launch { runCatching { graph.scrobbler.flush() } }
     }
 
-    private fun kbpsFor(songId: String): Int = chosenKbps.getOrPut(songId) {
+    /** Whether the song playing or the next one goes to the receiver as a bitstream (issue #860, TV app only). */
+    private fun passthroughNearby(): Boolean {
+        val mode = graph.settings.current.audioPassthrough
+        if (!BuildConfig.TV_APP || mode == PassthroughMode.OFF) return false
+        val next = exo.nextMediaItemIndex.takeIf { it != C.INDEX_UNSET }?.let { exo.getMediaItemAt(it).mediaId }
+        return listOfNotNull(exo.currentMediaItem?.mediaId, next).any { id -> Passthrough.involves(mode, id, SongRegistry.get(id)?.suffix) }
+    }
+
+    private fun kbpsFor(songId: String): Int = if (OutsideMedia.isOutside(songId)) 0 else chosenKbps.getOrPut(songId) {
         // A file type the phone can't open is converted from the start (issue #354).
         SongRegistry.get(songId)?.suffix?.takeIf { Formats.mustConvert(it) }?.let { suffix ->
             val kbps = Streaming.bitrate(this, graph.settings.current).takeIf { it > 0 } ?: FALLBACK_KBPS
             AppLog.i("Stream", "Song $songId: Opus $kbps kbit/s, as the phone can't open .$suffix files")
             return@getOrPut kbps
+        }
+        // A Dolby or DTS file always streams untouched while passthrough is on (issue #860): Opus can't go to the receiver.
+        SongRegistry.get(songId)?.suffix?.takeIf { Passthrough.keepsOriginal(graph.settings.current.audioPassthrough, it) }?.let { suffix ->
+            AppLog.i("Stream", "Song $songId: original .$suffix, for audio passthrough")
+            return@getOrPut 0
         }
         // Otherwise only what's chosen in Settings → Playback: Siansa never switches quality on its own.
         Streaming.bitrate(this, graph.settings.current).also {
@@ -250,6 +342,9 @@ class PlaybackService : MediaSessionService() {
 
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
 
+    /** The title a radio station's stream last sent (ICY), with the station's id (issue #353). */
+    private var streamTitle: Pair<String, String>? = null
+
     /** Tells the app's screens what the current song streams as (Opus kbit/s, or 0 for the original file). */
     private fun publishQuality() {
         val s = session ?: return
@@ -258,6 +353,8 @@ class PlaybackService : MediaSessionService() {
         s.setSessionExtras(Bundle().apply {
             putString(StreamQuality.EXTRA_SONG_ID, id)
             putInt(StreamQuality.EXTRA_KBPS, kbps)
+            // What a radio station is playing now, from its stream (issue #353).
+            streamTitle?.takeIf { it.first == id }?.let { putString(StreamQuality.EXTRA_STREAM_TITLE, it.second) }
         })
     }
 
@@ -328,7 +425,7 @@ class PlaybackService : MediaSessionService() {
         val factory = cacheFactory ?: return
         val items = upcomingIndices(player, ahead).drop(1).map { player.getMediaItemAt(it) }.filter { item ->
             // Only originals are cached; downloaded songs are on the phone already.
-            item.localConfiguration?.uri != null && kbpsFor(item.mediaId) <= 0 && graph.downloads.fileFor(item.mediaId) == null
+            item.localConfiguration?.uri != null && !OutsideMedia.isOutside(item.mediaId) && kbpsFor(item.mediaId) <= 0 && graph.downloads.fileFor(item.mediaId) == null
         }
         if (items.isEmpty()) return
         // Only called once the current song has fully loaded, so they never share the connection; one at a time.
@@ -457,6 +554,97 @@ class PlaybackService : MediaSessionService() {
     }
 
     /**
+     * Cast let go of the TV. A session that's only suspended (the phone's network dropped for a moment, as when a VPN
+     * reconnects) usually comes back within seconds with the music still playing there, so the music stays with the
+     * TV for [CAST_RESUME_WAIT_MS] instead of moving to the phone and straight back, which loaded the queue on the TV
+     * again (0.52.0-dev). An ended session brings it back to the phone.
+     */
+    private val castGone = Runnable {
+        val tv = castPlayer ?: return@Runnable
+        if (session?.player !== tv) return@Runnable
+        if (castSuspended) {
+            AppLog.i("Cast", "Lost touch with the TV for a moment; the music stays there while Cast reconnects")
+            handler.removeCallbacks(castGaveUp)
+            handler.postDelayed(castGaveUp, CAST_RESUME_WAIT_MS)
+        } else {
+            moveTo(phone)
+        }
+    }
+
+    /** The TV didn't come back after a moment away: the music comes back to the phone. */
+    private val castGaveUp = Runnable {
+        castSuspended = false
+        val tv = castPlayer ?: return@Runnable
+        if (session?.player !== tv || tv.connected) return@Runnable
+        AppLog.w("Cast", "The TV didn't come back within ${CAST_RESUME_WAIT_MS / 1000}s")
+        moveTo(phone)
+    }
+
+    /** The Cast session ended (also after being suspended, when Media3 says nothing more): back to the phone. */
+    private fun castEnded() {
+        castSuspended = false
+        handler.removeCallbacks(castGaveUp)
+        if (castPlayer != null && session?.player === castPlayer) moveTo(phone)
+    }
+
+    /** A Cast session is on (started, resumed, or already there): the music goes to the TV unless it's there. */
+    private fun castAvailable(tv: TvPlayer) {
+        handler.removeCallbacks(castGaveUp)
+        if (session?.player === tv) return // back in touch after a moment away: the music never left the TV
+        // Only one place plays at a time: a TV picked through DLNA lets go.
+        Dlna.select(null)
+        castStarted(tv)
+    }
+
+    /** A Cast session started: the TV plays the queue. */
+    private fun castStarted(tv: Player) {
+        if (session?.player === tv) return
+        if (phone.mediaItemCount == 0) AppLog.i("Cast", "Nothing playing yet: the TV shows Siansa's screen, and music goes there when it starts")
+        val resume = rejoinPlay && android.os.SystemClock.elapsedRealtime() - rejoinAskedAt < REJOIN_PLAY_MS
+        rejoinPlay = false
+        moveTo(tv)
+        // Joined again after the TV screen closed by itself: the music carries on where it was.
+        if (resume) {
+            AppLog.i("Cast", "Back on the TV after its screen closed: playing on")
+            tv.play()
+        }
+    }
+
+    /**
+     * Gets songs ready for the TV (issue #114): in lossless quality, the file types the library doesn't keep are asked
+     * from the server first, so each song goes as it is or as FLAC rather than as MP3. At most [CAST_PREP_MS].
+     */
+    private val castPrep = object : TvPlayer.Prep {
+        override fun needs(items: List<MediaItem>): Boolean {
+            val songs = items.map { it.toSong() }
+            val quality = CastSettings.quality.value
+            val unknown = quality == CastQuality.Lossless && CastFormats.worthAsking(songs).isNotEmpty()
+            if (!unknown) describe(items, songs, quality)
+            return unknown
+        }
+
+        override fun run(items: List<MediaItem>, done: () -> Unit) {
+            val songs = items.map { it.toSong() }
+            mainScope.launch {
+                val learned = withTimeoutOrNull(CAST_PREP_MS) { withContext(Dispatchers.IO) { CastFormats.learn(graph.source, songs) } }
+                if (learned == null) AppLog.w("Cast", "The server didn't say the songs' file types within ${CAST_PREP_MS / 1000}s; those go as MP3")
+                describe(items, songs, CastSettings.quality.value)
+                done()
+            }
+        }
+
+        private fun describe(items: List<MediaItem>, songs: List<Song>, quality: CastQuality) {
+            if (songs.isEmpty()) return
+            val summary = CastFormats.summary(songs.map { CastFormats.suffixOf(it) }, quality, graph.source.streamUrl(songs.first().id))
+            // About what the message to the TV weighs: Cast takes at most 64 KB (a 497-song queue never arrived, 0.52.0-dev).
+            val converter = CastItems(graph.source)
+            val bytes = runCatching { items.sumOf { converter.toMediaQueueItem(it).toJson().toString().length } }.getOrDefault(-1)
+            AppLog.i("Cast", "To the TV: ${songs.size} songs (${bytes / 1024} KB), ${summary.describe(quality)}")
+            if (bytes > CAST_MESSAGE_WARN_BYTES) AppLog.w("Cast", "That's near Cast's 64 KB limit for one message: the TV may not take it")
+        }
+    }
+
+    /**
      * Moves the queue, song and position between the phone and a Cast device. Music moving to a TV
      * keeps playing; music coming back to the phone waits paused, rather than suddenly playing out loud.
      */
@@ -473,12 +661,16 @@ class PlaybackService : MediaSessionService() {
         }
         if (toCast) StopCasting.requested = false
         castSaved = null
-        val (items, index, position) = spot
+        // A song with no id can't play anywhere: it would only be "Now playing" nothing (issue #114).
+        val named = CastHandBack.withoutNameless(spot) { it.mediaId }
+        if (named.items.size != spot.items.size) AppLog.w("Cast", "Left out ${spot.items.size - named.items.size} songs nobody could name")
+        val (items, index, position) = named
         val play = toCast && from.playWhenReady
         AppLog.i(
             "Cast",
             (if (toCast) "Playing on ${(target as? DlnaPlayer)?.name ?: Cast.deviceName() ?: "a Cast device"}" else "Cast ended; music back on the phone, paused") +
-                " (${items.size} songs, song ${index + 1} at ${position / 1000}s)",
+                " (${items.size} songs, song ${index + 1} at ${position / 1000}s" +
+                (if (target === castPlayer) ", ${CastSettings.quality.value.label}" else "") + ")",
         )
         precacheWriter?.cancel()
         precacheJob?.cancel()
@@ -515,10 +707,18 @@ class PlaybackService : MediaSessionService() {
         val live = spotOf(tv)
         val stopped = StopCasting.requested
         StopCasting.requested = false
+        // The TV plays the phone's own queue (TvPlayer), so it comes back as it is.
         val picked = CastHandBack.afterEnd(live, castSaved, stopped) { it.mediaId }
         if (stopped) AppLog.i("Cast", "Stopped with hold to stop: nothing comes back to the phone")
-        if (picked !== live) AppLog.w("Cast", "The TV forgot the queue while stopping; using the one saved as casting ended")
+        when {
+            stopped || picked === live -> {}
+            picked === castSaved -> AppLog.w("Cast", "The TV forgot the queue while stopping; using the one saved as casting ended")
+            else -> AppLog.w("Cast", "The TV forgot the queue while stopping; using the one the phone last saw on the TV (${picked.items.size} songs, song ${picked.index + 1} at ${picked.positionMs / 1000}s)")
+        }
         val spot = CastHandBack.withoutNameless(picked) { it.mediaId }
+        if (spot.items.size != picked.items.size) {
+            AppLog.w("Cast", "Left out ${picked.items.size - spot.items.size} of the TV's ${picked.items.size} songs: neither the TV nor the phone's copy could name them")
+        }
         return spot.copy(items = spot.items.map(::playableOnPhone))
     }
 
@@ -570,7 +770,7 @@ class PlaybackService : MediaSessionService() {
     /** The book session (issue #521), made when the first book controller connects. */
     private var books: BookSession? = null
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
         if (controllerInfo.connectionHints.getBoolean(BookSession.HINT_BOOKS, false)) {
             val b = books ?: BookSession(this, graph, pauseMusic = { session?.player?.pause() }).also {
                 books = it
@@ -616,7 +816,8 @@ class PlaybackService : MediaSessionService() {
         events?.stopWatches()
         precacheWriter?.cancel()
         events?.finishCurrent()
-        castPlayer?.setSessionAvailabilityListener(null)
+        handler.removeCallbacks(castGone)
+        handler.removeCallbacks(castGaveUp)
         castPlayer?.release()
         lanWatch?.stop()
         lanWatch = null
@@ -625,6 +826,8 @@ class PlaybackService : MediaSessionService() {
         crossfader?.release()
         crossfader = null
         exo.release()
+        engine?.release()
+        engine = null
         books?.release()
         books = null
         session?.release()
@@ -666,7 +869,8 @@ class PlaybackService : MediaSessionService() {
             handler.removeCallbacks(timelineTick)
             val started = startedAtMs
             val heard = listenedMs
-            scope.launch { runCatching { graph.history.finish(song.id, started, heard, song.durationSec) } }
+            // Radio and podcasts (issue #353) stay out of your listening history.
+            if (!OutsideMedia.isOutside(song.id)) scope.launch { runCatching { graph.history.finish(song.id, started, heard, song.durationSec) } }
             current = null
         }
 
@@ -705,11 +909,31 @@ class PlaybackService : MediaSessionService() {
             baseVolume = level.volume
             AppLog.i("Loudness", "Song ${song.id} levelled by ${level.source.name.lowercase()}: ${"%+.1f".format(level.gainDb)} dB (${level.why})")
             if (onPhone) applyVolume(player)
+            streamTitle = null
+            if (OutsideMedia.isOutside(song.id)) {
+                // A radio station or podcast episode (issue #353): no loudness profile, scrobble or history.
+                AppLog.i("Player", if (OutsideMedia.isLive(song.id)) "Live radio: no seeking, crossfades or scrobbling" else "Podcast episode: no crossfades or scrobbling")
+                publishQuality()
+                return
+            }
             fetchProfiles(song)
             graph.scrobbler.nowPlaying(song)
             scope.launch {
                 runCatching { graph.history.add(PlayEvent(song.id, song.title, song.artist, song.genre, System.currentTimeMillis())) }
             }
+        }
+
+        /** A radio stream's own title for what it's playing (ICY "StreamTitle"), shown under the station (issue #353). */
+        override fun onMetadata(metadata: androidx.media3.common.Metadata) {
+            val id = player.currentMediaItem?.mediaId ?: return
+            if (!OutsideMedia.isLive(id)) return
+            val title = (0 until metadata.length()).map { metadata.get(it) }
+                .filterIsInstance<androidx.media3.extractor.metadata.icy.IcyInfo>()
+                .firstNotNullOfOrNull { it.title?.trim()?.takeIf { t -> t.isNotEmpty() } } ?: return
+            if (streamTitle == id to title) return
+            streamTitle = id to title
+            AppLog.d("Player", "Station now playing \"$title\"")
+            publishQuality()
         }
 
         /** Levels the current song again, after a setting changed or its measured loudness arrived. */
@@ -782,11 +1006,27 @@ class PlaybackService : MediaSessionService() {
             AppLog.e("Player", "Playback error ${error.errorCodeName} on ${current?.id ?: "?"}", error, event = "playback.error", fields = mapOf(
                 "song_id" to current?.id, "code" to error.errorCodeName, "category" to errorCategory(error.errorCode),
             ))
+            // Passthrough (issue #860) failed: the TV said the receiver takes the format, but the output couldn't be
+            // opened for it or broke while playing. Give it up for this run, so these songs are decoded on the TV,
+            // and play the song again from where it was instead of stopping.
+            if (BuildConfig.TV_APP && (error as? ExoPlaybackException)?.rendererName == "PassthroughRenderer" && Passthrough.failed == null) {
+                val why = "${error.errorCodeName}: ${error.cause?.message ?: error.message}"
+                Passthrough.failed = why
+                val position = player.currentPosition
+                AppLog.w("Passthrough", "Sending ${current?.id ?: "?"} to the receiver failed ($why); decoding Dolby and DTS on the TV from now on",
+                    error, event = "passthrough.failed", fields = mapOf("song_id" to current?.id, "code" to error.errorCodeName))
+                player.seekTo(player.currentMediaItemIndex, position)
+                player.prepare()
+                player.play()
+                return
+            }
             // A file the phone can't open or decode at all (a WMA, say) plays converted to Opus by Navidrome
             // instead of stopping (issue #354). Tracks the phone can open but not decode are handled in
             // onTracksChanged; this covers the ones that never get that far.
             if (!onPhone || !Formats.convertible(error.errorCode)) return
             val item = player.currentMediaItem ?: return
+            // Only the music server can convert: a station or episode (issue #353) can't be played another way.
+            if (OutsideMedia.isOutside(item.mediaId)) return
             if (chosenKbps[item.mediaId] == FALLBACK_KBPS) return
             if (graph.connection.current.offline) return
             AppLog.w("Audio", "The phone can't play ${item.mediaId} (${error.errorCodeName}); playing it as Opus $FALLBACK_KBPS kbit/s from Navidrome",
@@ -824,7 +1064,7 @@ class PlaybackService : MediaSessionService() {
                 ))
                 return
             }
-            if (chosenKbps[item.mediaId] == FALLBACK_KBPS) {
+            if (chosenKbps[item.mediaId] == FALLBACK_KBPS || OutsideMedia.isOutside(item.mediaId)) {
                 AppLog.e("Audio", "Can't play ${item.mediaId} even as Opus: $desc", event = "playback.unsupported_format", fields = mapOf("song_id" to item.mediaId, "format" to desc))
                 return
             }
@@ -979,6 +1219,28 @@ class PlaybackService : MediaSessionService() {
                 val item = player.currentMediaItem ?: return
                 val id = item.mediaId
                 val where = "at ${position / 1000}s, ${(buffered - position) / 1000.0}s loaded ahead, state $state"
+                // A song going to the receiver unchanged (issue #860) isn't decoded here, so there's no decoder to be
+                // stuck, and converting it would lose its Dolby sound and the gapless join to the next song. Nor is the
+                // last few seconds of any song: the player is finishing it and moving on.
+                val librarySec = SongRegistry.get(id)?.durationSec ?: 0
+                val nearEnd = librarySec > 0 && position >= librarySec * 1000L - END_GRACE_MS
+                if (nearEnd) {
+                    AppLog.i("Player", "Song $id hasn't moved for 5 s ($where); left alone at its end")
+                    return
+                }
+                if (bitstreamOut || id in Passthrough.played) {
+                    if (stuckRescues < 2) {
+                        AppLog.w("Player", "Song $id stuck for 5 s with its data loaded ($where), sent to the receiver unchanged; opening its output again",
+                            event = "playback.recovery", fields = mapOf("song_id" to id, "action" to "restart_output", "reason" to "stuck", "attempt" to stuckRescues))
+                        player.seekTo(player.currentMediaItemIndex, position)
+                        stuckRescues++
+                    } else {
+                        AppLog.e("Player", "Song $id still stuck after $stuckRescues rescues ($where); giving up on it",
+                            event = "playback.recovery_failed", fields = mapOf("song_id" to id, "attempts" to stuckRescues))
+                        handler.removeCallbacks(this)
+                    }
+                    return
+                }
                 val alreadyOpus = (chosenKbps[id] ?: 0) > 0
                 when {
                     !alreadyOpus -> {
