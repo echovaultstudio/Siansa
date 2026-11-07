@@ -198,7 +198,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     val scroll = rememberScrollState()
     // The cover's colour, for the page, the cards under the player and the lyrics screen.
     val tint = rememberCoverColor(song?.cover)
-    // With Style's Dynamic colours, the seek bar, Play and where it plays take the cover's colour (issue #970).
+    // With Style's Dynamic colours, the seek bar, Play, the liked heart and where it plays take the cover's colour (issues #970, #998).
     val dynamic = rememberDynamicColours(song?.cover, style.dynamicPlayerColours)
     // The song's lyrics, for the lyrics button and the preview card. Cleared as the song changes, so the
     // button doesn't stay lit for a song without lyrics.
@@ -356,8 +356,11 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                             SwipeCover(song, onTap = ::openAlbum, slideLabel = slideLabel)
                         }
 
-                        TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
-                            song?.let { graph.favorites.toggle(it) }
+                        // The filled heart of a liked song takes the cover's colour too, with Dynamic colours on (issue #998).
+                        WithAccent(dynamic?.controls, dynamic?.onControls) {
+                            TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
+                                song?.let { graph.favorites.toggle(it) }
+                            }
                         }
                         // A radio station has no seek bar, only that it's live (issue #353).
                         // While a finger slides from the play button, everything around it dims (issue #963), and going down,
