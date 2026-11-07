@@ -19,6 +19,7 @@ import app.siansa.ui.RemoteAction
 import app.siansa.ui.SiansaTheme
 import app.siansa.ui.TvRemoteStage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -69,5 +70,41 @@ class TvRemoteStageTest {
         assertEquals("right twice, left once", 1, skips)
         press(KeyEvent.KEYCODE_DPAD_DOWN)
         compose.onNodeWithTag("menu").assertIsDisplayed()
+    }
+
+    /** Issue #984: held, right winds forward through the song instead of skipping; let go, it plays from there. */
+    @Test fun holdingRightWinds() {
+        var skips = 0
+        var wound = 0L
+        var done = 0
+        compose.setContent {
+            SiansaTheme {
+                TvRemoteStage(
+                    onAction = { a -> if (a == RemoteAction.NEXT || a == RemoteAction.PREVIOUS) skips++ },
+                    onWind = { wound += it },
+                    onWindDone = { done++ },
+                ) { Text("Clubfood") }
+            }
+        }
+        compose.waitForIdle()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.setInTouchMode(false)
+        compose.waitForIdle()
+        // As the remote sends a held key: down, then repeats, then up a second and a half later.
+        val start = android.os.SystemClock.uptimeMillis()
+        val code = KeyEvent.KEYCODE_DPAD_RIGHT
+        instrumentation.sendKeySync(KeyEvent(start, start, KeyEvent.ACTION_DOWN, code, 0))
+        for (i in 1..10) {
+            val at = start + 500 + i * 100L
+            instrumentation.sendKeySync(KeyEvent(start, at, KeyEvent.ACTION_DOWN, code, i))
+        }
+        instrumentation.sendKeySync(KeyEvent(start, start + 1_600, KeyEvent.ACTION_UP, code, 0))
+        compose.waitForIdle()
+        assertEquals("Holding doesn't skip", 0, skips)
+        assertEquals("Letting go plays from where it's wound to", 1, done)
+        assertTrue("It winds forward, at ten times ($wound ms)", wound in 10_000L..20_000L)
+        // A press still skips.
+        press(code)
+        assertEquals("A press skips", 1, skips)
     }
 }
