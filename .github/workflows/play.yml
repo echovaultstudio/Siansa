@@ -63,8 +63,13 @@ jobs:
           # Play shows 500 characters: a short note written for Play (play-notes/<version>.md) when there is one.
           if [ -f "../play-notes/$VERSION.md" ]; then cp "../play-notes/$VERSION.md" notes.md; fi
           pip install --quiet google-auth==2.40.3 requests==2.32.4
-          python3 ../scripts/play_upload.py "siansa-$VERSION.aab" "$VERSION" notes.md
-          # The TV app on Play's Android TV tracks (issue #988), once PLAY_TV is "true" and the run built it.
-          if [ "$PLAY_TV" = "true" ] && [ -f "siansa-tv-$VERSION.aab" ]; then
+          # With PLAY_TV "true", the TV app goes into the same release (#988): Android TV shares the phone's tracks.
+          also=()
+          if [ "$PLAY_TV" = "true" ] && [ -z "$PLAY_TV_TRACK" ] && [ -f "siansa-tv-$VERSION.aab" ]; then
+            also=(--also "siansa-tv-$VERSION.aab")
+          fi
+          python3 ../scripts/play_upload.py "siansa-$VERSION.aab" "$VERSION" notes.md "${also[@]}"
+          # On a dedicated Android TV track instead, when PLAY_TV_TRACK names one.
+          if [ "$PLAY_TV" = "true" ] && [ -n "$PLAY_TV_TRACK" ] && [ -f "siansa-tv-$VERSION.aab" ]; then
             python3 ../scripts/play_upload.py --tv "siansa-tv-$VERSION.aab" "$VERSION" notes.md
           fi
