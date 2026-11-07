@@ -97,7 +97,7 @@ not here.
   theme** for the colour scheme's own tinted backgrounds. Album, artist and now playing pages keep their colours from
   the cover.
 - **Now playing**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in.
-  **Dynamic colours** (off at first): the seek bar, the Play button and where it plays take the colour of the cover
+  **Dynamic colours** (off at first): the seek bar, the Play button, the heart of a liked song and where it plays take the colour of the cover
   instead of your theme's, fading from song to song. It's the colour that fills most of the cover, so a sepia cover
   with a red light in it gets tan, not red, and a muted colour stays muted; a cover in black and white gets silver. The
   colour is lightened as much as it needs to be to stand out from the cover behind it, dark or light. **Play

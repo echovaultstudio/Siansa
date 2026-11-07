@@ -166,10 +166,10 @@ fun NowPlayingStyleScreen(nav: NavController) {
                     modifier = Modifier.testTag("lyricsButtonSwitch"),
                 )
             }
-            // The cover's colours for the seek bar, Play and the device name (issue #970).
+            // The cover's colours for the seek bar, Play, the liked heart and the device name (issues #970, #998).
             StyleSwitchRow(
                 "Dynamic colours",
-                "The seek bar, Play and where it plays take the colour of the cover, always easy to see",
+                "The seek bar, Play, the heart and where it plays take the colour of the cover, always easy to see",
                 settings.dynamicPlayerColours,
                 "dynamicColoursSwitch",
             ) { on ->
