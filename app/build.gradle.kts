@@ -27,8 +27,8 @@ android {
         versionCode = buildNumber
         versionName = appVersion
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // The new audio engine (issue #826): one output all players are mixed into. Only Siansa Dev has it so far.
-        buildConfigField("boolean", "MIXER_ENGINE", "false")
+        // The new audio engine (issue #826): one output all players are mixed into. On for everyone from v1.0.
+        buildConfigField("boolean", "MIXER_ENGINE", "true")
         // The TV app (issue #860, the tv module) builds the same code with this on; the phone app never does.
         buildConfigField("boolean", "TV_APP", "false")
         // Siansa's own TV screen while casting (issue #114, cast-receiver/): its Cast app id from the Google Cast
@@ -77,7 +77,6 @@ android {
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
             matchingFallbacks += "release"
-            buildConfigField("boolean", "MIXER_ENGINE", "true")
         }
     }
 
