@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -64,6 +65,7 @@ import app.siansa.ui.ServerKindChips
 import app.siansa.ui.MenuRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DownloadForOffline
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.Speaker
 import androidx.compose.material.icons.rounded.Tv
@@ -484,6 +486,32 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                                     app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.SlideWay.RIGHT, armed), Modifier.fillMaxSize(),
                                 )
                             }
+                        }
+                    }
+                }
+            },
+            // Now playing's dynamic colours (issue #970): a seek bar and Play in each cover's colour, on its backdrop; a grey
+            // cover keeps the theme's.
+            Scene("dynamic_colours") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    listOf(
+                        Color(0xFFB2CE05) to Color(0xFFB8C64F), Color(0xFF09A2E5) to Color(0xFF203440), Color(0xFFAD6B41) to Color(0xFF6A4E31),
+                        Color(0xFF6A4744) to Color(0xFFCDC9C7), Color(0xFFE9E1CF) to Color(0xFFF4F1EA), Color(0xFF808080) to Color(0xFF808080),
+                    ).forEach { (seed, average) ->
+                        val backdrop = app.siansa.ui.DynamicAccent.backdropOf(average)
+                        val c = app.siansa.ui.DynamicAccent.of(seed, backdrop)
+                        Row(
+                            Modifier.fillMaxWidth().background(backdrop).padding(Space.Medium),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Space.Medium),
+                        ) {
+                            app.siansa.ui.WithAccent(c?.controls, c?.onControls) {
+                                Box(Modifier.weight(1f).height(3.dp).background(app.siansa.ui.Accent))
+                                Box(Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape).background(app.siansa.ui.Accent), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                                    androidx.compose.material3.Icon(Icons.Rounded.PlayArrow, null, tint = app.siansa.ui.OnAccent)
+                                }
+                            }
+                            app.siansa.ui.WithAccent(c?.text, c?.onControls) { Text("Living room TV", color = app.siansa.ui.Accent) }
                         }
                     }
                 }

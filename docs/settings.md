@@ -96,7 +96,10 @@ not here.
   (pages, cards, menus and sheets): **Grey** to start with, like Spotify, **Warm grey**, **Blue grey**, or **Match
   theme** for the colour scheme's own tinted backgrounds. Album, artist and now playing pages keep their colours from
   the cover.
-- **Now playing**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in. **Play
+- **Now playing**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in.
+  **Dynamic colours** (off at first): the seek bar, the Play button and where it plays take the colour of the cover
+  instead of your theme's, fading from song to song. The colour is lightened as much as it needs to be to stand out
+  from the cover behind it, dark or light; a cover in black and white keeps your theme's colour. **Play
   button slides**: whether sliding from the play button does anything, what each way does (DJ mix, Steady radio,
   Song path, Sonic match, Start a mix… or Nothing), and **Record grooves** on the play button while a DJ mix plays.
 - **Mini player** and **bottom bar**: hold a row and drag it to reorder; tap the eye to show or hide it.

@@ -198,6 +198,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     val scroll = rememberScrollState()
     // The cover's colour, for the page, the cards under the player and the lyrics screen.
     val tint = rememberCoverColor(song?.cover)
+    // With Style's Dynamic colours, the seek bar, Play and where it plays take the cover's colour (issue #970).
+    val dynamic = rememberDynamicColours(song?.cover, style.dynamicPlayerColours)
     // The song's lyrics, for the lyrics button and the preview card. Cleared as the song changes, so the
     // button doesn't stay lit for a song without lyrics.
     val lyrics by loadStateFresh("lyrics-${song?.id}") { song?.let { graph.source.lyrics(it) } }
@@ -363,8 +365,10 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         val slideDim by animateFloatAsState(if (slideLabel != null) SLIDING_OTHERS else 1f, label = "pageDim")
                         val castAlpha = if (slideLabel?.way == SlideWay.DOWN) 0f else slideDim
                         var trackY by remember { mutableStateOf<Float?>(null) }
-                        if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state, Modifier.alpha(slideDim)) { trackY = it }
-                        Controls(state, onSlide = ::slide, onSlideLabel = { slideLabel = it }, upTo = trackY)
+                        WithAccent(dynamic?.controls, dynamic?.onControls) {
+                            if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state, Modifier.alpha(slideDim)) { trackY = it }
+                            Controls(state, onSlide = ::slide, onSlideLabel = { slideLabel = it }, upTo = trackY)
+                        }
                         // The lyrics bottom left (greyed out when the song has none), where the music plays in
                         // the middle (with the TV, speaker or headphones' name), and the queue bottom right: tap
                         // it, or swipe up from it (#294).
@@ -372,7 +376,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                             // The classic style (before #294): where the music plays bottom left, the queue bottom right.
                             Row(Modifier.fillMaxWidth().padding(top = Space.Medium, bottom = Space.Small).testTag("classicBottomRow"), verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.weight(1f).alpha(castAlpha), contentAlignment = Alignment.CenterStart) {
-                                    CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
+                                    WithAccent(dynamic?.text, dynamic?.onControls) { CastDeviceButton(tint = Color.White.copy(alpha = 0.8f)) }
                                 }
                                 Box(Modifier.alpha(slideDim)) { queueButton() }
                             }
@@ -382,7 +386,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                                 LyricsButton(enabled = hasLyrics(songLyrics)) { lyricsOpen = true }
                             }
                             Box(Modifier.weight(1f).alpha(castAlpha), contentAlignment = Alignment.Center) {
-                                CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
+                                WithAccent(dynamic?.text, dynamic?.onControls) { CastDeviceButton(tint = Color.White.copy(alpha = 0.8f)) }
                             }
                             Box(Modifier.width(SIDE_BUTTON_WIDTH).alpha(slideDim), contentAlignment = Alignment.Center) {
                                 queueButton()
@@ -412,9 +416,11 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 exit = slideOutVertically(tween(180, easing = FastOutLinearInEasing)) { it },
             ) {
                 LyricsScreen(song, tint, onClose = { lyricsOpen = false }, menu = { menuOpen = true }) {
-                    Column {
-                        if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state)
-                        Controls(state, onSlide = ::slide)
+                    WithAccent(dynamic?.controls, dynamic?.onControls) {
+                        Column {
+                            if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state)
+                            Controls(state, onSlide = ::slide)
+                        }
                     }
                 }
             }
