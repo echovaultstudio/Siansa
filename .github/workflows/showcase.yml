@@ -94,8 +94,8 @@ jobs:
   tv:
     name: TV showcase screenshots
     # The TV app's pictures (tv/src/androidTest/.../TvShowcaseTest.kt) on an Android TV emulator at 1080p, next to the
-    # phone's. Android TV's emulator images are 32-bit x86 only, which Gradle's managed devices don't start, so the
-    # emulator is started here and the test run on it as on a connected TV.
+    # phone's. The emulator is started here (Gradle's managed devices don't make TVs) and the test run on it as on a
+    # connected TV. Android 16's is the 64-bit Android TV image; the older ones are 32-bit and didn't start.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (contains(github.event.pull_request.labels.*.name, 'showcase') &&
@@ -103,7 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      TV_IMAGE: "system-images;android-34;android-tv;x86"
+      TV_IMAGE: "system-images;android-36;android-tv;x86_64"
     steps:
       - name: Free disk space
         run: |
@@ -138,6 +138,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Start an Android TV emulator
+        timeout-minutes: 15
         run: |
           sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
           yes | "$sdk/sdkmanager" --licenses > /dev/null || true
@@ -146,7 +147,7 @@ jobs:
           "$ANDROID_HOME/emulator/emulator" -avd siansa-tv -no-window -no-audio -no-boot-anim -no-snapshot \
             -gpu swiftshader_indirect -memory 3072 > "$RUNNER_TEMP/emulator.log" 2>&1 &
           adb="$ANDROID_HOME/platform-tools/adb"
-          "$adb" wait-for-device
+          timeout 300 "$adb" wait-for-device || { echo "::error::The TV emulator didn't start"; tail -60 "$RUNNER_TEMP/emulator.log"; exit 1; }
           for i in $(seq 1 120); do
             [ "$("$adb" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break
             sleep 5
@@ -158,6 +159,7 @@ jobs:
           "$adb" logcat -c
 
       - name: Take the screenshots on the TV emulator
+        timeout-minutes: 30
         run: |
           set -o pipefail
           adb="$ANDROID_HOME/platform-tools/adb"
