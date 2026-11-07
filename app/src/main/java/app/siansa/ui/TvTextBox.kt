@@ -70,6 +70,11 @@ fun TvTextBox(
     placeholder: String? = null,
     kind: TvTextKind = TvTextKind.TEXT,
     opensOnFocus: Boolean = false,
+    /**
+     * In a form (issue #978): up and down go to the control before or after it in the form, as a narrow button (Test)
+     * under a wide box lost to a wide control further away. Off for a box beside other parts of the page (search).
+     */
+    inForm: Boolean = true,
     /** The keyboard's Done (or Search), with what's in the field. */
     onDone: ((String) -> Unit)? = null,
 ) {
@@ -123,16 +128,22 @@ fun TvTextBox(
                 // Keys while typing reach this first (Compose has them before Android's field): up and down leave.
                 .onPreviewKeyEvent { event ->
                     if (!typing || event.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    val way = textBoxExit(event.nativeKeyEvent.keyCode, multiLine) ?: return@onPreviewKeyEvent false
+                    val way = textBoxExit(event.nativeKeyEvent.keyCode, multiLine, inForm) ?: return@onPreviewKeyEvent false
                     stopTyping(way)
                     true
                 }
-                // On the box: OK types.
+                // On the box: OK types; in a form, up and down go to the control before or after it.
                 .onKeyEvent { event ->
                     if (typing || event.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) return@onKeyEvent false
-                    if (!textBoxTypes(event.nativeKeyEvent.keyCode)) return@onKeyEvent false
-                    startTyping()
-                    true
+                    val key = event.nativeKeyEvent.keyCode
+                    if (textBoxTypes(key)) {
+                        startTyping()
+                        return@onKeyEvent true
+                    }
+                    val way = textBoxMove(key, inForm) ?: return@onKeyEvent false
+                    val moved = runCatching { focusManager.moveFocus(way) }.getOrDefault(false)
+                    AppLog.d("TvTextBox", "\"$label\": ${if (way == androidx.compose.ui.focus.FocusDirection.Next) "down" else "up"} to the ${if (moved) "next control" else "page's own choice"}")
+                    moved
                 }
                 .semantics {
                     contentDescription = "$label, ${if (kind == TvTextKind.SECRET) (if (value.isEmpty()) "empty" else "filled") else value.ifEmpty { "empty" }}"
@@ -185,7 +196,7 @@ fun TvTextBox(
                                 stopTyping()
                                 return@setOnKeyListener true
                             }
-                            val way = textBoxExit(keyCode, multiLine) ?: return@setOnKeyListener false
+                            val way = textBoxExit(keyCode, multiLine, inForm) ?: return@setOnKeyListener false
                             stopTyping(way)
                             true
                         }
@@ -227,12 +238,21 @@ internal fun textBoxTypes(keyCode: Int): Boolean = keyCode == android.view.KeyEv
     keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER
 
 /**
- * Which way the remote's [keyCode] leaves a TV text box (issue #955): up and down to the control above or below, unless
- * the box has several lines ([multiLine]), which keep them. Left, right and OK stay in the box.
+ * Which way the remote's [keyCode] leaves a TV text box while typing (issue #955): up and down to the control above or
+ * below, unless the box has several lines ([multiLine]), which keep them. Left, right and OK stay in the box. In a form
+ * ([inForm]) as [textBoxMove].
  */
-internal fun textBoxExit(keyCode: Int, multiLine: Boolean): androidx.compose.ui.focus.FocusDirection? = when {
-    multiLine -> null
-    keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN -> androidx.compose.ui.focus.FocusDirection.Down
-    keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP -> androidx.compose.ui.focus.FocusDirection.Up
+internal fun textBoxExit(keyCode: Int, multiLine: Boolean, inForm: Boolean = true): androidx.compose.ui.focus.FocusDirection? =
+    if (multiLine) null else textBoxMove(keyCode, inForm)
+
+/**
+ * Which way the remote's [keyCode] moves on from a TV text box (issue #978). In a form ([inForm]) down and up go to
+ * the next and the previous control in it, in the form's order: going by distance, on the TV's wide page a narrow
+ * button under a wide box (Test under a login) lost to a wide control further down, and the remote skipped it. Beside
+ * other parts of the page, down and up go by distance as usual.
+ */
+internal fun textBoxMove(keyCode: Int, inForm: Boolean): androidx.compose.ui.focus.FocusDirection? = when (keyCode) {
+    android.view.KeyEvent.KEYCODE_DPAD_DOWN -> if (inForm) androidx.compose.ui.focus.FocusDirection.Next else androidx.compose.ui.focus.FocusDirection.Down
+    android.view.KeyEvent.KEYCODE_DPAD_UP -> if (inForm) androidx.compose.ui.focus.FocusDirection.Previous else androidx.compose.ui.focus.FocusDirection.Up
     else -> null
 }

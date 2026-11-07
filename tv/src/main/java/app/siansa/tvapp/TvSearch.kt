@@ -68,6 +68,7 @@ fun TvSearch(fromSystem: String?, onDone: () -> Unit) {
             placeholder = "Songs, albums or artists",
             kind = TvTextKind.SEARCH,
             opensOnFocus = opensKeyboard,
+            inForm = false,
             modifier = Modifier.padding(horizontal = TV_EDGE).fillMaxWidth(SEARCH_WIDTH).focusRequester(field),
         )
         // With AudioMuse: songs that sound like the words ("rainy sunday morning"), said or typed, as on the phone.
