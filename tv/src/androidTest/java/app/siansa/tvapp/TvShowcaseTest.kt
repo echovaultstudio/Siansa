@@ -115,6 +115,8 @@ class TvShowcaseTest {
 
             step("home") {
                 waitText("Today's mixes", 90_000)
+                // The library syncs again as the app opens: its line on Home goes when it's done.
+                runCatching { compose.waitUntil(120_000) { compose.onAllNodes(hasText("Syncing your library", substring = true)).fetchSemanticsNodes().isEmpty() } }
                 idle(5000)
                 shot("tv-home")
                 // The animation: the remote moving along Home's rows, the focused cover growing.
@@ -150,6 +152,18 @@ class TvShowcaseTest {
                 idle(3000)
                 shot("tv-library")
             }
+            step("album") {
+                click("Low Tide")
+                waitText("Harbour Lights")
+                idle(3000)
+                shot("tv-album")
+            }
+            step("artist") {
+                click("Glass Harbour")
+                waitText("Artist radio")
+                idle(3000)
+                shot("tv-artist")
+            }
             step("search") {
                 click("Search")
                 idle(1500)
@@ -157,7 +171,7 @@ class TvShowcaseTest {
                 type("harbour")
                 idle(1500)
                 closeKeyboard()
-                waitText("Harbour Lights")
+                waitText("Glass Harbour")
                 idle(2500)
                 shot("tv-search")
             }
@@ -185,18 +199,6 @@ class TvShowcaseTest {
                 menu("Up next")
                 idle(2000)
                 shot("tv-up-next")
-            }
-            step("album") {
-                menu("Go to the album")
-                waitText("Harbour Lights")
-                idle(3000)
-                shot("tv-album")
-            }
-            step("artist") {
-                click("Glass Harbour")
-                waitText("Artist radio")
-                idle(3000)
-                shot("tv-artist")
             }
         } finally {
             scenario.close()
