@@ -25,6 +25,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.zIndex
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.rememberUpdatedState
@@ -356,28 +358,33 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                             song?.let { graph.favorites.toggle(it) }
                         }
                         // A radio station has no seek bar, only that it's live (issue #353).
-                        if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state)
-                        Controls(state, onSlide = ::slide, onSlideLabel = { slideLabel = it })
+                        // While a finger slides from the play button, everything around it dims (issue #963), and going down,
+                        // Play on (right under the button) makes way completely.
+                        val slideDim by animateFloatAsState(if (slideLabel != null) SLIDING_OTHERS else 1f, label = "pageDim")
+                        val castAlpha = if (slideLabel?.way == SlideWay.DOWN) 0f else slideDim
+                        var trackY by remember { mutableStateOf<Float?>(null) }
+                        if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state, Modifier.alpha(slideDim)) { trackY = it }
+                        Controls(state, onSlide = ::slide, onSlideLabel = { slideLabel = it }, upTo = trackY)
                         // The lyrics bottom left (greyed out when the song has none), where the music plays in
                         // the middle (with the TV, speaker or headphones' name), and the queue bottom right: tap
                         // it, or swipe up from it (#294).
                         if (classic) {
                             // The classic style (before #294): where the music plays bottom left, the queue bottom right.
                             Row(Modifier.fillMaxWidth().padding(top = Space.Medium, bottom = Space.Small).testTag("classicBottomRow"), verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                                Box(Modifier.weight(1f).alpha(castAlpha), contentAlignment = Alignment.CenterStart) {
                                     CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
                                 }
-                                queueButton()
+                                Box(Modifier.alpha(slideDim)) { queueButton() }
                             }
                         } else Row(Modifier.fillMaxWidth().padding(top = Space.Medium, bottom = Space.Small), verticalAlignment = Alignment.CenterVertically) {
                             // The device name gets all the room between the two buttons (issue #311).
-                            Box(Modifier.width(SIDE_BUTTON_WIDTH), contentAlignment = Alignment.Center) {
+                            Box(Modifier.width(SIDE_BUTTON_WIDTH).alpha(slideDim), contentAlignment = Alignment.Center) {
                                 LyricsButton(enabled = hasLyrics(songLyrics)) { lyricsOpen = true }
                             }
-                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            Box(Modifier.weight(1f).alpha(castAlpha), contentAlignment = Alignment.Center) {
                                 CastDeviceButton(tint = Color.White.copy(alpha = 0.8f))
                             }
-                            Box(Modifier.width(SIDE_BUTTON_WIDTH), contentAlignment = Alignment.Center) {
+                            Box(Modifier.width(SIDE_BUTTON_WIDTH).alpha(slideDim), contentAlignment = Alignment.Center) {
                                 queueButton()
                             }
                         }
@@ -641,7 +648,7 @@ private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart:
  * while you drag, and the time shown follows your finger.
  */
 @Composable
-private fun SeekBar(state: PlayerState) {
+private fun SeekBar(state: PlayerState, modifier: Modifier = Modifier, onTrackCentre: (Float) -> Unit = {}) {
     val graph = LocalGraph.current
     val tracker = remember { SeekTracker() }
     var shown by remember { mutableStateOf(graph.player.progress().let { SeekTracker.Shown(it.positionMs, it.durationMs) }) }
@@ -672,11 +679,13 @@ private fun SeekBar(state: PlayerState) {
         graph.player.seekTo(ms)
     }
     val thumb by animateDpAsState(if (dragging != null) 16.dp else 11.dp, tween(100), label = "thumb")
-    Column(Modifier.padding(top = Space.Medium)) {
+    Column(modifier.padding(top = Space.Medium)) {
         BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
                 .height(28.dp)
+                // Where its line is, for the slide's up choice to sit on (issue #963).
+                .onGloballyPositioned { onTrackCentre(it.positionInRoot().y + it.size.height / 2f) }
                 .pointerInput(duration) {
                     detectTapGestures { offset -> seek((offset.x / size.width).coerceIn(0f, 1f)) }
                 }
@@ -726,7 +735,7 @@ private fun SeekBar(state: PlayerState) {
  * null for none; [onSlideLabel] gets what the slide shows, for the cover (issue #933).
  */
 @Composable
-internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null, onSlideLabel: (SlideLabel?) -> Unit = {}) {
+internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null, onSlideLabel: (SlideLabel?) -> Unit = {}, upTo: Float? = null) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
@@ -763,7 +772,11 @@ internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null
         // station or podcast has nothing to mix from.
         val song = state.current
         val slides = settings.playSlides.let { if (onSlide == null || song == null || OutsideMedia.isOutside(song.id)) it.copy(on = false) else it }
+        // The up choice sits on the seek bar's line when there is one (issue #963).
+        var playCentre by remember { mutableStateOf<Float?>(null) }
         PlayButton(
+            modifier = Modifier.onGloballyPositioned { playCentre = it.positionInRoot().y + it.size.height / 2f },
+            upReachPx = upReach(playCentre, upTo),
             playing = state.isPlaying,
             slides = slides,
             djMix = (radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ) ||
@@ -986,6 +999,21 @@ private const val NOW_PLAYING_TINT = 0.14f
 
 /** How faint the other controls go while a finger slides from the play button (issue #919). */
 private const val SLIDING_OTHERS = 0.3f
+
+/**
+ * How far above the play button's centre its up choice goes (issue #963): to the seek bar's line ([trackY]) when that's
+ * where it would land anyway, so the choice sits centred on it; null (its usual reach) when either isn't known or the
+ * bar is too close or too far.
+ */
+internal fun upReach(playCentreY: Float?, trackY: Float?): Int? {
+    if (playCentreY == null || trackY == null) return null
+    val reach = playCentreY - trackY
+    return reach.takeIf { it in UP_REACH_PX_MIN..UP_REACH_PX_MAX }?.toInt()
+}
+
+/** The seek bar is used as the up choice's place only between these distances from the button's centre (px). */
+private const val UP_REACH_PX_MIN = 80f
+private const val UP_REACH_PX_MAX = 600f
 
 /** How far up the queue button has to be pulled to open the queue. */
 private const val QUEUE_PULL_PX = 40f

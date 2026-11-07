@@ -185,6 +185,8 @@ internal fun PlayButton(
     unavailable: (PlaySlide) -> String? = { null },
     onSliding: (SlideState?) -> Unit = {},
     preview: SlideState? = null,
+    /** How far up the up choice goes from the button's centre, in px, to sit on the seek bar (issue #963); null for its usual reach. */
+    upReachPx: Int? = null,
 ) {
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
@@ -281,7 +283,7 @@ internal fun PlayButton(
         }
         if (state != null) {
             val slide = slides.of(state.way)
-            SlideChoice(slide, state, accent, onAccent)
+            SlideChoice(slide, state, accent, onAccent, upReachPx)
         }
     }
 }
@@ -291,10 +293,10 @@ internal fun PlayButton(
  * where the thumb on the button can't cover it (issue #933).
  */
 @Composable
-private fun SlideChoice(slide: PlaySlide, state: SlideState, accent: Color, onAccent: Color) {
+private fun SlideChoice(slide: PlaySlide, state: SlideState, accent: Color, onAccent: Color, upReachPx: Int? = null) {
     val reach = with(LocalDensity.current) { SLIDE_REACH.roundToPx() }
     val (x, y) = when (state.way) {
-        SlideWay.UP -> 0 to -reach
+        SlideWay.UP -> 0 to -(upReachPx ?: reach)
         SlideWay.DOWN -> 0 to reach
         SlideWay.LEFT -> -reach to 0
         SlideWay.RIGHT -> reach to 0
