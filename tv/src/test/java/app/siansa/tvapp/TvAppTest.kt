@@ -9,6 +9,18 @@ import org.junit.Test
 /** The TV app's own logic (issue #860). */
 class TvAppTest {
     @Test
+    fun homeSaysTheLibrarySyncsOnlyWhileItDoes() {
+        assertTrue(showsSyncLine(app.siansa.data.SyncProgress(phase = app.siansa.data.SyncPhase.ALBUMS)))
+        assertTrue(showsSyncLine(app.siansa.data.SyncProgress(phase = app.siansa.data.SyncPhase.CONNECTING)))
+        // Done or failed, the line goes; it said "so far" until the app was opened again.
+        assertFalse(showsSyncLine(app.siansa.data.SyncProgress(phase = app.siansa.data.SyncPhase.DONE)))
+        assertFalse(showsSyncLine(app.siansa.data.SyncProgress(phase = app.siansa.data.SyncPhase.FAILED)))
+        assertFalse(showsSyncLine(app.siansa.data.SyncProgress(phase = app.siansa.data.SyncPhase.IDLE)))
+        // The quiet check at start never shows it.
+        assertFalse(showsSyncLine(app.siansa.data.SyncProgress(phase = app.siansa.data.SyncPhase.ALBUMS, quiet = true)))
+    }
+
+    @Test
     fun theSignInCodeHoldsThePagesAddress() {
         val url = Pairing.pageUrl("192.168.1.20", 41234, Pairing.newKey())
         val grid = QrGrid.of(url)

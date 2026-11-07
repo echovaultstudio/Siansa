@@ -208,7 +208,7 @@ fun TvHome() {
                 }
             }
         }
-        if (sync.phase != SyncPhase.IDLE && !sync.quiet) {
+        if (showsSyncLine(sync)) {
             item("sync") {
                 Text(
                     "Syncing your library: ${sync.albums} albums, ${sync.songs} songs so far.",
@@ -384,3 +384,10 @@ internal fun steadyRows(old: List<TvRow>?, new: List<TvRow>): List<TvRow> {
     }
     return if (kept == old) old else kept
 }
+
+/**
+ * Whether Home says the library is syncing: only while a sync runs, not the quiet check at start. Once one is done
+ * (or failed) the line goes; it stayed before, "so far" and all, until the app was opened again.
+ */
+internal fun showsSyncLine(sync: app.siansa.data.SyncProgress): Boolean =
+    !sync.quiet && sync.running
