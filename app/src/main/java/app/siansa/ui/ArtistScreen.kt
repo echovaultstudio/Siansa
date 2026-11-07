@@ -202,7 +202,7 @@ fun ArtistScreen(nav: NavController, id: String) {
         LazyVerticalGrid(
             state = gridState,
             // Three across, or one release per row in the list (issue #289).
-            columns = GridCells.Fixed(GRID_COLUMNS),
+            columns = GridCells.Fixed(gridColumns()),
             contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section)),
             modifier = Modifier.fillMaxSize().then(cardModifier),
         ) {
