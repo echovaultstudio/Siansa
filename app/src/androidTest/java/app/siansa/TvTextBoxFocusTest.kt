@@ -7,7 +7,6 @@ import android.widget.EditText
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -26,6 +25,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.siansa.ui.SiansaTheme
 import app.siansa.ui.Space
+import app.siansa.ui.TvActionRow
 import app.siansa.ui.TvTextBox
 import app.siansa.ui.TvTextKind
 import org.junit.Assert.assertTrue
@@ -106,10 +106,12 @@ class TvTextBoxFocusTest {
 
     /**
      * Issue #978: as on the TV's settings, a wide page, a hint between the login and Test, and a wide Save under it. Going
-     * by distance, the narrow Test button lost to Save, and the remote skipped it on the TV, while the phone's narrow
-     * screen above passed. Drawn at a density of 1 so the phone's screen is as wide as a TV's page.
+     * by distance, the narrow Test button lost to Save both ways, and the remote skipped it on the TV, while the phone's
+     * narrow screen above passed; Test's row ([TvActionRow]) is now as wide as the page. Drawn at a density of 1 so the
+     * phone's screen is as wide as a TV's page.
      */
     @Test fun downFromTheLastBoxOfAWidePageReachesTest() {
+        var tested = 0
         compose.setContent {
             SiansaTheme {
                 androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(1f)) {
@@ -120,8 +122,9 @@ class TvTextBoxFocusTest {
                         TvTextBox("", {}, "Username", Modifier.fillMaxWidth())
                         TvTextBox("", {}, "Password", Modifier.fillMaxWidth(), kind = TvTextKind.SECRET)
                         Text("With several music servers in AudioMuse, each server's own name there is under Servers.")
-                        Row {
-                            OutlinedButton(onClick = {}, modifier = Modifier.testTag("test")) { Text("Test") }
+                        // As TestRow on the TV: the row is what the remote stops on.
+                        TvActionRow(onClick = { tested++ }, modifier = Modifier.testTag("test"), tv = true) { button ->
+                            OutlinedButton(onClick = {}, modifier = button) { Text("Test") }
                         }
                         Button(onClick = {}, modifier = Modifier.fillMaxWidth().testTag("save")) { Text("Save") }
                     }
@@ -156,5 +159,10 @@ class TvTextBoxFocusTest {
         assertTrue("Up from Save reaches Test ($trail)", up == "Test")
         assertTrue("Up from Test reaches Password ($trail)", upAgain == "Password")
         assertTrue("Up from Password reaches Username ($trail)", top == "Username")
+        // OK on Test's row tests.
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        assertTrue("OK on Test tests (on ${on()})", tested == 1)
     }
 }
