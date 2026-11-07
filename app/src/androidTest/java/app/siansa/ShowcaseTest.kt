@@ -4,6 +4,7 @@ import android.Manifest
 import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Base64
+import android.view.MotionEvent
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -120,6 +121,7 @@ class ShowcaseTest {
             val until = SystemClock.elapsedRealtime() + 20_000
             while (SystemClock.elapsedRealtime() < until && !graph.player.state.value.isPlaying) SystemClock.sleep(200)
         }
+        replay = { playHarbourLights(40_000) }
         // The same song in the mini player on every page: started again when it has run on to the next.
         fun keepPlaying() {
             if (graph.player.state.value.current?.title != "Harbour Lights") runCatching { playHarbourLights(40_000) }
@@ -203,14 +205,15 @@ class ShowcaseTest {
                 idle(1500)
                 compose.onAllNodesWithTag("miniPlayer").onFirst().performClick()
                 idle(3000)
-                val button = compose.onAllNodesWithTag("playButton").onFirst()
+                // Now playing is a window of its own: the finger goes to the screen, as a real one would.
+                val middle = compose.onAllNodesWithTag("playButton").onFirst().fetchSemanticsNode().boundsInWindow.center
                 frame("slides", 1400)
-                button.performTouchInput { down(center) }
+                finger(MotionEvent.ACTION_DOWN, middle.x, middle.y)
                 // Up, eased, until the DJ mix is chosen and its name is on the cover.
                 val reach = 120f * instrumentation.targetContext.resources.displayMetrics.density
                 for (i in 1..9) {
                     val f = ((1 - kotlin.math.cos(Math.PI * i / 9)) / 2).toFloat()
-                    button.performTouchInput { moveTo(center + androidx.compose.ui.geometry.Offset(0f, -reach * f)) }
+                    finger(MotionEvent.ACTION_MOVE, middle.x, middle.y - reach * f)
                     frame("slides", 60)
                 }
                 frame("slides", 1800)
@@ -219,9 +222,7 @@ class ShowcaseTest {
                 fun arc(fromDeg: Double, toDeg: Double, steps: Int) {
                     for (i in 1..steps) {
                         val a = Math.toRadians(fromDeg + (toDeg - fromDeg) * i / steps)
-                        button.performTouchInput {
-                            moveTo(center + androidx.compose.ui.geometry.Offset((reach * kotlin.math.sin(a)).toFloat(), (-reach * kotlin.math.cos(a)).toFloat()))
-                        }
+                        finger(MotionEvent.ACTION_MOVE, middle.x + (reach * kotlin.math.sin(a)).toFloat(), middle.y - (reach * kotlin.math.cos(a)).toFloat())
                         frame("slides", 50)
                     }
                 }
@@ -232,16 +233,19 @@ class ShowcaseTest {
                 frame("slides", 1500)
                 arc(270.0, 360.0, 6)
                 frame("slides", 900)
-                // Let go on the DJ mix: it starts, and the play button turns into a record.
-                button.performTouchInput { up() }
-                repeat(16) {
-                    SystemClock.sleep(250)
-                    compose.waitForIdle()
-                    frame("slides", 160)
+                // Let go on the DJ mix: it starts, and the play button turns into a record that turns while it plays.
+                finger(MotionEvent.ACTION_UP, middle.x, middle.y - reach)
+                whileTurning {
+                    repeat(16) {
+                        SystemClock.sleep(250)
+                        compose.mainClock.advanceTimeBy(250)
+                        frame("slides", 160)
+                    }
+                    SystemClock.sleep(3000)
+                    compose.mainClock.advanceTimeBy(3000)
+                    frame("slides", 2200)
+                    shot("dj-mix")
                 }
-                idle(4000)
-                frame("slides", 2200)
-                shot("dj-mix")
                 back()
                 idle(800)
                 settle()
@@ -268,16 +272,18 @@ class ShowcaseTest {
                 }
                 frame("album-dj", 1800)
                 shot("album-dj-slide")
-                shuffle.performTouchInput { up() }
-                repeat(14) {
-                    SystemClock.sleep(250)
-                    compose.waitForIdle()
-                    frame("album-dj", 160)
+                whileTurning {
+                    shuffle.performTouchInput { up() }
+                    repeat(14) {
+                        SystemClock.sleep(250)
+                        compose.mainClock.advanceTimeBy(250)
+                        frame("album-dj", 160)
+                    }
+                    SystemClock.sleep(3000)
+                    compose.mainClock.advanceTimeBy(3000)
+                    frame("album-dj", 2400)
+                    shot("album-dj-mix")
                 }
-                idle(3000)
-                frame("album-dj", 2400)
-                shot("album-dj-mix")
-                runCatching { playHarbourLights(40_000) }
                 back()
                 idle(800)
             }
@@ -571,6 +577,39 @@ class ShowcaseTest {
         println("Showcase: $text from ${before.toInt()} to ${top().toInt()} px of ${height.toInt()} ($swipes swipes)")
         idle(800)
     }
+
+    private var fingerDown = 0L
+
+    /** A finger on the screen at ([x], [y]), in the window's pixels: down, a move, or up. */
+    private fun finger(action: Int, x: Float, y: Float) {
+        val now = SystemClock.uptimeMillis()
+        if (action == MotionEvent.ACTION_DOWN) fingerDown = now
+        val event = MotionEvent.obtain(fingerDown, now, action, x, y, 0).apply { source = android.view.InputDevice.SOURCE_TOUCHSCREEN }
+        instrumentation.sendPointerSync(event)
+        event.recycle()
+        if (action != MotionEvent.ACTION_UP) SystemClock.sleep(16)
+    }
+
+    /**
+     * [block] while a DJ mix's record turns, which never lets the page be idle: the test's clock moves only when told.
+     * After it, Harbour Lights plays again (no record) and the clock runs on its own.
+     */
+    private fun whileTurning(block: () -> Unit) {
+        compose.mainClock.autoAdvance = false
+        try {
+            block()
+        } finally {
+            val until = SystemClock.elapsedRealtime() + 20_000
+            runCatching { replay() }
+            while (SystemClock.elapsedRealtime() < until && graph.player.state.value.current?.title != "Harbour Lights") {
+                SystemClock.sleep(200)
+                compose.mainClock.advanceTimeBy(200)
+            }
+            compose.mainClock.autoAdvance = true
+        }
+    }
+
+    private var replay: () -> Unit = {}
 
     private val frameCount = HashMap<String, Int>()
 
