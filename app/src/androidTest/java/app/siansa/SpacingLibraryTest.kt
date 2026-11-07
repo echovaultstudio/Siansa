@@ -144,8 +144,9 @@ class SpacingLibraryTest : SpacingCheck() {
         val similar = compose.onNodeWithTag("findSimilarAlbums").getBoundsInRoot()
         val shuffle = compose.onNodeWithTag("shuffleAll", useUnmergedTree = true).getBoundsInRoot()
         val play = compose.onNodeWithTag("bigPlay").getBoundsInRoot()
-        // The plus's icon (28 dp, centred in its 48 dp touch area) starts where the text above starts.
-        assertEven("The plus in line with the details", plus.left + 10.dp, details.left, 1.dp)
+        // The plus's circle (28 dp, centred in its 48 dp touch area, with 2 of its drawing's 24 units round it) starts where
+        // the text above starts.
+        assertEven("The plus in line with the details", plus.left + 10.dp + 28.dp * 2 / 24, details.left, 1.dp)
         val line = (play.top + play.bottom) / 2
         listOf(plus, similar, shuffle).forEach { assertEven("On Play's middle line", (it.top + it.bottom) / 2, line, 1.dp) }
         assertTrue("Similar, shuffle, then Play, left to right", similar.right <= shuffle.left + 0.5.dp && shuffle.right <= play.left + 0.5.dp)

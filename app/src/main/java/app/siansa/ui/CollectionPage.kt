@@ -747,8 +747,12 @@ private const val SLIDE_OTHERS = 0.3f
 data class PlayResume(val index: Int, val label: String)
 
 private val BIG_PLAY_SIZE = 56.dp
-/** An album bar icon's size, and how far inside its touch area it sits: the plus moves left by that, in line with the text. */
+/**
+ * An album bar icon's size, and how far its drawing sits inside its touch area: the icon centred in 48 dp, plus the
+ * circle's own margin in its 24-unit drawing (2 units). The plus moves left by that, so its circle starts in line with
+ * the text above.
+ */
 private val ICON_SIZE = 28.dp
-private val ICON_INSET = (48.dp - ICON_SIZE) / 2
+private val ICON_INSET = (48.dp - ICON_SIZE) / 2 + ICON_SIZE * 2 / 24
 private val BIG_PLAY_RING = 2.5.dp
 private val BIG_PLAY_RING_OUTSET = 1.5.dp
