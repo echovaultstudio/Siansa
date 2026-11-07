@@ -58,8 +58,9 @@ class PlayUploadTest(unittest.TestCase):
 
     def test_the_tv_app_goes_to_tv_tracks(self):
         # Issue #988: the TV app on Play's Android TV tracks of the same app, internal testing unless set.
-        self.assertEqual(["tv:qa"], tracks_of("", tv=True))
-        self.assertEqual(["tv:alpha", "tv:qa"], tracks_of("alpha, tv:qa", tv=True))
+        self.assertEqual(["tv:internal"], tracks_of("", tv=True))
+        self.assertEqual(["tv:alpha", "tv:internal"], tracks_of("alpha, tv:internal", tv=True))
+        self.assertEqual("TV internal testing", track_name("tv:internal"))
         self.assertEqual("TV internal testing", track_name("tv:qa"))
         self.assertEqual("TV closed testing (alpha)", track_name("tv:alpha"))
         self.assertEqual("closed testing", track_name("alpha"))
