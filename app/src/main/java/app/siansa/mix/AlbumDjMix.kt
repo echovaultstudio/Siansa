@@ -3,7 +3,9 @@ package app.siansa.mix
 import app.siansa.AppGraph
 import app.siansa.data.Song
 import app.siansa.log.AppLog
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.random.Random
 
@@ -30,7 +32,9 @@ object AlbumDjMix {
         if (album.isEmpty()) return
         val ordered = arrange(graph, album)
         songs.value = ordered.map { it.id }
-        graph.player.play(ordered)
+        // The player takes commands on the main thread only: started from the background it refused, and nothing played
+        // (the owner's log, 7 Nov).
+        withContext(Dispatchers.Main) { graph.player.play(ordered) }
         val sorted = ordered.map { it.id } != album.map { it.id }
         AppLog.d("AlbumMix", "Starts with \"${ordered.first().title}\"")
         AppLog.i("AlbumMix", "DJ mix of \"$title\": ${ordered.size} songs${if (sorted) " in the best order" else " in the album's order"}",
