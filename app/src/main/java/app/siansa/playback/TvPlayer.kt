@@ -52,6 +52,15 @@ class TvPlayer(
     private var items: List<MediaItem> = emptyList()
     /** A key per queue entry, sent with the song so the TV's word maps back to it (the same song can be in twice). */
     private var keys: List<Long> = emptyList()
+    /**
+     * The phone's keys of the songs the TV holds, in its order, as the phone loaded and changed them (issue #972). Cast's
+     * status only lists the songs around the one playing, so read from it the window looked short and the songs after
+     * were sent again at every song change ("0 out, 3 in"): the TV's queue grew, with repeats, until it dropped.
+     */
+    private var onTv: List<Long> = emptyList()
+    /** Since when Cast's list of item ids hasn't matched [onTv] (it can lag a change by a moment); 0 when it matches. */
+    private var unmatchedSince = 0L
+    private val retry = android.os.Handler(android.os.Looper.getMainLooper())
     private var nextKey = 1L
     private var index = 0
     private var playWhenReady = false
@@ -365,6 +374,7 @@ class TvPlayer(
             loading = false
             val status = r.status
             if (status.isSuccess) {
+                onTv = window.map { keys[it] }
                 AppLog.d("Cast", "The TV took the queue in ${System.currentTimeMillis() - sentAt} ms")
             } else {
                 // Said, not just lost (Media3 dropped this answer): the code tells too big, refused, or the TV gone.
@@ -472,10 +482,33 @@ class TvPlayer(
         if (syncing) { syncAgain = true; return }
         val s = c.mediaStatus ?: return
         val currentId = s.currentItemId
-        val tvKeys = s.queueItems.map { entryOf(it) }
-        val tvIds = s.queueItems.map { it.itemId }
+        // The TV's whole list of songs (Cast's queue of item ids), matched to what the phone put there; only if they
+        // don't match, the few songs Cast's status lists.
+        val allIds = runCatching { c.mediaQueue.itemIds.toList() }.getOrDefault(emptyList())
+        val whole = TvWindow.matched(onTv, allIds)
+        if (whole == null && onTv.isNotEmpty()) {
+            // Cast's list can lag a change by a moment: wait for it, then fall back to the status's few songs.
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (unmatchedSince == 0L) unmatchedSince = now
+            if (now - unmatchedSince < TvWindow.LIST_WAIT_MS) {
+                retry.removeCallbacksAndMessages(null)
+                retry.postDelayed({ sync() }, TvWindow.LIST_WAIT_MS)
+                return
+            }
+            AppLog.d("Cast", "The TV's list (${allIds.size} songs) doesn't match what the phone sent (${onTv.size}): following its status")
+            onTv = emptyList()
+        }
+        unmatchedSince = 0L
+        val tvKeys: List<Long?> = whole?.first ?: s.queueItems.map { entryOf(it) }
+        val tvIds = whole?.second ?: s.queueItems.map { it.itemId }
         val currentAt = tvIds.indexOf(currentId)
-        if (currentAt < 0 || tvKeys[currentAt] != keys.getOrNull(index)) return
+        if (currentAt < 0 || tvKeys[currentAt] != keys.getOrNull(index)) {
+            if (whole != null) {
+                AppLog.d("Cast", "The TV's list doesn't match what the phone sent: following its status")
+                onTv = emptyList()
+            }
+            return
+        }
         val want = TvWindow.around(items.size, index, repeat == Player.REPEAT_MODE_ALL).map { keys[it] }
         val wantAt = want.indexOf(keys[index])
         val plan = TvWindow.plan(tvKeys, currentAt, want, wantAt)
@@ -495,7 +528,10 @@ class TvPlayer(
                 else -> done()
             }
         }
-        AppLog.d("Cast", "The TV's songs follow the queue: ${remove.size} out, ${plan.insertAfter.size + plan.insertBefore.size} in")
+        AppLog.d("Cast", "The TV's songs follow the queue: ${remove.size} out, ${plan.insertAfter.size + plan.insertBefore.size} in" +
+            " (the TV holds ${tvKeys.size}${if (whole == null) ", as its status lists them" else ""})")
+        // Once done, the TV holds just the window the phone wants.
+        onTv = if (whole != null) want else emptyList()
         if (remove.isNotEmpty()) c.queueRemoveItems(remove, null).setResultCallback { insertAll() } else insertAll()
     }
 
@@ -543,6 +579,16 @@ object TvWindow {
     const val BEHIND = 1
     /** Songs after it: the next is loaded ahead for no gap, the rest are a cushion for the TV remote's next. */
     const val AHEAD = 4
+
+    /**
+     * The TV's songs as the phone's keys with their Cast item ids (issue #972): [onTv], what the phone put on the TV,
+     * against [ids], Cast's whole list of item ids, when they're as many; null when they don't line up.
+     */
+    /** How long Cast's list of item ids may lag a change before the phone follows the status's few songs instead. */
+    const val LIST_WAIT_MS = 3_000L
+
+    fun matched(onTv: List<Long>, ids: List<Int>): Pair<List<Long?>, List<Int>>? =
+        if (onTv.isNotEmpty() && onTv.size == ids.size) onTv to ids else null
 
     /** The phone's indexes the TV holds around [index] of [size], in order; wrapping when [wrap] (repeat all). */
     fun around(size: Int, index: Int, wrap: Boolean): List<Int> {

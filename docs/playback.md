@@ -213,7 +213,9 @@ The device button in now playing shows TVs and speakers on the same Wi-Fi: Chrom
 ones (most smart TVs, Sonos, AV receivers). They play straight from your server: a Chromecast gets your music
 lossless (see **Chromecast sound quality** below), a DLNA one Opus 320 kbit/s if it lists Ogg among the formats it
 plays, otherwise MP3 320, unless you ask for the original files.
-Stopping the cast brings the music back to the phone, paused. In **Play on**, each Chromecast shows its own name with
+Stopping the cast brings the music back to the phone, paused. If the TV's Siansa screen closes by itself, the phone
+joins the TV again straight away and the music carries on there (at most once in two minutes; if it keeps closing,
+the music comes back to the phone). In **Play on**, each Chromecast shows its own name with
 "Chromecast" under it ("Chromecast · speaker" or "Chromecast · speaker group" for speakers and groups); DLNA ones show
 "DLNA" and their model.
 

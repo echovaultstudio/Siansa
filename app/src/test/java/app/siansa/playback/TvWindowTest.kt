@@ -68,4 +68,43 @@ class TvWindowTest {
         assertEquals(listOf(1L), plan.insertBefore)
         assertEquals(0, plan.insertBeforeAt)
     }
+
+    /** Issue #972: at a song change the TV's window moves by one song: one out, one in, nothing sent twice. */
+    @Test
+    fun aSongChangeIsOneOutOneIn() {
+        val keys = (0L..36L).toList()
+        val tv = TvWindow.around(37, 7, wrap = false).map { keys[it] }  // 6..11, playing 7
+        val want = TvWindow.around(37, 8, wrap = false).map { keys[it] }  // 7..12, playing 8
+        val ids = listOf(101, 102, 103, 104, 105, 106)
+        val (tvKeys, tvIds) = TvWindow.matched(tv, ids)!!
+        assertEquals(ids, tvIds)
+        val plan = TvWindow.plan(tvKeys, tvKeys.indexOf(8L), want, want.indexOf(8L))
+        assertEquals(listOf(0), plan.remove)
+        assertEquals(listOf(12L), plan.insertAfter)
+        assertEquals(emptyList<Long>(), plan.insertBefore)
+    }
+
+    /** Cast's status only lists the songs around the one playing: read from it, the window looked short (the bug). */
+    @Test
+    fun theStatusAloneSendsSongsTwice() {
+        val want = TvWindow.around(37, 8, wrap = false).map { it.toLong() }
+        val plan = TvWindow.plan(listOf(8L, 9L), 0, want, want.indexOf(8L))
+        assertEquals(listOf(10L, 11L, 12L), plan.insertAfter)  // 10 and 11 were already on the TV
+    }
+
+    @Test
+    fun theWholeListOnlyWhenItLinesUp() {
+        assertEquals(null, TvWindow.matched(listOf(1L, 2L, 3L), listOf(10, 11)))
+        assertEquals(null, TvWindow.matched(emptyList(), emptyList()))
+    }
+
+    @Test
+    fun theTvIsJoinedAgainOnlyWhenItsScreenClosedByItself() {
+        val failed = 2155
+        assertEquals(true, CastRejoin.worth(failed, knownTv = true, fromPhone = false, sinceLastMs = CastRejoin.EVERY_MS))
+        assertEquals(false, CastRejoin.worth(0, knownTv = true, fromPhone = false, sinceLastMs = CastRejoin.EVERY_MS))  // ended cleanly
+        assertEquals(false, CastRejoin.worth(failed, knownTv = true, fromPhone = true, sinceLastMs = CastRejoin.EVERY_MS))  // the phone ended it
+        assertEquals(false, CastRejoin.worth(failed, knownTv = false, fromPhone = false, sinceLastMs = CastRejoin.EVERY_MS))
+        assertEquals(false, CastRejoin.worth(failed, knownTv = true, fromPhone = false, sinceLastMs = 30_000))  // just did
+    }
 }

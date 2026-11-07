@@ -445,7 +445,10 @@ player.setMessageInterceptor(M.MessageType.LOAD, req => {
     const items = req.queueData && req.queueData.items || [];
     const said = counts(items);
     if (req.media) pick(req.media);
-    tvlog('load from ' + (req.senderId || 'the TV') + ': ' + items.length + ' songs, starting at ' +
+    // Cast's own loads of the next song (ahead of time, and at the change) come with no queue and no phone: say so,
+    // rather than "0 songs" (issue #972).
+    if (!items.length && !req.senderId) tvlog('the TV loads the next song itself: ' + songOf(req.media));
+    else tvlog('load from ' + (req.senderId || 'the TV') + ': ' + items.length + ' songs, starting at ' +
       ((req.queueData && req.queueData.startIndex || 0) + 1) + ', ' + said + failedNote());
   } catch (e) { tvlog('load: ' + e.message); }
   return req;
@@ -547,7 +550,8 @@ const SE = cast.framework.system.EventType;
 if (SE.SENDER_DISCONNECTED) context.addEventListener(SE.SENDER_DISCONNECTED, e => tvlog('the phone let go (' + (e && e.reason) + ')'));
 if (SE.SHUTDOWN) context.addEventListener(SE.SHUTDOWN, () => tvlog('the TV screen is closing'));
 
-// Previous and next work on the queue the phone sends (the whole queue, with the next song loaded ahead).
+// Previous and next work on the songs the phone sends: the one playing, one before and a few after (the phone keeps the
+// queue, issue #114), the next loaded ahead.
 const options = new cast.framework.CastReceiverOptions();
 options.statusText = 'Siansa';
 options.customNamespaces = { [LOG_NS]: cast.framework.system.MessageType.STRING };
