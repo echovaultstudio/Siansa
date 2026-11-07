@@ -27,7 +27,7 @@ from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url,
 from . import generations, jobs, similarity, status, store
 
 PLUGIN_ID = "siansa_analysis"
-VERSION = "0.5.6"  # the newest in plugin.json: AudioMuse-AI and the Siansa app show it (test_version.py)
+VERSION = "0.5.7"  # the newest in plugin.json: AudioMuse-AI and the Siansa app show it (test_version.py)
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
@@ -132,9 +132,11 @@ def health():
             "plugin": PLUGIN_ID, "plugin_version": VERSION, "schema_version": SCHEMA_VERSION, "status": "ok",
             "profiles": state["profiles"].to_json(), "similar": state["similar"].to_json(),
         })
-    except Exception as e:
+    except Exception:
+        # The details stay in AudioMuse's log: an error's text can say things about the server (CodeQL).
         logger.exception("siansa_analysis health check failed")
-        return jsonify({"plugin": PLUGIN_ID, "plugin_version": VERSION, "status": "error", "error": str(e)[:200]})
+        return jsonify({"plugin": PLUGIN_ID, "plugin_version": VERSION, "status": "error",
+                        "error": "The plugin's health check failed: the details are in AudioMuse-AI's log"})
 
 
 @bp.route("/api/profiles")
