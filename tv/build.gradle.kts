@@ -6,13 +6,17 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-// Siansa for Android TV and Google TV (issue #860): an app of its own, app.siansa.tv, installed next to the phone app
-// and never over it. It builds the phone app's code as it is (the server and library, mixes, the playback service and
+// Siansa for Android TV and Google TV (issue #860): an app of its own, for the remote. On Google Play it's the same app as
+// the phone's, app.siansa (issue #988): one store page, the TV bundle on Play's Android TV tracks, and Play gives TVs this
+// one and phones theirs. Its version codes are apart from the phone's ([TV_CODES]), as Play needs every bundle of an app to
+// have its own. It builds the phone app's code as it is (the server and library, mixes, the playback service and
 // the audio engine) from app/src/main, and adds its own screens for the remote from tv/src/main. Nothing in app/ depends
 // on this module, so the phone app builds and ships exactly as before.
 val appVersion = rootProject.file("version.txt").readText().trim()
 val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 val shared = rootProject.file("app/src/main")
+// Added to the TV's version codes so they never meet the phone's, which count CI's runs from 1 (issue #988).
+val TV_CODES = 1_000_000_000
 
 android {
     // The same namespace as the phone app: its code refers to app.siansa.R and app.siansa.BuildConfig.
@@ -21,10 +25,10 @@ android {
     ndkVersion = "27.0.12077973"
 
     defaultConfig {
-        applicationId = "app.siansa.tv"
+        applicationId = "app.siansa"
         minSdk = 26
         targetSdk = 36
-        versionCode = buildNumber
+        versionCode = TV_CODES + buildNumber
         versionName = appVersion
         // The TV app plays through the new audio engine (issue #826), the engine v1.0 brings to everyone.
         buildConfigField("boolean", "MIXER_ENGINE", "true")
@@ -63,12 +67,14 @@ android {
         }
         debug {
             signingConfigs.findByName("siansa")?.let { signingConfig = it }
+            // Apart from the phone app's own debug build.
+            applicationIdSuffix = ".tv.debug"
         }
-        // Siansa TV Dev: built with Siansa Dev from the mixer branch (.github/workflows/dev-app.yml), installed next to
-        // the TV app as app.siansa.tv.dev. Never sent to Google Play.
+        // Siansa TV Dev: built from the dev branch (.github/workflows/tv-dev.yml), installed next to the TV app as
+        // app.siansa.tv.dev, as before. Never sent to Google Play.
         create("dev") {
             initWith(getByName("release"))
-            applicationIdSuffix = ".dev"
+            applicationIdSuffix = ".tv.dev"
             versionNameSuffix = "-dev"
             matchingFallbacks += "release"
         }
