@@ -62,11 +62,12 @@ queue.
 
 From a song's menu: **Similar songs** and **Similar albums**. On an artist's page: **Fans also like**.
 
-On an album's page, the buttons under its details are spread across the page: **Download**, **Similar albums**
-(with AudioMuse-AI), **Shuffle** and **Play**.
+On an album's page, the buttons under its details: **add to a playlist** (the plus) and **Download** on the left,
+**Similar albums** (with AudioMuse-AI), **Shuffle** and **Play** on the right.
 
 - **Play** carries on where you stopped, when you left the album part way: a ring round it shows how far you got,
-  and **from 10** under it says which song it starts from. Press and hold Play to start from the first song instead.
+  and the details line says **Continue from 8**. Press and hold Play to start from the first song instead.
+- The **plus** adds the whole album to a playlist you pick.
 - **Shuffle** plays the album shuffled. With AudioMuse-AI, **slide right** from it all the way onto Play for a **DJ mix
   of the album**: its own songs only, in an order that blends well (tempo and key, as a DJ mix orders them), played
   with DJ blends. It picks among the orders that blend best, so it doesn't always start from the same song. Nothing

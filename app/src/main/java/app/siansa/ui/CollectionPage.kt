@@ -27,7 +27,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.material.icons.rounded.AddCircleOutline
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -77,6 +78,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -422,6 +424,14 @@ private fun ActionRow(
     val albumMix by app.siansa.mix.AlbumDjMix.playing.collectAsStateWithLifecycle()
     val mixOn = onDjMix != null && playerState.hasMedia && app.siansa.mix.albumMixPlaying(playerState.queue, songs, albumMix)
     if (saving && saveAs != null) SaveAsPlaylistDialog(saveAs, songs) { saving = false }
+    // An album's plus (the owner's layout): the album into a playlist.
+    var adding by remember { mutableStateOf(false) }
+    val snack = LocalSnack.current
+    val snackScope = rememberCoroutineScope()
+    if (adding) AddToPlaylistDialog(songs) { message ->
+        adding = false
+        if (message != null) snackScope.launch { snack.showSnackbar(message) }
+    }
     ActionButtons(
         enabled = songs.isNotEmpty(),
         onQueue = { songs.forEach { graph.player.addToQueue(it) } },
@@ -446,6 +456,7 @@ private fun ActionRow(
         dim = dim,
         mixOn = mixOn,
         albumBar = albumBar,
+        onAddToPlaylist = if (albumBar && songs.isNotEmpty()) ({ adding = true }) else null,
         resume = resume?.takeIf { !playback.loaded && it.index in songs.indices }?.let { it to songs.size },
     )
 }
@@ -473,6 +484,8 @@ internal fun ActionButtons(
     // Where Play continues, with the album's length: Play shows a ring for how far you got and "from 10" under it.
     resume: Pair<PlayResume, Int>? = null,
     onPlayFromStart: (() -> Unit)? = null,
+    // An album's plus: the whole album into a playlist you pick.
+    onAddToPlaylist: (() -> Unit)? = null,
 ) {
     // How far right of shuffle's middle Play's near edge is: sliding there starts the DJ mix.
     var shuffleX by remember { mutableStateOf<Float?>(null) }
@@ -513,27 +526,24 @@ internal fun ActionButtons(
         }
     }
     if (albumBar) {
-        // Spread evenly across the page (the owner, issue #965): each in an equal share of the row, centred, so their
-        // middles are evenly apart though Play is bigger. Each is as tall as Play, so they line up with its middle while
-        // "from 10" hangs under Play.
-        PlayButtonRow(verticalAlignment = Alignment.Top) {
-            Box(Modifier.weight(1f).height(BIG_PLAY_SIZE).alpha(dim), contentAlignment = Alignment.Center) { download() }
-            if (onSimilar != null) Box(Modifier.weight(1f).height(BIG_PLAY_SIZE).alpha(dim), contentAlignment = Alignment.Center) { similarButton() }
-            Box(Modifier.weight(1f).height(BIG_PLAY_SIZE).alpha(if (djSlide != null) 1f else dim), contentAlignment = Alignment.Center) { shuffleButton() }
-            // "from 10" (wider with large text) never moves the other buttons: each share is the same.
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                playButton()
-                resume?.let { (at, _) ->
-                    Text(
-                        "from ${at.label}",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Accent,
-                        maxLines = 1,
-                        modifier = Modifier.wrapContentWidth(unbounded = true).alpha(dim).padding(top = Space.Tight).testTag("playFrom"),
-                    )
+        // The owner's layout (7 Nov): add to a playlist and download on the left, the plus right in line with the details
+        // above; similar albums, shuffle and Play on the right; nothing under Play, so the first song comes close under.
+        PlayButtonRow {
+            if (onAddToPlaylist != null) {
+                IconButton(
+                    onClick = onAddToPlaylist,
+                    enabled = enabled,
+                    modifier = Modifier.offset(x = -ICON_INSET).alpha(dim).testTag("albumAddToPlaylist"),  // spacing: exact (the icon in line with the text above)
+                ) {
+                    Icon(Icons.Rounded.AddCircleOutline, "Add to a playlist", Modifier.size(ICON_SIZE))
                 }
             }
+            Box(Modifier.offset(x = if (onAddToPlaylist != null) -ICON_INSET else 0.dp).alpha(dim)) { download() }  // spacing: exact
+            Spacer(Modifier.weight(1f))
+            Box(Modifier.alpha(dim)) { similarButton() }
+            Box(Modifier.alpha(if (djSlide != null) 1f else dim)) { shuffleButton() }
+            Spacer(Modifier.width(Space.Small))
+            playButton()
         }
         return
     }
@@ -591,21 +601,27 @@ fun BigPlayButton(
 ) {
     val ring = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
     val accent = Accent
+    // With a ring (an album you stopped part way), the button shrinks inside the same square, so Play stays the size of
+    // the mix pages' (the owner, 7 Nov) and the row doesn't grow.
     Box(
         Modifier
             .size(BIG_PLAY_SIZE)
             .then(
                 if (progress == null) Modifier
                 else Modifier.drawBehind {
-                    // Just outside the button: the whole track faint, how far you got in the accent.
+                    // The whole track faint, how far you got in the accent, inside the square.
                     val stroke = BIG_PLAY_RING.toPx()
-                    val inset = -BIG_PLAY_RING_OUTSET.toPx() - stroke / 2
-                    val arc = Size(size.width - 2 * inset, size.height - 2 * inset)
-                    val at = Offset(inset, inset)
+                    val arc = Size(size.width - stroke, size.height - stroke)
+                    val at = Offset(stroke / 2, stroke / 2)
                     drawArc(ring, 0f, 360f, false, at, arc, style = Stroke(stroke))
                     drawArc(accent, -90f, 360f * progress.coerceIn(0f, 1f), false, at, arc, style = Stroke(stroke, cap = StrokeCap.Round))
                 },
-            )
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+    Box(
+        Modifier
+            .size(if (progress == null) BIG_PLAY_SIZE else BIG_PLAY_SIZE - (BIG_PLAY_RING + BIG_PLAY_RING_OUTSET) * 2)
             .clip(CircleShape)
             .background(if (enabled) Accent else Accent.copy(alpha = 0.4f))
             .combinedClickable(
@@ -627,6 +643,7 @@ fun BigPlayButton(
             modifier = Modifier.size(32.dp),
         )
     }
+    }
 }
 
 /** How strongly the song playing now is marked in a song list: the queue's band, in the theme's colour. */
@@ -647,7 +664,7 @@ internal fun playingIndex(songs: List<Song>, current: Song?): Int? {
 
 /** A small "meta" line under the title: artist avatar and name, then details. */
 @Composable
-fun CollectionByline(name: String?, avatarCover: String?, onClick: (() -> Unit)?, details: String) {
+fun CollectionByline(name: String?, avatarCover: String?, onClick: (() -> Unit)?, details: String, note: String? = null) {
     Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
         if (!name.isNullOrBlank()) {
             Row(
@@ -661,7 +678,20 @@ fun CollectionByline(name: String?, avatarCover: String?, onClick: (() -> Unit)?
                 Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             }
         }
-        Text(details, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // [note] after the details in the accent: "Continue from 8" on an album you stopped part way (the owner, 7 Nov).
+        val accent = Accent
+        Text(
+            androidx.compose.ui.text.buildAnnotatedString {
+                append(details)
+                if (note != null) {
+                    append(" · ")
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = accent, fontWeight = FontWeight.SemiBold)) { append(note) }
+                }
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag("collectionDetails"),
+        )
     }
 }
 
@@ -717,5 +747,12 @@ private const val SLIDE_OTHERS = 0.3f
 data class PlayResume(val index: Int, val label: String)
 
 private val BIG_PLAY_SIZE = 56.dp
-private val BIG_PLAY_RING = 3.dp
-private val BIG_PLAY_RING_OUTSET = 3.dp
+/**
+ * An album bar icon's size, and how far its drawing sits inside its touch area: the icon centred in 48 dp, plus the
+ * circle's own margin in its 24-unit drawing (2 units). The plus moves left by that, so its circle starts in line with
+ * the text above.
+ */
+private val ICON_SIZE = 28.dp
+private val ICON_INSET = (48.dp - ICON_SIZE) / 2 + ICON_SIZE * 2 / 24
+private val BIG_PLAY_RING = 2.5.dp
+private val BIG_PLAY_RING_OUTSET = 1.5.dp
