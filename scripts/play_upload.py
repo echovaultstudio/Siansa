@@ -2,6 +2,7 @@
 """Uploads a release's app bundle to Google Play (issue #557).
 
   python3 scripts/play_upload.py siansa-0.37.0beta.aab 0.37.0beta notes.md
+  python3 scripts/play_upload.py --tv siansa-tv-0.37.0beta.aab 0.37.0beta notes.md
 
 The bundle goes to the testing tracks in PLAY_TRACK, comma-separated; unset, both closed testing ("alpha", Play's
 name for it) and internal testing. It's one release on each, named after the version, with the version's notes as
@@ -11,6 +12,11 @@ Google's review.
 Needs PLAY_SERVICE_ACCOUNT_JSON: a Google Cloud service account's JSON key, invited in Play Console with
 "Release apps to testing tracks" for Siansa only. Without it nothing is sent. The key stays in that secret; this
 script never prints it.
+
+The TV app (--tv, issue #988) is the same app on Play, app.siansa, on Play's own Android TV tracks: one store page,
+and Play gives TVs the TV bundle and phones the phone's. Its tracks are PLAY_TV_TRACK, comma-separated; unset, the TV's
+internal testing ("tv:qa"). Play Console must have Android TV turned on first (Advanced settings › Form factors), and a
+closed test for TVs is a track of its own there, named "tv:" and its name (e.g. "tv:alpha").
 
 A bundle Play already has isn't an error: it's found by its SHA-256 and put on the tracks, so running this again
 for a release adds it to a track it wasn't on, and otherwise changes nothing.
@@ -30,6 +36,16 @@ NOTES_MAX = 500
 # Closed testing ("alpha" in the API) and internal testing, both with every release (#557).
 DEFAULT_TRACKS = ("alpha", "internal")
 TRACK_NAMES = {"alpha": "closed testing", "internal": "internal testing", "beta": "open testing", "production": "production"}
+# The TV app's tracks (issue #988): Play's Android TV form factor, "tv:" and the track. Internal testing is "qa" there.
+DEFAULT_TV_TRACKS = ("tv:qa",)
+
+
+def track_name(track):
+    """A track in words: "closed testing", or "TV internal testing" for "tv:qa"."""
+    if track.startswith("tv:"):
+        rest = track[3:]
+        return "TV " + {"qa": "internal testing", "beta": "open testing", "production": "production"}.get(rest, f"closed testing ({rest})")
+    return TRACK_NAMES.get(track, track)
 
 
 def plain_notes(markdown):
@@ -131,14 +147,18 @@ def step_of(method, url):
     return f"{method} {path}"
 
 
-def tracks_of(setting):
-    """The tracks a release goes to: PLAY_TRACK as "alpha,internal", each once, in order; both when unset (#557)."""
+def tracks_of(setting, tv=False):
+    """The tracks a release goes to: PLAY_TRACK as "alpha,internal", each once, in order; both when unset (#557). For
+    the TV app ([tv]), PLAY_TV_TRACK, every one a TV track ("tv:" added where it's left out); its internal testing when
+    unset."""
     tracks = []
     for t in (setting or "").split(","):
         t = t.strip()
+        if tv and t and not t.startswith("tv:"):
+            t = "tv:" + t
         if t and t not in tracks:
             tracks.append(t)
-    return tracks or list(DEFAULT_TRACKS)
+    return tracks or list(DEFAULT_TV_TRACKS if tv else DEFAULT_TRACKS)
 
 
 def sha256_of(path):
@@ -205,7 +225,7 @@ def upload(aab, version, notes_md, tracks, key_json):
         # Same edit, so the bundle uploaded to it is still there.
         status = "draft"
         put(status)
-    print(f"::notice::Google Play: {version} (version code {code}) is on {', '.join(TRACK_NAMES.get(t, t) for t in tracks)} as {status}."
+    print(f"::notice::Google Play: {version} (version code {code}) is on {', '.join(track_name(t) for t in tracks)} as {status}."
           + (" Roll it out in Play Console." if status == "draft" else " Internal testing has it now; closed testing after Google's review."))
     return status
 
@@ -215,13 +235,15 @@ def main(argv):
     if not key:
         print("::notice::No Google Play key (PLAY_SERVICE_ACCOUNT_JSON); skipped.")
         return 0
-    if len(argv) != 4:
+    tv = "--tv" in argv[1:]
+    args = [a for a in argv[1:] if a != "--tv"]
+    if len(args) != 3:
         print(__doc__)
         return 2
-    aab, version, notes_path = argv[1:]
+    aab, version, notes_path = args
     with open(notes_path, encoding="utf-8") as f:
         notes_md = f.read()
-    tracks = tracks_of(os.environ.get("PLAY_TRACK", ""))
+    tracks = tracks_of(os.environ.get("PLAY_TV_TRACK" if tv else "PLAY_TRACK", ""), tv=tv)
     try:
         upload(aab, version, notes_md, tracks, key)
     except PlayError as e:
