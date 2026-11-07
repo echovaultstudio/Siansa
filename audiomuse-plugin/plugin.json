@@ -6,6 +6,12 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.5.7",
+      "min_core_version": "3.6.4",
+      "changelog": "A failed health check no longer sends the error's text to the app; the details are in AudioMuse-AI's log.",
+      "imageUrl": ""
+    },
+    {
       "version": "0.5.6",
       "min_core_version": "3.6.4",
       "changelog": "Siansa's settings show the plugin's real version. It had said 0.3.3 since that version.",
