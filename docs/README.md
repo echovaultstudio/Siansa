@@ -1,41 +1,34 @@
 # Siansa documentation
 
-Everything you need to know about Siansa: how to set it up, what each part of the app does, how it works under
-the hood, and what to do when something goes wrong.
-
-> These pages follow the newest version of Siansa. When something here doesn't match your app, check
-> [What changed](../CHANGELOG.md) or update the app. The TV app is still in beta.
+Siansa is a music player for your own music server (Navidrome, Jellyfin or Emby), on Android phones, Android Auto and
+Android TV. These pages follow the newest version; if something doesn't match, update the app or see [What
+changed](../CHANGELOG.md).
 
 ## Start here
 
 - [Getting started](getting-started.md): what you need, installing, first setup.
-- [Install and report a problem](testing.md): Google Play and F-Droid, the AudioMuse-AI plugin, how to report a bug.
 - [Servers, users and libraries](servers-and-users.md): Navidrome, Jellyfin and Emby, several users, the source filter.
 - [AudioMuse-AI and the Siansa plugin](audiomuse.md): the smart parts and how to connect them.
 
 ## Using Siansa
 
-- [Home and your mixes](home-and-mixes.md): today's mix, vibes, Made for you, radios, shortcuts.
+- [Home and your mixes](home-and-mixes.md): today's mix, vibes, Made for you, cards, radios.
 - [Discovery](discovery.md): song radio, Keep playing, similar music, Song path, Flow, the dice.
-- [Playback](playback.md): quality, cache, downloads, levelling, crossfades, equaliser, lyrics, sleep timer, casting,
-  Android Auto.
-- [Your listening](your-listening.md): your month and year, Time Machine, sonic fingerprint, scrobbling.
-- [Audiobooks and podcasts](books.md): Audiobookshelf, the Books panel and chips, the book player.
-- [Your Stations](stations.md): internet radio from your server and your own links, and podcasts by their feed.
-- [Siansa on your TV](tv.md): the Android TV and Google TV app (in beta), signing in from your phone, audio passthrough.
-- [AI features](ai.md): what the optional AI does, what it's sent, and the Situation panel.
-- [Settings](settings.md): every settings page, one by one.
+- [Playback](playback.md): quality, downloads, levelling, crossfades and DJ blends, now playing, casting, Android Auto.
+- [Your listening](your-listening.md): your month and year, Time Machine, scrobbling.
+- [Audiobooks and podcasts](books.md) and [Your Stations](stations.md): Audiobookshelf, radio and podcast feeds.
+- [Siansa on your TV](tv.md): the Android TV and Google TV app, and audio passthrough.
+- [AI features](ai.md): what the optional AI does, and what it's sent.
+- [Settings](settings.md): every settings page.
+
+## Help
+
+- [Troubleshooting](troubleshooting.md): common problems and what to check.
+- [Install and report a problem](testing.md): testing Siansa, and sending a useful report.
+- [Privacy, logs and reporting problems](privacy-and-logs.md)
 
 ## Under the hood
 
-- [How it works](how-it-works.md): how mixes, radios, levelling, crossfades and scrobbles are worked out.
-- [API](api.md): what Siansa asks of your servers, and the Siansa plugin's own API.
-- [Privacy, logs and reporting problems](privacy-and-logs.md)
-- [Troubleshooting](troubleshooting.md): common problems and what to check.
-
-## Keeping these pages up to date
-
-See [Maintaining the docs](MAINTAINING.md). Every new feature or change that users notice also updates these
-pages, in the same release.
-
-These pages will move to **docs.siansa.app** later.
+- [How it works](how-it-works.md): how mixes, radios, levelling, crossfades and DJ blends are worked out.
+- [API](api.md): what Siansa asks of your servers, and the Siansa plugin's API.
+- [Logging](logging.md) and [Maintaining the docs](MAINTAINING.md), for whoever works on Siansa.

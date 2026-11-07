@@ -2,49 +2,40 @@
 
 ## What you need
 
+Siansa plays with a music server alone. For the best of it, set up all four:
+
 | | |
 |---|---|
-| **Phone** | Android 8.0 or newer. |
-| **Music server** | Navidrome (or another OpenSubsonic server: Gonic, Airsonic, Ampache…), Jellyfin (10.9 or later) or Emby, that your phone can reach. At home on Wi-Fi is fine. Away from home, use a VPN such as WireGuard or Tailscale, or your own secure address. Files on the phone are listed as "coming soon". |
-| **AudioMuse-AI** (recommended) | [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) 3.6.4 or newer, connected to your music server, with text search (CLAP) on. It powers the mixes, radios, search by sound and more. See [AudioMuse-AI](audiomuse.md). |
-| **[Siansa Analysis plugin](https://github.com/echovaultstudio/siansa-audiomuse-plugin)** (recommended) | Installed in AudioMuse-AI ([how](audiomuse.md#install-the-siansa-analysis-plugin)). Needed for loudness levelling from measured audio, smart crossfades, DJ blends that keep to the beat, and similar albums and artists. |
-| **An AI service** (optional) | For mix titles and sound searches written by an AI model: OpenRouter, OpenAI, Anthropic, Google Gemini, Mistral, Groq, or Ollama on your own network. See [AI features](ai.md). |
-| **Last.fm or Koito** (optional) | Where Siansa sends your listens (scrobbling) and reads your history back from. [Last.fm](https://www.last.fm) with your own API key, or [Koito](https://github.com/gabehf/Koito), a ListenBrainz-compatible history server you run yourself. They keep your full listening history, which powers **Time Machine**, **Your month and year** and your history. Set them up in **Settings › Scrobbling and history**. See [Your listening](your-listening.md#scrobbling). |
+| **A music server** | [Navidrome](https://www.navidrome.org) (or another OpenSubsonic server), [Jellyfin](https://jellyfin.org) 10.9 or newer, or [Emby](https://emby.media), that your phone can reach. Away from home, use a VPN such as WireGuard or Tailscale, or your own secure address. |
+| **AudioMuse-AI** | [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) 3.6.4 or newer, with text search on, and the [Siansa plugin](audiomuse.md#install-the-siansa-plugin) in it. It powers the mixes, radios, search by sound, smart crossfades and DJ blends. See [AudioMuse-AI](audiomuse.md). |
+| **An AI service** | [OpenRouter](https://openrouter.ai) or a similar service (OpenAI, Anthropic, Gemini, Mistral, Groq, or Ollama at home), for mix titles and sound searches written for the moment. A small, cheap model is plenty. See [AI features](ai.md). |
+| **Last.fm or Koito** | Where your listens are kept: [Last.fm](https://www.last.fm), or [Koito](https://github.com/gabehf/Koito) on your own server. They keep your whole history, for **Time Machine** and **Your month and year**. See [Your listening](your-listening.md#scrobbling). |
 
-Siansa works as a plain player with only a music server. Everything "smart" needs AudioMuse-AI. Without Last.fm or Koito, Time Machine and your history use only what Siansa and your server have recorded.
+Plus Android 8.0 or newer on your phone, or Android TV or Google TV for [the TV app](tv.md).
 
 ## Install
 
-Pick one. Both give you the same app, and updates arrive the same way.
+- **Google Play** (in testing): [join Siansa's testers](https://siansa.app/#join), then install Siansa from Google
+  Play with the same Google account. On a TV, search for Siansa in the TV's Play Store.
+- **F-Droid**: in the F-Droid app, **Settings › Repositories › +**, add `https://siansa.app/fdroid/repo`, then install
+  Siansa.
 
-- **Google Play**: use the invite link we email you, tap **Become a tester**, then install Siansa from Play.
-  Use the Google account whose email you gave us.
-- **F-Droid**: in the F-Droid app, go to **Settings › Repositories › +** and add the repository address from your
-  invite. Then search for Siansa and install it.
-
-Not on the list yet? [Ask for an invite](https://siansa.app).
+Both update by themselves. **Settings › About › What's new** shows what changed.
 
 ## First setup
 
-1. **Where's your music?** Pick your server type: OpenSubsonic (Navidrome and others), Jellyfin or Emby.
-2. **Smart extras.** Choose **Add AudioMuse-AI** if you have it, or **Not now**. You can add it later in
-   Settings › Connections.
-3. **Connect your servers.** Enter your server's address (for example `http://192.168.1.10:4533`), user name and
-   password. Tap **Test**, then **Save**. If you added AudioMuse-AI, enter its address and its API token (or
-   user name and password) too.
-4. **Library sync.** Siansa copies your library's list of artists, albums and songs to the phone, so browsing
-   and search are instant and mixes build quickly. The first sync of a large library takes a few minutes. Only
-   the list is copied, never the music files.
+1. **Where's your music?** Pick OpenSubsonic (Navidrome and others), Jellyfin or Emby.
+2. **Smart extras.** **Add AudioMuse-AI** if you have it, or **Not now**.
+3. **Connect.** Your server's address (`http://192.168.1.10:4533`), user name and password, then **Test** and
+   **Save**; the same for AudioMuse-AI.
+4. **Library sync.** Siansa copies the list of your artists, albums and songs to the phone (never the files), so
+   browsing is instant. A big library takes a few minutes the first time.
 
-That's it: Home fills with your mixes and recent music.
-
-## Updating
-
-Google Play and F-Droid update Siansa by themselves. **Settings › About › What's new** shows what changed in the version
-you have; tap it to see every version's changes.
+Home then fills with your mixes. Add the AI service and Last.fm or Koito under **Settings › Connections** and
+**Settings › Scrobbling and history** whenever you like.
 
 ## Next
 
-- Several servers or users? See [Servers, users and libraries](servers-and-users.md).
-- Set up the smart parts: [AudioMuse-AI and the Siansa plugin](audiomuse.md).
-- Keep your history and use Time Machine: [Your listening](your-listening.md).
+- [Home and your mixes](home-and-mixes.md): what's on Home and how to make it yours.
+- [Siansa on your TV](tv.md): the TV app, signed in from your phone in a few seconds.
+- [Servers, users and libraries](servers-and-users.md): several logins, or the family's music together.

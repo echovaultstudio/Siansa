@@ -76,21 +76,43 @@ Each song gets one volume, from **one** source, never two at once:
 - Like ReplayGain, levelling works through the player's volume, so it can only **turn songs down**. That's why −14
   can't raise quiet songs to it.
 
-## Smart crossfades
+## Crossfades and DJ blends
 
 The Siansa plugin measures how each song starts and ends (the MixRamp idea from the MPD player): for a range of
 levels, how long after the start the song first gets that loud, and how long before the end it's last that loud.
 
-For each change of song, the **overlap** is the current song's quiet tail plus the time the next song takes to get
-going, up to your crossfade length:
+**Smart crossfades.** The overlap is the current song's quiet tail plus the time the next song takes to get going, up
+to your crossfade length. Both fade "equal power", so the loudness doesn't dip.
 
-- a long fade-out starts blending early; a hard ending doesn't blend at all;
-- a slow intro fades in slowly; a hard hit comes in at once;
-- the next track of the same album (same or next disc) isn't faded, so live albums and DJ mixes stay gapless.
+- A long fade-out blends early, and is cut once it's quiet. Silence at the end is skipped, but never before three
+  quarters of the song, so a quiet passage mid-song never starts the next one.
+- **Cold ends**: a hard ending into a hard start doesn't overlap. The old song plays to its last sound, then a short
+  pause (0.4 s, 0.6 s when the tempos are far apart), as a radio DJ plays it. Two songs with a beat get no pause.
+- **After the last beat**: a beatless outro of 6 s or more (plugin 0.5.0) lets the next song in one beat after the
+  last, and plays out under it, up to half a minute and never more than a third of either song. Only an outro that
+  winds down gets that long blend.
+- The next track of the same album isn't faded. Without measurements, the fixed length is used, but after a song
+  that ends on a beat the blend is short, so the beats don't clash.
 
-The current song fades out over the whole overlap and the next one fades in, both "equal power" so the loudness
-doesn't dip in the middle. Without measurements, the fixed length is used, except after a song that ends on a beat: then the blend is short, since the next song's beat can't be followed. Siansa fetches the measurements of the
-next few songs whenever the queue changes, so a radio or a reshaped DJ mix has them before its first blend.
+**Beat-matched blends.** The plugin also measures the beat grid at each end of a song, and from 0.4.0 its phrases (the
+4 or 8 bars a song is built from).
+
+- The blend starts where a phrase of the song going out starts, the next song comes in on its first phrase, and it
+  lasts whole phrases, as many as the Blend length allows. Without phrases, it goes bar on bar.
+- The next song plays up to 8 % faster or slower to keep time, then eases back over about 25 seconds in steps too
+  slight to hear. A shift over 4 % is kept to 8 bars. Its pitch moves with the speed (at most two thirds of a
+  semitone at 4 %), like a DJ's pitch fader.
+- Tempos are counted as a DJ counts: a beat read at half time is doubled. Songs whose tempos are more than 8 % apart, an
+  unsteady beat, or a stream that can't seek, get a short blend instead.
+- When the plugin couldn't hear a song's bars, but it was made on a grid (a whole BPM, steady all through), its bars
+  are counted from its first beat, as DJ software does; the log says "assumed".
+- Tracks of a continuous mix ("Mixed by", "DJ Mix") already hold their neighbours, so they're never beat-matched.
+- Behind the scenes, a silent second copy of the song going out plays for its last 14 seconds and is brought in step,
+  so it can hand over without a hitch. A blend may start up to a bar late rather than out of step. The log says how
+  each blend was planned and how far out of step it was.
+
+Songs the plugin measured before it measured beats get their beats when it measures them again (**Beat grids** on the
+plugin's settings page). Siansa fetches the measurements of the next few songs whenever the queue changes.
 
 ## When a song counts (scrobbling)
 

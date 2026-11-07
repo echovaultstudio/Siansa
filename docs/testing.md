@@ -26,17 +26,18 @@ What changed in each version: [CHANGELOG.md](../CHANGELOG.md)
 
 Pick one. Both give you the same app, and updates arrive the same way.
 
-**Google Play.** Use the invite link we email you, tap **Become a tester**, then install Siansa from Play.
-Use the Google account whose email you gave us, and stay in the test for 14 days.
+**Google Play.** Join the [Siansa testers group](https://groups.google.com/g/siansa-testers) with your Google
+account, open the [testing page](https://play.google.com/apps/testing/app.siansa) and tap **Become a tester**, then
+install Siansa from Play. Stay in the test for 14 days. The welcome email can land in your spam folder.
 
 **F-Droid.** In the F-Droid app, go to **Settings › Repositories › +** and add
 `https://siansa.app/fdroid/repo` (the page also shows a QR code and the repo's fingerprint). Then search for
 Siansa and install it.
 
-F-Droid needs no invite. Google Play is a closed test for now, as Google asks of new apps (12 testers for 14 days
-before it opens to everyone): [ask for a place](https://siansa.app/#join).
+F-Droid needs no sign-up. Google Play is a closed test for now, as Google asks of new apps (12 testers for 14 days
+before it opens to everyone): every tester brings Siansa on Google Play for everyone closer.
 
-**On a TV.** The TV app is in beta: see [Siansa on your TV](tv.md#getting-the-tv-app).
+**On a TV.** Search for Siansa in the TV's Play Store, or use F-Droid there too: see [Siansa on your TV](tv.md#getting-it).
 
 **Had Siansa from the earlier private F-Droid address?** Remove that repository, add the open one above, then
 uninstall Siansa once and install it again: the app has a new signing key since the project went public, and

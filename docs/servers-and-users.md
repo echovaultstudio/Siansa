@@ -4,112 +4,57 @@
 
 | Type | What works |
 |---|---|
-| **Navidrome** (OpenSubsonic) | Everything. Navidrome is what Siansa is tested on most. If your Navidrome has the AudioMuse-AI Navidrome plugin, "similar songs" and Song path can use Navidrome's own sonic similarity. |
-| **Other OpenSubsonic servers** (Gonic, Airsonic, Ampache…) | Browsing, playback, playlists, favourites, scrobbling. Some extras depend on what the server supports (lyrics with timings, sonic similarity). |
-| **Emby** | Browsing, playback, playlists, favourites, play history and "now playing" on Emby. The smart features go through AudioMuse-AI directly. Without AudioMuse, similar songs use Emby's Instant Mix. |
-| **Jellyfin** (10.9 or later) | The same as Emby: browsing, playback, playlists, favourites, play history, "now playing" and lyrics (timed when Jellyfin has them). The smart features go through AudioMuse-AI directly; without it, similar songs use Jellyfin's Instant Mix. |
+| **Navidrome** | Everything. Siansa is tested on it most. |
+| **Other OpenSubsonic servers** (Gonic, Airsonic, Ampache…) | Browsing, playback, playlists, favourites, scrobbling. Extras depend on the server. |
+| **Jellyfin** (10.9 or later) and **Emby** | Browsing, playback, playlists, favourites, play history, lyrics. The smart features go through AudioMuse-AI; without it, similar songs use the server's Instant Mix. |
+
+Siansa is tested against real Navidrome, Emby and Jellyfin servers, the newest and the oldest supported.
 
 ## Connecting
 
-**Settings › Connections**, under **Servers**: open the server in use for its address, user name and password, with
-**Test** and **Save**. The first time, Siansa asks for them when it starts.
+**Settings › Connections › Servers**: the address (with the port, `http://192.168.1.10:4533`, and a path if it has
+one), user name and password, then **Test** and **Save**.
 
-- The address can include the port (`http://192.168.1.10:4533`) and a path if your server lives under one.
-- **Server behind a login page?** If a reverse proxy asks for its own login before your server, tap **Add a proxy
-  login** and enter that user name and password too. With Jellyfin this works up to Jellyfin 10.11: Jellyfin 12
-  only takes its login in the same place the proxy's goes.
-- **API key** (OpenSubsonic servers): if your server gives you an API key, enter it instead of the user name and
-  password. Siansa uses it once the server says it takes API keys (the OpenSubsonic `apiKeyAuthentication`
-  extension); every request then sends the key and no user name or password. **Test** and **Save** check the key:
-  if your server doesn't take API keys, they say so, and you can clear the key and use your user name and password.
-  With only a key, the user name fills itself in from the server. Changing a playlist's picture still needs the
-  user name and password.
-- Passwords and API keys are stored encrypted with Android's keystore, and never written to the log or to backups.
+- **Behind a login page?** Tap **Add a proxy login** for the reverse proxy's own user name and password.
+- **API key** (OpenSubsonic): enter it instead of the user name and password, if your server takes keys.
+- Passwords and keys are kept encrypted on the phone, and never go into the log or backups.
 
 ## Several users
 
-**Settings › Connections › Servers** holds every login on this phone, one card each. Each user has their own
-library, play history and settings. A user can be on the same server or a different one, of either type.
+Each login on the phone is a "user", with its own library, history and settings, on the same server or another one.
 
-- Open another user's card to change its server address, user name, password, proxy login, name and name in
-  AudioMuse without switching to it; **Save** keeps the changes. **Switch to it** (Siansa restarts) saves them first;
-  **Remove** takes it off the phone.
-- **Add a music server** for another login (on the same server or a different one): a **New server** card opens on
-  the same page, with the server type (OpenSubsonic, Jellyfin or Emby), its address, user name, password and **Test**.
-  Nothing is added until you tap **Save**, and the music keeps playing; **Cancel** or going back leaves nothing
-  behind. Saved, it shows as another login: **Switch to it** there when you want to use it (Siansa restarts).
-- **Name shown in Siansa**, in the card of the server in use, shows a name like "Home" instead of its address.
-- **Remove** a user to take their library, history and settings off the phone. Nothing changes on the server.
-- **Name a server** with the pencil next to a user, for example "Home" or "Kids". That user then shows the name
-  instead of the address ("max on Home"), here and in the source filter. The name is each user's own, so two
-  logins on one server can be told apart, and it only changes what Siansa shows, nothing on the server. Leave the
-  name empty to show the address again.
+- **Add a music server** for another login. It's added when you save, without a restart.
+- **Switch to it** on another user's card (Siansa restarts), or **Remove** it (nothing changes on the server).
+- **Name shown in Siansa**, or the pencil beside a user, shows a name like "Home" instead of the address.
 
-## Showing several users' music together
+## The source filter
 
-**Sources** in the menu at the top of Home opens the source filter. There you can:
+**Sources**, in Home's round menu:
 
-- **Show other users' music next to yours**, for users on the **same server** as you (for example two logins on
-  one Navidrome). Their albums, artists, songs and playlists appear in your library, and everything about their
-  music (streaming, covers, lyrics, scrobbles) uses *their* login. Users on another server (another address, or
-  Emby next to Navidrome) can't be shown together: switch to them in **Settings › Connections** instead.
-  Siansa recognises your server by its songs, so a user who reaches it at another address (a domain instead
-  of an IP) still counts as the same server; while it checks, that user shows "Checking whether it's your server…".
-- **Hide your own music**, to see only another user's.
-- **Pick which libraries to show** (Navidrome's music folders, Emby's libraries).
-- **Only downloaded music**: hides everything that isn't on the phone. Handy on a flight.
-- **Sync** one server, or **Sync all** to sync every music library that's shown and Audiobookshelf at once. Each
-  server shows how its sync is going on one small line under its name, with a tick once it's done.
+- **Show other users' music next to yours**, for users on the same server. Their music plays with their login.
+- **Hide your own music**, to see only someone else's.
+- **Pick which libraries to show** (Navidrome's music folders, Jellyfin's and Emby's libraries).
+- **Only downloaded music**, for a flight.
+- **Sync** one server, or **Sync all**.
 
-Every server set up in **Settings › Connections** is listed, Audiobookshelf too (with how many books and podcasts it
-has after a sync). Audiobookshelf's books aren't hidden from here: Home's **Arrange** hides their rows.
-
-Song radios, mixes, the dice and recently played only use what the filter shows.
-
-**Playlists** follow the filter too: hiding your own music hides your own playlists. When you add songs to a
-playlist, a playlist on your server only takes its own user's songs (Kids' playlists take Kids' songs), and a
-playlist on this phone takes anyone's. Playlists that can't take the songs are greyed out.
-
-**Scrobbling for other users**: in **Settings › Scrobbling and history › Users** you can turn a user off, so songs from their
-library aren't sent anywhere while you listen as you.
-
-## Playlists on your server
-
-A playlist on your server opens straight away from the copy kept on the phone. While it's open, a turning cog at
-the top shows Siansa asking your server whether it changed; new songs (for example from a playlist your server
-rewrites every hour) show as soon as the answer comes. No library sync is needed.
+Mixes, radios, the dice and Recently played only use what the filter shows. Under **Settings › Scrobbling and history
+› Users**, turn off scrobbling for another user's music.
 
 ## Library sync
 
-Siansa keeps a copy of each user's library list on the phone (**Settings › Connections**, in the card of the server
-in use: **Library sync**):
-
-- It checks for changes when the app starts. If your server hasn't scanned since the last sync, nothing is
-  fetched again.
-- **Sync now** runs a sync by hand.
-- Every library on the server is kept on the phone, so turning one on or off is instant.
-- An album that's in more than one library shows once for each, with the library's name.
-- Duplicate albums from different libraries are merged.
+Siansa keeps a list of each user's library on the phone (never the music files), so browsing and search are instant.
+It checks for changes when the app starts, and fetches nothing if your server hasn't scanned since. **Library sync ›
+Sync now** runs one by hand. Playlists on your server open from the phone's copy and update while open.
 
 ## Tags
 
-Siansa shows your music as your server reads its tags, so tag your files the way your server asks
-(Navidrome's tagging guidelines, or Emby's music naming guide).
+Siansa shows your music as your server reads its tags, so tag the way your server asks.
 
-- **Album pictures on Emby and Jellyfin:** an album with no picture of its own (the art is in the song files, not
-  in the album folder) shows its first song's picture, in lists as well as on its page. Siansa asks the server
-  about such albums' songs once, a few at a time, so a library with many of them takes a moment longer to sync the
-  first time.
-- **Several artists on a song:** tag each one (Navidrome: `ARTISTS`; Emby: separate them with `; `). Every
-  artist gets a page, and the song shows up there.
-- **Compilations:** set the compilation tag (`COMPILATION=1`). An album by "Various Artists" (or "VA") counts as
-  a compilation too, also on Emby, which has no such tag.
-- **Song details** (⋮ › **Show details**) shows what the song's tags say, as far as your server passes them on:
-  all its artists, album artist, composer, lyricist and other roles, genres, moods, release date, BPM, ISRC,
-  explicit or clean, comment and MusicBrainz ID.
-- **An album's page** shows its type and year under the artist ("Album · 2011"), with the year it first came out
-  when this is a later release. At the foot of the page are its version (for example "Deluxe edition"), how many
-  songs and how long, and its **genres** and **record labels** as tags: tap one for every album in your library with
-  it. Navidrome has all of these; Emby has the genres and the label (its studio). The details need a connection:
-  offline, the page shows what's on the phone. Labels are read during the library sync, so a label's page fills
-  after the first sync on the new version.
+- **Several artists on a song**: tag each (Navidrome `ARTISTS`; Emby and Jellyfin separate them with `; `). Each gets a
+  page.
+- **Compilations**: `COMPILATION=1`. "Various Artists" counts too.
+- **Album pictures on Emby and Jellyfin**: an album without its own picture shows its first song's.
+- **Song details** (⋮ › **Show details**) shows every tag your server passes on: roles, genres, moods, BPM, ISRC and
+  more.
+- **An album's page** shows its type and year, its version ("Deluxe edition"), and its genres and record labels as
+  tags: tap one for every album with it.
