@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Siansa for Android TV and Google TV (issue #860): its own app, app.siansa.tv, next to the phone app. -->
+<!-- Siansa for Android TV and Google TV (issue #860): its own app for the remote; app.siansa on Google Play, beside the phone's (issue #988). -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- A TV app: the remote, no touch screen. -->
