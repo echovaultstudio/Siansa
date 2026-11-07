@@ -104,6 +104,8 @@ jobs:
     timeout-minutes: 60
     env:
       TV_IMAGE: "system-images;android-36;android-tv;x86_64"
+      # One place for the TV's AVD: avdmanager and the emulator otherwise look in different folders.
+      ANDROID_AVD_HOME: /home/runner/.android/avd
     steps:
       - name: Free disk space
         run: |
@@ -141,9 +143,11 @@ jobs:
         timeout-minutes: 15
         run: |
           sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
+          mkdir -p "$ANDROID_AVD_HOME"
           yes | "$sdk/sdkmanager" --licenses > /dev/null || true
           "$sdk/sdkmanager" --install "$TV_IMAGE" emulator platform-tools > /dev/null
           echo no | "$sdk/avdmanager" create avd -n siansa-tv -k "$TV_IMAGE" -d tv_1080p --force
+          "$ANDROID_HOME/emulator/emulator" -list-avds
           "$ANDROID_HOME/emulator/emulator" -avd siansa-tv -no-window -no-audio -no-boot-anim -no-snapshot \
             -gpu swiftshader_indirect -memory 3072 > "$RUNNER_TEMP/emulator.log" 2>&1 &
           adb="$ANDROID_HOME/platform-tools/adb"
@@ -174,6 +178,7 @@ jobs:
         if: always()
         run: |
           sleep 3
+          touch logcat.txt
           python3 scripts/showcase_pictures.py logcat.txt shots notes-tv.txt
 
       - uses: actions/upload-artifact@v7
