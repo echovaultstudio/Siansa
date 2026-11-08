@@ -203,7 +203,7 @@ object PluginProfiles {
     }
 
     /** The `<prefix>_bpm`, `_beat_ms`, `_bar_ms`, `_rhythm` and `_steady` fields of one end, or null without them. */
-    private fun beatEnd(p: JsonObject, prefix: String): BeatEnd? {
+    internal fun beatEnd(p: JsonObject, prefix: String): BeatEnd? {
         val bpm = p.dbl("${prefix}_bpm")?.takeIf { it.isFinite() && it > 0 } ?: return null
         val beat = p.dbl("${prefix}_beat_ms")?.takeIf { it.isFinite() } ?: return null
         return BeatEnd(

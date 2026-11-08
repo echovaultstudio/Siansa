@@ -25,6 +25,8 @@ class ProfileStore(
     private val get: suspend (String) -> JsonElement,
     private val settings: () -> AppSettings,
     private val now: () -> Long = System::currentTimeMillis,
+    /** A GET on Siansa Beats (Siansa Dev, an experiment): its beat grids, laid over the plugin's ([BeatsGrids]). */
+    private val beatsGet: (suspend (String) -> JsonElement)? = null,
 ) {
     private val lock = Any()
     private val cache = object : LinkedHashMap<String, TrackProfile>(256, 0.75f, true) {
@@ -32,6 +34,23 @@ class ProfileStore(
     }
     private val missingUntil = HashMap<String, Long>()
     private var backOffUntil = 0L
+    // Siansa Beats' grids, kept apart from the plugin's profiles and laid over them as they're read ([cached]), so
+    // switching where grids come from takes at once and neither side's trouble loses the other's.
+    private val grids = object : LinkedHashMap<String, BeatsGrid>(256, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, BeatsGrid>?) = size > MAX_CACHED
+    }
+    private val gridMissingUntil = HashMap<String, Long>()
+    private var gridBackOffUntil = 0L
+
+    /** Why the last request to Siansa Beats failed, or null when it worked. */
+    @Volatile var beatsProblem: String? = null
+        private set
+
+    private val gridSource: BeatGridSource
+        get() = settings().let { if (beatsGet != null && it.beatsUrl.isNotBlank()) it.beatGridSource else BeatGridSource.PLUGIN }
+
+    /** The profile of [id] as used: the plugin's, with the beat grid [gridSource] says. Call holding [lock]. */
+    private fun merged(id: String): TrackProfile? = BeatsGrids.merge(id, cache[id], grids[id], gridSource)
     private val fetching = Mutex()
 
     /** Why the last request failed, or null when it worked. */
@@ -42,7 +61,7 @@ class ProfileStore(
     val active: Boolean get() = settings().let { it.loudnessSource == LoudnessSource.PLUGIN && it.audioMuseReady }
 
     /** The profile already fetched for [id], or null (none yet, or profiles aren't used). */
-    fun cached(id: String): TrackProfile? = if (!active) null else synchronized(lock) { cache[id] }
+    fun cached(id: String): TrackProfile? = if (!active) null else synchronized(lock) { merged(id) }
 
     /**
      * Fetches the profiles of [ids] not already here, and returns all of [ids]' profiles that are known.
@@ -62,8 +81,71 @@ class ProfileStore(
                     if (!fetchBatch(batch)) break
                 }
             }
+            if (gridSource != BeatGridSource.PLUGIN) {
+                val needGrids = synchronized(lock) {
+                    if (time < gridBackOffUntil) emptyList()
+                    else ids.distinct().filter { it !in grids && (gridMissingUntil[it] ?: 0L) <= time }
+                }
+                val base = settings().beatsUrl + BeatsGrids.PATH
+                for (batch in PluginProfiles.batches(needGrids, base, maxIds = BeatsGrids.MAX_IDS)) {
+                    if (!fetchGrids(batch)) break
+                }
+            }
         }
-        return synchronized(lock) { ids.mapNotNull { id -> cache[id]?.let { id to it } }.toMap() }
+        return synchronized(lock) { ids.mapNotNull { id -> merged(id)?.let { id to it } }.toMap() }
+    }
+
+    private suspend fun fetchGrids(batch: List<String>): Boolean {
+        val answer = try {
+            beatsGet!!(BeatsGrids.PATH + PluginProfiles.query(batch)) as? JsonObject
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            failGrids(e.message?.takeIf { it.isNotBlank() } ?: "Couldn't reach Siansa Beats")
+            return false
+        }
+        if (answer == null) {
+            failGrids("Siansa Beats sent an unexpected answer")
+            return false
+        }
+        val found = BeatsGrids.parse(answer)
+        val time = now()
+        synchronized(lock) {
+            grids.putAll(found)
+            batch.filter { it !in found }.forEach { gridMissingUntil[it] = time + RETRY_MISSING_MS }
+            if (gridMissingUntil.size > MAX_CACHED) gridMissingUntil.entries.removeAll { it.value <= time }
+        }
+        beatsProblem = null
+        AppLog.i("Loudness", "Siansa Beats grids: ${found.size} of ${batch.size} songs (${gridSource.label})")
+        return true
+    }
+
+    private fun failGrids(why: String) {
+        synchronized(lock) { gridBackOffUntil = now() + BACK_OFF_MS }
+        if (beatsProblem != why) AppLog.w("Loudness", "${why.trimEnd('.')}. Trying Siansa Beats again in ${BACK_OFF_MS / 60_000} minutes")
+        beatsProblem = why
+    }
+
+    /** For the "Test" button of Siansa Beats: whether it answers, in plain words. Clears any back-off. */
+    suspend fun checkBeats(): CheckResult {
+        val beats = beatsGet ?: return CheckResult(false, "Not in this build")
+        if (settings().beatsUrl.isBlank()) return CheckResult(false, "Enter Siansa Beats' address first")
+        synchronized(lock) { gridBackOffUntil = 0L; gridMissingUntil.clear() }
+        return try {
+            val health = beats(BeatsGrids.HEALTH_PATH) as? JsonObject
+            // /api/health is open; the grids need the password when Siansa Beats has one.
+            beats(BeatsGrids.PATH + "?ids=")
+            val version = health?.str("version")?.let { " $it" } ?: ""
+            beatsProblem = null
+            AppLog.i("Loudness", "Siansa Beats$version is working")
+            CheckResult(true, "Siansa Beats$version is working")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val why = e.message?.takeIf { it.isNotBlank() } ?: "Couldn't reach Siansa Beats"
+            AppLog.w("Loudness", "Siansa Beats check failed: $why")
+            CheckResult(false, why)
+        }
     }
 
     private suspend fun fetchBatch(batch: List<String>): Boolean {

@@ -124,6 +124,8 @@ fun CollectionPage(
     albumBar: Boolean = false,
     // Where Play continues an album you stopped part way (issue #965, was "Continue from" #367): Play shows it.
     resume: PlayResume? = null,
+    // Shuffle slides onto Play for a DJ mix of just these songs, as an album's does (Siansa Dev: playlists too).
+    djMix: Boolean = false,
     // What the quick-scroll handle says for a song (a letter, a month); by default where it is in the list.
     scrollLabel: ((index: Int, song: Song) -> String?)? = null,
     footer: LazyListScope.() -> Unit = {},
@@ -233,7 +235,7 @@ fun CollectionPage(
                         songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed, saveAs = title.takeIf { saveAsPlaylist },
                         // An album's shuffle slides right onto Play for a DJ mix of its own songs (issue #965); it needs
                         // AudioMuse, as similar albums does.
-                        onDjMix = if (albumBar && onSimilar != null) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } }) else null,
+                        onDjMix = if ((albumBar && onSimilar != null) || djMix) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } }) else null,
                         djSlide = djSlide, onDjSlide = { djSlide = it }, dim = slideDim, albumBar = albumBar, resume = resume,
                     )
                 }

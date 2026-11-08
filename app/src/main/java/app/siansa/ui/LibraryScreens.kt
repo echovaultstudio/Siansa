@@ -240,6 +240,8 @@ fun PlaylistScreen(nav: NavController, id: String) {
     CollectionPage(
         nav = nav,
         title = d?.playlist?.name ?: "Playlist",
+        // A DJ mix of the playlist's own songs (Siansa Dev): Shuffle slides onto Play, as on an album.
+        djMix = true,
         color = rememberCoverColor(d?.playlist?.coverArt),
         songs = d?.let { pl -> order?.map { pl.songs[it] } ?: pl.songs },
         error = (detail as? Load.Err)?.message,

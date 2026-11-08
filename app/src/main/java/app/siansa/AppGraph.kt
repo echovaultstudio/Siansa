@@ -292,7 +292,8 @@ class AppGraph(val app: Application) {
     /** Which mini player shows: the player started last (beta #45). */
     val activePlayer: ActivePlayer by lazy { ActivePlayer(scope, player.state, bookPlayer.state) }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
-    val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
+    val siansaBeats = app.siansa.net.SiansaBeatsApi(http) { settings.current }
+    val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current }, beatsGet = { path -> siansaBeats.get(path) })
     /** The AI service that writes mix titles and sound searches (issue #665). */
     val ai = ChatApi(http) { settings.current }
     val deezer = DeezerApi(http)

@@ -45,7 +45,7 @@ object BackupRules {
 
     /** Encrypted with a key that never leaves this phone, so they're never saved; restoring keeps the current ones. */
     private val SECRET_KEYS = mapOf(
-        "settings" to setOf("nd_pass", "nd_api_key", "proxy_pass", "am_token", "am_pass", "or_key", "lfm_secret", "lfm_session", "lb_token"),
+        "settings" to setOf("nd_pass", "nd_api_key", "proxy_pass", "am_token", "am_pass", "or_key", "lfm_secret", "lfm_session", "lb_token", "beats_pass"),
         "connections" to setOf("am_token", "am_pass", "or_key"),
     )
 
