@@ -377,7 +377,7 @@ class AudioMuseApi(
      * AudioMuse's analysis of songs (tempo, key, moods, genres) from its read-only export for apps
      * (`/api/sync`), at most 500 at a time, without the large sound data (issue #216).
      */
-    suspend fun features(ids: List<String>): List<TrackFeatures> = ids.distinct().chunked(SYNC_BATCH).flatMap { batch ->
+    suspend fun features(ids: List<String>): List<TrackFeatures> = syncBatches(ids.distinct()).flatMap { batch ->
         val url = apiUrl("api/sync")
             .addQueryParameter("ids", batch.joinToString(","))
             .addQueryParameter("include_embeddings", "false")
@@ -412,6 +412,34 @@ class AudioMuseApi(
 
         val JSON_TYPE = "application/json".toMediaType()
         const val SYNC_BATCH = 500
+
+        /**
+         * AudioMuse's web server turns away a request line over about 4 KB (HTTP 400, an HTML page): 251 songs'
+         * ids in one /api/sync asked for 6 KB, and a playlist's DJ mix lost its tempo and key and was only shuffled
+         * (the owner's log, 8 Nov). Batches of at most [SYNC_BATCH] ids whose list stays within [budget] bytes,
+         * leaving room for the address and the other parameters.
+         */
+        fun syncBatches(ids: List<String>, budget: Int = SYNC_IDS_BUDGET): List<List<String>> {
+            val out = ArrayList<List<String>>()
+            var current = ArrayList<String>()
+            var length = 0  // of the ids as sent: each encoded, "%2C" between them
+            for (id in ids) {
+                val size = java.net.URLEncoder.encode(id, "UTF-8").length
+                val added = if (current.isEmpty()) size else size + 3
+                if (current.isNotEmpty() && (length + added > budget || current.size >= SYNC_BATCH)) {
+                    out += current
+                    current = ArrayList()
+                    length = 0
+                }
+                length += if (current.isEmpty()) size else size + 3
+                current += id
+            }
+            if (current.isNotEmpty()) out += current
+            return out
+        }
+
+        /** The ids' share of a 4 KB request line, after the address and the other parameters. */
+        const val SYNC_IDS_BUDGET = 3_000
 
         fun parseCatalogue(root: JsonObject): ConceptCatalogue {
             if (root.bool("available") == false) return ConceptCatalogue(emptyList(), 0)

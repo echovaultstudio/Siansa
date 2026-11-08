@@ -222,11 +222,6 @@ data class AppSettings(
     val crossfadeSeconds: Int = DEFAULT_CROSSFADE_SECONDS,
     /** Where smart crossfades are beat-matched like a DJ's (issue #646, experimental): off, DJ radio, everywhere. */
     val beatMatch: BeatMatchMode = BeatMatchMode.OFF,
-    /** Where beat-matched blends' beat grids come from (Siansa Dev, an experiment): the plugin, or Siansa Beats. */
-    val beatGridSource: app.siansa.playback.BeatGridSource = app.siansa.playback.BeatGridSource.PLUGIN,
-    /** Siansa Beats' address (http://…:8090) and its password, if it has one. */
-    val beatsUrl: String = "",
-    val beatsPassword: String = "",
     /** The old song rings out in a hall over the last bar of a beat-matched blend (issue #759). */
     val echoTail: Boolean = true,
     /** The bass swaps from the old song to the new over the first half of a beat-matched blend (issue #807). */
@@ -497,9 +492,6 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .takeIf { it in AppSettings.WIND_DOWN_CHOICES } ?: AppSettings.DEFAULT_WIND_DOWN_SONGS,
         crossfadeSeconds = prefs.getInt("crossfade_s", AppSettings.DEFAULT_CROSSFADE_SECONDS).coerceIn(AppSettings.CROSSFADE_SECONDS),
         beatMatch = BeatMatchMode.parse(prefs.getString("beat_match", null)),
-        beatGridSource = app.siansa.playback.BeatGridSource.parse(prefs.getString("beat_grid_source", null)),
-        beatsUrl = prefs.getString("beats_url", "") ?: "",
-        beatsPassword = secret("beats_pass"),
         echoTail = AppSettings.BLEND_EXTRAS && prefs.getBoolean("echo_tail", true),
         bassSwap = prefs.getBoolean("bass_swap", true),
         keepKey = AppSettings.BLEND_EXTRAS && prefs.getBoolean("keep_key", false),
@@ -828,15 +820,6 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         noteBlend("Beat-matched blends", _state.value.beatMatch.name.lowercase(), mode.name.lowercase())
         prefs.edit().putString("beat_match", mode.name).apply()
         _state.value = _state.value.copy(beatMatch = mode)
-    }
-
-    /** Where beat grids come from, and Siansa Beats' address and password (Siansa Dev, an experiment). */
-    fun setBeatGrids(source: app.siansa.playback.BeatGridSource, url: String, password: String) {
-        val address = url.trim().trimEnd('/')
-        noteBlend("Beat grids", _state.value.beatGridSource.name.lowercase(), source.name.lowercase())
-        prefs.edit().putString("beat_grid_source", source.name).putString("beats_url", address)
-            .putString("beats_pass", SecretBox.encrypt(password)).apply()
-        _state.value = _state.value.copy(beatGridSource = source, beatsUrl = address, beatsPassword = password)
     }
 
     fun setBlendBars(bars: Int) {

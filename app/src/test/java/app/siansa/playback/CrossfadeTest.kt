@@ -84,8 +84,9 @@ class PluginProfilesTest {
         assertEquals(listOf(RampPoint(-18, 30_000), RampPoint(6, 100)), p.startRamp)
         assertTrue(p.endRamp.isEmpty())
         assertEquals(201_000L, p.durationMs)
-        assertEquals("/plugins/siansa_analysis/api/profiles", PluginProfiles.PATH)
-        assertEquals("/plugins/siansa_analysis/api/health", ProfileStore.HEALTH_PATH)
+        // Siansa Dev's experiment: Siansa Beats (dev), next to the Siansa plugin.
+        assertEquals("/plugins/siansa_beats/api/profiles", PluginProfiles.PATH)
+        assertEquals("/plugins/siansa_beats/api/health", ProfileStore.HEALTH_PATH)
         assertEquals("siansa_analysis", ProfileStore.PLUGIN_NAME)
     }
 
@@ -517,11 +518,29 @@ class ProfileStoreTest {
     }
 
     @Test fun theTestSaysWhetherThePluginWorks() = runBlocking {
-        reply = { JsonObject(mapOf("plugin" to JsonPrimitive("siansa_analysis"), "plugin_version" to JsonPrimitive("1.4.0"), "status" to JsonPrimitive("ok"))) }
+        reply = { JsonObject(mapOf("plugin" to JsonPrimitive("siansa_beats"), "plugin_version" to JsonPrimitive("0.1.0"), "status" to JsonPrimitive("ok"))) }
         val ok = store.check()
         assertTrue(ok.ok)
-        assertEquals("Siansa plugin 1.4.0 is working", ok.message)
+        assertEquals("Siansa Beats (dev) 0.1.0 is working", ok.message)
         assertEquals(ProfileStore.HEALTH_PATH, asked.last())
+
+        // Siansa Beats (dev) says whether Siansa Beats answers it.
+        val beats = { reachable: Boolean -> JsonObject(mapOf(
+            "plugin" to JsonPrimitive("siansa_beats"), "plugin_version" to JsonPrimitive("0.1.0"), "status" to JsonPrimitive("ok"),
+            "siansa_plugin" to JsonPrimitive(true),
+            "beats" to JsonObject(if (reachable) mapOf("reachable" to JsonPrimitive(true), "version" to JsonPrimitive("0.8.1"))
+                else mapOf("reachable" to JsonPrimitive(false), "problem" to JsonPrimitive("Nothing answers at beats:8090"))),
+        )) }
+        reply = { beats(true) }
+        assertEquals("Siansa Beats (dev) 0.1.0 is working · Siansa Beats 0.8.1 answers", store.check().message)
+        reply = { beats(false) }
+        val down = store.check()
+        assertFalse(down.ok)
+        assertTrue(down.message, "Nothing answers at beats:8090" in down.message)
+
+        // The Siansa plugin itself isn't what this build asks.
+        reply = { JsonObject(mapOf("plugin" to JsonPrimitive("siansa_analysis"), "status" to JsonPrimitive("ok"))) }
+        assertTrue(store.check().message.contains("not as Siansa Beats (dev)"))
 
         reply = { throw ApiException("AudioMuse sent something that isn't JSON. Is the address its API port?") }
         val login = store.check()

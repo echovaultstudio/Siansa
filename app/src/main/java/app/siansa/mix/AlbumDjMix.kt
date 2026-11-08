@@ -37,21 +37,39 @@ object AlbumDjMix {
         withContext(Dispatchers.Main) { graph.player.play(ordered) }
         val sorted = ordered.map { it.id } != album.map { it.id }
         AppLog.d("AlbumMix", "Starts with \"${ordered.first().title}\"")
-        AppLog.i("AlbumMix", "DJ mix of \"$title\": ${ordered.size} songs${if (sorted) " in the best order" else " in the album's order"}",
+        val how = when {
+            !lastArrangedByFlow -> " shuffled (no tempo and key to order them by)"
+            sorted -> " in the best order"
+            else -> " in the album's order"
+        }
+        AppLog.i("AlbumMix", "DJ mix of \"$title\": ${ordered.size} songs$how",
             event = "mix.album_dj", fields = mapOf("songs" to ordered.size, "reordered" to sorted))
     }
+
+    /** Whether the last mix was ordered by how its songs blend, or only shuffled: for the log. */
+    private var lastArrangedByFlow = true
 
     private suspend fun arrange(graph: AppGraph, album: List<Song>): List<Song> {
         // Never the same start twice running for one album (the owner): last time's first song, if it was this album.
         val lastFirst = songs.value.firstOrNull()?.takeIf { first -> album.any { it.id == first } }
+        lastArrangedByFlow = false
         if (album.size < 3 || !graph.settings.current.audioMuseReady) return album.shuffled()
         val features = runCatching { graph.audioMuse.features(album.map { it.id }) }
             .onFailure { AppLog.w("AlbumMix", "Couldn't read tempo and key: ${it.message}; shuffled instead") }
             .getOrNull()?.associateBy { it.id } ?: return album.shuffled()
+        lastArrangedByFlow = true
+        // Siansa Dev's experiment: the tempo of each song's beat grid (Siansa Beats', through Siansa Beats (dev),
+        // counted as a DJ counts: drum and bass at 174 where AudioMuse often reads 87) orders the mix, AudioMuse's
+        // for the songs without one.
+        val gridTempo = runCatching { graph.profiles.fetch(album.map { it.id }) }.getOrNull().orEmpty()
+            .mapValues { (_, p) -> (p.outro ?: p.intro)?.bpm }.filterValues { it != null }
+        if (gridTempo.isNotEmpty()) {
+            AppLog.i("AlbumMix", "Tempo from the beat grids for ${gridTempo.size} of ${album.size} songs")
+        }
         val energy = energyByRank(album.associate { it.id to features[it.id]?.energy })
         val tracks = album.map { s ->
             val f = features[s.id]
-            DjTrack(s.id, s.artist, 1.0, f?.tempo, f?.key, f?.scale, energy[s.id])
+            DjTrack(s.id, s.artist, 1.0, gridTempo[s.id] ?: f?.tempo, f?.key, f?.scale, energy[s.id])
         }
         val byId = album.associateBy { it.id }
         return pickAlbumOrder(tracks, Random.Default, lastFirst).mapNotNull { byId[it.id] }

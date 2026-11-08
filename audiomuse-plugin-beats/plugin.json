@@ -1,0 +1,17 @@
+{
+  "id": "siansa_beats",
+  "name": "Siansa Beats (dev)",
+  "author": "Siansa",
+  "description": "For Siansa Dev, an experiment: the Siansa plugin's loudness and fades with each song's tempo, beats, bars and phrases from Siansa Beats (Beat This!). Installs next to the Siansa plugin and reads what it measured; measures nothing itself.",
+  "requirements": [],
+  "versions": [
+    {
+      "version": "0.1.0",
+      "min_core_version": "3.6.4",
+      "changelog": "First version: profiles from the Siansa plugin's measurements with the beat grids from Siansa Beats.",
+      "imageUrl": "",
+      "sourceUrl": "",
+      "checksum": ""
+    }
+  ]
+}

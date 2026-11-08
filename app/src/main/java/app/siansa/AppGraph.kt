@@ -106,7 +106,6 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.ConnectionPool
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
-import app.siansa.net.SiansaBeatsApi
 import okhttp3.Protocol
 import app.siansa.playback.StreamStats
 import java.io.File
@@ -293,8 +292,7 @@ class AppGraph(val app: Application) {
     /** Which mini player shows: the player started last (beta #45). */
     val activePlayer: ActivePlayer by lazy { ActivePlayer(scope, player.state, bookPlayer.state) }
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
-    val siansaBeats = SiansaBeatsApi(http) { settings.current }
-    val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current }, beatsGet = { path -> siansaBeats.get(path) })
+    val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
     /** The AI service that writes mix titles and sound searches (issue #665). */
     val ai = ChatApi(http) { settings.current }
     val deezer = DeezerApi(http)

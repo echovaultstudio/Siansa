@@ -147,7 +147,9 @@ object RampCodec {
 
 /** Reading the Siansa plugin's `GET /plugins/siansa_analysis/api/profiles?ids=…` answers. */
 object PluginProfiles {
-    const val PATH = "/plugins/siansa_analysis/api/profiles"
+    // Siansa Dev's experiment (experiment/siansa-beats): Siansa Beats (dev), the plugin that hands on the Siansa
+    // plugin's loudness and fades with Siansa Beats' beat grids. The Siansa app asks the Siansa plugin itself.
+    const val PATH = "/plugins/siansa_beats/api/profiles"
 
     /** The AudioMuse host rejects request lines over ~4 KB, and the plugin reads at most 500 ids. */
     const val URL_BUDGET_BYTES = 3_500
@@ -203,7 +205,7 @@ object PluginProfiles {
     }
 
     /** The `<prefix>_bpm`, `_beat_ms`, `_bar_ms`, `_rhythm` and `_steady` fields of one end, or null without them. */
-    internal fun beatEnd(p: JsonObject, prefix: String): BeatEnd? {
+    private fun beatEnd(p: JsonObject, prefix: String): BeatEnd? {
         val bpm = p.dbl("${prefix}_bpm")?.takeIf { it.isFinite() && it > 0 } ?: return null
         val beat = p.dbl("${prefix}_beat_ms")?.takeIf { it.isFinite() } ?: return null
         return BeatEnd(

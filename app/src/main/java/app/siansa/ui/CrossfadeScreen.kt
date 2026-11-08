@@ -44,7 +44,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.data.AppSettings
 import app.siansa.data.ReplayGainMode
-import app.siansa.playback.BeatGridSource
 import app.siansa.playback.BeatMatchMode
 import app.siansa.playback.CrossfadeMode
 import app.siansa.playback.Levelling
@@ -156,9 +155,6 @@ fun CrossfadeScreen(nav: NavController) {
                         graph.settings::setBeatMatch, graph.settings::setBlendBars, graph.settings::setEchoTail, graph.settings::setBassSwap,
                         graph.settings::setKeepKey,
                     )
-                    if (settings.beatMatch != BeatMatchMode.OFF) {
-                        BeatGridsSection(settings, graph.settings::setBeatGrids) { graph.profiles.checkBeats() }
-                    }
                 }
             }
             HorizontalDivider()
@@ -228,78 +224,6 @@ internal fun BeatMatchSection(
             Hint("The next song plays a touch faster or slower to match. Off, its pitch moves with it, like a DJ's pitch fader. On, its key is kept by stretching the sound.")
         }
     }
-}
-
-/**
- * Where the beat grids come from (Siansa Dev, an experiment): the Siansa plugin, or Siansa Beats (Beat This!, with
- * bars and phrases checked against the sound), with its address, password and a test.
- */
-@Composable
-internal fun BeatGridsSection(
-    settings: AppSettings,
-    onSave: (BeatGridSource, String, String) -> Unit,
-    check: suspend () -> app.siansa.playback.ProfileStore.CheckResult,
-) {
-    val scope = rememberCoroutineScope()
-    var url by remember(settings.beatsUrl) { mutableStateOf(settings.beatsUrl) }
-    var password by remember(settings.beatsPassword) { mutableStateOf(settings.beatsPassword) }
-    var test by remember { mutableStateOf<String?>(null) }
-    Text("Beat grids from", style = MaterialTheme.typography.bodyLarge)
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-        BeatGridSource.entries.forEach { source ->
-            FilterChip(selected = settings.beatGridSource == source, onClick = { onSave(source, url, password) }, label = { Text(source.label) })
-        }
-    }
-    Hint(
-        when (settings.beatGridSource) {
-            BeatGridSource.PLUGIN -> "The tempo, beats, bars and phrases the Siansa plugin measures."
-            BeatGridSource.BEATS -> "Siansa Beats' tempo, beats, bars and phrases where it has the song, the plugin's for the rest. Loudness and fades still come from the plugin."
-            BeatGridSource.BEATS_ONLY -> "Only Siansa Beats' tempo, beats, bars and phrases: the plugin's are ignored, so a song Siansa Beats hasn't analysed gets a plain fade. Loudness and fades still come from the plugin."
-        },
-    )
-    if (settings.beatGridSource != BeatGridSource.PLUGIN) {
-        BeatsTextField("Siansa Beats address", url, placeholder = "http://192.168.1.10:8090", secret = false) { url = it }
-        BeatsTextField("Password (if it has one)", password, secret = true) { password = it }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-            OutlinedButton(modifier = Modifier.focusRing(), onClick = {
-                onSave(settings.beatGridSource, url, password)
-                test = "Testing…"
-                scope.launch {
-                    val result = check()
-                    test = (if (result.ok) "✓ " else "✗ ") + result.message
-                }
-            }) { Text("Save and test") }
-            test?.let {
-                Text(
-                    it,
-                    modifier = Modifier.weight(1f).testTag("beats-test"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (it.startsWith("✗")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun BeatsTextField(label: String, value: String, placeholder: String? = null, secret: Boolean, onChange: (String) -> Unit) {
-    if (app.siansa.BuildConfig.TV_APP) {
-        TvTextBox(value, onChange, label, Modifier.fillMaxWidth(), placeholder = placeholder, kind = if (secret) TvTextKind.SECRET else TvTextKind.ADDRESS)
-        return
-    }
-    androidx.compose.material3.OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        label = { Text(label) },
-        placeholder = { if (placeholder != null) Text(placeholder) },
-        singleLine = true,
-        visualTransformation = if (secret) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
-        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-            keyboardType = if (secret) androidx.compose.ui.text.input.KeyboardType.Password else androidx.compose.ui.text.input.KeyboardType.Uri,
-            autoCorrectEnabled = false,
-        ),
-        modifier = Modifier.fillMaxWidth(),
-    )
 }
 
 private fun beatMatchHint(mode: BeatMatchMode): String = when (mode) {
