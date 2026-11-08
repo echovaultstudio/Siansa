@@ -87,7 +87,7 @@ class PluginProfilesTest {
         // Siansa Dev's experiment: Siansa Beats (dev), next to the Siansa plugin.
         assertEquals("/plugins/siansa_beats/api/profiles", PluginProfiles.PATH)
         assertEquals("/plugins/siansa_beats/api/health", ProfileStore.HEALTH_PATH)
-        assertEquals("siansa_analysis", ProfileStore.PLUGIN_NAME)
+        assertEquals("siansa_beats", ProfileStore.PLUGIN_NAME)
     }
 
     @Test fun theStoredChoiceIsRead() {
