@@ -29,9 +29,10 @@ There's no APK to download here: Siansa comes from Google Play and its F-Droid r
 
 ## What you need
 
-A music server is enough to play. For the best of Siansa, add [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI)
-with the Siansa plugin, an AI service such as [OpenRouter](https://openrouter.ai), and [Last.fm](https://www.last.fm) or
-[Koito](https://github.com/gabehf/Koito) for your listening history. See [Getting started](docs/getting-started.md).
+For the best of Siansa: a music server, [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) with the Siansa
+plugin, and [Last.fm](https://www.last.fm) or [Koito](https://github.com/gabehf/Koito) for your listening history. An AI
+service such as [OpenRouter](https://openrouter.ai) is optional: it names your mixes. See
+[Getting started](docs/getting-started.md).
 
 ## What it does
 
