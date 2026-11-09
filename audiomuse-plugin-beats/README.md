@@ -6,9 +6,8 @@ does, with each song's beat grid from **Siansa Beats** (Beat This!, in the sians
 
 - **Each song's loudness and fade ramps** are measured here (a scheduled tick every 15 minutes), and **similar albums
   and artists** are built here, as the Siansa plugin does: this plugin began as a copy of it (`siansa_analysis`).
-- **On install it takes what the Siansa plugin already measured** (its songs, similar lists and job state, copied
-  into this plugin's own tables when they're still empty), so nothing is measured again. The Siansa plugin is only
-  read, never changed, and keeps working for the Siansa app.
+- **It keeps everything in its own tables** and never reads the Siansa plugin's. (Up to 0.4.0 it copied what the
+  Siansa plugin had measured on install; that's done, so 0.4.1 no longer looks for it.)
 - **Each song's tempo, beats, bars and phrases** come from Siansa Beats (`GET /api/grids`), with its lock-in, bass,
   energy, drops and breakdowns. A song Siansa Beats hasn't analysed yet keeps this plugin's own beat reading, or has
   none (the page's choice). Each profile also carries AudioMuse-AI's key and scale.
@@ -25,8 +24,7 @@ until then both measure new songs.
 3. Open its page: enter Siansa Beats' address (`http://<server>:8090`, and its password if `BEATS_PASSWORD` is
    set), **Save and test**.
 
-Install it while the Siansa plugin is still installed, so it can take what that one measured. To remove it, uninstall
-it in AudioMuse-AI: the Siansa plugin and what it measured aren't touched.
+To remove it, uninstall it in AudioMuse-AI: the Siansa plugin and what it measured aren't touched.
 
 ## Publish
 

@@ -90,49 +90,7 @@ def migrate(db):
         ("plugin.siansa_beats.tick", "plugin.siansa_beats.tick", "*/15 * * * *"),
     )
     cur.close()
-    carry_over(db)
     db.commit()
-
-
-# ---- carrying over from the Siansa plugin ----------------------------------------------------------------------
-
-# This plugin began as a copy of the Siansa plugin ("siansa_analysis", tables plugin_siansa_analysis__<name>).
-# Installing it copies what that one gathered (measured songs, similar lists, job state), so nothing is measured
-# again. The Siansa plugin goes on as before (the Siansa app still uses it): its tick isn't touched; uninstall it
-# once only Siansa Dev is used.
-LEGACY_PREFIX = "plugin_siansa_analysis__"
-LEGACY_TICK = None
-CARRIED = ("profiles", "wanted", "state", "similar_albums", "similar_artists")
-
-
-def carry_over(db):
-    """Copies each of the earlier plugin's tables into this one's, when it exists and this one is still empty."""
-    cur = db.cursor()
-    copied = {}
-    for name in CARRIED:
-        old, new = LEGACY_PREFIX + name, table(name)
-        cur.execute("SELECT to_regclass(%s)", (old,))
-        if cur.fetchone()[0] is None:
-            continue
-        cur.execute(f"SELECT EXISTS (SELECT 1 FROM {new})")
-        if cur.fetchone()[0]:
-            continue
-        # Only the columns both have, in this table's order (a column added later starts with its default).
-        cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name=%s", (old,))
-        old_columns = {row[0] for row in cur.fetchall()}
-        cur.execute(
-            "SELECT column_name FROM information_schema.columns WHERE table_name=%s ORDER BY ordinal_position", (new,))
-        columns = ", ".join(row[0] for row in cur.fetchall() if row[0] in old_columns)
-        if not columns:
-            continue
-        cur.execute(f"INSERT INTO {new} ({columns}) SELECT {columns} FROM {old} ON CONFLICT DO NOTHING")
-        copied[name] = cur.rowcount
-    if copied:
-        if LEGACY_TICK:  # the earlier plugin's tick would measure the same songs again: this one takes over
-            cur.execute("DELETE FROM cron WHERE task_type=%s", (LEGACY_TICK,))
-        logger.info("siansa_beats carried over from the Siansa plugin: %s", copied)
-    cur.close()
-    return copied
 
 
 # ---- state -------------------------------------------------------------------------------------------------

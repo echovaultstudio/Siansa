@@ -32,7 +32,7 @@ from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url,
 from . import beats_service, generations, jobs, similarity, status, store
 
 PLUGIN_ID = "siansa_beats"
-VERSION = "0.4.0"  # the newest in plugin.json: AudioMuse-AI and the Siansa app show it (test_version.py)
+VERSION = "0.4.1"  # the newest in plugin.json: AudioMuse-AI and the Siansa app show it (test_version.py)
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
@@ -612,8 +612,8 @@ def render_service(beats, url, has_password, mode):
     return f"""
 <h2>Siansa Beats (dev)</h2>
 <p>For Siansa Dev: each song's loudness and fades, measured here, with its tempo, beats, bars and phrases from
-<strong>Siansa Beats</strong> (Beat This!), and similar albums and artists. It does all the Siansa plugin does, and
-on install takes what that one had already measured, so nothing is measured again.</p>
+<strong>Siansa Beats</strong> (Beat This!), and similar albums and artists. It does all the Siansa plugin does, on its
+own.</p>
 {reach}
 <form method="post">
   <p><label>Siansa Beats' address<br>
