@@ -190,14 +190,20 @@ private fun DjBarPlace(spot: DjBarSpot, chosen: Boolean, now: Boolean, modifier:
                 Icon(spot.icon, null, tint = ink, modifier = Modifier.size(DJ_SPOT_ICON))
             }
         }
-        // The whole name, never cut: a long one ("Wind down", or any at a large font size) gets a little smaller until
-        // it fits its place, with a little room either side. The line stays as tall, so the bar's spacing never moves.
+        // The whole name, never cut: a long one ("Wind down") gets a little smaller until it fits its place, with a little
+        // room either side. Its line and largest size are set in dp, not sp: with the phone's font size up, the bar must
+        // still fit the seek bar's room exactly, so nothing on the page moves (the cover shows the name large).
         BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            val density = LocalDensity.current
             val weight = if (chosen || now) FontWeight.Bold else FontWeight.Medium
-            val style = MaterialTheme.typography.labelSmall.copy(fontWeight = weight, letterSpacing = 0.sp, lineHeight = DJ_NAME_LINE)
-            val room = with(LocalDensity.current) { (maxWidth - Space.Tight).roundToPx() }
+            val line = with(density) { DJ_NAME_LINE.toSp() }
+            val largest = with(density) { DJ_NAME_SIZE.toSp() }
+            val style = MaterialTheme.typography.labelSmall.copy(fontWeight = weight, letterSpacing = 0.sp, lineHeight = line)
+            val room = with(density) { (maxWidth - Space.Tight).roundToPx() }
             val measurer = rememberTextMeasurer()
-            val size = remember(spot.short, weight, room, style) { fittedSize(spot.short, style, room) { t, st -> measurer.measure(t, st, maxLines = 1, softWrap = false).size.width } }
+            val size = remember(spot.short, weight, room, style, largest) {
+                fittedSize(spot.short, style, room, largest) { t, st -> measurer.measure(t, st, maxLines = 1, softWrap = false).size.width }
+            }
             Text(
                 spot.short,
                 style = style.copy(fontSize = size),
@@ -216,13 +222,14 @@ private fun DjBarPlace(spot: DjBarSpot, chosen: Boolean, now: Boolean, modifier:
 }
 
 /**
- * The largest name size from [DJ_NAME_SIZE] down to [DJ_NAME_SMALLEST] (half a point at a time) at which [text] in
+ * The largest name size from [largest] down to [DJ_NAME_SHRINK] of it (half a point at a time) at which [text] in
  * [style] is no wider than [roomPx], as [widthOf] measures it; the smallest when even that is too wide.
  */
-internal fun fittedSize(text: String, style: TextStyle, roomPx: Int, widthOf: (String, TextStyle) -> Int): TextUnit {
-    var size = DJ_NAME_SIZE.value
-    while (size > DJ_NAME_SMALLEST.value && widthOf(text, style.copy(fontSize = size.sp)) > roomPx) size -= 0.5f
-    return size.coerceAtLeast(DJ_NAME_SMALLEST.value).sp
+internal fun fittedSize(text: String, style: TextStyle, roomPx: Int, largest: TextUnit = 11.sp, widthOf: (String, TextStyle) -> Int): TextUnit {
+    val smallest = (largest.value * DJ_NAME_SHRINK).coerceAtMost(largest.value)
+    var size = largest.value
+    while (size > smallest && widthOf(text, style.copy(fontSize = size.sp)) > roomPx) size -= 0.5f
+    return size.coerceAtLeast(smallest).sp
 }
 
 /** The bar's drawings: the energy's way over the next songs, as the mockup drew them, and a stop square. */
@@ -285,8 +292,9 @@ private const val DJ_BAR_GROW_FROM = 0.4f
 private const val DJ_SPOT_TINT = 0.12f
 private const val DJ_STOP_TINT = 0.2f
 private const val DJ_NAME_ALPHA = 0.72f
-private val DJ_NAME_SIZE = 11.sp
-private val DJ_NAME_SMALLEST = 8.sp
-/** One line of a name, whatever its size: 12 sp, so the bar is always as tall. */
-private val DJ_NAME_LINE = 12.sp
+/** A name's largest size and its line, in dp so the bar is always as tall (see [DjBarPlace]). */
+private val DJ_NAME_SIZE = 11.dp
+private val DJ_NAME_LINE = 12.dp
+/** A name gets no smaller than this much of its largest size. */
+private const val DJ_NAME_SHRINK = 8f / 11f
 private val DJ_STOP_INK = Color(0xFF141414)
