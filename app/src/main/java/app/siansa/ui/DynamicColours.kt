@@ -68,6 +68,30 @@ object DynamicAccent {
     private const val LIGHTNESS_TOP = 1.0f
     private const val STEP = 0.01f
 
+    /** The grey [seedOf] gives a cover without a colour of its own: [of] makes it silver. */
+    private val SILVER_SEED = Color(0.5f, 0.5f, 0.5f)
+
+    /** A colour this lively counts as a colour of the cover's own, not a tint of its greys. */
+    private const val VIVID = 0.15f
+
+    /** Below this share of the cover, its lively colours are spots in a black and white cover. */
+    private const val FEW_COLOURS = 0.15f
+
+    /** Hues this far apart (a sixth of the round, 60°) are different colours: red and blue, not red and orange. */
+    private const val OTHER_HUE = 1f / 6f
+
+    /** A second colour with this much of the first's weight is as strong as it. */
+    private const val RIVAL = 0.6
+
+    /** A colour on less than this share of the cover is a spot, a title or a logo: [vividOf] finds its true colour. */
+    private const val ACCENT_SHARE = 0.10f
+
+    /** Pixels within this of a colour's hue (a 30th of the round, 12°) are the same colour. */
+    private const val SAME_HUE = 1f / 30f
+
+    /** Fewer pixels than this of a colour can't be told from noise. */
+    private const val FEWEST_PIXELS = 12
+
     /** The play symbol on the button: dark or white, whichever reads better. */
     private val ON_DARK = Color(0xFF120D00)
 
@@ -76,12 +100,72 @@ object DynamicAccent {
      * most of the cover and of colour together (its share × √chroma, so a big muted area beats a small bright spot, and a
      * bright logo on a black cover still counts). With none (black, white and grey), a grey: [of] makes it silver. Null
      * without swatches.
+     *
+     * A cover in black and white with a few small spots of different colours (red, green and blue stripes) has no one
+     * colour of its own: picking one of them would be a guess, so it's silver too.
      */
     fun seedOf(swatches: List<CoverSwatch>): Color? {
         if (swatches.isEmpty()) return null
         val coloured = swatches.filter { chroma(it.color) >= GREY }
-        if (coloured.isEmpty()) return Color(0.5f, 0.5f, 0.5f)
-        return coloured.maxBy { it.population * kotlin.math.sqrt(chroma(it.color)) }.color
+        if (coloured.isEmpty()) return SILVER_SEED
+        if (spotsOfManyColours(swatches)) return SILVER_SEED
+        return coloured.maxBy { score(it) }.color
+    }
+
+    /**
+     * The colour for the cover: [seedOf] its [swatches], made as lively as the cover's own pixels of it when it's a small
+     * spot such as a title or a logo ([vividOf]). [pixels] are the cover's, as ARGB.
+     */
+    fun pick(swatches: List<CoverSwatch>, pixels: IntArray): Color? {
+        val seed = seedOf(swatches) ?: return null
+        if (chroma(seed) < GREY) return seed
+        val total = swatches.sumOf { it.population }.coerceAtLeast(1)
+        val share = swatches.filter { it.color == seed }.sumOf { it.population }.toFloat() / total
+        return if (share < ACCENT_SHARE) vividOf(seed, pixels) else seed
+    }
+
+    /**
+     * The cover's own, liveliest pixels of [seed]'s colour: the palette mixes a small yellow title with the grey around
+     * its letters into khaki, while the title itself is bright yellow. Of the pixels of the same hue (within [SAME_HUE])
+     * and at least as lively as [seed], the liveliest quarter's average; [seed] when there are too few of them.
+     */
+    fun vividOf(seed: Color, pixels: IntArray): Color {
+        val hue = hsl(seed).first
+        val least = chroma(seed)
+        val same = ArrayList<Color>()
+        for (argb in pixels) {
+            if ((argb ushr 24) < 0x80) continue
+            val c = Color(argb)
+            val ch = chroma(c)
+            if (ch < least || ch < GREY) continue
+            if (hueDistance(hsl(c).first, hue) > SAME_HUE) continue
+            same += c
+        }
+        if (same.size < FEWEST_PIXELS) return seed
+        val liveliest = same.sortedByDescending { chroma(it) }.take((same.size / 4).coerceAtLeast(FEWEST_PIXELS))
+        val n = liveliest.size.toFloat()
+        return Color(liveliest.sumOf { it.red.toDouble() }.toFloat() / n, liveliest.sumOf { it.green.toDouble() }.toFloat() / n, liveliest.sumOf { it.blue.toDouble() }.toFloat() / n)
+    }
+
+    /**
+     * A cover that is mostly black, white and grey ([VIVID] colours fill less than [FEW_COLOURS] of it) whose two
+     * liveliest colours are far apart ([OTHER_HUE]) and as strong as each other: no single colour stands for it.
+     */
+    private fun spotsOfManyColours(swatches: List<CoverSwatch>): Boolean {
+        val total = swatches.sumOf { it.population }.coerceAtLeast(1)
+        val vivid = swatches.filter { chroma(it.color) >= VIVID }.sortedByDescending { score(it) }
+        if (vivid.size < 2) return false
+        if (vivid.sumOf { it.population }.toFloat() / total >= FEW_COLOURS) return false
+        val (first, second) = vivid
+        return hueDistance(hsl(first.color).first, hsl(second.color).first) >= OTHER_HUE && score(second) >= RIVAL * score(first)
+    }
+
+    private fun score(s: CoverSwatch): Double = s.population * kotlin.math.sqrt(chroma(s.color).toDouble())
+
+    /** How far apart two hues (0 to 1, round) are, 0 to ½. */
+    private fun hueDistance(a: Float, b: Float): Float {
+        val d = abs(a - b)
+        return min(d, 1f - d)
     }
 
     /**
@@ -197,7 +281,9 @@ fun rememberDynamicColours(coverId: String?, on: Boolean): DynamicColours? {
                 // silver, and how much of a cover is black counts against a small bright spot (issue #994).
                 val palette = Palette.from(bitmap).maximumColorCount(16).clearFilters().generate()
                 val one = android.graphics.Bitmap.createScaledBitmap(bitmap, 1, 1, true).getPixel(0, 0)
-                CoverTones(DynamicAccent.seedOf(palette.swatches.map { CoverSwatch(Color(it.rgb), it.population) }), Color(one))
+                // The pixels too: a small title's true colour is in them, not in the palette's blend of it (issue #1027).
+                val pixels = IntArray(bitmap.width * bitmap.height).also { bitmap.getPixels(it, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height) }
+                CoverTones(DynamicAccent.pick(palette.swatches.map { CoverSwatch(Color(it.rgb), it.population) }, pixels), Color(one))
             }.onFailure { AppLog.w("Colours", "Couldn't read the colours of cover $coverId: ${it.message}") }.getOrNull()
         }
         if (read != null) {
