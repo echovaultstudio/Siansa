@@ -156,7 +156,10 @@ class CrossfadePlanTest {
     @Test fun smartFollowsTheQuietTailAndTheIntro() {
         val plan = Crossfade.plan(CrossfadeMode.SMART, 12_000, a1, b1, minutes4, minutes4, profile("a1", 0, 5_000), profile("b1", 2_000, 0))!!
         assertEquals(7_000L, plan.overlapMs)
-        assertEquals(2_000L, plan.fadeInMs)
+        // The old song ends quietly (5 s): the next one builds up over the whole of it (the owner, 9 Nov), no longer
+        // coming in over 2 s and then playing at full level over the quiet end.
+        assertEquals(7_000L, plan.fadeInMs)
+        assertTrue(plan.buildUp)
     }
 
     @Test fun aHardEndingIntoAHardStartIsAColdEndWithAShortPause() {

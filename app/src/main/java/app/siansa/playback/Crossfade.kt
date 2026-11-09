@@ -51,6 +51,13 @@ data class FadePlan(
     val filterHz: Double = 0.0,
     /** An echo out: the old song's last bar echoes away, a beat ([echoBeatMs]) apart; null for none. */
     val echoBeatMs: Double? = null,
+    /**
+     * After a quiet ending (the owner, 9 Nov): the next song builds up slowly over [fadeInMs], to its first change, rather
+     * than coming in at full level over the old song's quiet end ([Crossfade.buildIn]).
+     */
+    val buildUp: Boolean = false,
+    /** Where the next song starts (its own ms) when it comes in after the old song ([coldEnd]): an echo out's downbeat. */
+    val incomingFromMs: Long = 0L,
 )
 
 /**
@@ -206,7 +213,7 @@ object Crossfade {
      * 30 s under the next song's start, two songs at full volume) gets a short one at its very end, [BEATLESS_LOUD_MS],
      * as the DJ blends do ([beatlessRunsLong]). An outro whose loudness wasn't measured counts as loud.
      */
-    fun afterLastBeat(profile: TrackProfile?, durationMs: Long, nextDurationMs: Long): FadePlan? {
+    fun afterLastBeat(profile: TrackProfile?, durationMs: Long, nextDurationMs: Long, next: TrackProfile? = null): FadePlan? {
         val lastBeat = profile?.beatsUntilMs ?: return null
         if (durationMs <= 0) return null
         val silence = (profile.lastAtExactlyMs(SILENT_DB) ?: 0L).takeIf { it >= MIN_SILENCE_MS } ?: 0L
@@ -226,8 +233,46 @@ object Crossfade {
             (if (!windsDown) " that stays loud (${seconds(quiet)} quiet at its end), so only its last ${seconds(overlap)}"
             else if (overlap < tail) ", its last ${seconds(overlap)}" else "") +
             (if (cut > 0) " · left out the last ${seconds(cut)} of silence" else "")
+        // A winding-down outro: the next song builds up under it to its first change (the owner, 9 Nov), not 2 s.
+        if (windsDown) {
+            val build = buildMs(next, overlap)
+            return FadePlan(overlap, build, why + " · ${buildWhy(next, build)}", cut, beatNote = "the beat stops at ${clockOf(lastBeat)}, so no beat-matching is needed", buildUp = true)
+        }
         return FadePlan(overlap, AFTER_BEAT_FADE_IN_MS.coerceAtMost(overlap), why, cut, beatNote = "the beat stops at ${clockOf(lastBeat)}, so no beat-matching is needed")
     }
+
+    /** The longest build-up of the next song after a quiet ending. */
+    const val BUILD_MAX_MS = 30_000L
+    /** A change sooner than this into the next song isn't where a build-up ends: it'd come in nearly at once. */
+    const val BUILD_MIN_MS = 4_000L
+    /** An old song quiet for this long at its end ends quietly: the next song builds up rather than coming in. */
+    const val QUIET_BUILD_MS = 4_000L
+
+    /**
+     * Where the next song first changes (ms from its start), from Siansa Beats' readings: the earliest of its first
+     * phrase change, where its bass comes in, and its first drop, at least [BUILD_MIN_MS] in. Null without them.
+     */
+    fun firstChangeMs(next: TrackProfile?): Long? {
+        val intro = next?.intro ?: return null
+        val bar = intro.beatLengthMs * BeatMatch.BEATS_PER_BAR
+        val from = intro.lockMs ?: intro.barMs ?: intro.beatMs
+        val phrase = intro.phraseMs?.let { ph -> if (ph >= BUILD_MIN_MS) ph else intro.phraseLengthMs?.let { ph + it } }
+        val bass = intro.bassBars?.takeIf { it > 0 }?.let { from + it * bar }
+        return listOfNotNull(phrase, bass, next.dropsMs.firstOrNull()?.toDouble())
+            .map { it.toLong() }.filter { it >= BUILD_MIN_MS }.minOrNull()
+    }
+
+    /** How long the next song builds up over an old song's quiet end of [overlapMs]: to its first change, within that end. */
+    fun buildMs(next: TrackProfile?, overlapMs: Long): Long {
+        val most = minOf(overlapMs, BUILD_MAX_MS).coerceAtLeast(MIN_FADE_IN_MS)
+        return (firstChangeMs(next) ?: most).coerceIn(MIN_FADE_IN_MS, most)
+    }
+
+    private fun buildWhy(next: TrackProfile?, buildMs: Long): String =
+        "the next song builds up over ${seconds(buildMs)}" + if (firstChangeMs(next)?.let { it <= buildMs } == true) ", to its first change" else ""
+
+    /** The next song's level [t] of the way through a build-up: slow at first, faster towards its change. */
+    fun buildIn(t: Float): Float = t.coerceIn(0f, 1f).let { it * it }
 
     private fun clockOf(ms: Long): String = "%d:%02d".format(java.util.Locale.ROOT, ms / 60_000, ms / 1000 % 60)
 
@@ -257,7 +302,7 @@ object Crossfade {
         // A beatless outro (plugin 0.5.0): the next song comes in after the last beat, and the outro, with its own
         // fade, plays out under it. Nothing to lay beat on beat, so no clash and no change of speed.
         if (mode == CrossfadeMode.SMART && !continuousMix(current) && !continuousMix(next)) {
-            afterLastBeat(currentProfile, currentDurationMs, nextDurationMs)?.let { return it }
+            afterLastBeat(currentProfile, currentDurationMs, nextDurationMs, nextProfile)?.let { return it }
         }
         // Where the plugin found no bars or phrases, a track made on a grid has them assumed from its first beat (issue #820).
         val outro = currentProfile?.outro?.let { BeatMatch.assumedGrid(currentProfile.intro?.let(BeatMatch::gridded), BeatMatch.gridded(it)) }
@@ -336,12 +381,9 @@ object Crossfade {
                 overlap = BeatMatch.CLASH_MS
                 why += " · a continuous mix, so a short blend" + notStraightOn(current, next)
             } else if (beatMatch && rhythmic && speed == null && outro != null && outro.bpm > 0 && outro.lockMs != null) {
-                // Tempos too far apart to match (the owner, 9 Nov: an echo out rather than a clash): the old song's last
-                // bar echoes away on its own beat while the next one starts.
-                val bar = (outro.beatLengthMs * BeatMatch.BEATS_PER_BAR).toLong()
-                overlap = minOf(maxMs, bar + outro.beatLengthMs.toLong())
-                why += " · DJ: ${Technique.ECHO_OUT.label}, %.0f and %.0f BPM are too far apart to match".format(java.util.Locale.ROOT, outro.bpm, intro?.bpm ?: 0.0)
-                return@run FadePlan(overlap, overlap / 2, why, cut, technique = Technique.ECHO_OUT, echoBeatMs = outro.beatLengthMs)
+                echoOut(outro, intro, currentDurationMs, cut)?.let { return@run it }
+                overlap = BeatMatch.CLASH_MS
+                why += " · beats would clash, so a short blend"
             } else if (rhythmic && overlap > BeatMatch.CLASH_MS) {
                 // Both ends keep a beat that can't be laid on the other's: a long blend would clash, so a short one.
                 overlap = BeatMatch.CLASH_MS
@@ -353,6 +395,11 @@ object Crossfade {
                     // a DJ brings a quiet intro in under the old song. The next song fades in over the first half of it.
                     overlap = maxMs
                     why += " · DJ: one end has no beat, nothing to clash, so the whole crossfade length"
+                    // The old song without a beat at its end: the next one builds up under it to its first change.
+                    if (BeatMatch.beatless(outro) && tail >= QUIET_BUILD_MS) {
+                        val build = buildMs(nextProfile, overlap)
+                        return@run FadePlan(overlap, build, why + " · " + buildWhy(nextProfile, build), cut, buildUp = true)
+                    }
                     return@run FadePlan(overlap, maxOf(head, overlap / 2), why, cut)
                 }
                 // The beatless end is the old song's, still going full on to its end (0.52.0-dev: a 30 s blend began
@@ -365,6 +412,11 @@ object Crossfade {
                 // 0.46 into Cubicolor's beat ran 30 s out of step): a long blend would clash, so a short one.
                 overlap = BeatMatch.CLASH_MS
                 why += " · DJ: both ends have some beat, so a short blend"
+            }
+            // The old song ends quietly (the owner, 9 Nov): the next one builds up to its first change, not at once.
+            if (tail >= QUIET_BUILD_MS && overlap > BeatMatch.CLASH_MS) {
+                val build = buildMs(nextProfile, overlap)
+                return@run FadePlan(overlap, build, why + " · " + buildWhy(nextProfile, build), cut, buildUp = true)
             }
             FadePlan(overlap, head.coerceIn(MIN_FADE_IN_MS, overlap.coerceAtLeast(MIN_FADE_IN_MS)), why, cut)
         } else if (mode == CrossfadeMode.SMART && BeatMatch.beatDriven(outro) && nextProfile == null) {
@@ -420,6 +472,33 @@ object Crossfade {
      * "DJ Mix", "Continuous Mix". Its start and end already hold the neighbouring tracks blended in, so it's never
      * beat-matched: a third song laid over that clashes whatever the timing. Within its album it runs straight on.
      */
+    /**
+     * An echo out (the owner, 9 Nov), as a DJ does it when the tempos are too far apart to match: no overlap at all.
+     * The old song plays its last whole bar at full level, more and more of it going to a short, thin echo, and stops
+     * dead on the bar line; the next song drops in at full level on its first downbeat, as the old one stops, while
+     * the echo's last repeats die away under it. Null when the old song has no bar to end on.
+     */
+    fun echoOut(outro: BeatEnd, intro: BeatEnd?, durationMs: Long, cut: Long): FadePlan? {
+        val bar = outro.beatLengthMs * BeatMatch.BEATS_PER_BAR
+        val grid = outro.barMs ?: outro.beatMs
+        val songEnd = (outro.lockEndMs ?: (durationMs - cut).toDouble()).coerceAtMost((durationMs - cut).toDouble())
+        // The last bar line at or before where the song (or its lock) ends.
+        val end = grid + kotlin.math.floor((songEnd - grid) / bar) * bar
+        if (end - bar <= 0 || end > durationMs) return null
+        val from = (intro?.barMs ?: intro?.beatMs ?: 0.0).takeIf { it in 0.0..ECHO_DOWNBEAT_WITHIN_MS } ?: 0.0
+        val why = "smart: ${Technique.ECHO_OUT.label}, %.0f and %.0f BPM are too far apart to match: the old song's last bar echoes out and stops on the bar line, the next drops in on its first downbeat (%.1f s)"
+            .format(java.util.Locale.ROOT, outro.bpm, intro?.bpm ?: 0.0, from / 1000.0)
+        return FadePlan(
+            overlapMs = bar.toLong(), fadeInMs = ECHO_DROP_IN_MS, why = why, cutMs = (durationMs - end).toLong(),
+            coldEnd = true, gapMs = 0L, technique = Technique.ECHO_OUT, echoBeatMs = outro.beatLengthMs, incomingFromMs = from.toLong(),
+        )
+    }
+
+    /** The next song's first downbeat further in than this isn't dropped onto: it starts from its beginning. */
+    const val ECHO_DOWNBEAT_WITHIN_MS = 8_000.0
+    /** An echo out's drop-in: at full level all but at once (a few ms, so it can't click). */
+    const val ECHO_DROP_IN_MS = 30L
+
     /** A filter fade's high-pass ends here: the old song thinned to its hats and vocals' top as it goes. */
     const val FILTER_FADE_HZ = 2_500.0
 

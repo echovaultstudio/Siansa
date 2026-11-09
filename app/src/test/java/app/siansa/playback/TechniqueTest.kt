@@ -120,7 +120,14 @@ class TechniqueTest {
         assertEquals(Technique.ECHO_OUT, echo.technique)
         assertNull(echo.beat)
         assertEquals(outro.beatLengthMs, echo.echoBeatMs!!, 0.0)
-        assertTrue(echo.overlapMs in 1_875L..2_400L)
+        // No overlap: the old song's last whole bar (300 s to 301.875 s, where its lock ends), stopped dead on the bar
+        // line; the next song drops in at once on its first downbeat (1 s), as the old one stops.
+        assertEquals(1_875L, echo.overlapMs)
+        assertTrue(echo.coldEnd)
+        assertEquals(0L, echo.gapMs)
+        assertEquals(310_000L - 301_875L, echo.cutMs)
+        assertEquals(1_000L, echo.incomingFromMs)
+        assertEquals(Crossfade.ECHO_DROP_IN_MS, echo.fadeInMs)
         // Without Siansa Beats' readings, as before: a short blend.
         val before = plan(outro.copy(lockMs = null), far.copy(lockMs = null))!!
         assertEquals(BeatMatch.CLASH_MS, before.overlapMs)
@@ -140,5 +147,36 @@ class TechniqueTest {
         assertEquals(625.0, DeckFilter.filterAt(0.5, 2_500.0), 1e-9)
         assertEquals(2_500.0, DeckFilter.filterAt(1.0, 2_500.0), 0.0)
         assertEquals(0.0, DeckFilter.filterAt(0.7, 0.0), 0.0)
+    }
+
+    // ---- After a quiet ending, the next song builds up (the owner, 9 Nov) ----
+
+    @Test fun theFirstChangeIsTheEarliestOfPhraseBassAndDrop() {
+        val bar = 60_000.0 / 127 * 4
+        val withPhrase = TrackProfile("b", -9.0, emptyList(), emptyList(), intro = intro.copy(phraseMs = 1_000.0, phraseBars = 8))
+        assertEquals((1_000 + 8 * bar).toLong(), Crossfade.firstChangeMs(withPhrase))  // its first phrase starts at once: the next one
+        val bass = withPhrase.copy(intro = withPhrase.intro!!.copy(bassBars = 4))
+        assertEquals((1_000 + 4 * bar).toLong(), Crossfade.firstChangeMs(bass))
+        assertEquals(6_000L, Crossfade.firstChangeMs(bass.copy(dropsMs = listOf(6_000L))))
+        assertNull(Crossfade.firstChangeMs(TrackProfile("x", -9.0, emptyList(), emptyList())))
+        // Up to its first change, within the old song's quiet end and half a minute.
+        assertEquals((1_000 + 4 * bar).toLong(), Crossfade.buildMs(bass, 20_000))
+        assertEquals(5_000L, Crossfade.buildMs(bass, 5_000))
+        assertEquals(12_000L, Crossfade.buildMs(null, 12_000))
+        assertEquals(Crossfade.BUILD_MAX_MS, Crossfade.buildMs(null, 45_000))
+        assertEquals(0.25f, Crossfade.buildIn(0.5f), 1e-6f)
+    }
+
+    @Test fun aWindingDownOutroHasTheNextSongBuildUpUnderIt() {
+        // The beat stops at 3:40 of 4:00 and the outro winds down for its last 15 s.
+        val outroEnd = TrackProfile("a", -10.0, emptyList(), listOf(RampPoint(-18, 15_000)), beatsUntilMs = 220_000)
+        val next = TrackProfile("b", -10.0, emptyList(), emptyList(), intro = intro.copy(bassBars = 4))
+        val plan = Crossfade.afterLastBeat(outroEnd, 240_000, 240_000, next)!!
+        assertTrue(plan.buildUp)
+        assertEquals(Crossfade.firstChangeMs(next)!!, plan.fadeInMs)
+        assertTrue(plan.why, plan.why.contains("builds up") && plan.why.contains("to its first change"))
+        // An outro that stays loud keeps its quick fade-in.
+        val loud = TrackProfile("a", -10.0, emptyList(), listOf(RampPoint(-18, 500)), beatsUntilMs = 220_000)
+        assertTrue(!Crossfade.afterLastBeat(loud, 240_000, 240_000, next)!!.buildUp)
     }
 }

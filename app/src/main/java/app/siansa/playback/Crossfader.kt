@@ -484,7 +484,7 @@ internal class Crossfader(
                 if (beat != null && Blending.of(settings()).bassSwap) swapBass(out)
                 val heard = if (main.currentMediaItemIndex == incomingIndex) (main.currentPosition - (beat?.incomingStartMs ?: 0L)).coerceAtLeast(0L) else 0L
                 val fadedIn = (heard.toFloat() / planned.fadeInMs).coerceIn(0f, 1f)
-                level = Crossfade.fadeIn(fadedIn)
+                level = if (planned.buildUp) Crossfade.buildIn(fadedIn) else Crossfade.fadeIn(fadedIn)
                 onLevel()
                 if (beat != null && !tailDone) keepInStep(beat, t)
                 // Done when both are (and the echo has rung out); or anyway a while after the old song ended, if the

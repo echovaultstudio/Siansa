@@ -349,6 +349,8 @@ internal class MixedCrossfader(
                 val echo = engine.core.echoOf(d)
                 echo.clear()
                 echo.delayMs = beatMs
+                // An echo out's repeats are few and faint: gone about a beat after the next song drops in.
+                echo.feedback = if (planned.technique == Technique.ECHO_OUT) ECHO_OUT_FEEDBACK else app.siansa.playback.engine.Echo.FEEDBACK
                 AppLog.d("Crossfade", "Echo at the end: over the old song's last bar, repeats a beat apart (${beatMs.toInt()} ms)")
             }
         }
@@ -383,7 +385,9 @@ internal class MixedCrossfader(
             val tailMs = tMix.mediaUsAt(heardMix)?.let { it / 1000 } ?: t.currentPosition
             val out = ((tailMs - startAt).toFloat() / planned.overlapMs).coerceIn(0f, 1f)
             val tailDone = out >= 1f || t.playbackState == Player.STATE_ENDED || t.playbackState == Player.STATE_IDLE
-            t.volume = if (tailDone) 0f else tailBase * sleepLevel() * Crossfade.fadeOut(out)
+            // An echo out plays the old song's last bar at full level and stops it dead on the bar line.
+            val outLevel = if (planned.technique == Technique.ECHO_OUT) 1f else Crossfade.fadeOut(out)
+            t.volume = if (tailDone) 0f else tailBase * sleepLevel() * outLevel
             val beat = planned.beat
             if (beat != null && Blending.of(settings()).bassSwap) swapBass(out, tMix, planned)
             else if (planned.filterHz > 0) tMix.filter.lowCutHz = DeckFilter.filterAt(out.toDouble(), planned.filterHz)
@@ -393,7 +397,7 @@ internal class MixedCrossfader(
             // so the fade-in can't stay at nothing (0.52.0-dev).
             val heard = if (onNext && heardMix >= incomingMix) ((heardMix - incomingMix) * 1000 / engine.outRate).toLong() else 0L
             val fadedIn = (heard.toFloat() / planned.fadeInMs).coerceIn(0f, 1f)
-            level = Crossfade.fadeIn(fadedIn)
+            level = if (planned.buildUp) Crossfade.buildIn(fadedIn) else Crossfade.fadeIn(fadedIn)
             onLevel()
             fallbackReason(onNext, heardMix)?.let { why ->
                 fallBack(why)
@@ -667,7 +671,8 @@ internal class MixedCrossfader(
         }
         val bar = beatMs * BeatMatch.BEATS_PER_BAR
         val left = planned.overlapMs - (tailMs - startAt)
-        echo.send = ((bar - left) / bar).toFloat().coerceIn(0f, 1f) * ECHO_SEND * tailBase * sleepLevel()
+        val most = if (planned.technique == Technique.ECHO_OUT) ECHO_OUT_SEND else ECHO_SEND
+        echo.send = ((bar - left) / bar).toFloat().coerceIn(0f, 1f) * most * tailBase * sleepLevel()
     }
 
     private fun releaseTail() {
@@ -796,6 +801,9 @@ internal class MixedCrossfader(
         const val MUTED_MS = 3_000L
         /** How much of the old song goes to the echo by the end of its last bar (as the old engine's hall, #759). */
         const val ECHO_SEND = 0.75f
+        /** An echo out's echo: quieter and shorter than the blend's, a faint trail under the next song. */
+        const val ECHO_OUT_SEND = 0.5f
+        const val ECHO_OUT_FEEDBACK = 0.25f
         /** An output playing this long without its position moving on is stuck. */
         const val STALLED_MS = 3_000L
         /** The player has handed over sound this long without a break: what it handed first should be heard by now. */
@@ -835,7 +843,7 @@ internal object EngineFade {
         return when {
             beat != null -> beat.incomingStartMs to beat.startMs
             // A cold end: after the old song's last sound and the pause (the point is past its end, on its clock).
-            plan.coldEnd -> 0L to startAtMs + plan.overlapMs + plan.gapMs
+            plan.coldEnd -> plan.incomingFromMs to startAtMs + plan.overlapMs + plan.gapMs
             else -> 0L to startAtMs
         }
     }

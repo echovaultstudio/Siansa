@@ -89,6 +89,10 @@ How Smart decides:
   crossfade length: up to half a minute of outro (then the last half minute of it), and never more than a third of
   either song. Only an outro that winds down (quiet for its last 6 seconds or more) gets that long blend: a beatless
   outro that stays loud is blended only over its last 6 seconds, so two songs never play loud together for long.
+- **After a quiet ending** (an old song quiet for its last 4 seconds or more, or a beatless outro that winds down), the
+  next song builds up slowly rather than coming in at full level: it reaches its full level at its first change (its
+  first phrase change, where its bass comes in, or its first drop, from Siansa Beats' readings), within the quiet
+  ending and at most half a minute; without those readings, over the whole quiet ending.
 - Songs that run straight on within one album aren't faded, so they stay gapless.
 - Radio stations and podcast episodes ([Your Stations](stations.md)) are never faded into or out of.
 - Without the plugin's measurements, Smart uses the fixed length. When the song going out keeps a beat but the
@@ -121,7 +125,9 @@ blend them the way a DJ mixes:
     or more quieter, or the keys only half mix.
   - **Quick swap**, 4 bars: when the keys clash, a beat is under 90 % sure, or you moved in the song in the last
     20 seconds.
-  - **Echo out**: when the tempos are too far apart to match, the old song's last bar echoes away on its beat.
+  - **Echo out**: when the tempos are too far apart to match, the two never play together. The old song's last bar
+    echoes out and it stops on the bar line; the next song drops in at full level on its first downbeat as it stops,
+    under the last faint repeats.
   - **Bass swap**, 16 bars: the usual. Never the same technique twice running when another fits as well.
   - Fixed always uses the bass swap over the bars set. The log says which was picked and why ("smart: …").
 - **Siansa Beats (Siansa Dev)**: each end of a song is read from where its beat locks onto its grid (the first and
