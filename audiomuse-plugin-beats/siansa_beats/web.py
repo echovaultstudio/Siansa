@@ -22,6 +22,7 @@ the asked music server's ids for songs in the similar lists. Like AudioMuse's ow
 """
 
 import json
+import urllib.parse
 from datetime import datetime, timezone
 from html import escape
 
@@ -32,7 +33,7 @@ from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url,
 from . import beats_service, generations, jobs, similarity, status, store
 
 PLUGIN_ID = "siansa_beats"
-VERSION = "0.4.1"  # the newest in plugin.json: AudioMuse-AI and the Siansa app show it (test_version.py)
+VERSION = "0.5.0"  # the newest in plugin.json: AudioMuse-AI and the Siansa app show it (test_version.py)
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
@@ -202,6 +203,27 @@ def bad_blend():
         return _error(str(e), 502)
     logger.info("siansa_beats: bad blend %s into %s (%s) passed on", mark["from_id"], mark["to_id"], mark["technique"])
     return jsonify({"id": answer.get("id")})
+
+
+@bp.route("/api/genre")
+def genre_songs():
+    """The songs of a genre radio, by Siansa Beats' vote (each song's sound first, its tags second): ``{"ids",
+    "styles", "genres", "source"}``. 502 when Siansa Beats doesn't answer: the app then plays by its tags."""
+    name = (request.args.get("name") or "").strip()
+    if not name:
+        return _error("name needed: the genre, as the app shows it", 400)
+    try:
+        limit = max(1, min(2000, int(request.args.get("limit") or 300)))
+    except ValueError:
+        return _error("limit is a number", 400)
+    try:
+        answer = beats_service._beats_get("/api/genre?" + urllib.parse.urlencode({"name": name, "limit": limit}))
+    except beats_service.BeatsError as e:
+        logger.info("siansa_beats: no genre radio from Siansa Beats for %s: %s", name, e)
+        return _error(str(e), 502)
+    return jsonify({"name": name, "ids": [str(i) for i in answer.get("ids") or []],
+                    "styles": answer.get("styles") or [], "genres": answer.get("genres") or [],
+                    "why": answer.get("why"), "source": "siansa_beats"})
 
 
 @bp.route("/api/status")

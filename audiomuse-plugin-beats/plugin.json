@@ -6,6 +6,14 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.5.0",
+      "min_core_version": "3.6.4",
+      "changelog": "Genre radios: the songs of a genre by Siansa Beats' vote (each song's sound first, its tags second), for Siansa Dev.",
+      "imageUrl": "",
+      "sourceUrl": "",
+      "checksum": ""
+    },
+    {
       "version": "0.4.1",
       "min_core_version": "3.6.4",
       "changelog": "No longer reads the Siansa plugin's tables: everything it uses is its own. Its data stays as it is.",

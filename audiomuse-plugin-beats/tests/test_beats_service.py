@@ -134,6 +134,9 @@ class ApiTest(unittest.TestCase):
             return {"id": 7}
         if path == "/api/health":
             return {"status": "ok", "version": "0.13.0"}
+        if path.startswith("/api/genre?"):
+            self.asked_genre = path
+            return {"ids": ["c", "o"], "styles": ["Electronic---Trance"], "genres": [], "why": None}
         ids = path.split("ids=")[1].split(",")
         return {"grids": [dict(CONTROL_GRID, intro_lock_ms=18.0, mix_track=False, drops_ms=[60_000.0]) for i in ids if i == "c"],
                 "missing": [i for i in ids if i != "c"]}
@@ -162,6 +165,15 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(self.client.post("/plugins/siansa_beats/api/bad-blends", json={"from_id": "c"}).status_code, 400)
         self.down = True
         self.assertEqual(self.client.post("/plugins/siansa_beats/api/bad-blends", json=mark).status_code, 502)
+
+    def test_genre_radios_come_from_siansa_beats_vote(self):
+        answer = self.client.get("/plugins/siansa_beats/api/genre?name=Electronic+%2F+Trance&limit=50").get_json()
+        self.assertEqual(answer, {"name": "Electronic / Trance", "ids": ["c", "o"], "styles": ["Electronic---Trance"],
+                                  "genres": [], "why": None, "source": "siansa_beats"})
+        self.assertEqual(self.asked_genre, "/api/genre?name=Electronic+%2F+Trance&limit=50")
+        self.assertEqual(self.client.get("/plugins/siansa_beats/api/genre").status_code, 400)
+        self.down = True  # the app then plays by its tags
+        self.assertEqual(self.client.get("/plugins/siansa_beats/api/genre?name=Trance").status_code, 502)
 
     def test_the_service_part_of_the_page(self):
         page = web.render_service({"reachable": True, "version": "0.13.0"}, "http://beats:8090", True, "plugin")
