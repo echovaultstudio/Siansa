@@ -124,8 +124,9 @@ fun CollectionPage(
     albumBar: Boolean = false,
     // Where Play continues an album you stopped part way (issue #965, was "Continue from" #367): Play shows it.
     resume: PlayResume? = null,
-    // Shuffle slides onto Play for a DJ mix of just these songs, as an album's does (Siansa Dev: playlists too).
-    djMix: Boolean = false,
+    // Shuffle slides onto Play for a DJ mix of just these songs, as an album's does: on playlists, radios, mixes and
+    // every other list of songs (the owner, 9 Nov); not on search results.
+    djMix: Boolean = true,
     // What the quick-scroll handle says for a song (a letter, a month); by default where it is in the list.
     scrollLabel: ((index: Int, song: Song) -> String?)? = null,
     footer: LazyListScope.() -> Unit = {},
@@ -754,7 +755,7 @@ private val BIG_PLAY_SIZE = 56.dp
  * circle's own margin in its 24-unit drawing (2 units). The plus moves left by that, so its circle starts in line with
  * the text above.
  */
-private val ICON_SIZE = 28.dp
-private val ICON_INSET = (48.dp - ICON_SIZE) / 2 + ICON_SIZE * 2 / 24
+internal val ICON_SIZE = 28.dp
+internal val ICON_INSET = (48.dp - ICON_SIZE) / 2 + ICON_SIZE * 2 / 24
 private val BIG_PLAY_RING = 2.5.dp
 private val BIG_PLAY_RING_OUTSET = 1.5.dp

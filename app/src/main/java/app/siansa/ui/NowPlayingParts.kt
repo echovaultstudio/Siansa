@@ -504,13 +504,16 @@ fun LyricsScreen(song: Song?, tint: Color, onClose: () -> Unit, menu: () -> Unit
  * when the song has no lyrics (#294).
  */
 @Composable
-fun LyricsButton(enabled: Boolean, onClick: () -> Unit) {
-    val color = Color.White.copy(alpha = if (enabled) 0.9f else 0.3f)
+fun LyricsButton(enabled: Boolean, open: Boolean = false, onClick: () -> Unit) {
+    // While the lyrics are open, the same button in the accent colour closes them.
+    val color = if (open) Accent else Color.White.copy(alpha = if (enabled) 0.9f else 0.3f)
     Box(
-        Modifier.size(48.dp).clip(CircleShape).clickable(enabled = enabled, onClickLabel = "Show lyrics", onClick = onClick),
+        Modifier.size(48.dp).clip(CircleShape)
+            .clickable(enabled = enabled, onClickLabel = if (open) "Close lyrics" else "Show lyrics", onClick = onClick)
+            .testTag(if (open) "closeLyricsButton" else "lyricsButton"),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Rounded.ChatBubble, if (enabled) "Lyrics" else "No lyrics for this song", tint = color)
+        Icon(Icons.Rounded.ChatBubble, if (open) "Close lyrics" else if (enabled) "Lyrics" else "No lyrics for this song", tint = color)
         // The quote marks, cut out of the bubble in the player's dark colour, a little above centre where the
         // bubble's body is.
         Icon(

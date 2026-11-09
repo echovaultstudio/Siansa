@@ -1,6 +1,7 @@
 package app.siansa
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -312,5 +313,27 @@ class SpacingPlayerTest : SpacingCheck() {
         val gap = (button.top + button.bottom) / 2 - (up.top + up.bottom) / 2
         val expected = with(compose.density) { reachPx.toDp() }
         assertEven("Up choice above the button's centre", gap, expected, 1.dp)
+    }
+
+    /** Now playing (the owner, 9 Nov): the top row sits exactly halfway between the top and the cover's top edge. */
+    @Test fun topRowSitsHalfwayToTheCover() {
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.height(700.dp).width(360.dp)) {
+                    app.siansa.ui.PlayerTop(
+                        topGap = 20.dp,
+                        row = { Box(Modifier.fillMaxWidth().height(48.dp).testTag("row")) },
+                        cover = { Box(Modifier.fillMaxWidth().aspectRatio(1f).testTag("cover")) },
+                        belowCover = {},
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    )
+                }
+            }
+        }
+        val top = compose.onNodeWithTag("playerTop").getBoundsInRoot()
+        val row = compose.onNodeWithTag("row").getBoundsInRoot()
+        val cover = compose.onNodeWithTag("cover").getBoundsInRoot()
+        assertEven("Gap above the row and gap below it", row.top - top.top, cover.top - row.bottom, 1.dp)
+        assertTrue("The row is clear of the cover", row.bottom <= cover.top)
     }
 }

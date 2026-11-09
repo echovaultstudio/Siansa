@@ -77,6 +77,7 @@ fun SearchMoreScreen(nav: NavController, kindId: String?, query: String) {
                 error = (songs as? Load.Err)?.message,
                 cover = { m -> GeneratedCover(query, colors, m) },
                 header = {},
+                djMix = false,
             )
         }
         SearchMore.ARTISTS, SearchMore.ALBUMS -> {

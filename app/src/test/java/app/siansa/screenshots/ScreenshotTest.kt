@@ -467,6 +467,34 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             // An album's details with "Continue from 8", and its bar (issue #965, the owner's layout): at rest; continuing (a ring
             // round Play); sliding shuffle onto Play (the rest dims, Play a record); while the album's DJ mix plays; and DJ mix
             // on the cover, on Play and before.
+            // An artist's bar (the owner, 9 Nov): the heart on the left, in line with the details; Radio, Shuffle and Play
+            // on the right. Not a favourite, a favourite, and an artist without songs of their own.
+            Scene("artist_bar") {
+                Column(Modifier.padding(Space.Page)) {
+                    androidx.compose.material3.Text("12 releases · 140 songs")
+                    listOf(false, true).forEach { on ->
+                        app.siansa.ui.ArtistButtons(
+                            heart = { m -> app.siansa.ui.FavouriteHeart(on, m, MaterialTheme.colorScheme.onSurface, 28.dp) {} },
+                            onRadio = {}, onShuffle = {}, playing = false, onPlay = {},
+                        )
+                    }
+                    app.siansa.ui.ArtistButtons(
+                        heart = { m -> app.siansa.ui.FavouriteHeart(false, m, MaterialTheme.colorScheme.onSurface, 28.dp) {} },
+                        onRadio = {}, onShuffle = null, playing = false, onPlay = null,
+                    )
+                }
+            },
+            // The lyrics button under the player's controls: at rest, greyed out without lyrics, and lit while the lyrics
+            // are open, when it closes them (the owner, 9 Nov).
+            Scene("lyrics_button") {
+                OnPlayer {
+                    Row(Modifier.background(Color(0xFF2A1F3D)).padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
+                        app.siansa.ui.LyricsButton(enabled = true) {}
+                        app.siansa.ui.LyricsButton(enabled = false) {}
+                        app.siansa.ui.LyricsButton(enabled = true, open = true) {}
+                    }
+                }
+            },
             Scene("album_bar") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
                     app.siansa.ui.CollectionByline("Thornhill", null, null, "Album · 2019", note = "Continue from 8")

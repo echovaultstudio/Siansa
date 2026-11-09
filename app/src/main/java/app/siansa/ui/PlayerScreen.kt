@@ -349,14 +349,15 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                     ) {
                         // A gap above the header that suits the screen's height, so the top of the player
                         // isn't pressed against the status bar.
-                        Spacer(Modifier.height(playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp))
-                        TopRow(song, onClose = onClose, onAlbum = ::openAlbum, onMenu = { menuOpen = true }, onSleep = { sleepOpen = true })
-
-                        Box(Modifier.weight(1f).fillMaxWidth().padding(top = Space.Page, bottom = Space.Medium), contentAlignment = Alignment.Center) {
-                            SwipeCover(song, onTap = ::openAlbum, slideLabel = slideLabel)
+                        // The top row sits exactly halfway between the status bar and the cover (the owner, 9 Nov).
+                        PlayerTop(
+                            topGap = playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp,
+                            row = { TopRow(song, onClose = onClose, onAlbum = ::openAlbum, onMenu = { menuOpen = true }, onSleep = { sleepOpen = true }) },
+                            cover = { SwipeCover(song, onTap = ::openAlbum, slideLabel = slideLabel) },
                             // Siansa Dev: marks the last DJ blend as bad (the owner, 9 Nov).
-                            BadBlendButton(Modifier.align(Alignment.BottomCenter))
-                        }
+                            belowCover = { BadBlendButton() },
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        )
 
                         // The filled heart of a liked song takes the cover's colour too, with Dynamic colours on (issue #998).
                         WithAccent(dynamic?.controls, dynamic?.onControls) {
@@ -425,6 +426,19 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         Column {
                             if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state)
                             Controls(state, onSlide = ::slide)
+                            // The same row as under the player's controls, the lyrics button lit bottom left: one
+                            // tap there closes the lyrics again (the owner, 9 Nov).
+                            Row(Modifier.fillMaxWidth().padding(top = Space.Medium).testTag("lyricsBottomRow"), verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.width(SIDE_BUTTON_WIDTH), contentAlignment = Alignment.Center) {
+                                    LyricsButton(enabled = true, open = true) { lyricsOpen = false }
+                                }
+                                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                    WithAccent(dynamic?.text, dynamic?.onControls) { CastDeviceButton(tint = Color.White.copy(alpha = 0.8f)) }
+                                }
+                                Box(Modifier.width(SIDE_BUTTON_WIDTH), contentAlignment = Alignment.Center) {
+                                    RoundIcon(Icons.AutoMirrored.Rounded.QueueMusic, "Queue") { queueOpen = true }
+                                }
+                            }
                         }
                     }
                 }
@@ -453,6 +467,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 enter = slideInVertically(tween(230, easing = FastOutSlowInEasing)) { it },
                 exit = slideOutVertically(tween(180, easing = FastOutLinearInEasing)) { it },
             ) {
+                // Back closes the queue first, also when it was opened over the lyrics.
+                BackHandler(enabled = queueOpen) { queueOpen = false }
                 // Swipe down anywhere on the queue to close it: the list scrolls back to the top first,
                 // then the panel follows the finger down.
                 var queueY by remember { mutableFloatStateOf(0f) }
@@ -589,10 +605,50 @@ private fun SwipeCover(song: Song?, onTap: () -> Unit, slideLabel: SlideLabel? =
     }
 }
 
+/**
+ * Now playing's top: the [row] ("Playing from album", the arrow and ⋮) and the [cover]. The cover takes the room that's
+ * left under a [topGap], the row and a [Space.Page] gap, down to a [Space.Medium] gap, and is centred in it; the row
+ * then sits exactly halfway between the top and the cover's top edge. [belowCover] sits at the bottom of the cover's
+ * room, in the middle.
+ */
+@Composable
+internal fun PlayerTop(
+    topGap: androidx.compose.ui.unit.Dp,
+    row: @Composable () -> Unit,
+    cover: @Composable () -> Unit,
+    belowCover: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.ui.layout.Layout(
+        contents = listOf(row, cover, belowCover),
+        modifier = modifier.testTag("playerTop"),
+    ) { (rows, covers, belows), constraints ->
+        val width = constraints.maxWidth
+        val height = constraints.maxHeight
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val rowPlaced = rows.map { it.measure(loose) }
+        val rowHeight = rowPlaced.maxOfOrNull { it.height } ?: 0
+        val gap = topGap.roundToPx()
+        val above = Space.Page.roundToPx()
+        val under = Space.Medium.roundToPx()
+        val room = (height - gap - rowHeight - above - under).coerceAtLeast(0)
+        val coverPlaced = covers.map { it.measure(loose.copy(maxHeight = room)) }
+        val coverHeight = coverPlaced.maxOfOrNull { it.height } ?: 0
+        val coverTop = playerCoverTop(gap, rowHeight, above, room, coverHeight)
+        val belowPlaced = belows.map { it.measure(loose) }
+        layout(width, height) {
+            val rowY = playerTopRowY(coverTop, rowHeight)
+            rowPlaced.forEach { it.place(0, rowY) }
+            coverPlaced.forEach { it.place((width - it.width) / 2, coverTop) }
+            belowPlaced.forEach { it.place((width - it.width) / 2, height - under - it.height) }
+        }
+    }
+}
+
 @Composable
 private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit, onMenu: () -> Unit, onSleep: () -> Unit) {
     val timerRunning = LocalGraph.current.sleepTimer.state.collectAsStateWithLifecycle().value != null
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().testTag("playerTopRow"), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onClose) { Icon(Icons.Rounded.KeyboardArrowDown, "Close", Modifier.size(32.dp)) }
         if (timerRunning) Spacer(Modifier.size(48.dp))  // spacing: exact (the width of the button it balances)
         Column(Modifier.weight(1f).clickable(enabled = song?.albumId != null, onClick = onAlbum), horizontalAlignment = Alignment.CenterHorizontally) {

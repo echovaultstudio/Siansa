@@ -77,6 +77,12 @@ While you slide, the cover says **DJ mix**, as in now playing, and the rest of t
 Play, it turns into a record and the phone clicks; letting go starts the mix. Play stays a turning record while the
 album's mix plays.
 
+The same slide works on every list of songs: a playlist, a radio, a mix, a card, Liked songs and the others (not
+search results). A list of more than 300 songs mixes a random 300 of them.
+
+On an artist's page, the buttons under the release count: the **heart** on the left makes the artist a favourite
+(in your server too); **Radio**, **Shuffle** and **Play** on the right.
+
 - **Similar songs** come from the best source your setup has: Navidrome's sonic similarity (if the AudioMuse-AI
   Navidrome plugin is installed), else AudioMuse-AI directly, else Navidrome's similar songs (or Emby's Instant
   Mix).

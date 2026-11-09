@@ -28,9 +28,12 @@ object AlbumDjMix {
      * Orders [album]'s songs for the best blends and plays them. Needs AudioMuse's tempo and key; without them the album
      * plays in its own order.
      */
-    suspend fun start(graph: AppGraph, title: String, album: List<Song>) {
-        if (album.isEmpty()) return
-        val ordered = arrange(graph, album)
+    suspend fun start(graph: AppGraph, title: String, songs: List<Song>) {
+        if (songs.isEmpty()) return
+        // A long playlist or a liked list mixes a random [MAX_MIX_SONGS] of its songs: hours of music, ordered quickly.
+        val album = mixPortion(songs, Random.Default)
+        if (album.size < songs.size) AppLog.i("AlbumMix", "\"$title\" has ${songs.size} songs: the mix takes ${album.size} of them")
+        val ordered = withContext(Dispatchers.Default) { arrange(graph, album) }
         songs.value = ordered.map { it.id }
         // The player takes commands on the main thread only: started from the background it refused, and nothing played
         // (the owner's log, 7 Nov).
@@ -83,15 +86,33 @@ object AlbumDjMix {
  */
 fun albumMixPlaying(queue: List<Song>, songs: List<Song>, mix: List<String>): Boolean =
     mix.isNotEmpty() && queue.size >= mix.size && queue.take(mix.size).map { it.id } == mix &&
-        songs.map { it.id }.toSet() == mix.toSet()
+        songs.map { it.id }.toSet().let { page -> page.containsAll(mix) && (page.size == mix.size || mix.size == MAX_MIX_SONGS) }
 
 /**
  * Every DJ order of an album's [tracks] (issue #965): from each song in turn, through the rest, each next song the best
  * change from the one before; best blending first ([flowScore]). All songs, each once.
  */
 internal fun albumOrders(tracks: List<DjTrack>): List<List<DjTrack>> =
-    tracks.map { start -> listOf(start) + djOrder(start, tracks, tracks.size - 1) }
+    startsOf(tracks).map { start -> listOf(start) + djOrder(start, tracks, tracks.size - 1) }
         .sortedByDescending { flowScore(it) }
+
+/**
+ * The songs an order may start from: every one on an album; on a long playlist [MAX_STARTS] spread evenly through it,
+ * as each start costs a pass over all the songs for each song.
+ */
+internal fun startsOf(tracks: List<DjTrack>): List<DjTrack> =
+    if (tracks.size <= MAX_STARTS) tracks
+    else List(MAX_STARTS) { i -> tracks[i * tracks.size / MAX_STARTS] }
+
+/** The songs a DJ mix takes from [songs]: all of them, or a random [MAX_MIX_SONGS] from a longer list. */
+fun mixPortion(songs: List<Song>, random: Random): List<Song> =
+    if (songs.size <= MAX_MIX_SONGS) songs else songs.shuffled(random).take(MAX_MIX_SONGS)
+
+/** At most this many starts are tried for a long playlist's order. */
+internal const val MAX_STARTS = 24
+
+/** A DJ mix takes at most this many songs (a day of music), so ordering stays quick on a phone. */
+const val MAX_MIX_SONGS = 300
 
 /**
  * The order an album's DJ mix plays (issue #965): one of the orders that blend best, picked at random, so the mix

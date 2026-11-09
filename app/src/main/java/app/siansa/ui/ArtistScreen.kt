@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -38,7 +39,6 @@ import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -172,8 +172,6 @@ fun ArtistScreen(nav: NavController, id: String) {
                 )
             }
         },
-        // A heart to make the artist a favourite, in Navidrome too (issue #397).
-        actions = { p?.artist?.let { FavouriteArtistButton(it) } },
         image = { modifier ->
             // Navidrome's artist image through its cover endpoint (ND_ARTISTARTPRIORITY), cached and downloaded
             // like every cover (issue #206).
@@ -219,26 +217,20 @@ fun ArtistScreen(nav: NavController, id: String) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(Space.Medium))
-                    PlayButtonRow {
-                        OutlinedButton(onClick = {
+                    // The owner's layout (9 Nov): the heart on the left, in line with the text above; radio,
+                    // shuffle and Play on the right, like an album's similar albums, shuffle and Play.
+                    val playback = rememberListPlayback(p.songs)
+                    ArtistButtons(
+                        heart = { m -> FavouriteArtistButton(p.artist, m, MaterialTheme.colorScheme.onSurface, ICON_SIZE) },
+                        onRadio = {
                             launch.progressivePicks("${p.artist.name} radio", { graph.radios.artistStart(p.artist) }) {
                                 graph.radios.artistMore(p.artist, it)
                             }
-                        }) {
-                            Icon(Icons.Rounded.Radio, null)
-                            Spacer(Modifier.width(Space.Tight))
-                            Text("Radio")
-                        }
-                        Spacer(Modifier.weight(1f))
-                        if (p.songs.isNotEmpty()) {
-                            IconButton(onClick = { graph.player.play(p.songs, shuffle = true) }) {
-                                Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
-                            }
-                            Spacer(Modifier.width(Space.Small))
-                            val playback = rememberListPlayback(p.songs)
-                            BigPlayButton(enabled = true, playing = playback.playing) { playback.press { graph.player.play(p.songs) } }
-                        }
-                    }
+                        },
+                        onShuffle = if (p.songs.isNotEmpty()) ({ graph.player.play(p.songs, shuffle = true) }) else null,
+                        playing = playback.playing,
+                        onPlay = if (p.songs.isNotEmpty()) ({ playback.press { graph.player.play(p.songs) } }) else null,
+                    )
                 }
             }
 
@@ -466,6 +458,36 @@ private fun SimilarRow(similar: List<SimilarArtist>, nav: NavController) {
                 Spacer(Modifier.height(Space.Tight))
                 Text(artist.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+        }
+    }
+}
+
+/**
+ * The artist page's button row: the heart to make the artist a favourite (issue #397) on the left, its drawing in line
+ * with the text above; Radio, Shuffle and Play on the right, on one line. Without songs, only the heart and Radio.
+ */
+@Composable
+internal fun ArtistButtons(
+    heart: @Composable (Modifier) -> Unit,
+    onRadio: () -> Unit,
+    onShuffle: (() -> Unit)?,
+    playing: Boolean,
+    onPlay: (() -> Unit)?,
+) {
+    PlayButtonRow {
+        heart(Modifier.offset(x = -ICON_INSET))  // spacing: exact (the heart in line with the text above)
+        Spacer(Modifier.weight(1f))
+        IconButton(onClick = onRadio, modifier = Modifier.testTag("artistRadio")) {
+            Icon(Icons.Rounded.Radio, "Radio", tint = Accent, modifier = Modifier.size(ICON_SIZE))
+        }
+        if (onShuffle != null) {
+            IconButton(onClick = onShuffle, modifier = Modifier.testTag("shuffleAll")) {
+                Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
+            }
+        }
+        if (onPlay != null) {
+            Spacer(Modifier.width(Space.Small))
+            BigPlayButton(enabled = true, playing = playing, onPlay = onPlay)
         }
     }
 }

@@ -240,8 +240,6 @@ fun PlaylistScreen(nav: NavController, id: String) {
     CollectionPage(
         nav = nav,
         title = d?.playlist?.name ?: "Playlist",
-        // A DJ mix of the playlist's own songs (Siansa Dev): Shuffle slides onto Play, as on an album.
-        djMix = true,
         color = rememberCoverColor(d?.playlist?.coverArt),
         songs = d?.let { pl -> order?.map { pl.songs[it] } ?: pl.songs },
         error = (detail as? Load.Err)?.message,
@@ -330,6 +328,8 @@ fun AlbumScreen(nav: NavController, id: String) {
     val pickUp by loadState(d to playingId) { d?.let { PickUps.find(it.songs, graph.history.all(), System.currentTimeMillis()) } }
     val pick = pickUp.valueOrNull()?.takeIf { d != null && d.songs.none { it.id == playingId } }
     CollectionPage(
+        // An album slides to its DJ mix only with AudioMuse, as similar albums (issue #965).
+        djMix = false,
         nav = nav,
         title = d?.album?.name ?: "Album",
         color = rememberCoverColor(d?.album?.coverArt),
@@ -542,16 +542,35 @@ internal fun FavouriteAlbumButton(album: Album) {
  * the artist's picture, like the back arrow beside it; the accent colour when on.
  */
 @Composable
-internal fun FavouriteArtistButton(artist: Artist) {
+internal fun FavouriteArtistButton(
+    artist: Artist,
+    modifier: Modifier = Modifier,
+    offTint: Color = Color.White,
+    iconSize: androidx.compose.ui.unit.Dp = 24.dp,
+) {
     val graph = LocalGraph.current
     val launcher = rememberPlayLauncher()
     val ids by graph.favouriteArtists.ids.collectAsStateWithLifecycle()
-    val on = artist.id in ids
-    IconButton(onClick = { graph.favouriteArtists.toggle(artist) { launcher.notify(it) } }, modifier = Modifier.testTag("favouriteArtist")) {
+    FavouriteHeart(on = artist.id in ids, modifier = modifier, offTint = offTint, iconSize = iconSize) {
+        graph.favouriteArtists.toggle(artist) { launcher.notify(it) }
+    }
+}
+
+/** The heart itself, filled in the accent colour when [on]; drawn on its own for the spacing tests. */
+@Composable
+internal fun FavouriteHeart(
+    on: Boolean,
+    modifier: Modifier = Modifier,
+    offTint: Color = Color.White,
+    iconSize: androidx.compose.ui.unit.Dp = 24.dp,
+    onClick: () -> Unit,
+) {
+    IconButton(onClick = onClick, modifier = modifier.testTag("favouriteArtist")) {
         Icon(
             if (on) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
             if (on) "Remove from favourite artists" else "Add to favourite artists",
-            tint = if (on) Accent else Color.White,
+            tint = if (on) Accent else offTint,
+            modifier = Modifier.size(iconSize),
         )
     }
 }

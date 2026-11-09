@@ -38,7 +38,6 @@ import app.siansa.data.AlbumCategory
 import app.siansa.ui.CHIPS_GAP
 import app.siansa.ui.CollectionByline
 import app.siansa.ui.FastScrollBar
-import app.siansa.ui.HeroPage
 import app.siansa.ui.MoreChipsHint
 import app.siansa.ui.ReleaseTypeRow
 import app.siansa.ui.SectionTitle
@@ -274,30 +273,34 @@ class SpacingLibraryTest : SpacingCheck() {
         assertTrue("Artist ${gap.value} dp under the name", gap.value >= -1f && gap.value <= Space.Tight.value)
     }
 
-    /** Artist page (issue #397): the heart sits on the title bar's line, level with the back arrow. */
-    @Test fun artistHeartSitsLevelWithTheBackArrow() {
+    /**
+     * Artist page (the owner's layout, 9 Nov): the heart on the left, its drawing in line with the text above; Radio,
+     * Shuffle and Play on the right, side by side; all on Play's middle line.
+     */
+    @Test fun artistBarLinesUp() {
         compose.setContent {
             SiansaTheme {
-                HeroPage(
-                    title = "Burial",
-                    heroHeight = 200.dp,
-                    scrolledPx = 0f,
-                    onBack = { },
-                    color = androidx.compose.ui.graphics.Color.DarkGray,
-                    image = { m -> Box(m) },
-                    // The artist page's heart is an IconButton like the back arrow (FavouriteArtistButton).
-                    actions = {
-                        androidx.compose.material3.IconButton(onClick = { }, modifier = Modifier.testTag("heart")) {
-                            androidx.compose.material3.Icon(Icons.Rounded.FavoriteBorder, "Heart")
-                        }
-                    },
-                ) { }
+                Column {
+                    Text("12 releases · 140 songs", Modifier.testTag("details"))
+                    app.siansa.ui.ArtistButtons(
+                        heart = { m -> app.siansa.ui.FavouriteHeart(on = false, modifier = m, iconSize = 28.dp) { } },
+                        onRadio = {}, onShuffle = {}, playing = false, onPlay = {},
+                    )
+                }
             }
         }
-        val back = compose.onNodeWithContentDescription("Back").getBoundsInRoot()
-        val heart = compose.onNodeWithTag("heart").getBoundsInRoot()
-        assertEven("Heart and back arrow on one line", back.top, heart.top, 1.dp)
-        assertEven("Heart and back arrow the same size", back.bottom - back.top, heart.bottom - heart.top, 1.dp)
+        val details = compose.onNodeWithTag("details").getBoundsInRoot()
+        val heart = compose.onNodeWithTag("favouriteArtist").getBoundsInRoot()
+        val radio = compose.onNodeWithTag("artistRadio").getBoundsInRoot()
+        val shuffle = compose.onNodeWithTag("shuffleAll").getBoundsInRoot()
+        val play = compose.onNodeWithTag("bigPlay").getBoundsInRoot()
+        // The heart's drawing (28 dp, centred on the 40 dp button, with 2 of its 24 units round it) starts where the
+        // text above starts.
+        assertEven("The heart in line with the details", (heart.left + heart.right) / 2 - 14.dp + 28.dp * 2 / 24, details.left, 1.dp)
+        val line = (play.top + play.bottom) / 2
+        listOf(heart, radio, shuffle).forEach { assertEven("On Play's middle line", (it.top + it.bottom) / 2, line, 1.dp) }
+        assertTrue("Radio, shuffle, then Play, left to right", radio.right <= shuffle.left + 0.5.dp && shuffle.right <= play.left + 0.5.dp)
+        assertTrue("Radio right next to Shuffle (${(shuffle.left - radio.right).value} dp)", shuffle.left - radio.right <= Space.Small + 0.5.dp)
     }
 
     /** Album page (issue #367): the last-played line is drawn behind its row, so the title keeps its even room. */

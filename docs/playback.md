@@ -227,6 +227,9 @@ cover). Scroll back up for the controls.
 Lyrics come from your server (Navidrome's lyrics, or the lyrics file or tags it reads). Synced lyrics light up line
 by line, and word by word when your server sends word timings (Navidrome 0.63 or newer).
 
+Open them with the speech bubble bottom left in now playing. While they're open, the same button, lit, sits in the
+same corner: tap it to close the lyrics again.
+
 ## Sleep timer and Wind down
 
 From now playing. Pick a time, or let the current song finish. **Wind down** swaps everything after the current
