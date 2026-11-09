@@ -22,8 +22,8 @@ data class SimilarArtistHit(val artist: String, val trackId: String, val score: 
 
 /** The Siansa plugin's similar albums and artists (`audiomuse-plugin/`, issue #223). */
 object SimilarPlugin {
-    const val ALBUMS_PATH = "/plugins/siansa_analysis/api/similar/albums"
-    const val ARTISTS_PATH = "/plugins/siansa_analysis/api/similar/artists"
+    const val ALBUMS_PATH = app.siansa.net.PLUGIN_PREFIX + "api/similar/albums"
+    const val ARTISTS_PATH = app.siansa.net.PLUGIN_PREFIX + "api/similar/artists"
 
     private fun enc(value: String) = URLEncoder.encode(value, "UTF-8")
 

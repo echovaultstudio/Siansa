@@ -34,8 +34,8 @@ class SimilarTest {
     }
 
     @Test fun queriesAreEncoded() {
-        assertEquals("/plugins/siansa_analysis/api/similar/albums?track_id=a%2Fb+c", SimilarPlugin.albumsQuery("a/b c"))
-        assertEquals("/plugins/siansa_analysis/api/similar/artists?artist=Simon+%26+Garfunkel", SimilarPlugin.artistsQuery("Simon & Garfunkel"))
+        assertEquals("/plugins/siansa_beats/api/similar/albums?track_id=a%2Fb+c", SimilarPlugin.albumsQuery("a/b c"))
+        assertEquals("/plugins/siansa_beats/api/similar/artists?artist=Simon+%26+Garfunkel", SimilarPlugin.artistsQuery("Simon & Garfunkel"))
     }
 
     @Test fun fansAlsoLikePutsSoundAlikesFirstWithoutDoublesOrTheArtistItself() {

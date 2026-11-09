@@ -1,17 +1,28 @@
-"""Siansa Beats (dev): the AudioMuse-AI plugin Siansa Dev reads its song profiles from, in the experiment with
-Siansa Beats (Beat This!, the siansa-audiomuse-plugin repository's beats/).
+"""Siansa Analysis: the AudioMuse-AI plugin for the Siansa app (issue #188).
 
-* Each song's loudness and fade ramps: what the Siansa plugin (siansa_analysis) measured, read from its table and
-  never changed. This plugin measures nothing and has no scheduled task, so it costs AudioMuse-AI nothing.
-* Each song's tempo, beats, bars and phrases at both ends: from Siansa Beats (GET /api/grids), in the same fields
-  the Siansa plugin sends, so the app reads them the same way.
+* Measures every song's loudness and how it starts and ends, for levelling and SmoothFade in Siansa.
+* Finds similar albums and artists from AudioMuse-AI's sound analysis, and rebuilds them when the library
+  or the analysis changes.
 
-It installs next to the Siansa plugin (its own id, its own address: /plugins/siansa_beats/), so the Siansa app keeps
-using the Siansa plugin, untouched; only Siansa Dev asks this one.
+See README.md next to this folder for what each part does and how to install it.
 """
 
+from . import jobs, store
 from .web import bp
 
 
 def register(ctx):
     ctx.add_blueprint(bp)
+    ctx.on_install(store.migrate)
+    ctx.on_song_analyzed(jobs.on_song_analyzed)
+    # One scheduled task, the tick, every 15 minutes: it does all the regular work. The settings page's buttons
+    # start their jobs themselves, so they need no tasks of their own in Scheduled Tasks (0.5.5: measure_missing
+    # and rebuild_similar were listed there and asked for a cron expression nobody needed).
+    try:
+        ctx.add_cron_task("tick", jobs.tick, description=TICK_DESCRIPTION)
+    except TypeError:  # an AudioMuse-AI without task descriptions
+        ctx.add_cron_task("tick", jobs.tick)
+
+
+TICK_DESCRIPTION = ("Siansa: measures new songs' loudness, fades and beats, and rebuilds similar albums and "
+                    "artists when the library changes. Every 15 minutes is enough; keep it on.")

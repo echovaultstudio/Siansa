@@ -502,11 +502,14 @@ class AudioMuseApi(
     }
 }
 
-/** Where the Siansa plugin's API is on an AudioMuse server. */
-const val PLUGIN_PREFIX = "/plugins/siansa_analysis/"
+/**
+ * Where the plugin's API is on an AudioMuse server. Siansa Dev (the owner, 9 Nov): Siansa Beats (dev), which does
+ * all the Siansa plugin does, with Siansa Beats' beat grids, and is the one plugin going forward.
+ */
+const val PLUGIN_PREFIX = "/plugins/siansa_beats/"
 
-/** Where it was before the rename (issue #360), used while only that version is installed. */
-const val LEGACY_PLUGIN_PREFIX = "/plugins/musix_analysis/"
+/** The Siansa plugin, used while Siansa Beats (dev) isn't installed (the same API). */
+const val LEGACY_PLUGIN_PREFIX = "/plugins/siansa_analysis/"
 
 /**
  * AudioMuse 3 serves several media servers; each request names which one with `server` (its name in AudioMuse),

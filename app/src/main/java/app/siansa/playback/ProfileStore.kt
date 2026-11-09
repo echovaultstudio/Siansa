@@ -117,7 +117,7 @@ class ProfileStore(
             } else {
                 problem = null
                 val version = health.str("plugin_version")?.let { " $it" } ?: ""
-                // Siansa Beats (dev) says whether Siansa Beats and the Siansa plugin's measurements are there.
+                // Siansa Beats (dev) says whether Siansa Beats answers it.
                 val beats = health["beats"] as? JsonObject
                 val reachable = beats?.get("reachable")?.toString() == "true"
                 val beatsNote = when {
@@ -125,9 +125,8 @@ class ProfileStore(
                     reachable -> " · Siansa Beats ${beats.str("version") ?: ""} answers".trimEnd()
                     else -> " · Siansa Beats doesn't answer: ${beats.str("problem") ?: "check its address on the plugin's page"}"
                 }
-                val siansaNote = if (health["siansa_plugin"]?.toString() == "false") " · the Siansa plugin isn't installed, so no loudness" else ""
-                AppLog.i("Loudness", "Siansa Beats (dev)$version is working$beatsNote$siansaNote")
-                CheckResult(beats == null || reachable, "Siansa Beats (dev)$version is working$beatsNote$siansaNote")
+                AppLog.i("Loudness", "Siansa Beats (dev)$version is working$beatsNote")
+                CheckResult(beats == null || reachable, "Siansa Beats (dev)$version is working$beatsNote")
             }
         } catch (e: CancellationException) {
             throw e
@@ -144,7 +143,7 @@ class ProfileStore(
         // Siansa Dev's experiment: profiles from Siansa Beats (dev), next to the Siansa plugin (see PluginProfiles.PATH).
         const val PLUGIN_NAME = "siansa_beats"
         /** The plugin by its name now, or as it was called before the rename (issue #360) until that's replaced. */
-        val PLUGIN_NAMES = setOf(PLUGIN_NAME, "musix_analysis")
+        val PLUGIN_NAMES = setOf(PLUGIN_NAME)
         const val HEALTH_PATH = "/plugins/siansa_beats/api/health"
         const val MAX_CACHED = 3_000
         const val RETRY_MISSING_MS = 30 * 60_000L
