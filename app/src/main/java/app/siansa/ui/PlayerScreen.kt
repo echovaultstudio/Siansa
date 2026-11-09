@@ -47,6 +47,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.rounded.Radio
@@ -251,6 +252,22 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
         }
     }
 
+    // The DJ mix bar (issue #1033): letting go on a place stops the mix, or gives it that shape as the queue's Shape the
+    // mix does (the next songs change).
+    fun djBar(place: DjBarSpot) {
+        val shape = place.shape
+        if (shape == null) {
+            AppLog.i("Player", "DJ mix bar: stop the mix")
+            graph.songRadio.stop()
+            app.siansa.mix.AlbumDjMix.stop()
+            scope.launch { snack.showSnackbar("Mix off") }
+        } else {
+            AppLog.i("Player", "DJ mix bar: ${shape.label}")
+            graph.settings.setMixShape(shape)
+            graph.songRadio.reshape()
+        }
+    }
+
     // Dragging down (at the top of the page) moves the whole player with the finger; let go far or fast
     // enough and it closes. Swiping up scrolls the whole page down to the cards under the player; swiping
     // back up brings the controls back (no small header over the page, #717).
@@ -371,9 +388,27 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         val slideDim by animateFloatAsState(if (slideLabel != null) SLIDING_OTHERS else 1f, label = "pageDim")
                         val castAlpha = if (slideLabel?.way == SlideWay.DOWN) 0f else slideDim
                         var trackY by remember { mutableStateOf<Float?>(null) }
+                        var trackWidth by remember { mutableStateOf<Int?>(null) }
                         WithAccent(dynamic?.controls, dynamic?.onControls) {
-                            if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state, Modifier.alpha(slideDim)) { trackY = it }
-                            Controls(state, onSlide = ::slide, onSlideLabel = { slideLabel = it }, upTo = trackY)
+                            if (OutsideMedia.isLive(song?.id)) LiveBar() else {
+                                // While a finger slides up during a DJ mix, the DJ mix bar comes in over the seek bar
+                                // (issue #1033), in the room the seek bar and the gap under it take: nothing moves.
+                                val bar = slideLabel?.bar
+                                Box {
+                                    SeekBar(state, Modifier.alpha(slideDim * (1f - (bar?.rise ?: 0f))), onTrackWidth = { trackWidth = it }) { trackY = it }
+                                    if (bar != null) {
+                                        val radioShape = style.mixShape.takeIf { bar.spots.size > 1 }?.let { DjBarSpot.of(it) }
+                                        DjBar(
+                                            bar.spots, bar.chosen, now = radioShape, rise = bar.rise,
+                                            modifier = Modifier.matchParentSize().wrapContentHeight(Alignment.Top, unbounded = true).height(DJ_BAR_HEIGHT),
+                                        )
+                                    }
+                                }
+                            }
+                            Controls(
+                                state, onSlide = ::slide, onSlideLabel = { slideLabel = it }, upTo = trackY,
+                                djBarWidthPx = trackWidth.takeIf { !OutsideMedia.isLive(song?.id) }, onDjBar = ::djBar,
+                            )
                         }
                         // The lyrics bottom left (greyed out when the song has none), where the music plays in
                         // the middle (with the TV, speaker or headphones' name), and the queue bottom right: tap
@@ -715,7 +750,7 @@ private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart:
  * while you drag, and the time shown follows your finger.
  */
 @Composable
-private fun SeekBar(state: PlayerState, modifier: Modifier = Modifier, onTrackCentre: (Float) -> Unit = {}) {
+private fun SeekBar(state: PlayerState, modifier: Modifier = Modifier, onTrackWidth: (Int) -> Unit = {}, onTrackCentre: (Float) -> Unit = {}) {
     val graph = LocalGraph.current
     val tracker = remember { SeekTracker() }
     var shown by remember { mutableStateOf(graph.player.progress().let { SeekTracker.Shown(it.positionMs, it.durationMs) }) }
@@ -751,8 +786,12 @@ private fun SeekBar(state: PlayerState, modifier: Modifier = Modifier, onTrackCe
             Modifier
                 .fillMaxWidth()
                 .height(28.dp)
-                // Where its line is, for the slide's up choice to sit on (issue #963).
-                .onGloballyPositioned { onTrackCentre(it.positionInRoot().y + it.size.height / 2f) }
+                // Where its line is, for the slide's up choice to sit on (issue #963), and how wide, for the DJ mix
+                // bar's places (issue #1033).
+                .onGloballyPositioned {
+                    onTrackCentre(it.positionInRoot().y + it.size.height / 2f)
+                    onTrackWidth(it.size.width)
+                }
                 .pointerInput(duration) {
                     detectTapGestures { offset -> seek((offset.x / size.width).coerceIn(0f, 1f)) }
                 }
@@ -802,7 +841,15 @@ private fun SeekBar(state: PlayerState, modifier: Modifier = Modifier, onTrackCe
  * null for none; [onSlideLabel] gets what the slide shows, for the cover (issue #933).
  */
 @Composable
-internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null, onSlideLabel: (SlideLabel?) -> Unit = {}, upTo: Float? = null) {
+internal fun Controls(
+    state: PlayerState,
+    onSlide: ((PlaySlide) -> Unit)? = null,
+    onSlideLabel: (SlideLabel?) -> Unit = {},
+    upTo: Float? = null,
+    // The seek bar's width, where the DJ mix bar comes in (issue #1033); null: no bar here (the lyrics screen).
+    djBarWidthPx: Int? = null,
+    onDjBar: (DjBarSpot) -> Unit = {},
+) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
@@ -841,13 +888,19 @@ internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null
         val slides = settings.playSlides.let { if (onSlide == null || song == null || OutsideMedia.isOutside(song.id)) it.copy(on = false) else it }
         // The up choice sits on the seek bar's line when there is one (issue #963).
         var playCentre by remember { mutableStateOf<Float?>(null) }
+        // While a DJ mix plays, up is the DJ mix bar (issue #1033): a radio's shapes and Stop, a list's own mix only Stop.
+        val djRadio = radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ
+        val listMix = song != null && song.id in albumDj
+        val barPlaces = djBarSpots(settings.djBarOrder, djRadio, listMix).takeIf { djBarWidthPx != null }
         PlayButton(
             modifier = Modifier.onGloballyPositioned { playCentre = it.positionInRoot().y + it.size.height / 2f },
             upReachPx = upReach(playCentre, upTo),
             playing = state.isPlaying,
             slides = slides,
-            djMix = (radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ) ||
-                (song != null && song.id in albumDj),
+            djMix = djRadio || listMix,
+            djBar = barPlaces,
+            djBarWidthPx = djBarWidthPx,
+            onDjBar = onDjBar,
             onToggle = { graph.player.togglePlay() },
             onStop = { graph.player.stop() },
             onSlide = { onSlide?.invoke(it) },
@@ -855,8 +908,13 @@ internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null
             onSliding = { shown ->
                 sliding = shown?.way
                 onSlideLabel(shown?.let {
-                    val slide = slides.of(it.way)
-                    SlideLabel(slide, it.way, it.armed, slideUnavailable(slide, settings, graph.connection.current.aiProblem(settings)))
+                    val places = barPlaces
+                    if (it.bar && places != null) {
+                        SlideLabel(PlaySlide.DJ_MIX, it.way, it.armed, bar = DjBarView(places, it.spot, it.rise))
+                    } else {
+                        val slide = slides.of(it.way)
+                        SlideLabel(slide, it.way, it.armed, slideUnavailable(slide, settings, graph.connection.current.aiProblem(settings)))
+                    }
                 })
             },
         )

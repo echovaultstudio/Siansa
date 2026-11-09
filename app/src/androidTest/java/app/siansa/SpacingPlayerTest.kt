@@ -336,4 +336,24 @@ class SpacingPlayerTest : SpacingCheck() {
         assertEven("Gap above the row and gap below it", row.top - top.top, cover.top - row.bottom, 1.dp)
         assertTrue("The row is clear of the cover", row.bottom <= cover.top)
     }
+
+    /**
+     * The DJ mix bar (issue #1033): as tall as the seek bar and the gap under it, so nothing moves when it comes in; the
+     * same room above the places' circles as below their names; and every name fits its place.
+     */
+    @Test fun djMixBarIsEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                Box(Modifier.width(312.dp)) {
+                    app.siansa.ui.DjBar(app.siansa.ui.DjBarSpot.default, chosen = 1, now = app.siansa.ui.DjBarSpot.EUPHORIC, rise = 1f)
+                }
+            }
+        }
+        val bar = compose.onNodeWithTag("djBar").getBoundsInRoot()
+        assertEven("DJ mix bar's height", bar.bottom - bar.top, app.siansa.ui.DJ_BAR_HEIGHT, 1.dp)
+        val chosen = compose.onNodeWithTag("djBarChosen", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Room above the places and below their names", chosen.top - bar.top, bar.bottom - chosen.bottom, 1.dp)
+        val name = compose.onNodeWithText("Wind down", useUnmergedTree = true).getBoundsInRoot()
+        assertTrue("Wind down's name fits on the bar (${name.right} of ${bar.right})", name.right <= bar.right)
+    }
 }

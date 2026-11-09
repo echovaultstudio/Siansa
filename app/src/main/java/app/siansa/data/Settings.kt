@@ -185,6 +185,8 @@ data class AppSettings(
     val nowPlayingLyricsButton: Boolean = true,
     /** Sliding from now playing's play button, and what each way does (issue #919). */
     val playSlides: app.siansa.ui.PlaySlides = app.siansa.ui.PlaySlides(),
+    /** The DJ mix bar's places, left to right (issue #1033): Style › DJ Mix Bar puts them in order. */
+    val djBarOrder: List<app.siansa.ui.DjBarSpot> = app.siansa.ui.DjBarSpot.default,
     val topBar: TopBarStyle = TopBarStyle.CLEAR,
     val homeHidden: Set<HomeSection> = emptySet(),
     /** Home's rows in another look than their own (issue #655); a row not in it looks as it is. */
@@ -472,6 +474,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeShortcuts = prefs.getInt("home_shortcuts", 8).coerceIn(2, 8),
         nowPlayingLyricsButton = prefs.getBoolean("now_playing_lyrics_button", true),
         playSlides = app.siansa.ui.PlaySlides.parse(prefs.getString("play_slides", null)),
+        djBarOrder = app.siansa.ui.DjBarSpot.parse(prefs.getString("dj_bar_order", null)),
         topBar = TopBarStyle.parse(prefs.getString("top_bar", null)),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
         homeLooks = HomeLook.parse(prefs.getString("home_looks", null)),
@@ -738,6 +741,12 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setNowPlayingLyricsButton(on: Boolean) {
         prefs.edit().putBoolean("now_playing_lyrics_button", on).apply()
         _state.value = _state.value.copy(nowPlayingLyricsButton = on)
+    }
+
+    /** The DJ mix bar's places in order (issue #1033). */
+    fun setDjBarOrder(order: List<app.siansa.ui.DjBarSpot>) {
+        prefs.edit().putString("dj_bar_order", app.siansa.ui.DjBarSpot.format(order)).apply()
+        _state.value = _state.value.copy(djBarOrder = order)
     }
 
     fun setPlaySlides(slides: app.siansa.ui.PlaySlides) {
