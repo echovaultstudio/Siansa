@@ -145,13 +145,18 @@ fun ArtistScreen(nav: NavController, id: String) {
     }
     val p = page.valueOrNull()
     val artistInfo = info.valueOrNull()
+    // The artist's picture, or their newest release's cover: the page's colour, and its buttons' with Dynamic colours on
+    // pages (issue #1028).
+    val pictureId = p?.artist?.coverArt ?: p?.albums?.firstOrNull()?.coverArt
+    val tint = rememberCoverColor(pictureId)
 
+    WithPageColours(pictureId, pageBackdrop(MaterialTheme.colorScheme.surface, tint), where = "Artist page") {
     HeroPage(
         title = p?.artist?.name ?: "Artist",
         heroHeight = HERO,
         scrolledPx = scrolled,
         onBack = { nav.popBackStack() },
-        color = rememberCoverColor(p?.artist?.coverArt ?: p?.albums?.firstOrNull()?.coverArt),
+        color = tint,
         overlay = {
             // A soft dark band behind the name, so it reads on any photo, and on a pale placeholder.
             Box(
@@ -317,6 +322,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                 full { SimilarRow(similar, nav) }
             }
         }
+    }
     }
 }
 

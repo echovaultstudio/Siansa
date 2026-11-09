@@ -114,6 +114,14 @@ fun StyleScreen(nav: NavController) {
                 SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
                 Hint("When an album folder has an animated cover (cover.gif or cover.webp), it moves on the album page and in now playing; lists show its first frame. Your server may not shrink an animated WebP (Navidrome can't), so it's downloaded once in full and kept on the phone.")  // server-name: ok (an example of a server that can't)
             }
+            // Dynamic colours on pages (issue #1028); now playing's own switch is on its page.
+            Column(Modifier.padding(start = Space.Page, end = Space.Page, bottom = Space.Section), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                SwitchRow("Dynamic colours on pages", settings.dynamicPageColours) { on ->
+                    AppLog.i("Style", "Pages: dynamic colours ${if (on) "on" else "off"}")
+                    graph.settings.setDynamicPageColours(on)
+                }
+                Hint("Play, Shuffle and the other buttons on album, artist and playlist pages take the colour of the cover, or of the artist's picture, always easy to see.")
+            }
         }
     }
 }

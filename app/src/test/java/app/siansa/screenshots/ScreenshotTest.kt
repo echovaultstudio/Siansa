@@ -484,6 +484,25 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     )
                 }
             },
+            // Dynamic colours on pages (issue #1028): Radio, Shuffle and Play in the cover's colour, on the page as it is in
+            // light and dark, for a bright yellow title, a rust cover and a black and white one (silver, or graphite in light).
+            Scene("page_colours") {
+                val surface = MaterialTheme.colorScheme.surface
+                Column(Modifier.padding(vertical = Space.Page)) {
+                    listOf(Color(0xFFE8E21E), Color(0xFFAD6B41), Color(0xFF808080)).forEach { seed ->
+                        val page = app.siansa.ui.pageBackdrop(surface, Color(0xFF3A2A20))
+                        val colours = app.siansa.ui.DynamicAccent.of(seed, page)!!
+                        Box(Modifier.fillMaxWidth().background(page).padding(horizontal = Space.Page)) {
+                            app.siansa.ui.WithAccent(colours.controls, colours.onControls) {
+                                app.siansa.ui.ArtistButtons(
+                                    heart = { m -> app.siansa.ui.FavouriteHeart(false, m, MaterialTheme.colorScheme.onSurface, 28.dp) {} },
+                                    onRadio = {}, onShuffle = {}, playing = false, onPlay = {},
+                                )
+                            }
+                        }
+                    }
+                }
+            },
             // The lyrics button under the player's controls: at rest, greyed out without lyrics, and lit while the lyrics
             // are open, when it closes them (the owner, 9 Nov).
             Scene("lyrics_button") {

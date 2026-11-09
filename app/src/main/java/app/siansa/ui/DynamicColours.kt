@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.palette.graphics.Palette
 import app.siansa.data.LocalPlaylists
 import app.siansa.log.AppLog
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
@@ -67,6 +68,16 @@ object DynamicAccent {
     // Up to white: on the lightest covers, text may need it.
     private const val LIGHTNESS_TOP = 1.0f
     private const val STEP = 0.01f
+
+    /**
+     * A page lighter than this (its luminance) gets darker colours rather than lighter ones: here black and white stand
+     * out from it equally, so the way chosen can always reach its contrast. Now playing stays below it.
+     */
+    private const val LIGHT_PAGE = 0.18f
+
+    /** On a light page, a colour starts no lighter than this, and a black and white cover's from graphite. */
+    private const val DARK_LIGHTNESS_FROM = 0.45f
+    private const val GRAPHITE_FROM = 0.32f
 
     /** The grey [seedOf] gives a cover without a colour of its own: [of] makes it silver. */
     private val SILVER_SEED = Color(0.5f, 0.5f, 0.5f)
@@ -177,13 +188,22 @@ object DynamicAccent {
         val (h, s0, l0) = hsl(seed)
         val grey = chroma(seed) < GREY
         val s = if (grey) 0f else min(MOST_SATURATION, s0 * LIVEN)
+        // A light page (an album in the light theme, issue #1028): the colour is darkened until it stands out, from
+        // graphite for a black and white cover. Now playing is always dark behind its controls.
+        val lightPage = backdrop.luminance() > LIGHT_PAGE
         val from = when {
+            lightPage && grey -> GRAPHITE_FROM
+            lightPage -> min(l0, DARK_LIGHTNESS_FROM)
             grey -> SILVER_FROM
             s < MUTED -> max(l0, MUTED_LIGHTNESS_FROM)
             else -> max(l0, LIGHTNESS_FROM)
         }
-        val controls = lightenUntil(h, s, from, backdrop, CONTROLS_CONTRAST)
-        val text = lightenUntil(h, s, from, backdrop, TEXT_CONTRAST)
+        // Play's colour must also carry its symbol, dark or white: on a light page a middling colour stands out from the
+        // page yet leaves neither easy to read, so it goes on darkening until white is.
+        val controls = shadeUntil(h, s, from, lighter = !lightPage) {
+            contrast(it, backdrop) >= CONTROLS_CONTRAST && max(contrast(it, ON_DARK), contrast(it, Color.White)) >= TEXT_CONTRAST
+        }
+        val text = shadeUntil(h, s, from, lighter = !lightPage) { contrast(it, backdrop) >= TEXT_CONTRAST }
         val on = if (contrast(controls, ON_DARK) >= contrast(controls, Color.White)) ON_DARK else Color.White
         return DynamicColours(controls, text, on)
     }
@@ -194,11 +214,12 @@ object DynamicAccent {
      */
     fun backdropOf(average: Color): Color = lerp(Color.Black, average, 0.85f * 0.55f)
 
-    private fun lightenUntil(h: Float, s: Float, from: Float, backdrop: Color, target: Double): Color {
+    /** The colour of hue [h] and saturation [s], made [lighter] (or darker) from [from] until it's [good] (stands out). */
+    private fun shadeUntil(h: Float, s: Float, from: Float, lighter: Boolean, good: (Color) -> Boolean): Color {
         var l = from
         var colour = fromHsl(h, s, l)
-        while (l < LIGHTNESS_TOP && contrast(colour, backdrop) < target) {
-            l += STEP
+        while ((if (lighter) l < LIGHTNESS_TOP else l > 0f) && !good(colour)) {
+            l = if (lighter) l + STEP else (l - STEP).coerceAtLeast(0f)
             colour = fromHsl(h, s, l)
         }
         return colour
@@ -257,9 +278,12 @@ private val tonesCache = ConcurrentHashMap<String, CoverTones>()
 /**
  * Now playing's colours from [coverId]'s cover (issue #970) while [on]; null when off, before the cover has been
  * looked at, or for a cover without a colour of its own. They fade from song to song.
+ *
+ * On a page ([backdrop] given, issue #1028), they stand out from that page's colour instead of now playing's blurred
+ * cover; [where] names the page in the log.
  */
 @Composable
-fun rememberDynamicColours(coverId: String?, on: Boolean): DynamicColours? {
+fun rememberDynamicColours(coverId: String?, on: Boolean, backdrop: Color? = null, where: String = "Now playing"): DynamicColours? {
     val graph = LocalGraph.current
     val context = LocalContext.current
     var tones by remember(coverId, on) { mutableStateOf(if (on) coverId?.let { tonesCache[it] } else null) }
@@ -291,9 +315,10 @@ fun rememberDynamicColours(coverId: String?, on: Boolean): DynamicColours? {
             tones = read
         }
     }
-    val colours = tones?.let { t -> t.seed?.let { DynamicAccent.of(it, DynamicAccent.backdropOf(t.average)) } }
-    LaunchedEffect(colours) {
-        if (colours != null) AppLog.d("Colours", "Now playing in the cover's colours: controls ${hex(colours.controls)}, text ${hex(colours.text)}")
+    val colours = tones?.let { t -> t.seed?.let { DynamicAccent.of(it, backdrop ?: DynamicAccent.backdropOf(t.average)) } }
+    // Once per cover, not on every frame of a page colour fading in.
+    LaunchedEffect(tones?.seed) {
+        if (colours != null) AppLog.d("Colours", "$where in the cover's colours: controls ${hex(colours.controls)}, text ${hex(colours.text)}")
     }
     // While the next cover is read, the last song's colours stay, so the theme's doesn't flash in between; a cover that
     // couldn't be read gives the theme's.
@@ -306,6 +331,27 @@ fun rememberDynamicColours(coverId: String?, on: Boolean): DynamicColours? {
     val text by animateColorAsState(target.text, tween(FADE_MS), label = "dynamicText")
     return DynamicColours(controls, text, target.onControls)
 }
+
+/**
+ * [content] with its Play button, Shuffle and the other buttons in the colour of [coverId]'s cover, with Style's
+ * Dynamic colours on pages (issue #1028), standing out from a page of [backdrop]. With it off, or before the cover has
+ * been read, the theme's colours.
+ */
+@Composable
+fun WithPageColours(coverId: String?, backdrop: Color, where: String, content: @Composable () -> Unit) {
+    val on = LocalGraph.current.settings.state.collectAsStateWithLifecycle().value.dynamicPageColours
+    val colours = rememberDynamicColours(coverId, on && coverId != null, backdrop, where)
+    WithAccent(colours?.controls, colours?.onControls, content)
+}
+
+/**
+ * The colour behind a page's buttons: its cover colour ([rememberCoverColor]) runs down into the page, mostly faded
+ * by where the buttons are.
+ */
+fun pageBackdrop(surface: Color, coverTone: Color): Color = lerp(surface, coverTone.copy(alpha = 1f), PAGE_TINT)
+
+/** How much of the cover colour is left behind a page's buttons. */
+private const val PAGE_TINT = 0.3f
 
 private fun hex(c: Color) = "#%06X".format(0xFFFFFF and (((c.red * 255).toInt() shl 16) or ((c.green * 255).toInt() shl 8) or (c.blue * 255).toInt()))
 

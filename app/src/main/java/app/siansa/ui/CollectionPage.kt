@@ -90,9 +90,10 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
 
 /**
- * The page used for albums, playlists, mixes and radios, laid out like Spotify: the cover's colour
- * runs down from the top into the page, the cover shrinks and fades away as you scroll, and the
- * title bar takes on the cover's colour once the cover is gone.
+ * The page used for albums, playlists, mixes and radios: the cover's colour runs down from the top
+ * into the page, the cover shrinks and fades away as you scroll, and the title bar takes on the
+ * cover's colour once the cover is gone. With [coverId], its buttons take that cover's colour while
+ * Style's Dynamic colours on pages is on (issue #1028).
  */
 @Composable
 fun CollectionPage(
@@ -100,6 +101,8 @@ fun CollectionPage(
     title: String,
     color: Color,
     songs: List<Song>?,
+    // The cover whose colour the page's buttons take, with Dynamic colours on pages (issue #1028).
+    coverId: String? = null,
     error: String? = null,
     cover: @Composable (Modifier) -> Unit,
     header: @Composable ColumnScope.() -> Unit,
@@ -184,6 +187,7 @@ fun CollectionPage(
     val pastHeader by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     val rowEnd = if (fast) AlphabetBarWidth else 0.dp
 
+    WithPageColours(coverId, pageBackdrop(surface, color), where = "Page \"$title\"") {
     Box(Modifier.fillMaxSize().background(surface)) {
         if (showCovers && songs != null) {
             val covers = remember(songs) { songs.map { it.cover } }
@@ -309,6 +313,7 @@ fun CollectionPage(
         }
 
         FadingTitleBar(nav, title, color, barAlpha, actions)
+    }
     }
 }
 
