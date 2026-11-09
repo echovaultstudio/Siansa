@@ -4,23 +4,17 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,55 +23,57 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.PlatformTextStyle
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.style.LineHeightStyle
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.siansa.mix.MixShape
 
 /**
- * A place on the DJ mix bar (issue #1033): while a DJ mix plays, sliding up from now playing's play button turns the
- * seek bar into this bar, and letting go on a place stops the mix or gives it that shape. [short] is its name on the
- * bar, [title] its name on the cover.
+ * A place on the DJ mix bar (issues #1033, #1035): sliding up from now playing's play button turns the seek bar into
+ * this bar, and letting go on a place starts a DJ mix, stops the one playing, or gives it a shape. [MIX] is the place
+ * that starts or stops the mix: Start while none plays, Stop while one does. Its id stays "stop", as orders were kept.
  */
-enum class DjBarSpot(val id: String, val short: String, val title: String) {
-    STEADY("steady", "Steady", MixShape.STEADY.label),
-    BUILD("build", "Build", MixShape.BUILD.label),
-    STOP("stop", "Stop", "Stop the mix"),
-    EUPHORIC("euphoric", "Euphoric", MixShape.EUPHORIC.label),
-    WIND_DOWN("wind-down", "Wind down", MixShape.WIND_DOWN.label);
+enum class DjBarSpot(val id: String) {
+    STEADY("steady"),
+    BUILD("build"),
+    MIX("stop"),
+    EUPHORIC("euphoric"),
+    WIND_DOWN("wind-down");
 
-    /** The shape this place gives the mix; null for Stop. */
+    /** The shape this place gives the mix; null for [MIX]. */
     val shape: MixShape?
         get() = when (this) {
             STEADY -> MixShape.STEADY
             BUILD -> MixShape.BUILD
-            STOP -> null
+            MIX -> null
             EUPHORIC -> MixShape.EUPHORIC
             WIND_DOWN -> MixShape.WIND_DOWN
         }
 
-    /** What letting go here does, under its name on the cover. */
-    val hint: String
-        get() = shape?.hint ?: "No more blends: the songs left in the queue play on as they are."
+    /** Its name on the cover: a shape's, or Start / Stop for [MIX] ([starting]: no mix plays yet). */
+    fun title(starting: Boolean): String = shape?.label ?: if (starting) "Start a DJ mix" else "Stop the mix"
 
-    /** Its drawing: the energy's way over the next songs, or a stop square. */
-    val icon: ImageVector
-        get() = DjBarIcons.of(this)
+    /** Its name in Style › DJ Mix Bar, where it's both. */
+    val arrangeLabel: String get() = shape?.label ?: "Start or stop the mix"
+
+    /** What letting go here does, under its name on the cover. */
+    fun hint(starting: Boolean): String = shape?.hint ?: if (starting) {
+        "A DJ mix from this song: songs that blend, beat-matched one into the next."
+    } else {
+        "No more blends: the songs left in the queue play on as they are."
+    }
+
+    /** Its drawing: the energy's way over the next songs, or a turntable to start and a square to stop. */
+    fun icon(starting: Boolean): ImageVector = if (this == MIX) (if (starting) SiansaIcons.Turntable else DjBarIcons.stop) else DjBarIcons.of(this)
 
     companion object {
-        /** Left to right as the bar starts: the steady shapes, Stop in the middle, the lively and the calm (the owner). */
-        val default = listOf(STEADY, BUILD, STOP, EUPHORIC, WIND_DOWN)
+        /** Left to right as the bar starts: the steady shapes, Start / Stop in the middle, the lively and the calm. */
+        val default = listOf(STEADY, BUILD, MIX, EUPHORIC, WIND_DOWN)
 
         /** The place that gives [shape]. */
         fun of(shape: MixShape): DjBarSpot = entries.first { it.shape == shape }
@@ -105,59 +101,77 @@ fun djBarSpotAt(dx: Float, widthPx: Float, count: Int): Int {
     return (along / (widthPx / count)).toInt().coerceIn(0, count - 1)
 }
 
+/** What the bar holds: its places, left to right, and whether its middle starts a mix (none plays) or stops one. */
+data class DjBarPlaces(val spots: List<DjBarSpot>, val starting: Boolean)
+
 /**
- * The places on the bar for what's playing: a DJ radio's in the order set under Style (shapes and Stop); an album's or
- * playlist's DJ mix plays its own songs in its own order, so only Stop. Null when no DJ mix plays.
+ * The bar for what's playing (issue #1035): while a DJ radio plays, its shapes and Stop in the order set under Style;
+ * an album's or playlist's DJ mix plays its own songs in its own order, so only Stop; with no DJ mix, the same places
+ * with Start in the middle, when a slide up starts a DJ mix ([canStart]). Null: no bar, up is the usual up choice.
  */
-fun djBarSpots(order: List<DjBarSpot>, djRadio: Boolean, listMix: Boolean): List<DjBarSpot>? = when {
-    djRadio -> order
-    listMix -> listOf(DjBarSpot.STOP)
+fun djBarPlaces(order: List<DjBarSpot>, djRadio: Boolean, listMix: Boolean, canStart: Boolean): DjBarPlaces? = when {
+    djRadio -> DjBarPlaces(order, starting = false)
+    listMix -> DjBarPlaces(listOf(DjBarSpot.MIX), starting = false)
+    canStart -> DjBarPlaces(order, starting = true)
     else -> null
 }
 
-/** The DJ mix bar as a slide shows it: its places, the one the finger is on, and how far it has come in (0 to 1). */
-data class DjBarView(val spots: List<DjBarSpot>, val chosen: Int?, val rise: Float) {
+/**
+ * The DJ mix bar as a slide shows it: its places, the one the finger is on, whether its middle starts a mix, and how far
+ * up to it the finger has come (0 to 1).
+ */
+data class DjBarView(val spots: List<DjBarSpot>, val chosen: Int?, val starting: Boolean, val rise: Float) {
     val chosenSpot: DjBarSpot? get() = chosen?.let { spots.getOrNull(it) }
 }
 
 /**
- * The DJ mix bar (issue #1033), drawn over the seek bar while a finger slides up from the play button during a DJ mix.
- * A see-through panel the seek bar's width, with each place in an equal part: its drawing in a circle, its name under
- * it. It fades in as the finger comes up ([rise]). The place under the finger ([chosen]) grows and fills: Stop in
- * white, a shape in the accent. The mix's shape [now] has a ring in the accent and its name in it.
+ * The DJ mix bar (issues #1033, #1035) over now playing's seek bar, [DJ_BAR_HEIGHT] tall and the seek bar's width,
+ * centred on its line. [open] (0 to 1, sprung by the page) grows it out of that line: the thin line thickens into a
+ * see-through pill, which reveals the places' drawings as it opens and hides them again as it closes. Symbols only;
+ * the cover names the place under the finger. The place [chosen] grows and fills (Stop in white, the rest in the
+ * accent); the mix's shape [now] has a ring in the accent.
  */
 @Composable
-internal fun DjBar(spots: List<DjBarSpot>, chosen: Int?, now: DjBarSpot?, rise: Float, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(DJ_BAR_CORNER)
-    Box(
-        modifier
-            .fillMaxWidth()
-            .graphicsLayer {
-                alpha = rise
-                // Grows out of the seek bar's line as it comes in.
-                scaleY = DJ_BAR_GROW_FROM + (1f - DJ_BAR_GROW_FROM) * rise
-            }
-            .clip(shape)
-            .background(Color.Black.copy(alpha = DJ_BAR_SHADE))
-            .border(DJ_BAR_EDGE, Color.White.copy(alpha = DJ_BAR_EDGE_ALPHA), shape)
-            .testTag("djBar"),
-    ) {
-        Row(Modifier.fillMaxWidth().padding(vertical = Space.Tight)) {
-            spots.forEachIndexed { i, spot ->
-                DjBarPlace(spot, chosen = i == chosen, now = spot == now, Modifier.weight(1f))
+internal fun DjBar(spots: List<DjBarSpot>, chosen: Int?, now: DjBarSpot?, starting: Boolean, open: Float, modifier: Modifier = Modifier) {
+    val thickness = DJ_TRACK_LINE + (DJ_BAR_HEIGHT - DJ_TRACK_LINE) * open
+    val shape = RoundedCornerShape(thickness / 2)
+    Box(modifier.fillMaxWidth().height(DJ_BAR_HEIGHT).testTag("djBar"), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(thickness)
+                .clip(shape)
+                // From the seek bar's faint line to the bar's see-through shade.
+                .background(lerp(Color.White.copy(alpha = DJ_TRACK_ALPHA), Color.Black.copy(alpha = DJ_BAR_SHADE), open))
+                .border(DJ_BAR_EDGE, Color.White.copy(alpha = DJ_BAR_EDGE_ALPHA * open), shape)
+                .testTag("djBarPill"),
+            contentAlignment = Alignment.Center,
+        ) {
+            // The places are the full bar's height, centred in the pill and cut by its edges: opening reveals them.
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .requiredHeight(DJ_BAR_HEIGHT)
+                    .graphicsLayer { alpha = ((open - DJ_PLACES_FROM) / (1f - DJ_PLACES_FROM)).coerceIn(0f, 1f) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                spots.forEachIndexed { i, spot ->
+                    DjBarPlace(spot, chosen = i == chosen, now = spot == now, starting = starting, Modifier.weight(1f))
+                }
             }
         }
     }
 }
 
 @Composable
-private fun DjBarPlace(spot: DjBarSpot, chosen: Boolean, now: Boolean, modifier: Modifier) {
-    val stop = spot == DjBarSpot.STOP
+private fun DjBarPlace(spot: DjBarSpot, chosen: Boolean, now: Boolean, starting: Boolean, modifier: Modifier) {
+    val middle = spot == DjBarSpot.MIX
+    val stop = middle && !starting
     val accent = Accent
     val size by animateDpAsState(
         when {
             chosen -> DJ_SPOT_CHOSEN
-            stop -> DJ_SPOT_STOP
+            middle -> DJ_SPOT_MIDDLE
             else -> DJ_SPOT
         },
         label = "djSpotSize",
@@ -166,7 +180,7 @@ private fun DjBarPlace(spot: DjBarSpot, chosen: Boolean, now: Boolean, modifier:
         when {
             chosen && stop -> Color.White
             chosen -> accent
-            stop -> Color.White.copy(alpha = DJ_STOP_TINT)
+            middle -> Color.White.copy(alpha = DJ_MIDDLE_TINT)
             else -> Color.White.copy(alpha = DJ_SPOT_TINT)
         },
         label = "djSpotFill",
@@ -176,74 +190,26 @@ private fun DjBarPlace(spot: DjBarSpot, chosen: Boolean, now: Boolean, modifier:
         chosen -> OnAccent
         else -> Color.White
     }
-    Column(
-        modifier.testTag(if (chosen) "djBarChosen" else "djBarPlace"),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Space.Tight),
+    Box(
+        modifier.semantics { contentDescription = spot.title(starting) }.testTag(if (chosen) "djBarChosen" else "djBarPlace"),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.size(DJ_SPOT_CHOSEN), contentAlignment = Alignment.Center) {
-            Box(
-                Modifier
-                    .size(size)
-                    .clip(CircleShape)
-                    .background(fill)
-                    .then(if (now && !chosen) Modifier.border(DJ_NOW_RING, accent, CircleShape) else Modifier),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(spot.icon, null, tint = ink, modifier = Modifier.size(DJ_SPOT_ICON))
-            }
-        }
-        // The whole name, never cut: a long one ("Wind down") gets a little smaller until it fits its place, with a little
-        // room either side. Its line and largest size are set in dp, not sp: with the phone's font size up, the bar must
-        // still fit the seek bar's room exactly, so nothing on the page moves (the cover shows the name large).
-        // The name's row is exactly one line tall: a font's own padding made it 1.5 dp taller on the emulator.
-        BoxWithConstraints(Modifier.fillMaxWidth().height(DJ_NAME_LINE), contentAlignment = Alignment.Center) {
-            val density = LocalDensity.current
-            val weight = if (chosen || now) FontWeight.Bold else FontWeight.Medium
-            val line = with(density) { DJ_NAME_LINE.toSp() }
-            val largest = with(density) { DJ_NAME_SIZE.toSp() }
-            val style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = weight,
-                letterSpacing = 0.sp,
-                lineHeight = line,
-                platformStyle = PlatformTextStyle(includeFontPadding = false),
-                lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
-            )
-            val room = with(density) { (maxWidth - Space.Tight).roundToPx() }
-            val measurer = rememberTextMeasurer()
-            val size = remember(spot.short, weight, room, style, largest) {
-                fittedSize(spot.short, style, room, largest) { t, st -> measurer.measure(t, st, maxLines = 1, softWrap = false).size.width }
-            }
-            Text(
-                spot.short,
-                style = style.copy(fontSize = size),
-                color = when {
-                    chosen -> Color.White
-                    now -> accent
-                    else -> Color.White.copy(alpha = DJ_NAME_ALPHA)
-                },
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Clip,
-            )
+        Box(
+            Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(fill)
+                .then(if (now && !chosen) Modifier.border(DJ_NOW_RING, accent, CircleShape) else Modifier)
+                .testTag(if (chosen) "djBarChosenCircle" else "djBarCircle"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(spot.icon(starting), null, tint = ink, modifier = Modifier.size(DJ_SPOT_ICON))
         }
     }
 }
 
-/**
- * The largest name size from [largest] down to [DJ_NAME_SHRINK] of it (half a point at a time) at which [text] in
- * [style] is no wider than [roomPx], as [widthOf] measures it; the smallest when even that is too wide.
- */
-internal fun fittedSize(text: String, style: TextStyle, roomPx: Int, largest: TextUnit = 11.sp, widthOf: (String, TextStyle) -> Int): TextUnit {
-    val smallest = (largest.value * DJ_NAME_SHRINK).coerceAtMost(largest.value)
-    var size = largest.value
-    while (size > smallest && widthOf(text, style.copy(fontSize = size.sp)) > roomPx) size -= 0.5f
-    return size.coerceAtLeast(smallest).sp
-}
-
 /** The bar's drawings: the energy's way over the next songs, as the mockup drew them, and a stop square. */
-private object DjBarIcons {
+internal object DjBarIcons {
     private fun line(name: String, vararg points: Pair<Float, Float>): ImageVector =
         ImageVector.Builder(name = "Siansa.DjBar.$name", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
             path(stroke = SolidColor(Color.Black), strokeLineWidth = 2.4f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
@@ -256,7 +222,7 @@ private object DjBarIcons {
     private val build by lazy { line("Build", 4f to 18f, 20f to 6f) }
     private val euphoric by lazy { line("Euphoric", 4f to 18f, 9.5f to 7f, 20f to 7f) }
     private val windDown by lazy { line("WindDown", 4f to 6f, 20f to 18f) }
-    private val stop by lazy {
+    val stop by lazy {
         ImageVector.Builder(name = "Siansa.DjBar.Stop", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
             path(fill = SolidColor(Color.Black)) {
                 moveTo(8.5f, 7f)
@@ -273,38 +239,42 @@ private object DjBarIcons {
         }.build()
     }
 
+    /** A shape's drawing ([DjBarSpot.MIX] draws a turntable or [stop] instead). */
     fun of(spot: DjBarSpot): ImageVector = when (spot) {
         DjBarSpot.STEADY -> steady
         DjBarSpot.BUILD -> build
-        DjBarSpot.STOP -> stop
+        DjBarSpot.MIX -> stop
         DjBarSpot.EUPHORIC -> euphoric
         DjBarSpot.WIND_DOWN -> windDown
     }
 }
 
+/** How tall the seek bar's touch row is; its line runs through the middle. */
+internal val SEEK_TRACK_HEIGHT = 28.dp
+
+/** Where the seek bar's line is, from the top of the seek bar (its top padding, then half its touch row). */
+internal val DJ_BAR_CENTRE: Dp = Space.Medium + SEEK_TRACK_HEIGHT / 2
+
 /**
- * The bar's room: the seek bar's 56 dp and the 8 dp under it down to the play button, so nothing moves. A place's
- * circle row ([DJ_SPOT_CHOSEN]) and its name (12 sp) with [Space.Tight] above, between and below them fill it evenly.
+ * The bar's height, open: a chosen place ([DJ_SPOT_CHOSEN]) with [Space.Tight] above and below. Centred on the seek bar's
+ * line, it ends [Space.Page] above the play button (the seek bar's 56 dp and the 8 dp under it), so it never crowds Play.
  */
-internal val DJ_BAR_HEIGHT = 64.dp
-private val DJ_BAR_CORNER = 22.dp
-private val DJ_SPOT_CHOSEN = 40.dp
-private val DJ_SPOT_STOP = 34.dp
-private val DJ_SPOT = 30.dp
-private val DJ_SPOT_ICON = 20.dp
+internal val DJ_BAR_HEIGHT = 44.dp
+private val DJ_TRACK_LINE = 3.dp
+private val DJ_SPOT_CHOSEN = 36.dp
+private val DJ_SPOT_MIDDLE = 30.dp
+private val DJ_SPOT = 28.dp
+private val DJ_SPOT_ICON = 18.dp
 private val DJ_NOW_RING = 1.5.dp
 private val DJ_BAR_EDGE = 1.dp
 
 /** The panel is see-through (the owner): the page shows through its shade. */
 private const val DJ_BAR_SHADE = 0.32f
 private const val DJ_BAR_EDGE_ALPHA = 0.14f
-private const val DJ_BAR_GROW_FROM = 0.4f
+/** The seek bar's line, as SeekBar draws it, which the bar grows out of. */
+private const val DJ_TRACK_ALPHA = 0.22f
+/** The places start to show once the bar is this far open. */
+private const val DJ_PLACES_FROM = 0.35f
 private const val DJ_SPOT_TINT = 0.12f
-private const val DJ_STOP_TINT = 0.2f
-private const val DJ_NAME_ALPHA = 0.72f
-/** A name's largest size and its line, in dp so the bar is always as tall (see [DjBarPlace]). */
-private val DJ_NAME_SIZE = 11.dp
-private val DJ_NAME_LINE = 12.dp
-/** A name gets no smaller than this much of its largest size. */
-private const val DJ_NAME_SHRINK = 8f / 11f
+private const val DJ_MIDDLE_TINT = 0.2f
 private val DJ_STOP_INK = Color(0xFF141414)

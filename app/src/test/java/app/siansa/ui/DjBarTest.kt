@@ -1,19 +1,21 @@
 package app.siansa.ui
 
+import androidx.compose.ui.unit.dp
 import app.siansa.mix.MixShape
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The DJ mix bar (issue #1033): which place a finger is on, the order kept under Style, and what's on the bar. */
+/** The DJ mix bar (issues #1033, #1035): which place a finger is on, the order kept under Style, and what's on the bar. */
 class DjBarTest {
     @Test
-    fun theDefaultIsTheMockupsOrderWithStopInTheMiddle() {
+    fun theDefaultIsTheMockupsOrderWithTheMixInTheMiddle() {
         assertEquals(
-            listOf(DjBarSpot.STEADY, DjBarSpot.BUILD, DjBarSpot.STOP, DjBarSpot.EUPHORIC, DjBarSpot.WIND_DOWN),
+            listOf(DjBarSpot.STEADY, DjBarSpot.BUILD, DjBarSpot.MIX, DjBarSpot.EUPHORIC, DjBarSpot.WIND_DOWN),
             DjBarSpot.default,
         )
-        assertEquals(DjBarSpot.STOP, DjBarSpot.default[DjBarSpot.default.size / 2])
+        assertEquals(DjBarSpot.MIX, DjBarSpot.default[DjBarSpot.default.size / 2])
     }
 
     @Test
@@ -41,46 +43,45 @@ class DjBarTest {
 
     @Test
     fun theOrderIsKeptAndEveryPlaceIsAlwaysThere() {
-        val mine = listOf(DjBarSpot.STOP, DjBarSpot.WIND_DOWN, DjBarSpot.STEADY, DjBarSpot.BUILD, DjBarSpot.EUPHORIC)
+        val mine = listOf(DjBarSpot.MIX, DjBarSpot.WIND_DOWN, DjBarSpot.STEADY, DjBarSpot.BUILD, DjBarSpot.EUPHORIC)
         assertEquals(mine, DjBarSpot.parse(DjBarSpot.format(mine)))
         // Unknown names go, repeats count once, missing places come back at the end in the default order.
         assertEquals(
-            listOf(DjBarSpot.WIND_DOWN, DjBarSpot.STEADY, DjBarSpot.BUILD, DjBarSpot.STOP, DjBarSpot.EUPHORIC),
+            listOf(DjBarSpot.WIND_DOWN, DjBarSpot.STEADY, DjBarSpot.BUILD, DjBarSpot.MIX, DjBarSpot.EUPHORIC),
             DjBarSpot.parse("wind-down, rocket ,wind-down"),
         )
         assertEquals(DjBarSpot.default, DjBarSpot.parse(null))
+        // An order saved before #1035 called the middle "stop": it still reads.
+        assertEquals(DjBarSpot.MIX, DjBarSpot.parse("stop").first())
     }
 
     @Test
-    fun aRadioHasShapesAndStopAListsOwnMixOnlyStop() {
+    fun theMiddleStartsOrStops() {
         val order = DjBarSpot.default
-        assertEquals(order, djBarSpots(order, djRadio = true, listMix = false))
-        assertEquals(listOf(DjBarSpot.STOP), djBarSpots(order, djRadio = false, listMix = true))
-        assertNull(djBarSpots(order, djRadio = false, listMix = false))
+        // A DJ radio: shapes and Stop. A list's own mix: only Stop.
+        assertEquals(DjBarPlaces(order, starting = false), djBarPlaces(order, djRadio = true, listMix = false, canStart = true))
+        assertEquals(DjBarPlaces(listOf(DjBarSpot.MIX), starting = false), djBarPlaces(order, djRadio = false, listMix = true, canStart = true))
+        // No DJ mix: the same bar with Start in the middle (issue #1035), when up starts one.
+        assertEquals(DjBarPlaces(order, starting = true), djBarPlaces(order, djRadio = false, listMix = false, canStart = true))
+        assertNull(djBarPlaces(order, djRadio = false, listMix = false, canStart = false))
+        assertEquals("Start a DJ mix", DjBarSpot.MIX.title(starting = true))
+        assertEquals("Stop the mix", DjBarSpot.MIX.title(starting = false))
     }
 
     @Test
     fun eachShapeHasItsPlace() {
         MixShape.entries.forEach { shape -> assertEquals(shape, DjBarSpot.of(shape).shape) }
-        assertNull(DjBarSpot.STOP.shape)
+        assertNull(DjBarSpot.MIX.shape)
     }
 
     @Test
-    fun aLongNameGetsSmallerUntilItFitsNeverCut() {
-        // A stand-in for measuring: each letter as wide as the font is big.
-        val widthOf = { text: String, style: androidx.compose.ui.text.TextStyle -> (text.length * style.fontSize.value).toInt() }
-        val style = androidx.compose.ui.text.TextStyle()
-        assertEquals(11f, fittedSize("Stop", style, 60, widthOf = widthOf).value)
-        // "Wind down" is 9 letters: too wide for 60 even at 8, the smallest, so 8; with 90 of room, 10 fits.
-        assertEquals(8f, fittedSize("Wind down", style, 60, widthOf = widthOf).value)
-        assertEquals(10f, fittedSize("Wind down", style, 90, widthOf = widthOf).value)
-    }
-
-    @Test
-    fun theLargestSizeIsWhatTheBarAllows() {
-        // At a larger font size the names start from the same size on screen (given here in sp), never larger.
-        val widthOf = { text: String, style: androidx.compose.ui.text.TextStyle -> (text.length * style.fontSize.value).toInt() }
-        val style = androidx.compose.ui.text.TextStyle()
-        assertEquals(8.5f, fittedSize("Stop", style, 100, largest = androidx.compose.ui.unit.TextUnit(8.5f, androidx.compose.ui.unit.TextUnitType.Sp), widthOf = widthOf).value)
+    fun theBarLeavesRoomAbovePlay() {
+        // Issue #1035: the bar was too close to Play. Centred on the seek bar's line, it ends at least Space.Page above
+        // Play, which is the seek bar's 56 dp (its top padding, touch row and times) and the controls' Space.Small down.
+        val top = DJ_BAR_CENTRE - DJ_BAR_HEIGHT / 2
+        val bottom = DJ_BAR_CENTRE + DJ_BAR_HEIGHT / 2
+        val playTop = 56.dp + Space.Small
+        assertTrue("the bar starts inside the seek bar's room: $top", top >= 0.dp)
+        assertTrue("room above Play: ${playTop - bottom}", playTop - bottom >= Space.Page)
     }
 }

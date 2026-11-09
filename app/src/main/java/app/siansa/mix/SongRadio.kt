@@ -95,10 +95,15 @@ class SongRadio(private val graph: AppGraph) {
      * follows; otherwise it plays first. Only the radio's songs follow it, marked in the queue as added by the
      * radio, and more are added as it nears the end, so the music doesn't stop.
      */
-    fun start(song: Song, mode: ContinuousMode = ContinuousMode.STEADY, onError: (String) -> Unit = {}) {
+    fun start(song: Song, mode: ContinuousMode = ContinuousMode.STEADY, shape: MixShape? = null, onError: (String) -> Unit = {}) {
         stop()
         // Each new radio starts as Steady vibes with no surprises; a shape picked for the last one doesn't carry over.
         if (graph.settings.resetMixShape()) AppLog.i("SongRadio", "Mix shape back to Steady vibes, no surprises, for the new radio")
+        // Started from the DJ mix bar on a shape (issue #1035): the mix has that shape from its first songs.
+        if (shape != null && mode == ContinuousMode.DJ) {
+            graph.settings.setMixShape(shape)
+            AppLog.i("SongRadio", "Starts as ${shape.label}")
+        }
         val picked = if (mode == ContinuousMode.OFF) ContinuousMode.STEADY else mode
         graph.scope.launch {
             val started = System.currentTimeMillis()

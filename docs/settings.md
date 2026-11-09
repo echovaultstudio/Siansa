@@ -111,9 +111,9 @@ not here.
 - **Mini player** and **bottom bar**: hold a row and drag it to reorder; tap the eye to show or hide it.
 - **Home**: how many shortcuts the top of Home shows, 2 to 8 (8 from the start). They're what you played last, newest
   first.
-- **DJ Mix Bar**: the order of the places on the bar that comes in over the seek bar when you slide up from the play
-  button while a DJ mix plays (Steady vibes, Steady build, Stop, Euphoric, Wind down to start with): hold a row and
-  drag it; top to bottom is left to right on the bar. See [Playback](playback.md).
+- **DJ Mix Bar**: the order of the places on the bar that opens over the seek bar when you slide up from the play
+  button (Steady vibes, Steady build, Start or stop the mix, Euphoric, Wind down to start with): hold a row and drag it;
+  top to bottom is left to right on the bar. See [Playback](playback.md).
 - **Home Menu**: the order of the options under the round button at the top of Home (Roll the dice, Play on…,
   Sources, Arrange Home): hold a row and drag it. The mini player
   starts with **Play or pause**, **Next song** and **Add to playlist**.

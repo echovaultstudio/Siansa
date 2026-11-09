@@ -45,10 +45,10 @@ object RadioChooser {
      * Starts a mix from [song] in [mode] without asking (a slide from the play button, issue #919, or a choice here),
      * saying so with [say], and why not if it can't.
      */
-    fun startNow(graph: app.siansa.AppGraph, song: Song, mode: ContinuousMode, say: (String) -> Unit) {
+    fun startNow(graph: app.siansa.AppGraph, song: Song, mode: ContinuousMode, shape: app.siansa.mix.MixShape? = null, say: (String) -> Unit) {
         AppLog.i("SongRadio", "Chose ${mode.label} for a radio from \"${song.title}\"")
         say("Starting ${mixName(mode)} from ${song.title}… more songs are added as it plays")
-        graph.songRadio.start(song, mode) { message -> say(message) }
+        graph.songRadio.start(song, mode, shape) { message -> say(message) }
     }
 }
 

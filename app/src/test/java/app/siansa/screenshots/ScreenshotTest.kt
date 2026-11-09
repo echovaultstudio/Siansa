@@ -453,31 +453,32 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // The DJ mix bar (issue #1033) over now playing's seek bar, the seek bar's width: coming in, nothing chosen yet
-            // (Euphoric is the mix's shape now), Steady build under the finger, Stop under the finger, and an album's DJ mix,
-            // which has only Stop.
+            // The DJ mix bar (issues #1033, #1035), the seek bar's width: opening out of the seek bar's line; open with no
+            // mix playing (Start in the middle, then on Start); while a mix plays (Euphoric now), on Steady build and on
+            // Stop; and an album's DJ mix, only Stop.
             Scene("dj_bar") {
                 OnPlayer {
-                    Column(Modifier.padding(horizontal = Space.Section, vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                    Column(Modifier.padding(horizontal = Space.Section, vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
                         val all = app.siansa.ui.DjBarSpot.default
                         val now = app.siansa.ui.DjBarSpot.EUPHORIC
-                        app.siansa.ui.DjBar(all, chosen = null, now = now, rise = 0.6f)
-                        app.siansa.ui.DjBar(all, chosen = null, now = now, rise = 1f)
-                        app.siansa.ui.DjBar(all, chosen = 1, now = now, rise = 1f)
-                        app.siansa.ui.DjBar(all, chosen = 2, now = now, rise = 1f)
-                        app.siansa.ui.DjBar(listOf(app.siansa.ui.DjBarSpot.STOP), chosen = 0, now = null, rise = 1f)
+                        app.siansa.ui.DjBar(all, chosen = null, now = null, starting = true, open = 0.4f)
+                        app.siansa.ui.DjBar(all, chosen = null, now = null, starting = true, open = 1f)
+                        app.siansa.ui.DjBar(all, chosen = 2, now = null, starting = true, open = 1f)
+                        app.siansa.ui.DjBar(all, chosen = 1, now = now, starting = false, open = 1f)
+                        app.siansa.ui.DjBar(all, chosen = 2, now = now, starting = false, open = 1f)
+                        app.siansa.ui.DjBar(listOf(app.siansa.ui.DjBarSpot.MIX), chosen = 0, now = null, starting = false, open = 1f)
                     }
                 }
             },
-            // The cover while sliding to the DJ mix bar (issue #1033): on Steady build and on Stop, with what each does.
+            // The cover while on the DJ mix bar (issue #1035): on Start with no mix playing, and on Stop while one plays.
             Scene("dj_bar_cover") {
                 OnPlayer {
                     Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
                         val all = app.siansa.ui.DjBarSpot.default
-                        listOf(1, 2).forEach { chosen ->
+                        listOf(true, false).forEach { starting ->
                             val label = app.siansa.ui.SlideLabel(
                                 app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.SlideWay.UP, armed = true,
-                                bar = app.siansa.ui.DjBarView(all, chosen, rise = 1f),
+                                bar = app.siansa.ui.DjBarView(all, chosen = 2, starting = starting, rise = 1f),
                             )
                             Box(
                                 Modifier.size(300.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
