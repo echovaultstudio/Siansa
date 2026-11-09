@@ -6,6 +6,7 @@ import app.siansa.net.WebStationPictures
 import app.siansa.playback.ActivePlayer
 import app.siansa.playback.MiniFor
 import app.siansa.mix.Dice
+import app.siansa.mix.GenreVote
 import app.siansa.data.ArtistPhotos
 import app.siansa.data.audioMuseUserFor
 import app.siansa.data.Users
@@ -294,7 +295,7 @@ class AppGraph(val app: Application) {
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
     val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
     /** Genre radios by Siansa Beats' vote, when it's there (Siansa Dev); by the songs' tags otherwise. */
-    val genreVote = app.siansa.mix.GenreVote({ path -> audioMuse.plugin(path) }, { settings.current.audioMuseReady })
+    val genreVote = GenreVote({ path -> audioMuse.plugin(path) }, { settings.current.audioMuseReady })
     /** The AI service that writes mix titles and sound searches (issue #665). */
     val ai = ChatApi(http) { settings.current }
     val deezer = DeezerApi(http)
