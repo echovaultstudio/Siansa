@@ -104,6 +104,7 @@ fun StyleScreen(nav: NavController) {
             HubRow(Icons.Rounded.Dashboard, "Nav Bar") { nav.navigate("settings/style/nav-bar") }
             HubRow(Icons.Rounded.Home, "Home") { nav.navigate("settings/style/home") }
             HubRow(Icons.Rounded.FilterList, "Home Menu") { nav.navigate("settings/style/home-menu") }
+            HubRow(SiansaIcons.Turntable, "DJ Mix Bar") { nav.navigate("settings/style/dj-bar") }
             Spacer(Modifier.height(Space.Section))
             TopBarChoice(settings.topBar) {
                 AppLog.i("Style", "Phone's top bar: ${it.name.lowercase()}")
@@ -404,6 +405,41 @@ internal fun ShortcutCountRow(count: Int, onDone: (Int) -> Unit) {
  * Home Menu (issue #872): the options in Home's menu, top to bottom as they hang under its button. Hold a row or grab
  * its 6-dot handle to move it. All of them always show: each is the only way to it from Home.
  */
+/**
+ * DJ Mix Bar (issue #1033): the places on the bar that comes in over the seek bar when you slide up from the play button
+ * while a DJ mix plays, in order, left to right. Hold a row and drag it. Every place is always on the bar.
+ */
+@Composable
+fun DjBarStyleScreen(nav: NavController) {
+    val graph = LocalGraph.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    val order = settings.djBarOrder
+    fun save(places: List<DjBarSpot>) {
+        AppLog.i("Style", "DJ mix bar: ${DjBarSpot.format(places)}")
+        graph.settings.setDjBarOrder(places)
+    }
+    Screen(
+        title = "DJ Mix Bar",
+        nav = nav,
+        actions = { TextButton(onClick = { save(DjBarSpot.default) }, enabled = order != DjBarSpot.default) { Text("Reset") } },
+    ) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
+            StyleHint("While a DJ mix plays, slide up from the play button and the seek bar turns into this bar: let go on a place to stop the mix or give it that shape. Hold a row and drag it: top to bottom is left to right on the bar.")
+            ArrangeList(
+                order = order,
+                shown = order.toSet(),
+                label = { it.title },
+                icon = { it.icon },
+                key = { it.id },
+                canHide = { false },
+                canShowMore = false,
+                onChange = { places, _ -> save(places) },
+                eyes = false,
+            )
+        }
+    }
+}
+
 @Composable
 fun HomeMenuStyleScreen(nav: NavController) {
     val graph = LocalGraph.current

@@ -215,6 +215,15 @@ and holding still stops. What each way does can be changed, or the slides switch
 Now playing**. While a DJ mix plays, the play button has record grooves in its colour, with a glint that turns as it
 plays.
 
+While a DJ mix plays, sliding **up** from the play button opens the **DJ mix bar** instead: the seek bar turns into a
+see-through bar with five places, **Steady vibes**, **Steady build**, **Stop**, **Euphoric** and **Wind down** (Stop in
+the middle to start with). Slide up onto it, then along it: the place under your finger lights up (Stop in white, a
+shape in your colour) and the phone clicks at each one, while the cover shows its name, what it does and "Let go to
+stop" or "Let go to reshape". Letting go there stops the mix (the songs left in the queue play on, without blends) or
+gives it that shape, as **Shape the mix** in the queue does: the next songs change. The mix's shape now has a ring and
+its name in your colour. Slide back down to change your mind. An album's or playlist's DJ mix plays its own songs, so its
+bar has only **Stop**. Put the places in your own order under **Settings › Style › DJ Mix Bar**.
+
 Swipe the mini player left for the next song or right for the one before; the phone gives a short buzz as the song
 changes, and when you press **Repeat** or **Add to playlist** in now playing (if touch vibration is on in your
 phone's settings).

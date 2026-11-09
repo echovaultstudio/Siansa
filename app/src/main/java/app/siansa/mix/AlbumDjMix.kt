@@ -21,6 +21,15 @@ object AlbumDjMix {
     /** The songs of the album DJ mix last started, in its order; empty when none was. */
     val playing: StateFlow<List<String>> = songs
 
+    /**
+     * Ends the album's DJ mix (issue #1033, the DJ mix bar's Stop): its songs play on in the order they're in, without
+     * blends, and the play buttons lose their grooves.
+     */
+    fun stop() {
+        if (songs.value.isNotEmpty()) AppLog.i("AlbumMix", "Stopped")
+        songs.value = emptyList()
+    }
+
     /** Whether [songId] plays as part of an album's DJ mix. */
     fun isOn(songId: String?): Boolean = songId != null && songId in songs.value
 

@@ -159,8 +159,12 @@ fun slideDistance(way: SlideWay, dx: Float, dy: Float): Float = when (way) {
     SlideWay.RIGHT -> dx
 }
 
-/** A slide as it's shown: which way, and whether it's gone far enough to start on letting go. */
-data class SlideState(val way: SlideWay, val armed: Boolean)
+/**
+ * A slide as it's shown: which way, and whether it's gone far enough to start on letting go. On the DJ mix bar
+ * (issue #1033, [bar]): how far up to it the finger has come ([rise], 0 to 1) and the place it's on ([spot]), armed once
+ * it's on one.
+ */
+data class SlideState(val way: SlideWay, val armed: Boolean, val bar: Boolean = false, val rise: Float = 0f, val spot: Int? = null)
 
 /**
  * Now playing's play button (issue #919). A tap plays or pauses, and pressing and holding stops, as before. Sliding a
@@ -187,6 +191,14 @@ internal fun PlayButton(
     preview: SlideState? = null,
     /** How far up the up choice goes from the button's centre, in px, to sit on the seek bar (issue #963); null for its usual reach. */
     upReachPx: Int? = null,
+    /**
+     * While a DJ mix plays (issue #1033): sliding up opens the DJ mix bar on the seek bar with these places, left to
+     * right, instead of the up choice; letting go on one runs [onDjBar]. Null: up is the up choice as ever.
+     */
+    djBar: List<DjBarSpot>? = null,
+    /** The DJ mix bar's width in px (the seek bar's), centred on the button, to tell which place the finger is on. */
+    djBarWidthPx: Int? = null,
+    onDjBar: (DjBarSpot) -> Unit = {},
 ) {
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
@@ -199,6 +211,14 @@ internal fun PlayButton(
     val sliding by rememberUpdatedState(onSliding)
     val current by rememberUpdatedState(slides)
     val blocked by rememberUpdatedState(unavailable)
+    val bar by rememberUpdatedState(djBar)
+    val barWidth by rememberUpdatedState(djBarWidthPx)
+    val pickOnBar by rememberUpdatedState(onDjBar)
+    val reachUp by rememberUpdatedState(upReachPx)
+    val reachDefault = with(density) { SLIDE_REACH.toPx() }
+    val barGrace = with(density) { DJ_BAR_GRACE.toPx() }
+    // Up on the DJ mix bar: stays so while the finger moves along it, until it goes back down past halfway.
+    var onBar by remember { mutableStateOf(false) }
     var shown by remember { mutableStateOf<SlideState?>(null) }
     val state = preview ?: shown
     // The play button's own colour, as set under Style.
@@ -210,8 +230,8 @@ internal fun PlayButton(
         val before = shown
         shown = next
         sliding(next)
-        // A click as a choice appears, changes, or is far enough to start.
-        if (next != null && (next.way != before?.way || (next.armed && before?.armed != true))) {
+        // A click as a choice appears, changes, or is far enough to start; on the DJ mix bar, at each place.
+        if (next != null && (next.way != before?.way || (next.armed && before?.armed != true) || (next.spot != null && next.spot != before?.spot))) {
             QueueHaptics.vibrate(context, QueueHaptics.Kind.START)
         }
     }
@@ -235,18 +255,36 @@ internal fun PlayButton(
         detectDragGestures(
             onDragEnd = {
                 val last = shown
-                if (last?.armed == true && !held) {
+                val places = bar
+                if (last?.bar == true && last.spot != null && places != null && !held) {
+                    QueueHaptics.vibrate(context, QueueHaptics.Kind.ADDED)
+                    places.getOrNull(last.spot)?.let { pickOnBar(it) }
+                } else if (last?.bar != true && last?.armed == true && !held) {
                     QueueHaptics.vibrate(context, QueueHaptics.Kind.ADDED)
                     runSlide(current.of(last.way))
                 }
+                onBar = false
                 show(null)
             },
-            onDragCancel = { show(null) },
+            onDragCancel = { onBar = false; show(null) },
             onDrag = { change, _ ->
                 if (!current.on || held) return@detectDragGestures
                 change.consume()
                 // Where the finger is from the button's middle: only the way counts, and past the edge is fine.
                 val d = change.position - Offset(size.width / 2f, size.height / 2f)
+                // A DJ mix playing (issue #1033): up goes to the DJ mix bar on the seek bar. Once on it, the finger
+                // moves along it freely; it comes in as the finger rises, and going back down past halfway leaves it.
+                val places = bar
+                val up = -d.y
+                if (!places.isNullOrEmpty() && (onBar || (up > deadZone && up >= abs(d.x)))) {
+                    val reach = (reachUp ?: reachDefault.toInt()).toFloat()
+                    val landAt = (reach - barGrace).coerceAtLeast(deadZone + 1f)
+                    if (up >= landAt) onBar = true else if (up < reach / 2f) onBar = false
+                    val spot = if (onBar) djBarSpotAt(d.x, (barWidth ?: 0).toFloat(), places.size) else null
+                    val rise = if (onBar) 1f else ((up - deadZone) / (landAt - deadZone)).coerceIn(0f, 1f)
+                    show(SlideState(SlideWay.UP, armed = spot != null, bar = true, rise = rise, spot = spot))
+                    return@detectDragGestures
+                }
                 val way = slideWay(d.x, d.y, deadZone)
                 val slide = way?.let { current.of(it) }
                 show(
@@ -281,7 +319,8 @@ internal fun PlayButton(
             if (djMix && slides.grooves) Grooves(playing, Modifier.fillMaxSize().testTag("playGrooves"))
             Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, tint = onAccent, modifier = Modifier.size(38.dp))
         }
-        if (state != null) {
+        // On the way to the DJ mix bar the bar itself is the choice: nothing beside the button.
+        if (state != null && !state.bar) {
             val slide = slides.of(state.way)
             SlideChoice(slide, state, accent, onAccent, upReachPx)
         }
@@ -313,7 +352,7 @@ private fun SlideChoice(slide: PlaySlide, state: SlideState, accent: Color, onAc
 }
 
 /** What a slide from the play button shows in the cover: the choice, its way, whether it's far enough, and why it can't run. */
-data class SlideLabel(val slide: PlaySlide, val way: SlideWay, val armed: Boolean, val why: String? = null)
+data class SlideLabel(val slide: PlaySlide, val way: SlideWay, val armed: Boolean, val why: String? = null, val bar: DjBarView? = null)
 
 /**
  * A slide's choice in the middle of now playing's cover (issue #933), where a thumb on the play button can't hide it:
@@ -334,6 +373,18 @@ internal fun SlideCoverLabel(label: SlideLabel?, modifier: Modifier = Modifier) 
     ) {
         val shown = last ?: return@AnimatedVisibility
         val ready = shown.armed && shown.why == null
+        // On the DJ mix bar (issue #1033): the place under the finger, what letting go there does, and how.
+        val bar = shown.bar
+        val place = bar?.chosenSpot
+        val stopping = place == DjBarSpot.STOP
+        val icon = if (bar != null) place?.icon ?: SiansaIcons.Turntable else shown.slide.icon
+        val name = if (bar != null) place?.title ?: "Shape the mix" else shown.slide.label
+        val action = when {
+            bar == null -> shown.why ?: if (ready) "Let go to start" else "Slide a little further"
+            stopping -> "Let go to stop"
+            place != null -> "Let go to reshape"
+            else -> "Slide up onto the bar"
+        }
         val scrim by androidx.compose.animation.core.animateFloatAsState(
             when {
                 ready -> if (android.os.Build.VERSION.SDK_INT >= 31) SCRIM_READY else SCRIM_READY_NO_BLUR
@@ -349,11 +400,11 @@ internal fun SlideCoverLabel(label: SlideLabel?, modifier: Modifier = Modifier) 
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(horizontal = Space.Section).alpha(if (ready) 1f else LABEL_FAINT),
             ) {
-                // Its icon, on its own: no circle round it.
-                shown.slide.icon?.let { Icon(it, null, tint = if (ready) Accent else Color.White, modifier = Modifier.size(LABEL_ICON)) }
+                // Its icon, on its own: no circle round it. Stop stays white, so it never looks like a shape to pick.
+                icon?.let { Icon(it, null, tint = if (ready && !stopping) Accent else Color.White, modifier = Modifier.size(LABEL_ICON)) }
                 androidx.compose.foundation.layout.Spacer(Modifier.size(Space.Medium))
                 Text(
-                    shown.slide.label,
+                    name,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
@@ -363,16 +414,30 @@ internal fun SlideCoverLabel(label: SlideLabel?, modifier: Modifier = Modifier) 
                 )
                 androidx.compose.foundation.layout.Spacer(Modifier.size(Space.Small))
                 androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (shown.why == null) {
+                    // The way to go; on the DJ mix bar only until the finger is on it.
+                    if (shown.why == null && place == null) {
                         Icon(shown.way.arrowIcon, null, tint = Accent, modifier = Modifier.size(LABEL_ARROW))
                         androidx.compose.foundation.layout.Spacer(Modifier.size(Space.Tight))
                     }
                     Text(
-                        shown.why ?: if (ready) "Let go to start" else "Slide a little further",
+                        action,
                         style = MaterialTheme.typography.bodyLarge,
                         color = Color.White.copy(alpha = LABEL_HINT),
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                }
+                // What the place does, under its name.
+                if (place != null) {
+                    androidx.compose.foundation.layout.Spacer(Modifier.size(Space.Small))
+                    Text(
+                        place.hint,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = LABEL_HINT),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        maxLines = 3,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("slideHint"),
                     )
                 }
             }
@@ -429,6 +494,9 @@ internal fun Grooves(playing: Boolean, modifier: Modifier = Modifier) {
 }
 
 val PLAY_SIZE = 68.dp
+
+/** The finger is on the DJ mix bar a little before its middle line (issue #1033), so a short slide is enough. */
+private val DJ_BAR_GRACE = Space.Page
 /** Within this of the button's middle, no choice shows: back in the middle cancels. */
 private val SLIDE_DEAD_ZONE = 20.dp
 /** Far enough to start on letting go, from the button's middle: a little past its edge. */

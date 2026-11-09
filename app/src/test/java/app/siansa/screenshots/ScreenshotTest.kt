@@ -453,6 +453,40 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // The DJ mix bar (issue #1033) over now playing's seek bar, the seek bar's width: coming in, nothing chosen yet
+            // (Euphoric is the mix's shape now), Steady build under the finger, Stop under the finger, and an album's DJ mix,
+            // which has only Stop.
+            Scene("dj_bar") {
+                OnPlayer {
+                    Column(Modifier.padding(horizontal = Space.Section, vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                        val all = app.siansa.ui.DjBarSpot.default
+                        val now = app.siansa.ui.DjBarSpot.EUPHORIC
+                        app.siansa.ui.DjBar(all, chosen = null, now = now, rise = 0.6f)
+                        app.siansa.ui.DjBar(all, chosen = null, now = now, rise = 1f)
+                        app.siansa.ui.DjBar(all, chosen = 1, now = now, rise = 1f)
+                        app.siansa.ui.DjBar(all, chosen = 2, now = now, rise = 1f)
+                        app.siansa.ui.DjBar(listOf(app.siansa.ui.DjBarSpot.STOP), chosen = 0, now = null, rise = 1f)
+                    }
+                }
+            },
+            // The cover while sliding to the DJ mix bar (issue #1033): on the way up, on Steady build, and on Stop.
+            Scene("dj_bar_cover") {
+                OnPlayer {
+                    Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                        val all = app.siansa.ui.DjBarSpot.default
+                        listOf(null, 1, 2).forEach { chosen ->
+                            val label = app.siansa.ui.SlideLabel(
+                                app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.SlideWay.UP, armed = chosen != null,
+                                bar = app.siansa.ui.DjBarView(all, chosen, rise = if (chosen == null) 0.5f else 1f),
+                            )
+                            Box(
+                                Modifier.size(300.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                                    .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF2FA39A), Color(0xFF3A1D6E)))),
+                            ) { app.siansa.ui.SlideCoverLabel(label, Modifier.fillMaxSize()) }
+                        }
+                    }
+                }
+            },
             // Settings › Style › Home: how many shortcuts Home shows (issue #934).
             Scene("home_style_shortcuts") {
                 Column(Modifier.padding(vertical = Space.Page)) { app.siansa.ui.ShortcutCountRow(6) {} }

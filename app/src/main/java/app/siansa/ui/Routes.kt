@@ -56,6 +56,7 @@ fun NavGraphBuilder.siansaRoutes(nav: NavController, except: Set<String> = empty
     page("settings/style/nav-bar") { NavBarStyleScreen(nav) }
     page("settings/style/home") { HomeStyleScreen(nav) }
     page("settings/style/home-menu") { HomeMenuStyleScreen(nav) }
+    page("settings/style/dj-bar") { DjBarStyleScreen(nav) }
     page("settings/equaliser") { EqualiserScreen(nav) }
     page("settings/crossfade") { CrossfadeScreen(nav) }
     // Storage became Streaming and data (issue #780); the old address opens it.

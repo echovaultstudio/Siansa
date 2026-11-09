@@ -1,0 +1,2 @@
+### Added
+- **The DJ mix bar.** While a DJ mix plays, slide up from the play button in now playing: the seek bar turns into a see-through bar with **Steady vibes**, **Steady build**, **Stop**, **Euphoric** and **Wind down**. Slide along it and let go on one to stop the mix or give it that shape; its name and what it does show on the cover as you go, and the mix's shape now is marked. An album's or playlist's DJ mix has only Stop. Put the places in your own order under Settings › Style › DJ Mix Bar.
