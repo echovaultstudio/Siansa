@@ -503,6 +503,21 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // An artist's release types as tabs at the top of their page (issue #1029): All chosen; Singles chosen; every
+            // type with DJ-mixes chosen, scrolled into view and fading at the edges; and pinned under the title bar, white on
+            // its colour.
+            Scene("artist_tabs") {
+                val few = listOf(app.siansa.data.AlbumCategory.ALBUM, app.siansa.data.AlbumCategory.EP, app.siansa.data.AlbumCategory.SINGLE)
+                val all = app.siansa.data.AlbumCategory.entries.toList()
+                Column(Modifier.padding(vertical = Space.Page)) {
+                    app.siansa.ui.ReleaseTypeTabs(few, null) {}
+                    app.siansa.ui.ReleaseTypeTabs(few, app.siansa.data.AlbumCategory.SINGLE) {}
+                    app.siansa.ui.ReleaseTypeTabs(all, app.siansa.data.AlbumCategory.DJMIX) {}
+                    Box(Modifier.fillMaxWidth().background(Color(0xFF3A2A20))) {
+                        app.siansa.ui.ReleaseTypeTabs(all, null, content = Color.White) {}
+                    }
+                }
+            },
             // The lyrics button under the player's controls: at rest, greyed out without lyrics, and lit while the lyrics
             // are open, when it closes them (the owner, 9 Nov).
             Scene("lyrics_button") {
