@@ -5,6 +5,7 @@
 ### Changed
 - **Crossfade: Smart decides everything, Fixed is yours to set (Siansa Dev).** With Smart there's nothing to set. Fixed has its length and, in DJ radio and DJ mixes, the blend length in bars. Beat-matched blends happen in DJ radio and DJ mixes only, with either; an album playing in order always stays gapless.
 - **Blends stay where a song's beat is (Siansa Dev).** With Siansa Beats, a blend is laid where each song's beat locks onto its grid, and only when 80 % of its beats are there: tracks cut from a mixed CD no longer clash with the DJ's own changeovers.
+- **Smart DJ blends pick how to blend (Siansa Dev).** With Siansa Beats' readings, each blend in DJ radio and DJ mixes is chosen for the two songs: a long 32-bar blend when tempos are close, keys mix and an end has room without bass; a drop swap that brings the next song in so its drop lands where the old one goes; a filter fade when the energy goes down or the keys only half mix; a quick 4-bar swap when keys clash, the beat isn't sure or you just moved in the song; an echo out when the tempos are too far apart; else the usual bass swap, and never the same twice running when another fits.
 - **"Bad blend" button (Siansa Dev).** During a DJ blend and for a minute after, a button over the cover marks it as bad: it goes to the log and to Siansa Beats' list.
 
 ### Fixed

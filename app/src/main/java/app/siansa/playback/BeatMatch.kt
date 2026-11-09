@@ -49,9 +49,9 @@ object BeatMatch {
     const val CLASH_MS = 1_500L
     const val BEATS_PER_BAR = 4
     /** A blend is this many bars, the longest that fits the blend length setting (and the song). */
-    val BAR_CHOICES = listOf(16, 8, 4, 2, 1)
-    /** The most whole phrases a blend lasts (two 8-bar phrases is the 16-bar blend length). */
-    const val MAX_PHRASES = 2
+    val BAR_CHOICES = listOf(32, 16, 8, 4, 2, 1)
+    /** The most whole phrases a blend lasts (two 8-bar phrases is the 16-bar blend length, four Smart's long blend). */
+    const val MAX_PHRASES = 4
 
     /**
      * The longest blend of [bars] whole bars at [outgoing]'s tempo: those bars plus the part-bar a song's end

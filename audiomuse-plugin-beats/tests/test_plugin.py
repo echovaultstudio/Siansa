@@ -168,6 +168,13 @@ class ApiTest(unittest.TestCase):
         self.assertEqual((merged["intro_lock_ms"], merged["mix_track"], merged["drops_ms"]), (12000.0, True, [60000.0]))
         self.assertNotIn("other", merged)
 
+    def test_each_song_has_audiomuses_key(self):
+        api.db = support.FakeDb([CONTROL, OTHER], keys={"c-canon": ("A", "minor")})
+        body = self.client.get("/plugins/siansa_beats/api/profiles?ids=c,o").get_json()
+        by_id = {p["track_id"]: p for p in body["profiles"]}
+        self.assertEqual((by_id["c"]["key"], by_id["c"]["scale"]), ("A", "minor"))
+        self.assertNotIn("key", by_id.get("o", {}))
+
     def test_too_many_ids(self):
         response = self.client.get("/plugins/siansa_beats/api/profiles?ids=" + ",".join(str(n) for n in range(501)))
         self.assertEqual(response.status_code, 400)

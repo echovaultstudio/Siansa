@@ -140,6 +140,9 @@ data class TrackProfile(
     /** Siansa Beats: where the bass comes back after being out (ms from the start), and where it drops out. */
     val dropsMs: List<Long> = emptyList(),
     val breakdownsMs: List<Long> = emptyList(),
+    /** AudioMuse-AI's key and scale (Siansa Beats (dev) plugin 0.3.0), for blends in key. */
+    val key: String? = null,
+    val scale: String? = null,
 ) {
     /** How long after the start the song first gets up to [db] (relative), or null if it never does. */
     fun reachesAfterMs(db: Int): Long? = startRamp.firstOrNull { it.db >= db }?.ms
@@ -230,6 +233,8 @@ object PluginProfiles {
             mixTrack = (p["mix_track"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "true",
             dropsMs = times(p, "drops_ms"),
             breakdownsMs = times(p, "breakdowns_ms"),
+            key = p.str("key")?.takeIf { it.isNotBlank() },
+            scale = p.str("scale")?.takeIf { it.isNotBlank() },
         )
     }
 

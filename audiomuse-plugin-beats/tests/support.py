@@ -28,8 +28,9 @@ class FakeDb:
     """The Siansa plugin's profiles table, as rows ``(item_id, ref_lufs, start_ramp, end_ramp, duration_ms, beats)``;
     ``installed`` False as if the Siansa plugin weren't there. Every statement is kept in ``seen``."""
 
-    def __init__(self, rows=(), installed=True):
+    def __init__(self, rows=(), installed=True, keys=None):
         self.rows, self.installed, self.seen = list(rows), installed, []
+        self.keys = dict(keys or {})  # AudioMuse-AI's score table: {item_id: (key, scale)}
 
     def cursor(self):
         return FakeCursor(self)
@@ -50,6 +51,10 @@ class FakeCursor:
             assert sql.lstrip().upper().startswith("SELECT"), "the Siansa plugin's table is only ever read"
             wanted = set(params[0])
             self.result = [r for r in self.db.rows if r[0] in wanted]
+        elif "FROM score" in sql:
+            assert sql.lstrip().upper().startswith("SELECT"), "AudioMuse-AI's own table is only ever read"
+            wanted = set(params[0])
+            self.result = [(i, k, sc) for i, (k, sc) in self.db.keys.items() if i in wanted]
         else:
             raise AssertionError(f"unexpected SQL: {sql}")
 

@@ -112,6 +112,18 @@ blend them the way a DJ mixes:
   to 8 %) so its beats keep time with the old song's, then eases back to its own speed over about 25
   seconds, in small steps too slight to hear. A shift of more than 4 % is kept to 8 bars, however long the Blend
   length, so the song is back at its own speed sooner.
+- **Smart picks how to blend (Siansa Dev, with Siansa Beats' readings at both ends, and the keys from AudioMuse-AI):**
+  - **Long blend**, 32 bars with the bass swapped in the middle: tempos within 2 %, keys that mix, both ends sure of
+    their beat, and 8 bars or more without bass at one end.
+  - **Drop swap**: the next song comes in 16 (or 8) bars before its first drop, so the drop lands where the old song
+    goes; the old song keeps its bass until then. Not when the energy goes down.
+  - **Filter fade**, 16 bars: the old song is swept out with a rising high-pass filter, when the next song starts 3 dB
+    or more quieter, or the keys only half mix.
+  - **Quick swap**, 4 bars: when the keys clash, a beat is under 90 % sure, or you moved in the song in the last
+    20 seconds.
+  - **Echo out**: when the tempos are too far apart to match, the old song's last bar echoes away on its beat.
+  - **Bass swap**, 16 bars: the usual. Never the same technique twice running when another fits as well.
+  - Fixed always uses the bass swap over the bars set. The log says which was picked and why ("smart: …").
 - **Siansa Beats (Siansa Dev)**: each end of a song is read from where its beat locks onto its grid (the first and
   last 4 bars it all keeps to). A blend stays inside that, and an end needs 80 % of its beats on the grid there to be
   beat-matched. A track cut from a mixed CD carries the DJ's own changeovers at its ends: its blends are laid inside

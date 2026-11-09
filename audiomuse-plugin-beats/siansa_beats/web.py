@@ -26,7 +26,7 @@ from flask import Blueprint, jsonify, redirect, request, url_for
 from plugin.api import get_db, get_setting, logger, render_page, set_setting
 
 PLUGIN_ID = "siansa_beats"
-VERSION = "0.2.0"  # the newest in plugin.json (test_version.py)
+VERSION = "0.3.0"  # the newest in plugin.json (test_version.py)
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
@@ -195,6 +195,19 @@ def siansa_profiles(db, item_ids):
         cur.close()
 
 
+def song_keys(db, item_ids):
+    """AudioMuse-AI's own key and scale of each song (its ``score`` table), ``{item_id: {"key", "scale"}}``: for the
+    app to tell which blends are in key. Read only."""
+    if not item_ids:
+        return {}
+    cur = db.cursor()
+    try:
+        cur.execute("SELECT item_id, key, scale FROM score WHERE item_id = ANY(%s)", (list(item_ids),))
+        return {item_id: {"key": key, "scale": scale} for item_id, key, scale in cur.fetchall() if key}
+    finally:
+        cur.close()
+
+
 def is_beat_field(key):
     """A field of the beat grid (the Siansa plugin's or Siansa Beats'), not of loudness or ramps."""
     return key.startswith("intro_") or key.startswith("outro_") or key.startswith("beats_until") or key in GRID_ONLY
@@ -306,6 +319,11 @@ def profiles():
     except Exception:
         logger.exception("siansa_beats couldn't read the Siansa plugin's profiles")
         measured = {}
+    try:
+        keys = song_keys(get_db(), set(canonical.values()))
+    except Exception:
+        logger.exception("siansa_beats couldn't read AudioMuse-AI's keys")
+        keys = {}
     grids = CACHE.grids(asked, _beats_get) if beats_url() else {}
     mode = missing_mode()
     out, pending = [], []
@@ -314,7 +332,7 @@ def profiles():
         if profile is None:
             pending.append(asked_id)
         else:
-            out.append({"track_id": asked_id, **profile})
+            out.append({"track_id": asked_id, **profile, **keys.get(canonical.get(asked_id, asked_id), {})})
     return jsonify({"schema_version": SCHEMA_VERSION, "profiles": out, "pending": pending})
 
 

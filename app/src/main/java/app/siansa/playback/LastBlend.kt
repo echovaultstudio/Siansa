@@ -76,6 +76,12 @@ object LastBlend {
     fun of(fromId: String, toId: String, atMs: Long, plan: FadePlan, dj: Boolean, now: Long): Report {
         val beat = plan.beat
         val technique = when {
+            plan.technique != null -> plan.technique.label + when {
+                beat?.phraseBars != null -> ", phrase on phrase"
+                beat?.onBars == true -> ", bar on bar"
+                beat != null -> ", beat on beat"
+                else -> ""
+            }
             beat?.phraseBars != null -> "phrase on phrase"
             beat?.onBars == true -> "bar on bar"
             beat != null -> "beat on beat"

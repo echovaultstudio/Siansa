@@ -101,7 +101,7 @@ class SmartBlendTest {
         val plan = Crossfade.plan(CrossfadeMode.SMART, 20_000, song, next, 310_000, 300_000,
             profile("a", outro.copy(lockMs = 296_250.0), null), profile("b", null, intro.copy(lockMs = 1_000.0)), beatMatch = true)!!
         val report = LastBlend.of("a", "b", 294_000, plan, dj = true, now = 1_000)
-        assertTrue(report.technique, report.technique in listOf("phrase on phrase", "bar on bar"))
+        assertEquals("bass swap, bar on bar", report.technique)
         assertEquals(plan.beat!!.bars, report.bars)
         assertEquals(128.0, report.fromBpm!!, 0.0)
         assertEquals(0.95f, report.fromRhythm!!, 0f)

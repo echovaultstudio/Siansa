@@ -42,6 +42,15 @@ data class FadePlan(
     val coldEnd: Boolean = false,
     /** A cold end's pause; 0 for every other blend, and for a cold end where both songs keep a beat. */
     val gapMs: Long = 0L,
+    /** Siansa Dev: how the blend is made ([TechniquePicker]); null for a plain fade. */
+    val technique: Technique? = null,
+    /** The bass swap's span, as fractions of the blend: from [swapFrom] to [swapTo] the old bass goes, the new comes. */
+    val swapFrom: Float = 0f,
+    val swapTo: Float = 0.5f,
+    /** A filter fade: the old song's high-pass sweeps up to this many Hz over the blend; 0 for none. */
+    val filterHz: Double = 0.0,
+    /** An echo out: the old song's last bar echoes away, a beat ([echoBeatMs]) apart; null for none. */
+    val echoBeatMs: Double? = null,
 )
 
 /**
@@ -232,7 +241,11 @@ object Crossfade {
         currentProfile: TrackProfile? = null,
         nextProfile: TrackProfile? = null,
         beatMatch: Boolean = false,
-        blendBars: Int = BeatMatch.BAR_CHOICES[1],
+        blendBars: Int = BeatMatch.BAR_CHOICES[2],
+        /** How long since the listener moved in the song going out (Smart picks a quick swap just after); null: not lately. */
+        sinceSeekMs: Long? = null,
+        /** The technique of the last blend, so Smart doesn't use the same twice running when another fits. */
+        lastTechnique: Technique? = null,
     ): FadePlan? {
         if (mode == CrossfadeMode.OFF || maxMs <= 0) return null
         // An album playing in order stays gapless, Smart or Fixed (the owner, 9 Nov).
@@ -266,10 +279,31 @@ object Crossfade {
         // The song going out is let go where its lock ends, when that's before its end (the DJ's next record follows).
         val songEnd = currentDurationMs - cut
         val endMs = outro?.lockEndMs?.toLong()?.takeIf { it in 1 until songEnd } ?: songEnd
-        val matched = if (matchable && beatMatch && currentDurationMs > 0) {
-            val bars = BeatMatch.barsFor(outro!!, intro!!, blendBars).let { if (currentMix || nextMix) minOf(it, BeatMatch.MIX_TRACK_BARS) else it }
-            BeatMatch.plan(outro, intro, endMs, BeatMatch.maxMsFor(outro, bars))
+        // Smart picks how to blend (the owner, 9 Nov); Fixed always swaps the bass over the bars set.
+        val speed = if (outro != null && intro != null) BeatMatch.speed(outro, intro) else null
+        // Only with Siansa Beats' readings at both ends (their lock, bass, drops): the Siansa plugin's have none of it.
+        val fromBeats = outro?.lockMs != null && intro?.lockMs != null
+        val choice = if (mode == CrossfadeMode.SMART && matchable && beatMatch && speed != null && fromBeats) {
+            TechniquePicker.pick(outro!!, intro!!, speed, TechniquePicker.keys(currentProfile, nextProfile), nextProfile?.dropsMs.orEmpty(),
+                mix = currentMix || nextMix, sinceSeekMs = sinceSeekMs, last = lastTechnique)
         } else null
+        val matched = if (matchable && beatMatch && currentDurationMs > 0) {
+            val bars = BeatMatch.barsFor(outro!!, intro!!, choice?.bars ?: blendBars).let { if (currentMix || nextMix) minOf(it, BeatMatch.MIX_TRACK_BARS) else it }
+            // A drop swap: the next song comes in [bars] before its drop, so the drop lands where the blend ends.
+            val into = choice?.dropAtMs?.let { drop ->
+                val start = drop - bars * intro.beatLengthMs * BeatMatch.BEATS_PER_BAR
+                intro.copy(beatMs = start, barMs = start, phraseMs = start, phraseBars = intro.phraseBars ?: BeatMatch.ASSUMED_PHRASE_BARS)
+            } ?: intro
+            BeatMatch.plan(outro, into, endMs, BeatMatch.maxMsFor(outro, bars))
+                ?: if (into !== intro) BeatMatch.plan(outro, intro, endMs, BeatMatch.maxMsFor(outro, bars)) else null
+        } else null
+        val technique = when {
+            matched == null -> null
+            choice == null -> Technique.BASS_SWAP
+            choice.technique == Technique.DROP_SWAP && matched.incoming.beatMs != intro?.beatMs -> Technique.DROP_SWAP
+            choice.technique == Technique.DROP_SWAP -> Technique.BASS_SWAP  // the drop didn't fit: the usual
+            else -> choice.technique
+        }
         // A cold end: a hard ending into a hard start never overlaps (both songs' edges loud), unless it's laid beat on
         // beat, or it's a DJ blend that brings a beatless song in under the other for the whole crossfade length.
         if (mode == CrossfadeMode.SMART && matched == null && !mixed && currentProfile != null && nextProfile != null) {
@@ -287,8 +321,11 @@ object Crossfade {
         var plan = if (matched != null) {
             // A phrase-on-phrase blend may let the song go at the end of its last phrase (issue #757).
             val lockCut = songEnd - endMs
-            FadePlan(matched.overlapMs, matched.overlapMs, matched.why + (if (lockCut > 0) ", let go where its beat stops locking (%.1f s before its end)".format(java.util.Locale.ROOT, (lockCut + cut) / 1000.0) else ""),
-                cut + lockCut + matched.cutMs, matched)
+            val how = if (choice != null) "smart: ${technique!!.label} (${if (technique == choice.technique) choice.why else "the drop didn't fit"}) · " else ""
+            val (swapFrom, swapTo) = swapSpan(technique!!)
+            FadePlan(matched.overlapMs, matched.overlapMs, how + matched.why + (if (lockCut > 0) ", let go where its beat stops locking (%.1f s before its end)".format(java.util.Locale.ROOT, (lockCut + cut) / 1000.0) else ""),
+                cut + lockCut + matched.cutMs, matched, technique = technique, swapFrom = swapFrom, swapTo = swapTo,
+                filterHz = if (technique == Technique.FILTER_FADE) FILTER_FADE_HZ else 0.0)
         } else if (mode == CrossfadeMode.SMART && currentProfile != null && nextProfile != null) run {
             val tail = ((currentProfile.quietForLastMs(QUIET_DB) ?: 0L) - cut).coerceAtLeast(0L)
             val head = nextProfile.reachesAfterMs(QUIET_DB) ?: 0L
@@ -298,6 +335,13 @@ object Crossfade {
                 // A continuous mix can't be laid on a beat, and a cut into or out of one is heard: a short blend (issue #807).
                 overlap = BeatMatch.CLASH_MS
                 why += " · a continuous mix, so a short blend" + notStraightOn(current, next)
+            } else if (beatMatch && rhythmic && speed == null && outro != null && outro.bpm > 0 && outro.lockMs != null) {
+                // Tempos too far apart to match (the owner, 9 Nov: an echo out rather than a clash): the old song's last
+                // bar echoes away on its own beat while the next one starts.
+                val bar = (outro.beatLengthMs * BeatMatch.BEATS_PER_BAR).toLong()
+                overlap = minOf(maxMs, bar + outro.beatLengthMs.toLong())
+                why += " · DJ: ${Technique.ECHO_OUT.label}, %.0f and %.0f BPM are too far apart to match".format(java.util.Locale.ROOT, outro.bpm, intro?.bpm ?: 0.0)
+                return@run FadePlan(overlap, overlap / 2, why, cut, technique = Technique.ECHO_OUT, echoBeatMs = outro.beatLengthMs)
             } else if (rhythmic && overlap > BeatMatch.CLASH_MS) {
                 // Both ends keep a beat that can't be laid on the other's: a long blend would clash, so a short one.
                 overlap = BeatMatch.CLASH_MS
@@ -376,6 +420,17 @@ object Crossfade {
      * "DJ Mix", "Continuous Mix". Its start and end already hold the neighbouring tracks blended in, so it's never
      * beat-matched: a third song laid over that clashes whatever the timing. Within its album it runs straight on.
      */
+    /** A filter fade's high-pass ends here: the old song thinned to its hats and vocals' top as it goes. */
+    const val FILTER_FADE_HZ = 2_500.0
+
+    /** Where in the blend each technique swaps the bass ([FadePlan.swapFrom], [FadePlan.swapTo]). */
+    fun swapSpan(t: Technique): Pair<Float, Float> = when (t) {
+        Technique.LONG_BLEND -> 0.375f to 0.625f  // the middle phrase of four: both basslines never meet
+        Technique.QUICK_SWAP -> 0f to 0.25f  // within the first bar of four
+        Technique.DROP_SWAP -> 0.875f to 1f  // the old song keeps its bass to the drop
+        else -> 0f to 0.5f
+    }
+
     fun continuousMix(song: Song): Boolean {
         val text = "${song.title} ${song.album}".lowercase(java.util.Locale.ROOT)
         return MIX_MARKS.any { it in text }
