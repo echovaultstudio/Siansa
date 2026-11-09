@@ -272,8 +272,8 @@ internal fun PlayButton(
                 change.consume()
                 // Where the finger is from the button's middle: only the way counts, and past the edge is fine.
                 val d = change.position - Offset(size.width / 2f, size.height / 2f)
-                // A DJ mix playing (issue #1033): up goes to the DJ mix bar on the seek bar. Once on it, the finger
-                // moves along it freely; it comes in as the finger rises, and going back down past halfway leaves it.
+                // Up goes to the DJ mix bar on the seek bar (issues #1033, #1035): it opens as soon as the finger heads up,
+                // and once the finger is on it, it moves along it freely; back down past halfway leaves it.
                 val places = bar
                 val up = -d.y
                 if (!places.isNullOrEmpty() && (onBar || (up > deadZone && up >= abs(d.x)))) {
@@ -376,12 +376,14 @@ internal fun SlideCoverLabel(label: SlideLabel?, modifier: Modifier = Modifier) 
         // On the DJ mix bar (issue #1033): the place under the finger, what letting go there does, and how.
         val bar = shown.bar
         val place = bar?.chosenSpot
-        val stopping = place == DjBarSpot.STOP
-        val icon = if (bar != null) place?.icon ?: SiansaIcons.Turntable else shown.slide.icon
-        val name = if (bar != null) place?.title ?: "Shape the mix" else shown.slide.label
+        val starting = bar?.starting == true
+        val stopping = place == DjBarSpot.MIX && !starting
+        val icon = if (bar != null) place?.icon(starting) ?: SiansaIcons.Turntable else shown.slide.icon
+        val name = if (bar != null) place?.title(starting) ?: (if (starting) "DJ mix" else "Shape the mix") else shown.slide.label
         val action = when {
             bar == null -> shown.why ?: if (ready) "Let go to start" else "Slide a little further"
             stopping -> "Let go to stop"
+            place != null && starting -> "Let go to start"
             place != null -> "Let go to reshape"
             else -> "Slide up onto the bar"
         }
@@ -431,7 +433,7 @@ internal fun SlideCoverLabel(label: SlideLabel?, modifier: Modifier = Modifier) 
                 if (place != null) {
                     androidx.compose.foundation.layout.Spacer(Modifier.size(Space.Small))
                     Text(
-                        place.hint,
+                        place.hint(starting),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = LABEL_HINT),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,

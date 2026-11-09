@@ -424,12 +424,12 @@ fun DjBarStyleScreen(nav: NavController) {
         actions = { TextButton(onClick = { save(DjBarSpot.default) }, enabled = order != DjBarSpot.default) { Text("Reset") } },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
-            StyleHint("While a DJ mix plays, slide up from the play button and the seek bar turns into this bar: let go on a place to stop the mix or give it that shape. Hold a row and drag it: top to bottom is left to right on the bar.")
+            StyleHint("Slide up from the play button and the seek bar opens into this bar: let go on a place to start a DJ mix, stop the one playing, or give it that shape. Hold a row and drag it: top to bottom is left to right on the bar.")
             ArrangeList(
                 order = order,
                 shown = order.toSet(),
-                label = { it.title },
-                icon = { it.icon },
+                label = { it.arrangeLabel },
+                icon = { it.icon(starting = true) },
                 key = { it.id },
                 canHide = { false },
                 canShowMore = false,
