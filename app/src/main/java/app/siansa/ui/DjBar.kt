@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -32,7 +33,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -193,12 +196,19 @@ private fun DjBarPlace(spot: DjBarSpot, chosen: Boolean, now: Boolean, modifier:
         // The whole name, never cut: a long one ("Wind down") gets a little smaller until it fits its place, with a little
         // room either side. Its line and largest size are set in dp, not sp: with the phone's font size up, the bar must
         // still fit the seek bar's room exactly, so nothing on the page moves (the cover shows the name large).
-        BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        // The name's row is exactly one line tall: a font's own padding made it 1.5 dp taller on the emulator.
+        BoxWithConstraints(Modifier.fillMaxWidth().height(DJ_NAME_LINE), contentAlignment = Alignment.Center) {
             val density = LocalDensity.current
             val weight = if (chosen || now) FontWeight.Bold else FontWeight.Medium
             val line = with(density) { DJ_NAME_LINE.toSp() }
             val largest = with(density) { DJ_NAME_SIZE.toSp() }
-            val style = MaterialTheme.typography.labelSmall.copy(fontWeight = weight, letterSpacing = 0.sp, lineHeight = line)
+            val style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = weight,
+                letterSpacing = 0.sp,
+                lineHeight = line,
+                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
+            )
             val room = with(density) { (maxWidth - Space.Tight).roundToPx() }
             val measurer = rememberTextMeasurer()
             val size = remember(spot.short, weight, room, style, largest) {
