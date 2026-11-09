@@ -1,6 +1,7 @@
 package app.siansa.ui
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -137,6 +138,32 @@ class DynamicAccentTest {
     fun tooFewPixelsKeepThePalettesColour() {
         val seed = Color(0xFFC1C069)
         assertTrue(DynamicAccent.vividOf(seed, pixels(5 to 0xFFE8E21E, 9000 to 0xFF000000)) == seed)
+    }
+
+    @Test
+    fun onAPageItStandsOutLightOrDark() {
+        // Issue #1028: album, artist and playlist pages, in the dark and the light theme, with a little of the cover's colour.
+        val pages = mapOf(
+            "dark" to pageBackdrop(Color(0xFF121212), Color(0xFF6A2E1E)),
+            "light" to pageBackdrop(Color(0xFFF7F7F7), Color(0xFF6A2E1E)),
+            "light, pale cover" to pageBackdrop(Color(0xFFFFFFFF), Color(0xFFE9E1CF)),
+        )
+        val seeds = covers.values.map { it.first } + Color(0xFF808080)
+        pages.forEach { (name, page) ->
+            seeds.forEach { seed ->
+                val c = DynamicAccent.of(seed, page)!!
+                assertTrue("$name, $seed: Play ${DynamicAccent.contrast(c.controls, page)}", DynamicAccent.contrast(c.controls, page) >= DynamicAccent.CONTROLS_CONTRAST)
+                assertTrue("$name, $seed: play symbol", DynamicAccent.contrast(c.onControls, c.controls) >= DynamicAccent.TEXT_CONTRAST)
+            }
+        }
+    }
+
+    @Test
+    fun aLightPageGetsADarkerColourOfTheSameHue() {
+        val page = pageBackdrop(Color(0xFFF7F7F7), Color(0xFF203440))
+        val c = DynamicAccent.of(Color(0xFF09A2E5), page)!!.controls
+        assertTrue("blue: $c", c.blue > c.red && c.blue > c.green)
+        assertTrue("darker than the page: $c", c.luminance() < page.luminance())
     }
 
     @Test

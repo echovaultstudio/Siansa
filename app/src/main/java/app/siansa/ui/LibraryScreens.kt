@@ -241,6 +241,8 @@ fun PlaylistScreen(nav: NavController, id: String) {
         nav = nav,
         title = d?.playlist?.name ?: "Playlist",
         color = rememberCoverColor(d?.playlist?.coverArt),
+        // Its buttons in the cover's colour, with Dynamic colours on pages (issue #1028).
+        coverId = d?.playlist?.coverArt,
         songs = d?.let { pl -> order?.map { pl.songs[it] } ?: pl.songs },
         error = (detail as? Load.Err)?.message,
         cover = { m -> Cover(d?.playlist?.coverArt, LARGE_COVER, m, RoundedCornerShape(6.dp)) },
@@ -333,6 +335,7 @@ fun AlbumScreen(nav: NavController, id: String) {
         nav = nav,
         title = d?.album?.name ?: "Album",
         color = rememberCoverColor(d?.album?.coverArt),
+        coverId = d?.album?.coverArt,
         songs = d?.songs,
         error = (detail as? Load.Err)?.message,
         numbered = true,
