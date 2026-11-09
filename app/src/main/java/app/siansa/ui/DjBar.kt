@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,10 +30,14 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.siansa.mix.MixShape
@@ -184,23 +190,39 @@ private fun DjBarPlace(spot: DjBarSpot, chosen: Boolean, now: Boolean, modifier:
                 Icon(spot.icon, null, tint = ink, modifier = Modifier.size(DJ_SPOT_ICON))
             }
         }
-        Text(
-            spot.short,
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 11.sp,
-            lineHeight = 12.sp,
-            fontWeight = if (chosen || now) FontWeight.Bold else FontWeight.Medium,
-            color = when {
-                chosen -> Color.White
-                now -> accent
-                else -> Color.White.copy(alpha = DJ_NAME_ALPHA)
-            },
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Space.Tight),
-        )
+        // The whole name, never cut: a long one ("Wind down", or any at a large font size) gets a little smaller until
+        // it fits its place, with a little room either side. The line stays as tall, so the bar's spacing never moves.
+        BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            val weight = if (chosen || now) FontWeight.Bold else FontWeight.Medium
+            val style = MaterialTheme.typography.labelSmall.copy(fontWeight = weight, letterSpacing = 0.sp, lineHeight = DJ_NAME_LINE)
+            val room = with(LocalDensity.current) { (maxWidth - Space.Tight).roundToPx() }
+            val measurer = rememberTextMeasurer()
+            val size = remember(spot.short, weight, room, style) { fittedSize(spot.short, style, room) { t, st -> measurer.measure(t, st, maxLines = 1, softWrap = false).size.width } }
+            Text(
+                spot.short,
+                style = style.copy(fontSize = size),
+                color = when {
+                    chosen -> Color.White
+                    now -> accent
+                    else -> Color.White.copy(alpha = DJ_NAME_ALPHA)
+                },
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+            )
+        }
     }
+}
+
+/**
+ * The largest name size from [DJ_NAME_SIZE] down to [DJ_NAME_SMALLEST] (half a point at a time) at which [text] in
+ * [style] is no wider than [roomPx], as [widthOf] measures it; the smallest when even that is too wide.
+ */
+internal fun fittedSize(text: String, style: TextStyle, roomPx: Int, widthOf: (String, TextStyle) -> Int): TextUnit {
+    var size = DJ_NAME_SIZE.value
+    while (size > DJ_NAME_SMALLEST.value && widthOf(text, style.copy(fontSize = size.sp)) > roomPx) size -= 0.5f
+    return size.coerceAtLeast(DJ_NAME_SMALLEST.value).sp
 }
 
 /** The bar's drawings: the energy's way over the next songs, as the mockup drew them, and a stop square. */
@@ -263,4 +285,8 @@ private const val DJ_BAR_GROW_FROM = 0.4f
 private const val DJ_SPOT_TINT = 0.12f
 private const val DJ_STOP_TINT = 0.2f
 private const val DJ_NAME_ALPHA = 0.72f
+private val DJ_NAME_SIZE = 11.sp
+private val DJ_NAME_SMALLEST = 8.sp
+/** One line of a name, whatever its size: 12 sp, so the bar is always as tall. */
+private val DJ_NAME_LINE = 12.sp
 private val DJ_STOP_INK = Color(0xFF141414)

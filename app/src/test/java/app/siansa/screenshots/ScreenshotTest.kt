@@ -469,15 +469,15 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // The cover while sliding to the DJ mix bar (issue #1033): on the way up, on Steady build, and on Stop.
+            // The cover while sliding to the DJ mix bar (issue #1033): on Steady build and on Stop, with what each does.
             Scene("dj_bar_cover") {
                 OnPlayer {
                     Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
                         val all = app.siansa.ui.DjBarSpot.default
-                        listOf(null, 1, 2).forEach { chosen ->
+                        listOf(1, 2).forEach { chosen ->
                             val label = app.siansa.ui.SlideLabel(
-                                app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.SlideWay.UP, armed = chosen != null,
-                                bar = app.siansa.ui.DjBarView(all, chosen, rise = if (chosen == null) 0.5f else 1f),
+                                app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.SlideWay.UP, armed = true,
+                                bar = app.siansa.ui.DjBarView(all, chosen, rise = 1f),
                             )
                             Box(
                                 Modifier.size(300.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))

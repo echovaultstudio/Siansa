@@ -64,4 +64,15 @@ class DjBarTest {
         MixShape.entries.forEach { shape -> assertEquals(shape, DjBarSpot.of(shape).shape) }
         assertNull(DjBarSpot.STOP.shape)
     }
+
+    @Test
+    fun aLongNameGetsSmallerUntilItFitsNeverCut() {
+        // A stand-in for measuring: each letter as wide as the font is big.
+        val widthOf = { text: String, style: androidx.compose.ui.text.TextStyle -> (text.length * style.fontSize.value).toInt() }
+        val style = androidx.compose.ui.text.TextStyle()
+        assertEquals(11f, fittedSize("Stop", style, 60, widthOf).value)
+        // "Wind down" is 9 letters: too wide for 60 even at 8, the smallest, so 8; with 90 of room, 10 fits.
+        assertEquals(8f, fittedSize("Wind down", style, 60, widthOf).value)
+        assertEquals(10f, fittedSize("Wind down", style, 90, widthOf).value)
+    }
 }
