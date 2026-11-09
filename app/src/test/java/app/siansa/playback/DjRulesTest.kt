@@ -20,7 +20,7 @@ class DjRulesTest {
     private val next = song.copy(id = "b", title = "Paraiso 94", albumId = "al2")
 
     private fun profile(id: String, outro: BeatEnd?, intro: BeatEnd?, tailMs: Long = 2_000, headMs: Long = 3_000) =
-        TrackProfile(id, -10.0, listOf(RampPoint(-18, tailMs)), listOf(RampPoint(-18, headMs)), 400_000, intro = intro, outro = outro)
+        TrackProfile(id, -10.0, listOf(RampPoint(-18, headMs)), listOf(RampPoint(-18, tailMs)), 400_000, intro = intro, outro = outro)
 
     private fun plan(out: BeatEnd?, into: BeatEnd?, tailMs: Long = 2_000, headMs: Long = 3_000, dj: Boolean = true) =
         Crossfade.plan(CrossfadeMode.SMART, 30_000, song, next, 400_000, 375_000,

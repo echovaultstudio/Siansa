@@ -204,9 +204,11 @@ class CrossfadePlanTest {
         assertEquals(0L, plan.gapMs)
         assertEquals(Crossfade.COLD_OUT_MS, plan.overlapMs)
         assertTrue(plan.why, plan.why.contains("no pause"))
-        // One side without a beat (Yor Zarad's 0.15 into a beat): the pause, as before.
+        // One side without a beat (Yor Zarad's 0.15 into a beat): outside DJ playback the pause, as before; in it, never
+        // a pause (the owner's bad blends, 9 Nov).
         val beatless = out.copy(outro = house.copy(rhythm = 0.15f, steady = 0.0f))
-        assertTrue(Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, beatless, inn, beatMatch = true)!!.gapMs > 0)
+        assertTrue(Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, beatless, inn, beatMatch = false)!!.gapMs > 0)
+        assertEquals(0L, Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, beatless, inn, beatMatch = true)!!.gapMs)
     }
 
     @Test fun aColdEndPausesLongerWhenTheTemposAreFarApart() {
