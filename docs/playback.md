@@ -73,7 +73,7 @@ How Smart decides:
   they don't overlap at all: the old song plays to its very last sound, then a short pause (0.4 seconds, 0.6 when
   their tempos are far apart), then the next song from its start, as a radio DJ plays a cold end. Both songs stay
   whole. When both songs keep a beat (dance music, a DJ radio), there's no pause: the next song starts right as the
-  old one's last sound ends, so the music doesn't stop. Only when both edges are hard: a soft ending or a soft start
+  old one's last sound ends, so the music doesn't stop. In DJ radio and DJ mixes there's never a pause. Only when both edges are hard: a soft ending or a soft start
   blends as above. A beat-matched DJ blend still
   comes first.
 - Most fades are shorter than 20 seconds, as the songs decide. The full 20 seconds is used for songs the plugin hasn't
@@ -127,13 +127,21 @@ blend them the way a DJ mixes:
     20 seconds.
   - **Echo out**: when the tempos are too far apart to match, the two never play together. The old song's last bar
     echoes out and it stops on the bar line; the next song drops in at full level on its first downbeat as it stops,
-    under the last faint repeats.
+    under the last faint repeats. Only into a song whose beat starts right away: one with an intro without a beat
+    slides in under the old song instead.
   - **Bass swap**, 16 bars: the usual. Never the same technique twice running when another fits as well.
   - Fixed always uses the bass swap over the bars set. The log says which was picked and why ("smart: …").
 - **Siansa Beats (Siansa Dev)**: each end of a song is read from where its beat locks onto its grid (the first and
   last 4 bars it all keeps to). A blend stays inside that, and an end needs 80 % of its beats on the grid there to be
-  beat-matched. A track cut from a mixed CD carries the DJ's own changeovers at its ends: its blends are laid inside
-  its lock and kept to 8 bars, and without a lock it gets a short blend.
+  beat-matched, and 80 % of them sitting on the grid. A track cut from a mixed CD carries the DJ's own changeovers at
+  its ends: its blends are laid inside its lock and kept to 8 bars, and without a lock it gets a short blend.
+  - Two songs are beat-matched only when Siansa Beats has a grid for both (or, without Siansa Beats, the plugin's
+    readings for both): one with a grid and one without gets a short blend, never the two readings laid on each other.
+  - A song whose beat comes in more than 8 seconds into it (an ambient intro) isn't beat-matched from there, which
+    would skip its intro: it slides in under the old song from its start, and the old song is gone a bar before
+    its beat comes in.
+  - Siansa Dev asks for a song's readings again after half an hour when Siansa Beats hadn't analysed it yet, so a
+    song analysed since is blended on its grid.
 
 In DJ playback, a blend where one end has no beat at all (a beatless
 intro, an ambient outro) runs the whole crossfade length: there's nothing to clash with, so the next song comes in

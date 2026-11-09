@@ -124,10 +124,15 @@ object Crossfade {
      * gap in the music (0.52.0-dev, 20:15: house and drum and bass in a DJ radio had 0.4 to 0.6 s of silence between
      * songs). The next song starts right as the old one's last sound ends, still without overlap.
      */
-    fun coldEnd(tailMs: Long, headMs: Long, cutMs: Long, outBpm: Double?, inBpm: Double?, bothBeat: Boolean = false): FadePlan? {
+    fun coldEnd(tailMs: Long, headMs: Long, cutMs: Long, outBpm: Double?, inBpm: Double?, bothBeat: Boolean = false, dj: Boolean = false): FadePlan? {
         if (tailMs >= COLD_TAIL_MS || headMs >= COLD_HEAD_MS) return null
-        val gap = if (bothBeat) 0L else coldGap(outBpm, inBpm)
-        val then = if (bothBeat) "then the next song straight on (both keep a beat, so no pause)" else "then a ${gap} ms pause"
+        // In DJ playback, never a pause (the owner's bad blends, 9 Nov: a pause in a mix sounds like a dropout).
+        val gap = if (bothBeat || dj) 0L else coldGap(outBpm, inBpm)
+        val then = when {
+            bothBeat -> "then the next song straight on (both keep a beat, so no pause)"
+            dj -> "then the next song straight on (a DJ mix never pauses)"
+            else -> "then a ${gap} ms pause"
+        }
         return FadePlan(
             overlapMs = tailMs.coerceAtLeast(COLD_OUT_MS),
             fadeInMs = MIN_FADE_IN_MS,
@@ -307,8 +312,14 @@ object Crossfade {
         // Where the plugin found no bars or phrases, a track made on a grid has them assumed from its first beat (issue #820).
         val outro = currentProfile?.outro?.let { BeatMatch.assumedGrid(currentProfile.intro?.let(BeatMatch::gridded), BeatMatch.gridded(it)) }
         val intro = nextProfile?.intro?.let { BeatMatch.assumedIntro(BeatMatch.gridded(it)) }
+        // A next song whose beat locks in late (an ambient intro, Siansa Beats): it starts without a beat, so it isn't
+        // beat-matched (that would skip its intro) and can't clash until its beat comes in; it slides in under the old
+        // song as a beatless intro does. A track off a mixed CD is different: before its lock is the DJ's last record.
+        val nextMixTrack = continuousMix(next) || nextProfile?.mixTrack == true
+        val lateStart = !nextMixTrack && BeatMatch.startsLate(intro)
+        val startIntro = if (lateStart) intro?.copy(rhythm = 0f) else intro
         // Both ends keep a beat (steady or not): unless laid beat on beat, a long blend clashes (issue #796).
-        val rhythmic = mode == CrossfadeMode.SMART && BeatMatch.wouldClash(outro, intro)
+        val rhythmic = mode == CrossfadeMode.SMART && BeatMatch.wouldClash(outro, startIntro)
         // Beat-matched (issue #646): a DJ blend over whole bars, beat on beat, when both ends have a steady beat;
         // a quiet, steady intro with clear bars is laid on the beat too (issue #759), but doesn't count as a clash.
         // A track of a continuous mix already blends into its neighbours (issue #807): a third song laid over it clashes.
@@ -320,7 +331,9 @@ object Crossfade {
         // Fixed beat-matches too, in DJ playback, with the listener's bars (the owner, 9 Nov).
         val beatMode = mode == CrossfadeMode.SMART || (mode == CrossfadeMode.FIXED && beatMatch)
         val mixed = beatMode && (currentMix || nextMix) && !(beatMatch && insideLock)
-        val matchable = beatMode && !mixed && outro?.matchable == true && intro?.matchableAsIntro == true
+        // Siansa Beats' grid at one end and not the other: never beat-matched (the owner's bad blends, 9 Nov).
+        val matchable = beatMode && !mixed && !lateStart && !BeatMatch.halfKnown(outro, intro) &&
+            outro?.matchable == true && intro?.matchableAsIntro == true
         // The song going out is let go where its lock ends, when that's before its end (the DJ's next record follows).
         val songEnd = currentDurationMs - cut
         val endMs = outro?.lockEndMs?.toLong()?.takeIf { it in 1 until songEnd } ?: songEnd
@@ -354,10 +367,10 @@ object Crossfade {
         if (mode == CrossfadeMode.SMART && matched == null && !mixed && currentProfile != null && nextProfile != null) {
             val tail = ((currentProfile.quietForLastMs(QUIET_DB) ?: 0L) - cut).coerceAtLeast(0L)
             val head = nextProfile.reachesAfterMs(QUIET_DB) ?: 0L
-            val djLong = beatMatch && !rhythmic && (BeatMatch.beatless(outro) || BeatMatch.beatless(intro)) &&
-                beatlessRunsLong(BeatMatch.beatless(outro), BeatMatch.beatless(intro), tail, head)
+            val djLong = beatMatch && !rhythmic && (BeatMatch.beatless(outro) || BeatMatch.beatless(startIntro)) &&
+                beatlessRunsLong(BeatMatch.beatless(outro), BeatMatch.beatless(startIntro), tail, head)
             if (!djLong) {
-                coldEnd(tail, head, cut, outro?.bpm, intro?.bpm, bothBeat = BeatMatch.someBeat(outro) && BeatMatch.someBeat(intro))?.let { cold ->
+                coldEnd(tail, head, cut, outro?.bpm, intro?.bpm, bothBeat = BeatMatch.someBeat(outro) && BeatMatch.someBeat(startIntro), dj = beatMatch)?.let { cold ->
                     val note = if (outro != null || intro != null) BeatMatch.note(outro, intro, beatMatch) else null
                     return cold.copy(why = cold.why + (cutWhy?.let { " · $it" } ?: ""), beatNote = note)
                 }
@@ -381,20 +394,28 @@ object Crossfade {
                 overlap = BeatMatch.CLASH_MS
                 why += " · a continuous mix, so a short blend" + notStraightOn(current, next)
             } else if (beatMatch && rhythmic && speed == null && outro != null && outro.bpm > 0 && outro.lockMs != null) {
-                echoOut(outro, intro, currentDurationMs, cut)?.let { return@run it }
+                echoOut(outro, startIntro, currentDurationMs, cut)?.let { return@run it }
                 overlap = BeatMatch.CLASH_MS
                 why += " · beats would clash, so a short blend"
             } else if (rhythmic && overlap > BeatMatch.CLASH_MS) {
                 // Both ends keep a beat that can't be laid on the other's: a long blend would clash, so a short one.
                 overlap = BeatMatch.CLASH_MS
                 why += " · beats would clash, so a short blend"
-            } else if (beatMatch && !rhythmic && !mixed && overlap < maxMs && (BeatMatch.beatless(outro) || BeatMatch.beatless(intro))) {
-                if (beatlessRunsLong(BeatMatch.beatless(outro), BeatMatch.beatless(intro), tail, head)) {
+            } else if (beatMatch && !rhythmic && !mixed && overlap < maxMs && (BeatMatch.beatless(outro) || BeatMatch.beatless(startIntro))) {
+                if (beatlessRunsLong(BeatMatch.beatless(outro), BeatMatch.beatless(startIntro), tail, head)) {
                     // A DJ blend where one end has no beat at all (0.52.0-dev: a beatless intro under a beat-driven
                     // outro got 3.3 s with 30 s set): nothing to clash with, so it runs the whole crossfade length, as
                     // a DJ brings a quiet intro in under the old song. The next song fades in over the first half of it.
                     overlap = maxMs
                     why += " · DJ: one end has no beat, nothing to clash, so the whole crossfade length"
+                    // An intro whose beat comes in later: the old song is gone a bar before it does, so they never clash.
+                    if (lateStart && !BeatMatch.beatless(outro) && intro != null) {
+                        val before = (intro.lockMs!! - intro.beatLengthMs * BeatMatch.BEATS_PER_BAR).toLong()
+                        if (before < overlap) {
+                            overlap = before.coerceAtLeast(BEATLESS_LOUD_MS)
+                            why += ", gone a bar before the next song's beat comes in (%.1f s)".format(java.util.Locale.ROOT, intro.lockMs / 1000.0)
+                        }
+                    }
                     // The old song without a beat at its end: the next one builds up under it to its first change.
                     if (BeatMatch.beatless(outro) && tail >= QUIET_BUILD_MS) {
                         val build = buildMs(nextProfile, overlap)
@@ -407,7 +428,7 @@ object Crossfade {
                 // two folk songs overlapped for 15 s): no clash, but a long blend cuts the song short. A short one.
                 overlap = overlap.coerceAtLeast(BEATLESS_LOUD_MS).coerceAtMost(maxMs)
                 why += " · DJ: no beat to clash, but the song going out is still going, so a short blend"
-            } else if (beatMatch && !rhythmic && !mixed && overlap > BeatMatch.CLASH_MS && BeatMatch.someBeat(outro) && BeatMatch.someBeat(intro)) {
+            } else if (beatMatch && !rhythmic && !mixed && overlap > BeatMatch.CLASH_MS && BeatMatch.someBeat(outro) && BeatMatch.someBeat(startIntro)) {
                 // Both ends have some beat, one just short of beat-driven (0.52.0-dev: a house remix's outro read
                 // 0.46 into Cubicolor's beat ran 30 s out of step): a long blend would clash, so a short one.
                 overlap = BeatMatch.CLASH_MS

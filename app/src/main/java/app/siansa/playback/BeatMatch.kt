@@ -32,6 +32,17 @@ object BeatMatch {
     const val MIN_RHYTHM = 0.5f
     /** With Siansa Beats' lock, the rhythm is measured inside it and has to reach this (the owner, 9 Nov). */
     const val MIN_LOCKED_RHYTHM = 0.8f
+    /**
+     * With Siansa Beats' lock, the share of the end's beats on its grid has to reach this too (the owner's bad blends,
+     * 9 Nov: Nomansland's outro, 74 % on its grid, flammed in a 4-bar swap).
+     */
+    const val MIN_LOCKED_STEADY = 0.8f
+    /**
+     * A next song whose beat locks in further than this into it starts without its beat (an ambient intro): nothing
+     * to drop in on, nothing to clash with until then (the owner's bad blends: an echo out "dropped" Snowflake, whose
+     * beat comes in at 1:37).
+     */
+    const val LATE_LOCK_MS = 8_000.0
     /** A blend into or out of a track cut from a mixed CD is kept to this many bars, inside its lock. */
     const val MIX_TRACK_BARS = 8
     /** …and steady enough at this [BeatEnd.steady]. */
@@ -155,6 +166,17 @@ object BeatMatch {
     const val ASSUMED_PHRASE_BARS = 8
 
     /** Both ends are beat-driven and steady: a blend between them either keeps the beats in step or clashes. */
+    /**
+     * Siansa Beats has a grid for one song but not the other (the owner's bad blends, 9 Nov): the other's beat is the
+     * plugin's own older reading, or a song Siansa Beats found isn't at one tempo, and laid against a Siansa Beats grid
+     * it drifted (Palermo at 123 against 125 BPM, 32 s). Such a pair is never beat-matched.
+     */
+    fun halfKnown(outgoing: BeatEnd?, incoming: BeatEnd?): Boolean =
+        (outgoing?.lockMs != null) != (incoming?.lockMs != null)
+
+    /** The next song's beat locks in only after [LATE_LOCK_MS]: it starts without its beat ([LATE_LOCK_MS]). */
+    fun startsLate(incoming: BeatEnd?): Boolean = (incoming?.lockMs ?: 0.0) > LATE_LOCK_MS
+
     fun bothRhythmic(outgoing: BeatEnd?, incoming: BeatEnd?): Boolean = outgoing?.matchable == true && incoming?.matchable == true
 
     /**
@@ -299,6 +321,7 @@ object BeatMatch {
         val reason = when {
             outgoing == null -> "the plugin hasn't measured the beat at the end of the song going out"
             incoming == null -> "the plugin hasn't measured the beat at the start of the next song"
+            halfKnown(outgoing, incoming) -> "Siansa Beats has no grid for ${if (outgoing.lockMs == null) "the song going out" else "the next song"} (not at one tempo, or not analysed yet)"
             !outgoing.matchable -> "the end of the song going out isn't beat-driven and steady enough"
             !incoming.matchableAsIntro -> "the start of the next song isn't beat-driven and steady enough" +
                 (if (incoming.steady >= MIN_STEADY && incoming.barMs == null) " (steady, but its bars aren't clear)" else "")

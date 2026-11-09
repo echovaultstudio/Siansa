@@ -498,6 +498,17 @@ class ProfileStoreTest {
         assertEquals(2, asked.size)
     }
 
+    @Test fun aProfileWithoutSiansaBeatsIsFetchedAgainLater() = runBlocking {
+        // The owner's bad blend #1: a profile fetched before Siansa Beats had the song was kept all morning.
+        store.fetch(listOf("a"))
+        store.fetch(listOf("a"))
+        assertEquals(1, asked.size)
+        time += ProfileStore.RETRY_MISSING_MS + 1
+        store.fetch(listOf("a"))
+        assertEquals(2, asked.size)
+        assertNotNull(store.cached("a"))  // kept meanwhile, and after
+    }
+
     @Test fun aFailingPluginIsLeftAloneForAWhile() = runBlocking {
         reply = { throw ApiException("AudioMuse answered HTTP 404: not found") }
         assertTrue(store.fetch(listOf("a")).isEmpty())

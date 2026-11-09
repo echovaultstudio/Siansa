@@ -76,7 +76,8 @@ data class BeatEnd(
     val phraseLengthMs: Double? get() = phraseBars?.let { it * BeatMatch.BEATS_PER_BAR * beatLengthMs }
 
     /** A beat-driven, steady end: one a blend can be laid on, beat for beat. */
-    val matchable: Boolean get() = bpm > 0 && rhythm >= minRhythm && (steady >= BeatMatch.MIN_STEADY || grid)
+    val matchable: Boolean get() = bpm > 0 && rhythm >= minRhythm &&
+        (if (lockMs != null) steady >= BeatMatch.MIN_LOCKED_STEADY else steady >= BeatMatch.MIN_STEADY || grid)
 
     /**
      * As the start of the next song (issue #759): a quiet build-up that keeps a steady beat with clear bars can be
@@ -144,6 +145,9 @@ data class TrackProfile(
     val key: String? = null,
     val scale: String? = null,
 ) {
+    /** Siansa Beats has its grid for this song (a lock at either end), not only the plugin's own reading. */
+    val fromBeats: Boolean get() = intro?.lockMs != null || outro?.lockMs != null
+
     /** How long after the start the song first gets up to [db] (relative), or null if it never does. */
     fun reachesAfterMs(db: Int): Long? = startRamp.firstOrNull { it.db >= db }?.ms
 

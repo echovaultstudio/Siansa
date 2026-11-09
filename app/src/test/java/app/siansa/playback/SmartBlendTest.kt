@@ -57,7 +57,7 @@ class SmartBlendTest {
         // The beat last locks on the bar from 290 s (ends 291.875 s); the DJ's next record plays after it.
         val locked = outro.copy(beatMs = 290_000.0, barMs = 290_000.0, lockMs = 290_000.0)
         val plan = Crossfade.plan(CrossfadeMode.SMART, 20_000, song, next, 310_000, 300_000,
-            profile("a", locked, null), profile("b", null, intro), beatMatch = true)!!
+            profile("a", locked, null), profile("b", null, intro.copy(lockMs = 1_000.0)), beatMatch = true)!!
         assertNotNull(plan.beat)
         val end = 310_000 - plan.cutMs
         assertEquals(291_875.0, end.toDouble(), 2.0)

@@ -31,6 +31,8 @@ class ProfileStore(
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, TrackProfile>?) = size > MAX_CACHED
     }
     private val missingUntil = HashMap<String, Long>()
+    /** When each cached profile is to be asked for again ([refreshAfter]). */
+    private val freshUntil = HashMap<String, Long>()
     private var backOffUntil = 0L
     private val fetching = Mutex()
 
@@ -54,7 +56,9 @@ class ProfileStore(
             val time = now()
             val need = synchronized(lock) {
                 if (time < backOffUntil) emptyList()
-                else ids.distinct().filter { it !in cache && (missingUntil[it] ?: 0L) <= time }
+                else ids.distinct().filter {
+                    (it !in cache || (freshUntil[it] ?: 0L) <= time) && (missingUntil[it] ?: 0L) <= time
+                }
             }
             if (need.isNotEmpty()) {
                 val base = settings().audioMuseUrl + PluginProfiles.PATH
@@ -87,7 +91,11 @@ class ProfileStore(
         val profiles = PluginProfiles.parse(answer)
         val time = now()
         synchronized(lock) {
-            profiles.forEach { cache[it.trackId] = it }
+            profiles.forEach {
+                cache[it.trackId] = it
+                freshUntil[it.trackId] = time + refreshAfter(it)
+            }
+            if (freshUntil.size > 2 * MAX_CACHED) freshUntil.keys.retainAll(cache.keys)
             val found = profiles.mapTo(HashSet()) { it.trackId }
             batch.filter { it !in found }.forEach { missingUntil[it] = time + RETRY_MISSING_MS }
             if (missingUntil.size > MAX_CACHED) missingUntil.entries.removeAll { it.value <= time }
@@ -146,6 +154,15 @@ class ProfileStore(
         val PLUGIN_NAMES = setOf(PLUGIN_NAME)
         const val HEALTH_PATH = "/plugins/siansa_beats/api/health"
         const val MAX_CACHED = 3_000
+
+        /**
+         * How long a profile is kept before it's asked for again. One without Siansa Beats' grid ([TrackProfile.fromBeats])
+         * is asked for again after [RETRY_MISSING_MS], as Siansa Beats may have analysed the song since (the owner's bad
+         * blends, 9 Nov: India in Me was blended on a profile fetched before Siansa Beats had it, kept all morning);
+         * one with it after [REFRESH_MS], in case it was worked out again.
+         */
+        fun refreshAfter(profile: TrackProfile): Long = if (profile.fromBeats) REFRESH_MS else RETRY_MISSING_MS
+        const val REFRESH_MS = 6 * 60 * 60_000L
         const val RETRY_MISSING_MS = 30 * 60_000L
         const val BACK_OFF_MS = 5 * 60_000L
 
