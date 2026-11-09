@@ -10,16 +10,19 @@ Siansa is **open source** under the GNU GPL, version 3 or later ([LICENSE](LICEN
 
 ## Get Siansa
 
+**Help bring Siansa to Google Play, free for everyone.** Before a new developer can publish an app for everyone, Google
+asks for a closed test: 12 testers who keep it installed for 14 days in a row. Siansa isn't there yet, so every tester
+counts. Joining takes a minute: [ask for a place](https://siansa.app/#join) and the steps follow.
+
 <p align="center">
-<a href="https://siansa.app/fdroid/repo"><img src="docs/brand/get-fdroid.svg" alt="Get it on F-Droid" width="220" height="66"></a>
-&nbsp;
 <a href="https://siansa.app/#join"><img src="docs/brand/play-beta.svg" alt="Join the test on Google Play" width="220" height="66"></a>
+&nbsp;
+<a href="https://siansa.app/fdroid/repo"><img src="docs/brand/get-fdroid.svg" alt="Get it on F-Droid" width="140" height="42"></a>
 </p>
 
-- **F-Droid**, open to everyone, no sign-up: in the F-Droid app, go to **Settings › Repositories › +** and add
-  `https://siansa.app/fdroid/repo`, then search for Siansa.
-- **Google Play**: a closed test for now, as Google asks of new apps (12 testers for 14 days before it opens to
-  everyone). [Ask for a place](https://siansa.app/#join) and we'll add your Google account.
+- **Google Play**: the closed test above. Siansa updates on its own, and your feedback shapes the app.
+- **F-Droid**, open to everyone, no sign-up, if you'd rather not use Google Play: in the F-Droid app, go to
+  **Settings › Repositories › +** and add `https://siansa.app/fdroid/repo`, then search for Siansa.
 - **On your TV**: Siansa for Android TV and Google TV, in beta. See [Siansa on your TV](docs/tv.md).
 
 More in the [install guide](docs/testing.md).
