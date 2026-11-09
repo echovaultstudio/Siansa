@@ -129,7 +129,7 @@ fun CrossfadeScreen(nav: NavController) {
                 Hint(levellingHint(settings))
             }
             HorizontalDivider()
-            FoldSection("Crossfade", crossfadeSummary(settings)) {
+            FoldSection("Crossfade", crossfadeFoldSummary(settings)) {
                 CrossfadeModeRow(settings.crossfade) { graph.settings.setCrossfade(mode = it) }
                 Hint(crossfadeHint(settings))
                 // Smart decides every change; only Fixed has a length and bars to set (the owner, 9 Nov).
@@ -174,7 +174,7 @@ internal fun crossfadeLengthHint(s: AppSettings): String? =
         if (s.beatMatch != BeatMatchMode.OFF) " and for a quiet intro without a beat in DJ blends." else "."
 
 /** The section's summary: Smart has nothing to set; Fixed says its length and bars. */
-internal fun crossfadeSummary(s: AppSettings): String = when (s.crossfade) {
+internal fun crossfadeFoldSummary(s: AppSettings): String = when (s.crossfade) {
     CrossfadeMode.OFF -> "Off"
     CrossfadeMode.SMART -> "Smart"
     CrossfadeMode.FIXED -> "Fixed · ${s.crossfadeSeconds} s" + if (s.loudnessSource == LoudnessSource.PLUGIN) " · ${s.blendBars} bars" else ""
