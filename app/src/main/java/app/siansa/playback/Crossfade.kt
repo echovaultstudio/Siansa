@@ -235,7 +235,8 @@ object Crossfade {
         blendBars: Int = BeatMatch.BAR_CHOICES[1],
     ): FadePlan? {
         if (mode == CrossfadeMode.OFF || maxMs <= 0) return null
-        if (mode == CrossfadeMode.SMART && runsStraightOn(current, next)) return null
+        // An album playing in order stays gapless, Smart or Fixed (the owner, 9 Nov).
+        if (runsStraightOn(current, next)) return null
 
         // Smart: the dead air and the long fade-out at the end are left out first (issue #628); the blend is planned
         // from the song's new end.
@@ -253,10 +254,21 @@ object Crossfade {
         // Beat-matched (issue #646): a DJ blend over whole bars, beat on beat, when both ends have a steady beat;
         // a quiet, steady intro with clear bars is laid on the beat too (issue #759), but doesn't count as a clash.
         // A track of a continuous mix already blends into its neighbours (issue #807): a third song laid over it clashes.
-        val mixed = mode == CrossfadeMode.SMART && (continuousMix(current) || continuousMix(next))
-        val matchable = mode == CrossfadeMode.SMART && !mixed && outro?.matchable == true && intro?.matchableAsIntro == true
+        // Siansa Dev: a track Siansa Beats found cut from a mixed CD counts too; with its lock known, a DJ blend is laid
+        // inside it, kept short (the owner, 9 Nov), rather than never beat-matched.
+        val currentMix = continuousMix(current) || currentProfile?.mixTrack == true
+        val nextMix = continuousMix(next) || nextProfile?.mixTrack == true
+        val insideLock = (!currentMix || outro?.lockMs != null) && (!nextMix || intro?.lockMs != null)
+        // Fixed beat-matches too, in DJ playback, with the listener's bars (the owner, 9 Nov).
+        val beatMode = mode == CrossfadeMode.SMART || (mode == CrossfadeMode.FIXED && beatMatch)
+        val mixed = beatMode && (currentMix || nextMix) && !(beatMatch && insideLock)
+        val matchable = beatMode && !mixed && outro?.matchable == true && intro?.matchableAsIntro == true
+        // The song going out is let go where its lock ends, when that's before its end (the DJ's next record follows).
+        val songEnd = currentDurationMs - cut
+        val endMs = outro?.lockEndMs?.toLong()?.takeIf { it in 1 until songEnd } ?: songEnd
         val matched = if (matchable && beatMatch && currentDurationMs > 0) {
-            BeatMatch.plan(outro!!, intro!!, currentDurationMs - cut, BeatMatch.maxMsFor(outro, BeatMatch.barsFor(outro, intro, blendBars)))
+            val bars = BeatMatch.barsFor(outro!!, intro!!, blendBars).let { if (currentMix || nextMix) minOf(it, BeatMatch.MIX_TRACK_BARS) else it }
+            BeatMatch.plan(outro, intro, endMs, BeatMatch.maxMsFor(outro, bars))
         } else null
         // A cold end: a hard ending into a hard start never overlaps (both songs' edges loud), unless it's laid beat on
         // beat, or it's a DJ blend that brings a beatless song in under the other for the whole crossfade length.
@@ -274,13 +286,15 @@ object Crossfade {
         }
         var plan = if (matched != null) {
             // A phrase-on-phrase blend may let the song go at the end of its last phrase (issue #757).
-            FadePlan(matched.overlapMs, matched.overlapMs, matched.why, cut + matched.cutMs, matched)
+            val lockCut = songEnd - endMs
+            FadePlan(matched.overlapMs, matched.overlapMs, matched.why + (if (lockCut > 0) ", let go where its beat stops locking (%.1f s before its end)".format(java.util.Locale.ROOT, (lockCut + cut) / 1000.0) else ""),
+                cut + lockCut + matched.cutMs, matched)
         } else if (mode == CrossfadeMode.SMART && currentProfile != null && nextProfile != null) run {
             val tail = ((currentProfile.quietForLastMs(QUIET_DB) ?: 0L) - cut).coerceAtLeast(0L)
             val head = nextProfile.reachesAfterMs(QUIET_DB) ?: 0L
             var overlap = (tail + head).coerceAtMost(maxMs)
             var why = "smart: ${tail} ms tail + ${head} ms intro"
-            if (mixed && rhythmic) {
+            if ((mixed || currentMix || nextMix) && rhythmic) {
                 // A continuous mix can't be laid on a beat, and a cut into or out of one is heard: a short blend (issue #807).
                 overlap = BeatMatch.CLASH_MS
                 why += " · a continuous mix, so a short blend" + notStraightOn(current, next)
@@ -321,7 +335,7 @@ object Crossfade {
             val note = BeatMatch.note(outro, intro, beatMatch)
             plan = plan.copy(
                 beatNote = when {
-                    mixed && !note.contains("not beat-matched") -> "$note · not beat-matched: ${if (continuousMix(current)) "the song going out" else "the next song"} is part of a continuous mix"
+                    mixed && !note.contains("not beat-matched") -> "$note · not beat-matched: ${if (currentMix) "the song going out" else "the next song"} is part of a continuous mix"
                     matched == null && matchable && beatMatch && !note.contains("not beat-matched") -> "$note · not beat-matched: not even one bar fits before the song's end"
                     else -> note
                 },

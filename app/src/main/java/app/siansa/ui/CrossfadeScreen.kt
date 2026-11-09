@@ -129,31 +129,23 @@ fun CrossfadeScreen(nav: NavController) {
                 Hint(levellingHint(settings))
             }
             HorizontalDivider()
-            val crossfadeSummary = if (settings.crossfade == CrossfadeMode.OFF) "Off" else "${settings.crossfade.label} · ${settings.crossfadeSeconds} s"
-            FoldSection("Crossfade", crossfadeSummary) {
+            FoldSection("Crossfade", crossfadeSummary(settings)) {
                 CrossfadeModeRow(settings.crossfade) { graph.settings.setCrossfade(mode = it) }
                 Hint(crossfadeHint(settings))
-                if (settings.crossfade != CrossfadeMode.OFF) {
-                    CrossfadeLengthRow(settings.crossfadeSeconds, smart = settings.crossfade == CrossfadeMode.SMART) {
+                // Smart decides every change; only Fixed has a length and bars to set (the owner, 9 Nov).
+                if (settings.crossfade == CrossfadeMode.FIXED) {
+                    CrossfadeLengthRow(settings.crossfadeSeconds, smart = false) {
                         graph.settings.setCrossfade(seconds = it)
                     }
-                    crossfadeLengthHint(settings)?.let { Hint(it) }
+                    if (settings.loudnessSource == LoudnessSource.PLUGIN) {
+                        FixedBlendBars(settings.blendBars, graph.settings::setBlendBars)
+                    }
+                }
+                if (settings.crossfade != CrossfadeMode.OFF) {
                     Hint(
                         // The TV app plays on the TV itself and has no sleep timer (issue #860).
                         if (app.siansa.BuildConfig.TV_APP) "Not used with Repeat one, or for Dolby and DTS songs sent to your receiver."
                         else "Only on this phone: on a TV or speaker, songs play back to back. Not used with Repeat one, or while the sleep timer lets a song finish.",
-                    )
-                }
-            }
-            if (settings.crossfade == CrossfadeMode.SMART && settings.loudnessSource == LoudnessSource.PLUGIN) {
-                HorizontalDivider()
-                val blendSummary = if (settings.beatMatch == BeatMatchMode.OFF) "Off" else "${settings.beatMatch.label} · ${settings.blendBars} bars" +
-                    (if (settings.bassSwap) " · bass swap" else "") + (if (AppSettings.BLEND_EXTRAS && settings.echoTail) " · echo" else "")
-                FoldSection("Beat-matched blends", blendSummary, tag = "beat-matched-blends") {
-                    BeatMatchSection(
-                        settings.beatMatch, settings.blendBars, settings.echoTail, settings.bassSwap, settings.keepKey,
-                        graph.settings::setBeatMatch, graph.settings::setBlendBars, graph.settings::setEchoTail, graph.settings::setBassSwap,
-                        graph.settings::setKeepKey,
                     )
                 }
             }
@@ -181,14 +173,35 @@ internal fun crossfadeLengthHint(s: AppSettings): String? =
     else "The longest a fade can be. Most are shorter: the songs decide. The full length is used for songs not measured yet" +
         if (s.beatMatch != BeatMatchMode.OFF) " and for a quiet intro without a beat in DJ blends." else "."
 
-private fun crossfadeHint(s: AppSettings): String = when (s.crossfade) {
+/** The section's summary: Smart has nothing to set; Fixed says its length and bars. */
+internal fun crossfadeSummary(s: AppSettings): String = when (s.crossfade) {
+    CrossfadeMode.OFF -> "Off"
+    CrossfadeMode.SMART -> "Smart"
+    CrossfadeMode.FIXED -> "Fixed · ${s.crossfadeSeconds} s" + if (s.loudnessSource == LoudnessSource.PLUGIN) " · ${s.blendBars} bars" else ""
+}
+
+internal fun crossfadeHint(s: AppSettings): String = when (s.crossfade) {
     CrossfadeMode.OFF -> "Songs play back to back, with no gap."
-    CrossfadeMode.FIXED -> "Each song fades into the next over the length below."
-    CrossfadeMode.SMART -> "Songs on one album that run straight on stay gapless. " + if (s.loudnessSource == LoudnessSource.PLUGIN) {
-        "Other fades start where a song goes quiet and last as long as the two songs need, up to the length below."
+    CrossfadeMode.FIXED -> "Each song fades into the next over the length below. An album playing in order stays gapless." +
+        if (s.loudnessSource == LoudnessSource.PLUGIN) " In DJ radio and DJ mixes, songs that keep a beat blend beat on beat over the bars below, the bass swapped halfway." else ""
+    CrossfadeMode.SMART -> "The phone decides every change. An album playing in order stays gapless. " + if (s.loudnessSource == LoudnessSource.PLUGIN) {
+        "Other fades start where a song goes quiet and last as long as the two songs need. In DJ radio and DJ mixes, " +
+            "songs that keep a beat blend beat on beat, phrase on phrase, with the next song a touch faster or slower to match."
     } else {
-        "Other fades use the length below; with the Siansa plugin they follow how each song ends and starts."
+        "With the Siansa plugin, fades follow how each song ends and starts, and DJ radio blends beat on beat."
     }
+}
+
+/** Fixed's blend length in DJ playback (the owner, 9 Nov). */
+@Composable
+internal fun FixedBlendBars(bars: Int, onBars: (Int) -> Unit) {
+    Text("Blend length in DJ radio and DJ mixes", style = MaterialTheme.typography.bodyLarge)
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        AppSettings.BLEND_BAR_CHOICES.forEach { n ->
+            FilterChip(selected = bars == n, onClick = { onBars(n) }, label = { Text("$n bars") })
+        }
+    }
+    Hint("8 bars is about 15 seconds at 128 BPM. A blend never takes more than a third of a song.")
 }
 
 /** The beat-matched blends' choice, its hint, the echo at the end (issue #759), the bass swap (issue #807) and keeping the key (issue #816), for the page and its screenshot. */

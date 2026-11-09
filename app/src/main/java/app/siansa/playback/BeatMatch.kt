@@ -30,6 +30,10 @@ enum class BeatMatchMode(val label: String) {
 object BeatMatch {
     /** An end is beat-driven enough to match to at this [BeatEnd.rhythm]… */
     const val MIN_RHYTHM = 0.5f
+    /** With Siansa Beats' lock, the rhythm is measured inside it and has to reach this (the owner, 9 Nov). */
+    const val MIN_LOCKED_RHYTHM = 0.8f
+    /** A blend into or out of a track cut from a mixed CD is kept to this many bars, inside its lock. */
+    const val MIX_TRACK_BARS = 8
     /** …and steady enough at this [BeatEnd.steady]. */
     const val MIN_STEADY = 0.5f
     /** A song is played at most this much faster or slower to match (DJ decks go to ±8 %). */

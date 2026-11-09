@@ -181,6 +181,10 @@ class AudioMuseApi(
         return executeElement { request(path, songIdsIn(pathAndQuery)).get().build() }
     }
 
+    /** POSTs [body] (JSON) to a plugin's [path] on the AudioMuse server (Siansa Dev's bad blends). */
+    suspend fun pluginPost(path: String, body: String): JsonElement =
+        executeElement { request(path).post(body.toRequestBody(JSON_TYPE)).build() }
+
     /** Per AudioMuse address: whether only the plugin's earlier version (before the rename, issue #360) is installed. */
     private val legacyPlugin = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
 

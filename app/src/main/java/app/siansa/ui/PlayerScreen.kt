@@ -354,6 +354,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
 
                         Box(Modifier.weight(1f).fillMaxWidth().padding(top = Space.Page, bottom = Space.Medium), contentAlignment = Alignment.Center) {
                             SwipeCover(song, onTap = ::openAlbum, slideLabel = slideLabel)
+                            // Siansa Dev: marks the last DJ blend as bad (the owner, 9 Nov).
+                            BadBlendButton(Modifier.align(Alignment.BottomCenter))
                         }
 
                         // The filled heart of a liked song takes the cover's colour too, with Dynamic colours on (issue #998).

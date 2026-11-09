@@ -56,7 +56,16 @@ Details: [How it works › Levelling](how-it-works.md#levelling).
 
 ## Crossfade
 
-Same page. **Off**, a **fixed** length (1–30 seconds, 6 by default), or **Smart**:
+Same page. **Off**, **Fixed**, or **Smart**:
+
+- **Smart** decides every change by itself: there's nothing to set. Fades are up to 20 seconds, and in DJ radio and DJ
+  mixes, songs that keep a beat blend beat on beat (below).
+- **Fixed** fades every change over the length you choose (1–30 seconds, 6 by default). With the Siansa plugin, in DJ
+  radio and DJ mixes songs that keep a beat blend beat on beat over the **Blend length in DJ radio and DJ mixes** (4, 8 or
+  16 bars), with the bass swapped halfway.
+- An album playing in order stays gapless with either.
+
+How Smart decides:
 
 - Smart crossfades follow how songs end and start, measured by the Siansa plugin. A long fade-out starts blending
   early, a hard ending doesn't blend at all. A slow intro fades in slowly, a hard hit comes in at once.
@@ -67,9 +76,8 @@ Same page. **Off**, a **fixed** length (1–30 seconds, 6 by default), or **Smar
   old one's last sound ends, so the music doesn't stop. Only when both edges are hard: a soft ending or a soft start
   blends as above. A beat-matched DJ blend still
   comes first.
-- With Smart, the length (**Up to**) is the longest a fade can be, not the length of every fade: most are shorter,
-  as the songs decide. The full length is used for songs the plugin hasn't measured yet, and in DJ blends for a
-  quiet intro without a beat. The setting says so under the slider.
+- Most fades are shorter than 20 seconds, as the songs decide. The full 20 seconds is used for songs the plugin hasn't
+  measured yet, and in DJ blends for a quiet intro without a beat.
 - Silence at the end of a song is left out: the next song comes straight in. A long fade-out is cut once it's quiet
   (at most the crossfade length of it), so the next song comes in while it's still fading. Only what runs to the very
   end counts: a silence or a quiet passage mid-song never starts the next song, a soft ending that stays at one low
@@ -88,13 +96,13 @@ Same page. **Off**, a **fixed** length (1–30 seconds, 6 by default), or **Smar
 
 ### Beat-matched blends
 
-**Settings › Playback › Crossfade and levelling › Beat-matched blends**, shown with Smart crossfades and the Siansa
-plugin. Two songs that both keep a beat can clash at the changeover when their beats land at different moments,
+In DJ playback only: DJ radio, songs Keep playing adds in DJ mode, and the DJ mix of an album or playlist (slide
+Shuffle onto Play). An album or playlist playing on its own never beat-matches. Needs the Siansa plugin (in Siansa Dev,
+the Siansa Beats (dev) plugin). Two songs that both keep a beat can clash at the changeover when their beats land at different moments,
 like a bad DJ set. The Siansa plugin for AudioMuse measures the beat grid at each end of every song, so Siansa can
 blend them the way a DJ mixes:
 
-- **DJ radio**: in DJ radio and DJ keep-playing, a song that keeps a beat blends into the next one the
-  way a DJ mixes. With plugin 0.4.0, which also finds the phrases (the 4 or 8 bars a song is built from), the
+- A song that keeps a beat blends into the next one the way a DJ mixes. With plugin 0.4.0, which also finds the phrases (the 4 or 8 bars a song is built from), the
   blend goes **phrase on phrase**: it starts where a phrase of the song going out starts, the next song comes in on
   its first phrase, it lasts whole phrases (as many as the **Blend length** below allows: 8 bars gives one 8-bar
   phrase, 16 bars two, 4 bars half of one), and the song going out is let go
@@ -104,11 +112,12 @@ blend them the way a DJ mixes:
   to 8 %) so its beats keep time with the old song's, then eases back to its own speed over about 25
   seconds, in small steps too slight to hear. A shift of more than 4 % is kept to 8 bars, however long the Blend
   length, so the song is back at its own speed sooner.
-- **Everywhere**: the same in every smart crossfade.
-- **Off** (the default): fades don't follow the beat. On many phones a beat-matched blend still drifts out of step,
-  so it's off until you choose it.
+- **Siansa Beats (Siansa Dev)**: each end of a song is read from where its beat locks onto its grid (the first and
+  last 4 bars it all keeps to). A blend stays inside that, and an end needs 80 % of its beats on the grid there to be
+  beat-matched. A track cut from a mixed CD carries the DJ's own changeovers at its ends: its blends are laid inside
+  its lock and kept to 8 bars, and without a lock it gets a short blend.
 
-In DJ radio (when beat-matched blends apply there), a blend where one end has no beat at all (a beatless
+In DJ playback, a blend where one end has no beat at all (a beatless
 intro, an ambient outro) runs the whole crossfade length: there's nothing to clash with, so the next song comes in
 under the old one as a DJ would, fading in over the first half. A song going out without a beat only gets that
 when it winds down (quiet for its last 6 seconds or more); one that's still loud to its end, and two beatless songs

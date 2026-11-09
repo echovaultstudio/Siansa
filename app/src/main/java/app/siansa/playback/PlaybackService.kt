@@ -126,6 +126,20 @@ class PlaybackService : MediaLibraryService() {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Int>?) = size > 200
     })
 
+    /**
+     * Whether the change coming up is DJ playback (the owner, 9 Nov): DJ radio, songs Keep playing added in DJ mode,
+     * or a DJ mix of an album or playlist, into or out of. Only then are changes beat-matched; an album or playlist
+     * playing on its own never is. Keep playing in DJ mode used to count for every song, its album's too.
+     */
+    private fun djPlayback(exo: androidx.media3.common.Player): Boolean {
+        if (graph.songRadio.seed.value != null && graph.songRadio.mode == ContinuousMode.DJ) return true
+        val next = exo.nextMediaItemIndex.takeIf { it != androidx.media3.common.C.INDEX_UNSET }?.let { exo.getMediaItemAt(it).mediaId }
+        return listOf(exo.currentMediaItem?.mediaId, next).any { id ->
+            // An album's or playlist's DJ mix blends as one (issue #965).
+            graph.continuousPlay.addedForDj(id) || app.siansa.mix.AlbumDjMix.isOn(id)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         graph = (application as SiansaApp).graph
@@ -159,12 +173,7 @@ class PlaybackService : MediaLibraryService() {
             allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true && !passthroughNearby() },
             onLevel = { if (session?.player === phone) applyVolume(phone) },
             bitstream = { Passthrough.pastTheMix(bitstreamOut, exo.audioFormat?.sampleMimeType) },
-            inDjRadio = {
-                (graph.songRadio.seed.value != null && graph.songRadio.mode == ContinuousMode.DJ) ||
-                    graph.settings.current.continuousPlay == ContinuousMode.DJ ||
-                    // An album's DJ mix blends as one (issue #965).
-                    app.siansa.mix.AlbumDjMix.isOn(exo.currentMediaItem?.mediaId)
-            },
+            inDjRadio = { djPlayback(exo) },
         ).also { it.start() } else Crossfader(
             main = exo,
             handler = handler,
@@ -177,12 +186,7 @@ class PlaybackService : MediaLibraryService() {
             // A Dolby or DTS song going to the receiver as a bitstream can't be mixed (issue #860): no blend into or out of it.
             allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true && !passthroughNearby() },
             onLevel = { if (session?.player === phone) applyVolume(phone) },
-            inDjRadio = {
-                (graph.songRadio.seed.value != null && graph.songRadio.mode == ContinuousMode.DJ) ||
-                    graph.settings.current.continuousPlay == ContinuousMode.DJ ||
-                    // An album's DJ mix blends as one (issue #965).
-                    app.siansa.mix.AlbumDjMix.isOn(exo.currentMediaItem?.mediaId)
-            },
+            inDjRadio = { djPlayback(exo) },
         ).also { it.start() }
         exo.addAnalyticsListener(PlaybackDiagnostics(exo, this))
         exo.addAnalyticsListener(object : AnalyticsListener {

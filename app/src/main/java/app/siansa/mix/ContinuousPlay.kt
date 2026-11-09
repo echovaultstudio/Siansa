@@ -210,6 +210,11 @@ class ContinuousPlay(private val graph: AppGraph) {
     private var job: Job? = null
     /** Songs this has added since the app started, so a long session doesn't loop back to them. */
     private val added = LinkedHashSet<String>()
+    /** The songs it added in DJ mode, which blend as DJ playback (read from the player's thread). */
+    private val addedDj: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    /** Whether [id] was added by Keep playing in DJ mode: a change into or out of it is beat-matched. */
+    fun addedForDj(id: String?): Boolean = id != null && id in addedDj
 
     private data class Snapshot(val left: Int, val last: Song?, val hasMedia: Boolean, val repeatOff: Boolean)
 
@@ -276,6 +281,10 @@ class ContinuousPlay(private val graph: AppGraph) {
                 return
             }
             added += songs.map { it.id }
+            if (mode == ContinuousMode.DJ) {
+                addedDj += songs.map { it.id }
+                if (addedDj.size > MAX_REMEMBERED) addedDj.retainAll(added)
+            }
             while (added.size > MAX_REMEMBERED) added.remove(added.first())
             AppLog.i(
                 "KeepPlaying",

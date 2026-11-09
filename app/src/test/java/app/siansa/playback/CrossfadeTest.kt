@@ -137,9 +137,11 @@ class CrossfadePlanTest {
     }
 
     @Test fun fixedFadesTheWholeLength() {
-        val plan = Crossfade.plan(CrossfadeMode.FIXED, 6_000, a1, a2, minutes4, minutes4)!!
+        val plan = Crossfade.plan(CrossfadeMode.FIXED, 6_000, a1, b1, minutes4, minutes4)!!
         assertEquals(6_000L, plan.overlapMs)
         assertEquals(6_000L, plan.fadeInMs)
+        // An album playing in order stays gapless with Fixed too (the owner, 9 Nov).
+        assertNull(Crossfade.plan(CrossfadeMode.FIXED, 6_000, a1, a2, minutes4, minutes4))
     }
 
     @Test fun smartKeepsAlbumsGaplessWhenTheyRunStraightOn() {

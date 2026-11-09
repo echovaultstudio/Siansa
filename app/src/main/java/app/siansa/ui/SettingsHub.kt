@@ -207,7 +207,7 @@ internal fun crossfadeSummary(s: AppSettings): String {
     val fade = when (s.crossfade) {
         CrossfadeMode.OFF -> "No crossfade"
         CrossfadeMode.FIXED -> "Crossfade ${s.crossfadeSeconds} s"
-        CrossfadeMode.SMART -> "Smart crossfade up to ${s.crossfadeSeconds} s"
+        CrossfadeMode.SMART -> "Smart crossfade"
     }
     val levelling = if (s.replayGain == ReplayGainMode.OFF) "no levelling" else
         "levelling ${s.replayGain.label.lowercase()} by " + if (s.loudnessSource == LoudnessSource.PLUGIN) "the Siansa plugin" else "ReplayGain tags"

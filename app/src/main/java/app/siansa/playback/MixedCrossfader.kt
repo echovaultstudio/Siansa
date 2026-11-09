@@ -155,10 +155,11 @@ internal class MixedCrossfader(
             return LOOK_MS
         }
         val position = main.currentPosition
-        val maxMs = s.crossfadeSeconds * 1000L
-        val beatMatch = s.crossfade == CrossfadeMode.SMART && s.beatMatch.appliesTo(inDjRadio())
+        val blending = Blending.of(s)
+        val maxMs = blending.maxMs
+        val beatMatch = Blending.beatMatched(s, inDjRadio())
         val cut = if (s.crossfade == CrossfadeMode.SMART) Crossfade.endCut(profiles.cached(item.mediaId), duration, maxMs).first else 0L
-        val beatLook = if (beatMatch) max(maxMs, profiles.cached(item.mediaId)?.outro?.let { BeatMatch.maxMsFor(it, s.blendBars) } ?: 0L) else maxMs
+        val beatLook = if (beatMatch) max(maxMs, profiles.cached(item.mediaId)?.outro?.let { BeatMatch.maxMsFor(it, blending.blendBars) } ?: 0L) else maxMs
         // A blend after the last beat can be longer than the setting: it's planned early enough for that.
         val lookMs = if (s.crossfade == CrossfadeMode.SMART && profiles.cached(item.mediaId)?.beatsUntilMs != null) max(beatLook, Crossfade.AFTER_BEAT_MAX_MS) else beatLook
         if (duration - cut - position > lookMs + LEAD_MS + PREPARE_MS) {
@@ -179,7 +180,7 @@ internal class MixedCrossfader(
                 currentProfile = profiles.cached(current.id),
                 nextProfile = profiles.cached(next.id),
                 beatMatch = beatMatch,
-                blendBars = s.blendBars,
+                blendBars = blending.blendBars,
             )
             if (planned == null) {
                 val why = Crossfade.whyNoFade(s.crossfade, maxMs, current, next, profiles.cached(current.id), profiles.cached(next.id), beatMatch)
@@ -274,7 +275,7 @@ internal class MixedCrossfader(
             return
         }
         baseSpeed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
-        t.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, settings().keepKey)
+        t.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, Blending.of(settings()).keepKey)
         val cued = tMix.cueNow(handoverAt * 1000, gate, engine.outRate)
         if (cued == null) {
             AppLog.w("Crossfade", "The song's second copy couldn't be cued; playing on without a crossfade")
@@ -327,12 +328,12 @@ internal class MixedCrossfader(
         incomingFrom = from
         incomingMix = at?.let { ceil(it).toLong() } ?: (engine.writtenMix + MIN_CUE_FRAMES)
         if (beat != null) {
-            main.playbackParameters = BeatMatch.parameters(baseSpeed * beat.speed, baseSpeed, settings().keepKey)
-            if (settings().bassSwap) {
+            main.playbackParameters = BeatMatch.parameters(baseSpeed * beat.speed, baseSpeed, Blending.of(settings()).keepKey)
+            if (Blending.of(settings()).bassSwap) {
                 mainMix.filter.shelfDb = DeckFilter.SHELF_START_DB
                 AppLog.d("Crossfade", "Bass swap over the first ${SWAP_FRACTION_PERCENT} % of the blend: next song's bass held back ${-DeckFilter.SHELF_START_DB.toInt()} dB, old song's cut up to ${DeckFilter.LOW_CUT_HZ.toInt()} Hz")
             }
-            if (settings().echoTail) {
+            if (Blending.of(settings()).echoTail) {
                 tailMix?.let { d ->
                     val echo = engine.core.echoOf(d)
                     echo.clear()
@@ -340,7 +341,7 @@ internal class MixedCrossfader(
                     AppLog.d("Crossfade", "Echo at the end: over the old song's last bar, repeats a beat apart (${beat.outgoing.beatLengthMs.toInt()} ms)")
                 }
             }
-            if (settings().keepKey && beat.speed != 1f) AppLog.d("Crossfade", "Keep the key: the next song is stretched in time, its pitch kept")
+            if (Blending.of(settings()).keepKey && beat.speed != 1f) AppLog.d("Crossfade", "Keep the key: the next song is stretched in time, its pitch kept")
         }
         // Sent a little before its point: a jump lands on the start of a decoded block at or after where it's
         // sent, so the point itself is then in what's decoded and the cue is exact.
@@ -354,6 +355,7 @@ internal class MixedCrossfader(
             "Fading ${item.mediaId} into $incomingId: ${planned.why} · old song handed over on mix frame $handoverMix · " +
                 "next song comes in at ${clock(from)} (${from} ms) on mix frame $incomingMix, with ${clock(against)} of the old song (in $inMs ms)",
         )
+        LastBlend.record(item.mediaId, incomingId ?: "", against, planned, dj = inDjRadio())
         handler.post(fadeTick)
     }
 
@@ -373,8 +375,8 @@ internal class MixedCrossfader(
             val tailDone = out >= 1f || t.playbackState == Player.STATE_ENDED || t.playbackState == Player.STATE_IDLE
             t.volume = if (tailDone) 0f else tailBase * sleepLevel() * Crossfade.fadeOut(out)
             val beat = planned.beat
-            if (beat != null && settings().bassSwap) swapBass(out, tMix)
-            if (beat != null && settings().echoTail) tMix.echo?.let { echoOut(it, planned, beat, tailMs, tailDone) }
+            if (beat != null && Blending.of(settings()).bassSwap) swapBass(out, tMix)
+            if (beat != null && Blending.of(settings()).echoTail) tMix.echo?.let { echoOut(it, planned, beat, tailMs, tailDone) }
             val onNext = main.currentMediaItemIndex == incomingIndex
             // How long the next song has been heard, on the mixer's own clock: never a song time that can be misread,
             // so the fade-in can't stay at nothing (0.52.0-dev).
@@ -471,7 +473,7 @@ internal class MixedCrossfader(
             val elapsed = SystemClock.elapsedRealtime() - easingSince
             BeatMatch.easeStep(easingFrom, elapsed, main.playbackParameters.speed, baseSpeed)?.let {
                 easeChanges++
-                main.playbackParameters = BeatMatch.parameters(it, baseSpeed, settings().keepKey)
+                main.playbackParameters = BeatMatch.parameters(it, baseSpeed, Blending.of(settings()).keepKey)
             }
             if (elapsed >= BeatMatch.EASE_MS) {
                 easingFrom = 0f
@@ -498,7 +500,7 @@ internal class MixedCrossfader(
         handler.removeCallbacks(easeTick)
         if (easingFrom != 0f) {
             easingFrom = 0f
-            main.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, settings().keepKey)
+            main.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, Blending.of(settings()).keepKey)
         }
     }
 
@@ -618,7 +620,7 @@ internal class MixedCrossfader(
             if (beat != null && main.currentMediaItemIndex == incomingIndex) {
                 startEasing(beat)
             } else if (beat != null) {
-                main.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, settings().keepKey)
+                main.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, Blending.of(settings()).keepKey)
             }
             // Stopped before the next song came in: the old song's main copy sounds again.
             if (main.currentMediaItemIndex != incomingIndex) uncut()
