@@ -23,9 +23,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
-import androidx.compose.ui.test.hasAnyDescendant
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -35,14 +32,14 @@ import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.siansa.data.AlbumCategory
-import app.siansa.ui.CHIPS_GAP
 import app.siansa.ui.CollectionByline
 import app.siansa.ui.FastScrollBar
 import app.siansa.ui.MoreChipsHint
-import app.siansa.ui.ReleaseTypeRow
+import app.siansa.ui.ReleaseTypeTabs
 import app.siansa.ui.SectionTitle
 import app.siansa.ui.SiansaTheme
 import app.siansa.ui.Space
+import app.siansa.ui.TABS_GAP
 import app.siansa.ui.lastPlayedLine
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
@@ -53,23 +50,26 @@ import org.junit.runner.RunWith
 /** Even spacing, measured on a real screen: Your Library, artist, album, playlist and book pages, album grids, song rows and Downloads. Shared setup in [SpacingCheck]. */
 @RunWith(AndroidJUnit4::class)
 class SpacingLibraryTest : SpacingCheck() {
-    /** Artist page: the release-type chips sit evenly between the last Popular song and the first heading. */
-    @Test fun releaseTypeChipsAreEvenlySpaced() {
+    /**
+     * Artist page (issue #1029): the release types are tabs, the chosen one's line inside the row's own room, and with
+     * many types, the chosen one is scrolled into view.
+     */
+    @Test fun releaseTypeTabsShowTheChosenOneOfMany() {
         compose.setContent {
             SiansaTheme {
-                Column {
-                    // A song row: 60 dp, of which the last 6 dp are its own padding below the cover.
-                    Box(Modifier.fillMaxWidth().height(60.dp).testTag("song"))
-                    ReleaseTypeRow(listOf(AlbumCategory.ALBUM, AlbumCategory.SINGLE), null) { }
-                    SectionTitle("Discography", top = CHIPS_GAP)
+                Column(Modifier.width(360.dp)) {
+                    ReleaseTypeTabs(AlbumCategory.entries.toList(), AlbumCategory.OTHER) { }
+                    SectionTitle("Other releases", top = TABS_GAP)
                 }
             }
         }
-        val song = compose.onNodeWithTag("song").getBoundsInRoot()
-        // The chip's label can sit in the unmerged tree only, depending on how the chip merges it.
-        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Singles")), useUnmergedTree = true).getBoundsInRoot()
-        val title = compose.onNodeWithText("Discography").getBoundsInRoot()
-        assertEven("Release-type chips", chip.top - (song.bottom - 6.dp), title.top - chip.bottom)
+        compose.waitForIdle()
+        val row = compose.onNodeWithTag("releaseTypeTabs").getBoundsInRoot()
+        val chosen = compose.onNodeWithTag("releaseTypeTabChosen").getBoundsInRoot()
+        assertTrue("the chosen tab is in view: $chosen in $row", chosen.left >= row.left && chosen.right <= row.right)
+        assertTrue("the tabs are easy to tap: ${row.bottom - row.top}", row.bottom - row.top >= 44.dp)
+        val title = compose.onNodeWithText("Other releases").getBoundsInRoot()
+        assertTrue("the heading comes under the tabs", title.top >= row.bottom)
     }
 
     /** Stations in Your Library (issue #353): a station's row has the same room above and below its picture, with its ⋮ menu. */

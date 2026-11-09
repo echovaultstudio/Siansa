@@ -1,6 +1,14 @@
 package app.siansa.ui
 
 import app.siansa.data.versionLabels
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalDensity
+import app.siansa.data.AlbumCategory
+import kotlinx.coroutines.launch
 
 import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -100,9 +108,14 @@ private suspend fun appearsOnOf(graph: app.siansa.AppGraph, page: ArtistPage): L
 
 private val HERO = 380.dp
 
+/** The release-type tabs' place in the artist page's grid: after the picture's spacer and the buttons (issue #1029). */
+private const val TABS_KEY = "release-type-tabs"
+private const val TABS_INDEX = 2
+
 /**
  * An artist with what Navidrome knows about them: photo, biography, top songs, discography grouped by
- * release type and similar artists. The photo fills the top and blends away behind the page as it scrolls.
+ * release type and similar artists. The photo fills the top and the page fades in over it as it scrolls; the
+ * release types are tabs under the buttons, pinned under the title bar once scrolled to (issue #1029).
  */
 @Composable
 fun ArtistScreen(nav: NavController, id: String) {
@@ -150,6 +163,27 @@ fun ArtistScreen(nav: NavController, id: String) {
     val pictureId = p?.artist?.coverArt ?: p?.albums?.firstOrNull()?.coverArt
     val tint = rememberCoverColor(pictureId)
 
+    // Release types as tabs at the top (issue #1029): All, Albums, EPs, Singles, DJ-mixes… one at a time, only while
+    // the page is open. Once scrolled up to the title bar, they stay pinned under it.
+    var typeName by rememberReleaseTypeFilter()
+    val types = remember(p) { p?.let { releaseTypeChoices(it.albums) }.orEmpty() }
+    val type = chosenReleaseType(typeName, types)
+    val density = LocalDensity.current
+    val barPx = WindowInsets.statusBars.getTop(density) + with(density) { HERO_TITLE_BAR.toPx() }
+    val tabsPinned by remember(types.isNotEmpty(), barPx) {
+        derivedStateOf {
+            if (types.isEmpty()) return@derivedStateOf false
+            val tabs = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == TABS_KEY }
+            if (tabs == null) gridState.firstVisibleItemIndex > TABS_INDEX else tabs.offset.y < barPx
+        }
+    }
+    val scope = rememberCoroutineScope()
+    fun choose(t: AlbumCategory?) {
+        typeName = t?.name
+        // Pinned: the tabs stay where they are and the chosen releases start right under them.
+        if (tabsPinned) scope.launch { gridState.scrollToItem(TABS_INDEX); gridState.scrollBy(-barPx) }
+    }
+
     WithPageColours(pictureId, pageBackdrop(MaterialTheme.colorScheme.surface, tint), where = "Artist page") {
     HeroPage(
         title = p?.artist?.name ?: "Artist",
@@ -157,6 +191,7 @@ fun ArtistScreen(nav: NavController, id: String) {
         scrolledPx = scrolled,
         onBack = { nav.popBackStack() },
         color = tint,
+        pinned = if (tabsPinned) ({ ReleaseTypeTabs(types, type, content = androidx.compose.ui.graphics.Color.White) { choose(it) } }) else null,
         overlay = {
             // A soft dark band behind the name, so it reads on any photo, and on a pale placeholder.
             Box(
@@ -189,15 +224,13 @@ fun ArtistScreen(nav: NavController, id: String) {
         }
         val others by loadState("appears-$id") { appearsOnOf(graph, p) }
         val groups = p.albums.groupBy { it.category }.toList().sortedBy { it.first.ordinal }
+        // All of the page, or only the chosen type's releases.
+        val everything = type == null
         // An album in more than one library shows once for each, with the library's name (issue #376).
         val folderNames by loadState("folder-names") { graph.library.folderNames() }
         val versions = versionLabels(p.albums, folderNames.valueOrNull().orEmpty())
         fun albumLine(album: Album) = listOfNotNull(album.year?.toString(), versions[album.id]).joinToString(" · ")
 
-        // Release-type chips (Albums, Singles, DJ-mixes…): one type at a time, only while the page is open.
-        var typeName by rememberReleaseTypeFilter()
-        val types = releaseTypeChoices(p.albums)
-        val type = chosenReleaseType(typeName, types)
         val shownGroups = onlyReleaseType(groups, type)
         var releasesGrid by rememberGridMode("artist")
         var topExpanded by rememberSaveable(id) { mutableStateOf(false) }
@@ -239,8 +272,16 @@ fun ArtistScreen(nav: NavController, id: String) {
                 }
             }
 
-            val topSongs = top
-            if (topSongs == null) {
+            if (types.isNotEmpty()) {
+                // Hidden behind the pinned copy under the title bar once scrolled that far.
+                item(key = TABS_KEY, span = { GridItemSpan(maxLineSpan) }) {
+                    ReleaseTypeTabs(types, type, Modifier.alpha(if (tabsPinned) 0f else 1f)) { choose(it) }
+                }
+            }
+
+            // Popular songs, on All only: a release type shows just its releases.
+            val topSongs = top.takeIf { everything } ?: emptyList()
+            if (everything && top == null) {
                 // Keeps the section's place while the first answer comes in, so the page doesn't jump.
                 full { SectionTitle("Popular") }
                 items(TOP_ROWS_SHORT, key = { "top-wait-$it" }, span = { GridItemSpan(maxLineSpan) }) { SongRowPlaceholder() }
@@ -263,10 +304,6 @@ fun ArtistScreen(nav: NavController, id: String) {
                 }
             }
 
-            if (types.isNotEmpty()) {
-                full { ReleaseTypeRow(types, type) { typeName = it?.name } }
-            }
-
             // Discography by release type: Albums, EPs, Singles, Live, Compilations, DJ-mixes…
             shownGroups.forEachIndexed { i, (category, albums) ->
                 full {
@@ -274,7 +311,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                         SectionTitle(
                             if (albums.size == 1) category.single else category.plural,
                             Modifier.weight(1f),
-                            top = if (i == 0 && types.isNotEmpty()) CHIPS_GAP else SECTION_GAP,
+                            top = if (i == 0 && !everything) TABS_GAP else SECTION_GAP,
                         )
                         // The grid / list switch beside the first heading (issue #289).
                         if (i == 0) GridListToggle(releasesGrid, onToggle = { releasesGrid = !releasesGrid }, modifier = Modifier.padding(end = Space.Tight))
@@ -296,7 +333,7 @@ fun ArtistScreen(nav: NavController, id: String) {
             }
 
             // Albums by others they're credited on: a row here, all of them on their own page.
-            val appearsOn = others.valueOrNull().orEmpty()
+            val appearsOn = others.valueOrNull().orEmpty().takeIf { everything }.orEmpty()
             if (appearsOn.isNotEmpty()) {
                 full { AppearsOnTitle { nav.navigate("artist/${p.artist.id}/appears-on") } }
                 full {
@@ -314,9 +351,9 @@ fun ArtistScreen(nav: NavController, id: String) {
                 }
             }
 
-            artistInfo?.biography?.let { bio -> full { Biography(bio) } }
+            if (everything) artistInfo?.biography?.let { bio -> full { Biography(bio) } }
 
-            val similar = SimilarPlugin.mergeArtists(p.artist.name, soundsAlike.valueOrNull().orEmpty(), artistInfo?.similar.orEmpty())
+            val similar = if (!everything) emptyList() else SimilarPlugin.mergeArtists(p.artist.name, soundsAlike.valueOrNull().orEmpty(), artistInfo?.similar.orEmpty())
             if (similar.isNotEmpty()) {
                 full { SectionTitle("Fans also like") }
                 full { SimilarRow(similar, nav) }

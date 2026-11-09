@@ -83,6 +83,12 @@ search results). A list of more than 300 songs mixes a random 300 of them.
 On an artist's page, the buttons under the release count: the **heart** on the left makes the artist a favourite
 (in your server too); **Radio**, **Shuffle** and **Play** on the right.
 
+Under the buttons, the artist's release types are tabs: **All**, then each type they have (**Albums**, **EPs**,
+**Singles**, **Live**, **DJ-mixes**…). Pick one to see only those releases; **All** (or tapping the chosen tab again)
+shows the whole page: popular songs, every release, **Appears on**, **About** and **Fans also like**. An artist with
+many types scrolls the tabs sideways. As you scroll down, the page slides softly over the artist's picture and the tabs
+stay pinned under the title bar.
+
 - **Similar songs** come from the best source your setup has: Navidrome's sonic similarity (if the AudioMuse-AI
   Navidrome plugin is installed), else AudioMuse-AI directly, else Navidrome's similar songs (or Emby's Instant
   Mix).
