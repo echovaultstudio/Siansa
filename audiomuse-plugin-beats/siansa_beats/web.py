@@ -26,7 +26,7 @@ from flask import Blueprint, jsonify, redirect, request, url_for
 from plugin.api import get_db, get_setting, logger, render_page, set_setting
 
 PLUGIN_ID = "siansa_beats"
-VERSION = "0.1.0"  # the newest in plugin.json (test_version.py)
+VERSION = "0.2.0"  # the newest in plugin.json (test_version.py)
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
@@ -66,15 +66,19 @@ class BeatsError(Exception):
     pass
 
 
-def _beats_get(path):
-    """The JSON answer of Siansa Beats at ``path``, or :class:`BeatsError` saying what to check."""
+def _beats_get(path, body=None):
+    """The JSON answer of Siansa Beats at ``path`` (a POST of ``body`` when given), or :class:`BeatsError` saying
+    what to check."""
     base = beats_url()
     if not base:
         raise BeatsError("Siansa Beats' address isn't set: enter it on this plugin's page")
     parts = urllib.parse.urlsplit(base)
     if parts.scheme not in ("http", "https") or not parts.hostname:
         raise BeatsError("Siansa Beats' address needs to start with http:// or https://")
-    req = urllib.request.Request(base + path, headers={"Accept": "application/json"})
+    req = urllib.request.Request(base + path, headers={"Accept": "application/json"},
+                                 data=None if body is None else json.dumps(body).encode())
+    if body is not None:
+        req.add_header("Content-Type", "application/json")
     password = get_setting("beats_password", "") or ""
     if password:
         req.add_header("Authorization", "Basic " + base64.b64encode(f"siansa:{password}".encode()).decode())
@@ -193,7 +197,10 @@ def siansa_profiles(db, item_ids):
 
 def is_beat_field(key):
     """A field of the beat grid (the Siansa plugin's or Siansa Beats'), not of loudness or ramps."""
-    return key.startswith("intro_") or key.startswith("outro_") or key.startswith("beats_until")
+    return key.startswith("intro_") or key.startswith("outro_") or key.startswith("beats_until") or key in GRID_ONLY
+
+
+GRID_ONLY = ("mix_track", "drops_ms", "breakdowns_ms")  # Siansa Beats' fields that aren't one end's
 
 
 def merge(siansa, grid, missing="plugin"):
@@ -268,6 +275,24 @@ def health():
     except BeatsError as e:
         answer["beats"] = {"reachable": False, "problem": str(e)}
     return jsonify(answer)
+
+
+@bp.route("/api/bad-blends", methods=["POST"])
+def bad_blend():
+    """A song change marked as bad in Siansa Dev, passed on to Siansa Beats' list (the app only knows AudioMuse-AI)."""
+    body = request.get_json(silent=True) or {}
+    mark = {"from_id": str(body.get("from_id") or "").strip(), "to_id": str(body.get("to_id") or "").strip(),
+            "technique": str(body.get("technique") or "")[:80],
+            "details": body.get("details") if isinstance(body.get("details"), dict) else {}}
+    if not mark["from_id"] or not mark["to_id"]:
+        return jsonify({"error": "from_id and to_id needed: the two songs"}), 400
+    try:
+        answer = _beats_get("/api/bad-blends", mark)
+    except BeatsError as e:
+        logger.warning("siansa_beats: couldn't pass a bad blend on: %s", e)
+        return jsonify({"error": str(e)}), 502
+    logger.info("siansa_beats: bad blend %s into %s (%s) passed on", mark["from_id"], mark["to_id"], mark["technique"])
+    return jsonify({"id": answer.get("id")})
 
 
 @bp.route("/api/profiles")

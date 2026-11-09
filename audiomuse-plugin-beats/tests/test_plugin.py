@@ -108,6 +108,7 @@ class ApiTest(unittest.TestCase):
         api.db = support.FakeDb([CONTROL, OTHER])
         web.CACHE.clear()
         self.beats_down = False
+        self.sent = []
         self.original = (web._beats_get, web._canonical)
         web._beats_get = self.fake_beats
         web._canonical = lambda ids: {i: {"c": "c-canon", "o": "o-canon"}.get(i, i) for i in ids}
@@ -115,7 +116,12 @@ class ApiTest(unittest.TestCase):
     def tearDown(self):
         web._beats_get, web._canonical = self.original
 
-    def fake_beats(self, path):
+    def fake_beats(self, path, body=None):
+        if body is not None:
+            self.sent.append((path, body))
+            if self.beats_down:
+                raise web.BeatsError("Nothing answers at beats:8090: is Siansa Beats running?")
+            return {"id": 7}
         if self.beats_down:
             raise web.BeatsError("Nothing answers at beats:8090: is Siansa Beats running?")
         if path == "/api/health":
@@ -143,6 +149,24 @@ class ApiTest(unittest.TestCase):
         answer = self.client.get("/plugins/siansa_beats/api/profiles?ids=c,o").get_json()
         self.assertEqual([p["track_id"] for p in answer["profiles"]], ["c"])
         self.assertIsNone(answer["profiles"][0]["ref_lufs"])
+
+    def test_bad_blends_go_on_to_siansa_beats(self):
+        mark = {"from_id": "c", "to_id": "o", "technique": "bass swap", "details": {"bars": 16}, "extra": "dropped"}
+        answer = self.client.post("/plugins/siansa_beats/api/bad-blends", json=mark)
+        self.assertEqual((answer.status_code, answer.get_json()), (200, {"id": 7}))
+        self.assertEqual(self.sent, [("/api/bad-blends", {"from_id": "c", "to_id": "o", "technique": "bass swap",
+                                                          "details": {"bars": 16}})])
+        self.assertEqual(self.client.post("/plugins/siansa_beats/api/bad-blends", json={"from_id": "c"}).status_code, 400)
+        self.beats_down = True
+        down = self.client.post("/plugins/siansa_beats/api/bad-blends", json=mark)
+        self.assertEqual(down.status_code, 502)
+        self.assertIn("is Siansa Beats running", down.get_json()["error"])
+
+    def test_the_end_data_for_smart_blends_is_passed_on(self):
+        grid = {"intro_lock_ms": 12000.0, "mix_track": True, "drops_ms": [60000.0], "breakdowns_ms": [], "other": 1}
+        merged = web.merge({"ref_lufs": -9.0, "intro_bpm": 120.0}, grid)
+        self.assertEqual((merged["intro_lock_ms"], merged["mix_track"], merged["drops_ms"]), (12000.0, True, [60000.0]))
+        self.assertNotIn("other", merged)
 
     def test_too_many_ids(self):
         response = self.client.get("/plugins/siansa_beats/api/profiles?ids=" + ",".join(str(n) for n in range(501)))

@@ -6,6 +6,14 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.2.0",
+      "min_core_version": "3.6.4",
+      "changelog": "Passes on Siansa Beats' lock-in points, bass, energy, drops and breakdowns, and sends song changes marked as bad in Siansa Dev to Siansa Beats' list.",
+      "imageUrl": "",
+      "sourceUrl": "",
+      "checksum": ""
+    },
+    {
       "version": "0.1.0",
       "min_core_version": "3.6.4",
       "changelog": "First version: profiles from the Siansa plugin's measurements with the beat grids from Siansa Beats.",
