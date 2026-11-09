@@ -59,7 +59,8 @@ class SpacingLibraryTest : SpacingCheck() {
             SiansaTheme {
                 Column(Modifier.width(360.dp)) {
                     ReleaseTypeTabs(AlbumCategory.entries.toList(), AlbumCategory.OTHER) { }
-                    SectionTitle("Other releases", top = TABS_GAP)
+                    // Not "Other releases": the chosen tab says that too.
+                    SectionTitle("Releases", top = TABS_GAP)
                 }
             }
         }
@@ -68,7 +69,7 @@ class SpacingLibraryTest : SpacingCheck() {
         val chosen = compose.onNodeWithTag("releaseTypeTabChosen").getBoundsInRoot()
         assertTrue("the chosen tab is in view: $chosen in $row", chosen.left >= row.left && chosen.right <= row.right)
         assertTrue("the tabs are easy to tap: ${row.bottom - row.top}", row.bottom - row.top >= 44.dp)
-        val title = compose.onNodeWithText("Other releases").getBoundsInRoot()
+        val title = compose.onNodeWithText("Releases").getBoundsInRoot()
         assertTrue("the heading comes under the tabs", title.top >= row.bottom)
     }
 
