@@ -28,11 +28,11 @@ object AlbumDjMix {
      * Orders [album]'s songs for the best blends and plays them. Needs AudioMuse's tempo and key; without them the album
      * plays in its own order.
      */
-    suspend fun start(graph: AppGraph, title: String, songs: List<Song>) {
-        if (songs.isEmpty()) return
+    suspend fun start(graph: AppGraph, title: String, list: List<Song>) {
+        if (list.isEmpty()) return
         // A long playlist or a liked list mixes a random [MAX_MIX_SONGS] of its songs: hours of music, ordered quickly.
-        val album = mixPortion(songs, Random.Default)
-        if (album.size < songs.size) AppLog.i("AlbumMix", "\"$title\" has ${songs.size} songs: the mix takes ${album.size} of them")
+        val album = mixPortion(list, Random.Default)
+        if (album.size < list.size) AppLog.i("AlbumMix", "\"$title\" has ${list.size} songs: the mix takes ${album.size} of them")
         val ordered = withContext(Dispatchers.Default) { arrange(graph, album) }
         songs.value = ordered.map { it.id }
         // The player takes commands on the main thread only: started from the background it refused, and nothing played
