@@ -34,7 +34,16 @@ class WholeWordsTest {
         assertEquals(true, lines(text, 110)(scale) <= 2)
     }
 
-    @Test fun neverSmallerThanTheFloor() {
+    @Test fun aWordThatCantFitEvenSmallKeepsTheFloor() {
         assertEquals(MIN_TITLE_SCALE, wholeWordsScale({ 10_000 }, { 1 }, width = 50, maxLines = 1), 0.001f)
+    }
+
+    @Test fun aLongWordOnASmallTileShrinksPastTheFloorRatherThanBreaking() {
+        // "Contemporary Jazz" (120 px for its longest word at full size) on a 64 px tile: whole only below 0.6.
+        val text = "Contemporary Jazz"
+        val scale = wholeWordsScale(widest(text.split(" ")), lines(text, 64), width = 64, maxLines = 3)
+        assertEquals(true, scale < MIN_TITLE_SCALE)
+        assertEquals(true, scale >= WORD_FLOOR_SCALE)
+        assertEquals(true, widest(text.split(" "))(scale) <= 64)
     }
 }

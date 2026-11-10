@@ -55,15 +55,34 @@ fun WholeWordsText(
 const val MIN_TITLE_SCALE = 0.6f
 
 /**
+ * A word wider than the tile even at [MIN_TITLE_SCALE] ("Contemporary" on a third of the screen, 10 Nov) may shrink
+ * to this, so it stays whole rather than breaking across lines ("Contemporar / y").
+ */
+const val WORD_FLOOR_SCALE = 0.35f
+
+/**
  * The largest size, as a share of the title's own (1 down to [minScale] in steps of [STEP]), at which every word fits
- * on a line [width] wide ([widestWord]) and the title takes at most [maxLines] lines ([lines]). [minScale] when even
- * that doesn't fit.
+ * on a line [width] wide ([widestWord]) and the title takes at most [maxLines] lines ([lines]). When even [minScale]
+ * doesn't do: the largest size down to [WORD_FLOOR_SCALE] at which every word is whole and the lines fit, else at which
+ * every word is whole (the end may then be cut off with "…": a word broken in two reads worse).
  */
 fun wholeWordsScale(widestWord: (Float) -> Int, lines: (Float) -> Int, width: Int, maxLines: Int, minScale: Float = MIN_TITLE_SCALE): Float {
     var scale = 1f
     while (scale > minScale + 1e-3f) {
         if (widestWord(scale) <= width && lines(scale) <= maxLines) return scale
         scale -= STEP
+    }
+    if (widestWord(minScale) <= width && lines(minScale) <= maxLines) return minScale
+    // Smaller still, words whole first.
+    var s = minScale - STEP
+    while (s > WORD_FLOOR_SCALE - 1e-3f) {
+        if (widestWord(s) <= width && lines(s) <= maxLines) return s
+        s -= STEP
+    }
+    s = minScale
+    while (s > WORD_FLOOR_SCALE - 1e-3f) {
+        if (widestWord(s) <= width) return s
+        s -= STEP
     }
     return minScale
 }
