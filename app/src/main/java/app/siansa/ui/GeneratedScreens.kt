@@ -36,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.platform.testTag
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.lerp
@@ -82,6 +83,7 @@ fun GenreScreen(nav: NavController, name: String) {
     val scope = rememberCoroutineScope()
     val colors = genreColors(name)
     val songs by loadState("genre-songs-$name") { graph.genreRadio.songsOf(name) }
+    val aboutState by loadState("genre-about-$name") { graph.genreVote.about(name) }
     val list = songs.valueOrNull()
     CollectionPage(
         nav = nav,
@@ -93,15 +95,24 @@ fun GenreScreen(nav: NavController, name: String) {
         djMix = false,
         cover = { m -> GeneratedCover(name, colors, m) },
         radioColour = colors.first,
+        // Its name is on its cover: under it only what the genre is, with a little history (Siansa Beats, from
+        // Wikipedia, the owner, 10 Nov), or how many songs it has when there's no description.
+        showTitle = false,
         header = {
-            CollectionByline(null, null, null, "Genre" + (list?.let { " · ${"%,d".format(it.size)} songs" } ?: ""))
-            Spacer(Modifier.height(Space.Tight))
-            Text(
-                "The radio button plays ${app.siansa.mix.GenreRadio.PICKS} of its songs at random, and more as they play; so does a song you tap, first.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag("genreRadioHint"),
-            )
+            val about = aboutState.valueOrNull()
+            if (about != null) {
+                Text(about.summary, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("genreAbout"))
+                Spacer(Modifier.height(Space.Tight))
+                val uri = androidx.compose.ui.platform.LocalUriHandler.current
+                Text(
+                    "From ${about.source}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = if (about.url != null) Modifier.clickable { runCatching { uri.openUri(about.url) } } else Modifier,
+                )
+            } else if (list != null) {
+                CollectionByline(null, null, null, "%,d songs".format(list.size))
+            }
         },
         playAs = { first ->
             val all = list.orEmpty()

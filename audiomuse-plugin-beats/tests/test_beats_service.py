@@ -138,6 +138,9 @@ class ApiTest(unittest.TestCase):
             return {"styles": {"available": True}, "genres": [
                 {"label": "Electronic---Trance", "genre": "Electronic", "style": "Trance", "songs": 40, "name": "Trance"},
                 {"label": "Hip Hop---Electro", "genre": "Hip Hop", "style": "Electro", "songs": 3, "name": "Hip Hop / Electro"}]}
+        if path.startswith("/api/genre/about?"):
+            return {"name": "Dubstep", "about": {"summary": "Dubstep is a genre of electronic dance music.", "source": "Wikipedia",
+                                                  "url": "https://en.wikipedia.org/wiki/Dubstep", "title": "Dubstep"}}
         if path.startswith("/api/genre?"):
             self.asked_genre = path
             return {"ids": ["c", "o"], "styles": ["Electronic---Trance"], "genres": [], "why": None}
@@ -186,6 +189,14 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(self.client.get("/plugins/siansa_beats/api/genre").status_code, 400)
         self.down = True  # the app then plays by its tags
         self.assertEqual(self.client.get("/plugins/siansa_beats/api/genre?name=Trance").status_code, 502)
+
+    def test_a_genre_s_description_comes_from_siansa_beats(self):
+        answer = self.client.get("/plugins/siansa_beats/api/genre/about?name=Dubstep").get_json()
+        self.assertEqual(answer["about"]["source"], "Wikipedia")
+        self.assertIn("electronic dance music", answer["about"]["summary"])
+        self.assertEqual(self.client.get("/plugins/siansa_beats/api/genre/about").status_code, 400)
+        self.down = True  # the page then shows without it
+        self.assertEqual(self.client.get("/plugins/siansa_beats/api/genre/about?name=Dubstep").status_code, 502)
 
     def test_the_service_part_of_the_page(self):
         page = web.render_service({"reachable": True, "version": "0.13.0"}, "http://beats:8090", True, "plugin")

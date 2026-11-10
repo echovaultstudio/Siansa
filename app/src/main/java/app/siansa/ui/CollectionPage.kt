@@ -54,6 +54,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -142,6 +145,9 @@ fun CollectionPage(
     playAs: ((first: Song?) -> Unit)? = null,
     // With [playAs]: the colour of its one button, the radio (a genre's own colour).
     radioColour: Color? = null,
+    // The title under the cover: it rides up with the page and glides into the title bar (as an artist's name, the
+    // owner, 10 Nov). False: no title under the cover (a genre's is on its cover), and the bar shows it as before.
+    showTitle: Boolean = true,
 ) {
     val graph = LocalGraph.current
     val djSettings by graph.settings.state.collectAsStateWithLifecycle()
@@ -172,6 +178,8 @@ fun CollectionPage(
     // worked out once the last row is in view, from the rows alone, so it never changes because of itself.
     var roomPx by remember { mutableFloatStateOf(0f) }
     val loaded = songs != null
+    // The title's glide takes this much scrolling past the cover's (DOCK_SPAN times its last stretch into the bar).
+    val glideRoomPx = with(density) { (DOCK_START_GAP + 56.dp).toPx() } * DOCK_SPAN
     LaunchedEffect(listState, coverPx, loaded) {
         snapshotFlow {
             val info = listState.layoutInfo
@@ -184,12 +192,35 @@ fun CollectionPage(
                     viewportEndPx = info.viewportEndOffset.toFloat(),
                     afterPaddingPx = info.afterContentPadding.toFloat(),
                 ),
-                coverPx = coverPx,
+                // Enough to scroll the cover away, and the title all the way into the bar.
+                coverPx = maxOf(coverPx, (coverPx + glideRoomPx) / FULL_FADE),
             )
         }.filterNotNull().collect { roomPx = it }
     }
     val progress = (scrolled / coverPx).coerceIn(0f, 1f)
-    val barAlpha = ((scrolled - coverPx * 0.8f) / (coverPx * 0.3f)).coerceIn(0f, 1f)
+    // The title's glide into the bar (glideFrame): where it is on the page while the header is in view, and from there
+    // its way into the bar's title place, shrinking to the bar's size.
+    val statusPx = WindowInsets.statusBars.getTop(density).toFloat()
+    val barPx = with(density) { 56.dp.toPx() }  // spacing: exact (the title bar's height)
+    val measurer = rememberTextMeasurer()
+    val baseTitleStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
+    val titleWidthPx = with(density) { (LocalConfiguration.current.screenWidthDp.dp - Space.Page * 2).toPx() }
+    val titleStyle = remember(title, baseTitleStyle, titleWidthPx) { fitOneLine(measurer, title, baseTitleStyle, titleWidthPx) }
+    val barTitleStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black)
+    val dockScale = barTitleStyle.fontSize.value / titleStyle.fontSize.value
+    val titleLinePx = with(density) { titleStyle.lineHeight.toPx() }
+    val gapPx = with(density) { DOCK_START_GAP.toPx() }
+    val dockTop = statusPx + barPx / 2f - titleLinePx * dockScale / 2f
+    var pageTop by remember { mutableFloatStateOf(0f) }
+    var titleTop by remember { mutableStateOf<Float?>(null) }
+    val headerInView = listState.firstVisibleItemIndex == 0
+    val titleFrame = when {
+        !showTitle -> null
+        !headerInView -> HeroNameFrame(dockTop, 1f)
+        else -> titleTop?.let { glideFrame(it, startTop = statusPx + barPx + gapPx, dockTop = dockTop) }
+    }
+    val titleBar = titleFrame?.let { smooth(((statusPx + barPx + 2 * gapPx - it.top) / (2 * gapPx)).coerceIn(0f, 1f)) } ?: 0f
+    val barAlpha = maxOf(((scrolled - coverPx * 0.8f) / (coverPx * 0.3f)).coerceIn(0f, 1f), titleBar)
     val surface = MaterialTheme.colorScheme.surface
     // Albums with several discs get a heading above each disc (its title, or "Disc 2").
     val discs = remember(songs, numbered, discTitles) { if (numbered && songs != null) discHeaders(songs, discTitles) else emptyMap() }
@@ -202,7 +233,7 @@ fun CollectionPage(
 
     // Dynamic colours: the cover's colour for Play only (BigPlayButton reads it).
     CompositionLocalProvider(LocalPlayColours provides rememberPageColours(coverId, pageBackdrop(surface, color), where = "Page \"$title\"")) {
-    Box(Modifier.fillMaxSize().background(surface)) {
+    Box(Modifier.fillMaxSize().background(surface).onGloballyPositioned { pageTop = it.positionInRoot().y }) {
         if (showCovers && songs != null) {
             val covers = remember(songs) { songs.map { it.cover } }
             PrefetchCovers(listState.firstVisibleItemIndex, listState.layoutInfo.visibleItemsInfo.size, covers, 150)
@@ -239,14 +270,19 @@ fun CollectionPage(
                     }
                     Spacer(Modifier.height(Space.Page))
                     Column(Modifier.alpha(slideDim)) {
-                        Text(
-                            title,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(Modifier.height(Space.Small))
+                        if (showTitle) {
+                            // Its place: the title itself is drawn over the page (below), gliding into the bar from here.
+                            Text(
+                                title,
+                                style = titleStyle,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .alpha(0f)
+                                    .onGloballyPositioned { titleTop = it.positionInRoot().y - pageTop },
+                            )
+                            Spacer(Modifier.height(Space.Small))
+                        }
                         header()
                     }
                     Spacer(Modifier.height(Space.Tight))
@@ -329,7 +365,32 @@ fun CollectionPage(
             }
         }
 
-        FadingTitleBar(nav, title, color, barAlpha, actions)
+        FadingTitleBar(nav, title, color, barAlpha, actions, showTitle = !showTitle)
+        // The title, one all the way: under the cover, then up into the bar, shrinking, as an artist's name.
+        if (titleFrame != null) {
+            val restColour = MaterialTheme.colorScheme.onSurface
+            Text(
+                title,
+                style = titleStyle,
+                color = lerp(restColour, Color.White, smooth(titleFrame.t)),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .padding(start = Space.Page, end = Space.Page)
+                    .graphicsLayer {
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                        val e = smooth((titleFrame.t * SIDEWAYS_LEAD).coerceAtMost(1f))
+                        val restLeft = Space.Page.toPx()
+                        translationX = ((Space.Tight + BACK_BUTTON + Space.Small).toPx() - restLeft) * e
+                        translationY = titleFrame.top
+                        val sc = 1f + (dockScale - 1f) * smooth(titleFrame.t)
+                        scaleX = sc
+                        scaleY = sc
+                        alpha = if (titleFrame.t > 0f) 1f else slideDim
+                    }
+                    .testTag("collectionTitle"),
+            )
+        }
     }
     }
 }
@@ -357,7 +418,7 @@ internal fun roomBelow(maxScrollPx: Float, coverPx: Float): Float = (coverPx * F
  * colour until the page scrolls, then a solid bar in that colour with the title.
  */
 @Composable
-internal fun FadingTitleBar(nav: NavController, title: String, color: Color, barAlpha: Float, actions: @Composable () -> Unit = {}) {
+internal fun FadingTitleBar(nav: NavController, title: String, color: Color, barAlpha: Float, actions: @Composable () -> Unit = {}, showTitle: Boolean = true) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -379,7 +440,7 @@ internal fun FadingTitleBar(nav: NavController, title: String, color: Color, bar
             color = Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).graphicsLayer { alpha = barAlpha },
+            modifier = Modifier.weight(1f).graphicsLayer { alpha = if (showTitle) barAlpha else 0f },
         )
         actions()
     }

@@ -33,7 +33,7 @@ from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url,
 from . import beats_service, generations, jobs, similarity, status, store
 
 PLUGIN_ID = "siansa_beats"
-VERSION = "0.5.1"  # the newest in plugin.json: AudioMuse-AI and the Siansa app show it (test_version.py)
+VERSION = "0.5.2"  # the newest in plugin.json: AudioMuse-AI and the Siansa app show it (test_version.py)
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
@@ -223,6 +223,22 @@ def genre_list():
                "songs": g.get("songs", 0)} for g in (answer.get("genres") or [])[:limit]]
     return jsonify({"genres": listed, "available": bool((answer.get("styles") or {}).get("available")),
                     "source": "siansa_beats"})
+
+
+@bp.route("/api/genre/about")
+def genre_about():
+    """A genre's short description with a little history, from Siansa Beats (the opening of its Wikipedia article,
+    named and linked): ``{"name", "about": {"summary", "url", "source", "title"} or null}``. 502 when Siansa Beats doesn't
+    answer: the app's genre page then shows without it."""
+    name = (request.args.get("name") or "").strip()
+    if not name:
+        return _error("name needed: the genre, as the app shows it", 400)
+    try:
+        answer = beats_service._beats_get("/api/genre/about?" + urllib.parse.urlencode({"name": name}))
+    except beats_service.BeatsError as e:
+        logger.info("siansa_beats: no description from Siansa Beats for %s: %s", name, e)
+        return _error(str(e), 502)
+    return jsonify({"name": name, "about": answer.get("about"), "source": "siansa_beats"})
 
 
 @bp.route("/api/genre")

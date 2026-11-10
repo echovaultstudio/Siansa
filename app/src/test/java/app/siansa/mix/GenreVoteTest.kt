@@ -102,4 +102,26 @@ class GenreVoteTest {
         assertNull(slow.refresh())
         assertEquals(GenreVote.MIN_GENRES, slow.saved()!!.size)
     }
+
+    @Test fun aGenresDescriptionComesFromSiansaBeatsAndIsKept() = runBlocking {
+        reply = { path ->
+            if (path.startsWith(GenreVote.ABOUT_PATH)) JsonObject(mapOf("about" to JsonObject(mapOf(
+                "summary" to JsonPrimitive("Dubstep is a genre of electronic dance music."),
+                "url" to JsonPrimitive("https://en.wikipedia.org/wiki/Dubstep"),
+                "source" to JsonPrimitive("Wikipedia"),
+            )))) else JsonObject(emptyMap())
+        }
+        val about = vote.about("Dubstep")!!
+        assertEquals("Wikipedia", about.source)
+        assertEquals("/plugins/siansa_beats/api/genre/about?name=Dubstep", asked.last())
+        vote.about("Dubstep")
+        assertEquals(1, asked.size)  // kept
+    }
+
+    @Test fun noDescriptionWithoutSiansaBeats() = runBlocking {
+        reply = { JsonObject(mapOf("about" to kotlinx.serialization.json.JsonNull)) }
+        assertNull(vote.about("Mercury"))
+        ready = false
+        assertNull(vote.about("Dubstep"))
+    }
 }

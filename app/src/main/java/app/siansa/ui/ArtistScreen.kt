@@ -118,6 +118,8 @@ private val HERO_NAME_BAND = 120.dp
 /** The release-type tabs' place in the artist page's grid: after the picture's spacer and the buttons (issue #1029). */
 private const val TABS_KEY = "release-type-tabs"
 private const val TABS_INDEX = 2
+/** The item with the artist's buttons (after the picture's room). */
+private const val BUTTONS_INDEX = 1
 private const val FOOTER_KEY = "artist-page-end"
 
 /**
@@ -191,6 +193,14 @@ fun ArtistScreen(nav: NavController, id: String) {
             if (tabs == null) gridState.firstVisibleItemIndex > TABS_INDEX else tabs.offset.y < barPx
         }
     }
+    // The heart in the title bar once the page's own (with Radio, Shuffle and Play) has gone up under it, never both at
+    // once (the owner, 10 Nov).
+    val buttonsGone by remember(barPx) {
+        derivedStateOf {
+            val header = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == BUTTONS_INDEX }
+            if (header == null) gridState.firstVisibleItemIndex > BUTTONS_INDEX else header.offset.y + header.size.height < barPx
+        }
+    }
     val scope = rememberCoroutineScope()
     // Room at the end of the page, so the tabs can always be scrolled up under the title bar, however few releases
     // the chosen type has (the owner, 10 Nov: choosing Albums, one album, while pinned threw the page back to the top,
@@ -228,6 +238,9 @@ fun ArtistScreen(nav: NavController, id: String) {
         scrolledPx = scrolled,
         onBack = { nav.popBackStack() },
         color = tint,
+        actions = {
+            if (buttonsGone && p != null) FavouriteArtistButton(p.artist, Modifier.testTag("barHeart"), androidx.compose.ui.graphics.Color.White, ICON_SIZE)
+        },
         pinned = if (tabsPinned) ({ ReleaseTypeTabs(types, type, content = androidx.compose.ui.graphics.Color.White) { choose(it) } }) else null,
         overlay = {
             // A soft dark band at the foot of the picture, where the name sits at first (HeroPage draws the name, which

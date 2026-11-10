@@ -115,8 +115,34 @@ class GenreVote(
         return listed
     }
 
+    private val abouts = java.util.concurrent.ConcurrentHashMap<String, GenreAbout>()
+
+    /**
+     * Genre [name]'s short description, with a little of its history (Siansa Beats, from Wikipedia), for its page: null
+     * without Siansa Beats or when it has none; the page shows without it then. Waits at most [WAIT_MS] * 2.
+     */
+    suspend fun about(name: String): GenreAbout? {
+        abouts[name.lowercase()]?.let { return it }
+        if (!ready() || now() < backOffUntil) return null
+        val answer = try {
+            withTimeout(WAIT_MS * 2) { ask(ABOUT_PATH + "?name=" + java.net.URLEncoder.encode(name, "UTF-8").replace("+", "%20")) } as? JsonObject
+        } catch (e: CancellationException) {
+            if (e is kotlinx.coroutines.TimeoutCancellationException) return null
+            throw e
+        } catch (e: Exception) {
+            AppLog.i("Genre", "No description of $name from Siansa Beats: ${e.message}")
+            return null
+        } ?: return null
+        val o = answer["about"] as? JsonObject ?: return null
+        fun text(key: String) = (o[key] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() && it != "null" }
+        val about = GenreAbout(text("summary") ?: return null, text("url"), text("source") ?: "Wikipedia")
+        abouts[name.lowercase()] = about
+        return about
+    }
+
     companion object {
         const val PATH = PLUGIN_PREFIX + "api/genre"
+        const val ABOUT_PATH = PLUGIN_PREFIX + "api/genre/about"
         /** Every genre: the model has 400 styles, and the plugin gives at most this many. */
         const val MOST_GENRES = 400
         /** How long the list may take before the saved one (or the tags) stays: a page never waits longer. */
@@ -164,3 +190,6 @@ internal fun parseSaved(text: String): SavedGenres? {
     }.orEmpty()
     return SavedGenres(at, genres)
 }
+
+/** A genre's short description and where it's from (Wikipedia, linked, as its licence asks). */
+data class GenreAbout(val summary: String, val url: String?, val source: String)

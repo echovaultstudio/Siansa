@@ -251,19 +251,43 @@ fun heroNameFrame(scrolled: Float, restTop: Float, startTop: Float, dockTop: Flo
     return HeroNameFrame(top, t)
 }
 
-private fun smooth(t: Float): Float = t * t * (3f - 2f * t)
+/**
+ * [heroNameFrame] for a title whose place on the screen is known as it scrolls ([free], its top as the page has it):
+ * an album's, a playlist's (the owner, 10 Nov: as the artist's page).
+ */
+fun glideFrame(free: Float, startTop: Float, dockTop: Float): HeroNameFrame {
+    val start = startTop.coerceAtLeast(dockTop)
+    if (free >= start) return HeroNameFrame(free, 0f)
+    val distance = start - dockTop
+    if (distance <= 0f) return HeroNameFrame(dockTop, 1f)
+    val span = DOCK_SPAN * distance
+    val t = ((start - free) / span).coerceIn(0f, 1f)
+    val t2 = t * t
+    val t3 = t2 * t
+    val top = (2 * t3 - 3 * t2 + 1) * start + (t3 - 2 * t2 + t) * (-span) + (-2 * t3 + 3 * t2) * dockTop
+    return HeroNameFrame(top, t)
+}
+
+/** A long title set smaller to fit one line [widthPx] wide, down to [MIN_NAME_FIT] of [style], then cut off with "…". */
+fun fitOneLine(measurer: androidx.compose.ui.text.TextMeasurer, title: String, style: androidx.compose.ui.text.TextStyle, widthPx: Float): androidx.compose.ui.text.TextStyle {
+    val full = measurer.measure(title, style, maxLines = 1, softWrap = false).size.width
+    val fit = if (full <= 0) 1f else (widthPx / full).coerceIn(MIN_NAME_FIT, 1f)
+    return style.copy(fontSize = style.fontSize * fit, lineHeight = style.lineHeight * fit)
+}
+
+internal fun smooth(t: Float): Float = t * t * (3f - 2f * t)
 
 /** How many times the last distance into the bar the name takes to glide there (at most 3, or it would overshoot). */
 const val DOCK_SPAN = 2.5f
 
 /** How far under the title bar the name starts gliding into it. */
-private val DOCK_START_GAP = Space.Section
+internal val DOCK_START_GAP = Space.Section
 
 /** The back arrow's button, before the bar's title. */
-private val BACK_BUTTON = 48.dp
+internal val BACK_BUTTON = 48.dp
 
 /** The name is sideways in its place a little before it's up: it clears the back arrow on the way. */
-private const val SIDEWAYS_LEAD = 1.3f
+internal const val SIDEWAYS_LEAD = 1.3f
 
 /** How much smaller a long artist name may be set to fit one line before it's cut off with "…". */
 private const val MIN_NAME_FIT = 0.6f
