@@ -211,7 +211,8 @@ class SpacingLibraryTest : SpacingCheck() {
             }
         }
         val above = compose.onNodeWithTag("above").getBoundsInRoot()
-        val sort = compose.onNodeWithTag("sortPicker", useUnmergedTree = true).getBoundsInRoot()
+        // The arrows themselves: the touch area round them reaches a step past the margin.
+        val sort = compose.onNodeWithTag("sortArrows", useUnmergedTree = true).getBoundsInRoot()
         assertEven("The sort's arrows in line with the text above", sort.left, above.left, 1.dp)
         compose.onNodeWithText("Recently liked").assertIsDisplayed()
         compose.onNodeWithTag("sortPicker", useUnmergedTree = true).performClick()

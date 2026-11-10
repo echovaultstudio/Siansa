@@ -1242,7 +1242,7 @@ internal fun <T> SortPicker(label: String, options: List<Pair<T, String>>, selec
             Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "Sort by") { open = true }.padding(Space.Small).testTag("sortPicker"),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Rounded.SwapVert, null, Modifier.size(20.dp))
+            Icon(Icons.Rounded.SwapVert, null, Modifier.size(20.dp).testTag("sortArrows"))
             Spacer(Modifier.width(Space.Small))
             Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
