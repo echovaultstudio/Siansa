@@ -5,6 +5,8 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -132,10 +134,36 @@ data class DjBarView(val spots: List<DjBarSpot>, val chosen: Int?, val starting:
  * accent); the mix's shape [now] has a ring in the accent.
  */
 @Composable
-internal fun DjBar(spots: List<DjBarSpot>, chosen: Int?, now: DjBarSpot?, starting: Boolean, open: Float, modifier: Modifier = Modifier) {
+internal fun DjBar(
+    spots: List<DjBarSpot>,
+    chosen: Int?,
+    now: DjBarSpot?,
+    starting: Boolean,
+    open: Float,
+    modifier: Modifier = Modifier,
+    onTap: ((DjBarSpot) -> Unit)? = null,
+) {
+    GlidePill(open, modifier.testTag("djBar")) {
+        spots.forEachIndexed { i, spot ->
+            GlidePlace(
+                spot.icon(starting), spot.title(starting), chosen = i == chosen, now = spot == now,
+                middle = spot == DjBarSpot.MIX, dark = spot == DjBarSpot.MIX && !starting,
+                tag = "djBar", onTap = onTap?.let { tap -> { tap(spot) } }, modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/**
+ * The glide bar's pill (issues #1033, #1035), [DJ_BAR_HEIGHT] tall and as wide as it's given: [open] (0 to 1) grows
+ * it out of a thin line, as from now playing's seek bar, into a see-through pill that reveals its places. Also the
+ * queue's Shape your mix bars, always open. [places] are laid in a row, each with a weight.
+ */
+@Composable
+internal fun GlidePill(open: Float, modifier: Modifier = Modifier, places: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
     val thickness = DJ_TRACK_LINE + (DJ_BAR_HEIGHT - DJ_TRACK_LINE) * open
     val shape = RoundedCornerShape(thickness / 2)
-    Box(modifier.fillMaxWidth().height(DJ_BAR_HEIGHT).testTag("djBar"), contentAlignment = Alignment.Center) {
+    Box(modifier.fillMaxWidth().height(DJ_BAR_HEIGHT), contentAlignment = Alignment.Center) {
         Box(
             Modifier
                 .fillMaxWidth()
@@ -154,19 +182,29 @@ internal fun DjBar(spots: List<DjBarSpot>, chosen: Int?, now: DjBarSpot?, starti
                     .requiredHeight(DJ_BAR_HEIGHT)
                     .graphicsLayer { alpha = ((open - DJ_PLACES_FROM) / (1f - DJ_PLACES_FROM)).coerceIn(0f, 1f) },
                 verticalAlignment = Alignment.CenterVertically,
-            ) {
-                spots.forEachIndexed { i, spot ->
-                    DjBarPlace(spot, chosen = i == chosen, now = spot == now, starting = starting, Modifier.weight(1f))
-                }
-            }
+                content = places,
+            )
         }
     }
 }
 
+/**
+ * One place on a glide bar: its drawing in a circle. [chosen] grows and fills it ([dark]: in white, as Stop; else in
+ * the accent); [now] rings it in the accent; [middle] (Start / Stop) is a little bigger. [onTap] makes it a button
+ * (the queue's bars); [tag] names its test tags.
+ */
 @Composable
-private fun DjBarPlace(spot: DjBarSpot, chosen: Boolean, now: Boolean, starting: Boolean, modifier: Modifier) {
-    val middle = spot == DjBarSpot.MIX
-    val stop = middle && !starting
+internal fun GlidePlace(
+    icon: ImageVector,
+    description: String,
+    chosen: Boolean,
+    now: Boolean,
+    middle: Boolean = false,
+    dark: Boolean = false,
+    tag: String = "djBar",
+    onTap: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
     val accent = Accent
     val size by animateDpAsState(
         when {
@@ -178,7 +216,7 @@ private fun DjBarPlace(spot: DjBarSpot, chosen: Boolean, now: Boolean, starting:
     )
     val fill by animateColorAsState(
         when {
-            chosen && stop -> Color.White
+            chosen && dark -> Color.White
             chosen -> accent
             middle -> Color.White.copy(alpha = DJ_MIDDLE_TINT)
             else -> Color.White.copy(alpha = DJ_SPOT_TINT)
@@ -186,12 +224,16 @@ private fun DjBarPlace(spot: DjBarSpot, chosen: Boolean, now: Boolean, starting:
         label = "djSpotFill",
     )
     val ink = when {
-        chosen && stop -> DJ_STOP_INK
+        chosen && dark -> DJ_STOP_INK
         chosen -> OnAccent
         else -> Color.White
     }
     Box(
-        modifier.semantics { contentDescription = spot.title(starting) }.testTag(if (chosen) "djBarChosen" else "djBarPlace"),
+        modifier
+            .fillMaxHeight()
+            .then(if (onTap != null) Modifier.clickable(onClickLabel = description, onClick = onTap) else Modifier)
+            .semantics { contentDescription = description }
+            .testTag(if (chosen) "${tag}Chosen" else "${tag}Place"),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -200,11 +242,37 @@ private fun DjBarPlace(spot: DjBarSpot, chosen: Boolean, now: Boolean, starting:
                 .clip(CircleShape)
                 .background(fill)
                 .then(if (now && !chosen) Modifier.border(DJ_NOW_RING, accent, CircleShape) else Modifier)
-                .testTag(if (chosen) "djBarChosenCircle" else "djBarCircle"),
+                .testTag(if (chosen) "${tag}ChosenCircle" else "${tag}Circle"),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(spot.icon(starting), null, tint = ink, modifier = Modifier.size(DJ_SPOT_ICON))
+            Icon(icon, null, tint = ink, modifier = Modifier.size(DJ_SPOT_ICON))
         }
+    }
+}
+
+/**
+ * How much a DJ radio may stray from the mix's way (issue #649), as the queue's Surprises bar shows it: four places, the
+ * setting each gives, and its drawing (more sparks, more surprises).
+ */
+enum class SurpriseLevel(val value: Int, val label: String) {
+    NONE(0, "None"),
+    FEW(25, "A few"),
+    SOME(55, "Some"),
+    LOTS(85, "Lots");
+
+    val hint: String
+        get() = when (this) {
+            NONE -> "Only songs that follow the mix's way."
+            FEW -> "Now and then a song from a little further off."
+            SOME -> "Songs from further off, every few songs."
+            LOTS -> "Plenty of songs you might not expect."
+        }
+
+    val icon: ImageVector get() = DjBarIcons.surprise(ordinal)
+
+    companion object {
+        /** The level a surprise setting (0 to 100) is at, as [surpriseLabel] names it. */
+        fun of(surprise: Int): SurpriseLevel = entries.first { surpriseLabel(surprise) == it.label }
     }
 }
 
@@ -238,6 +306,40 @@ internal object DjBarIcons {
             }
         }.build()
     }
+
+    private fun spark(path: androidx.compose.ui.graphics.vector.PathBuilder, cx: Float, cy: Float, r: Float) = path.apply {
+        moveTo(cx, cy - r)
+        quadTo(cx, cy, cx + r, cy)
+        quadTo(cx, cy, cx, cy + r)
+        quadTo(cx, cy, cx - r, cy)
+        quadTo(cx, cy, cx, cy - r)
+        close()
+    }
+
+    private val sparks: List<ImageVector> by lazy {
+        val layouts = listOf(
+            emptyList(),
+            listOf(Triple(12f, 12f, 7f)),
+            listOf(Triple(9f, 14f, 6f), Triple(16.5f, 7.5f, 4.5f)),
+            listOf(Triple(8.5f, 15f, 5.5f), Triple(16.5f, 15.5f, 4f), Triple(13f, 6.5f, 4.5f)),
+        )
+        layouts.mapIndexed { i, sparks ->
+            ImageVector.Builder(name = "Siansa.Surprise.$i", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+                if (sparks.isEmpty()) {
+                    // None: a small ring, nothing in it.
+                    path(stroke = SolidColor(Color.Black), strokeLineWidth = 2.2f) {
+                        moveTo(12f, 8f)
+                        arcTo(4f, 4f, 0f, true, true, 11.99f, 8f)
+                    }
+                } else {
+                    path(fill = SolidColor(Color.Black)) { sparks.forEach { (x, y, r) -> spark(this, x, y, r) } }
+                }
+            }.build()
+        }
+    }
+
+    /** The Surprises bar's drawing for a level (0 none, 1 to 3 sparks). */
+    fun surprise(level: Int): ImageVector = sparks[level.coerceIn(0, 3)]
 
     /** A shape's drawing ([DjBarSpot.MIX] draws a turntable or [stop] instead). */
     fun of(spot: DjBarSpot): ImageVector = when (spot) {

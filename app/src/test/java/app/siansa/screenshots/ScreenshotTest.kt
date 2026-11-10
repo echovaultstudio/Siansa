@@ -50,7 +50,6 @@ import app.siansa.ui.DlnaSettingsContent
 import app.siansa.ui.GradientTile
 import app.siansa.ui.HomeItem
 import app.siansa.ui.HomeLookRow
-import app.siansa.ui.MixShapeControls
 import app.siansa.ui.ProgressCard
 import app.siansa.playback.BeatMatchMode
 import app.siansa.ui.BeatMatchSection
@@ -236,9 +235,16 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // The queue's mix controls ("Surprises", issue #677).
+            // The queue's Shape your mix (the owner, 10 Nov): folded, and open with the glide bar and the Surprises bar.
             Scene("queue_mix_shape") {
-                OnPlayer { Box(Modifier.padding(vertical = Space.Medium)) { MixShapeControls(MixShape.STEADY, 50) { _, _ -> } } }
+                OnPlayer {
+                    Column(Modifier.padding(vertical = Space.Medium)) {
+                        val places = app.siansa.ui.DjBarPlaces(app.siansa.ui.DjBarSpot.default, starting = false)
+                        app.siansa.ui.MixShapePanel(places, MixShape.BUILD, 55, open = false, onOpen = {}, onPlace = {}, onSurprise = {})
+                        app.siansa.ui.MixShapePanel(places, MixShape.BUILD, 55, open = true, onOpen = {}, onPlace = {}, onSurprise = {})
+                        app.siansa.ui.MixShapePanel(places.copy(starting = true), null, null, open = true, onOpen = {}, onPlace = {}, onSurprise = {})
+                    }
+                }
             },
             // Settings › Style (issue #681).
             Scene("style_top_bar") { TopBarChoice(TopBarStyle.BLACK) {} },

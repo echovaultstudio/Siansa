@@ -116,7 +116,18 @@ class DynamicAccentTest {
         val seed = DynamicAccent.pick(pianoDnb, cover)!!
         assertTrue("lively yellow, not khaki: $seed", DynamicAccent.chroma(seed) > 0.6f && seed.red > 0.8f && seed.green > 0.8f && seed.blue < 0.3f)
         val c = DynamicAccent.of(seed, DynamicAccent.backdropOf(Color(0xFF151615)))!!.controls
-        assertTrue("yellow on now playing: $c", c.red > 0.8f && c.green > 0.8f && c.blue < 0.35f)
+        assertTrue("a soft yellow on now playing: $c", c.red > c.blue + 0.2f && c.green > c.blue + 0.2f)
+    }
+
+    @Test
+    fun aBrightCoverGetsACalmerColourOfItsOwnHue() {
+        // A loud blue cover gives a steel blue that sits with it (the owner, 10 Nov), not the loud blue itself.
+        for (backdrop in listOf(DynamicAccent.backdropOf(Color(0xFF1E3A8A)), pageBackdrop(Color(0xFFF7F7F7), Color(0xFF1E3A8A)))) {
+            val c = DynamicAccent.of(Color(0xFF1E5BFF), backdrop)!!
+            assertTrue("blue: ${c.controls}", c.controls.blue > c.controls.red && c.controls.blue > c.controls.green)
+            assertTrue("calm: ${c.controls}", DynamicAccent.chroma(c.controls) <= 0.5f)
+            assertTrue("stands out", DynamicAccent.contrast(c.controls, backdrop) >= DynamicAccent.CONTROLS_CONTRAST)
+        }
     }
 
     @Test

@@ -50,4 +50,21 @@ class GenreVoteTest {
         assertEquals(tagged, GenreVote.pick("Trance", many.take(5)) { tagged })
         assertEquals(tagged, GenreVote.pick("Trance", null) { tagged })  // no Siansa Beats: as always
     }
+
+    @Test fun theSearchPageGetsTheVotedGenresWithTheirRadioNames() = runBlocking {
+        val many = (1..GenreVote.MIN_GENRES).map { JsonObject(mapOf("name" to JsonPrimitive("Style $it"), "songs" to JsonPrimitive(100 - it))) }
+        reply = { JsonObject(mapOf("genres" to JsonArray(many + JsonObject(mapOf("name" to JsonPrimitive("Hip Hop / Electro"), "songs" to JsonPrimitive(3)))))) }
+        val genres = vote.genres(30)!!
+        assertEquals("Style 1", genres.first().name)
+        assertEquals(99, genres.first().songCount)
+        assertEquals("Hip Hop / Electro", genres.last().name)
+        assertEquals("/plugins/siansa_beats/api/genres?limit=30", asked.last())
+    }
+
+    @Test fun tooFewVotedGenresShowTheTags() = runBlocking {
+        reply = { JsonObject(mapOf("genres" to JsonArray(listOf(JsonObject(mapOf("name" to JsonPrimitive("Trance"), "songs" to JsonPrimitive(3))))))) }
+        assertNull(vote.genres(30))
+        ready = false
+        assertNull(vote.genres(30))
+    }
 }

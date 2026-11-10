@@ -33,7 +33,7 @@ from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url,
 from . import beats_service, generations, jobs, similarity, status, store
 
 PLUGIN_ID = "siansa_beats"
-VERSION = "0.5.0"  # the newest in plugin.json: AudioMuse-AI and the Siansa app show it (test_version.py)
+VERSION = "0.5.1"  # the newest in plugin.json: AudioMuse-AI and the Siansa app show it (test_version.py)
 SCHEMA_VERSION = 1
 MAX_IDS = 500
 
@@ -203,6 +203,26 @@ def bad_blend():
         return _error(str(e), 502)
     logger.info("siansa_beats: bad blend %s into %s (%s) passed on", mark["from_id"], mark["to_id"], mark["technique"])
     return jsonify({"id": answer.get("id")})
+
+
+@bp.route("/api/genres")
+def genre_list():
+    """The genres of the library by Siansa Beats' vote, most songs first: ``{"genres": [{"name", "style", "genre",
+    "songs"}], "source"}``. ``name`` is what to ask a radio for. 502 when Siansa Beats doesn't answer, and an empty
+    list until its style model has voted: the app then shows the tags' genres."""
+    try:
+        limit = max(1, min(400, int(request.args.get("limit") or 60)))
+    except ValueError:
+        return _error("limit is a number", 400)
+    try:
+        answer = beats_service._beats_get("/api/genres")
+    except beats_service.BeatsError as e:
+        logger.info("siansa_beats: no genre list from Siansa Beats: %s", e)
+        return _error(str(e), 502)
+    listed = [{"name": g.get("name") or g.get("style"), "style": g.get("style"), "genre": g.get("genre"),
+               "songs": g.get("songs", 0)} for g in (answer.get("genres") or [])[:limit]]
+    return jsonify({"genres": listed, "available": bool((answer.get("styles") or {}).get("available")),
+                    "source": "siansa_beats"})
 
 
 @bp.route("/api/genre")

@@ -131,10 +131,11 @@ data class AppSettings(
     /** Image cache limit in MB; 0 = no limit. */
     val imageCacheMb: Int = 500,
     val animatedCovers: Boolean = animatedCoversByDefault(app.siansa.BuildConfig.TV_APP),
-    /** Now playing's seek bar, Play button and device name in the cover's colours (issue #970). */
-    val dynamicPlayerColours: Boolean = false,
-    /** Album, artist and playlist pages' Play and other buttons in the cover's colours (issue #1028). */
-    val dynamicPageColours: Boolean = false,
+    /**
+     * The cover's colours, everywhere (one switch in Style, the owner's 10 Nov): now playing's seek bar, Play and device
+     * name (issue #970), and the Play and other buttons of album, artist and playlist pages (issue #1028).
+     */
+    val dynamicColours: Boolean = false,
     /** Download every album, artist and playlist cover in the background. */
     val coverDownload: Boolean = false,
     /** ...on any Wi-Fi, rather than only on the same local network as Navidrome. */
@@ -433,8 +434,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         imageCacheMb = prefs.getInt("image_cache_mb", 500),
         // Off from the start on the TV app (issue #945): an animation costs a TV more than it gives.
         animatedCovers = prefs.getBoolean("animated_covers", animatedCoversByDefault(app.siansa.BuildConfig.TV_APP)),
-        dynamicPlayerColours = prefs.getBoolean("dynamic_player_colours", false),
-        dynamicPageColours = prefs.getBoolean("dynamic_page_colours", false),
+        // Once two switches, now playing's and the pages': on if either was.
+        dynamicColours = prefs.getBoolean(
+            "dynamic_colours",
+            prefs.getBoolean("dynamic_player_colours", false) || prefs.getBoolean("dynamic_page_colours", false),
+        ),
         coverDownload = prefs.getBoolean("cover_download", false),
         coverDownloadAnyWifi = prefs.getBoolean("cover_download_any_wifi", false),
         coverDownloadWifiOnly = prefs.getBoolean("cover_download_wifi_only", true),
@@ -645,16 +649,10 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(notices = notices)
     }
 
-    /** Now playing in the cover's colours (issue #970). */
-    fun setDynamicPlayerColours(on: Boolean) {
-        prefs.edit().putBoolean("dynamic_player_colours", on).apply()
-        _state.value = _state.value.copy(dynamicPlayerColours = on)
-    }
-
-    /** Album, artist and playlist pages in the cover's colours (issue #1028). */
-    fun setDynamicPageColours(on: Boolean) {
-        prefs.edit().putBoolean("dynamic_page_colours", on).apply()
-        _state.value = _state.value.copy(dynamicPageColours = on)
+    /** Now playing and the album, artist and playlist pages in the cover's colours (issues #970, #1028). */
+    fun setDynamicColours(on: Boolean) {
+        prefs.edit().putBoolean("dynamic_colours", on).apply()
+        _state.value = _state.value.copy(dynamicColours = on)
     }
 
     fun setAnimatedCovers(on: Boolean) {

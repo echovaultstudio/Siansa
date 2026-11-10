@@ -134,6 +134,10 @@ class ApiTest(unittest.TestCase):
             return {"id": 7}
         if path == "/api/health":
             return {"status": "ok", "version": "0.13.0"}
+        if path == "/api/genres":
+            return {"styles": {"available": True}, "genres": [
+                {"label": "Electronic---Trance", "genre": "Electronic", "style": "Trance", "songs": 40, "name": "Trance"},
+                {"label": "Hip Hop---Electro", "genre": "Hip Hop", "style": "Electro", "songs": 3, "name": "Hip Hop / Electro"}]}
         if path.startswith("/api/genre?"):
             self.asked_genre = path
             return {"ids": ["c", "o"], "styles": ["Electronic---Trance"], "genres": [], "why": None}
@@ -165,6 +169,14 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(self.client.post("/plugins/siansa_beats/api/bad-blends", json={"from_id": "c"}).status_code, 400)
         self.down = True
         self.assertEqual(self.client.post("/plugins/siansa_beats/api/bad-blends", json=mark).status_code, 502)
+
+    def test_the_genre_list_comes_from_siansa_beats_vote(self):
+        answer = self.client.get("/plugins/siansa_beats/api/genres?limit=1").get_json()
+        self.assertEqual(answer, {"genres": [{"name": "Trance", "style": "Trance", "genre": "Electronic", "songs": 40}],
+                                  "available": True, "source": "siansa_beats"})
+        self.assertEqual(len(self.client.get("/plugins/siansa_beats/api/genres").get_json()["genres"]), 2)
+        self.down = True
+        self.assertEqual(self.client.get("/plugins/siansa_beats/api/genres").status_code, 502)
 
     def test_genre_radios_come_from_siansa_beats_vote(self):
         answer = self.client.get("/plugins/siansa_beats/api/genre?name=Electronic+%2F+Trance&limit=50").get_json()

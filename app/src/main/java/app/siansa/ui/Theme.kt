@@ -207,6 +207,9 @@ val OnSelected: Color
 val Accent: Color
     @Composable @ReadOnlyComposable get() = LocalAccent.current
 
+/** A favourite artist's filled heart: red in every theme and with Dynamic colours, as a heart is expected to be. */
+val FavouriteRed = Color(0xFFE5534B)
+
 /** Text and icons on [Accent]. */
 val OnAccent: Color
     @Composable @ReadOnlyComposable get() = LocalOnAccent.current

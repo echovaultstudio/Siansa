@@ -115,13 +115,13 @@ fun StyleScreen(nav: NavController) {
                 SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
                 Hint("When an album folder has an animated cover (cover.gif or cover.webp), it moves on the album page and in now playing; lists show its first frame. Your server may not shrink an animated WebP (Navidrome can't), so it's downloaded once in full and kept on the phone.")  // server-name: ok (an example of a server that can't)
             }
-            // Dynamic colours on pages (issue #1028); now playing's own switch is on its page.
+            // Dynamic colours, one switch for now playing and the pages (issues #970, #1028; the owner, 10 Nov).
             Column(Modifier.padding(start = Space.Page, end = Space.Page, bottom = Space.Section), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-                SwitchRow("Dynamic colours on pages", settings.dynamicPageColours) { on ->
-                    AppLog.i("Style", "Pages: dynamic colours ${if (on) "on" else "off"}")
-                    graph.settings.setDynamicPageColours(on)
+                SwitchRow("Dynamic colours", settings.dynamicColours) { on ->
+                    AppLog.i("Style", "Dynamic colours ${if (on) "on" else "off"}")
+                    graph.settings.setDynamicColours(on)
                 }
-                Hint("Play, Shuffle and the other buttons on album, artist and playlist pages take the colour of the cover, or of the artist's picture, always easy to see.")
+                Hint("Now playing and the album, artist and playlist pages take a soft colour from the cover, or from the artist's picture, always easy to see. On an artist's page, only Play.")
             }
         }
     }
@@ -174,16 +174,6 @@ fun NowPlayingStyleScreen(nav: NavController) {
                     onCheckedChange = { setLyricsButton(graph, it) },
                     modifier = Modifier.testTag("lyricsButtonSwitch"),
                 )
-            }
-            // The cover's colours for the seek bar, Play, the liked heart and the device name (issues #970, #998).
-            StyleSwitchRow(
-                "Dynamic colours",
-                "The seek bar, Play, the heart and where it plays take the colour of the cover, always easy to see",
-                settings.dynamicPlayerColours,
-                "dynamicColoursSwitch",
-            ) { on ->
-                AppLog.i("Style", "Now playing: dynamic colours ${if (on) "on" else "off"}")
-                graph.settings.setDynamicPlayerColours(on)
             }
             Spacer(Modifier.height(Space.Section))
             PlaySlidesSettings(settings.playSlides) { slides ->

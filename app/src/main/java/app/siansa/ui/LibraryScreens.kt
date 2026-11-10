@@ -559,7 +559,7 @@ internal fun FavouriteArtistButton(
     }
 }
 
-/** The heart itself, filled in the accent colour when [on]; drawn on its own for the spacing tests. */
+/** The heart itself, filled red when [on] (a favourite), otherwise an outline in [offTint]; drawn on its own for the spacing tests. */
 @Composable
 internal fun FavouriteHeart(
     on: Boolean,
@@ -572,7 +572,7 @@ internal fun FavouriteHeart(
         Icon(
             if (on) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
             if (on) "Remove from favourite artists" else "Add to favourite artists",
-            tint = if (on) Accent else offTint,
+            tint = if (on) FavouriteRed else offTint,
             modifier = Modifier.size(iconSize),
         )
     }

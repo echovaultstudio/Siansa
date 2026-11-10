@@ -44,7 +44,9 @@ data class CoverSwatch(val color: Color, val population: Int)
  * controls and text.
  *
  * The colour is the one that fills most of the cover, as much as its liveliest (issue #994): a sepia cover with a red
- * light in it is tan, not red, and a muted colour stays muted. A cover in black, white and grey gets silver, from its
+ * light in it is tan, not red, and a muted colour stays muted. It's calmed rather than livened (the owner, 10 Nov):
+ * never more than [MOST_SATURATION], and a little less than the cover's own ([CALM]), so a bright blue cover gives a
+ * steel blue that sits with it rather than a loud one. A cover in black, white and grey gets silver, from its
  * own greys: the theme's amber came from nowhere on it. Only a cover that couldn't be read keeps the theme's colour.
  */
 object DynamicAccent {
@@ -54,10 +56,10 @@ object DynamicAccent {
     /** Below this chroma (the most and least of red, green and blue apart) a colour is grey: its hue means nothing. */
     private const val GREY = 0.04f
 
-    /** A cover's colour is livened a little, so it reads as a colour on the dark page; never past [MOST_SATURATION]. */
-    private const val LIVEN = 1.15f
-    private const val MOST_SATURATION = 0.85f
-    private const val LIGHTNESS_FROM = 0.40f
+    /** A cover's colour is calmed a little, and never past [MOST_SATURATION]: a soft tone of the cover, not a loud one. */
+    private const val CALM = 0.8f
+    const val MOST_SATURATION = 0.45f
+    private const val LIGHTNESS_FROM = 0.52f
 
     /** A muted colour (below [MUTED] saturation) starts lighter, like the cover's own highlights, so it isn't muddy. */
     private const val MUTED = 0.35f
@@ -187,7 +189,7 @@ object DynamicAccent {
         if (seed.alpha <= 0f) return null
         val (h, s0, l0) = hsl(seed)
         val grey = chroma(seed) < GREY
-        val s = if (grey) 0f else min(MOST_SATURATION, s0 * LIVEN)
+        val s = if (grey) 0f else min(MOST_SATURATION, s0 * CALM)
         // A light page (an album in the light theme, issue #1028): the colour is darkened until it stands out, from
         // graphite for a black and white cover. Now playing is always dark behind its controls.
         val lightPage = backdrop.luminance() > LIGHT_PAGE
@@ -334,14 +336,20 @@ fun rememberDynamicColours(coverId: String?, on: Boolean, backdrop: Color? = nul
 
 /**
  * [content] with its Play button, Shuffle and the other buttons in the colour of [coverId]'s cover, with Style's
- * Dynamic colours on pages (issue #1028), standing out from a page of [backdrop]. With it off, or before the cover has
+ * Dynamic colours on (issue #1028), standing out from a page of [backdrop]. With it off, or before the cover has
  * been read, the theme's colours.
  */
 @Composable
 fun WithPageColours(coverId: String?, backdrop: Color, where: String, content: @Composable () -> Unit) {
-    val on = LocalGraph.current.settings.state.collectAsStateWithLifecycle().value.dynamicPageColours
-    val colours = rememberDynamicColours(coverId, on && coverId != null, backdrop, where)
+    val colours = rememberPageColours(coverId, backdrop, where)
     WithAccent(colours?.controls, colours?.onControls, content)
+}
+
+/** A page's colours from [coverId]'s cover on a page of [backdrop], with Style's Dynamic colours on; null when off. */
+@Composable
+fun rememberPageColours(coverId: String?, backdrop: Color, where: String): DynamicColours? {
+    val on = LocalGraph.current.settings.state.collectAsStateWithLifecycle().value.dynamicColours
+    return rememberDynamicColours(coverId, on && coverId != null, backdrop, where)
 }
 
 /**

@@ -404,7 +404,10 @@ private fun MakeVibeRow(query: String, nav: NavController, onOpen: () -> Unit) {
 private fun BrowseGrid(nav: NavController) {
     val graph = LocalGraph.current
     val version by graph.library.version.collectAsStateWithLifecycle()
-    val genreList by loadState(version to "browse-genres") { if (graph.library.isSynced) graph.library.genres(30) else emptyList() }
+    // Siansa Beats' genres (each song's sound first, its tags second) when it's there; the songs' tags otherwise.
+    val genreList by loadState(version to "browse-genres") {
+        if (!graph.library.isSynced) emptyList() else graph.genreVote.genres(30) ?: graph.library.genres(30)
+    }
     val genres = genreList.valueOrNull().orEmpty()
     LazyVerticalGrid(
         columns = GridCells.Adaptive(160.dp),

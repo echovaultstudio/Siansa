@@ -84,4 +84,21 @@ class DjBarTest {
         assertTrue("the bar starts inside the seek bar's room: $top", top >= 0.dp)
         assertTrue("room above Play: ${playTop - bottom}", playTop - bottom >= Space.Page)
     }
+
+    @Test fun surpriseLevelsMatchTheWords() {
+        assertEquals(SurpriseLevel.NONE, SurpriseLevel.of(0))
+        assertEquals(SurpriseLevel.FEW, SurpriseLevel.of(20))
+        assertEquals(SurpriseLevel.SOME, SurpriseLevel.of(50))
+        assertEquals(SurpriseLevel.LOTS, SurpriseLevel.of(100))
+        // Each level's own setting reads as that level again.
+        SurpriseLevel.entries.forEach { assertEquals(it, SurpriseLevel.of(it.value)) }
+    }
+
+    @Test fun foldedShapeYourMixSaysWhatsSet() {
+        val radio = DjBarPlaces(DjBarSpot.default, starting = false)
+        assertEquals("Steady build · some surprises", mixShapeSummary(radio, app.siansa.mix.MixShape.BUILD, SurpriseLevel.SOME))
+        assertEquals("Steady vibes · no surprises", mixShapeSummary(radio, app.siansa.mix.MixShape.STEADY, SurpriseLevel.NONE))
+        assertEquals("Start a DJ mix from this song", mixShapeSummary(radio.copy(starting = true), null, null))
+        assertEquals("A DJ mix of this list", mixShapeSummary(DjBarPlaces(listOf(DjBarSpot.MIX), false), null, null))
+    }
 }

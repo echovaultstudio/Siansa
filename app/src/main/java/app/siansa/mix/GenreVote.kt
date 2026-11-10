@@ -43,8 +43,37 @@ class GenreVote(
         return ids
     }
 
+    /**
+     * The library's genres by vote, most songs first (the search page's genres): null when the vote can't be had, or
+     * Siansa Beats hasn't voted any yet, so the page shows the tags' genres. Each name is what a radio asks for.
+     */
+    suspend fun genres(limit: Int): List<app.siansa.data.Genre>? {
+        if (!ready() || now() < backOffUntil) return null
+        val answer = try {
+            ask("$LIST_PATH?limit=$limit") as? JsonObject
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            backOffUntil = now() + BACK_OFF_MS
+            AppLog.i("Search", "Genres: none from Siansa Beats (${e.message}), so the tags'")
+            return null
+        } ?: return null
+        val listed = (answer["genres"] as? JsonArray)?.mapNotNull { item ->
+            val o = item as? JsonObject ?: return@mapNotNull null
+            val name = (o["name"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            app.siansa.data.Genre(name, (o["songs"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0)
+        }.orEmpty()
+        if (listed.size < MIN_GENRES) return null
+        AppLog.d("Search", "Genres: ${listed.size} by Siansa Beats' vote")
+        return listed
+    }
+
     companion object {
         const val PATH = PLUGIN_PREFIX + "api/genre"
+        const val LIST_PATH = PLUGIN_PREFIX + "api/genres"
+
+        /** Fewer genres than this by vote (it has hardly started), and the search page shows the tags' genres. */
+        const val MIN_GENRES = 8
         const val BACK_OFF_MS = 10 * 60_000L
 
         /** Fewer songs than this by vote (Siansa Beats hasn't heard many yet, or they aren't on the phone), and the tags play. */

@@ -6,6 +6,14 @@
   "requirements": [],
   "versions": [
     {
+      "version": "0.5.1",
+      "min_core_version": "3.6.4",
+      "changelog": "The genre list by Siansa Beats' vote, for Siansa Dev's search page.",
+      "imageUrl": "",
+      "sourceUrl": "",
+      "checksum": ""
+    },
+    {
       "version": "0.5.0",
       "min_core_version": "3.6.4",
       "changelog": "Genre radios: the songs of a genre by Siansa Beats' vote (each song's sound first, its tags second), for Siansa Dev.",

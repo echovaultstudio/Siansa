@@ -184,7 +184,9 @@ fun ArtistScreen(nav: NavController, id: String) {
         if (tabsPinned) scope.launch { gridState.scrollToItem(TABS_INDEX); gridState.scrollBy(-barPx) }
     }
 
-    WithPageColours(pictureId, pageBackdrop(MaterialTheme.colorScheme.surface, tint), where = "Artist page") {
+    // With Dynamic colours, only Play takes the picture's colour (the owner, 10 Nov): Radio, Shuffle and the heart stay
+    // as they are, so the row doesn't shout.
+    val playColours = rememberPageColours(pictureId, pageBackdrop(MaterialTheme.colorScheme.surface, tint), where = "Artist page")
     HeroPage(
         title = p?.artist?.name ?: "Artist",
         heroHeight = HERO,
@@ -268,6 +270,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                         onShuffle = if (p.songs.isNotEmpty()) ({ graph.player.play(p.songs, shuffle = true) }) else null,
                         playing = playback.playing,
                         onPlay = if (p.songs.isNotEmpty()) ({ playback.press { graph.player.play(p.songs) } }) else null,
+                        playColours = playColours,
                     )
                 }
             }
@@ -359,7 +362,6 @@ fun ArtistScreen(nav: NavController, id: String) {
                 full { SimilarRow(similar, nav) }
             }
         }
-    }
     }
 }
 
@@ -508,6 +510,8 @@ private fun SimilarRow(similar: List<SimilarArtist>, nav: NavController) {
 /**
  * The artist page's button row: the heart to make the artist a favourite (issue #397) on the left, its drawing in line
  * with the text above; Radio, Shuffle and Play on the right, on one line. Without songs, only the heart and Radio.
+ * With Dynamic colours, only Play takes the picture's colours ([playColours]); Radio and Shuffle are the page's text
+ * colour, and the heart is red only for a favourite.
  */
 @Composable
 internal fun ArtistButtons(
@@ -516,21 +520,25 @@ internal fun ArtistButtons(
     onShuffle: (() -> Unit)?,
     playing: Boolean,
     onPlay: (() -> Unit)?,
+    playColours: DynamicColours? = null,
 ) {
+    val plain = MaterialTheme.colorScheme.onSurface
     PlayButtonRow {
         heart(Modifier.offset(x = -ICON_INSET))  // spacing: exact (the heart in line with the text above)
         Spacer(Modifier.weight(1f))
         IconButton(onClick = onRadio, modifier = Modifier.testTag("artistRadio")) {
-            Icon(Icons.Rounded.Radio, "Radio", tint = Accent, modifier = Modifier.size(ICON_SIZE))
+            Icon(Icons.Rounded.Radio, "Radio", tint = plain, modifier = Modifier.size(ICON_SIZE))
         }
         if (onShuffle != null) {
             IconButton(onClick = onShuffle, modifier = Modifier.testTag("shuffleAll")) {
-                Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
+                Icon(Icons.Rounded.Shuffle, "Shuffle", tint = plain, modifier = Modifier.size(30.dp))
             }
         }
         if (onPlay != null) {
             Spacer(Modifier.width(Space.Small))
-            BigPlayButton(enabled = true, playing = playing, onPlay = onPlay)
+            WithAccent(playColours?.controls, playColours?.onControls) {
+                BigPlayButton(enabled = true, playing = playing, onPlay = onPlay)
+            }
         }
     }
 }

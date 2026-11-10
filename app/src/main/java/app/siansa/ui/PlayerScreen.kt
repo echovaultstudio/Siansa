@@ -118,6 +118,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -199,7 +200,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     // The cover's colour, for the page, the cards under the player and the lyrics screen.
     val tint = rememberCoverColor(song?.cover)
     // With Style's Dynamic colours, the seek bar, Play, the liked heart and where it plays take the cover's colour (issues #970, #998).
-    val dynamic = rememberDynamicColours(song?.cover, style.dynamicPlayerColours)
+    val dynamic = rememberDynamicColours(song?.cover, style.dynamicColours)
     // The song's lyrics, for the lyrics button and the preview card. Cleared as the song changes, so the
     // button doesn't stay lit for a song without lyrics.
     val lyrics by loadStateFresh("lyrics-${song?.id}") { song?.let { graph.source.lyrics(it) } }
@@ -592,7 +593,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                     ) {
                         Box(Modifier.size(width = 40.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.5f)))
                     }
-                    QueueView(state)
+                    QueueView(state, ::djBar)
                 }
             }
         }
@@ -1002,7 +1003,7 @@ private val QUEUE_SHEET = Color(0xF2121212)
 internal val QUEUE_ROW = Color(0xFF121212)
 
 @Composable
-private fun QueueView(state: PlayerState) {
+private fun QueueView(state: PlayerState, onDjBar: (DjBarSpot, Boolean) -> Unit) {
     val graph = LocalGraph.current
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = max(0, state.index - 1))
     if (state.queue.isEmpty()) {
@@ -1024,14 +1025,31 @@ private fun QueueView(state: PlayerState) {
                 Icon(Icons.Rounded.AddCircle, "Save queue as playlist", tint = Color.White)
             }
         }
-        // Shape the mix (issue #649): only while a DJ song radio fills the queue.
+        // Shape your mix (issue #649; the owner, 10 Nov): the glide bar of now playing, folded under its heading, with
+        // the Surprises bar under it while a DJ radio plays. Its places as the glide bar's: a radio's shapes and Stop,
+        // a list's own mix only Stop, or the shapes and Start when a DJ mix can start from this song.
         val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
-        if (radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ) {
-            val settings by graph.settings.state.collectAsStateWithLifecycle()
-            MixShapeControls(settings.mixShape, settings.mixSurprise) { shape, surprise ->
-                graph.settings.setMixShape(shape, surprise)
-                graph.songRadio.reshape()
-            }
+        val albumDj by app.siansa.mix.AlbumDjMix.playing.collectAsStateWithLifecycle()
+        val settings by graph.settings.state.collectAsStateWithLifecycle()
+        val song = state.current
+        val djRadio = radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ
+        val listMix = song != null && song.id in albumDj
+        val canStart = song != null && !OutsideMedia.isOutside(song.id) &&
+            slideUnavailable(PlaySlide.DJ_MIX, settings, graph.connection.current.aiProblem(settings)) == null
+        djBarPlaces(settings.djBarOrder, djRadio, listMix, canStart)?.let { places ->
+            var open by rememberSaveable { mutableStateOf(false) }
+            MixShapePanel(
+                places = places,
+                shape = settings.mixShape.takeIf { djRadio },
+                surprise = settings.mixSurprise.takeIf { djRadio },
+                open = open,
+                onOpen = { open = it },
+                onPlace = { onDjBar(it, places.starting) },
+                onSurprise = { level ->
+                    graph.settings.setMixShape(settings.mixShape, level.value)
+                    graph.songRadio.reshape()
+                },
+            )
         }
         Spacer(Modifier.height(Space.Tight))
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
@@ -1079,40 +1097,78 @@ private fun QueueView(state: PlayerState) {
 
 
 /**
- * The shape of a DJ mix (issue #649), in the queue: a chip for what the energy does over the next songs, and a
- * slider for how far the mix may stray. Each change puts the songs not yet played in a new order.
+ * Shape your mix (issue #649; the owner, 10 Nov), in the queue: a heading that folds open on the glide bar of now
+ * playing, tapped instead of slid to ([places]: start, stop or shape the mix), and, while a DJ radio plays ([surprise]
+ * not null), the Surprises bar in the same design: how far the mix may stray. Folded, the heading says what's set.
+ * [shape]: the mix's shape now (a DJ radio's), ringed on the bar.
  */
 @Composable
-internal fun MixShapeControls(shape: app.siansa.mix.MixShape, surprise: Int, onChange: (app.siansa.mix.MixShape, Int) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = Space.Page).testTag("mixShape")) {
-        Text("Shape the mix", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.8f))
-        Spacer(Modifier.height(Space.Small))
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-            app.siansa.mix.MixShape.entries.forEach { s ->
-                androidx.compose.material3.FilterChip(
-                    selected = shape == s,
-                    onClick = { if (s != shape) onChange(s, surprise) },
-                    label = { Text(s.label) },
-                    modifier = Modifier.testTag("mixShape-${s.name}"),
+internal fun MixShapePanel(
+    places: DjBarPlaces,
+    shape: app.siansa.mix.MixShape?,
+    surprise: Int?,
+    open: Boolean,
+    onOpen: (Boolean) -> Unit,
+    onPlace: (DjBarSpot) -> Unit,
+    onSurprise: (SurpriseLevel) -> Unit,
+) {
+    val level = surprise?.let { SurpriseLevel.of(it) }
+    Column(Modifier.fillMaxWidth().testTag("mixShape")) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClickLabel = if (open) "Fold" else "Unfold") { onOpen(!open) }
+                .padding(horizontal = Space.Page, vertical = Space.Medium)
+                .testTag("mixShapeHeading"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Shape your mix", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    mixShapeSummary(places, shape, level),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("mixShapeSummary"),
                 )
             }
+            val turn by animateFloatAsState(if (open) 180f else 0f, label = "mixShapeChevron")
+            Icon(Icons.Rounded.KeyboardArrowDown, null, tint = Color.White, modifier = Modifier.rotate(turn))
         }
-        Spacer(Modifier.height(Space.Small))
-        Text(shape.hint, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
-        var value by remember(surprise) { mutableFloatStateOf(surprise.toFloat()) }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // On one line whatever the font size (issue #677): the slider takes what's left.
-            Text("Surprises", style = MaterialTheme.typography.bodyMedium, maxLines = 1, softWrap = false, modifier = Modifier.padding(end = Space.Small).testTag("mixSurpriseLabel"))
-            Slider(
-                value = value,
-                onValueChange = { value = it },
-                onValueChangeFinished = { if (value.roundToInt() != surprise) onChange(shape, value.roundToInt()) },
-                valueRange = 0f..100f,
-                modifier = Modifier.weight(1f).testTag("mixSurprise"),
-            )
-            Text(surpriseLabel(value.roundToInt()), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.End, maxLines = 1, softWrap = false, modifier = Modifier.padding(start = Space.Small).width(SURPRISE_LABEL_WIDTH))
+        AnimatedVisibility(open) {
+            Column(Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Page, bottom = Space.Medium)) {
+                val now = shape?.let { DjBarSpot.of(it) }
+                DjBar(places.spots, chosen = now?.let { places.spots.indexOf(it) }?.takeIf { it >= 0 }, now = now,
+                    starting = places.starting, open = 1f, onTap = onPlace)
+                Text(
+                    now?.hint ?: (places.spots.singleOrNull() ?: DjBarSpot.MIX).hint(places.starting),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = Space.Small).testTag("mixShapeHint"),
+                )
+                if (level != null) {
+                    Text("Surprises", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(top = Space.Page, bottom = Space.Small).testTag("mixSurpriseLabel"))
+                    GlidePill(1f, Modifier.testTag("mixSurprise")) {
+                        SurpriseLevel.entries.forEach { l ->
+                            GlidePlace(l.icon, "Surprises: ${l.label}", chosen = l == level, now = false, tag = "surprise",
+                                onTap = { if (l != level) onSurprise(l) }, modifier = Modifier.weight(1f))
+                        }
+                    }
+                    Text("${level.label}: ${level.hint}", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(top = Space.Small).testTag("mixSurpriseHint"))
+                }
+            }
         }
     }
+}
+
+/** What Shape your mix says folded: the shape and surprises a DJ radio has, or what its bar does. */
+internal fun mixShapeSummary(places: DjBarPlaces, shape: app.siansa.mix.MixShape?, level: SurpriseLevel?): String = when {
+    shape != null -> shape.label + (level?.let { " · " + if (it == SurpriseLevel.NONE) "no surprises" else "${it.label.lowercase()} surprises" }.orEmpty())
+    places.starting -> "Start a DJ mix from this song"
+    else -> "A DJ mix of this list"
 }
 
 /** What a surprise setting means, in a word. */
@@ -1123,7 +1179,6 @@ internal fun surpriseLabel(surprise: Int): String = when {
     else -> "Lots"
 }
 
-private val SURPRISE_LABEL_WIDTH = 64.dp
 
 /** In the classic now playing style, how much of the lyrics card shows under the player before scrolling (issue #346). */
 private val PLAYER_PEEK = 44.dp

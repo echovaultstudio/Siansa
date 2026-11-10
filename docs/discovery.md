@@ -19,8 +19,10 @@ When you start a radio you pick **Steady** (the wave) or **DJ** (the turntable) 
 
 ### Shape the mix
 
-While a DJ radio plays, the queue (pull up from now playing) has **Shape the mix**: what the energy does over the
-songs not yet played, and how far the mix may stray. Each change picks the radio's next songs again, starting
+While a DJ radio plays, the queue (pull up from now playing) has **Shape your mix**, folded under its heading with
+what's set beside it ("Steady build · some surprises"). Tap it to open two bars like the DJ mix bar on now playing:
+slide or tap along the first for what the energy does over the songs not yet played, and along **Surprises** for how
+far the mix may stray. Each change picks the radio's next songs again, starting
 with the very next one: from the ones queued and a fresh lot that sound like the song playing, so a wind down finds
 calmer songs and a euphoric mix brighter ones at a tempo that still mixes. The queue keeps as many songs as before;
 ones that don't fit the new shape go, and may come back later. The song playing and anything you queued yourself
@@ -120,6 +122,10 @@ and can be renamed or deleted.
 ("dreamy synth pop", "energetic electronic"), where AudioMuse-AI finds songs that sound like your words. Each kind
 shows its top five; tap a section's title (**Artists**, **Albums**, **Songs**, **Sounds like …**) to see every
 match on a page of its own, with Play and Shuffle at the top for songs.
+
+Before you type, Search shows your genres to browse. In Siansa Dev with Siansa Beats, they're the genres Siansa Beats
+heard in your music (its sound and tags together), most songs first; without Siansa Beats, or until it has voted on
+enough songs, the genre tags of your library as always.
 
 ## Roll the dice
 

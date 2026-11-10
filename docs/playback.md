@@ -219,7 +219,7 @@ Sliding **up** from the play button opens the **DJ mix bar** (when up is set to 
 into a slim, see-through bar with five symbols, **Steady vibes**, **Steady build**, the mix in the middle, **Euphoric**
 and **Wind down**, and closes back into the line when you let go. With no DJ mix playing, the middle is **Start**: let go
 there for a DJ mix from the song playing, or on a shape to start one in that shape. While a DJ mix plays, the middle is
-**Stop** (the songs left in the queue play on, without blends), and a shape changes the mix as **Shape the mix** in the
+**Stop** (the songs left in the queue play on, without blends), and a shape changes the mix as **Shape your mix** in the
 queue does: the next songs change; the mix's shape now has a ring in your colour. Slide up onto the bar, then along it:
 the place under your finger lights up (Stop in white, the rest in your colour) and the phone clicks at each one, while
 the cover shows its name, what it does and "Let go to start", "Let go to stop" or "Let go to reshape". Slide back down
