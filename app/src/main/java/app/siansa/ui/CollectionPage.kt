@@ -133,6 +133,8 @@ fun CollectionPage(
     // What the quick-scroll handle says for a song (a letter, a month); by default where it is in the list.
     scrollLabel: ((index: Int, song: Song) -> String?)? = null,
     footer: LazyListScope.() -> Unit = {},
+    // False for a page whose cover Siansa draws (a radio): Home's shortcut shows that, not its first song's cover.
+    shortcutCover: Boolean = true,
 ) {
     val graph = LocalGraph.current
     val djSettings by graph.settings.state.collectAsStateWithLifecycle()
@@ -144,7 +146,7 @@ fun CollectionPage(
     val route = remember(nav.currentBackStackEntry) { nav.currentBackStackEntry?.let { routeOf(it.destination.route, it.arguments) } }
     fun notePlayed() {
         val r = route ?: return
-        val cover = songs?.firstOrNull()?.cover
+        val cover = if (shortcutCover) songs?.firstOrNull()?.cover else null
         graph.scope.launch { graph.recentPlays.note(r, title, cover) }
     }
     val listState = rememberLazyListState()

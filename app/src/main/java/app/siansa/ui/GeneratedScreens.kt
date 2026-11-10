@@ -49,6 +49,23 @@ fun NavController.openGenreRadio(name: String) = navigate("radio/genre/${Uri.enc
 fun NavController.openCentreRadio(key: String) = navigate("radio/centre/${Uri.encode(key)}")
 fun NavController.openMoodPlaylist(text: String) = navigate("mood/${Uri.encode(text)}")
 
+/**
+ * The colours of a page whose cover Siansa draws (a radio, a mood playlist, More like this playlist) from its [route],
+ * as Home's shortcut to it shows them: its own cover, not one of its songs' (the owner, 10 Nov). Null for any other page.
+ */
+fun generatedCoverColors(route: String): Pair<Color, Color>? {
+    val parts = route.split('/')
+    return when {
+        parts.size == 3 && parts[0] == "radio" -> {
+            val key = Uri.decode(parts[2])
+            moodRadios.firstOrNull { it.id == key }?.let { Color(it.colors.first) to Color(it.colors.second) } ?: tileColors(key)
+        }
+        parts.size == 2 && parts[0] == "blend" -> tileColors("blend-${Uri.decode(parts[1])}")
+        parts.size == 2 && parts[0] == "mood" -> tileColors(Uri.decode(parts[1]))
+        else -> null
+    }
+}
+
 /** A mood or genre radio shown as a playlist first, so you can look, play or shuffle. */
 @Composable
 fun RadioScreen(nav: NavController, kind: String, key: String) {
@@ -86,6 +103,7 @@ fun RadioScreen(nav: NavController, kind: String, key: String) {
         songs = songs.valueOrNull(),
         error = (songs as? Load.Err)?.message,
         saveAsPlaylist = true,
+        shortcutCover = false,
         cover = { m -> GeneratedCover(title, colors, m) },
         header = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -138,6 +156,7 @@ fun BlendScreen(nav: NavController, playlistId: String) {
         songs = songs.valueOrNull(),
         error = (source as? Load.Err)?.message ?: (songs as? Load.Err)?.message,
         saveAsPlaylist = true,
+        shortcutCover = false,
         cover = { m -> GeneratedCover(title, colors, m) },
         header = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -174,6 +193,7 @@ fun MoodScreen(nav: NavController, text: String) {
         songs = r?.songs,
         error = (result as? Load.Err)?.message,
         saveAsPlaylist = true,
+        shortcutCover = false,
         cover = { m -> GeneratedCover(r?.title ?: text, colors, m) },
         header = {
             if (r != null) {

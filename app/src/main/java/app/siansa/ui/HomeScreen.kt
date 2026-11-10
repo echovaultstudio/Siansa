@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
@@ -334,10 +335,19 @@ fun HomeScreen(nav: NavController) {
                         val played = shownRecents(recentPlays.orEmpty(), shownRecentAlbums)
                             .filter { !it.route.startsWith("mix/") || it.route.removePrefix("mix/") in mixIds }
                         val quick = quickShortcuts(played, fill, homeSettings.homeShortcuts)
-                        fun colorsOf(r: RecentPlay) = if (r.route == "liked") Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(r.title)
+                        fun colorsOf(r: RecentPlay) = if (r.route == "liked") Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else generatedCoverColors(r.route) ?: tileColors(r.title)
+                        // A radio's (or another page whose cover Siansa draws) is its own cover, in its colours, never one
+                        // of its songs' (the owner, 10 Nov), also for shortcuts noted before.
+                        fun coverOf(r: RecentPlay) = if (generatedCoverColors(r.route) != null) null else r.cover
+                        fun iconOf(r: RecentPlay) = when {
+                            r.route == "liked" && r.cover == null -> Icons.Rounded.Favorite
+                            r.route.startsWith("radio/") -> Icons.Rounded.Radio
+                            r.route.startsWith("blend/") || r.route.startsWith("mood/") -> Icons.Rounded.AutoAwesome
+                            else -> null
+                        }
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "quick", "Shortcuts", quick.mapIndexed { i, r ->
-                                HomeItem("quick-$i", r.title, coverArt = r.cover, colors = colorsOf(r), open = { nav.navigate(r.route) })
+                                HomeItem("quick-$i", r.title, coverArt = coverOf(r), colors = colorsOf(r), open = { nav.navigate(r.route) })
                             })
                         } else if (quick.isNotEmpty()) {
                             Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium).testTag("quickShortcuts"), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
@@ -345,8 +355,8 @@ fun HomeScreen(nav: NavController) {
                                     Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                                         row.forEach { r ->
                                             QuickTile(
-                                                r.title, r.cover, colorsOf(r), { nav.navigate(r.route) }, Modifier.weight(1f),
-                                                icon = if (r.route == "liked" && r.cover == null) Icons.Rounded.Favorite else null,
+                                                r.title, coverOf(r), colorsOf(r), { nav.navigate(r.route) }, Modifier.weight(1f),
+                                                icon = iconOf(r),
                                             )
                                         }
                                         if (row.size == 1) Spacer(Modifier.weight(1f))
