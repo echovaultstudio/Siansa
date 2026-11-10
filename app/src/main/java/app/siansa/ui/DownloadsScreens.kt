@@ -745,9 +745,9 @@ private fun CoverDownloadSection() {
         )
         Text(
             // Before the covers, the artists are looked up for their photos (Looking up artist photos: 40 of 900).
-            if (download.total == 0 && download.note != null) download.note
-            else "Checked ${download.done} of ${download.total} · ${download.downloaded} downloaded" +
-                if (download.failed > 0) " · ${download.failed} failed" else "",
+            download.note?.takeIf { download.total == 0 }
+            ?: ("Checked ${download.done} of ${download.total} · ${download.downloaded} downloaded" +
+                if (download.failed > 0) " · ${download.failed} failed" else ""),
             style = MaterialTheme.typography.bodyMedium,
         )
         OutlinedButton(onClick = { CoverDownload.stop(context) }) { Text("Stop") }
