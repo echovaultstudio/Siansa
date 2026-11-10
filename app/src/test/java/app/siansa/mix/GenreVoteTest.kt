@@ -20,7 +20,8 @@ class GenreVoteTest {
         JsonObject(mapOf("ids" to JsonArray(listOf("a", "b").map { JsonPrimitive(it) }),
             "styles" to JsonArray(listOf(JsonPrimitive("Electronic---Trance"))), "genres" to JsonArray(emptyList())))
     }
-    private val vote = GenreVote({ path -> asked += path; reply(path) }, { ready }, { time })
+    private var savedText: String? = null
+    private val vote = GenreVote({ path -> asked += path; reply(path) }, { ready }, { time }, { savedText }, { savedText = it })
 
     @Test fun asksThePluginForTheGenreAsShown() = runBlocking {
         assertEquals(listOf("a", "b"), vote.songIds("Electronic / Trance", 300))
@@ -33,14 +34,16 @@ class GenreVoteTest {
         assertTrue(asked.isEmpty())
     }
 
-    @Test fun aMissingServiceIsLeftAloneForAWhile() = runBlocking {
+    @Test fun aMissingServiceIsLeftAloneForAWhileAfterSeveralMisses() = runBlocking {
         reply = { throw IllegalStateException("AudioMuse answered HTTP 502") }
+        // One slow or failed answer doesn't turn the vote off: only GenreVote.MISSES in a row do.
+        repeat(GenreVote.MISSES) { assertNull(vote.songIds("Trance", 300)) }
+        assertEquals(GenreVote.MISSES, asked.size)
         assertNull(vote.songIds("Trance", 300))
-        assertNull(vote.songIds("Trance", 300))
-        assertEquals(1, asked.size)
+        assertEquals(GenreVote.MISSES, asked.size)
         time += GenreVote.BACK_OFF_MS + 1
         vote.songIds("Trance", 300)
-        assertEquals(2, asked.size)
+        assertEquals(GenreVote.MISSES + 1, asked.size)
     }
 
     @Test fun theTagsPlayWhenTheVoteHasTooFewSongs() = runBlocking {
@@ -51,20 +54,52 @@ class GenreVoteTest {
         assertEquals(tagged, GenreVote.pick("Trance", null) { tagged })  // no Siansa Beats: as always
     }
 
-    @Test fun theSearchPageGetsTheVotedGenresWithTheirRadioNames() = runBlocking {
-        val many = (1..GenreVote.MIN_GENRES).map { JsonObject(mapOf("name" to JsonPrimitive("Style $it"), "songs" to JsonPrimitive(100 - it))) }
-        reply = { JsonObject(mapOf("genres" to JsonArray(many + JsonObject(mapOf("name" to JsonPrimitive("Hip Hop / Electro"), "songs" to JsonPrimitive(3)))))) }
-        val genres = vote.genres(30)!!
+    private fun manyGenres(extra: List<JsonObject> = emptyList()) = JsonObject(mapOf("genres" to JsonArray(
+        (1..GenreVote.MIN_GENRES).map { JsonObject(mapOf("name" to JsonPrimitive("Style $it"), "songs" to JsonPrimitive(100 - it))) } + extra,
+    )))
+
+    @Test fun everyVotedGenreComesWithItsRadioNameAndIsSaved() = runBlocking {
+        reply = { manyGenres(listOf(JsonObject(mapOf("name" to JsonPrimitive("Hip Hop / Electro"), "songs" to JsonPrimitive(3))))) }
+        val genres = vote.refresh()!!
         assertEquals("Style 1", genres.first().name)
         assertEquals(99, genres.first().songCount)
         assertEquals("Hip Hop / Electro", genres.last().name)
-        assertEquals("/plugins/siansa_beats/api/genres?limit=30", asked.last())
+        assertEquals("/plugins/siansa_beats/api/genres?limit=${GenreVote.MOST_GENRES}", asked.last())
+        // Saved: a new start shows it at once, without asking.
+        val again = GenreVote({ throw IllegalStateException("not asked") }, { true }, { time }, { savedText }, {})
+        assertEquals(genres, again.saved())
+        assertTrue(!again.stale())
+        time += GenreVote.REFRESH_MS + 1
+        assertTrue(again.stale())
+    }
+
+    @Test fun theSavedListStaysWhenSiansaBeatsDoesntAnswer() = runBlocking {
+        reply = { manyGenres() }
+        val first = vote.refresh()!!
+        reply = { throw IllegalStateException("AudioMuse answered HTTP 502") }
+        assertNull(vote.refresh())
+        assertEquals(first, vote.saved())
+    }
+
+    @Test fun withoutAudioMuseTheTagsAreShownEvenWithASavedList() = runBlocking {
+        reply = { manyGenres() }
+        vote.refresh()
+        ready = false
+        assertNull(vote.saved())  // Siansa Beats isn't needed: the tags' genres show
+        assertNull(vote.refresh())
     }
 
     @Test fun tooFewVotedGenresShowTheTags() = runBlocking {
         reply = { JsonObject(mapOf("genres" to JsonArray(listOf(JsonObject(mapOf("name" to JsonPrimitive("Trance"), "songs" to JsonPrimitive(3))))))) }
-        assertNull(vote.genres(30))
-        ready = false
-        assertNull(vote.genres(30))
+        assertNull(vote.refresh())
+        assertNull(vote.saved())
+    }
+
+    @Test fun aSlowAnswerKeepsTheSavedList() = runBlocking {
+        reply = { manyGenres() }
+        vote.refresh()
+        val slow = GenreVote({ kotlinx.coroutines.delay(GenreVote.WAIT_MS + 1_000); manyGenres() }, { true }, { time }, { savedText }, {})
+        assertNull(slow.refresh())
+        assertEquals(GenreVote.MIN_GENRES, slow.saved()!!.size)
     }
 }

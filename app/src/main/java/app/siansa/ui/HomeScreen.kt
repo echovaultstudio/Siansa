@@ -258,7 +258,8 @@ fun HomeScreen(nav: NavController) {
         if (graph.library.isSynced) graph.library.randomAlbums(20)
         else graph.source.albums("random", 20, 0).distinctBy { it.name + "|" + it.artist }
     }
-    val genres by loadState(version to "genres") { if (graph.library.isSynced) graph.library.genres(12) else emptyList() }
+    // Siansa Beats' genres by vote as last saved, or the songs' tags (the same list as Search).
+    val genres by rememberBrowseGenres(12)
 
     // The Home tab tapped again: glide back to the top. From far down, jump most of the way first so it's quick.
     val listState = rememberLazyListState()
@@ -575,10 +576,10 @@ fun HomeScreen(nav: NavController) {
                 HomeSection.GENRES -> {
                     titledItem(section !in homeSettings.homeUntitled, key = "genres") {
                         if (look != HomeLook.AS_IS) {
-                            HomeLookRow(look, "genres", "Your genres", genres.valueOrNull().orEmpty().map { genre ->
+                            HomeLookRow(look, "genres", "Your genres", genres.orEmpty().map { genre ->
                                 HomeItem(genre.name, genre.name, open = { nav.openGenreRadio(genre.name) })
                             }, openAll = nav.openAll(app.siansa.ui.HomeSection.Genres))
-                        } else Shelf("Your genres", genres.valueOrNull().orEmpty(), key = { it.name }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Genres)) { genre ->
+                        } else Shelf("Your genres", genres.orEmpty(), key = { it.name }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Genres)) { genre ->
                             GradientTile(
                                 title = genre.name,
                                 colors = tileColors(genre.name),

@@ -135,6 +135,10 @@ fun CollectionPage(
     footer: LazyListScope.() -> Unit = {},
 ) {
     val graph = LocalGraph.current
+    val djSettings by graph.settings.state.collectAsStateWithLifecycle()
+    val djConnection by graph.connection.state.collectAsStateWithLifecycle()
+    val djBeats by graph.djReady.beats.collectAsStateWithLifecycle()
+    val djPossible = app.siansa.mix.DjReady.problem(djSettings, djConnection, djBeats) == null
     val player by graph.player.state.collectAsStateWithLifecycle()
     // This page as Home's shortcuts open it again (issue #271): its route with the ids filled in.
     val route = remember(nav.currentBackStackEntry) { nav.currentBackStackEntry?.let { routeOf(it.destination.route, it.arguments) } }
@@ -240,7 +244,8 @@ fun CollectionPage(
                         songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed, saveAs = title.takeIf { saveAsPlaylist },
                         // An album's shuffle slides right onto Play for a DJ mix of its own songs (issue #965); it needs
                         // AudioMuse, as similar albums does.
-                        onDjMix = if ((albumBar && onSimilar != null) || djMix) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } }) else null,
+                        // Only when a DJ mix's needs are met (AudioMuse and Siansa Beats): otherwise a plain Shuffle.
+                        onDjMix = if (((albumBar && onSimilar != null) || djMix) && djPossible) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } }) else null,
                         djSlide = djSlide, onDjSlide = { djSlide = it }, dim = slideDim, albumBar = albumBar, resume = resume,
                     )
                 }

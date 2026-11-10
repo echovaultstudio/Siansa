@@ -63,8 +63,9 @@ class PlaySlidesTest {
     @Test fun songPathNeedsAudioMuseAndMixesWaitForIt() {
         val without = AppSettings()
         assertEquals("Needs AudioMuse", slideUnavailable(PlaySlide.SONG_PATH, without, "AudioMuse isn't set up."))
-        // Without AudioMuse a mix still starts, from the server's similar songs, as from the ⋮ menu.
-        assertNull(slideUnavailable(PlaySlide.DJ_MIX, without, "AudioMuse isn't set up."))
+        // Without AudioMuse a Steady radio still starts, from the server's similar songs; a DJ mix doesn't (DjReady).
+        assertNull(slideUnavailable(PlaySlide.STEADY, without, "AudioMuse isn't set up."))
+        assertEquals("Needs AudioMuse", slideUnavailable(PlaySlide.DJ_MIX, without, "AudioMuse isn't set up.", "Needs AudioMuse"))
         assertNull(slideUnavailable(PlaySlide.SONIC_MATCH, without, "AudioMuse isn't set up."))
     }
 
@@ -72,9 +73,10 @@ class PlaySlidesTest {
         val ready = AppSettings(audioMuseUrl = "http://192.168.1.10:8000")
         assertNull(slideUnavailable(PlaySlide.SONG_PATH, ready, null))
         assertNull(slideUnavailable(PlaySlide.DJ_MIX, ready, null))
-        for (slide in listOf(PlaySlide.SONG_PATH, PlaySlide.DJ_MIX, PlaySlide.STEADY, PlaySlide.START_A_MIX)) {
+        for (slide in listOf(PlaySlide.SONG_PATH, PlaySlide.STEADY, PlaySlide.START_A_MIX)) {
             assertEquals("Not available now", slideUnavailable(slide, ready, "You're offline."))
         }
+        assertEquals("Not available now", slideUnavailable(PlaySlide.DJ_MIX, ready, "You're offline.", "Not available now"))
         assertNull(slideUnavailable(PlaySlide.SONIC_MATCH, ready, "You're offline."))
     }
 }

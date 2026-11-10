@@ -633,6 +633,8 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             Scene("radio_choices_and_mixing_docs") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
                     app.siansa.ui.RadioModeChoices {}
+                    // Without Siansa Beats a DJ mix isn't offered: greyed, with why (the owner, 10 Nov).
+                    app.siansa.ui.RadioModeChoices("Needs Siansa Beats") {}
                     app.siansa.ui.MixingDocsLink()
                 }
             },

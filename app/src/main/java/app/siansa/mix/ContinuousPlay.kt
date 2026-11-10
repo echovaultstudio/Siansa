@@ -262,10 +262,13 @@ class ContinuousPlay(private val graph: AppGraph) {
                 AppLog.i("KeepPlaying", "Nothing new like \"${last.title}\" to add")
                 return
             }
-            val ids = when (mode) {
-                ContinuousMode.DJ -> djIds(last, hits) ?: hits.take(TOP_UP).map { it.id }
-                else -> hits.take(TOP_UP).map { it.id }
+            // DJ only when its needs are met (AudioMuse and Siansa Beats, DjReady): else these are added as in Steady,
+            // and play as ordinary songs, not blended as a DJ mix.
+            val dj = mode == ContinuousMode.DJ && graph.djProblem().let { problem ->
+                if (problem != null) AppLog.i("KeepPlaying", "DJ isn't possible now ($problem); adding as in Steady")
+                problem == null
             }
+            val ids = if (dj) djIds(last, hits) ?: hits.take(TOP_UP).map { it.id } else hits.take(TOP_UP).map { it.id }
             val byId = hits.associateBy { it.id }
             var songs = graph.generator.resolveHits(ids.mapNotNull { byId[it] })
             // Offline, or with "Only downloaded music" on, only songs on the phone can play.
@@ -281,7 +284,7 @@ class ContinuousPlay(private val graph: AppGraph) {
                 return
             }
             added += songs.map { it.id }
-            if (mode == ContinuousMode.DJ) {
+            if (dj) {
                 addedDj += songs.map { it.id }
                 if (addedDj.size > MAX_REMEMBERED) addedDj.retainAll(added)
             }

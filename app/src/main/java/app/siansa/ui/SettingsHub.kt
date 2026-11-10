@@ -269,7 +269,7 @@ fun PlaybackSettingsScreen(nav: NavController) {
             FoldSection("Keep playing", settings.continuousPlay.label) {
                 Hint("When the queue is about to end, should Siansa add more songs?")
                 ContinuousChips(settings.continuousPlay) { graph.settings.setContinuousPlay(it) }
-                Hint(continuousHint(settings.continuousPlay, settings.audioMuseReady))
+                Hint(continuousHint(settings.continuousPlay, settings.audioMuseReady, graph.djProblem()))
             }
             // The TV app has no sleep timer (issue #860), so nothing to wind down.
             if (!app.siansa.BuildConfig.TV_APP) {
@@ -338,9 +338,13 @@ internal fun ContinuousChips(selected: ContinuousMode, onPick: (ContinuousMode) 
     }
 }
 
-/** The line under the keep playing choices; DJ says when it can't order songs without AudioMuse. */
-internal fun continuousHint(mode: ContinuousMode, audioMuseReady: Boolean): String =
-    if (mode == ContinuousMode.DJ && !audioMuseReady) "${mode.hint} AudioMuse isn't set up, so songs are added as in Steady." else mode.hint
+/** The line under the keep playing choices; DJ says when it can't run (no AudioMuse or Siansa Beats), and songs come as in Steady. */
+internal fun continuousHint(mode: ContinuousMode, audioMuseReady: Boolean, djProblem: String? = null): String = when {
+    mode != ContinuousMode.DJ -> mode.hint
+    !audioMuseReady -> "${mode.hint} AudioMuse isn't set up, so songs are added as in Steady."
+    djProblem == "Needs Siansa Beats" -> "${mode.hint} Siansa Beats isn't answering, so songs are added as in Steady."
+    else -> mode.hint
+}
 
 /** 10, 20 or 30 calm songs for a wind down without a timer (issue #330). */
 @Composable

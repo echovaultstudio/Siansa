@@ -537,12 +537,14 @@ private const val GLINT_TURN_MS = 4_000
  * Why [slide] can't run now, in a few words shown in place of its name, or null when it can: a mix as the ⋮ menu's
  * Start a mix allows (not while AudioMuse is set up but can't be reached), a song path only with AudioMuse.
  */
-fun slideUnavailable(slide: PlaySlide, settings: app.siansa.data.AppSettings, aiProblem: String?): String? = when (slide) {
+fun slideUnavailable(slide: PlaySlide, settings: app.siansa.data.AppSettings, aiProblem: String?, djProblem: String? = null): String? = when (slide) {
     PlaySlide.SONG_PATH -> when {
         !settings.audioMuseReady -> "Needs AudioMuse"
         aiProblem != null -> "Not available now"
         else -> null
     }
-    PlaySlide.DJ_MIX, PlaySlide.STEADY, PlaySlide.START_A_MIX -> if (settings.audioMuseReady && aiProblem != null) "Not available now" else null
+    // A DJ mix only when its needs are met ([app.siansa.mix.DjReady]): AudioMuse and Siansa Beats answering.
+    PlaySlide.DJ_MIX -> djProblem
+    PlaySlide.STEADY, PlaySlide.START_A_MIX -> if (settings.audioMuseReady && aiProblem != null) "Not available now" else null
     PlaySlide.SONIC_MATCH, PlaySlide.NOTHING -> null
 }

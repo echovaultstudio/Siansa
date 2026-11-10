@@ -3,7 +3,9 @@ package app.siansa.mix
 import app.siansa.data.Song
 import app.siansa.log.AppLog
 import app.siansa.net.PLUGIN_PREFIX
+import app.siansa.data.Genre
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -14,14 +16,31 @@ import kotlinx.serialization.json.JsonPrimitive
  * (dev) plugin on AudioMuse-AI. Without AudioMuse-AI, the plugin, Siansa Beats or its style model, [songIds] is null
  * and the radio plays by the songs' own genre tags, as it always did: Siansa works fully without any of them.
  *
- * After a failed request nothing is asked for [BACK_OFF_MS], so a missing service costs one request now and then.
+ * After [MISSES] failed requests in a row nothing is asked for [BACK_OFF_MS], so a missing service costs a request now
+ * and then, while one slow answer doesn't turn the vote off for minutes.
+ *
+ * The library's genre list ([genres]) is saved on the phone ([saved]) when it comes, so the search page and Home show
+ * it at once and keep showing it while Siansa Beats is slow or away; it's asked for again in the background ([refresh]).
+ * Without AudioMuse set up, nothing saved is shown: the tags' genres are, as always.
  */
 class GenreVote(
     private val ask: suspend (String) -> JsonElement,
     private val ready: () -> Boolean,
     private val now: () -> Long = System::currentTimeMillis,
+    /** Where the list is saved: read it (null: none yet) and write it. */
+    private val load: () -> String? = { null },
+    private val save: (String) -> Unit = {},
 ) {
     @Volatile private var backOffUntil = 0L
+    @Volatile private var misses = 0
+
+    private fun missed(): Boolean {
+        if (++misses >= MISSES) {
+            backOffUntil = now() + BACK_OFF_MS
+            misses = 0
+        }
+        return true
+    }
 
     /** The ids of [name]'s songs by vote, at most [limit]; null when the vote can't be had (play by the tags). */
     suspend fun songIds(name: String, limit: Int): List<String>? {
@@ -31,10 +50,11 @@ class GenreVote(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            backOffUntil = now() + BACK_OFF_MS
+            missed()
             AppLog.i("Radio", "Genre radio $name: no vote from Siansa Beats (${e.message}), so by its tags")
             return null
         } ?: return null
+        misses = 0
         val ids = (answer["ids"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content } ?: return null
         val styles = (answer["styles"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content?.substringAfter("---") }.orEmpty()
         val genres = (answer["genres"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty()
@@ -43,33 +63,68 @@ class GenreVote(
         return ids
     }
 
+    @Volatile private var memory: SavedGenres? = null
+
     /**
-     * The library's genres by vote, most songs first (the search page's genres): null when the vote can't be had, or
-     * Siansa Beats hasn't voted any yet, so the page shows the tags' genres. Each name is what a radio asks for.
+     * The library's genres by vote as last saved, most songs first (all of them, at once, from the phone): null when
+     * AudioMuse isn't set up or Siansa Beats has never given enough, so the tags' genres are shown.
      */
-    suspend fun genres(limit: Int): List<app.siansa.data.Genre>? {
+    fun saved(): List<Genre>? {
+        if (!ready()) return null
+        val kept = memory ?: runCatching { load()?.let(::parseSaved) }.getOrNull()?.also { memory = it } ?: return null
+        return kept.genres.takeIf { it.size >= MIN_GENRES }
+    }
+
+    /** Whether the saved list is older than [REFRESH_MS] (or there's none), so [refresh] is worth asking. */
+    fun stale(): Boolean {
+        saved() // reads it from the phone the first time
+        return (memory?.at ?: 0L) + REFRESH_MS < now()
+    }
+
+    /**
+     * Asks Siansa Beats for every genre by vote (waiting at most [WAIT_MS]) and saves them: the new list, or null when
+     * none came (the saved one, or the tags, stay).
+     */
+    suspend fun refresh(): List<Genre>? {
         if (!ready() || now() < backOffUntil) return null
         val answer = try {
-            ask("$LIST_PATH?limit=$limit") as? JsonObject
+            withTimeout(WAIT_MS) { ask("$LIST_PATH?limit=$MOST_GENRES") } as? JsonObject
         } catch (e: CancellationException) {
+            if (e is kotlinx.coroutines.TimeoutCancellationException) {
+                missed()
+                AppLog.i("Search", "Genres: Siansa Beats didn't answer within ${WAIT_MS / 1000} s; the saved list stays")
+                return null
+            }
             throw e
         } catch (e: Exception) {
-            backOffUntil = now() + BACK_OFF_MS
-            AppLog.i("Search", "Genres: none from Siansa Beats (${e.message}), so the tags'")
+            missed()
+            AppLog.i("Search", "Genres: none from Siansa Beats (${e.message}); the saved list stays")
             return null
         } ?: return null
+        misses = 0
         val listed = (answer["genres"] as? JsonArray)?.mapNotNull { item ->
             val o = item as? JsonObject ?: return@mapNotNull null
             val name = (o["name"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            app.siansa.data.Genre(name, (o["songs"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0)
+            Genre(name, (o["songs"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0)
         }.orEmpty()
         if (listed.size < MIN_GENRES) return null
-        AppLog.d("Search", "Genres: ${listed.size} by Siansa Beats' vote")
+        val kept = SavedGenres(now(), listed)
+        memory = kept
+        runCatching { save(writeSaved(kept)) }.onFailure { AppLog.w("Search", "Genres: couldn't save the list: ${it.message}") }
+        AppLog.d("Search", "Genres: ${listed.size} by Siansa Beats' vote, saved")
         return listed
     }
 
     companion object {
         const val PATH = PLUGIN_PREFIX + "api/genre"
+        /** Every genre: the model has 400 styles, and the plugin gives at most this many. */
+        const val MOST_GENRES = 400
+        /** How long the list may take before the saved one (or the tags) stays: a page never waits longer. */
+        const val WAIT_MS = 3_000L
+        /** The saved list is asked for again when it's older than this. */
+        const val REFRESH_MS = 30 * 60_000L
+        /** Failed requests in a row before Siansa Beats is left alone for [BACK_OFF_MS]. */
+        const val MISSES = 3
         const val LIST_PATH = PLUGIN_PREFIX + "api/genres"
 
         /** Fewer genres than this by vote (it has hardly started), and the search page shows the tags' genres. */
@@ -89,4 +144,23 @@ class GenreVote(
             return tagged()
         }
     }
+}
+
+/** The genre list as saved on the phone, with when it came. */
+data class SavedGenres(val at: Long, val genres: List<Genre>)
+
+internal fun writeSaved(saved: SavedGenres): String = JsonObject(mapOf(
+    "at" to JsonPrimitive(saved.at),
+    "genres" to JsonArray(saved.genres.map { JsonObject(mapOf("name" to JsonPrimitive(it.name), "songs" to JsonPrimitive(it.songCount))) }),
+)).toString()
+
+internal fun parseSaved(text: String): SavedGenres? {
+    val o = kotlinx.serialization.json.Json.parseToJsonElement(text) as? JsonObject ?: return null
+    val at = (o["at"] as? JsonPrimitive)?.content?.toLongOrNull() ?: return null
+    val genres = (o["genres"] as? JsonArray)?.mapNotNull { item ->
+        val g = item as? JsonObject ?: return@mapNotNull null
+        val name = (g["name"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+        Genre(name, (g["songs"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0)
+    }.orEmpty()
+    return SavedGenres(at, genres)
 }

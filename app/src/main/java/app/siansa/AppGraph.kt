@@ -295,7 +295,12 @@ class AppGraph(val app: Application) {
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
     val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
     /** Genre radios by Siansa Beats' vote, when it's there (Siansa Dev); by the songs' tags otherwise. */
-    val genreVote = GenreVote({ path -> audioMuse.plugin(path) }, { settings.current.audioMuseReady })
+    val genreVote = GenreVote(
+        { path -> audioMuse.plugin(path) }, { settings.current.audioMuseReady },
+        // The genre list by vote, saved so Search and Home show it at once (and while Siansa Beats is away).
+        load = { java.io.File(app.filesDir, "voted-genres.json").takeIf { it.exists() }?.readText() },
+        save = { java.io.File(app.filesDir, "voted-genres.json").writeText(it) },
+    )
     /** The AI service that writes mix titles and sound searches (issue #665). */
     val ai = ChatApi(http) { settings.current }
     val deezer = DeezerApi(http)
@@ -398,6 +403,30 @@ class AppGraph(val app: Application) {
         isDownloaded = { downloads.isDownloaded(it) }
         onPlayStarted = { activePlayer.choose(MiniFor.MUSIC); bookPlayer.pause() }
     }
+    /** Whether a DJ mix can run: AudioMuse and Siansa Beats answering ([DjReady]). */
+    val djReady = app.siansa.mix.DjReady()
+
+    /** Why a DJ mix can't run now (a few words for its button), or null when it can. */
+    fun djProblem(): String? = app.siansa.mix.DjReady.problem(settings.current, connection.current, djReady.beats.value)
+
+    init {
+        // DJ mixes need the Siansa Beats (dev) plugin and Siansa Beats: checked when AudioMuse answers, again every
+        // half hour (every two minutes while it doesn't), and from scratch when AudioMuse is set up anew.
+        scope.launch(CoroutineName("dj-ready")) {
+            settings.state.map { it.audioMuseUrl to it.audioMuseReady }.distinctUntilChanged().drop(1).collect { djReady.forget() }
+        }
+        scope.launch(CoroutineName("dj-ready-check")) {
+            while (true) {
+                val s = settings.current
+                if (s.audioMuseReady && connection.current.audioMuse == true && djReady.due()) {
+                    val result = runCatching { profiles.check() }.getOrNull()
+                    if (result != null) djReady.checked(result.ok, result.message)
+                }
+                delay(DJ_CHECK_LOOK_MS)
+            }
+        }
+    }
+
     init {
         // The playing artist's popular songs, fetched ahead so their page shows them at once (issue #398). After
         // a short wait, so skipping through songs doesn't ask for every artist on the way.
@@ -482,3 +511,5 @@ fun movedPreamp(oldReplayGainPreamp: Float, equaliserPreamp: Float): Float? {
 
 /** How long a song plays before its artist's popular songs are fetched ahead (issue #398). */
 private const val TOP_SONGS_AHEAD_WAIT_MS = 5_000L
+/** How often the DJ check looks whether the plugin is due to be asked again (it asks only every 2 or 30 minutes). */
+private const val DJ_CHECK_LOOK_MS = 15_000L

@@ -39,6 +39,11 @@ object AlbumDjMix {
      */
     suspend fun start(graph: AppGraph, title: String, list: List<Song>) {
         if (list.isEmpty()) return
+        // Only when a DJ mix's needs are met (the button isn't offered otherwise; this is the last word).
+        graph.djProblem()?.let { problem ->
+            AppLog.i("AlbumMix", "No DJ mix of \"$title\": $problem")
+            return
+        }
         // A long playlist or a liked list mixes a random [MAX_MIX_SONGS] of its songs: hours of music, ordered quickly.
         val album = mixPortion(list, Random.Default)
         if (album.size < list.size) AppLog.i("AlbumMix", "\"$title\" has ${list.size} songs: the mix takes ${album.size} of them")

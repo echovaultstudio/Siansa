@@ -908,8 +908,10 @@ internal fun Controls(
         // Stop; with none playing, the shapes and Start, when up starts a DJ mix and one can start (else up is as set).
         val djRadio = radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ
         val listMix = song != null && song.id in albumDj
-        val canStart = slides.on && slides.up == PlaySlide.DJ_MIX &&
-            slideUnavailable(PlaySlide.DJ_MIX, settings, graph.connection.current.aiProblem(settings)) == null
+        val djBeats by graph.djReady.beats.collectAsStateWithLifecycle()
+        val connection by graph.connection.state.collectAsStateWithLifecycle()
+        val djProblem = app.siansa.mix.DjReady.problem(settings, connection, djBeats)
+        val canStart = slides.on && slides.up == PlaySlide.DJ_MIX && djProblem == null
         val barPlaces = djBarPlaces(settings.djBarOrder, djRadio, listMix, canStart).takeIf { djBarWidthPx != null }
         PlayButton(
             modifier = Modifier.onGloballyPositioned { playCentre = it.positionInRoot().y + it.size.height / 2f },
@@ -923,7 +925,7 @@ internal fun Controls(
             onToggle = { graph.player.togglePlay() },
             onStop = { graph.player.stop() },
             onSlide = { onSlide?.invoke(it) },
-            unavailable = { slideUnavailable(it, settings, graph.connection.current.aiProblem(settings)) },
+            unavailable = { slideUnavailable(it, settings, graph.connection.current.aiProblem(settings), djProblem) },
             onSliding = { shown ->
                 sliding = shown?.way
                 onSlideLabel(shown?.let {
@@ -932,7 +934,7 @@ internal fun Controls(
                         SlideLabel(PlaySlide.DJ_MIX, it.way, it.armed, bar = DjBarView(places.spots, it.spot, places.starting, it.rise))
                     } else {
                         val slide = slides.of(it.way)
-                        SlideLabel(slide, it.way, it.armed, slideUnavailable(slide, settings, graph.connection.current.aiProblem(settings)))
+                        SlideLabel(slide, it.way, it.armed, slideUnavailable(slide, settings, graph.connection.current.aiProblem(settings), djProblem))
                     }
                 })
             },
@@ -1034,8 +1036,10 @@ private fun QueueView(state: PlayerState, onDjBar: (DjBarSpot, Boolean) -> Unit)
         val song = state.current
         val djRadio = radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ
         val listMix = song != null && song.id in albumDj
+        val djBeats by graph.djReady.beats.collectAsStateWithLifecycle()
+        val connection by graph.connection.state.collectAsStateWithLifecycle()
         val canStart = song != null && !OutsideMedia.isOutside(song.id) &&
-            slideUnavailable(PlaySlide.DJ_MIX, settings, graph.connection.current.aiProblem(settings)) == null
+            app.siansa.mix.DjReady.problem(settings, connection, djBeats) == null
         djBarPlaces(settings.djBarOrder, djRadio, listMix, canStart)?.let { places ->
             var open by rememberSaveable { mutableStateOf(false) }
             MixShapePanel(

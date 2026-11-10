@@ -205,6 +205,13 @@ Both follow your finger, and let go wherever you like: a hard swipe finishes qui
 a short pull springs back. The mini player fades away as the player rises and comes back as it goes. The book
 player opens and closes the same way.
 
+A **DJ mix** (from the play button, the DJ mix bar, Start a mix, an album's or playlist's Shuffle, or Keep playing in DJ
+mode) is only offered when everything it needs answers: **AudioMuse-AI**, which puts the songs in order by tempo, key and
+energy, and **Siansa Beats** behind its plugin, for the beat grids its blends follow. Siansa checks for them when
+AudioMuse answers, every half hour after that, and every two minutes while they don't. Until then the DJ choices are
+greyed out with the reason ("Needs AudioMuse", "Needs Siansa Beats"), an album's Shuffle is a plain shuffle, and Keep
+playing in DJ mode adds songs as Steady does. Steady radio, shuffle and crossfades work without either.
+
 Slide a finger from the play button to start something from the song playing: **up** for a DJ mix, **down** for a
 Steady radio, **left** for its song path and **right** for songs that sound like it. Only the way you slide shows its
 choice: its icon beside the button, and its name in the middle of the cover, which blurs behind it so your thumb never

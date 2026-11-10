@@ -70,7 +70,7 @@ On an album's page, the buttons under its details: **add to a playlist** (the pl
 - **Play** carries on where you stopped, when you left the album part way: a ring round it shows how far you got,
   and the details line says **Continue from 8**. Press and hold Play to start from the first song instead.
 - The **plus** adds the whole album to a playlist you pick.
-- **Shuffle** plays the album shuffled. With AudioMuse-AI, **slide right** from it all the way onto Play for a **DJ mix
+- **Shuffle** plays the album shuffled. With AudioMuse-AI and Siansa Beats answering, **slide right** from it all the way onto Play for a **DJ mix
   of the album**: its own songs only, in an order that blends well (tempo and key, as a DJ mix orders them), played
   with DJ blends. It picks among the orders that blend best, so it doesn't always start from the same song. Nothing
   else is added, so the mix ends with the album.
@@ -123,9 +123,12 @@ and can be renamed or deleted.
 shows its top five; tap a section's title (**Artists**, **Albums**, **Songs**, **Sounds like …**) to see every
 match on a page of its own, with Play and Shuffle at the top for songs.
 
-Before you type, Search shows your genres to browse. In Siansa Dev with Siansa Beats, they're the genres Siansa Beats
-heard in your music (its sound and tags together), most songs first; without Siansa Beats, or until it has voted on
-enough songs, the genre tags of your library as always.
+Before you type, Search shows your genres to browse, the 30 with the most songs, then **All genres** for every one. In
+Siansa Dev with Siansa Beats, they're the genres Siansa Beats heard in your music (its sound and tags together), most
+songs first. The list is saved on your phone, so it shows at once, and it's brought up to date in the background every
+half hour. When Siansa Beats is slow or away, the saved list stays. Home's **Your genres** shows the same list. Without
+AudioMuse or Siansa Beats, or until Siansa Beats has voted on enough songs, Search and Home show your library's genre
+tags as always: Siansa Beats is never needed.
 
 ## Roll the dice
 
