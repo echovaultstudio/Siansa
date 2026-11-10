@@ -58,7 +58,8 @@ fun generatedCoverColors(route: String): Pair<Color, Color>? {
     return when {
         parts.size == 3 && parts[0] == "radio" -> {
             val key = Uri.decode(parts[2])
-            moodRadios.firstOrNull { it.id == key }?.let { Color(it.colors.first) to Color(it.colors.second) } ?: tileColors(key)
+            moodRadios.firstOrNull { it.id == key }?.let { Color(it.colors.first) to Color(it.colors.second) }
+                ?: if (parts[1] == "genre") genreColors(key) else tileColors(key)
         }
         parts.size == 2 && parts[0] == "blend" -> tileColors("blend-${Uri.decode(parts[1])}")
         parts.size == 2 && parts[0] == "mood" -> tileColors(Uri.decode(parts[1]))
@@ -81,7 +82,8 @@ fun RadioScreen(nav: NavController, kind: String, key: String) {
         "centre" -> centre.valueOrNull()?.let { AudioMuseApi.centreTitle(it) } ?: key.substringBefore('-').replaceFirstChar { it.uppercase() }
         else -> key
     }
-    val colors = if (mood != null) Color(mood.colors.first) to Color(mood.colors.second) else tileColors(key)
+    // A genre radio in its genre's colours (red for hard, blue or green for calm), as its tile.
+    val colors = if (mood != null) Color(mood.colors.first) to Color(mood.colors.second) else if (kind == "genre") genreColors(key) else tileColors(key)
     val songs by loadState(Triple(kind, key, round)) {
         when (kind) {
             "mood" -> {

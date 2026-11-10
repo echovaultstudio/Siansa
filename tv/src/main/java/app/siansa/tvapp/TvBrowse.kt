@@ -116,7 +116,7 @@ fun TvLibrary() {
                         .map { a -> graph.library.album(a.id) ?: a }.distinctBy { it.id }.map { TvItem.OfAlbum(it) }
                     Shelf.FAVOURITE_ARTISTS -> graph.favouriteArtists.refresh().filter { it.id in favouriteArtists }.map { TvItem.OfArtist(it) }
                     // Siansa Beats' genres as last saved, or the songs' tags (app.siansa.ui.browseGenres).
-                    Shelf.GENRES -> graph.browseGenres(GENRES).map { TvItem.OfGenre(it) }
+                    Shelf.GENRES -> graph.browseGenres(GENRES).sortedBy { app.siansa.data.normalizeKey(it.name) }.map { TvItem.OfGenre(it) }
                     Shelf.LIKED -> emptyList()
                 }
                 if (next != tiles) tiles = next

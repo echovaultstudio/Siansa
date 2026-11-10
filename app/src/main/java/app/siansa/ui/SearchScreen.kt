@@ -426,7 +426,7 @@ private fun BrowseGrid(nav: NavController) {
                 Text("Genres", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = Space.Small))
             }
             items(genres, key = { "genre-" + it.name }) { genre ->
-                BrowseTile(genre.name, tileColors(genre.name)) { nav.openGenreRadio(genre.name) }
+                BrowseTile(genre.name, genreColors(genre.name)) { nav.openGenreRadio(genre.name) }
             }
             if (allGenres.size > genres.size) {
                 item(key = "genre-all") {

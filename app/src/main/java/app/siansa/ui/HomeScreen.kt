@@ -592,7 +592,7 @@ fun HomeScreen(nav: NavController) {
                         } else Shelf("Your genres", genres.orEmpty(), key = { it.name }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Genres)) { genre ->
                             GradientTile(
                                 title = genre.name,
-                                colors = tileColors(genre.name),
+                                colors = genreColors(genre.name),
                                 size = 130.dp,
                                 // Just the tile (issue #338).
                                 onClick = { nav.openGenreRadio(genre.name) },

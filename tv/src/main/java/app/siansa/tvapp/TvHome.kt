@@ -299,7 +299,7 @@ fun TvItemTile(item: TvItem, modifier: Modifier = Modifier, width: Dp = TILE_WID
         is TvItem.OfMix -> TvTile(item.mix.title, "${item.mix.songs.size} songs", item.mix.songs.firstOrNull()?.cover, { nav.navigate(TvRoutes.mix(item.mix.id)) }, modifier, width = width, wide = wide)
         is TvItem.OfMood -> TvTile(item.radio.name, "Sound radio", null, { play.moodRadio(item.radio) }, modifier, width = width,
             colors = Color(item.radio.colors.first) to Color(item.radio.colors.second), wide = wide)
-        is TvItem.OfGenre -> TvTile(item.genre.name, "${item.genre.songCount} songs", null, { play.genreRadio(item.genre.name) }, modifier, width = width, colors = tileColors(item.genre.name), wide = wide)
+        is TvItem.OfGenre -> TvTile(item.genre.name, "${item.genre.songCount} songs", null, { play.genreRadio(item.genre.name) }, modifier, width = width, colors = app.siansa.ui.genreColors(item.genre.name), wide = wide)
         // A radio's own cover in its colours, as on the phone's shortcuts, never one of its songs'.
         is TvItem.OfShortcut -> app.siansa.ui.generatedCoverColors(item.play.route).let { own ->
             TvTile(item.play.title, shortcutKind(item.play.route), if (own != null) null else item.play.cover, { nav.navigate(item.play.route) }, modifier,

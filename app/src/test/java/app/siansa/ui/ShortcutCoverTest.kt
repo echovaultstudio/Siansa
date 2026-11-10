@@ -8,8 +8,8 @@ import org.junit.Test
 /** Home's shortcut to a radio shows the radio's own cover, in its colours, not one of its songs' (the owner, 10 Nov). */
 class ShortcutCoverTest {
     @Test fun aGenreRadioHasItsPagesColours() {
-        assertEquals(tileColors("Halftime"), generatedCoverColors("radio/genre/Halftime"))
-        assertEquals(tileColors("Liquid Funk"), generatedCoverColors("radio/genre/Liquid%20Funk"))
+        assertEquals(genreColors("Halftime"), generatedCoverColors("radio/genre/Halftime"))
+        assertEquals(genreColors("Liquid Funk"), generatedCoverColors("radio/genre/Liquid%20Funk"))
     }
 
     @Test fun aMoodRadioHasItsMoodsColours() {
