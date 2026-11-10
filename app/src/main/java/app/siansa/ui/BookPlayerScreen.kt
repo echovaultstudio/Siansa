@@ -168,93 +168,98 @@ fun BookPlayerScreen(nav: NavController, onClose: () -> Unit) {
         }
     }
 
-    MaterialTheme(colorScheme = bookPlayerColors(), typography = MaterialTheme.typography) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .clipToBounds()
-                .background(Color.Black)
-                .nestedScroll(dismissOnPull)
-                .testTag("bookPlayer"),
-        ) {
-            // The cover, enlarged and blurred, as the background (a darker plain version before Android 12).
-            Cover(
-                book?.cover,
-                300,
+    // Dynamic colours (the owner, 10 Nov: books and podcasts too): the seek bar, Play and the rest in the cover's colour,
+    // standing out from the blurred cover behind them, as the music's now playing.
+    val dynamic = rememberDynamicColours(book?.cover, settings.dynamicColours, where = "Book player")
+    WithAccent(dynamic?.controls, dynamic?.onControls) {
+        MaterialTheme(colorScheme = bookPlayerColors(), typography = MaterialTheme.typography) {
+            Box(
                 Modifier
                     .fillMaxSize()
-                    .graphicsLayer { scaleX = 1.4f; scaleY = 1.4f; alpha = if (Build.VERSION.SDK_INT >= 31) 0.85f else 0.45f }
-                    .then(if (Build.VERSION.SDK_INT >= 31) Modifier.blur(70.dp) else Modifier),
-                RectangleShape,
-            )
-            Box(
-                Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(
-                        0f to Color.Black.copy(alpha = 0.25f),
-                        0.55f to Color.Black.copy(alpha = 0.45f),
-                        1f to Color.Black.copy(alpha = 0.9f),
+                    .clipToBounds()
+                    .background(Color.Black)
+                    .nestedScroll(dismissOnPull)
+                    .testTag("bookPlayer"),
+            ) {
+                // The cover, enlarged and blurred, as the background (a darker plain version before Android 12).
+                Cover(
+                    book?.cover,
+                    300,
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { scaleX = 1.4f; scaleY = 1.4f; alpha = if (Build.VERSION.SDK_INT >= 31) 0.85f else 0.45f }
+                        .then(if (Build.VERSION.SDK_INT >= 31) Modifier.blur(70.dp) else Modifier),
+                    RectangleShape,
+                )
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(
+                            0f to Color.Black.copy(alpha = 0.25f),
+                            0.55f to Color.Black.copy(alpha = 0.45f),
+                            1f to Color.Black.copy(alpha = 0.9f),
+                        )
                     )
                 )
-            )
 
-            val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-            BoxWithConstraints(Modifier.fillMaxSize()) {
-                val pageHeight = maxHeight
-                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                    Column(
-                        Modifier
-                            .height(pageHeight)
-                            .statusBarsPadding()
-                            .padding(horizontal = Space.Section)
-                            .padding(bottom = navBar),
-                    ) {
-                        Spacer(Modifier.height(playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp))
-                        BookTopRow(state, onClose = onClose, onBook = ::openBookPage, onMenu = { menuOpen = true })
+                val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val pageHeight = maxHeight
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        Column(
+                            Modifier
+                                .height(pageHeight)
+                                .statusBarsPadding()
+                                .padding(horizontal = Space.Section)
+                                .padding(bottom = navBar),
+                        ) {
+                            Spacer(Modifier.height(playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp))
+                            BookTopRow(state, onClose = onClose, onBook = ::openBookPage, onMenu = { menuOpen = true })
 
-                        Box(Modifier.weight(1f).fillMaxWidth().padding(top = Space.Page, bottom = Space.Medium), contentAlignment = Alignment.Center) {
-                            // The same size as an album's cover in now playing: the page's width, square (beta #44: it was larger).
-                            Cover(
-                                book?.cover,
-                                LARGE_COVER,
-                                Modifier.fillMaxWidth().aspectRatio(1f).shadow(24.dp, RoundedCornerShape(10.dp)).clickable(enabled = book != null, onClick = ::openBookPage).testTag("bookPlayerCover"),
-                                RoundedCornerShape(10.dp),
-                            )
-                        }
-
-                        BookTitleRow(book) { graph.bookPlayer.bookmark { launch.notify(it) } }
-                        BookSeekBar(state)
-                        BookControls(state, settings.bookSkipBackSec, settings.bookSkipForwardSec)
-                        // The speed bottom left, where you are in the whole book in the middle, sleep bottom right.
-                        Row(Modifier.fillMaxWidth().padding(top = Space.Medium, bottom = Space.Small), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.width(SIDE_WIDTH), contentAlignment = Alignment.Center) {
-                                SpeedButton(state.speed) { graph.bookPlayer.setSpeed(nextSpeed(state.speed)) }
-                            }
-                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                if (book != null) Text(
-                                    "${bookLength(state.positionSec)} of ${bookLength(book.durationSec.toDouble())} · ${bookLength((book.durationSec - state.positionSec).coerceAtLeast(0.0))} left",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = Color.White.copy(alpha = 0.8f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.testTag("bookWhole"),
+                            Box(Modifier.weight(1f).fillMaxWidth().padding(top = Space.Page, bottom = Space.Medium), contentAlignment = Alignment.Center) {
+                                // The same size as an album's cover in now playing: the page's width, square (beta #44: it was larger).
+                                Cover(
+                                    book?.cover,
+                                    LARGE_COVER,
+                                    Modifier.fillMaxWidth().aspectRatio(1f).shadow(24.dp, RoundedCornerShape(10.dp)).clickable(enabled = book != null, onClick = ::openBookPage).testTag("bookPlayerCover"),
+                                    RoundedCornerShape(10.dp),
                                 )
                             }
-                            Box(Modifier.width(SIDE_WIDTH), contentAlignment = Alignment.Center) {
-                                SleepButton(on = graph.bookPlayer.sleepAtChapterEnd) { graph.bookPlayer.toggleSleepAtChapterEnd() }
+
+                            BookTitleRow(book) { graph.bookPlayer.bookmark { launch.notify(it) } }
+                            BookSeekBar(state)
+                            BookControls(state, settings.bookSkipBackSec, settings.bookSkipForwardSec)
+                            // The speed bottom left, where you are in the whole book in the middle, sleep bottom right.
+                            Row(Modifier.fillMaxWidth().padding(top = Space.Medium, bottom = Space.Small), verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.width(SIDE_WIDTH), contentAlignment = Alignment.Center) {
+                                    SpeedButton(state.speed) { graph.bookPlayer.setSpeed(nextSpeed(state.speed)) }
+                                }
+                                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                    if (book != null) Text(
+                                        "${bookLength(state.positionSec)} of ${bookLength(book.durationSec.toDouble())} · ${bookLength((book.durationSec - state.positionSec).coerceAtLeast(0.0))} left",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = Color.White.copy(alpha = 0.8f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.testTag("bookWhole"),
+                                    )
+                                }
+                                Box(Modifier.width(SIDE_WIDTH), contentAlignment = Alignment.Center) {
+                                    SleepButton(on = graph.bookPlayer.sleepAtChapterEnd) { graph.bookPlayer.toggleSleepAtChapterEnd() }
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            if (menuOpen && book != null) {
-                BookMenu(
-                    book = book,
-                    onDismiss = { menuOpen = false },
-                    onOpenBook = ::openBookPage,
-                    notify = { launch.notify(it) },
-                )
+                if (menuOpen && book != null) {
+                    BookMenu(
+                        book = book,
+                        onDismiss = { menuOpen = false },
+                        onOpenBook = ::openBookPage,
+                        notify = { launch.notify(it) },
+                    )
+                }
             }
         }
     }

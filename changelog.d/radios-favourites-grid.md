@@ -4,4 +4,4 @@
 - **Play in the title bar.** On every page of songs, once its buttons have scrolled away, the title bar has its Play (a radio's radio, with its heart).
 
 ### Changed
-- **Radio pages.** A radio's name is on its cover only, and its Play takes the cover's colour with Dynamic colours on, as every page's Play now does. A genre's radio button sits on its cover's corner, with how many songs it has under its description.
+- **Radio pages.** A radio's name is on its cover only, and its Play takes the cover's colour with Dynamic colours on, as every page's Play now does, books' and podcasts' too. The book player's seek bar and buttons follow the book's cover as well, like the music's now playing. A genre's radio button sits on its cover's corner, with how many songs it has under its description.

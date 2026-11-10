@@ -321,7 +321,10 @@ fun BookScreen(nav: NavController, id: String) {
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
                 item {
                     BookPageHeader(b, color, surface, bookDetails(b, episodeList.size.takeIf { b.podcast && it > 0 }, finished), position) {
-                        BookActions(b, progress, position)
+                        // Dynamic colours: Play in the cover's colour, as an album's (the owner, 10 Nov: books and podcasts too).
+                        androidx.compose.runtime.CompositionLocalProvider(
+                            LocalPlayColours provides rememberPageColours(b.cover, pageBackdrop(surface, color), where = "Book page"),
+                        ) { BookActions(b, progress, position) }
                     }
                 }
                 if (b.podcast) {
