@@ -4,7 +4,10 @@ import app.siansa.data.LocalPlaylists
 import app.siansa.net.AudioMuseApi
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -78,6 +81,50 @@ fun generatedCoverColors(route: String): Pair<Color, Color>? {
  */
 @Composable
 fun GenreScreen(nav: NavController, name: String) {
+    GenreScreenContent(nav, name)
+}
+
+/**
+ * A genre's description on its page: its first [ABOUT_LINES] lines, and "Show more" for the rest when there is more
+ * (the owner, 10 Nov: the page shouldn't be filled with text), then where it's from, linked.
+ */
+@Composable
+internal fun GenreAboutText(summary: String, source: String, onSource: (() -> Unit)?) {
+    var expanded by rememberSaveable(summary) { mutableStateOf(false) }
+    var cut by remember(summary) { mutableStateOf(false) }
+    Column(Modifier.animateContentSize()) {
+        Text(
+            summary,
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = if (expanded) Int.MAX_VALUE else ABOUT_LINES,
+            overflow = TextOverflow.Ellipsis,
+            onTextLayout = { if (!expanded) cut = it.hasVisualOverflow },
+            modifier = Modifier.testTag("genreAbout").then(if (cut || expanded) Modifier.clickable { expanded = !expanded } else Modifier),
+        )
+        Row(Modifier.padding(top = Space.Small), horizontalArrangement = Arrangement.spacedBy(Space.Page), verticalAlignment = Alignment.CenterVertically) {
+            if (cut || expanded) {
+                Text(
+                    if (expanded) "Show less" else "Show more",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { expanded = !expanded }.testTag("genreAboutMore"),
+                )
+            }
+            Text(
+                "From $source",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = if (onSource != null) Modifier.clickable(onClick = onSource) else Modifier,
+            )
+        }
+    }
+}
+
+/** Lines of a genre's description shown before "Show more". */
+const val ABOUT_LINES = 3
+
+@Composable
+private fun GenreScreenContent(nav: NavController, name: String) {
     val graph = LocalGraph.current
     val snack = LocalSnack.current
     val scope = rememberCoroutineScope()
@@ -101,15 +148,8 @@ fun GenreScreen(nav: NavController, name: String) {
         header = {
             val about = aboutState.valueOrNull()
             if (about != null) {
-                Text(about.summary, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("genreAbout"))
-                Spacer(Modifier.height(Space.Tight))
                 val uri = androidx.compose.ui.platform.LocalUriHandler.current
-                Text(
-                    "From ${about.source}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = if (about.url != null) Modifier.clickable { runCatching { uri.openUri(about.url) } } else Modifier,
-                )
+                GenreAboutText(about.summary, about.source, onSource = about.url?.let { url -> { runCatching { uri.openUri(url) } } })
             } else if (list != null) {
                 CollectionByline(null, null, null, "%,d songs".format(list.size))
             }

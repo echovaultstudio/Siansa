@@ -127,7 +127,9 @@ match on a page of its own, with Play and Shuffle at the top for songs.
 Before you type, Search shows your genres to browse, the 30 with the most songs, then **All genres** for every one. In
 Siansa Dev with Siansa Beats, they're the genres Siansa Beats heard in your music (its sound and tags together), most
 songs first. The list is saved on your phone, so it shows at once, and it's brought up to date in the background every
-half hour. When Siansa Beats is slow or away, the saved list stays. Home's **Your genres** shows the same list. Without
+half hour. When Siansa Beats is slow or away, the saved list stays. A genre whose songs are all in libraries you hide
+(Home's filter) isn't listed, and each genre counts only its songs in the libraries you show. A genre's page shows the
+first three lines of what it is, with **Show more** for the rest. Home's **Your genres** shows the same list. Without
 AudioMuse or Siansa Beats, or until Siansa Beats has voted on enough songs, Search and Home show your library's genre
 tags as always: Siansa Beats is never needed.
 

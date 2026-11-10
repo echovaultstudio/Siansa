@@ -73,6 +73,29 @@ class GenreVoteTest {
         assertTrue(again.stale())
     }
 
+    @Test fun genresOnlyInHiddenLibrariesAreLeftOut() = runBlocking {
+        // The owner, 10 Nov: Kayōkyoku showed, with 0 songs, as all of it is in a library hidden on the phone.
+        fun g(name: String, songs: Int, libraries: Map<String, Int>?) = JsonObject(buildMap {
+            put("name", JsonPrimitive(name)); put("songs", JsonPrimitive(songs))
+            libraries?.let { by -> put("libraries", JsonObject(by.mapValues { JsonPrimitive(it.value) })) }
+        })
+        reply = { manyGenres(listOf(
+            g("Kayōkyoku", 40, mapOf("3" to 40)),
+            g("Indie Pop", 200, mapOf("1" to 20, "3" to 180)),
+            g("Older Beats", 5, null),
+        )) }
+        val shown = vote.refresh(setOf("1"))!!.associate { it.name to it.songCount }
+        assertTrue("Kayōkyoku" !in shown)
+        assertEquals(20, shown["Indie Pop"])  // its songs in the shown library
+        assertEquals(5, shown["Older Beats"])  // an older Siansa Beats said no libraries: kept as it was
+        // Every library (none chosen): all of them, as counted.
+        assertEquals(200, vote.saved()!!.first { it.name == "Indie Pop" }.songCount)
+        // Saved with the libraries: a new start leaves it out at once too.
+        val again = GenreVote({ throw IllegalStateException("not asked") }, { true }, { time }, { savedText }, {})
+        assertTrue(again.saved(setOf("1"))!!.none { it.name == "Kayōkyoku" })
+        assertTrue(again.saved(setOf("3"))!!.any { it.name == "Kayōkyoku" })
+    }
+
     @Test fun theSavedListStaysWhenSiansaBeatsDoesntAnswer() = runBlocking {
         reply = { manyGenres() }
         val first = vote.refresh()!!

@@ -69,10 +69,10 @@ class GenreVote(
      * The library's genres by vote as last saved, most songs first (all of them, at once, from the phone): null when
      * AudioMuse isn't set up or Siansa Beats has never given enough, so the tags' genres are shown.
      */
-    fun saved(): List<Genre>? {
+    fun saved(shown: Set<String> = emptySet()): List<Genre>? {
         if (!ready()) return null
         val kept = memory ?: runCatching { load()?.let(::parseSaved) }.getOrNull()?.also { memory = it } ?: return null
-        return kept.genres.takeIf { it.size >= MIN_GENRES }
+        return kept.genres.takeIf { it.size >= MIN_GENRES }?.let { inLibraries(it, kept.libraries, shown) }
     }
 
     /** Whether the saved list is older than [REFRESH_MS] (or there's none), so [refresh] is worth asking. */
@@ -85,7 +85,7 @@ class GenreVote(
      * Asks Siansa Beats for every genre by vote (waiting at most [WAIT_MS]) and saves them: the new list, or null when
      * none came (the saved one, or the tags, stay).
      */
-    suspend fun refresh(): List<Genre>? {
+    suspend fun refresh(shown: Set<String> = emptySet()): List<Genre>? {
         if (!ready() || now() < backOffUntil) return null
         val answer = try {
             withTimeout(WAIT_MS) { ask("$LIST_PATH?limit=$MOST_GENRES") } as? JsonObject
@@ -102,17 +102,14 @@ class GenreVote(
             return null
         } ?: return null
         misses = 0
-        val listed = (answer["genres"] as? JsonArray)?.mapNotNull { item ->
-            val o = item as? JsonObject ?: return@mapNotNull null
-            val name = (o["name"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            Genre(name, (o["songs"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0)
-        }.orEmpty()
+        val items = (answer["genres"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+        val listed = items.mapNotNull(::genreOf)
         if (listed.size < MIN_GENRES) return null
-        val kept = SavedGenres(now(), listed)
+        val kept = SavedGenres(now(), listed, items.mapNotNull { o -> genreOf(o)?.let { g -> librariesOf(o)?.let { g.name to it } } }.toMap())
         memory = kept
         runCatching { save(writeSaved(kept)) }.onFailure { AppLog.w("Search", "Genres: couldn't save the list: ${it.message}") }
         AppLog.d("Search", "Genres: ${listed.size} by Siansa Beats' vote, saved")
-        return listed
+        return inLibraries(listed, kept.libraries, shown)
     }
 
     private val abouts = java.util.concurrent.ConcurrentHashMap<String, GenreAbout>()
@@ -153,6 +150,20 @@ class GenreVote(
         const val MISSES = 3
         const val LIST_PATH = PLUGIN_PREFIX + "api/genres"
 
+        /**
+         * [genres] as the libraries [shown] have them (the libraries chosen to sync; empty: all of them): a genre whose
+         * songs are all in hidden libraries is left out, and each one's count is its songs in the shown ones. A genre
+         * Siansa Beats didn't say the libraries of ([libraries] lacks it: an older Siansa Beats) stays as it is.
+         */
+        fun inLibraries(genres: List<Genre>, libraries: Map<String, Map<String, Int>>, shown: Set<String>): List<Genre> {
+            if (shown.isEmpty() || libraries.isEmpty()) return genres
+            return genres.mapNotNull { g ->
+                val by = libraries[g.name] ?: return@mapNotNull g
+                val n = shown.sumOf { by[it] ?: 0 }
+                if (n > 0) Genre(g.name, n) else null
+            }.sortedByDescending { it.songCount }
+        }
+
         /** Fewer genres than this by vote (it has hardly started), and the search page shows the tags' genres. */
         const val MIN_GENRES = 8
         const val BACK_OFF_MS = 10 * 60_000L
@@ -172,23 +183,39 @@ class GenreVote(
     }
 }
 
-/** The genre list as saved on the phone, with when it came. */
-data class SavedGenres(val at: Long, val genres: List<Genre>)
+/**
+ * The genre list as saved on the phone, with when it came and each genre's songs in each library (by the library's id,
+ * Siansa Beats 0.20 and its plugin 0.5.3), to leave out genres only in hidden libraries.
+ */
+data class SavedGenres(val at: Long, val genres: List<Genre>, val libraries: Map<String, Map<String, Int>> = emptyMap())
+
+private fun genreOf(o: JsonObject): Genre? {
+    val name = (o["name"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() } ?: return null
+    return Genre(name, (o["songs"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0)
+}
+
+private fun librariesOf(o: JsonObject): Map<String, Int>? = (o["libraries"] as? JsonObject)?.mapNotNull { (id, n) ->
+    (n as? JsonPrimitive)?.content?.toIntOrNull()?.let { id to it }
+}?.toMap()
 
 internal fun writeSaved(saved: SavedGenres): String = JsonObject(mapOf(
     "at" to JsonPrimitive(saved.at),
-    "genres" to JsonArray(saved.genres.map { JsonObject(mapOf("name" to JsonPrimitive(it.name), "songs" to JsonPrimitive(it.songCount))) }),
+    "genres" to JsonArray(saved.genres.map { g ->
+        JsonObject(buildMap {
+            put("name", JsonPrimitive(g.name))
+            put("songs", JsonPrimitive(g.songCount))
+            saved.libraries[g.name]?.let { by -> put("libraries", JsonObject(by.mapValues { JsonPrimitive(it.value) })) }
+        })
+    }),
 )).toString()
 
 internal fun parseSaved(text: String): SavedGenres? {
     val o = kotlinx.serialization.json.Json.parseToJsonElement(text) as? JsonObject ?: return null
     val at = (o["at"] as? JsonPrimitive)?.content?.toLongOrNull() ?: return null
-    val genres = (o["genres"] as? JsonArray)?.mapNotNull { item ->
-        val g = item as? JsonObject ?: return@mapNotNull null
-        val name = (g["name"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-        Genre(name, (g["songs"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0)
-    }.orEmpty()
-    return SavedGenres(at, genres)
+    val items = (o["genres"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+    val genres = items.mapNotNull(::genreOf)
+    val libraries = items.mapNotNull { g -> genreOf(g)?.let { genre -> librariesOf(g)?.let { genre.name to it } } }.toMap()
+    return SavedGenres(at, genres, libraries)
 }
 
 /** A genre's short description and where it's from (Wikipedia, linked, as its licence asks). */

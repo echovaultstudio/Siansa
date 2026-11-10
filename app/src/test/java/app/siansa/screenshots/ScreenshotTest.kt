@@ -733,6 +733,17 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             Scene("player_live") {
                 OnPlayer { Box(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium)) { app.siansa.ui.LiveBar() } }
             },
+            // A genre's description: three lines and "Show more", or all of a short one (the owner, 10 Nov).
+            Scene("genre_about") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.GenreAboutText(
+                        "Indie pop is a music genre and subculture that combines guitar pop with a DIY ethic in opposition to the " +
+                            "style and tone of mainstream pop music. It originated from British post-punk in the late 1970s.",
+                        "Wikipedia", onSource = {},
+                    )
+                    app.siansa.ui.GenreAboutText("Kayōkyoku is Japanese popular music of the Shōwa era.", "Wikipedia", onSource = null)
+                }
+            },
             // Custom card editor: a rule (issue #663).
             Scene("card_rule") {
                 Column(Modifier.padding(Space.Page)) {
