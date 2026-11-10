@@ -517,11 +517,15 @@ class SpacingLibraryTest : SpacingCheck() {
         compose.onNode(androidx.compose.ui.test.hasScrollToIndexAction()).performScrollToIndex(2)
         compose.waitForIdle()
         val bar = compose.onNodeWithTag("fadingTitleBar").getBoundsInRoot()
-        // The page's own title, not the title bar's: the lower of the two.
+        // The page's title has glided up into the title bar (one title, as on an artist's page, the owner, 10 Nov),
+        // and what was under it comes up under the bar, with no empty band where the cover was.
         val title = compose.onAllNodesWithText("A single").fetchSemanticsNodes().maxBy { it.boundsInRoot.top }
-        val titleTop = with(compose.density) { title.boundsInRoot.top.toDp() }
-        assertTrue("The title sits under the title bar: ${titleTop.value} dp vs bar ${bar.bottom.value} dp",
-            abs((titleTop - bar.bottom).value) <= Space.Page.value)
+        val middle = with(compose.density) { title.boundsInRoot.center.y.toDp() }
+        assertTrue("The title is in the title bar: its middle at ${middle.value} dp, bar ${bar.top.value}–${bar.bottom.value} dp",
+            middle >= bar.top && middle <= bar.bottom)
+        val byline = with(compose.density) { compose.onNodeWithText("Sunborn").fetchSemanticsNode().boundsInRoot.top.toDp() }
+        assertTrue("What was under the title comes up under the bar: ${byline.value} dp vs bar ${bar.bottom.value} dp",
+            byline - bar.bottom <= Space.Section * 2)
         compose.onNodeWithText("The only song").assertIsDisplayed()
     }
 }
