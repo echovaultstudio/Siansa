@@ -128,7 +128,7 @@ fun editablePlaylists(playlists: List<Playlist>, user: String): List<Playlist> =
 // ---- Now playing's ⋮ menu ----
 
 /**
- * The ⋮ menu in now playing, a sheet like Spotify's: the song at the top, then what you can do with it.
+ * The ⋮ menu in now playing, a sheet: the song at the top, then what you can do with it.
  * Share isn't offered (the music is on your own server), and the queue opens from its own button.
  */
 @OptIn(ExperimentalMaterial3Api::class)

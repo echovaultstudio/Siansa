@@ -112,7 +112,7 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 /*
- * Your Library, laid out like Spotify's: filter chips at the top (Playlists, Mixes, Albums, Artists, Your
+ * Your Library: filter chips at the top (Playlists, Mixes, Albums, Artists, Your
  * listening), each opening its own sub-filters, a sort menu (Recents first), a list/grid switch, and
  * everything in one list. "Recents" is built from what you actually play: Siansa's own history plus
  * Navidrome's recently played albums, so the things you listen to come to the top.
@@ -636,7 +636,7 @@ private fun LibraryHeader(
 }
 
 /**
- * Spotify's chip row: all chips (in the order last opened), or ✕ + the chosen chip + its own sub-chips, and under
+ * The chip row: all chips (in the order last opened), or ✕ + the chosen chip + its own sub-chips, and under
  * Music's Albums or Artists their tags. While chips are hidden off the right edge, the row fades there with a ›
  * that scrolls on (issue #497).
  */

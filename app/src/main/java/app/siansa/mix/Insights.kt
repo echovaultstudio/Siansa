@@ -29,7 +29,7 @@ import java.util.Locale
 /** An album worth coming back to, and when it was last played. */
 data class Rediscovery(val album: Album, val lastPlayed: LocalDate?, val plays: Long)
 
-/** One period of listening, Spotify Wrapped style. */
+/** One period of listening, as a year in review shows it. */
 data class ListeningReport(
     val title: String,
     val subtitle: String,

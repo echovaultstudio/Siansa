@@ -110,7 +110,7 @@ fun castDeviceLabel(status: CastStatus, output: OutputDevice? = null, dlna: Stri
 }
 
 /**
- * Now playing's device button, bottom left as in Spotify: an icon for where the music plays, followed by
+ * Now playing's device button, bottom left: an icon for where the music plays, followed by
  * the device's name when it isn't this phone's speaker ("Living Room TV", "Sony Headphones"). Tapping it
  * picks a TV or speaker to cast to, on phones that can cast.
  */

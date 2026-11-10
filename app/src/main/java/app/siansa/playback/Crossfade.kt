@@ -648,7 +648,7 @@ object Crossfade {
  * Like ReplayGain through the player volume, it can only turn songs down; [preampDb] applies as with tags.
  */
 object Levelling {
-    /** Loudness targets: Spotify's default, and one closer to ReplayGain with more headroom. */
+    /** Loudness targets: the usual streaming level, and one closer to ReplayGain with more headroom. */
     val TARGETS = listOf(-14, -18)
 
     fun volume(profile: TrackProfile?, targetLufs: Int, preampDb: Float = 0f): Float? {

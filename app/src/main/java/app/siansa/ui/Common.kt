@@ -937,7 +937,7 @@ fun <T> Shelf(
 }
 
 /**
- * Spotify's swipe to queue: drag a song row from right to left past a third of its width and let go, and
+ * Swipe to queue: drag a song row from right to left past a third of its width and let go, and
  * the song is added to the queue (after the songs queued before it). The row slides back; an amber strip
  * with the queue icon shows behind it while dragging. [content] gets a background for the row, solid
  * only while it's dragged so the row looks as usual otherwise.

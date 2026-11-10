@@ -82,7 +82,7 @@ fun HomeSectionScreen(nav: NavController, id: String) {
 
     val items by loadState(version to section) { loadSection(graph, section) }
     // A grid of three or a list, switched at the top and kept per kind of page (issue #289). Playlists start
-    // as a list, like Spotify; the rest as a grid.
+    // as a list; the rest as a grid.
     var grid by rememberGridMode("section-${section.id}", default = section != HomeSection.Playlists)
     val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
     Screen(section.title, nav) { padding ->

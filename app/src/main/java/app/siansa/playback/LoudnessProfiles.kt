@@ -27,6 +27,9 @@ enum class LoudnessSource(val label: String, val detail: String) {
 /** Who measures the songs: "Siansa Beats" when it's set up (Siansa Dev), "the Siansa plugin" otherwise. */
 val AppSettings.measurer: String get() = if (beatsReady) "Siansa Beats" else "the Siansa plugin"
 
+/** [measurer]'s, said right: "Siansa Beats'" or "the Siansa plugin's". */
+val AppSettings.measurers: String get() = if (beatsReady) "Siansa Beats'" else "the Siansa plugin's"
+
 /** One level on a ramp: the song is at [db] relative to its own loudness at [ms] (see [TrackProfile]). */
 data class RampPoint(val db: Int, val ms: Long)
 

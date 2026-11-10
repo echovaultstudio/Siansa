@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap
 private val colorCache = ConcurrentHashMap<String, Int>()
 
 /**
- * The cover's main colour (as Spotify uses for page backgrounds), toned down so white text stays
+ * The cover's main colour (for page backgrounds), toned down so white text stays
  * readable. Fades in once the cover has been looked at; remembered for the rest of the session.
  */
 @Composable

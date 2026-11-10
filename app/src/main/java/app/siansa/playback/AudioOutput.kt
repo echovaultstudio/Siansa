@@ -16,7 +16,7 @@ data class OutputDevice(val name: String, val bluetooth: Boolean)
 
 /**
  * Follows the phone's audio outputs, so now playing can show "Sony Headphones" next to the device button
- * as Spotify does. Only names are kept; nothing about the device is logged beyond its kind.
+ * as music apps do. Only names are kept; nothing about the device is logged beyond its kind.
  */
 object AudioOutput {
     private val _device = MutableStateFlow<OutputDevice?>(null)

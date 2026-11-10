@@ -49,6 +49,7 @@ import app.siansa.playback.CrossfadeMode
 import app.siansa.playback.Levelling
 import app.siansa.playback.LoudnessSource
 import app.siansa.playback.measurer
+import app.siansa.playback.measurers
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -72,7 +73,7 @@ fun CrossfadeScreen(nav: NavController) {
             verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP),
         ) {
             Heading("Where loudness and fades come from")
-            LoudnessSourceRow(settings.loudnessSource) {
+            LoudnessSourceRow(settings.loudnessSource, beats = settings.beatsReady) {
                 test = null
                 graph.settings.setLoudness(source = it)
             }
@@ -125,7 +126,7 @@ fun CrossfadeScreen(nav: NavController) {
                 // The target applies to ReplayGain tags too (issue #667), so it's there whenever levelling is on.
                 if (settings.replayGain != ReplayGainMode.OFF) {
                     LoudnessTargetRow(settings.loudnessTarget) { graph.settings.setLoudness(target = it) }
-                    Hint("How loud songs are brought to, by the plugin's measurement or by ReplayGain tags. −18 is ReplayGain's own level and leaves room for loud songs. −14 is louder, like Spotify, but quiet songs can't be raised to it.")
+                    Hint("How loud songs are brought to, by ${settings.measurers} measurement or by ReplayGain tags. −18 is ReplayGain's own level and leaves room for loud songs. −14 is louder, as many streaming services play, but quiet songs can't be raised to it.")
                 }
                 Hint(levellingHint(settings))
             }
@@ -159,9 +160,9 @@ fun CrossfadeScreen(nav: NavController) {
 private fun levellingHint(s: AppSettings): String = when {
     s.replayGain == ReplayGainMode.OFF -> "Levelling is off: songs play at their own loudness."
     s.loudnessSource == LoudnessSource.PLUGIN && s.replayGain == ReplayGainMode.ALBUM ->
-        "Each song is levelled one way only: songs with album tags keep them, the rest by ${s.measurer}'s measurement."
+        "Each song is levelled one way only: songs with album tags keep them, the rest by ${s.measurers} measurement."
     s.loudnessSource == LoudnessSource.PLUGIN ->
-        "Each song is levelled one way only: by ${s.measurer}'s measurement, or by its ReplayGain tags until it's measured."
+        "Each song is levelled one way only: by ${s.measurers} measurement, or by its ReplayGain tags until it's measured."
     else -> "Uses the songs' ReplayGain tags (${s.replayGain.label.lowercase()})."
 }
 
@@ -189,7 +190,7 @@ internal fun crossfadeHint(s: AppSettings): String = when (s.crossfade) {
         "Other fades start where a song goes quiet and last as long as the two songs need. In DJ radio and DJ mixes, " +
             "songs that keep a beat blend beat on beat, phrase on phrase, with the next song a touch faster or slower to match."
     } else {
-        "With the Siansa plugin, fades follow how each song ends and starts, and DJ radio blends beat on beat."
+        "With ${s.measurer.replaceFirstChar { it.uppercase() }}, fades follow how each song ends and starts, and DJ radio blends beat on beat."
     }
 }
 
@@ -218,9 +219,11 @@ internal fun BeatMatchSection(
     onEcho: (Boolean) -> Unit,
     onBassSwap: (Boolean) -> Unit,
     onKeepKey: (Boolean) -> Unit,
+    /** Who measures the beats: [app.siansa.playback.measurer]. */
+    measurer: String = "the Siansa plugin",
 ) {
     BeatMatchRow(mode, onMode)
-    Hint(beatMatchHint(mode))
+    Hint(beatMatchHint(mode, measurer))
     if (mode != BeatMatchMode.OFF) {
         Text("Blend length", style = MaterialTheme.typography.bodyLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
@@ -240,10 +243,10 @@ internal fun BeatMatchSection(
     }
 }
 
-private fun beatMatchHint(mode: BeatMatchMode): String = when (mode) {
+private fun beatMatchHint(mode: BeatMatchMode, measurer: String): String = when (mode) {
     BeatMatchMode.OFF -> "Fades don't follow the beat. Two songs that both keep a beat get a short fade, so their beats don't clash for long."
-    BeatMatchMode.DJ_RADIO -> "In DJ radio, a song that keeps a beat blends into the next one like a DJ mix: phrase on phrase where the Siansa plugin for AudioMuse found the phrases a song is built from, else bar for bar. The next song comes in on its first phrase, a touch faster or slower to match, then eases back to its own speed."
-    BeatMatchMode.EVERYWHERE -> "Every smart crossfade blends phrase on phrase or bar for bar when both songs keep a beat, with the next song a touch faster or slower to match (up to 8 %). Uses the beats and phrases the Siansa plugin for AudioMuse measures."
+    BeatMatchMode.DJ_RADIO -> "In DJ radio, a song that keeps a beat blends into the next one like a DJ mix: phrase on phrase where $measurer found the phrases a song is built from, else bar for bar. The next song comes in on its first phrase, a touch faster or slower to match, then eases back to its own speed."
+    BeatMatchMode.EVERYWHERE -> "Every smart crossfade blends phrase on phrase or bar for bar when both songs keep a beat, with the next song a touch faster or slower to match (up to 8 %). Uses the beats and phrases $measurer measures."
 }
 
 /** Off, DJ radio or Everywhere: where blends are beat-matched (issue #646). */
@@ -258,10 +261,10 @@ internal fun BeatMatchRow(selected: BeatMatchMode, onPick: (BeatMatchMode) -> Un
 
 /** The choice of where loudness and fades come from. */
 @Composable
-internal fun LoudnessSourceRow(selected: LoudnessSource, onPick: (LoudnessSource) -> Unit) {
+internal fun LoudnessSourceRow(selected: LoudnessSource, beats: Boolean = false, onPick: (LoudnessSource) -> Unit) {
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         LoudnessSource.entries.forEach { source ->
-            FilterChip(selected = selected == source, onClick = { onPick(source) }, label = { Text(source.label) })
+            FilterChip(selected = selected == source, onClick = { onPick(source) }, label = { Text(if (source == LoudnessSource.PLUGIN && beats) "Siansa Beats" else source.label) })
         }
     }
 }
@@ -341,7 +344,7 @@ internal fun LevellingNow(settings: AppSettings) {
     }
     val song = player.current?.let { SongRegistry.get(it.id) ?: it }
     val decision = remember(song, settings, tick) { Levelling.decide(song, settings, song?.let { graph.profiles.cached(it.id) }) }
-    val (icon, text) = levellingNowText(song?.title, decision)
+    val (icon, text) = levellingNowText(song?.title, decision, settings.measurer)
     Row(
         Modifier.fillMaxWidth().testTag("levelling-now"),
         verticalAlignment = Alignment.CenterVertically,
@@ -357,12 +360,12 @@ internal fun LevellingNow(settings: AppSettings) {
 }
 
 /** The line [LevellingNow] shows, and its icon: a tick when the Siansa plugin levels the song. */
-internal fun levellingNowText(title: String?, d: Levelling.Decision): Pair<androidx.compose.ui.graphics.vector.ImageVector, String> {
+internal fun levellingNowText(title: String?, d: Levelling.Decision, by: String = "the Siansa plugin"): Pair<androidx.compose.ui.graphics.vector.ImageVector, String> {
     if (title == null) return Icons.Rounded.MusicOff to "Nothing playing right now."
     val db = "%+.1f dB".format(d.gainDb)
     return when (d.source) {
-        Levelling.Source.PLUGIN -> Icons.Rounded.CheckCircle to "Now playing \"$title\": levelled by the Siansa plugin, $db."
-        Levelling.Source.REPLAYGAIN -> Icons.Rounded.Info to "Now playing \"$title\": levelled by its ReplayGain tags, $db, not by the Siansa plugin (${d.why})."
+        Levelling.Source.PLUGIN -> Icons.Rounded.CheckCircle to "Now playing \"$title\": levelled by $by, $db."
+        Levelling.Source.REPLAYGAIN -> Icons.Rounded.Info to "Now playing \"$title\": levelled by its ReplayGain tags, $db, not by $by (${d.why})."
         Levelling.Source.NONE -> Icons.Rounded.Info to "Now playing \"$title\": not levelled (${d.why})."
     }
 }

@@ -156,7 +156,7 @@ internal fun playerColors() = darkColorScheme(
 )
 
 /**
- * Now playing, in the style of Spotify: the cover blurred into the background, a large cover that
+ * Now playing: the cover blurred into the background, a large cover that
  * opens its album, title and artist with a heart, the controls, where the music plays (bottom left) and
  * the queue (bottom right). The ⋮ menu has everything else. Scrolling down shows the lyrics, the artist
  * and the song's details on cards; they stay out of sight until then (#294), and the lyrics have their own
@@ -345,7 +345,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 // The player fills the screen; the cards below only come into view when scrolling, so none
                 // sits under the phone's own buttons (#294). The classic style leaves the top of the lyrics card
-                // peeking in at the bottom, as in Spotify, to show there's more below (issue #346).
+                // peeking in at the bottom, to show there's more below (issue #346).
                 val pageHeight = if (classic) maxHeight - PLAYER_PEEK - navBar else maxHeight
                 val queueButton = @Composable {
                     RoundIcon(
@@ -718,7 +718,7 @@ private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit, onMenu
 }
 
 /**
- * While a sleep timer runs, the moon with the time left shows in the top row (as Spotify does); it opens the
+ * While a sleep timer runs, the moon with the time left shows in the top row; it opens the
  * timer. Otherwise the timer is only in the ⋮ menu, so the player stays uncluttered.
  */
 @Composable

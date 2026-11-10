@@ -303,7 +303,7 @@ fun SyncPrompt(nav: NavController) {
 
 /**
  * An album from the synced library (all merged copies together), or straight from Navidrome before a
- * sync, in the Spotify layout with the cover's colour behind the header.
+ * sync, with the cover's colour behind the header.
  */
 @Composable
 fun AlbumScreen(nav: NavController, id: String) {

@@ -322,7 +322,7 @@ fun HomeScreen(nav: NavController) {
                 // The notices are the top of Home now (issue #872), not a section of their own.
                 HomeSection.NOTICES -> Unit
                 HomeSection.QUICK -> {
-                    // Quick access, like the top grid in Spotify (issue #271): what you played last, newest first, as
+                    // Quick access, the top grid (issue #271): what you played last, newest first, as
                     // many as Settings › Style › Home says (issue #934); until there's enough of that, today's mixes,
                     // playlists and recent albums. Liked songs is one of them only when you played it.
                     titledItem(section !in homeSettings.homeUntitled, key = "quick") {
