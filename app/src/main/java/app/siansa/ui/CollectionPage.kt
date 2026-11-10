@@ -751,10 +751,17 @@ fun PlayButtonRow(
 
 /**
  * The page's Play in the title bar once its own has scrolled away (the owner, 10 Nov): small and round, in the page's
- * Play colour; a radio's in its colour, with the radio.
+ * Play colour; a radio's is the radio icon alone, in white like the bar's other icons.
  */
 @Composable
 internal fun BarPlayButton(radio: Boolean, colour: Color, onColour: Color, playing: Boolean, onClick: () -> Unit) {
+    // A radio's is the icon alone, as the bar's other icons (the owner, 10 Nov: no coloured ring round it).
+    if (radio) {
+        IconButton(onClick = onClick, modifier = Modifier.testTag("barPlayButton")) {
+            Icon(Icons.Rounded.Radio, "Start the radio", tint = Color.White)
+        }
+        return
+    }
     Box(
         Modifier
             .padding(horizontal = Space.Tight)

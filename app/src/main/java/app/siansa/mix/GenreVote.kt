@@ -30,6 +30,9 @@ class GenreVote(
     /** Where the list is saved: read it (null: none yet) and write it. */
     private val load: () -> String? = { null },
     private val save: (String) -> Unit = {},
+    /** Where the genres' descriptions are kept on the phone (the owner, 10 Nov: they weren't kept at all). */
+    private val loadAbouts: () -> String? = { null },
+    private val saveAbouts: (String) -> Unit = {},
 ) {
     @Volatile private var backOffUntil = 0L
     @Volatile private var misses = 0
@@ -112,14 +115,34 @@ class GenreVote(
         return inLibraries(listed, kept.libraries, shown)
     }
 
-    private val abouts = java.util.concurrent.ConcurrentHashMap<String, GenreAbout>()
+    /** Descriptions kept on the phone, by genre (lower case): one found, or none (Wikipedia has nothing on it). */
+    private val abouts = java.util.concurrent.ConcurrentHashMap<String, KeptAbout>()
+    @Volatile private var aboutsRead = false
+
+    private fun readAbouts() {
+        if (aboutsRead) return
+        aboutsRead = true
+        runCatching { loadAbouts()?.let(::parseAbouts) }.getOrNull()?.let { abouts.putAll(it) }
+    }
+
+    private fun keep(name: String, about: GenreAbout?) {
+        abouts[name.lowercase()] = KeptAbout(about, now())
+        runCatching { saveAbouts(writeAbouts(abouts)) }.onFailure { AppLog.w("Genre", "Couldn't keep the descriptions: ${it.message}") }
+    }
+
+    /** Genre [name]'s description as kept on the phone, at once: null when there's none kept (or it's none). */
+    fun keptAbout(name: String): GenreAbout? {
+        readAbouts()
+        return abouts[name.lowercase()]?.takeIf { it.fresh(now()) }?.about
+    }
 
     /**
      * Genre [name]'s short description, with a little of its history (Siansa Beats, from Wikipedia), for its page: null
      * without Siansa Beats or when it has none; the page shows without it then. Waits at most [WAIT_MS] * 2.
      */
     suspend fun about(name: String): GenreAbout? {
-        abouts[name.lowercase()]?.let { return it }
+        readAbouts()
+        abouts[name.lowercase()]?.takeIf { it.fresh(now()) }?.let { return it.about }
         if (!ready() || now() < backOffUntil) return null
         // Siansa Beats 0.22 answers at once with a kept one; a genre it hasn't looked up yet comes back "pending" after a
         // few seconds, and is there when asked again shortly (the owner, 10 Nov: some genre pages never showed theirs).
@@ -137,10 +160,23 @@ class GenreVote(
             if (answer != null && !pending) break
             if (attempt < ABOUT_TRIES) kotlinx.coroutines.delay(ABOUT_AGAIN_MS)
         }
-        val o = answer?.get("about") as? JsonObject ?: return null
-        fun text(key: String) = (o[key] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() && it != "null" }
-        val about = GenreAbout(text("summary") ?: return null, text("url"), text("source") ?: "Wikipedia")
-        abouts[name.lowercase()] = about
+        val status = (answer?.get("status") as? JsonPrimitive)?.content
+        val o = answer?.get("about") as? JsonObject
+        fun text(key: String) = (o?.get(key) as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() && it != "null" }
+        val about = text("summary")?.let { GenreAbout(it, text("url"), text("source") ?: "Wikipedia") }
+        when {
+            about != null -> {
+                keep(name, about)
+                AppLog.i("Genre", "$name: its description from ${about.source}, kept on the phone")
+            }
+            status == "missing" -> {
+                keep(name, null)  // asked again after a day, not on every visit
+                AppLog.i("Genre", "$name: Wikipedia has nothing on it")
+            }
+            status == "failed" -> AppLog.i("Genre", "$name: Siansa Beats couldn't ask Wikipedia (it tries again in half an hour)")
+            answer == null || status == "pending" -> AppLog.i("Genre", "$name: its description is still being looked up")
+            else -> AppLog.i("Genre", "$name: no description from Siansa Beats")
+        }
         return about
     }
 
@@ -226,6 +262,39 @@ internal fun parseSaved(text: String): SavedGenres? {
     val genres = items.mapNotNull(::genreOf)
     val libraries = items.mapNotNull { g -> genreOf(g)?.let { genre -> librariesOf(g)?.let { genre.name to it } } }.toMap()
     return SavedGenres(at, genres, libraries)
+}
+
+/** A genre's description as kept on the phone ([about] null: Wikipedia has nothing on it), and when it came. */
+data class KeptAbout(val about: GenreAbout?, val at: Long) {
+    /** A description is kept [ABOUT_FOUND_MS], "nothing on it" [ABOUT_MISSING_MS]; then it's asked for again. */
+    fun fresh(now: Long): Boolean = now - at < if (about != null) ABOUT_FOUND_MS else ABOUT_MISSING_MS
+
+    companion object {
+        const val ABOUT_FOUND_MS = 30L * 24 * 60 * 60_000
+        const val ABOUT_MISSING_MS = 24L * 60 * 60_000
+    }
+}
+
+internal fun writeAbouts(kept: Map<String, KeptAbout>): String = JsonObject(kept.mapValues { (_, k) ->
+    JsonObject(buildMap {
+        put("at", JsonPrimitive(k.at))
+        k.about?.let { a ->
+            put("summary", JsonPrimitive(a.summary))
+            a.url?.let { put("url", JsonPrimitive(it)) }
+            put("source", JsonPrimitive(a.source))
+        }
+    })
+}).toString()
+
+internal fun parseAbouts(text: String): Map<String, KeptAbout> {
+    val o = kotlinx.serialization.json.Json.parseToJsonElement(text) as? JsonObject ?: return emptyMap()
+    return o.mapNotNull { (name, v) ->
+        val k = v as? JsonObject ?: return@mapNotNull null
+        val at = (k["at"] as? JsonPrimitive)?.content?.toLongOrNull() ?: return@mapNotNull null
+        val summary = (k["summary"] as? JsonPrimitive)?.content
+        val about = summary?.let { GenreAbout(it, (k["url"] as? JsonPrimitive)?.content, (k["source"] as? JsonPrimitive)?.content ?: "Wikipedia") }
+        name to KeptAbout(about, at)
+    }.toMap()
 }
 
 /** A genre's short description and where it's from (Wikipedia, linked, as its licence asks). */

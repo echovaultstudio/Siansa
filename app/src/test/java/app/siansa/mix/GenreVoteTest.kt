@@ -153,6 +153,38 @@ class GenreVoteTest {
         assertEquals(2, asks)
     }
 
+    @Test fun descriptionsAreKeptOnThePhone() = runBlocking {
+        // The owner, 10 Nov: genre descriptions weren't kept at all; each visit asked again.
+        var kept: String? = null
+        var asks = 0
+        fun vote() = GenreVote({ path ->
+            asks++
+            when {
+                "Polka" in path -> JsonObject(mapOf("about" to kotlinx.serialization.json.JsonNull, "status" to JsonPrimitive("missing")))
+                "Surf" in path -> JsonObject(mapOf("about" to kotlinx.serialization.json.JsonNull, "status" to JsonPrimitive("failed")))
+                else -> JsonObject(mapOf("about" to JsonObject(mapOf("summary" to JsonPrimitive("Trance is fast."), "source" to JsonPrimitive("Wikipedia"))), "status" to JsonPrimitive("found")))
+            }
+        }, { true }, { time }, loadAbouts = { kept }, saveAbouts = { kept = it })
+        val first = vote()
+        assertEquals("Trance is fast.", first.about("Trance")!!.summary)
+        assertNull(first.about("Polka"))
+        assertNull(first.about("Surf"))
+        assertEquals(3, asks)
+        // A new start: the description and the "nothing on it" come from the phone; a failure is asked again.
+        val again = vote()
+        assertEquals("Trance is fast.", again.keptAbout("Trance")!!.summary)
+        assertEquals("Trance is fast.", again.about("Trance")!!.summary)
+        assertNull(again.about("Polka"))
+        assertEquals(3, asks)
+        again.about("Surf")
+        assertEquals(4, asks)
+        // A day on, "nothing on it" is asked again; the description stays a month.
+        time += KeptAbout.ABOUT_MISSING_MS + 1
+        again.about("Polka")
+        again.about("Trance")
+        assertEquals(5, asks)
+    }
+
     @Test fun noDescriptionWithoutSiansaBeats() = runBlocking {
         reply = { JsonObject(mapOf("about" to kotlinx.serialization.json.JsonNull)) }
         assertNull(vote.about("Mercury"))

@@ -135,6 +135,8 @@ private fun GenreScreenContent(nav: NavController, name: String) {
     val colors = genreColors(name)
     val songs by loadState("genre-songs-$name") { graph.genreRadio.songsOf(name) }
     val aboutState by loadState("genre-about-$name") { graph.genreVote.about(name) }
+    // The description kept on the phone shows at once (the owner, 10 Nov); the asking above only fills in a new one.
+    val keptAbout = remember(name) { graph.genreVote.keptAbout(name) }
     val list = songs.valueOrNull()
     CollectionPage(
         nav = nav,
@@ -154,7 +156,7 @@ private fun GenreScreenContent(nav: NavController, name: String) {
         radioOnCover = true,
         barExtras = { RadioHeart(nav, name, colors) },
         header = {
-            val about = aboutState.valueOrNull()
+            val about = aboutState.valueOrNull() ?: keptAbout
             if (about != null) {
                 val uri = androidx.compose.ui.platform.LocalUriHandler.current
                 GenreAboutText(about.summary, about.source, onSource = about.url?.let { url -> { runCatching { uri.openUri(url) } } })

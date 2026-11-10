@@ -319,6 +319,9 @@ class AppGraph(val app: Application) {
         // The genre list by vote, saved so Search and Home show it at once (and while Siansa Beats is away).
         load = { java.io.File(app.filesDir, "voted-genres.json").takeIf { it.exists() }?.readText() },
         save = { java.io.File(app.filesDir, "voted-genres.json").writeText(it) },
+        // Each genre's description, kept so its page shows it at once, also while Siansa Beats is away.
+        loadAbouts = { java.io.File(app.filesDir, "genre-abouts.json").takeIf { it.exists() }?.readText() },
+        saveAbouts = { java.io.File(app.filesDir, "genre-abouts.json").writeText(it) },
     )
     /** The AI service that writes mix titles and sound searches (issue #665). */
     val ai = ChatApi(http) { settings.current }
