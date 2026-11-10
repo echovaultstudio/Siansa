@@ -364,7 +364,16 @@ class TvPlay(private val graph: AppGraph, private val launcher: app.siansa.ui.Pl
 
     fun moodRadio(radio: MoodRadio) = launcher(radio.name) { graph.radios.mood(radio) }
 
-    fun genreRadio(name: String) = launcher("$name radio") { graph.radios.genre(name) }
+    /** A genre's radio as on the phone (GenreRadio): 30 of its songs at random, more as they play, never all of them. */
+    fun genreRadio(name: String) {
+        scope.launch {
+            val songs = runCatching { graph.genreRadio.songsOf(name) }.getOrDefault(emptyList())
+            if (songs.isEmpty()) notify("No songs of $name on this TV") else {
+                graph.genreRadio.start(name, songs)
+                notify("$name radio: ${minOf(songs.size, app.siansa.mix.GenreRadio.PICKS)} songs, more as they play")
+            }
+        }
+    }
 }
 
 @Composable

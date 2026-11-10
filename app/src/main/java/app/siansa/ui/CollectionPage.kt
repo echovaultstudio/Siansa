@@ -53,6 +53,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -135,6 +136,9 @@ fun CollectionPage(
     footer: LazyListScope.() -> Unit = {},
     // False for a page whose cover Siansa draws (a radio): Home's shortcut shows that, not its first song's cover.
     shortcutCover: Boolean = true,
+    // A list too long to queue whole (a genre, issue: the owner, 10 Nov): Play, Shuffle and a song start this instead
+    // (a radio of some of the songs, the song tapped first), and there's no Add all to queue or DJ mix.
+    playAs: ((first: Song?) -> Unit)? = null,
 ) {
     val graph = LocalGraph.current
     val djSettings by graph.settings.state.collectAsStateWithLifecycle()
@@ -193,7 +197,8 @@ fun CollectionPage(
     val pastHeader by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     val rowEnd = if (fast) AlphabetBarWidth else 0.dp
 
-    WithPageColours(coverId, pageBackdrop(surface, color), where = "Page \"$title\"") {
+    // Dynamic colours: the cover's colour for Play only (BigPlayButton reads it).
+    CompositionLocalProvider(LocalPlayColours provides rememberPageColours(coverId, pageBackdrop(surface, color), where = "Page \"$title\"")) {
     Box(Modifier.fillMaxSize().background(surface)) {
         if (showCovers && songs != null) {
             val covers = remember(songs) { songs.map { it.cover } }
@@ -243,11 +248,12 @@ fun CollectionPage(
                     }
                     Spacer(Modifier.height(Space.Tight))
                     ActionRow(
-                        songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed, saveAs = title.takeIf { saveAsPlaylist },
+                        songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed, saveAs = title.takeIf { saveAsPlaylist && playAs == null },
+                        playAs = playAs,
                         // An album's shuffle slides right onto Play for a DJ mix of its own songs (issue #965); it needs
                         // AudioMuse, as similar albums does.
                         // Only when a DJ mix's needs are met (AudioMuse and Siansa Beats): otherwise a plain Shuffle.
-                        onDjMix = if (((albumBar && onSimilar != null) || djMix) && djPossible) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } }) else null,
+                        onDjMix = if (((albumBar && onSimilar != null) || djMix) && djPossible && playAs == null) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } }) else null,
                         djSlide = djSlide, onDjSlide = { djSlide = it }, dim = slideDim, albumBar = albumBar, resume = resume,
                     )
                 }
@@ -278,7 +284,7 @@ fun CollectionPage(
                             ) {
                                 SongRow(
                                     song = song,
-                                    onClick = { graph.player.play(songs, index); notePlayed() },
+                                    onClick = { if (playAs != null) playAs(song) else graph.player.play(songs, index); notePlayed() },
                                     leading = if (numbered) song.track?.toString() ?: "${index + 1}" else null,
                                     highlighted = now,
                                     showCover = showCovers,
@@ -429,6 +435,7 @@ private fun ActionRow(
     dim: Float = 1f,
     albumBar: Boolean = false,
     resume: PlayResume? = null,
+    playAs: ((first: Song?) -> Unit)? = null,
 ) {
     val graph = LocalGraph.current
     var saving by remember { mutableStateOf(false) }
@@ -450,13 +457,17 @@ private fun ActionRow(
     ActionButtons(
         enabled = songs.isNotEmpty(),
         onQueue = { songs.forEach { graph.player.addToQueue(it) } },
+        queueAll = playAs == null,
         onSave = if (saveAs != null) ({ saving = true }) else null,
         download = { if (offline != null) DownloadButton(offline, songs) },
         onSimilar = onSimilar,
-        onShuffle = { graph.player.play(songs, shuffle = true); onPlayed() },
+        onShuffle = { if (playAs != null) playAs(null) else graph.player.play(songs, shuffle = true); onPlayed() },
         // Play continues where you stopped, when you did (issue #965); held, it starts from the top.
         onPlay = {
-            playback.press {
+            if (playAs != null) {
+                playAs(null)
+                onPlayed()
+            } else playback.press {
                 val at = resume?.index?.takeIf { it in songs.indices } ?: 0
                 if (at > 0) AppLog.i("Album", "Continue from ${at + 1} of ${songs.size}")
                 graph.player.play(songs, at)
@@ -501,6 +512,8 @@ internal fun ActionButtons(
     onPlayFromStart: (() -> Unit)? = null,
     // An album's plus: the whole album into a playlist you pick.
     onAddToPlaylist: (() -> Unit)? = null,
+    // False for a list too long to queue whole (a genre): no Add all to queue.
+    queueAll: Boolean = true,
 ) {
     // How far right of shuffle's middle Play's near edge is: sliding there starts the DJ mix.
     var shuffleX by remember { mutableStateOf<Float?>(null) }
@@ -563,7 +576,7 @@ internal fun ActionButtons(
         return
     }
     PlayButtonRow {
-        IconButton(onClick = onQueue, enabled = enabled, modifier = Modifier.alpha(dim).testTag("queueAll")) {
+        if (queueAll) IconButton(onClick = onQueue, enabled = enabled, modifier = Modifier.alpha(dim).testTag("queueAll")) {
             Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add all to queue", Modifier.size(28.dp))
         }
         if (onSave != null) {
@@ -612,6 +625,23 @@ fun BigPlayButton(
     progress: Float? = null,
     // Held: the album from the top, when Play would continue it.
     onLongPlay: (() -> Unit)? = null,
+    onPlay: () -> Unit,
+) {
+    // With Dynamic colours, only Play takes the cover's colour on a page (the owner, 10 Nov): Shuffle and the rest keep
+    // the theme's, so the row doesn't shout.
+    val own = LocalPlayColours.current
+    WithAccent(own?.controls, own?.onControls) { BigPlayButtonDrawn(enabled, playing, grooves, turning, progress, onLongPlay, onPlay) }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun BigPlayButtonDrawn(
+    enabled: Boolean,
+    playing: Boolean,
+    grooves: Boolean,
+    turning: Boolean,
+    progress: Float?,
+    onLongPlay: (() -> Unit)?,
     onPlay: () -> Unit,
 ) {
     val ring = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)

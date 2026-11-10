@@ -236,7 +236,8 @@ class ContinuousPlay(private val graph: AppGraph) {
                         left = snapshot.left,
                         hasMedia = snapshot.hasMedia,
                         repeatOff = snapshot.repeatOff,
-                        radioOn = graph.songRadio.seed.value != null,
+                        // A song radio or a genre radio adds its own songs.
+                        radioOn = graph.songRadio.seed.value != null || graph.genreRadio.active,
                         windingDown = graph.sleepTimer.windingDown(),
                         sleepFinishing = graph.sleepTimer.state.value?.finishing == true,
                     )

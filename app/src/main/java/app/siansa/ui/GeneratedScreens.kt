@@ -35,6 +35,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.testTag
+import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -67,9 +70,53 @@ fun generatedCoverColors(route: String): Pair<Color, Color>? {
     }
 }
 
+/**
+ * A genre's page (the owner, 10 Nov): every song of it on the phone (Siansa Beats' vote, or the songs' genre tags), to
+ * look through. Play, Shuffle or a song start the genre's radio: [GenreRadio.PICKS] songs at random (the song first),
+ * and more of the genre as the queue comes to its end; never the whole genre in the queue, as some have thousands.
+ */
+@Composable
+fun GenreScreen(nav: NavController, name: String) {
+    val graph = LocalGraph.current
+    val snack = LocalSnack.current
+    val scope = rememberCoroutineScope()
+    val colors = genreColors(name)
+    val songs by loadState("genre-songs-$name") { graph.genreRadio.songsOf(name) }
+    val list = songs.valueOrNull()
+    CollectionPage(
+        nav = nav,
+        title = name,
+        color = lerp(colors.first, Color.Black, 0.25f),
+        songs = list,
+        error = (songs as? Load.Err)?.message ?: if (list != null && list.isEmpty()) "No songs of $name on the phone" else null,
+        shortcutCover = false,
+        djMix = false,
+        cover = { m -> GeneratedCover(name, colors, m) },
+        header = {
+            CollectionByline(null, null, null, "Genre" + (list?.let { " · ${"%,d".format(it.size)} songs" } ?: ""))
+            Spacer(Modifier.height(Space.Tight))
+            Text(
+                "Play starts the genre's radio: ${app.siansa.mix.GenreRadio.PICKS} of its songs at random, more as they play.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("genreRadioHint"),
+            )
+        },
+        playAs = { first ->
+            val all = list.orEmpty()
+            if (all.isNotEmpty()) {
+                graph.genreRadio.start(name, all, first)
+                scope.launch { snack.showSnackbar("$name radio: ${minOf(all.size, app.siansa.mix.GenreRadio.PICKS)} songs, more as they play") }
+            }
+        },
+    )
+}
+
 /** A mood or genre radio shown as a playlist first, so you can look, play or shuffle. */
 @Composable
 fun RadioScreen(nav: NavController, kind: String, key: String) {
+    // A genre opens its page of songs, with its radio from there (the owner, 10 Nov).
+    if (kind == "genre") return GenreScreen(nav, key)
     val graph = LocalGraph.current
     var round by remember { mutableIntStateOf(0) }
     val mood = moodRadios.firstOrNull { it.id == key }

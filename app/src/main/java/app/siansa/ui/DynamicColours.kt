@@ -345,6 +345,9 @@ fun WithPageColours(coverId: String?, backdrop: Color, where: String, content: @
     WithAccent(colours?.controls, colours?.onControls, content)
 }
 
+/** The page's colours for its Play button only (Dynamic colours), set by the page around its content. */
+val LocalPlayColours = androidx.compose.runtime.staticCompositionLocalOf<DynamicColours?> { null }
+
 /** A page's colours from [coverId]'s cover on a page of [backdrop], with Style's Dynamic colours on; null when off. */
 @Composable
 fun rememberPageColours(coverId: String?, backdrop: Color, where: String): DynamicColours? {

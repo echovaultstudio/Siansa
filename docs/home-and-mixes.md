@@ -217,7 +217,11 @@ Home with its switch in Settings.
 ## Radios
 
 - **Mood radios** are AudioMuse-AI sound searches, kept varied.
-- **Genre radios** take songs of that genre from your synced library.
+- **Genres** open a page with every song of the genre on your phone, to look
+  through. **Play**, **Shuffle** or a song there starts the genre's **radio**: 30 of its songs at random (the song you
+  tapped first), and 30 more of the genre each time the queue comes to its end, for as long as you don't play
+  something else or add your own songs after it. The whole genre never goes into the queue, as some have thousands
+  of songs. A genre's tile and page are coloured by its feel: red for hard and fast, blue or green for calm.
 - **Artist radios** start with a few of the artist's songs. With AudioMuse-AI set up, the rest are songs that
   sound like the artist (AudioMuse blends a dozen of their songs), with one of their own every fourth song. Without
   it, they're your music server's similar songs (Navidrome's come from Last.fm or other agents it has); if the

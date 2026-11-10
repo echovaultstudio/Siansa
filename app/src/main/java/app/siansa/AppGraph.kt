@@ -7,6 +7,7 @@ import app.siansa.playback.ActivePlayer
 import app.siansa.playback.MiniFor
 import app.siansa.mix.Dice
 import app.siansa.mix.DjReady
+import app.siansa.mix.GenreRadio
 import app.siansa.mix.GenreVote
 import app.siansa.data.ArtistPhotos
 import app.siansa.data.audioMuseUserFor
@@ -498,6 +499,8 @@ class AppGraph(val app: Application) {
     val sleepTimer = SleepTimer()
     val windDown = WindDown(this)
     /** Keep playing: songs added when the queue is about to end (issue #337). */
+    /** A genre's radio: 30 random songs of it, more as the queue ends (the owner, 10 Nov). Before Keep playing, which asks it. */
+    val genreRadio = GenreRadio(this)
     val continuousPlay = ContinuousPlay(this)
 }
 
