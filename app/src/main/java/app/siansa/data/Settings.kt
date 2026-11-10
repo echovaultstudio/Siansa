@@ -199,6 +199,8 @@ data class AppSettings(
     val homeHidden: Set<HomeSection> = emptySet(),
     /** Home's rows in another look than their own (issue #655); a row not in it looks as it is. */
     val homeLooks: Map<HomeSection, HomeLook> = emptyMap(),
+    /** How many tiles a row shown as [HomeLook.GRID] has (2 to 8); not in it: 8. */
+    val homeGridSizes: Map<HomeSection, Int> = emptyMap(),
     /** Home's sections shown without their title (issue #961). */
     val homeUntitled: Set<HomeSection> = emptySet(),
     /** The gap between Home's sections (#554), as a step of the spacing scale: 0 tight … 4 airy. 2 is the default. */
@@ -496,6 +498,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         topBar = TopBarStyle.parse(prefs.getString("top_bar", null)),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
         homeLooks = HomeLook.parse(prefs.getString("home_looks", null)),
+        homeGridSizes = HomeLook.parseGridSizes(prefs.getString("home_grid_sizes", null)),
         homeUntitled = HomeSection.parseHidden(prefs.getString("home_untitled", null)),
         homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
@@ -794,10 +797,17 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeLooks = looks)
     }
 
+    /** How many tiles [section] shows as a [HomeLook.GRID], 2 to 8 (the owner, 10 Nov). */
+    fun setHomeGridSize(section: HomeSection, size: Int) {
+        val sizes = _state.value.homeGridSizes + (section to size.coerceIn(2, HomeLook.GRID_MOST))
+        prefs.edit().putString("home_grid_sizes", HomeLook.formatGridSizes(sizes)).apply()
+        _state.value = _state.value.copy(homeGridSizes = sizes)
+    }
+
     /** Every row back in its own look. */
     fun resetHomeLooks() {
-        prefs.edit().remove("home_looks").apply()
-        _state.value = _state.value.copy(homeLooks = emptyMap())
+        prefs.edit().remove("home_looks").remove("home_grid_sizes").apply()
+        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap())
     }
 
     fun setSyncFolders(ids: Set<String>) {

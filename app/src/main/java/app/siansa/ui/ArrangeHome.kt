@@ -93,6 +93,11 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
             AppLog.i("Home", "${section.label} looks: ${look.label}")
             graph.settings.setHomeLook(section, look)
         },
+        gridSizes = s.homeGridSizes,
+        onGridSizeChange = { section, size ->
+            AppLog.i("Home", "${section.label}: $size tiles in its grid")
+            graph.settings.setHomeGridSize(section, size)
+        },
         onResetLooks = {
             AppLog.i("Home", "Every row back in its own look")
             graph.settings.resetHomeLooks()
@@ -130,6 +135,9 @@ fun ArrangeHomeSheet(
     onTitleShownChange: (HomeSection, Boolean) -> Unit = { _, _ -> },
     onLookChange: (HomeSection, HomeLook) -> Unit = { _, _ -> },
     onResetLooks: () -> Unit = {},
+    // Tiles of a row shown as the shortcut grid (the owner, 10 Nov), picked in its look's dialog.
+    gridSizes: Map<HomeSection, Int> = emptyMap(),
+    onGridSizeChange: (HomeSection, Int) -> Unit = { _, _ -> },
     onOpenSettings: (HomeSection) -> Unit = {},
     // The sections listed here, in Reset's order: all but the notices, which are the top of Home (issue #872).
     sections: List<HomeSection> = HomeSection.default - HomeSection.NOTICES,
@@ -140,8 +148,11 @@ fun ArrangeHomeSheet(
             section, looks[section] ?: HomeLook.AS_IS,
             titleShown = section !in untitled,
             onTitleShown = { onTitleShownChange(section, it) },
-            onPick = { onLookChange(section, it); picking = null },
+            // The grid stays open, so how many tiles it has can be picked there.
+            onPick = { onLookChange(section, it); if (it != HomeLook.GRID) picking = null },
             onDismiss = { picking = null },
+            gridSize = gridSizes[section] ?: HomeLook.GRID_MOST,
+            onGridSize = { onGridSizeChange(section, it) },
         )
     }
     var sources by remember { mutableStateOf(startOnSources) }
@@ -336,9 +347,13 @@ private fun HomeLookDialog(
     onTitleShown: (Boolean) -> Unit,
     onPick: (HomeLook) -> Unit,
     onDismiss: () -> Unit,
+    gridSize: Int = HomeLook.GRID_MOST,
+    onGridSize: (Int) -> Unit = {},
 ) {
     // The switch shows its change at once: the dialog stays open for the look.
     var shown by remember(section) { mutableStateOf(titleShown) }
+    var look by remember(section) { mutableStateOf(current) }
+    var tiles by remember(section) { mutableStateOf(gridSize) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(section.label) },
@@ -350,17 +365,21 @@ private fun HomeLookDialog(
                     onTitleShown(it)
                 }
                 HorizontalDivider(Modifier.padding(vertical = Space.Small))
-                HomeLook.entries.forEach { look ->
+                // Shortcuts is the grid already: its size is set in Settings › Style › Home.
+                HomeLook.entries.filter { it != HomeLook.GRID || section != HomeSection.QUICK }.forEach { option ->
                     Row(
-                        Modifier.fillMaxWidth().clickable { onPick(look) }.padding(vertical = Space.Small).testTag("homeLook-${look.id}"),
+                        Modifier.fillMaxWidth().clickable { look = option; onPick(option) }.padding(vertical = Space.Small).testTag("homeLook-${option.id}"),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        RadioButton(selected = look == current, onClick = { onPick(look) })
+                        RadioButton(selected = option == look, onClick = { look = option; onPick(option) })
                         Spacer(Modifier.width(Space.Small))
                         Column(Modifier.weight(1f)) {
-                            Text(look.label, style = MaterialTheme.typography.bodyLarge)
-                            Text(look.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(option.label, style = MaterialTheme.typography.bodyLarge)
+                            Text(option.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
+                    }
+                    if (option == HomeLook.GRID && look == HomeLook.GRID) {
+                        GridSizeChips(tiles, Modifier.padding(start = Space.Section, bottom = Space.Small)) { tiles = it; onGridSize(it) }
                     }
                 }
             }
@@ -468,5 +487,21 @@ internal fun SectionTitleSwitch(shown: Boolean, onChange: (Boolean) -> Unit) {
         }
         Spacer(Modifier.width(Space.Medium))
         androidx.compose.material3.Switch(checked = shown, onCheckedChange = onChange, modifier = Modifier.testTag("homeTitleSwitch"))
+    }
+}
+
+/** How many tiles a shortcut grid has (the owner, 10 Nov): 2, 4, 6 or 8, two to a row. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun GridSizeChips(size: Int, modifier: Modifier = Modifier, onPick: (Int) -> Unit) {
+    androidx.compose.foundation.layout.FlowRow(modifier.testTag("gridSize"), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Space.Small)) {
+        HomeLook.GRID_SIZES.forEach { n ->
+            androidx.compose.material3.FilterChip(
+                selected = size == n,
+                onClick = { onPick(n) },
+                label = { Text("$n tiles") },
+                modifier = Modifier.testTag("gridSize-$n"),
+            )
+        }
     }
 }

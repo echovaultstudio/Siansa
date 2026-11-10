@@ -91,6 +91,35 @@ class Radios(private val graph: AppGraph) {
         return varied(found, 60)
     }
 
+    /**
+     * The songs of the radio whose page is [route] (a favourite radio's, for its card on Home, the owner, 10 Nov): a
+     * sound or mood radio, a genre's radio (some of its songs, as its radio starts), or "More like" a playlist. Throws
+     * with a readable reason for a radio that can't be made now.
+     */
+    suspend fun ofRoute(route: String): List<Song> {
+        val parts = route.split('/').map { android.net.Uri.decode(it) }
+        return when {
+            parts.size == 3 && parts[0] == "radio" && parts[1] == "mood" ->
+                mood(moodRadios.firstOrNull { it.id == parts[2] } ?: throw MixException("This radio isn't in Siansa any more"))
+            parts.size == 3 && parts[0] == "radio" && parts[1] == "centre" ->
+                centre(graph.audioMuse.moodCentres().firstOrNull { app.siansa.net.AudioMuseApi.centreKey(it) == parts[2] }
+                    ?: throw MixException("AudioMuse doesn't have this mood any more"))
+            parts.size == 3 && parts[0] == "radio" && parts[1] == "genre" -> {
+                val all = graph.genreRadio.songsOf(parts[2])
+                if (all.isEmpty()) throw MixException("No songs of ${parts[2]} on the phone")
+                GenreRadio.firstPicks(all, null, GenreRadio.PICKS, kotlin.random.Random.Default)
+            }
+            parts.size == 2 && parts[0] == "blend" -> {
+                val id = parts[1]
+                val songs = if (app.siansa.data.LocalPlaylists.isLocal(id)) {
+                    graph.localPlaylists.get(id)?.songs ?: throw MixException("This playlist isn't on this phone any more")
+                } else graph.playlistCache.get(id).songs
+                blend(songs)
+            }
+            else -> throw MixException("Not a radio Siansa can make a card of")
+        }
+    }
+
     /** A few of the artist's own songs, from the phone, so the radio starts at once. */
     suspend fun artistStart(artist: Artist): List<Song> = graph.library.songsOf(artist).shuffled().take(6)
 

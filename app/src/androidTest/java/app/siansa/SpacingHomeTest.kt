@@ -213,6 +213,24 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Banner left margin is the page margin", banner.left - screen.left, Space.Page, 1.dp)
     }
 
+    /**
+     * The shortcut grid look (the owner, 10 Nov): two tiles a row a page margin from both edges, the same small gap
+     * between the two of a row as between rows.
+     */
+    @Test fun tileGridHasEvenMarginsAndGaps() {
+        val tiles = (1..4).map { i -> app.siansa.ui.GridTile("t$i", "Tile $i with a long name to cut", null, Color.Red to Color.Blue, onClick = {}) }
+        compose.setContent { SiansaTheme { Column { app.siansa.ui.TileGrid("Recently played", tiles, 4) } } }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val boxes = compose.onAllNodesWithTag("tileGridTile").fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(4, boxes.size)
+        val d = compose.density
+        fun dp(px: Float) = with(d) { px.toDp() }
+        assertEven("Grid margins", dp(boxes[0].left) - screen.left, screen.right - dp(boxes[1].right), 1.dp)
+        assertEven("Grid left margin is the page margin", dp(boxes[0].left) - screen.left, Space.Page, 1.dp)
+        assertEven("Gap across and gap down", dp(boxes[1].left - boxes[0].right), dp(boxes[2].top - boxes[0].bottom), 1.dp)
+        assertEven("The gap is a small step", dp(boxes[1].left - boxes[0].right), Space.Small, 1.dp)
+    }
+
     /** Custom cards (issue #622): the play button card sits a page margin from both edges of the screen. */
     @Test fun pinnedPlayButtonHasEvenPageMargins() {
         val card = app.siansa.mix.PinnedCard.new("Shuffle it").copy(look = app.siansa.mix.CardLook.BUTTON, favourites = true)

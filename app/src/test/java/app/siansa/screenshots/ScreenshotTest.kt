@@ -733,6 +733,27 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             Scene("player_live") {
                 OnPlayer { Box(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium)) { app.siansa.ui.LiveBar() } }
             },
+            // The shortcut grid look for any card or Home row, and its size chips (the owner, 10 Nov).
+            Scene("tile_grid") {
+                Column {
+                    app.siansa.ui.TileGrid(
+                        "Recently played with a long title",
+                        listOf("Halftime radio", "Supercalifragilistic expialidocious", "Liked songs", "Happy").mapIndexed { i, t ->
+                            app.siansa.ui.GridTile("t$i", t, null, Color(0xFF7A1F2B) to Color(0xFF2B5FD6), icon = if (i == 0) Icons.Rounded.PlayArrow else null, onClick = {})
+                        },
+                        4,
+                    )
+                    app.siansa.ui.GridSizeChips(6, Modifier.padding(Space.Page)) {}
+                }
+            },
+            // A page's Play in the title bar once its own has scrolled away, and a radio's (the owner, 10 Nov).
+            Scene("bar_play") {
+                Row(Modifier.background(Color(0xFF7A1F2B)).padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
+                    app.siansa.ui.BarPlayButton(radio = false, colour = Color(0xFFFFB547), onColour = Color(0xFF1A1200), playing = false) {}
+                    app.siansa.ui.BarPlayButton(radio = false, colour = Color(0xFF9DB4C8), onColour = Color(0xFF120D00), playing = true) {}
+                    app.siansa.ui.BarPlayButton(radio = true, colour = Color(0xFFE53935), onColour = Color.White, playing = false) {}
+                }
+            },
             // A genre's description: three lines and "Show more", or all of a short one (the owner, 10 Nov).
             Scene("genre_about") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {

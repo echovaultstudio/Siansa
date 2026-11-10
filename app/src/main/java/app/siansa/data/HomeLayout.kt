@@ -75,7 +75,9 @@ enum class HomeLook(val id: String, val label: String, val hint: String) {
     BANNER("banner", "Banner", "One wide card with the first covers and a button"),
     LIST("list", "List", "The first five listed, the rest a tap away"),
     BUTTON("button", "Play button", "A slim card: one tap plays it, or opens it"),
-    COVER_ROWS("cover_rows", "Cover rows", "Covers with their details beside them, three to a column, to swipe through");
+    COVER_ROWS("cover_rows", "Cover rows", "Covers with their details beside them, three to a column, to swipe through"),
+    // The owner, 10 Nov: any row as the Shortcuts card is, two small tiles a row, 2 to 8 of them.
+    GRID("grid", "Shortcut grid", "Small tiles two to a row, as Shortcuts: 2 to 8 of them");
 
     companion object {
         /** Reads the saved looks ("recent:list,added:banner"); unknown sections and looks are dropped. */
@@ -88,6 +90,24 @@ enum class HomeLook(val id: String, val label: String, val hint: String) {
                 if (s.lookable && l != AS_IS) s to l else null
             }.toMap()
         }
+
+        /** The most tiles of a [GRID] row, and the choices: up to four rows of two, as Shortcuts. */
+        const val GRID_MOST = 8
+        val GRID_SIZES = listOf(2, 4, 6, 8)
+
+        /** Reads the saved grid sizes ("recent:4,genres:8"); unknown sections and sizes out of 2..8 are dropped. */
+        fun parseGridSizes(saved: String?): Map<HomeSection, Int> {
+            if (saved.isNullOrBlank()) return emptyMap()
+            return saved.split(',').mapNotNull { pair ->
+                val (section, n) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                val s = HomeSection.entries.firstOrNull { it.id == section.trim() } ?: return@mapNotNull null
+                val size = n.trim().toIntOrNull()?.takeIf { it in 2..GRID_MOST } ?: return@mapNotNull null
+                s to size
+            }.toMap()
+        }
+
+        fun formatGridSizes(sizes: Map<HomeSection, Int>): String =
+            HomeSection.entries.mapNotNull { s -> sizes[s]?.let { "${s.id}:$it" } }.joinToString(",")
 
         fun format(looks: Map<HomeSection, HomeLook>): String =
             HomeSection.entries.mapNotNull { s -> looks[s]?.takeIf { it != AS_IS }?.let { "${s.id}:${it.id}" } }.joinToString(",")

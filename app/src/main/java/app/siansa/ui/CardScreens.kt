@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -193,6 +194,7 @@ internal fun lookIcon(look: CardLook) = when (look) {
     CardLook.LIST -> Icons.Rounded.FormatListBulleted
     CardLook.BUTTON -> Icons.Rounded.PlayCircle
     CardLook.COVER_ROWS -> Icons.Rounded.ViewAgenda
+    CardLook.GRID -> Icons.Rounded.GridView
 }
 
 /** Picking what a new card shows: a kind, and a genre or years where it needs one. */

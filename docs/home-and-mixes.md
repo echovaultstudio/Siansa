@@ -43,6 +43,7 @@ The **cog** on a section changes its look, to any of the custom cards' looks:
 | **List** | The first five, listed; the title opens the rest. |
 | **Play button** | A slim card: its ▶ plays the section; a tap anywhere else on the card opens it. |
 | **Cover rows** | Covers with their details beside them, three to a column, to swipe through: the same look as a custom card's. The cover plays that album or opens that item; the row opens it. Books and podcasts show how far you are along the cover. A radio or genre shows its colours instead of a cover. |
+| **Shortcut grid** | Small tiles two to a row, like Shortcuts. Pick **2, 4, 6 or 8 tiles** under it in the same dialog. A tile opens its item; the title opens the rest. Shortcuts itself has no such choice: it's the grid already, and its count is under Settings › Style › Home. |
 
 A section in another look says which under its name. **Play** in a banner or the ▶ of a play button card plays the section:
 today's mix or the carousel's first mix where they left off, or the albums of Rediscover, Recently played, Recently
@@ -164,8 +165,9 @@ on a page of its own:
   every album. With Audiobookshelf set up, also **Audiobooks**, **Podcast episodes** (the newest few of your
   podcasts) or **Keep listening** (books and episodes you're partway through, the most recent first). These have no
   rules, only an order (recently added, A to Z or random) and how many, and show as Cover rows.
-- **Comes from** (songs only): **From your library**, by rules, or **By sound**: describe a sound ("rainy jazz
-  piano") and AudioMuse-AI finds songs that match (only with AudioMuse-AI).
+- **Comes from** (songs only): **From your library**, by rules, **By sound**: describe a sound ("rainy jazz
+  piano") and AudioMuse-AI finds songs that match (only with AudioMuse-AI), or **A favourite radio**: one of the
+  radios you hearted (below), its songs new each day.
 - **Rules**: each says what to keep or leave out, and the card keeps what matches **every rule** or **any rule**.
   Add one with **Add a rule**, then pick how it compares and the value:
 
@@ -191,8 +193,9 @@ on a page of its own:
   added, most played (a song's own plays first), or A to Z; and **How many, at most** (up to 500).
 - **Look on Home**: **Song tiles** (a row of covers; for an album card, **Album tiles**), **Album row** (the albums
   the songs come from), **Banner** (one wide card with the first covers and Play and Shuffle), **Song list** (the
-  first five; for an album card, **Album list**), **Play button** (a slim card: its ▶ plays it, the rest opens it) and
-  **Cover rows** (below).
+  first five; for an album card, **Album list**), **Play button** (a slim card: its ▶ plays it, the rest opens it),
+  **Cover rows** (below) and **Shortcut grid** (small tiles two to a row, like Shortcuts: pick 2, 4, 6 or 8; a song's
+  tile plays it, an album's opens it).
 
 **Cover rows**: each row is a cover with three lines beside it, three rows to a column; swipe sideways for the next
 three (the dots under the card show which of them you're on), and tap the card's title for all of them.
@@ -216,10 +219,17 @@ Home with its switch in Settings.
 
 ## Radios
 
-- **Mood radios** are AudioMuse-AI sound searches, kept varied.
+- **Mood radios** are AudioMuse-AI sound searches, kept varied. Their page has the radio's name on its cover, and its
+  Play takes the cover's colour with Dynamic colours on.
+- **Favourite radios**: the heart on a radio's page (a mood radio, a genre, "More like" a playlist) keeps it in Your
+  Library under **Favourites**. Right after you heart one, **Make a Home card** makes a custom card of it, or pick it
+  later under **Comes from › A favourite radio** in a card.
+- **On every page of songs**, once the cover and buttons have scrolled away, the title bar has its **Play** (a radio's
+  **radio**, and its heart).
 - **Genres** open a page with every song of the genre on your phone, to look
   through. With Siansa Beats (0.19 or later), it says what the genre is, with a little of its history: the opening of
-  its Wikipedia article, linked under it; without, how many songs it has. Its one button, the **radio** (round, in the genre's colour), or a song there starts the genre's radio: 30 of its songs at random (the song you
+  its Wikipedia article, linked under it, and under that how many songs it has. Its one button, the **radio** (round,
+  in the genre's colour, on the cover's bottom right corner), or a song there starts the genre's radio: 30 of its songs at random (the song you
   tapped first), and 30 more of the genre each time the queue comes to its end, for as long as you don't play
   something else or add your own songs after it. The whole genre never goes into the queue, as some have thousands
   of songs. A genre's tile and page are coloured by its feel: red for hard and fast, blue or green for calm.
@@ -232,7 +242,7 @@ Home with its switch in Settings.
 ## Your Library
 
 The chips at the top narrow the list down: **Playlists**, **Music**, **Mixes**, **Favourites**, **Your listening**
-and **Stations**.
+and **Stations**. **Favourites** has Liked songs, your favourite albums and artists, and each radio you hearted.
 
 - **Music** holds your albums, artists and songs; tap **Albums**, **Artists** or **Songs** under it to see one kind.
   **Songs** lists every song in the libraries you sync; tap one to play it and the songs after it.

@@ -1,5 +1,7 @@
 package app.siansa.ui
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -71,8 +73,17 @@ import kotlinx.coroutines.launch
 fun CardEditorScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
     val scope = rememberCoroutineScope()
-    val isNew = id == "new"
-    var card by remember { mutableStateOf<PinnedCard?>(if (isNew) PinnedCard.new() else null) }
+    // "radio:<page>": a new card of that favourite radio, from the radio's page (the owner, 10 Nov).
+    val fromRadio = id.removePrefix("radio:").takeIf { id.startsWith("radio:") }?.let { android.net.Uri.decode(it) }
+    val isNew = id == "new" || fromRadio != null
+    var card by remember {
+        mutableStateOf<PinnedCard?>(
+            if (fromRadio != null) {
+                val title = graph.favouriteRadios.all.value.firstOrNull { it.route == fromRadio }?.title.orEmpty()
+                PinnedCard.new(title).copy(source = app.siansa.mix.CardSource.RADIO, radio = fromRadio, radioTitle = title, look = app.siansa.mix.CardLook.GRID)
+            } else if (isNew) PinnedCard.new() else null,
+        )
+    }
     LaunchedEffect(id) {
         // A card made before rules gets its single fields as rules here, so they can be changed one by one.
         if (!isNew) card = graph.pinnedCards.get(id)?.migrated() ?: PinnedCard.new()
@@ -148,6 +159,24 @@ fun CardEditorScreen(nav: NavController, id: String) {
                 NumberField("How many, at most", c.size.toString(), Modifier.fillMaxWidth().testTag("cardSize")) { v ->
                     change(c.copy(size = v.toIntOrNull()?.coerceIn(0, MAX_SIZE) ?: 0))
                 }
+            } else if (c.source == CardSource.RADIO && c.contents == CardContents.SONGS) {
+                // One of the radios hearted on their page (the owner, 10 Nov).
+                val radios by graph.favouriteRadios.all.collectAsStateWithLifecycle()
+                if (radios.isEmpty()) Hint("No favourite radios yet: tap the heart on a radio's page first.")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    radios.forEach { r ->
+                        FilterChip(
+                            selected = c.radio == r.route,
+                            onClick = { change(c.copy(radio = r.route, radioTitle = r.title, title = c.title.ifBlank { r.title })) },
+                            label = { Text(r.title) },
+                            leadingIcon = { Icon(Icons.Rounded.Radio, null, Modifier.size(18.dp)) },
+                            modifier = Modifier.testTag("cardRadio"),
+                        )
+                    }
+                }
+                NumberField("How many songs, at most", c.size.toString(), Modifier.fillMaxWidth().testTag("cardSize")) { v ->
+                    change(c.copy(size = v.toIntOrNull()?.coerceIn(0, PinnedCard.SIZE) ?: 0))
+                }
             } else if (c.source == CardSource.SOUND && c.contents == CardContents.SONGS) {
                 if (!audioMuseReady) Hint("Needs AudioMuse-AI, set up in Settings › Connections.")
                 OutlinedTextField(c.sound, { change(c.copy(sound = it)) }, label = { Text("The sound") }, placeholder = { Text("rainy jazz piano") }, modifier = Modifier.fillMaxWidth().testTag("pinnedSound"))
@@ -204,6 +233,7 @@ fun CardEditorScreen(nav: NavController, id: String) {
                 }
             }
             Hint(lookHint(c.look, c.contents))
+            if (c.look == CardLook.GRID) GridSizeChips(c.gridSize) { change(c.copy(gridSize = it)) }
 
             problem?.let { ErrorText(it, Modifier.testTag("cardProblem")) }
             Button(onClick = ::save, modifier = Modifier.fillMaxWidth().testTag("cardEditorSaveBottom")) { Text(if (isNew) "Add the card" else "Save") }

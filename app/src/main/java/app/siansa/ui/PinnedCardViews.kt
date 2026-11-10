@@ -103,6 +103,16 @@ private fun PinnedCardLook(card: PinnedCard, content: CardContent, open: () -> U
         return
     }
     val songs = content.songs
+    // The Shortcuts card's look (the owner, 10 Nov): small tiles two to a row, a song's playing it, an album's opening it.
+    if (card.look == CardLook.GRID) {
+        val tiles = if (card.contents == CardContents.ALBUMS) {
+            content.albums.map { a -> GridTile(a.id, a.name, a.coverArt, onClick = { nav.navigate("album/${a.id}") }) }
+        } else {
+            songs.mapIndexed { i, song -> GridTile("$i-${song.id}", song.title, song.cover, onClick = { play(songs, i, false) }) }
+        }
+        TileGrid(card.title, tiles, card.gridSize, onOpenAll = open)
+        return
+    }
     // An album card (issue #663): its tiles and list are its albums; its banner and button play them in turn.
     if (card.contents == CardContents.ALBUMS && card.look in setOf(CardLook.TILES, CardLook.ALBUMS, CardLook.LIST)) {
         if (card.look == CardLook.LIST) {
@@ -156,6 +166,7 @@ private fun PinnedCardLook(card: PinnedCard, content: CardContent, open: () -> U
         }
         CardLook.BUTTON -> PinnedPlayButton(card, songs, open, play, rememberListPlayback(songs))
         CardLook.COVER_ROWS -> CoverRowsCard(nav, card, content, open)
+        CardLook.GRID -> Unit  // drawn above
     }
 }
 

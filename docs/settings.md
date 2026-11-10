@@ -102,8 +102,9 @@ not here.
   theme** for the colour scheme's own tinted backgrounds. Album, artist and now playing pages keep their colours from
   the cover.
 - **Dynamic colours** (off at first), one switch for the whole app: now playing's seek bar, Play button, the heart of
-  a liked song and where it plays, and the Play button on album, playlist and artist pages, take a soft colour from the
-  cover (an artist's picture) instead of your theme's, fading from song to song. On those pages only Play takes it;
+  a liked song and where it plays, and the Play button on every page of songs (albums, playlists, artists, radios, mixes,
+  cards) and in its title bar, take a soft colour from the cover (an artist's picture; a radio's or mix's own drawn
+  cover) instead of your theme's, fading from song to song. On those pages only Play takes it;
   Shuffle and the other buttons keep your theme's, and an artist's heart is red once they're a favourite. It's the colour that fills most of the
   cover, a little calmer than on the cover itself, so it sits with the cover rather than shouting over it: a sepia
   cover with a red light in it gets tan, not red, and a muted colour stays muted; a cover in black and white gets

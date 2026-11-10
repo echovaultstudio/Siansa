@@ -1,5 +1,7 @@
 package app.siansa
 
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -527,5 +529,53 @@ class SpacingLibraryTest : SpacingCheck() {
         assertTrue("What was under the title comes up under the bar: ${byline.value} dp vs bar ${bar.bottom.value} dp",
             byline - bar.bottom <= Space.Section * 2)
         compose.onNodeWithText("The only song").assertIsDisplayed()
+    }
+
+    /**
+     * A genre's page (the owner, 10 Nov): its radio sits on the cover's bottom right corner, as far from the cover's
+     * right edge as from its bottom; the song count starts at the page margin; and once the cover has scrolled away the
+     * title bar has the radio.
+     */
+    @Test fun aGenresRadioSitsOnItsCoverAndGoesToTheBar() {
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
+        val songs = (1..40).map { app.siansa.data.Song(id = "g-$it", title = "Song $it", artist = "Artist", album = "Album") }
+        compose.setContent {
+            val nav = androidx.navigation.compose.rememberNavController()
+            androidx.compose.runtime.CompositionLocalProvider(
+                app.siansa.ui.LocalGraph provides graph,
+                app.siansa.ui.LocalNav provides nav,
+                app.siansa.ui.LocalSnack provides androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() },
+            ) {
+                SiansaTheme {
+                    app.siansa.ui.CollectionPage(
+                        nav = nav,
+                        title = "Halftime",
+                        color = androidx.compose.ui.graphics.Color(0xFF7A1F2B),
+                        songs = songs,
+                        cover = { m -> Box(m.background(androidx.compose.ui.graphics.Color.Gray).testTag("genreCover")) },
+                        header = { app.siansa.ui.CollectionByline(null, null, null, "2,000 songs") },
+                        showTitle = false,
+                        playAs = { },
+                        radioColour = androidx.compose.ui.graphics.Color(0xFFE53935),
+                        radioOnCover = true,
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        val cover = compose.onNodeWithTag("genreCover").getBoundsInRoot()
+        val radio = compose.onNodeWithTag("genreRadioButton").getBoundsInRoot()
+        assertEven("The radio as far from the cover's right as from its bottom", cover.right - radio.right, cover.bottom - radio.bottom, 1.dp)
+        assertEven("The radio a step in from the corner", cover.right - radio.right, Space.Medium, 1.dp)
+        val count = compose.onNodeWithText("2,000 songs").getBoundsInRoot()
+        val screen = compose.onRoot().getBoundsInRoot()
+        assertEven("The count at the page margin", count.left - screen.left, Space.Page, 1.dp)
+        compose.onAllNodesWithTag("barPlayButton").assertCountEquals(0)
+        compose.onNode(androidx.compose.ui.test.hasScrollToIndexAction()).performScrollToIndex(20)
+        compose.waitForIdle()
+        compose.onNodeWithTag("barPlayButton").assertIsDisplayed()
+        val bar = compose.onNodeWithTag("fadingTitleBar").getBoundsInRoot()
+        val inBar = compose.onNodeWithTag("barPlayButton").getBoundsInRoot()
+        assertTrue("The bar's radio inside the bar: $inBar in $bar", inBar.top >= bar.top && inBar.bottom <= bar.bottom)
     }
 }

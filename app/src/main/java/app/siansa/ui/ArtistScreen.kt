@@ -239,7 +239,20 @@ fun ArtistScreen(nav: NavController, id: String) {
         onBack = { nav.popBackStack() },
         color = tint,
         actions = {
-            if (buttonsGone && p != null) FavouriteArtistButton(p.artist, Modifier.testTag("barHeart"), androidx.compose.ui.graphics.Color.White, ICON_SIZE)
+            if (buttonsGone && p != null) {
+                FavouriteArtistButton(p.artist, Modifier.testTag("barHeart"), androidx.compose.ui.graphics.Color.White, ICON_SIZE)
+                // Play too, in the picture's colour, as every page's bar has it once its buttons are gone (the owner, 10 Nov).
+                if (p.songs.isNotEmpty()) {
+                    val barPlayback = rememberListPlayback(p.songs)
+                    BarPlayButton(
+                        radio = false,
+                        colour = playColours?.controls ?: Accent,
+                        onColour = playColours?.onControls ?: MaterialTheme.colorScheme.onPrimary,
+                        playing = barPlayback.playing,
+                        onClick = { barPlayback.press { graph.player.play(p.songs) } },
+                    )
+                }
+            }
         },
         pinned = if (tabsPinned) ({ ReleaseTypeTabs(types, type, content = androidx.compose.ui.graphics.Color.White) { choose(it) } }) else null,
         overlay = {

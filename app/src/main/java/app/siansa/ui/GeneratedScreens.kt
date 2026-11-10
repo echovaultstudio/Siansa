@@ -1,5 +1,9 @@
 package app.siansa.ui
 
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.graphics.toArgb
 import app.siansa.data.LocalPlaylists
 import app.siansa.net.AudioMuseApi
 import android.net.Uri
@@ -145,13 +149,22 @@ private fun GenreScreenContent(nav: NavController, name: String) {
         // Its name is on its cover: under it only what the genre is, with a little history (Siansa Beats, from
         // Wikipedia, the owner, 10 Nov), or how many songs it has when there's no description.
         showTitle = false,
+        coverColour = colors.first,
+        // Its radio on the cover's corner, and in the bar once the cover has scrolled away (the owner, 10 Nov).
+        radioOnCover = true,
+        barExtras = { RadioHeart(nav, name, colors) },
         header = {
             val about = aboutState.valueOrNull()
             if (about != null) {
                 val uri = androidx.compose.ui.platform.LocalUriHandler.current
                 GenreAboutText(about.summary, about.source, onSource = about.url?.let { url -> { runCatching { uri.openUri(url) } } })
-            } else if (list != null) {
-                CollectionByline(null, null, null, "%,d songs".format(list.size))
+                Spacer(Modifier.height(Space.Small))
+            }
+            // How many songs, at the page's left edge, with or without a description (the owner, 10 Nov).
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CollectionByline(null, null, null, list?.let { "%,d songs".format(it.size) } ?: "")
+                Spacer(Modifier.weight(1f))
+                RadioHeart(nav, name, colors, onBar = false)
             }
         },
         playAs = { first ->
@@ -206,6 +219,10 @@ fun RadioScreen(nav: NavController, kind: String, key: String) {
         saveAsPlaylist = true,
         shortcutCover = false,
         cover = { m -> GeneratedCover(title, colors, m) },
+        // Its name is on its cover (the owner, 10 Nov); Play in the cover's colour.
+        showTitle = false,
+        coverColour = colors.first,
+        barExtras = { RadioHeart(nav, "$title radio", colors) },
         header = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CollectionByline(
@@ -215,6 +232,7 @@ fun RadioScreen(nav: NavController, kind: String, key: String) {
                     (when (kind) { "mood" -> "Sound radio"; "centre" -> "AudioMuse mood radio"; else -> "Genre radio" }) + (songs.valueOrNull()?.let { " · ${it.size} songs" } ?: ""),
                 )
                 Spacer(Modifier.weight(1f))
+RadioHeart(nav, "$title radio", colors, onBar = false)
                 TextButton(onClick = { round++ }, modifier = Modifier.focusRing()) {
                     Icon(Icons.Rounded.Refresh, null)
                     Spacer(Modifier.width(Space.Tight))
@@ -259,10 +277,15 @@ fun BlendScreen(nav: NavController, playlistId: String) {
         saveAsPlaylist = true,
         shortcutCover = false,
         cover = { m -> GeneratedCover(title, colors, m) },
+        // Its name is on its cover (the owner, 10 Nov); Play in the cover's colour.
+        showTitle = false,
+        coverColour = colors.first,
+        barExtras = { RadioHeart(nav, title, colors) },
         header = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CollectionByline(null, null, null, "Song alchemy" + (songs.valueOrNull()?.let { " · ${it.size} songs" } ?: ""))
                 Spacer(Modifier.weight(1f))
+RadioHeart(nav, title, colors, onBar = false)
                 TextButton(onClick = { round++ }, modifier = Modifier.focusRing()) {
                     Icon(Icons.Rounded.Refresh, null)
                     Spacer(Modifier.width(Space.Tight))
@@ -314,3 +337,33 @@ fun MoodScreen(nav: NavController, text: String) {
     )
 }
 
+/**
+ * A radio's heart (the owner, 10 Nov): keeps the radio whose page this is among your favourites, in Your Library ›
+ * Favourites, where a Home card can be made of it. Red when it's one; on its page an outline, in the bar a white one.
+ */
+@Composable
+internal fun RadioHeart(nav: NavController, title: String, colors: Pair<Color, Color>, onBar: Boolean = true) {
+    val graph = LocalGraph.current
+    val route = remember(nav.currentBackStackEntry) { nav.currentBackStackEntry?.let { routeOf(it.destination.route, it.arguments) } } ?: return
+    val all by graph.favouriteRadios.all.collectAsStateWithLifecycle()
+    val on = all.any { it.route == route }
+    val snack = LocalSnack.current
+    val scope = rememberCoroutineScope()
+    IconButton(
+        onClick = {
+            graph.favouriteRadios.toggle(route, title, colors.first.toArgb().toLong() and 0xFFFFFFFFL, colors.second.toArgb().toLong() and 0xFFFFFFFFL)
+            // Hearted: it's in Your Library › Favourites, and a Home card can be made of it straight away.
+            if (!on) scope.launch {
+                val r = snack.showSnackbar("$title is in your favourites", actionLabel = "Make a Home card", duration = androidx.compose.material3.SnackbarDuration.Short)
+                if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) nav.navigate("settings/cards/edit/radio:${android.net.Uri.encode(route)}")
+            }
+        },
+        modifier = Modifier.testTag(if (onBar) "radioHeartBar" else "radioHeart"),
+    ) {
+        Icon(
+            if (on) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+            if (on) "Remove from favourite radios" else "Add to favourite radios",
+            tint = if (on) FavouriteRed else if (onBar) Color.White else MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}

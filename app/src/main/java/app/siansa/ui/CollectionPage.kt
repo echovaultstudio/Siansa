@@ -12,6 +12,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.runtime.rememberCoroutineScope
 import app.siansa.data.cover
 import androidx.compose.foundation.background
@@ -148,6 +150,13 @@ fun CollectionPage(
     // The title under the cover: it rides up with the page and glides into the title bar (as an artist's name, the
     // owner, 10 Nov). False: no title under the cover (a genre's is on its cover), and the bar shows it as before.
     showTitle: Boolean = true,
+    // A page whose cover Siansa draws (a radio, a mix): the cover's own colour, which Play takes with Dynamic colours
+    // (the owner, 10 Nov). Without it, or a [coverId], the page's [color] does.
+    coverColour: Color? = null,
+    // With [playAs]: its radio button sits on the cover's bottom right corner instead of under it (a genre's page).
+    radioOnCover: Boolean = false,
+    // Shown in the title bar once the page's buttons have scrolled away (a radio's heart, the owner, 10 Nov).
+    barExtras: @Composable () -> Unit = {},
 ) {
     val graph = LocalGraph.current
     val djSettings by graph.settings.state.collectAsStateWithLifecycle()
@@ -231,8 +240,28 @@ fun CollectionPage(
     val pastHeader by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     val rowEnd = if (fast) AlphabetBarWidth else 0.dp
 
-    // Dynamic colours: the cover's colour for Play only (BigPlayButton reads it).
-    CompositionLocalProvider(LocalPlayColours provides rememberPageColours(coverId, pageBackdrop(surface, color), where = "Page \"$title\"")) {
+    // Dynamic colours: the cover's colour for Play only (BigPlayButton reads it). A page without a picture (a radio, a
+    // mix, a card) takes its own cover's colour, so every Play button follows the switch (the owner, 10 Nov).
+    val backdrop = pageBackdrop(surface, color)
+    val fromCover = rememberPageColours(coverId, backdrop, where = "Page \"$title\"")
+    val dynamicOn = djSettings.dynamicColours
+    val ownColours = remember(coverId, coverColour, color, backdrop, dynamicOn) {
+        if (dynamicOn && coverId == null) DynamicAccent.of(coverColour ?: color, backdrop) else null
+    }
+    val playColours = fromCover ?: ownColours
+    // The page's Play (or its radio), also in the title bar once its buttons have scrolled under it (the owner, 10 Nov).
+    val pagePlayback = rememberListPlayback(songs.orEmpty())
+    fun playPage() {
+        val list = songs.orEmpty()
+        if (list.isEmpty()) return
+        if (playAs != null) playAs(null) else pagePlayback.press {
+            val at = resume?.index?.takeIf { it in list.indices } ?: 0
+            graph.player.play(list, at)
+        }
+        notePlayed()
+    }
+    var buttonsBottom by remember { mutableStateOf<Float?>(null) }
+    CompositionLocalProvider(LocalPlayColours provides playColours) {
     Box(Modifier.fillMaxSize().background(surface).onGloballyPositioned { pageTop = it.positionInRoot().y }) {
         if (showCovers && songs != null) {
             val covers = remember(songs) { songs.map { it.cover } }
@@ -266,6 +295,17 @@ fun CollectionPage(
                             val blur by androidx.compose.animation.core.animateDpAsState(slideBlur(label), label = "slideBlur")
                             cover(Modifier.size(coverSize).then(if (blur > 0.dp) Modifier.blur(blur) else Modifier))
                             SlideCoverLabel(label, Modifier.fillMaxSize())
+                            // A genre's radio on its cover's corner (the owner, 10 Nov).
+                            if (radioOnCover && playAs != null) {
+                                Box(
+                                    Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(Space.Medium)
+                                        .onGloballyPositioned { buttonsBottom = it.positionInRoot().y + it.size.height - pageTop },
+                                ) {
+                                    BigRadioButton(radioColour ?: Accent, enabled = !songs.isNullOrEmpty()) { playPage() }
+                                }
+                            }
                         }
                     }
                     Spacer(Modifier.height(Space.Page))
@@ -286,6 +326,7 @@ fun CollectionPage(
                         header()
                     }
                     Spacer(Modifier.height(Space.Tight))
+                    if (!(radioOnCover && playAs != null)) Box(Modifier.onGloballyPositioned { buttonsBottom = it.positionInRoot().y + it.size.height - pageTop }) {
                     ActionRow(
                         songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed, saveAs = title.takeIf { saveAsPlaylist && playAs == null },
                         playAs = playAs,
@@ -296,6 +337,7 @@ fun CollectionPage(
                         onDjMix = if (((albumBar && onSimilar != null) || djMix) && djPossible && playAs == null) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } }) else null,
                         djSlide = djSlide, onDjSlide = { djSlide = it }, dim = slideDim, albumBar = albumBar, resume = resume,
                     )
+                    }
                 }
             }
             when {
@@ -365,7 +407,26 @@ fun CollectionPage(
             }
         }
 
-        FadingTitleBar(nav, title, color, barAlpha, actions, showTitle = !showTitle)
+        // Once the page's Play (or radio) has scrolled under the bar, the bar has it (the owner, 10 Nov).
+        val buttonsGone = !headerInView || (buttonsBottom?.let { it < statusPx + barPx } ?: false)
+        val barActions: @Composable () -> Unit = {
+            AnimatedVisibility(visible = buttonsGone, enter = fadeIn() + scaleIn(initialScale = 0.6f), exit = fadeOut() + scaleOut(targetScale = 0.6f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    barExtras()
+                    if (!songs.isNullOrEmpty()) {
+                        BarPlayButton(
+                            radio = playAs != null,
+                            colour = if (playAs != null) radioColour ?: Accent else playColours?.controls ?: Accent,
+                            onColour = if (playAs != null) Color.White else playColours?.onControls ?: MaterialTheme.colorScheme.onPrimary,
+                            playing = playAs == null && pagePlayback.playing,
+                            onClick = ::playPage,
+                        )
+                    }
+                }
+            }
+            actions()
+        }
+        FadingTitleBar(nav, title, color, barAlpha, barActions, showTitle = !showTitle)
         // The title, one all the way: under the cover, then up into the bar, shrinking, as an artist's name.
         if (titleFrame != null) {
             val restColour = MaterialTheme.colorScheme.onSurface
@@ -687,6 +748,34 @@ fun PlayButtonRow(
         content = content,
     )
 }
+
+/**
+ * The page's Play in the title bar once its own has scrolled away (the owner, 10 Nov): small and round, in the page's
+ * Play colour; a radio's in its colour, with the radio.
+ */
+@Composable
+internal fun BarPlayButton(radio: Boolean, colour: Color, onColour: Color, playing: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .padding(horizontal = Space.Tight)
+            .size(BAR_PLAY_SIZE)
+            .clip(CircleShape)
+            .background(colour)
+            .clickable(onClick = onClick)
+            .testTag("barPlayButton"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            if (radio) Icons.Rounded.Radio else if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+            if (radio) "Start the radio" else if (playing) "Pause" else "Play",
+            tint = onColour,
+            modifier = Modifier.size(if (radio) 20.dp else 24.dp),
+        )
+    }
+}
+
+/** The title bar's Play: as big as an icon button's touch area. */
+internal val BAR_PLAY_SIZE = 40.dp
 
 /** A genre page's one button (the owner, 10 Nov): its radio, round as Play, in the genre's [colour]. */
 @Composable

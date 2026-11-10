@@ -217,6 +217,7 @@ fun YourLibraryScreen(nav: NavController) {
 
     val favouriteIds by graph.favouriteAlbums.ids.collectAsStateWithLifecycle()
     val favouriteArtistIds by graph.favouriteArtists.ids.collectAsStateWithLifecycle()
+    val favouriteRadios by graph.favouriteRadios.all.collectAsStateWithLifecycle()
     // From the phone straight away, then again once Navidrome has answered (issue #161).
     // Built again when the connection comes back, for what only Navidrome has.
     val connection by graph.connection.state.collectAsStateWithLifecycle()
@@ -224,7 +225,7 @@ fun YourLibraryScreen(nav: NavController) {
     // Built again when a station or podcast is added, changed or removed, or a station's picture is found (issue #353).
     val ownStations by graph.stations.state.collectAsStateWithLifecycle()
     val stationPictures by graph.stations.pictures.collectAsStateWithLifecycle()
-    val data by produceState<Load<LibraryData>>(Load.Loading, version, mixes?.size, settings.navidromeUser, favouriteIds, favouriteArtistIds, online, ownStations, stationPictures) {
+    val data by produceState<Load<LibraryData>>(Load.Loading, version, mixes?.size, settings.navidromeUser, favouriteIds, favouriteArtistIds, favouriteRadios, online, ownStations, stationPictures) {
         val me = settings.navidromeUser
         value = loadLibrary(graph, me)
         if (refreshFromServer(graph, me)) value = loadLibrary(graph, me)
@@ -1352,6 +1353,23 @@ private suspend fun buildLibrary(graph: app.siansa.AppGraph, me: String): Librar
         recentAt = System.currentTimeMillis() - 5,
         favourite = true,
     )
+
+    // Favourite radios (the owner, 10 Nov): each its own entry, in its cover's colours, opening its page.
+    graph.favouriteRadios.all.value.forEach { r ->
+        entries += Entry(
+            key = "radio-${r.route}",
+            kind = null,
+            title = r.title,
+            subtitle = "Radio · Favourite",
+            route = r.route,
+            gradient = Color(r.from.toInt()) to Color(r.to.toInt()),
+            icon = Icons.Rounded.Radio,
+            recentAt = r.at,
+            addedAt = r.at,
+            creator = "Siansa",
+            favourite = true,
+        )
+    }
 
     // Artists.
     graph.library.artists().forEach { ar ->

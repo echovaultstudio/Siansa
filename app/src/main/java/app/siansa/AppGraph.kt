@@ -12,6 +12,7 @@ import app.siansa.mix.DjReady
 import app.siansa.mix.GenreRadio
 import app.siansa.mix.GenreVote
 import app.siansa.data.ArtistPhotos
+import app.siansa.data.FavouriteRadios
 import app.siansa.data.audioMuseUserFor
 import app.siansa.data.Users
 import app.siansa.data.NoticeStore
@@ -374,6 +375,8 @@ class AppGraph(val app: Application) {
     val favouriteAlbums = FavouriteAlbums(app, source, scope)
     /** Favourite artists, starred in Navidrome (issue #397). */
     val favouriteArtists = FavouriteArtists(app, source, scope)
+    /** Radios hearted on their page (the owner, 10 Nov): in Your Library › Favourites, and as custom cards. */
+    val favouriteRadios = FavouriteRadios(app, scope)
 
     /**
      * Songs kept on the phone as they play (and the next one in the queue), so replays start at once
