@@ -34,6 +34,8 @@ class BeatsApiTest {
         assertEquals("/api/v1/genre/about?name=Trance", BeatsApi.fromPlugin("/plugins/siansa_beats/api/genre/about?name=Trance"))
         assertEquals("/api/v1/genres?limit=400", BeatsApi.fromPlugin("/plugins/siansa_beats/api/genres?limit=400"))
         assertEquals("/api/v1/bad-blends", BeatsApi.fromPlugin(app.siansa.playback.LastBlend.PATH))
+        assertEquals("/api/v1/similar/albums?track_id=t1", BeatsApi.fromPlugin(app.siansa.mix.SimilarPlugin.albumsQuery("t1")))
+        assertEquals("/api/v1/similar/artists?artist=Daft+Punk", BeatsApi.fromPlugin(app.siansa.mix.SimilarPlugin.artistsQuery("Daft Punk")))
     }
 
     @Test fun capabilitiesAreRead() {

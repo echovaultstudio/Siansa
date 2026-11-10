@@ -6,6 +6,7 @@ import app.siansa.data.SimilarArtist
 import app.siansa.data.Song
 import app.siansa.data.normalizeKey
 import app.siansa.log.AppLog
+import app.siansa.net.BeatsApi
 import app.siansa.net.arr
 import app.siansa.net.dbl
 import app.siansa.net.str
@@ -127,7 +128,20 @@ class Similar(private val graph: AppGraph) {
         return out
     }
 
+    /**
+     * The plugin's answer to [query]: from Siansa Beats when it's set up (it asks AudioMuse-AI for now, its v1
+     * `similar` paths), else, or when Siansa Beats can't answer, from the plugin on AudioMuse itself.
+     */
     private suspend fun ask(query: String): JsonObject {
+        if (graph.settings.current.beatsReady) {
+            try {
+                (graph.beats.get(BeatsApi.fromPlugin(query)) as? JsonObject)?.let { return it }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.d("Similar", "Siansa Beats couldn't answer (${e.message}); asking the plugin")
+            }
+        }
         if (!graph.settings.current.audioMuseReady) throw IllegalStateException("Set up AudioMuse in Settings › Connections first")
         val answer = try {
             graph.audioMuse.plugin(query)
