@@ -324,6 +324,12 @@ fun Cover(
     shape: Shape = RoundedCornerShape(8.dp),
 ) {
     val graph = LocalGraph.current
+    // An artist's picture as looked up this run (ArtistPhotos), wherever it shows: their page, Fans also like, Home,
+    // lists. The id a list holds may be from before Navidrome found the photo, and stand for its placeholder star; the
+    // new one shows as soon as it's known, without the page being opened again (the owner, 10 Nov).
+    val freshArtists by graph.artistPhotos.covers.collectAsStateWithLifecycle()
+    @Suppress("NAME_SHADOWING")
+    val coverId = coverId?.let { app.siansa.data.freshArtistCover(it, freshArtists) }
     val context = LocalContext.current
     val loader = SingletonImageLoader.get(context)
     val cached = remember(coverId, size) {

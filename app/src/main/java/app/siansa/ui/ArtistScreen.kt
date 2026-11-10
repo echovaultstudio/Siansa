@@ -506,6 +506,11 @@ private fun SimilarRow(similar: List<SimilarArtist>, nav: NavController) {
     val matched by loadState(similar) {
         similar.map { a -> a to (a.id?.let { graph.library.artist(it) } ?: graph.library.artistByName(a.name)) }
     }
+    // Their photos as their own pages have them: Navidrome finds an artist's photo when they're looked up (ArtistPhotos,
+    // once a run each); Cover shows the new ones as they come.
+    LaunchedEffect(matched.valueOrNull()) {
+        matched.valueOrNull()?.mapNotNull { it.second }?.let { graph.artistPhotos.refresh(it) }
+    }
     LazyRow(contentPadding = PaddingValues(horizontal = Space.Medium), horizontalArrangement = Arrangement.spacedBy(Space.Tight)) {
         items(matched.valueOrNull() ?: similar.map { it to null }, key = { it.first.id ?: it.first.name }) { (artist, local) ->
             val target = local?.id ?: artist.id

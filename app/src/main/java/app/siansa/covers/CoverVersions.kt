@@ -10,6 +10,8 @@ package app.siansa.covers
  * carry their album's version instead, which changes when the album's cover does.
  */
 object CoverVersions {
+    private const val WEEK_MS = 7L * 24 * 60 * 60 * 1000
+
     @Volatile
     private var stamps: Map<String, String> = emptyMap()
 
@@ -19,7 +21,7 @@ object CoverVersions {
     }
 
     /** The id to cache [id] under: itself, or with its album's cover version when it has none of its own. */
-    fun cacheId(id: String): String = cacheIdFor(id) { stamps[it] }
+    fun cacheId(id: String): String = cacheIdFor(id, System.currentTimeMillis()) { stamps[it] }
 
     /** The `_<stamp>` ending of a cover id, or null when it has none. */
     internal fun stampOf(cover: String?): String? = cover?.substringAfter('_', "")?.takeIf { it.isNotEmpty() }
@@ -28,7 +30,11 @@ object CoverVersions {
      * [cacheId] with the album's stamp looked up by [albumStamp]: a disc cover without a stamp of its own gets
      * `@<album stamp>` added; every other id stays as it is.
      */
-    internal fun cacheIdFor(id: String, albumStamp: (String) -> String?): String {
+    internal fun cacheIdFor(id: String, now: Long = 0L, albumStamp: (String) -> String?): String {
+        // An artist's picture without a version (`ar-<id>`): Navidrome sends its placeholder star until it has found
+        // the artist's photo, then the photo under the same id. Kept a week, then asked for again, so a star cached
+        // once doesn't stay for good (the owner, 10 Nov). Versioned ids change by themselves.
+        if (id.startsWith("ar-") && !id.contains('_')) return "$id@w${now / WEEK_MS}"
         if (!id.startsWith("dc-") || id.contains('_')) return id
         val album = id.removePrefix("dc-").substringBefore(':').takeIf { it.isNotEmpty() } ?: return id
         return albumStamp(album)?.let { "$id@$it" } ?: id

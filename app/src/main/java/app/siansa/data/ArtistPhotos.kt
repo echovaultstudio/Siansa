@@ -63,5 +63,26 @@ class ArtistPhotos(private val source: MusicSource, private val library: Library
     }
 }
 
+/**
+ * [coverId] as an artist's newest picture id when it's an artist's (`ar-<id>`, with or without its `_<version>`) and a
+ * newer one was looked up ([fresh]: artist id → picture id); any other id as it is.
+ */
+fun freshArtistCover(coverId: String, fresh: Map<String, String>): String {
+    if (!coverId.startsWith("ar-") || fresh.isEmpty()) return coverId
+    return fresh[coverId.removePrefix("ar-").substringBefore('_')] ?: coverId
+}
+
+/**
+ * The picture id to keep for an artist when the library is read again: the server's ([incoming]), unless it carries no
+ * version (`_<…>`) while the one kept does, for the same artist: then the kept one, which [ArtistPhotos] found by
+ * looking the artist up (a sync would otherwise put back the id that stands for Navidrome's placeholder).
+ */
+fun keptArtistCover(incoming: String?, kept: String?): String? {
+    if (kept == null || !kept.contains('_')) return incoming
+    if (incoming != null && incoming.contains('_')) return incoming
+    val base = kept.substringBefore('_')
+    return if (incoming == null || incoming == base) kept else incoming
+}
+
 /** Whether the server's [fresh] picture id for an artist differs from the one kept ([kept]). */
 internal fun newCover(kept: String?, fresh: String?): Boolean = !fresh.isNullOrBlank() && fresh != kept
