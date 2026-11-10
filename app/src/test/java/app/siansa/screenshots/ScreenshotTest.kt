@@ -579,14 +579,14 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             // the title bar (shrinking, sideways past the back arrow), and settled there as the bar's title. A long name too.
             Scene("artist_name_glide") {
                 val density = androidx.compose.ui.platform.LocalDensity.current
-                val hero = 220.dp
+                val hero = 150.dp
                 val heroPx = with(density) { hero.toPx() }
                 Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                     listOf(
                         "Joy Orbison" to 0f, "Joy Orbison" to heroPx * 0.25f, "Joy Orbison" to heroPx * 0.62f,
                         "Joy Orbison" to heroPx * 2f, "Tayo Meets Acid Rockers Uptown" to heroPx * 0.62f,
                     ).forEach { (name, scrolled) ->
-                        Box(Modifier.fillMaxWidth().height(250.dp)) {
+                        Box(Modifier.fillMaxWidth().height(170.dp)) {
                             app.siansa.ui.HeroPage(
                                 title = name, heroHeight = hero, scrolledPx = scrolled, onBack = {}, color = Color(0xFF4A2A26),
                                 image = { m -> Box(m.background(androidx.compose.ui.graphics.Brush.radialGradient(listOf(Color(0xFF7A5A4C), Color(0xFF26171A))))) },

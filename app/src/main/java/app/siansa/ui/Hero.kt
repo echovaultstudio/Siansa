@@ -249,7 +249,7 @@ private fun smooth(t: Float): Float = t * t * (3f - 2f * t)
 const val DOCK_SPAN = 2.5f
 
 /** How far under the title bar the name starts gliding into it. */
-private val DOCK_START_GAP = 24.dp
+private val DOCK_START_GAP = Space.Section
 
 /** The back arrow's button, before the bar's title. */
 private val BACK_BUTTON = 48.dp
