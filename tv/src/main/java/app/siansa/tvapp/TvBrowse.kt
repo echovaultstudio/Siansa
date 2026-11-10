@@ -60,6 +60,7 @@ import app.siansa.data.Song
 import app.siansa.data.cover
 import app.siansa.data.isFavouriteAlbum
 import app.siansa.log.AppLog
+import app.siansa.ui.browseGenres
 import app.siansa.ui.AlbumTag
 import app.siansa.ui.Cover
 import app.siansa.ui.LARGE_COVER
@@ -114,7 +115,8 @@ fun TvLibrary() {
                     Shelf.FAVOURITE_ALBUMS -> graph.favouriteAlbums.refresh().filter { isFavouriteAlbum(it, favouriteAlbums) }
                         .map { a -> graph.library.album(a.id) ?: a }.distinctBy { it.id }.map { TvItem.OfAlbum(it) }
                     Shelf.FAVOURITE_ARTISTS -> graph.favouriteArtists.refresh().filter { it.id in favouriteArtists }.map { TvItem.OfArtist(it) }
-                    Shelf.GENRES -> graph.library.genres(GENRES).map { TvItem.OfGenre(it) }
+                    // Siansa Beats' genres as last saved, or the songs' tags (app.siansa.ui.browseGenres).
+                    Shelf.GENRES -> graph.browseGenres(GENRES).map { TvItem.OfGenre(it) }
                     Shelf.LIKED -> emptyList()
                 }
                 if (next != tiles) tiles = next
@@ -303,7 +305,12 @@ fun TvArtist(id: String) {
         }.getOrDefault(emptyList())
     }
     var topOpen by rememberSaveable(id) { mutableStateOf(false) }
+    // The photo Navidrome found when the artist was looked up, not the placeholder the library may still have
+    // (ArtistPhotos, as the phone's artist page).
+    val freshCovers by graph.artistPhotos.covers.collectAsStateWithLifecycle()
+    LaunchedEffect(artist?.id) { artist?.let { graph.artistPhotos.refresh(listOf(it)) } }
     val a = artist ?: return Loading()
+    val picture = freshCovers[a.id] ?: a.coverArt
     val favourite = a.id in favourites
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = Space.Large), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
         item("header") {
@@ -312,13 +319,13 @@ fun TvArtist(id: String) {
                 horizontalArrangement = Arrangement.spacedBy(Space.Large),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Cover(a.coverArt, LARGE_COVER, Modifier.size(HEADER_COVER), CircleShape)
+                Cover(picture, LARGE_COVER, Modifier.size(HEADER_COVER), CircleShape)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                     Text(a.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
                     albums?.let { Text(if (it.size == 1) "1 release" else "${it.size} releases", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     ButtonsInLine {
-                        PlayButtons(play = { graph.library.songsOf(a).ifEmpty { top } }, note = null, shortcut = Shortcut("artist/$id", a.name, a.coverArt), focusFirst = true)
+                        PlayButtons(play = { graph.library.songsOf(a).ifEmpty { top } }, note = null, shortcut = Shortcut("artist/$id", a.name, picture), focusFirst = true)
                         TvButton("Artist radio", Icons.Rounded.Radio, onClick = { play.artistRadio(a) })
                         TvButton(
                             if (favourite) "Favourite" else "Add to favourites",
@@ -609,7 +616,7 @@ private val NUMBER_WIDTH = 32.dp
 private val MORE_SIZE = 48.dp
 private val LIKED_ICON = 20.dp
 private const val ROW_GROW = 1.02f
-private const val GENRES = 200
+private const val GENRES = 500
 private const val TOP_SONGS = 10
 /** Top songs shown on an artist's page before Show all (issue #943). */
 internal const val TOP_FOLDED = 3

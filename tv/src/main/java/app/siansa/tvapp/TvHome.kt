@@ -50,6 +50,7 @@ import app.siansa.mix.MixGenerator
 import app.siansa.mix.MixRules
 import app.siansa.mix.MoodRadio
 import app.siansa.mix.moodRadios
+import app.siansa.ui.browseGenres
 import app.siansa.ui.LocalGraph
 import app.siansa.ui.LocalNav
 import app.siansa.ui.LocalSnack
@@ -130,9 +131,13 @@ private suspend fun homeRow(graph: AppGraph, section: Section): TvRow? {
         Section.RADIOS -> if (settings(graph).audioMuseReady) TvRow("Radios", moodRadios.map { TvItem.OfMood(it) }) else null
         Section.PLAYLISTS -> TvRow("Your playlists", graph.playlists.removed.visible(library.playlists()).take(ROW_SIZE).map { TvItem.OfPlaylist(it) })
         Section.RECENT -> TvRow("Recently played", albums(recentlyPlayedAlbums(graph, ROW_SIZE)))
-        Section.ARTIST_RADIOS -> TvRow("Artist radios", artistRadioArtists(graph, ROW_SIZE).map { TvItem.OfArtistRadio(it) })
+        Section.ARTIST_RADIOS -> TvRow("Artist radios", artistRadioArtists(graph, ROW_SIZE).also { picked ->
+            // Their photos as the phone's Home: Navidrome finds an artist's photo when they're looked up (ArtistPhotos).
+            graph.scope.launch { graph.artistPhotos.refresh(picked) }
+        }.map { TvItem.OfArtistRadio(it) })
         Section.ADDED -> TvRow("Recently added", albums(library.albums("newest")))
-        Section.GENRES -> TvRow("Your genres", library.genres(ROW_SIZE).map { TvItem.OfGenre(it) })
+        // Siansa Beats' genres as last saved, or the songs' tags, as the phone's Home (app.siansa.ui.browseGenres).
+        Section.GENRES -> TvRow("Your genres", graph.browseGenres(ROW_SIZE).map { TvItem.OfGenre(it) })
         Section.RANDOM -> TvRow(RANDOM_PICKS, albums(library.randomAlbums(ROW_SIZE)))
         // Notices, the carousel, cards, books and podcasts are the phone's.
         else -> null
@@ -170,6 +175,8 @@ fun TvHome() {
         val next = steadyRows(rows, homeRows(graph))
         if (next !== rows) rows = next
     }
+    // Siansa Beats' genre list brought up to date now and then, as on the phone (Home reads the saved one).
+    LaunchedEffect(Unit) { if (graph.library.isSynced && graph.genreVote.stale()) graph.genreVote.refresh() }
     val play = rememberTvPlay()
     val nav = LocalNav.current
     // The phone's notices (issue #784): what needs you, what you're partway through, what's new; shown or hidden in
@@ -282,10 +289,12 @@ fun TvItemRow(row: TvRow) {
 fun TvItemTile(item: TvItem, modifier: Modifier = Modifier, width: Dp = TILE_WIDTH, wide: Boolean = false) {
     val nav = LocalNav.current
     val play = rememberTvPlay()
+    // Artists' photos looked up this run (ArtistPhotos): the library's picture id may still be Navidrome's placeholder.
+    val freshCovers by LocalGraph.current.artistPhotos.covers.collectAsStateWithLifecycle()
     when (item) {
         is TvItem.OfAlbum -> TvTile(item.album.name, item.subtitle, item.album.coverArt, { nav.navigate(TvRoutes.album(item.album.id)) }, modifier, width = width, wide = wide)
-        is TvItem.OfArtist -> TvTile(item.artist.name, null, item.artist.coverArt, { nav.navigate(TvRoutes.artist(item.artist.id)) }, modifier, width = width, round = true, wide = wide)
-        is TvItem.OfArtistRadio -> TvTile("${item.artist.name} radio", "With similar artists", item.artist.coverArt, { play.artistRadio(item.artist) }, modifier, width = width, round = true, wide = wide)
+        is TvItem.OfArtist -> TvTile(item.artist.name, null, freshCovers[item.artist.id] ?: item.artist.coverArt, { nav.navigate(TvRoutes.artist(item.artist.id)) }, modifier, width = width, round = true, wide = wide)
+        is TvItem.OfArtistRadio -> TvTile("${item.artist.name} radio", "With similar artists", freshCovers[item.artist.id] ?: item.artist.coverArt, { play.artistRadio(item.artist) }, modifier, width = width, round = true, wide = wide)
         is TvItem.OfPlaylist -> TvTile(item.playlist.name, "${item.playlist.songCount} songs", item.playlist.coverArt, { nav.navigate(TvRoutes.playlist(item.playlist.id)) }, modifier, width = width, wide = wide)
         is TvItem.OfMix -> TvTile(item.mix.title, "${item.mix.songs.size} songs", item.mix.songs.firstOrNull()?.cover, { nav.navigate(TvRoutes.mix(item.mix.id)) }, modifier, width = width, wide = wide)
         is TvItem.OfMood -> TvTile(item.radio.name, "Sound radio", null, { play.moodRadio(item.radio) }, modifier, width = width,
