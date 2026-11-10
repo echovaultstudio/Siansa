@@ -37,6 +37,8 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -50,7 +52,8 @@ import kotlin.math.min
  * slides the page up over the picture, which stays almost still, zooms gently and fades out into [color];
  * the page comes up with a soft edge, so the picture fades into it rather than being cut off (issue #1029).
  * [title] sits large at the foot of the picture and rides up with the page; near the top it glides into the
- * title bar, shrinking as it goes, and becomes the bar's title (the owner, 10 Nov: [heroNameFrame]). The bar
+ * title bar, shrinking as it goes, and is the bar's title from then on: one name all the way, on one line (the
+ * owner, 10 Nov: [heroNameFrame]). The bar
  * fills with [color] as it arrives, and [pinned] (the release-type tabs) sits under it once the page has
  * scrolled past them.
  *
@@ -143,8 +146,18 @@ fun HeroPage(
             shadow = Shadow(Color.Black.copy(alpha = 0.45f), Offset(0f, 2f), 14f),
         )
         val smallStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black)
-        val dockScale = smallStyle.fontSize.value / bigStyle.fontSize.value
-        val lineHeightPx = with(density) { bigStyle.lineHeight.toPx() }
+        // One name, one line, all the way (the owner, 10 Nov: no second title fading in over it). A long name is set a
+        // little smaller to fit the line, down to [MIN_NAME_FIT], and cut off with "…" beyond that.
+        val measurer = rememberTextMeasurer()
+        val screenWidthPx = with(density) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
+        val nameWidthPx = screenWidthPx - 2 * with(density) { Space.Page.toPx() }
+        val nameStyle = remember(title, bigStyle, nameWidthPx) {
+            val full = measurer.measure(title, bigStyle, maxLines = 1, softWrap = false).size.width
+            val fit = if (full <= 0) 1f else (nameWidthPx / full).coerceIn(MIN_NAME_FIT, 1f)
+            bigStyle.copy(fontSize = bigStyle.fontSize * fit, lineHeight = bigStyle.lineHeight * fit)
+        }
+        val dockScale = smallStyle.fontSize.value / nameStyle.fontSize.value
+        val lineHeightPx = with(density) { nameStyle.lineHeight.toPx() }
         val restLeftPx = with(density) { Space.Page.toPx() }
         // Where the bar's title starts: the bar's padding, the back arrow's button and the gap after it.
         val dockLeftPx = with(density) { (Space.Tight + BACK_BUTTON + Space.Small).toPx() }
@@ -155,10 +168,11 @@ fun HeroPage(
         val dockTop = statusPx + barPx / 2f - lineHeightPx * dockScale / 2f
         val frame = heroNameFrame(scrolledPx, restTop, startTop = statusPx + barPx + startGapPx, dockTop = dockTop)
         val dockT = frame.t
-        val barAlpha = maxOf(((scrolledPx - heroPx * 0.65f) / (heroPx * 0.25f)).coerceIn(0f, 1f), smooth(dockT))
-        // The last of the way: the shrunk name hands over to the bar's own title (one line, cut off with "…"
-        // before the buttons), in the same place and size, so a long name ends tidy.
-        val handOver = ((dockT - HAND_OVER_FROM) / (1f - HAND_OVER_FROM)).coerceIn(0f, 1f)
+        // The bar is solid by the time the name comes into it, so nothing on the page shows through behind the name:
+        // it fills in over the last stretch before the name reaches the bar's lower edge.
+        val barBottomPx = statusPx + barPx
+        val nameBar = smooth(((barBottomPx + 2 * startGapPx - frame.top) / (2 * startGapPx)).coerceIn(0f, 1f))
+        val barAlpha = maxOf(((scrolledPx - heroPx * 0.65f) / (heroPx * 0.25f)).coerceIn(0f, 1f), if (nameHeight == 0) 0f else nameBar)
         Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier
@@ -174,14 +188,8 @@ fun HeroPage(
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White)
             }
             Spacer(Modifier.width(Space.Small))
-            Text(
-                title,
-                style = smallStyle,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).graphicsLayer { alpha = handOver }.testTag("heroBarTitle"),
-            )
+            // The bar's title is the name itself, glided into this place (below): one name, never two.
+            Spacer(Modifier.weight(1f))
             actions()
         }
         if (pinned != null) {
@@ -194,9 +202,9 @@ fun HeroPage(
         // filling in never covers it on the way).
         Text(
             title,
-            style = bigStyle,
+            style = nameStyle,
             color = Color.White,
-            maxLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .padding(start = Space.Page, end = Space.Page)
@@ -210,7 +218,7 @@ fun HeroPage(
                     val sc = 1f + (dockScale - 1f) * smooth(dockT)
                     scaleX = sc
                     scaleY = sc
-                    alpha = if (nameHeight == 0) 0f else 1f - handOver
+                    alpha = if (nameHeight == 0) 0f else 1f
                 }
                 .testTag("heroName"),
         )
@@ -257,8 +265,8 @@ private val BACK_BUTTON = 48.dp
 /** The name is sideways in its place a little before it's up: it clears the back arrow on the way. */
 private const val SIDEWAYS_LEAD = 1.3f
 
-/** From here on the way into the bar, the name hands over to the bar's own title. */
-private const val HAND_OVER_FROM = 0.8f
+/** How much smaller a long artist name may be set to fit one line before it's cut off with "…". */
+private const val MIN_NAME_FIT = 0.6f
 
 /** How fast the picture drifts up as the page slides over it: slowly, so it seems to stay put. */
 private const val HERO_DRIFT = 0.3f
