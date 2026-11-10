@@ -29,11 +29,18 @@ fun WholeWordsText(
     BoxWithConstraints(modifier) {
         val measurer = rememberTextMeasurer()
         val width = constraints.maxWidth
-        val fitted = remember(text, style, width, maxLines) {
+        // The room below too (a small tile, a large font): three lines that don't fit its height were cut off with
+        // "…" ("Drum And B…" in a third of the screen, 10 Nov), so they shrink until they fit it as well.
+        val height = constraints.maxHeight
+        val fitted = remember(text, style, width, height, maxLines) {
             if (width == Constraints.Infinity || width <= 0) return@remember style
             val scale = wholeWordsScale(
                 widestWord = { s -> words(text).maxOfOrNull { measurer.measure(it, scaled(style, s), maxLines = 1, softWrap = false).size.width } ?: 0 },
-                lines = { s -> measurer.measure(text, scaled(style, s), constraints = Constraints(maxWidth = width)).lineCount },
+                lines = { s ->
+                    val laid = measurer.measure(text, scaled(style, s), constraints = Constraints(maxWidth = width))
+                    // Taller than the room counts as one line too many.
+                    if (height != Constraints.Infinity && laid.size.height > height) maxLines + 1 else laid.lineCount
+                },
                 width = width,
                 maxLines = maxLines,
                 minScale = minScale,

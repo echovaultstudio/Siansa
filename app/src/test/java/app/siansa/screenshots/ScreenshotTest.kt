@@ -178,6 +178,22 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // All genres: three small tiles a row, where three lines didn't fit the height and were cut off ("Drum And B…",
+            // 10 Nov): they shrink to fit.
+            Scene("genre_tiles_small") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        GradientTile("Drum And Bass", Color(0xFF2C7A8C) to Color(0xFF173A47), onClick = {}, size = 104.dp)
+                        GradientTile("Alternative Rock", Color(0xFF4A5AC8) to Color(0xFF22285A), onClick = {}, size = 104.dp)
+                        GradientTile("Progressive Breaks", Color(0xFFB0306A) to Color(0xFF4A1230), onClick = {}, size = 104.dp)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        GradientTile("Hip Hop / Electro", Color(0xFF3A8C4A) to Color(0xFF173A20), onClick = {}, size = 104.dp)
+                        GradientTile("Contemporary Jazz", Color(0xFFE08A2C) to Color(0xFFB04A20), onClick = {}, size = 104.dp)
+                        GradientTile("Idm", Color(0xFF4A5AC8) to Color(0xFF22285A), onClick = {}, size = 104.dp)
+                    }
+                }
+            },
             // Home rows in their other looks (issue #655).
             Scene("home_banner") {
                 HomeLookRow(HomeLook.BANNER, "today", "Rainy Window, Early Hours", items("Evian", "Revenant", "Infinity Pool"))
