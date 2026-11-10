@@ -50,6 +50,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.withFrameNanos
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -114,6 +118,7 @@ private val HERO_NAME_BAND = 120.dp
 /** The release-type tabs' place in the artist page's grid: after the picture's spacer and the buttons (issue #1029). */
 private const val TABS_KEY = "release-type-tabs"
 private const val TABS_INDEX = 2
+private const val FOOTER_KEY = "artist-page-end"
 
 /**
  * An artist with what Navidrome knows about them: photo, biography, top songs, discography grouped by
@@ -163,7 +168,13 @@ fun ArtistScreen(nav: NavController, id: String) {
     val artistInfo = info.valueOrNull()
     // The artist's picture, or their newest release's cover: the page's colour, and its buttons' with Dynamic colours on
     // pages (issue #1028).
-    val pictureId = p?.artist?.coverArt ?: p?.albums?.firstOrNull()?.coverArt
+    // Navidrome fetches an artist's photo when they're looked up, and gives it a new picture id; the library keeps the
+    // id from its last sync, which may still stand for the placeholder star (the owner, 10 Nov: Rezident). Looked up
+    // once a run, as Home's artist radios are (ArtistPhotos), and the new id kept.
+    val freshCovers by graph.artistPhotos.covers.collectAsStateWithLifecycle()
+    LaunchedEffect(p?.artist?.id) { p?.artist?.let { graph.artistPhotos.refresh(listOf(it)) } }
+    val artistCover = p?.artist?.let { freshCovers[it.id] ?: it.coverArt }
+    val pictureId = artistCover ?: p?.albums?.firstOrNull()?.coverArt
     val tint = rememberCoverColor(pictureId)
 
     // Release types as tabs at the top (issue #1029): All, Albums, EPs, Singles, DJ-mixes… one at a time, only while
@@ -181,10 +192,31 @@ fun ArtistScreen(nav: NavController, id: String) {
         }
     }
     val scope = rememberCoroutineScope()
+    // Room at the end of the page, so the tabs can always be scrolled up under the title bar, however few releases
+    // the chosen type has (the owner, 10 Nov: choosing Albums, one album, while pinned threw the page back to the top,
+    // as it had too little left to scroll). Just enough: the page's end stays where it is for a long list.
+    var footerPx by remember { mutableIntStateOf(0) }
+    LaunchedEffect(gridState, barPx) {
+        snapshotFlow {
+            val info = gridState.layoutInfo
+            val tabs = info.visibleItemsInfo.firstOrNull { it.key == TABS_KEY }
+            val end = info.visibleItemsInfo.firstOrNull { it.key == FOOTER_KEY }
+            if (tabs == null || end == null) null else (info.viewportSize.height - barPx.toInt() - (end.offset.y - tabs.offset.y)).coerceAtLeast(0)
+        }.collect { needed -> if (needed != null) footerPx = needed }
+    }
     fun choose(t: AlbumCategory?) {
+        val pinned = tabsPinned
         typeName = t?.name
-        // Pinned: the tabs stay where they are and the chosen releases start right under them.
-        if (tabsPinned) scope.launch { gridState.scrollToItem(TABS_INDEX); gridState.scrollBy(-barPx) }
+        // Pinned: the tabs stay where they are and the chosen releases start right under them. Room enough first
+        // (worked out exactly once the new releases are laid out), then the scroll.
+        if (pinned) {
+            footerPx = gridState.layoutInfo.viewportSize.height
+            scope.launch {
+                withFrameNanos { }
+                gridState.scrollToItem(TABS_INDEX)
+                gridState.scrollBy(-barPx)
+            }
+        }
     }
 
     // With Dynamic colours, only Play takes the picture's colour (the owner, 10 Nov): Radio, Shuffle and the heart stay
@@ -211,7 +243,7 @@ fun ArtistScreen(nav: NavController, id: String) {
         image = { modifier ->
             // Navidrome's artist image through its cover endpoint (ND_ARTISTARTPRIORITY), cached and downloaded
             // like every cover (issue #206).
-            Cover(p?.artist?.coverArt ?: "ar-$id", LARGE_COVER, modifier, RectangleShape)
+            Cover(artistCover ?: "ar-$id", LARGE_COVER, modifier, RectangleShape)
         },
     ) { cardModifier ->
         if (p == null) {
@@ -354,6 +386,10 @@ fun ArtistScreen(nav: NavController, id: String) {
             if (similar.isNotEmpty()) {
                 full { SectionTitle("Fans also like") }
                 full { SimilarRow(similar, nav) }
+            }
+            // The room that lets the tabs reach the title bar (footerPx).
+            item(key = FOOTER_KEY, span = { GridItemSpan(maxLineSpan) }) {
+                Spacer(Modifier.fillMaxWidth().height(with(density) { footerPx.toDp() }).testTag("artistPageEnd"))
             }
         }
     }
