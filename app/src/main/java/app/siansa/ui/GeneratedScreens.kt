@@ -92,11 +92,12 @@ fun GenreScreen(nav: NavController, name: String) {
         shortcutCover = false,
         djMix = false,
         cover = { m -> GeneratedCover(name, colors, m) },
+        radioColour = colors.first,
         header = {
             CollectionByline(null, null, null, "Genre" + (list?.let { " · ${"%,d".format(it.size)} songs" } ?: ""))
             Spacer(Modifier.height(Space.Tight))
             Text(
-                "Play starts the genre's radio: ${app.siansa.mix.GenreRadio.PICKS} of its songs at random, more as they play.",
+                "The radio button plays ${app.siansa.mix.GenreRadio.PICKS} of its songs at random, and more as they play; so does a song you tap, first.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag("genreRadioHint"),

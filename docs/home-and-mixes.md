@@ -218,7 +218,7 @@ Home with its switch in Settings.
 
 - **Mood radios** are AudioMuse-AI sound searches, kept varied.
 - **Genres** open a page with every song of the genre on your phone, to look
-  through. **Play**, **Shuffle** or a song there starts the genre's **radio**: 30 of its songs at random (the song you
+  through. Its one button, the **radio** (round, in the genre's colour), or a song there starts the genre's radio: 30 of its songs at random (the song you
   tapped first), and 30 more of the genre each time the queue comes to its end, for as long as you don't play
   something else or add your own songs after it. The whole genre never goes into the queue, as some have thousands
   of songs. A genre's tile and page are coloured by its feel: red for hard and fast, blue or green for calm.

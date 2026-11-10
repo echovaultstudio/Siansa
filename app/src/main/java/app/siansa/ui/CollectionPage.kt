@@ -2,6 +2,7 @@ package app.siansa.ui
 
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.AddCircle
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.filterNotNull
@@ -139,6 +140,8 @@ fun CollectionPage(
     // A list too long to queue whole (a genre, issue: the owner, 10 Nov): Play, Shuffle and a song start this instead
     // (a radio of some of the songs, the song tapped first), and there's no Add all to queue or DJ mix.
     playAs: ((first: Song?) -> Unit)? = null,
+    // With [playAs]: the colour of its one button, the radio (a genre's own colour).
+    radioColour: Color? = null,
 ) {
     val graph = LocalGraph.current
     val djSettings by graph.settings.state.collectAsStateWithLifecycle()
@@ -250,6 +253,7 @@ fun CollectionPage(
                     ActionRow(
                         songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed, saveAs = title.takeIf { saveAsPlaylist && playAs == null },
                         playAs = playAs,
+                        radioColour = radioColour,
                         // An album's shuffle slides right onto Play for a DJ mix of its own songs (issue #965); it needs
                         // AudioMuse, as similar albums does.
                         // Only when a DJ mix's needs are met (AudioMuse and Siansa Beats): otherwise a plain Shuffle.
@@ -436,8 +440,17 @@ private fun ActionRow(
     albumBar: Boolean = false,
     resume: PlayResume? = null,
     playAs: ((first: Song?) -> Unit)? = null,
+    radioColour: Color? = null,
 ) {
     val graph = LocalGraph.current
+    // A list too long to play whole (a genre): one button, its radio, in the page's own colour (the owner, 10 Nov).
+    if (playAs != null) {
+        PlayButtonRow {
+            Spacer(Modifier.weight(1f))
+            BigRadioButton(radioColour ?: Accent, enabled = songs.isNotEmpty()) { playAs(null); onPlayed() }
+        }
+        return
+    }
     var saving by remember { mutableStateOf(false) }
     // ⏸ while this page's songs play; it pauses them rather than starting over (issue #644).
     val playback = rememberListPlayback(songs)
@@ -543,14 +556,15 @@ internal fun ActionButtons(
             )
         } else {
             IconButton(onClick = onShuffle, enabled = enabled, modifier = Modifier.testTag("shuffleAll")) {
-                Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
+                // Plain, as Radio and Shuffle on an artist's page: only Play takes the page's colour (the owner, 10 Nov).
+                Icon(Icons.Rounded.Shuffle, "Shuffle", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(30.dp))
             }
         }
     }
     val similarButton: @Composable () -> Unit = {
         // The waveform with an "A", as "Similar albums" in the now playing menu (issue #239).
         if (onSimilar != null) IconButton(onClick = onSimilar, modifier = Modifier.testTag("findSimilarAlbums")) {
-            Icon(rememberSimilarAlbumsIcon(), "Find similar albums", tint = Accent, modifier = Modifier.size(28.dp))
+            Icon(rememberSimilarAlbumsIcon(), "Find similar albums", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(28.dp))
         }
     }
     if (albumBar) {
@@ -611,6 +625,22 @@ fun PlayButtonRow(
         verticalAlignment = verticalAlignment,
         content = content,
     )
+}
+
+/** A genre page's one button (the owner, 10 Nov): its radio, round as Play, in the genre's [colour]. */
+@Composable
+fun BigRadioButton(colour: Color, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(BIG_PLAY_SIZE)
+            .clip(CircleShape)
+            .background(if (enabled) colour else colour.copy(alpha = 0.4f))
+            .clickable(enabled = enabled, onClick = onClick)
+            .testTag("genreRadioButton"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Rounded.Radio, "Start the genre's radio", tint = Color.White, modifier = Modifier.size(28.dp))
+    }
 }
 
 /** The big round Play button of album, playlist, mix and artist pages. Only ever inside a [PlayButtonRow]. */
