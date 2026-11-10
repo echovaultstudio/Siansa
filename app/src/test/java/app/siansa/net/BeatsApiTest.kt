@@ -136,8 +136,8 @@ class BeatsApiTest {
             val url = chain.request().url
             seen += url.encodedPath + (url.encodedQuery?.let { "?$it" } ?: "")
             val emby = url.queryParameter("server") == "emby"
-            val body = if (url.encodedPath.endsWith("/capabilities")) caps.replace("KIND", if (emby) "emby" else "navidrome")
-                .replace("ID", if (emby) "emby" else "main").replace("GRIDS", if (emby) "7" else "9") else "{}"
+            val body = if (url.encodedPath.endsWith("/capabilities")) caps.replace("GRIDS", if (emby) "7" else "9")
+                .replace("KIND", if (emby) "emby" else "navidrome").replace("\"ID\"", if (emby) "\"emby\"" else "\"main\"") else "{}"
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("x")
                 .body(body.toResponseBody("application/json".toMediaType())).build()
         }).build()
