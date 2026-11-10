@@ -224,6 +224,13 @@ class PlaybackService : MediaLibraryService() {
         // Android may refuse to start the service in the foreground; the player waits instead of the app crashing (issue #602).
         setListener(object : Listener {
             override fun onForegroundServiceStartNotAllowedException() {
+                // Sound already playing plays on (the owner's music stopped once a resume from the background
+                // skipped the foreground, 10 Nov): pausing it would stop it for sure, playing on only may.
+                if (session?.player?.isPlaying == true) {
+                    AppLog.w("Player", "Android would not put playback back in the foreground; it plays on, but Android may cut its network while the screen is off (turning off battery optimisation for Siansa helps)",
+                        event = "playback.foreground_refused", fields = mapOf("action" to "play_on"))
+                    return
+                }
                 AppLog.w("Player", "Android would not start playback in the foreground; paused instead")
                 session?.player?.pause()
             }
@@ -418,6 +425,15 @@ class PlaybackService : MediaLibraryService() {
      * is instant and survives a dropped connection. Only originals are cached.
      */
     private var precachedFor: String? = null
+
+    /** Whether all of [item] is in the song cache already (it was loaded ahead), so the next one may load now. */
+    private fun fullyCached(item: MediaItem): Boolean = runCatching {
+        val uri = item.localConfiguration?.uri ?: return false
+        val key = songCacheKey(uri)
+        val cache = graph.songCache
+        val length = androidx.media3.datasource.cache.ContentMetadata.getContentLength(cache.getContentMetadata(key))
+        length > 0 && cache.isCached(key, 0, length)
+    }.getOrDefault(false)
 
     private fun precacheNext(player: Player) {
         precacheWriter?.cancel()
@@ -800,7 +816,15 @@ class PlaybackService : MediaLibraryService() {
             AppLog.d("Player", "Notification left as it is while waiting for data in the background")
             return
         }
-        super.onUpdateNotification(session, startInForegroundRequired)
+        try {
+            super.onUpdateNotification(session, startInForegroundRequired)
+        } catch (e: IllegalStateException) {
+            // Asking from the background while playing (a resume from the notification or headphones after a long
+            // pause) is usually allowed; when Android refuses, the music plays on rather than the app crashing.
+            if (!refusedForeground(e)) throw e
+            AppLog.w("Player", "Android would not put playback back in the foreground; it plays on, but Android may cut its network while the screen is off (turning off battery optimisation for Siansa helps)",
+                event = "playback.foreground_refused", fields = mapOf("action" to "play_on"))
+        }
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -903,6 +927,10 @@ class PlaybackService : MediaLibraryService() {
             focusRescued = false
             restarted = false
             resetProgressWatch()
+            // Already in the song cache (loaded ahead while the last one played): load the next one now, minutes
+            // before it's needed, instead of in the last minute of this one, so a dropped connection has a whole
+            // song to come back in (the owner's DJ radio stopped when the next song had only 45 s to load, 10 Nov).
+            if (onPhone && player.currentMediaItem?.let(::fullyCached) == true) precacheNext(player)
             // A song that ran straight on from the last (gapless) is playing already: nothing to wait for (issue #813:
             // the timer then ran until the next start, and a seek minutes later logged "started 242386 ms after").
             if (player.isPlaying) {
@@ -1093,6 +1121,7 @@ class PlaybackService : MediaLibraryService() {
 
         private var startRequestedAt = 0L
         private var startRescues = 0
+        private var networkDown = false
         private var focusRescued = false
 
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -1122,6 +1151,7 @@ class PlaybackService : MediaLibraryService() {
             if (!onPhone) return
             startRequestedAt = SystemClock.elapsedRealtime()
             startRescues = 0
+            networkDown = false
             lastBuffered = -1L
             lastBytes = StreamStats.totalBytes()
             handler.removeCallbacks(startWatch)
@@ -1152,6 +1182,8 @@ class PlaybackService : MediaLibraryService() {
                         player.play()
                     }
                     player.playbackState == Player.STATE_IDLE -> {
+                        val error = player.playerError?.errorCode
+                        networkDown = error != null && keepsTryingAfter(error)
                         AppLog.w("Player", "Song $id stopped before it started (${player.playerError?.errorCodeName ?: "no error"}) after ${waited}ms; preparing it again")
                         player.prepare()
                     }
@@ -1169,7 +1201,9 @@ class PlaybackService : MediaLibraryService() {
                 }
                 lastBuffered = buffered
                 lastBytes = StreamStats.totalBytes()
-                if (++startRescues < 5) handler.postDelayed(this, 2_500)
+                // A connection that's out (a tunnel stalled, the network cut while the screen was off) is tried for
+                // a couple of minutes, so the music carries on once it's back instead of staying stopped.
+                if (++startRescues < if (networkDown) NETWORK_RESCUES else 5) handler.postDelayed(this, 2_500)
             }
         }
 
