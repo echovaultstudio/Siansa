@@ -2,6 +2,8 @@ package app.siansa.playback
 
 import app.siansa.data.AppSettings
 import app.siansa.log.AppLog
+import app.siansa.net.BeatsApi
+import app.siansa.net.SourceKind
 import app.siansa.net.int
 import app.siansa.net.str
 import kotlinx.coroutines.CancellationException
@@ -11,20 +13,22 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 /**
- * Song loudness and fade shapes (issue #60), from wherever Settings › Playback says they come from. Today that
- * is the Siansa plugin on the AudioMuse server; with song tags, there are no profiles and everything falls back
- * to ReplayGain and plain crossfades.
+ * Song loudness and fade shapes (issue #60), from wherever Settings › Playback says they come from: Siansa Beats when
+ * it's set up in Settings › Connections (Siansa Dev), else the Siansa plugin on the AudioMuse server; with song tags,
+ * there are no profiles and everything falls back to ReplayGain and plain crossfades.
  *
  * Only the songs about to play are asked for, a few at a time, and kept in memory (about 100 bytes each).
  * Songs the plugin hasn't analysed are asked for again after [RETRY_MISSING_MS]; after a failed request,
  * nothing is asked for [BACK_OFF_MS], so a missing or broken plugin costs one request now and then.
  *
- * [get] does a GET of a path and query on the AudioMuse server (see [app.siansa.net.AudioMuseApi.plugin]).
+ * [get] does a GET of the plugin's path and query, answered by Siansa Beats or the plugin
+ * ([app.siansa.AppGraph.siansaBeats]); [beats] asks Siansa Beats what it can do, for [check].
  */
 class ProfileStore(
     private val get: suspend (String) -> JsonElement,
     private val settings: () -> AppSettings,
     private val now: () -> Long = System::currentTimeMillis,
+    private val beats: (suspend () -> BeatsApi.Capabilities)? = null,
 ) {
     private val lock = Any()
     private val cache = object : LinkedHashMap<String, TrackProfile>(256, 0.75f, true) {
@@ -40,8 +44,11 @@ class ProfileStore(
     @Volatile var problem: String? = null
         private set
 
-    /** Profiles are used: the switch is on the Siansa plugin and AudioMuse is set up. */
-    val active: Boolean get() = settings().let { it.loudnessSource == LoudnessSource.PLUGIN && it.audioMuseReady }
+    /** Profiles are used: the switch is on measured loudness, and Siansa Beats or AudioMuse is set up. */
+    val active: Boolean get() = settings().let { it.loudnessSource == LoudnessSource.PLUGIN && (it.beatsReady || it.audioMuseReady) }
+
+    /** Who answers, for the log and messages. */
+    private val source: String get() = if (settings().beatsReady) "Siansa Beats" else "The Siansa plugin"
 
     /** The profile already fetched for [id], or null (none yet, or profiles aren't used). */
     fun cached(id: String): TrackProfile? = if (!active) null else synchronized(lock) { cache[id] }
@@ -80,12 +87,12 @@ class ProfileStore(
             return false
         }
         if (answer == null) {
-            fail("The Siansa plugin sent an unexpected answer")
+            fail("$source sent an unexpected answer")
             return false
         }
         val schema = answer.int("schema_version")
         if (schema != null && schema != PluginProfiles.SCHEMA_VERSION) {
-            fail("The Siansa plugin answers in a newer layout ($schema) than Siansa reads (${PluginProfiles.SCHEMA_VERSION}); using song tags")
+            fail("$source answers in a newer layout ($schema) than Siansa reads (${PluginProfiles.SCHEMA_VERSION}); using song tags")
             return false
         }
         val profiles = PluginProfiles.parse(answer)
@@ -102,7 +109,7 @@ class ProfileStore(
         }
         problem = null
         val measured = profiles.count { it.refLufs != null }
-        AppLog.i("Loudness", "Siansa plugin profiles: ${profiles.size} of ${batch.size} songs ($measured with loudness)")
+        AppLog.i("Loudness", "$source profiles: ${profiles.size} of ${batch.size} songs ($measured with loudness)")
         return true
     }
 
@@ -112,9 +119,14 @@ class ProfileStore(
         problem = why
     }
 
-    /** For the "Test" button: whether the plugin answers, in plain words. Clears any back-off. */
+    /** For the "Test" button: whether Siansa Beats or the plugin answers, in plain words. Clears any back-off. */
     suspend fun check(): CheckResult {
-        if (!settings().audioMuseReady) return CheckResult(false, "Set up AudioMuse in Settings › Connections first")
+        val s = settings()
+        if (s.beatsReady) {
+            synchronized(lock) { backOffUntil = 0L }
+            return checkBeats(s)
+        }
+        if (!s.audioMuseReady) return CheckResult(false, "Set up Siansa Beats or AudioMuse in Settings › Connections first")
         synchronized(lock) { backOffUntil = 0L }
         return try {
             val health = get(HEALTH_PATH) as? JsonObject
@@ -145,6 +157,20 @@ class ProfileStore(
         }
     }
 
+    private suspend fun checkBeats(s: AppSettings): CheckResult = try {
+        val caps = (beats ?: error("no Siansa Beats here")).invoke()
+        val result = beatsResult(caps, s.sourceKind)
+        if (result.ok) problem = null
+        AppLog.i("Loudness", "Siansa Beats check: ${result.message}")
+        result
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        val why = e.message ?: "Couldn't reach Siansa Beats"
+        AppLog.w("Loudness", "Siansa Beats check failed: $why")
+        CheckResult(false, why)
+    }
+
     data class CheckResult(val ok: Boolean, val message: String)
 
     companion object {
@@ -165,6 +191,18 @@ class ProfileStore(
         const val REFRESH_MS = 6 * 60 * 60_000L
         const val RETRY_MISSING_MS = 30 * 60_000L
         const val BACK_OFF_MS = 5 * 60_000L
+
+        /**
+         * What Siansa Beats' [caps] say for the Test button and the DJ check: working when it speaks this app's API and
+         * has beat grids, for songs of this kind of server ([kind]; it reads Navidrome).
+         */
+        fun beatsResult(caps: BeatsApi.Capabilities, kind: SourceKind): CheckResult = when {
+            caps.api < BeatsApi.API -> CheckResult(false, "This Siansa Beats (${caps.version}) is too old for the app: update it to 0.20 or newer")
+            caps.musicServer == "navidrome" && kind != SourceKind.OPENSUBSONIC ->
+                CheckResult(false, "Siansa Beats reads Navidrome, so it doesn't know this server's songs")
+            caps.beatGrids == 0 -> CheckResult(false, "Siansa Beats ${caps.version} answers, but hasn't analysed any songs yet: choose libraries on its page")
+            else -> CheckResult(true, "Siansa Beats ${caps.version} is working · %,d songs with beat grids, %,d measured for loudness".format(caps.beatGrids, caps.loudness))
+        }
 
         /** AudioMuse's errors, said for the plugin. */
         fun friendly(message: String?): String {

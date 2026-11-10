@@ -683,15 +683,15 @@ object Levelling {
         val albumTags = settings.replayGain == ReplayGainMode.ALBUM && song.albumGain != null
         if (measured != null && !albumTags) {
             volume(measured, settings.loudnessTarget)?.let { v ->
-                return Decision(Source.PLUGIN, v, "measured by the Siansa plugin at ${"%.1f".format(measured.refLufs)} LUFS, brought to ${settings.loudnessTarget} LUFS")
+                return Decision(Source.PLUGIN, v, "measured by ${settings.measurer} at ${"%.1f".format(measured.refLufs)} LUFS, brought to ${settings.loudnessTarget} LUFS")
             }
         }
         val hasTags = song.trackGain != null || song.albumGain != null
         val why = when {
             !fromPlugin -> "ReplayGain ${settings.replayGain.label.lowercase()} tags"
             albumTags -> "album mode keeps the album's ReplayGain tags"
-            measured != null -> "the Siansa plugin has no loudness for this song, so its ReplayGain tags"
-            else -> "the Siansa plugin hasn't measured this song yet, so its ReplayGain tags"
+            measured != null -> "${settings.measurer} has no loudness for this song, so its ReplayGain tags"
+            else -> "${settings.measurer} hasn't measured this song yet, so its ReplayGain tags"
         }
         if (!hasTags) return Decision(Source.NONE, 1f, "$why: the song has none")
         return Decision(Source.REPLAYGAIN, replayGainVolume(song, settings), "$why, brought to ${settings.loudnessTarget} LUFS")

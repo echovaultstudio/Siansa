@@ -110,6 +110,13 @@ data class AppSettings(
      * it has in AudioMuse; empty for AudioMuse's default server.
      */
     val audioMuseServer: String = "",
+    /**
+     * Siansa Beats (Siansa Dev, the owner, 10 Nov): the service that measures each song's loudness, fades, key and beat
+     * grid and votes the genres, asked directly at its address with its API key (or password). Empty: those come from
+     * the Siansa Beats (dev) plugin on AudioMuse when it's there, the songs' tags otherwise.
+     */
+    val beatsUrl: String = "",
+    val beatsKey: String = "",
     /** The AI service that writes mix titles and sound searches, its key and model (issue #665: was OpenRouter only). */
     val aiProvider: AiProvider = AiProvider.OPENROUTER,
     val aiKey: String = "",
@@ -263,6 +270,9 @@ data class AppSettings(
     val hasApiKey: Boolean get() = sourceKind == SourceKind.OPENSUBSONIC && navidromeApiKey.isNotBlank()
     val audioMuseReady: Boolean
         get() = audioMuseUrl.isNotBlank()
+    /** Siansa Beats is set up: the app asks it directly, and not the plugin. */
+    val beatsReady: Boolean
+        get() = beatsUrl.isNotBlank()
     val aiReady: Boolean
         get() = aiTitles && aiModel.isNotBlank() && (aiKey.isNotBlank() || !aiProvider.needsKey) &&
             aiCompletionsUrl(aiProvider, aiAddress) != null
@@ -277,6 +287,7 @@ data class AppSettings(
         proxyUser = page.proxyUser, proxyPassword = page.proxyPassword,
         audioMuseUrl = page.audioMuseUrl, audioMuseToken = page.audioMuseToken,
         audioMuseUser = page.audioMuseUser, audioMusePassword = page.audioMusePassword, audioMuseServer = page.audioMuseServer,
+        beatsUrl = page.beatsUrl, beatsKey = page.beatsKey,
         aiProvider = page.aiProvider, aiKey = page.aiKey, aiModel = page.aiModel, aiAddress = page.aiAddress, aiTitles = page.aiTitles,
         audiobookshelfUrl = page.audiobookshelfUrl, audiobookshelfToken = page.audiobookshelfToken,
         audiobookshelfUser = page.audiobookshelfUser, audiobookshelfPassword = page.audiobookshelfPassword,
@@ -379,6 +390,7 @@ private fun decode(value: String): String = runCatching { URLDecoder.decode(valu
 private const val CONNECTIONS = "connections"
 private const val SEEDED = "seeded"
 private val CONNECTION_STRINGS = listOf("am_url", "am_token", "am_user", "am_pass", "am_server", "or_key", "or_model", "abs_url", "abs_token", "abs_user", "abs_pass")
+// Siansa Beats' address and key (beats_url, beats_key) are only ever in the shared store: they came after #416.
 
 /** One user's settings: by default the user in use, or another user's (to show their music too). */
 class SettingsRepository(context: Context, user: Int = Users.active) {
@@ -416,6 +428,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         // Which of AudioMuse's servers is this user's (beta report 810dc85c): per user, as a Navidrome user and an
         // Emby user are different servers there. The shared value from before is the fallback.
         audioMuseServer = prefs.getString("am_server", null) ?: shared.getString("am_server", "") ?: "",
+        beatsUrl = shared.getString("beats_url", "") ?: "",
+        beatsKey = SecretBox.decrypt(shared.getString("beats_key", "") ?: ""),
         aiKey = SecretBox.decrypt(shared.getString("or_key", "") ?: ""),
         aiModel = shared.getString("or_model", AppSettings.DEFAULT_MODEL) ?: AppSettings.DEFAULT_MODEL,
         aiProvider = AiProvider.parse(shared.getString("ai_provider", null)),
@@ -530,6 +544,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun clean(input: AppSettings): AppSettings {
         val nd = parseAddress(input.navidromeUrl)
         val am = parseAddress(input.audioMuseUrl)
+        val beats = parseAddress(input.beatsUrl)
         return input.copy(
             navidromeUrl = nd.url,
             navidromeUser = input.navidromeUser.trim(),
@@ -541,6 +556,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             audioMuseUser = am.user ?: input.audioMuseUser.trim(),
             audioMusePassword = am.password ?: input.audioMusePassword,
             audioMuseServer = input.audioMuseServer.trim(),
+            beatsUrl = beats.url,
+            beatsKey = input.beatsKey.trim().ifEmpty { beats.password.orEmpty() },
             aiKey = input.aiKey.trim(),
             aiModel = input.aiModel.trim(),
             aiAddress = input.aiAddress.trim(),
@@ -597,6 +614,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putString("am_token", SecretBox.encrypt(s.audioMuseToken))
             .putString("am_user", s.audioMuseUser)
             .putString("am_pass", SecretBox.encrypt(s.audioMusePassword))
+            .putString("beats_url", s.beatsUrl)
+            .putString("beats_key", SecretBox.encrypt(s.beatsKey))
             .putString("or_key", SecretBox.encrypt(s.aiKey))
             .putString("or_model", s.aiModel)
             .putString("ai_provider", s.aiProvider.name)

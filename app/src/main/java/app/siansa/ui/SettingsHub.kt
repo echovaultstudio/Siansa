@@ -85,6 +85,7 @@ import app.siansa.log.AppLog
 import app.siansa.playback.CrossfadeMode
 import app.siansa.playback.EqSettings
 import app.siansa.playback.LoudnessSource
+import app.siansa.playback.measurer
 import app.siansa.log.logForClipboard
 import app.siansa.log.problemsForClipboard
 import app.siansa.log.logEntries
@@ -210,7 +211,7 @@ internal fun crossfadeSummary(s: AppSettings): String {
         CrossfadeMode.SMART -> "Smart crossfade"
     }
     val levelling = if (s.replayGain == ReplayGainMode.OFF) "no levelling" else
-        "levelling ${s.replayGain.label.lowercase()} by " + if (s.loudnessSource == LoudnessSource.PLUGIN) "the Siansa plugin" else "ReplayGain tags"
+        "levelling ${s.replayGain.label.lowercase()} by " + if (s.loudnessSource == LoudnessSource.PLUGIN) s.measurer else "ReplayGain tags"
     return "$fade · $levelling"
 }
 

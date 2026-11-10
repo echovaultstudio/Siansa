@@ -48,6 +48,7 @@ import app.siansa.playback.BeatMatchMode
 import app.siansa.playback.CrossfadeMode
 import app.siansa.playback.Levelling
 import app.siansa.playback.LoudnessSource
+import app.siansa.playback.measurer
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -75,10 +76,10 @@ fun CrossfadeScreen(nav: NavController) {
                 test = null
                 graph.settings.setLoudness(source = it)
             }
-            Hint(settings.loudnessSource.detail + ".")
+            Hint(if (settings.loudnessSource == LoudnessSource.PLUGIN && settings.beatsReady) "Measured by Siansa Beats." else settings.loudnessSource.detail + ".")
             if (settings.loudnessSource == LoudnessSource.PLUGIN) {
-                if (!settings.audioMuseReady) {
-                    Hint("Set up AudioMuse in Settings › Connections first. Until then, song tags are used.")
+                if (!settings.audioMuseReady && !settings.beatsReady) {
+                    Hint("Set up Siansa Beats or AudioMuse in Settings › Connections first. Until then, song tags are used.")
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                         OutlinedButton(modifier = Modifier.focusRing(), onClick = {
@@ -97,7 +98,7 @@ fun CrossfadeScreen(nav: NavController) {
                             )
                         }
                     }
-                    Hint("Songs the plugin hasn't measured yet use their tags.")
+                    Hint("Songs ${settings.measurer} hasn't measured yet use their tags.")
                 }
             }
             LevellingNow(settings)
@@ -158,9 +159,9 @@ fun CrossfadeScreen(nav: NavController) {
 private fun levellingHint(s: AppSettings): String = when {
     s.replayGain == ReplayGainMode.OFF -> "Levelling is off: songs play at their own loudness."
     s.loudnessSource == LoudnessSource.PLUGIN && s.replayGain == ReplayGainMode.ALBUM ->
-        "Each song is levelled one way only: songs with album tags keep them, the rest by the plugin's measurement."
+        "Each song is levelled one way only: songs with album tags keep them, the rest by ${s.measurer}'s measurement."
     s.loudnessSource == LoudnessSource.PLUGIN ->
-        "Each song is levelled one way only: by the plugin's measurement, or by its ReplayGain tags until the plugin has measured it."
+        "Each song is levelled one way only: by ${s.measurer}'s measurement, or by its ReplayGain tags until it's measured."
     else -> "Uses the songs' ReplayGain tags (${s.replayGain.label.lowercase()})."
 }
 

@@ -10,11 +10,12 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Whether a DJ mix can run (the owner, 10 Nov: "only ever possible if the minimum requirements are met"). It needs:
  * - AudioMuse-AI, set up and answering: each song's tempo, key and energy put the mix in order;
- * - the Siansa Beats (dev) plugin answering, with Siansa Beats behind it: the beat grids and fades the blends need.
+ * - Siansa Beats answering with beat grids, directly (Settings › Connections) or through its plugin on AudioMuse: the
+ *   beat grids and fades the blends need.
  * Without them, a DJ mix isn't offered (its buttons say why); Steady radio, shuffle and everything else work as always.
  */
 class DjReady(private val now: () -> Long = System::currentTimeMillis) {
-    /** The last check of the plugin and Siansa Beats: true when both answered, null before the first. */
+    /** The last check of Siansa Beats (or the plugin and Siansa Beats behind it): true when it works, null before the first. */
     private val _beats = MutableStateFlow<Boolean?>(null)
     val beats: StateFlow<Boolean?> = _beats.asStateFlow()
     @Volatile private var checkedAt = 0L
@@ -50,7 +51,7 @@ class DjReady(private val now: () -> Long = System::currentTimeMillis) {
         /** The longer reason, for a message when a DJ mix is asked for and can't start. */
         fun explain(problem: String): String = when (problem) {
             "Needs AudioMuse" -> "A DJ mix needs AudioMuse (Settings › Connections): it puts the songs in order by tempo, key and energy."
-            "Needs Siansa Beats" -> "A DJ mix needs Siansa Beats and its plugin on AudioMuse, for the beat grids its blends follow."
+            "Needs Siansa Beats" -> "A DJ mix needs Siansa Beats (Settings › Connections), for the beat grids its blends follow."
             "Checking…" -> "Still checking for Siansa Beats: try again in a moment."
             else -> "A DJ mix needs AudioMuse and Siansa Beats, which can't be reached right now."
         }

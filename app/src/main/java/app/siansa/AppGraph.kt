@@ -1,5 +1,7 @@
 package app.siansa
 
+import kotlinx.serialization.json.JsonElement
+import app.siansa.net.BeatsApi
 import app.siansa.data.StationRepository
 import app.siansa.net.OutsideSource
 import app.siansa.net.WebStationPictures
@@ -294,11 +296,25 @@ class AppGraph(val app: Application) {
     val bookPlayer: BookPlayer by lazy { BookPlayer(this) }
     /** Which mini player shows: the player started last (beta #45). */
     val activePlayer: ActivePlayer by lazy { ActivePlayer(scope, player.state, bookPlayer.state) }
+    /** Siansa Beats, asked directly when it's set up (Siansa Dev, the owner, 10 Nov). */
+    val beats = BeatsApi(http) { settings.current }
+
+    /**
+     * A GET of the Siansa Beats (dev) plugin's [pluginPath], answered by Siansa Beats itself when it's set up (its v1
+     * API has the same paths and answers), by the plugin on AudioMuse otherwise.
+     */
+    suspend fun siansaBeats(pluginPath: String): JsonElement =
+        if (settings.current.beatsReady) beats.get(BeatsApi.fromPlugin(pluginPath)) else audioMuse.plugin(pluginPath)
+
+    /** A POST to the plugin's [pluginPath], or to Siansa Beats itself (as [siansaBeats]). */
+    suspend fun siansaBeatsPost(pluginPath: String, body: String): JsonElement =
+        if (settings.current.beatsReady) beats.post(BeatsApi.fromPlugin(pluginPath), body) else audioMuse.pluginPost(pluginPath, body)
+
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
-    val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
+    val profiles = ProfileStore({ path -> siansaBeats(path) }, { settings.current }, beats = { beats.capabilities() })
     /** Genre radios by Siansa Beats' vote, when it's there (Siansa Dev); by the songs' tags otherwise. */
     val genreVote = GenreVote(
-        { path -> audioMuse.plugin(path) }, { settings.current.audioMuseReady },
+        { path -> siansaBeats(path) }, { settings.current.let { it.beatsReady || it.audioMuseReady } },
         // The genre list by vote, saved so Search and Home show it at once (and while Siansa Beats is away).
         load = { java.io.File(app.filesDir, "voted-genres.json").takeIf { it.exists() }?.readText() },
         save = { java.io.File(app.filesDir, "voted-genres.json").writeText(it) },
@@ -412,15 +428,16 @@ class AppGraph(val app: Application) {
     fun djProblem(): String? = DjReady.problem(settings.current, connection.current, djReady.beats.value)
 
     init {
-        // DJ mixes need the Siansa Beats (dev) plugin and Siansa Beats: checked when AudioMuse answers, again every
-        // half hour (every two minutes while it doesn't), and from scratch when AudioMuse is set up anew.
+        // DJ mixes need Siansa Beats' beat grids (directly, or through its plugin on AudioMuse): checked at the start,
+        // again every half hour (every two minutes while it doesn't answer), and from scratch when either is set up anew.
         scope.launch(CoroutineName("dj-ready")) {
-            settings.state.map { it.audioMuseUrl to it.audioMuseReady }.distinctUntilChanged().drop(1).collect { djReady.forget() }
+            settings.state.map { Triple(it.audioMuseUrl, it.beatsUrl, it.beatsKey) }.distinctUntilChanged().drop(1).collect { djReady.forget() }
         }
         scope.launch(CoroutineName("dj-ready-check")) {
             while (true) {
                 val s = settings.current
-                if (s.audioMuseReady && connection.current.audioMuse == true && djReady.due()) {
+                // Siansa Beats directly when it's set up; else the plugin, once AudioMuse answers.
+                if ((s.beatsReady || s.audioMuseReady && connection.current.audioMuse == true) && djReady.due()) {
                     val result = runCatching { profiles.check() }.getOrNull()
                     if (result != null) djReady.checked(result.ok, result.message)
                 }

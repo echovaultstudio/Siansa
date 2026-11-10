@@ -1,6 +1,7 @@
 package app.siansa.playback
 
 import app.siansa.data.AppJson
+import app.siansa.data.AppSettings
 import app.siansa.net.arr
 import app.siansa.net.dbl
 import app.siansa.net.int
@@ -22,6 +23,9 @@ enum class LoudnessSource(val label: String, val detail: String) {
         fun parse(value: String?): LoudnessSource = entries.firstOrNull { it.name == value } ?: TAGS
     }
 }
+
+/** Who measures the songs: "Siansa Beats" when it's set up (Siansa Dev), "the Siansa plugin" otherwise. */
+val AppSettings.measurer: String get() = if (beatsReady) "Siansa Beats" else "the Siansa plugin"
 
 /** One level on a ramp: the song is at [db] relative to its own loudness at [ms] (see [TrackProfile]). */
 data class RampPoint(val db: Int, val ms: Long)

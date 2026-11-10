@@ -34,6 +34,11 @@ to fold it open; they start folded. **Save** (at the top, or in any open card) k
 **Services**
 
 - **AudioMuse-AI**: address, and an API token or user name and password. See [AudioMuse-AI](audiomuse.md).
+- **Siansa Beats** (Siansa Dev): its address (port 8090) and, if it asks for one, its API key or password. With it
+  set, each song's beats, loudness, fades and key, and the genres, come straight from Siansa Beats instead of the
+  Siansa plugin on AudioMuse-AI; leave the address empty to keep using the plugin, or the songs' tags. **Test** says
+  how many songs it has analysed. It reads Navidrome, so it's for a Navidrome server. See
+  [AudioMuse-AI](audiomuse.md#siansa-beats-siansa-dev).
 - **AI** (optional): which service writes mix titles and sound searches (OpenRouter, OpenAI, Anthropic, Google
   Gemini, Mistral, Groq, Ollama or another), its key, its model, and **AI titles and sound searches**. See
   [AI features](ai.md).

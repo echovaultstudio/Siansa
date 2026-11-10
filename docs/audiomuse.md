@@ -119,3 +119,19 @@ match can't be used for radios and similar music. If Siansa says "AudioMuse does
 The Siansa plugin measures songs on every server: it fetches each song from whichever server has it (0.3.3).
 AudioMuse-AI runs the plugin's 15-minute task once per server; the first run does the work and the others stop
 straight away, so more servers don't make it take longer.
+
+## Siansa Beats (Siansa Dev)
+
+Siansa Beats is a separate service (its own container, next to Navidrome) that finds every beat and downbeat of each
+song, measures its loudness, fades and key, and sorts songs into genres by their sound. Siansa Dev can ask it directly:
+set its address in **Settings › Connections › Siansa Beats**. Then levelling, smart crossfades, DJ blends and the
+genres come from Siansa Beats, and the Siansa plugin isn't needed for them. Similar albums and artists still come from
+the plugin for now.
+
+Without Siansa Beats set up, everything works as before: through the Siansa plugin when it's installed, otherwise
+from the songs' tags. A DJ mix is only offered when beat grids are there (from Siansa Beats or through its plugin)
+and AudioMuse-AI answers.
+
+Songs Siansa Beats analysed before version 0.20 are measured for loudness, fades and key while it has nothing else
+to do; until then they're levelled by their tags.
+

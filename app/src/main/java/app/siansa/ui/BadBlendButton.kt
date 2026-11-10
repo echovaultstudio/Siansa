@@ -45,7 +45,7 @@ internal fun BadBlendButton(modifier: Modifier = Modifier) {
             if (said == null) {
                 said = "Sending…"
                 scope.launch {
-                    val problem = LastBlend.mark(blend) { path, body -> graph.audioMuse.pluginPost(path, body) }
+                    val problem = LastBlend.mark(blend) { path, body -> graph.siansaBeatsPost(path, body) }
                     said = if (problem == null) "Marked as a bad blend" else "In the log; not sent: $problem"
                 }
             }
