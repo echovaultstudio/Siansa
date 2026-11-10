@@ -89,7 +89,8 @@ Under the buttons, the artist's release types are tabs: **All**, then each type 
 **Singles**, **Live**, **DJ-mixes**…). Pick one to see only those releases; **All** (or tapping the chosen tab again)
 shows the whole page: popular songs, every release, **Appears on**, **About** and **Fans also like**. An artist with
 many types scrolls the tabs sideways. As you scroll down, the page slides softly over the artist's picture and the tabs
-stay pinned under the title bar.
+stay pinned under the title bar. The artist's name, large at the foot of the picture, moves up with the page and
+then glides into the title bar, shrinking as it goes, to become the page's title; scroll back and it glides out again.
 
 - **Similar songs** come from the best source your setup has: Navidrome's sonic similarity (if the AudioMuse-AI
   Navidrome plugin is installed), else AudioMuse-AI directly, else Navidrome's similar songs (or Emby's Instant

@@ -108,6 +108,9 @@ private suspend fun appearsOnOf(graph: app.siansa.AppGraph, page: ArtistPage): L
 
 private val HERO = 380.dp
 
+/** The dark band at the foot of the artist's picture, behind the name at rest. */
+private val HERO_NAME_BAND = 120.dp
+
 /** The release-type tabs' place in the artist page's grid: after the picture's spacer and the buttons (issue #1029). */
 private const val TABS_KEY = "release-type-tabs"
 private const val TABS_INDEX = 2
@@ -195,24 +198,15 @@ fun ArtistScreen(nav: NavController, id: String) {
         color = tint,
         pinned = if (tabsPinned) ({ ReleaseTypeTabs(types, type, content = androidx.compose.ui.graphics.Color.White) { choose(it) } }) else null,
         overlay = {
-            // A soft dark band behind the name, so it reads on any photo, and on a pale placeholder.
+            // A soft dark band at the foot of the picture, where the name sits at first (HeroPage draws the name, which
+            // rides up with the page into the title bar), so it reads on any photo and on a pale placeholder.
             Box(
-                Modifier.fillMaxWidth().background(
+                Modifier.fillMaxWidth().height(HERO_NAME_BAND).background(
                     androidx.compose.ui.graphics.Brush.verticalGradient(
                         listOf(androidx.compose.ui.graphics.Color.Transparent, androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.55f)),
                     ),
                 ),
-            ) {
-                Text(
-                    p?.artist?.name.orEmpty(),
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Black,
-                    color = androidx.compose.ui.graphics.Color.White,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Section, bottom = Space.Medium),
-                )
-            }
+            )
         },
         image = { modifier ->
             // Navidrome's artist image through its cover endpoint (ND_ARTISTARTPRIORITY), cached and downloaded

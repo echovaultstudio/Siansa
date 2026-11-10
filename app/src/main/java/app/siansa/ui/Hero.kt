@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -20,6 +22,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -27,7 +33,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -40,8 +49,10 @@ import kotlin.math.min
  * A page whose picture fills the top of the screen, up behind the status bar (an artist's page). Scrolling
  * slides the page up over the picture, which stays almost still, zooms gently and fades out into [color];
  * the page comes up with a soft edge, so the picture fades into it rather than being cut off (issue #1029).
- * The title bar fills with [color] once the picture is gone, and [pinned] (the release-type tabs) sits
- * under it once the page has scrolled past them.
+ * [title] sits large at the foot of the picture and rides up with the page; near the top it glides into the
+ * title bar, shrinking as it goes, and becomes the bar's title (the owner, 10 Nov: [heroNameFrame]). The bar
+ * fills with [color] as it arrives, and [pinned] (the release-type tabs) sits under it once the page has
+ * scrolled past them.
  *
  * [scrolledPx] is how far the first item has scrolled; the list or grid must start with [HeroSpacer]
  * and use the given modifier, which paints the page behind its items.
@@ -122,7 +133,32 @@ fun HeroPage(
         }
         content(pageModifier)
 
-        val barAlpha = ((scrolledPx - heroPx * 0.65f) / (heroPx * 0.25f)).coerceIn(0f, 1f)
+        // The name's way from the picture into the title bar, all of it worked out while drawing, so it follows the
+        // finger frame by frame.
+        val statusPx = WindowInsets.statusBars.getTop(density).toFloat()
+        val barPx = with(density) { HERO_TITLE_BAR.toPx() }
+        val bigStyle = MaterialTheme.typography.displaySmall.copy(
+            fontWeight = FontWeight.Black,
+            // Reads on any photo, and on the page as the photo fades.
+            shadow = Shadow(Color.Black.copy(alpha = 0.45f), Offset(0f, 2f), 14f),
+        )
+        val smallStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black)
+        val dockScale = smallStyle.fontSize.value / bigStyle.fontSize.value
+        val lineHeightPx = with(density) { bigStyle.lineHeight.toPx() }
+        val restLeftPx = with(density) { Space.Page.toPx() }
+        // Where the bar's title starts: the bar's padding, the back arrow's button and the gap after it.
+        val dockLeftPx = with(density) { (Space.Tight + BACK_BUTTON + Space.Small).toPx() }
+        val restBottomPx = with(density) { Space.Medium.toPx() }
+        val startGapPx = with(density) { DOCK_START_GAP.toPx() }
+        var nameHeight by remember { mutableIntStateOf(0) }
+        val restTop = heroPx - nameHeight - restBottomPx
+        val dockTop = statusPx + barPx / 2f - lineHeightPx * dockScale / 2f
+        val frame = heroNameFrame(scrolledPx, restTop, startTop = statusPx + barPx + startGapPx, dockTop = dockTop)
+        val dockT = frame.t
+        val barAlpha = maxOf(((scrolledPx - heroPx * 0.65f) / (heroPx * 0.25f)).coerceIn(0f, 1f), smooth(dockT))
+        // The last of the way: the shrunk name hands over to the bar's own title (one line, cut off with "…"
+        // before the buttons), in the same place and size, so a long name ends tidy.
+        val handOver = ((dockT - HAND_OVER_FROM) / (1f - HAND_OVER_FROM)).coerceIn(0f, 1f)
         Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier
@@ -140,12 +176,11 @@ fun HeroPage(
             Spacer(Modifier.width(Space.Small))
             Text(
                 title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style = smallStyle,
                 color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).graphicsLayer { alpha = barAlpha },
+                modifier = Modifier.weight(1f).graphicsLayer { alpha = handOver }.testTag("heroBarTitle"),
             )
             actions()
         }
@@ -154,8 +189,76 @@ fun HeroPage(
             Box(Modifier.fillMaxWidth().background(color.copy(alpha = 1f)).testTag("heroPinned")) { pinned() }
         }
         }
+
+        // The name, over everything: it rides up with the page, then glides into the bar (above it, so the bar
+        // filling in never covers it on the way).
+        Text(
+            title,
+            style = bigStyle,
+            color = Color.White,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .padding(start = Space.Page, end = Space.Page)
+                .onSizeChanged { nameHeight = it.height }
+                .graphicsLayer {
+                    // Laid out at the page's left edge; moved and shrunk from its top left corner.
+                    transformOrigin = TransformOrigin(0f, 0f)
+                    val e = smooth((dockT * SIDEWAYS_LEAD).coerceAtMost(1f))
+                    translationX = (dockLeftPx - restLeftPx) * e
+                    translationY = frame.top
+                    val sc = 1f + (dockScale - 1f) * smooth(dockT)
+                    scaleX = sc
+                    scaleY = sc
+                    alpha = if (nameHeight == 0) 0f else 1f - handOver
+                }
+                .testTag("heroName"),
+        )
     }
 }
+
+/** Where the hero's name is, [top] in px from the top of the screen, and how far into the title bar it is ([t], 0–1). */
+data class HeroNameFrame(val top: Float, val t: Float)
+
+/**
+ * The hero's name as the page scrolls [scrolled] px: at rest its top is at [restTop], and it moves up with the page
+ * until it reaches [startTop] (just under the title bar). From there it glides into the bar's title place, [dockTop],
+ * over [DOCK_SPAN] times that last distance of scrolling: its speed at the start is the page's, so there's no jolt,
+ * and it slows to a stop as it settles (a Hermite curve, which never overshoots at this span). Scrolling back runs it
+ * the other way, frame for frame.
+ */
+fun heroNameFrame(scrolled: Float, restTop: Float, startTop: Float, dockTop: Float): HeroNameFrame {
+    // A tall font on a short screen can start the name above the start line: then it starts gliding at once.
+    val start = minOf(startTop, restTop).coerceAtLeast(dockTop)
+    val free = restTop - scrolled
+    if (free >= start) return HeroNameFrame(free, 0f)
+    val distance = start - dockTop
+    if (distance <= 0f) return HeroNameFrame(dockTop, 1f)
+    val span = DOCK_SPAN * distance
+    val t = ((scrolled - (restTop - start)) / span).coerceIn(0f, 1f)
+    // Hermite from (start, moving up at the page's speed) to (dockTop, at rest).
+    val t2 = t * t
+    val t3 = t2 * t
+    val top = (2 * t3 - 3 * t2 + 1) * start + (t3 - 2 * t2 + t) * (-span) + (-2 * t3 + 3 * t2) * dockTop
+    return HeroNameFrame(top, t)
+}
+
+private fun smooth(t: Float): Float = t * t * (3f - 2f * t)
+
+/** How many times the last distance into the bar the name takes to glide there (at most 3, or it would overshoot). */
+const val DOCK_SPAN = 2.5f
+
+/** How far under the title bar the name starts gliding into it. */
+private val DOCK_START_GAP = 24.dp
+
+/** The back arrow's button, before the bar's title. */
+private val BACK_BUTTON = 48.dp
+
+/** The name is sideways in its place a little before it's up: it clears the back arrow on the way. */
+private const val SIDEWAYS_LEAD = 1.3f
+
+/** From here on the way into the bar, the name hands over to the bar's own title. */
+private const val HAND_OVER_FROM = 0.8f
 
 /** How fast the picture drifts up as the page slides over it: slowly, so it seems to stay put. */
 private const val HERO_DRIFT = 0.3f
