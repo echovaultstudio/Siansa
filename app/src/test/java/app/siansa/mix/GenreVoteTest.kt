@@ -141,6 +141,18 @@ class GenreVoteTest {
         assertEquals(1, asked.size)  // kept
     }
 
+    @Test fun aDescriptionStillBeingLookedUpIsAskedForAgain() = runBlocking {
+        var asks = 0
+        reply = { path ->
+            if (!path.startsWith(GenreVote.ABOUT_PATH)) JsonObject(emptyMap())
+            else if (++asks == 1) JsonObject(mapOf("about" to kotlinx.serialization.json.JsonNull, "pending" to JsonPrimitive(true)))
+            else JsonObject(mapOf("about" to JsonObject(mapOf("summary" to JsonPrimitive("Nu metal is a subgenre of alternative metal."),
+                "source" to JsonPrimitive("Wikipedia")))))
+        }
+        assertEquals("Nu metal is a subgenre of alternative metal.", vote.about("Nu Metal")!!.summary)
+        assertEquals(2, asks)
+    }
+
     @Test fun noDescriptionWithoutSiansaBeats() = runBlocking {
         reply = { JsonObject(mapOf("about" to kotlinx.serialization.json.JsonNull)) }
         assertNull(vote.about("Mercury"))

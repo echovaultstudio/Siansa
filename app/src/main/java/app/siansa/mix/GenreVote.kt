@@ -121,16 +121,23 @@ class GenreVote(
     suspend fun about(name: String): GenreAbout? {
         abouts[name.lowercase()]?.let { return it }
         if (!ready() || now() < backOffUntil) return null
-        val answer = try {
-            withTimeout(WAIT_MS * 2) { ask(ABOUT_PATH + "?name=" + java.net.URLEncoder.encode(name, "UTF-8").replace("+", "%20")) } as? JsonObject
-        } catch (e: CancellationException) {
-            if (e is kotlinx.coroutines.TimeoutCancellationException) return null
-            throw e
-        } catch (e: Exception) {
-            AppLog.i("Genre", "No description of $name from Siansa Beats: ${e.message}")
-            return null
-        } ?: return null
-        val o = answer["about"] as? JsonObject ?: return null
+        // Siansa Beats 0.22 answers at once with a kept one; a genre it hasn't looked up yet comes back "pending" after a
+        // few seconds, and is there when asked again shortly (the owner, 10 Nov: some genre pages never showed theirs).
+        var answer: JsonObject? = null
+        for (attempt in 1..ABOUT_TRIES) {
+            answer = try {
+                withTimeout(WAIT_MS * 2) { ask(ABOUT_PATH + "?name=" + java.net.URLEncoder.encode(name, "UTF-8").replace("+", "%20")) } as? JsonObject
+            } catch (e: CancellationException) {
+                if (e is kotlinx.coroutines.TimeoutCancellationException) null else throw e
+            } catch (e: Exception) {
+                AppLog.i("Genre", "No description of $name from Siansa Beats: ${e.message}")
+                return null
+            }
+            val pending = (answer?.get("pending") as? JsonPrimitive)?.content == "true"
+            if (answer != null && !pending) break
+            if (attempt < ABOUT_TRIES) kotlinx.coroutines.delay(ABOUT_AGAIN_MS)
+        }
+        val o = answer?.get("about") as? JsonObject ?: return null
         fun text(key: String) = (o[key] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() && it != "null" }
         val about = GenreAbout(text("summary") ?: return null, text("url"), text("source") ?: "Wikipedia")
         abouts[name.lowercase()] = about
@@ -140,6 +147,9 @@ class GenreVote(
     companion object {
         const val PATH = PLUGIN_PREFIX + "api/genre"
         const val ABOUT_PATH = PLUGIN_PREFIX + "api/genre/about"
+        /** Times a genre's description is asked for while Siansa Beats is still looking it up, [ABOUT_AGAIN_MS] apart. */
+        const val ABOUT_TRIES = 5
+        const val ABOUT_AGAIN_MS = 2_500L
         /** Every genre: the model has 400 styles, and the plugin gives at most this many. */
         const val MOST_GENRES = 400
         /** How long the list may take before the saved one (or the tags) stays: a page never waits longer. */
