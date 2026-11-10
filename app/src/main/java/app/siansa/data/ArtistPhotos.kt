@@ -27,10 +27,15 @@ class ArtistPhotos(private val source: MusicSource, private val library: Library
     /** Artist id → their new picture id, for the artists refreshed this run. */
     val covers: StateFlow<Map<String, String>> = _covers.asStateFlow()
 
-    /** Looks up [artists] not looked up yet this run; true when any picture id changed. */
-    suspend fun refresh(artists: List<Artist>): Boolean = coroutineScope {
+    /**
+     * Looks up [artists] not looked up yet this run; true when any picture id changed. [onProgress] hears how many of
+     * them are done, of how many (Download all covers, which looks every artist up first).
+     */
+    suspend fun refresh(artists: List<Artist>, onProgress: (done: Int, of: Int) -> Unit = { _, _ -> }): Boolean = coroutineScope {
         val permits = Semaphore(3)
-        val changed = artists.filter { done.add(it.id) }.map { artist ->
+        val todo = artists.filter { done.add(it.id) }
+        val finished = java.util.concurrent.atomic.AtomicInteger()
+        val changed = todo.map { artist ->
             async {
                 permits.withPermit {
                     runCatching {
@@ -44,13 +49,15 @@ class ArtistPhotos(private val source: MusicSource, private val library: Library
                         } else {
                             false
                         }
-                    }.onFailure { AppLog.d("Covers", "Artist photo for ${artist.name} not refreshed: ${it.message}") }
-                        .getOrDefault(false)
+                    }.onFailure {
+                        if (it is kotlinx.coroutines.CancellationException) throw it
+                        AppLog.d("Covers", "Artist photo for ${artist.name} not refreshed: ${it.message}")
+                    }.getOrDefault(false).also { onProgress(finished.incrementAndGet(), todo.size) }
                 }
             }
         }.awaitAll().count { it }
         if (changed > 0) {
-            AppLog.i("Covers", "New photos for $changed artist radio(s)")
+            AppLog.i("Covers", "New photos for $changed of ${todo.size} artist(s) looked up")
         }
         changed > 0
     }

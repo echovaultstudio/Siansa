@@ -744,7 +744,9 @@ private fun CoverDownloadSection() {
             modifier = Modifier.fillMaxWidth(),
         )
         Text(
-            "Checked ${download.done} of ${download.total} · ${download.downloaded} downloaded" +
+            // Before the covers, the artists are looked up for their photos (Looking up artist photos: 40 of 900).
+            if (download.total == 0 && download.note != null) download.note
+            else "Checked ${download.done} of ${download.total} · ${download.downloaded} downloaded" +
                 if (download.failed > 0) " · ${download.failed} failed" else "",
             style = MaterialTheme.typography.bodyMedium,
         )

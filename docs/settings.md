@@ -63,7 +63,7 @@ What's kept on the phone, what it costs in data, and how well Siansa plays on wi
 | **Load songs ahead** | How many songs to load ahead, on Wi-Fi and on mobile data (0–5). |
 | **Song cache** | Keeps songs as they play, up to the size chosen, with **Clear song cache**. **Off** keeps no song once it has played (from the next song); then up to 3 songs are loaded ahead, each held only until it plays. A new size applies after a restart. |
 | **Downloads** | **Your downloads** (what's on the phone, opening the list to add or remove music), **Download on Wi-Fi only**, the download quality, the storage limit and **Remove all downloads**. See [Playback](playback.md#downloads). |
-| **Covers on the phone** | **Download all covers**, and the **Image cache** (its size, a limit or none, and **Clear image cache**; a new size applies after a restart). |
+| **Covers on the phone** | **Download all covers** (every album, artist and playlist cover; it looks each artist up first, so their photo is downloaded even when Navidrome found it after your library was last read), and the **Image cache** (its size, a limit or none, and **Clear image cache**; a new size applies after a restart). |
 | **Other data on this phone** | What the library database and the logs take. |
 
 The downloads themselves are also in Your Library (the download button at the top), with **Add music**,
