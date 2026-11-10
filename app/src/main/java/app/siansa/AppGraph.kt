@@ -6,6 +6,7 @@ import app.siansa.net.WebStationPictures
 import app.siansa.playback.ActivePlayer
 import app.siansa.playback.MiniFor
 import app.siansa.mix.Dice
+import app.siansa.mix.DjReady
 import app.siansa.mix.GenreVote
 import app.siansa.data.ArtistPhotos
 import app.siansa.data.audioMuseUserFor
@@ -404,10 +405,10 @@ class AppGraph(val app: Application) {
         onPlayStarted = { activePlayer.choose(MiniFor.MUSIC); bookPlayer.pause() }
     }
     /** Whether a DJ mix can run: AudioMuse and Siansa Beats answering ([DjReady]). */
-    val djReady = app.siansa.mix.DjReady()
+    val djReady = DjReady()
 
     /** Why a DJ mix can't run now (a few words for its button), or null when it can. */
-    fun djProblem(): String? = app.siansa.mix.DjReady.problem(settings.current, connection.current, djReady.beats.value)
+    fun djProblem(): String? = DjReady.problem(settings.current, connection.current, djReady.beats.value)
 
     init {
         // DJ mixes need the Siansa Beats (dev) plugin and Siansa Beats: checked when AudioMuse answers, again every
