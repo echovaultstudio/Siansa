@@ -499,6 +499,9 @@ fun VibeScreen(nav: NavController, id: String) {
         songs = if (vibes == null) null else vibe?.songs.orEmpty(),
         error = if (vibes != null && vibe == null) "This vibe is no longer kept" else null,
         cover = { m -> GeneratedCover(vibe?.shownTitle ?: "", colors, m) },
+        // Its name is on its cover, and Play takes the cover's colour, as every page with a drawn cover (the owner, 10 Nov).
+        showTitle = false,
+        coverColour = colors.first,
         // Rename or delete the vibe (issue #369).
         actions = {
             if (vibe != null) Box {

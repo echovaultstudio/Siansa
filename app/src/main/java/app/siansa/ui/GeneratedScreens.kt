@@ -10,6 +10,7 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Spacer
@@ -152,22 +153,20 @@ private fun GenreScreenContent(nav: NavController, name: String) {
         // Wikipedia, the owner, 10 Nov), or how many songs it has when there's no description.
         showTitle = false,
         coverColour = colors.first,
-        // Its radio on the cover's corner, and in the bar once the cover has scrolled away (the owner, 10 Nov).
-        radioOnCover = true,
         barExtras = { RadioHeart(nav, name, colors) },
         header = {
             val about = aboutState.valueOrNull() ?: keptAbout
             if (about != null) {
                 val uri = androidx.compose.ui.platform.LocalUriHandler.current
                 GenreAboutText(about.summary, about.source, onSource = about.url?.let { url -> { runCatching { uri.openUri(url) } } })
-                Spacer(Modifier.height(Space.Small))
             }
-            // How many songs, at the page's left edge, with or without a description (the owner, 10 Nov).
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CollectionByline(null, null, null, list?.let { "%,d songs".format(it.size) } ?: "")
-                Spacer(Modifier.weight(1f))
-                RadioHeart(nav, name, colors, onBar = false)
-            }
+        },
+        // One row under it (the owner, 10 Nov): how many songs at the page's left edge, with or without a description,
+        // and the heart beside the radio on the right. Both go into the title bar once the row has scrolled under it.
+        radioRow = {
+            Box(Modifier.weight(1f)) { CollectionByline(null, null, null, list?.let { "%,d songs".format(it.size) } ?: "") }
+            RadioHeart(nav, name, colors, onBar = false)
+            Spacer(Modifier.width(Space.Small))
         },
         playAs = { first ->
             val all = list.orEmpty()
@@ -226,21 +225,10 @@ fun RadioScreen(nav: NavController, kind: String, key: String) {
         coverColour = colors.first,
         barExtras = { RadioHeart(nav, "$title radio", colors) },
         header = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CollectionByline(
-                    null,
-                    null,
-                    null,
-                    (when (kind) { "mood" -> "Sound radio"; "centre" -> "AudioMuse mood radio"; else -> "Genre radio" }) + (songs.valueOrNull()?.let { " · ${it.size} songs" } ?: ""),
-                )
-                Spacer(Modifier.weight(1f))
-RadioHeart(nav, "$title radio", colors, onBar = false)
-                TextButton(onClick = { round++ }, modifier = Modifier.focusRing()) {
-                    Icon(Icons.Rounded.Refresh, null)
-                    Spacer(Modifier.width(Space.Tight))
-                    Text("New picks")
-                }
-            }
+            PicksRow(
+                (when (kind) { "mood" -> "Sound radio"; "centre" -> "AudioMuse mood radio"; else -> "Genre radio" }) + (songs.valueOrNull()?.let { " · ${it.size} songs" } ?: ""),
+                onNewPicks = { round++ },
+            ) { RadioHeart(nav, "$title radio", colors, onBar = false) }
         },
     )
 }
@@ -284,15 +272,8 @@ fun BlendScreen(nav: NavController, playlistId: String) {
         coverColour = colors.first,
         barExtras = { RadioHeart(nav, title, colors) },
         header = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CollectionByline(null, null, null, "Song alchemy" + (songs.valueOrNull()?.let { " · ${it.size} songs" } ?: ""))
-                Spacer(Modifier.weight(1f))
-RadioHeart(nav, title, colors, onBar = false)
-                TextButton(onClick = { round++ }, modifier = Modifier.focusRing()) {
-                    Icon(Icons.Rounded.Refresh, null)
-                    Spacer(Modifier.width(Space.Tight))
-                    Text("New picks")
-                }
+            PicksRow("Song alchemy" + (songs.valueOrNull()?.let { " · ${it.size} songs" } ?: ""), onNewPicks = { round++ }) {
+                RadioHeart(nav, title, colors, onBar = false)
             }
         },
     )
@@ -321,20 +302,15 @@ fun MoodScreen(nav: NavController, text: String) {
         saveAsPlaylist = true,
         shortcutCover = false,
         cover = { m -> GeneratedCover(r?.title ?: text, colors, m) },
+        // Its name is on its cover, and Play takes the cover's colour, as every page with a drawn cover (the owner, 10 Nov).
+        showTitle = false,
+        coverColour = colors.first,
         header = {
             if (r != null) {
                 Text(r.description, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(Space.Small))
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CollectionByline(null, null, null, "From “$text”" + (r?.let { " · ${it.songs.size} songs" } ?: ""))
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = { round++ }, modifier = Modifier.focusRing()) {
-                    Icon(Icons.Rounded.Refresh, null)
-                    Spacer(Modifier.width(Space.Tight))
-                    Text("Again")
-                }
-            }
+            PicksRow("From “$text”" + (r?.let { " · ${it.songs.size} songs" } ?: ""), onNewPicks = { round++ })
         },
     )
 }

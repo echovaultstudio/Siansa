@@ -220,16 +220,20 @@ Home with its switch in Settings.
 ## Radios
 
 - **Mood radios** are AudioMuse-AI sound searches, kept varied. Their page has the radio's name on its cover, and its
-  Play takes the cover's colour with Dynamic colours on.
+  Play takes the cover's colour with Dynamic colours on. Every page whose cover Siansa draws is the same: a radio, a
+  mood playlist, a vibe, a Made for you card, your own cards and a song path.
+- **New picks**, on the right of the line under the cover, picks the songs again, on every page that can: radios,
+  "More like" a playlist, mood playlists and cards.
 - **Favourite radios**: the heart on a radio's page (a mood radio, a genre, "More like" a playlist) keeps it in Your
   Library under **Favourites**. Right after you heart one, **Make a Home card** makes a custom card of it, or pick it
   later under **Comes from › A favourite radio** in a card.
 - **On every page of songs**, once the cover and buttons have scrolled away, the title bar has its **Play** (a radio's
-  **radio**, and its heart).
+  **radio**, and its heart). They grow into the bar the same way on every page: albums, playlists, radios, genres,
+  artists, books and podcasts.
 - **Genres** open a page with every song of the genre on your phone, to look
   through. With Siansa Beats (0.19 or later), it says what the genre is, with a little of its history: the opening of
-  its Wikipedia article, linked under it, and under that how many songs it has. Its one button, the **radio** (round,
-  in the genre's colour, on the cover's bottom right corner), or a song there starts the genre's radio: 30 of its songs at random (the song you
+  its Wikipedia article, linked under it. Under that, one line: how many songs it has on the left, and on the right
+  its heart beside its one button, the **radio** (round, in the genre's colour). The radio or a song there starts the genre's radio: 30 of its songs at random (the song you
   tapped first), and 30 more of the genre each time the queue comes to its end, for as long as you don't play
   something else or add your own songs after it. The whole genre never goes into the queue, as some have thousands
   of songs. A genre's tile and page are coloured by its feel: red for hard and fast, blue or green for calm.
@@ -254,6 +258,8 @@ and **Stations**. **Favourites** has Liked songs, your favourite albums and arti
   are hidden to the right, the row fades there with a **›** button that scrolls on.
 - **Each chip keeps its own sort** (Recents, Alphabetical, Most played…) until you change it, also after Siansa
   restarts. Sorting Music by name doesn't change how Playlists are sorted.
+- **Liked songs and playlists sort the same way**: the arrows under the title, with the order's name, open **Sort by**
+  (Recently liked or Playlist order, Last played, Date added, Title, Artist). Each keeps its order.
 - **Each view keeps its own list or grid** (the button next to the sort) until you change it, also after Siansa
   restarts: Playlists can be a grid while Music's Artists stay a list. Albums, Artists and Songs under Music each
   keep their own.

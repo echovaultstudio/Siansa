@@ -11,6 +11,8 @@ import coil3.SingletonImageLoader
 import app.siansa.data.cover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.rounded.SwapVert
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -1226,4 +1228,39 @@ internal fun radioMore(startedEmpty: Boolean, restEmpty: Boolean, startedAt: Lon
     startedAt != now -> RadioMore.DROP
     startedEmpty -> RadioMore.PLAY
     else -> RadioMore.ADD
+}
+
+/**
+ * How a list is sorted, as one control everywhere (the owner, 10 Nov: playlists had chips, Your Library the arrows):
+ * the up-and-down arrows with the order's name, opening a "Sort by" menu with the chosen one ticked.
+ */
+@Composable
+internal fun <T> SortPicker(label: String, options: List<Pair<T, String>>, selected: T, modifier: Modifier = Modifier, onPick: (T) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        Row(
+            Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "Sort by") { open = true }.padding(Space.Small).testTag("sortPicker"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Rounded.SwapVert, null, Modifier.size(20.dp))
+            Spacer(Modifier.width(Space.Small))
+            Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            Text(
+                "Sort by",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
+            )
+            options.forEach { (option, name) ->
+                DropdownMenuItem(
+                    text = { Text(name, color = if (option == selected) Accent else MaterialTheme.colorScheme.onSurface) },
+                    trailingIcon = { if (option == selected) Icon(Icons.Rounded.Check, null, tint = Accent) },
+                    onClick = { open = false; onPick(option) },
+                    modifier = Modifier.testTag("sort-$option"),
+                )
+            }
+        }
+    }
 }

@@ -76,6 +76,9 @@ fun SearchMoreScreen(nav: NavController, kindId: String?, query: String) {
                 songs = songs.valueOrNull(),
                 error = (songs as? Load.Err)?.message,
                 cover = { m -> GeneratedCover(query, colors, m) },
+                // Play in the cover's colour, as every page with a drawn cover (the owner, 10 Nov). Its title stays:
+                // the cover says what was searched for, the title what's listed.
+                coverColour = colors.first,
                 header = {},
                 djMix = false,
             )

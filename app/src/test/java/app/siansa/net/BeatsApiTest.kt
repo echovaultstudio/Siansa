@@ -58,7 +58,10 @@ class BeatsApiTest {
         assertTrue("too old" in ProfileStore.beatsResult(caps(api = 0), SourceKind.OPENSUBSONIC).message)
         val emby = ProfileStore.beatsResult(caps(), SourceKind.EMBY)
         assertFalse(emby.ok)
-        assertTrue(emby.message, "Navidrome" in emby.message)
+        assertTrue(emby.message, "doesn't read this Emby server yet" in emby.message)
+        // Siansa Beats 0.23 reads Emby and Jellyfin too: working once its numbers are that server's.
+        assertTrue(ProfileStore.beatsResult(caps(server = "emby"), SourceKind.EMBY).ok)
+        assertTrue(ProfileStore.beatsResult(caps(server = "jellyfin"), SourceKind.JELLYFIN).ok)
     }
 
     @Test fun profilesComeFromSiansaBeatsWithoutAudioMuse() = runBlocking {
@@ -87,7 +90,7 @@ class BeatsApiTest {
         }).build()
         var settings = AppSettings(beatsUrl = "http://beats:8090", beatsKey = "k3y")
         val api = BeatsApi(http) { settings }
-        assertEquals(3, runBlocking { api.capabilities() }.beatGrids)
+        assertEquals(3, runBlocking { api.capabilities() }.beatGrids)  // an older Siansa Beats: no servers to name
         assertEquals("http://beats:8090/api/v1/capabilities", seen[0].url.toString())
         assertEquals("Bearer k3y", seen[0].header("Authorization"))
         val denied = runCatching { runBlocking { api.get("/api/v1/profiles?ids=a") } }.exceptionOrNull()
@@ -99,5 +102,68 @@ class BeatsApiTest {
         assertEquals(null, seen[3].header("Authorization"))
         settings = AppSettings()
         assertTrue(runCatching { runBlocking { api.get("/api/v1/genres") } }.exceptionOrNull()?.message.orEmpty().contains("isn't set up"))
+    }
+
+    private fun server(id: String, kind: String, url: String, user: String, default: Boolean = false) =
+        BeatsApi.MusicServer(id, kind, id, url, user, default)
+
+    @Test fun theServerThisAppPlaysFromIsFoundAmongSiansaBeats() {
+        val servers = listOf(
+            server("main", "navidrome", "http://192.168.1.106:30043", "max", default = true),
+            server("navidrome", "navidrome", "http://192.168.1.106:30043", "anna"),
+            server("emby", "emby", "http://192.168.1.106:8096", "max"),
+        )
+        fun pick(kind: SourceKind, url: String, user: String) = BeatsApi.serverFor(servers, kind, url, user)
+        assertEquals("emby", pick(SourceKind.EMBY, "https://emby.example.org", "max"))
+        assertEquals(null, pick(SourceKind.JELLYFIN, "http://192.168.1.106:8097", "max"))
+        // Two users of one Navidrome: by the user, whatever address the phone knows it by.
+        assertEquals("navidrome", pick(SourceKind.OPENSUBSONIC, "https://music.example.org", "Anna"))
+        assertEquals("main", pick(SourceKind.OPENSUBSONIC, "http://192.168.1.106:30043", "max"))
+        // A user Siansa Beats doesn't have: the default one of that server.
+        assertEquals("main", pick(SourceKind.OPENSUBSONIC, "http://192.168.1.106:30043", "guest"))
+        assertEquals(null, BeatsApi.serverFor(emptyList(), SourceKind.OPENSUBSONIC, "http://x", "max"))
+        assertEquals("/api/v1/genre?name=Trance&server=living+room", BeatsApi.withServer("/api/v1/genre?name=Trance", "living room"))
+        assertEquals("/api/v1/genres?server=emby", BeatsApi.withServer("/api/v1/genres", "emby"))
+    }
+
+    @Test fun everyRequestNamesTheServerOnceItsKnown() {
+        val seen = mutableListOf<String>()
+        val caps = """{"service":"siansa-beats","version":"0.23.0","api":1,"music_server":{"kind":"KIND","set_up":true,"id":"ID"},
+            "servers":[{"id":"main","kind":"navidrome","name":"Navidrome","url":"http://nas:4533","user":"max","default":true,"songs":9},
+                       {"id":"emby","kind":"emby","name":"Emby","url":"http://nas:8096","user":"max","default":false,"songs":9}],
+            "features":{"beat_grids":{"available":true,"songs":GRIDS}}}"""
+        val http = OkHttpClient.Builder().addInterceptor(Interceptor { chain ->
+            val url = chain.request().url
+            seen += url.encodedPath + (url.encodedQuery?.let { "?$it" } ?: "")
+            val emby = url.queryParameter("server") == "emby"
+            val body = if (url.encodedPath.endsWith("/capabilities")) caps.replace("KIND", if (emby) "emby" else "navidrome")
+                .replace("ID", if (emby) "emby" else "main").replace("GRIDS", if (emby) "7" else "9") else "{}"
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("x")
+                .body(body.toResponseBody("application/json".toMediaType())).build()
+        }).build()
+        var settings = AppSettings(beatsUrl = "http://beats:8090", sourceKind = SourceKind.EMBY, navidromeUrl = "http://nas:8096", navidromeUser = "max")
+        val api = BeatsApi(http) { settings }
+        runBlocking { api.get("/api/v1/profiles?ids=a") }
+        runBlocking { api.get("/api/v1/genres") }
+        runBlocking { api.post("/api/v1/bad-blends", "{}") }
+        // Similar music's server is AudioMuse's own name for one: left as it is.
+        runBlocking { api.get("/api/v1/similar/artists?artist=X&server=Home") }
+        assertEquals(listOf("/api/v1/capabilities", "/api/v1/profiles?ids=a&server=emby", "/api/v1/genres?server=emby",
+            "/api/v1/bad-blends?server=emby", "/api/v1/similar/artists?artist=X&server=Home"), seen)
+        // The Test and the DJ check read this server's numbers, not the default's.
+        val mine = runBlocking { api.capabilities() }
+        assertEquals("emby", mine.musicServer)
+        assertEquals(7, mine.beatGrids)
+        assertTrue(ProfileStore.beatsResult(mine, SourceKind.EMBY).ok)
+        // Another server in the app: looked up again; one Siansa Beats doesn't read is asked without a name.
+        seen.clear()
+        settings = settings.copy(sourceKind = SourceKind.JELLYFIN)
+        runBlocking { api.get("/api/v1/genres") }
+        assertEquals(listOf("/api/v1/capabilities", "/api/v1/genres"), seen)
+        assertFalse(ProfileStore.beatsResult(runBlocking { api.capabilities() }, SourceKind.JELLYFIN).ok)
+        seen.clear()
+        settings = settings.copy(sourceKind = SourceKind.OPENSUBSONIC, navidromeUrl = "http://nas:4533")
+        runBlocking { api.get("/api/v1/genres") }
+        assertEquals(listOf("/api/v1/capabilities", "/api/v1/genres?server=main"), seen)
     }
 }

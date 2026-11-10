@@ -136,3 +136,10 @@ and AudioMuse-AI answers.
 Songs Siansa Beats analysed before version 0.20 are measured for loudness, fades and key while it has nothing else
 to do; until then they're levelled by their tags.
 
+**Emby and Jellyfin.** Siansa Beats 0.23 reads Emby and Jellyfin as well as Navidrome, several servers at once and
+several users of one: add them on its page under **Setup › Music servers** and tick their libraries. A song two
+servers have (the same files) is analysed once, so adding Emby or Jellyfin beside a Navidrome that's already analysed
+takes a read of the library, not a new analysis. Siansa tells Siansa Beats which server it plays from (by its kind,
+your user name and its address), so levelling, crossfades, DJ blends and genres work whichever of them you're signed
+in to. **Test** under Settings › Connections › Siansa Beats says when Siansa Beats doesn't read your server yet.
+

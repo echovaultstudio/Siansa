@@ -744,35 +744,12 @@ internal fun LibraryPill(text: String, active: Boolean, outlined: Boolean = fals
 
 @Composable
 private fun SortBar(sort: Sort, grid: Boolean, onSort: (Sort) -> Unit, onGrid: () -> Unit) {
-    var open by remember { mutableStateOf(false) }
     Row(
         Modifier.fillMaxWidth().padding(start = Space.Small, end = Space.Tight, top = Space.Tight, bottom = Space.Tight),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.weight(1f)) {
-            Row(
-                Modifier.clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(Space.Small),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Rounded.SwapVert, null, Modifier.size(20.dp))
-                Spacer(Modifier.width(Space.Small))
-                Text(sort.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                Text(
-                    "Sort by",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
-                )
-                Sort.entries.forEach { s ->
-                    DropdownMenuItem(
-                        text = { Text(s.label, color = if (s == sort) Accent else MaterialTheme.colorScheme.onSurface) },
-                        trailingIcon = { if (s == sort) Icon(Icons.Rounded.Check, null, tint = Accent) },
-                        onClick = { open = false; onSort(s) },
-                    )
-                }
-            }
+            SortPicker(sort.label, Sort.entries.map { it to it.label }, sort, onPick = onSort)
         }
         IconButton(onClick = onGrid) {
             Icon(if (grid) Icons.Rounded.ViewList else Icons.Rounded.GridView, if (grid) "Show as list" else "Show as grid")

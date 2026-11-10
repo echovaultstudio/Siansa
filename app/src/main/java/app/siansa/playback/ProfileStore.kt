@@ -194,12 +194,13 @@ class ProfileStore(
 
         /**
          * What Siansa Beats' [caps] say for the Test button and the DJ check: working when it speaks this app's API and
-         * has beat grids, for songs of this kind of server ([kind]; it reads Navidrome).
+         * has beat grids, for songs of this kind of server ([kind]: it reads Navidrome, Emby and Jellyfin since 0.23,
+         * the ones added on its page).
          */
         fun beatsResult(caps: BeatsApi.Capabilities, kind: SourceKind): CheckResult = when {
             caps.api < BeatsApi.API -> CheckResult(false, "This Siansa Beats (${caps.version}) is too old for the app: update it to 0.20 or newer")
-            caps.musicServer == "navidrome" && kind != SourceKind.OPENSUBSONIC ->
-                CheckResult(false, "Siansa Beats reads Navidrome, so it doesn't know this server's songs")
+            caps.musicServer != null && caps.musicServer != BeatsApi.kindName(kind) ->
+                CheckResult(false, "Siansa Beats doesn't read this ${kind.label} server yet: add it on its page (Setup › Music servers)")
             caps.beatGrids == 0 -> CheckResult(false, "Siansa Beats ${caps.version} answers, but hasn't analysed any songs yet: choose libraries on its page")
             else -> CheckResult(true, "Siansa Beats ${caps.version} is working · %,d songs with beat grids, %,d measured for loudness".format(caps.beatGrids, caps.loudness))
         }

@@ -87,11 +87,11 @@ fun CardScreen(nav: NavController, id: String) {
         error = (card as? Load.Err)?.message ?: (songs as? Load.Err)?.message,
         saveAsPlaylist = true,
         cover = { m -> GeneratedCover(title, colors, m) },
+        // Its name is on its cover, and Play takes the cover's colour, as every page with a drawn cover (the owner, 10 Nov).
+        showTitle = false,
+        coverColour = colors.first,
         header = {
-            CollectionByline(null, null, null, listOfNotNull("Made for you", c?.detail, songs.valueOrNull()?.let { "${it.size} songs" }).joinToString(" · "))
-        },
-        actions = {
-            IconButton(onClick = { round++ }) { Icon(Icons.Rounded.Refresh, "New songs") }
+            PicksRow(listOfNotNull("Made for you", c?.detail, songs.valueOrNull()?.let { "${it.size} songs" }).joinToString(" · "), onNewPicks = { round++ })
         },
     )
 }

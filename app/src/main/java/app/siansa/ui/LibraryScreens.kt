@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import androidx.compose.foundation.layout.offset
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -152,7 +153,7 @@ fun LikedScreen(nav: NavController) {
         },
         header = {
             CollectionByline(null, null, null, "${songs.valueOrNull()?.size ?: 0} songs")
-            SortChips(sort, defaultLabel = "Recently liked") { sort = it; graph.listSort.set("liked", it) }
+            SongSortPicker(sort, defaultLabel = "Recently liked") { sort = it; graph.listSort.set("liked", it) }
         },
         offline = remember { likedOfflineItem() },
         // The quick-scroll handle says the letter or month of the order shown; liked first by when (beta testers #24).
@@ -257,7 +258,7 @@ fun PlaylistScreen(nav: NavController, id: String) {
                 null,
                 if (d == null) "" else "Playlist · ${d.songs.size} songs · ${formatDuration(d.songs.sumOf { it.durationSec.toLong() })}",
             )
-            SortChips(sort, defaultLabel = "Playlist order") { sort = it; graph.listSort.set("playlist", it) }
+            SongSortPicker(sort, defaultLabel = "Playlist order") { sort = it; graph.listSort.set("playlist", it) }
         },
         // A phone playlist's songs download one by one (from their ⋮ menu); Downloads keeps Navidrome's playlists.
         offline = if (onPhone) null else d?.playlist?.offlineItem(),
@@ -506,22 +507,20 @@ private suspend fun lastHeard(graph: app.siansa.AppGraph): Map<String, Long> {
     return at
 }
 
-/** "Recently liked · Last played · Date added · Title · Artist" as chips under a list's title (issue #257). */
+/**
+ * How a list of songs is sorted, under its title (issue #257): the same arrows and menu as Your Library (the owner,
+ * 10 Nov; chips until then). Its arrows sit on the page's left edge, so the touch area reaches a step past it.
+ */
 @Composable
-internal fun SortChips(selected: ListSort, defaultLabel: String, onPick: (ListSort) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = Space.Small).testTag("sortChips"),
-        horizontalArrangement = Arrangement.spacedBy(Space.Small),
-    ) {
-        ListSort.entries.forEach { sort ->
-            FilterChip(
-                selected = selected == sort,
-                onClick = { onPick(sort) },
-                label = { Text(if (sort == ListSort.DEFAULT) defaultLabel else sort.label) },
-                modifier = Modifier.testTag("sort-${sort.name}"),
-            )
-        }
-    }
+internal fun SongSortPicker(selected: ListSort, defaultLabel: String, onPick: (ListSort) -> Unit) {
+    fun name(sort: ListSort) = if (sort == ListSort.DEFAULT) defaultLabel else sort.label
+    SortPicker(
+        name(selected),
+        ListSort.entries.map { it to name(it) },
+        selected,
+        Modifier.padding(top = Space.Tight).offset(x = -Space.Small),
+        onPick,
+    )
 }
 
 /** The heart on an album page (issue #275): marks it as a favourite, in Navidrome too. */

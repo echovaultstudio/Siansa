@@ -50,7 +50,11 @@ class GenreVoteTest {
         val tagged = listOf(Song(id = "t", title = "Tagged", artist = "x"))
         val many = (1..GenreVote.MIN_VOTED).map { Song(id = "v$it", title = "v$it", artist = "x") }
         assertEquals(many, GenreVote.pick("Trance", many) { tagged })
-        assertEquals(tagged, GenreVote.pick("Trance", many.take(5)) { tagged })
+        val moreTagged = (1..6).map { Song(id = "t$it", title = "t$it", artist = "x") }
+        assertEquals(moreTagged, GenreVote.pick("Trance", many.take(5)) { moreTagged })
+        // A genre only in the list by vote has no tagged songs: its voted ones show, however few (Yé-Yé's 19).
+        assertEquals(many.take(19), GenreVote.pick("Yé-Yé", many.take(19)) { emptyList() })
+        assertEquals(many.take(5), GenreVote.pick("Surf", many.take(5)) { tagged })
         assertEquals(tagged, GenreVote.pick("Trance", null) { tagged })  // no Siansa Beats: as always
     }
 

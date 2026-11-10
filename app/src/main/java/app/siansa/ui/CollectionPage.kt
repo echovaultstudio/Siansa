@@ -63,6 +63,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -153,8 +155,9 @@ fun CollectionPage(
     // A page whose cover Siansa draws (a radio, a mix): the cover's own colour, which Play takes with Dynamic colours
     // (the owner, 10 Nov). Without it, or a [coverId], the page's [color] does.
     coverColour: Color? = null,
-    // With [playAs]: its radio button sits on the cover's bottom right corner instead of under it (a genre's page).
-    radioOnCover: Boolean = false,
+    // With [playAs]: what stands left of its radio button, in the same row (a genre's song count, then its heart beside
+    // the radio: the owner, 10 Nov, the radio no longer on the cover).
+    radioRow: @Composable RowScope.() -> Unit = { Spacer(Modifier.weight(1f)) },
     // Shown in the title bar once the page's buttons have scrolled away (a radio's heart, the owner, 10 Nov).
     barExtras: @Composable () -> Unit = {},
 ) {
@@ -295,17 +298,6 @@ fun CollectionPage(
                             val blur by androidx.compose.animation.core.animateDpAsState(slideBlur(label), label = "slideBlur")
                             cover(Modifier.size(coverSize).then(if (blur > 0.dp) Modifier.blur(blur) else Modifier))
                             SlideCoverLabel(label, Modifier.fillMaxSize())
-                            // A genre's radio on its cover's corner (the owner, 10 Nov).
-                            if (radioOnCover && playAs != null) {
-                                Box(
-                                    Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .padding(Space.Medium)
-                                        .onGloballyPositioned { buttonsBottom = it.positionInRoot().y + it.size.height - pageTop },
-                                ) {
-                                    BigRadioButton(radioColour ?: Accent, enabled = !songs.isNullOrEmpty()) { playPage() }
-                                }
-                            }
                         }
                     }
                     Spacer(Modifier.height(Space.Page))
@@ -326,11 +318,12 @@ fun CollectionPage(
                         header()
                     }
                     Spacer(Modifier.height(Space.Tight))
-                    if (!(radioOnCover && playAs != null)) Box(Modifier.onGloballyPositioned { buttonsBottom = it.positionInRoot().y + it.size.height - pageTop }) {
+                    Box(Modifier.onGloballyPositioned { buttonsBottom = it.positionInRoot().y + it.size.height - pageTop }) {
                     ActionRow(
                         songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed, saveAs = title.takeIf { saveAsPlaylist && playAs == null },
                         playAs = playAs,
                         radioColour = radioColour,
+                        radioRow = radioRow,
                         // An album's shuffle slides right onto Play for a DJ mix of its own songs (issue #965); it needs
                         // AudioMuse, as similar albums does.
                         // Only when a DJ mix's needs are met (AudioMuse and Siansa Beats): otherwise a plain Shuffle.
@@ -410,18 +403,16 @@ fun CollectionPage(
         // Once the page's Play (or radio) has scrolled under the bar, the bar has it (the owner, 10 Nov).
         val buttonsGone = !headerInView || (buttonsBottom?.let { it < statusPx + barPx } ?: false)
         val barActions: @Composable () -> Unit = {
-            AnimatedVisibility(visible = buttonsGone, enter = fadeIn() + scaleIn(initialScale = 0.6f), exit = fadeOut() + scaleOut(targetScale = 0.6f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    barExtras()
-                    if (!songs.isNullOrEmpty()) {
-                        BarPlayButton(
-                            radio = playAs != null,
-                            colour = if (playAs != null) radioColour ?: Accent else playColours?.controls ?: Accent,
-                            onColour = if (playAs != null) Color.White else playColours?.onControls ?: MaterialTheme.colorScheme.onPrimary,
-                            playing = playAs == null && pagePlayback.playing,
-                            onClick = ::playPage,
-                        )
-                    }
+            BarReveal(buttonsGone) {
+                barExtras()
+                if (!songs.isNullOrEmpty()) {
+                    BarPlayButton(
+                        radio = playAs != null,
+                        colour = if (playAs != null) radioColour ?: Accent else playColours?.controls ?: Accent,
+                        onColour = if (playAs != null) Color.White else playColours?.onControls ?: MaterialTheme.colorScheme.onPrimary,
+                        playing = playAs == null && pagePlayback.playing,
+                        onClick = ::playPage,
+                    )
                 }
             }
             actions()
@@ -563,12 +554,13 @@ private fun ActionRow(
     resume: PlayResume? = null,
     playAs: ((first: Song?) -> Unit)? = null,
     radioColour: Color? = null,
+    radioRow: @Composable RowScope.() -> Unit = { Spacer(Modifier.weight(1f)) },
 ) {
     val graph = LocalGraph.current
     // A list too long to play whole (a genre): one button, its radio, in the page's own colour (the owner, 10 Nov).
     if (playAs != null) {
         PlayButtonRow {
-            Spacer(Modifier.weight(1f))
+            radioRow()
             BigRadioButton(radioColour ?: Accent, enabled = songs.isNotEmpty()) { playAs(null); onPlayed() }
         }
         return
@@ -747,6 +739,37 @@ fun PlayButtonRow(
         verticalAlignment = verticalAlignment,
         content = content,
     )
+}
+
+/**
+ * How a page's own buttons arrive in its title bar once they've scrolled under it, and leave again: growing in as
+ * they fade in, the same on every page (albums, playlists, radios, genres, artists, books: the owner, 10 Nov).
+ */
+@Composable
+internal fun BarReveal(visible: Boolean, content: @Composable RowScope.() -> Unit) {
+    AnimatedVisibility(visible = visible, enter = fadeIn() + scaleIn(initialScale = 0.6f), exit = fadeOut() + scaleOut(targetScale = 0.6f)) {
+        Row(verticalAlignment = Alignment.CenterVertically, content = content)
+    }
+}
+
+/**
+ * A page's details on the left and, on the right, what it can do with them: [extra] (a radio's heart), then New picks
+ * when the page can pick again. One row for every page that picks songs (radios, mood playlists, cards: the owner,
+ * 10 Nov; they had "New picks", "Again" and an arrow in the title bar).
+ */
+@Composable
+internal fun PicksRow(details: String, onNewPicks: (() -> Unit)?, extra: @Composable RowScope.() -> Unit = {}) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.weight(1f)) { CollectionByline(null, null, null, details) }
+        extra()
+        if (onNewPicks != null) {
+            TextButton(onClick = onNewPicks, modifier = Modifier.focusRing().testTag("newPicks")) {
+                Icon(Icons.Rounded.Refresh, null)
+                Spacer(Modifier.width(Space.Tight))
+                Text("New picks")
+            }
+        }
+    }
 }
 
 /**

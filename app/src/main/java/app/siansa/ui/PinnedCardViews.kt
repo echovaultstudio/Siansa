@@ -303,12 +303,15 @@ fun PinnedCardScreen(nav: NavController, id: String) {
         error = (card as? Load.Err)?.message ?: (content as? Load.Err)?.message,
         saveAsPlaylist = true,
         cover = { m -> GeneratedCover(title, colors, m) },
+        // Its name is on its cover, and Play takes the cover's colour, as every page with a drawn cover (the owner, 10 Nov).
+        showTitle = false,
+        coverColour = colors.first,
         header = {
-            CollectionByline(null, null, null, listOfNotNull("Your card", c?.detail, content.valueOrNull()?.songs?.let { "${it.size} songs" }).joinToString(" · "))
-        },
-        actions = {
-            // A new set only for cards from the library: a sound search gives the same answer again.
-            if (c?.source == CardSource.LIBRARY) IconButton(onClick = { round++ }) { Icon(Icons.Rounded.Refresh, "New songs") }
+            PicksRow(
+                listOfNotNull("Your card", c?.detail, content.valueOrNull()?.songs?.let { "${it.size} songs" }).joinToString(" · "),
+                // A new set only for cards from the library: a sound search gives the same answer again.
+                onNewPicks = if (c?.source == CardSource.LIBRARY) ({ round++ }) else null,
+            )
         },
     )
 }

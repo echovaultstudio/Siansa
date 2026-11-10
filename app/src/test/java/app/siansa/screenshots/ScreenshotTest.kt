@@ -754,6 +754,18 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.BarPlayButton(radio = true, colour = Color(0xFFE53935), onColour = Color.White, playing = false) {}
                 }
             },
+            // A list's sort (liked songs, playlists): Your Library's arrows and menu, not chips; and the line under a
+            // drawn cover with its heart and New picks, the same on radios, mood playlists and cards (the owner, 10 Nov).
+            Scene("song_sort_and_picks") {
+                Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    Column {
+                        app.siansa.ui.CollectionByline(null, null, null, "Playlist · 100 songs · 6:41:38")
+                        app.siansa.ui.SongSortPicker(app.siansa.data.ListSort.DEFAULT, "Playlist order") {}
+                    }
+                    app.siansa.ui.PicksRow("Made for you · supercalifragilistic expialidocious sounds · 30 songs", onNewPicks = {})
+                    app.siansa.ui.PicksRow("Your card · 30 songs", onNewPicks = null)
+                }
+            },
             // A genre's description: three lines and "Show more", or all of a short one (the owner, 10 Nov).
             Scene("genre_about") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {

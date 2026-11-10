@@ -218,13 +218,21 @@ class GenreVote(
         const val MIN_VOTED = 30
 
         /**
-         * The songs a genre radio plays: those by vote when there are at least [MIN_VOTED] of them on the phone, else
-         * those tagged with the genre ([tagged]), as without Siansa Beats.
+         * The songs a genre radio plays: those by vote when there are at least [MIN_VOTED] of them on the phone. With
+         * fewer, those tagged with the genre ([tagged]), as without Siansa Beats, unless the tags have fewer still: a
+         * genre that's only in the list by vote (Yé-Yé: 19 songs by their sound, no song tagged so) showed an empty page
+         * (the owner, 10 Nov), so the voted ones play then.
          */
         suspend fun pick(name: String, voted: List<Song>?, tagged: suspend () -> List<Song>): List<Song> {
             if (voted != null && voted.size >= MIN_VOTED) return voted
-            if (voted != null) AppLog.i("Radio", "Genre radio $name: only ${voted.size} songs by vote on the phone, so by its tags")
-            return tagged()
+            val byTags = tagged()
+            if (voted == null) return byTags
+            if (byTags.size >= voted.size) {
+                AppLog.i("Radio", "Genre radio $name: only ${voted.size} songs by vote on the phone, so its ${byTags.size} by tags")
+                return byTags
+            }
+            AppLog.i("Radio", "Genre radio $name: ${voted.size} songs by vote and ${byTags.size} by tags, so by vote")
+            return voted
         }
     }
 }
