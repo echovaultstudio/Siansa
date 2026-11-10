@@ -60,12 +60,12 @@ fun generatedCoverColors(route: String): Pair<Color, Color>? {
     val parts = route.split('/')
     return when {
         parts.size == 3 && parts[0] == "radio" -> {
-            val key = Uri.decode(parts[2])
+            val key = java.net.URLDecoder.decode(parts[2], "UTF-8")
             moodRadios.firstOrNull { it.id == key }?.let { Color(it.colors.first) to Color(it.colors.second) }
                 ?: if (parts[1] == "genre") genreColors(key) else tileColors(key)
         }
-        parts.size == 2 && parts[0] == "blend" -> tileColors("blend-${Uri.decode(parts[1])}")
-        parts.size == 2 && parts[0] == "mood" -> tileColors(Uri.decode(parts[1]))
+        parts.size == 2 && parts[0] == "blend" -> tileColors("blend-${java.net.URLDecoder.decode(parts[1], "UTF-8")}")
+        parts.size == 2 && parts[0] == "mood" -> tileColors(java.net.URLDecoder.decode(parts[1], "UTF-8"))
         else -> null
     }
 }
