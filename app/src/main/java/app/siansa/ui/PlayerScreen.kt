@@ -1142,7 +1142,7 @@ internal fun MixShapePanel(
                 DjBar(places.spots, chosen = now?.let { places.spots.indexOf(it) }?.takeIf { it >= 0 }, now = now,
                     starting = places.starting, open = 1f, onTap = onPlace)
                 Text(
-                    now?.hint ?: (places.spots.singleOrNull() ?: DjBarSpot.MIX).hint(places.starting),
+                    (now ?: places.spots.singleOrNull() ?: DjBarSpot.MIX).hint(places.starting),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.7f),
                     modifier = Modifier.padding(top = Space.Small).testTag("mixShapeHint"),
