@@ -8,6 +8,8 @@ import android.view.MotionEvent
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.click
+import app.siansa.ui.padAt
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasScrollToNodeAction
@@ -308,8 +310,10 @@ class ShowcaseTest {
                     .performSemanticsAction(SemanticsActions.SetText) { it(AnnotatedString("rainy jazz piano")) }
                 compose.onAllNodesWithTag("shapeToggle").onFirst().performClick()
                 idle(1000)
-                slider("sliderEnergy", -2f)
-                slider("sliderTempo", -1f)
+                // The sound pad's dot: much calmer (near the bottom) and a bit slower (left of the middle).
+                compose.onAllNodesWithTag("soundPad").onFirst().performScrollTo()
+                    .performTouchInput { click(percentOffset(padAt(-1), padAt(2))) }
+                idle(300)
                 idle(1500)
                 shot("flow-shape")
                 compose.onAllNodesWithTag("vibeGenerate").onFirst().performScrollTo().performClick()

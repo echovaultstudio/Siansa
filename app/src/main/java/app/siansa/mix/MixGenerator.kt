@@ -533,6 +533,22 @@ class MixGenerator(private val graph: AppGraph) {
         .getOrDefault(emptyList())
 
     /**
+     * What a vibe's [songs] have to offer for shaping it: the sounds some of them have and others don't (from Siansa
+     * Beats' genres; none without it), and where each song sits on the sound pad (its tempo and energy).
+     */
+    suspend fun mixOffer(songs: List<Song>): MixOffer {
+        val ids = songs.map { it.id }.distinct()
+        if (ids.isEmpty()) return MixOffer()
+        val sounds = mixSounds(graph.beatsGenres.ofSongs(ids).orEmpty())
+        val dots = runCatching { graph.audioMuse.features(ids) }
+            .onFailure { AppLog.w("Vibe", "Couldn't load the songs' energy and tempo for the sound pad: ${it.message}") }
+            .getOrDefault(emptyList())
+            .mapNotNull { padPlace(it.tempo, it.energy) }
+        AppLog.i("Vibe", "A mix of ${ids.size} songs offers: ${sounds.joinToString { "${it.name} (${it.songs})" }.ifEmpty { "no sounds of its own" }} · ${dots.size} on the pad")
+        return MixOffer(sounds, dots)
+    }
+
+    /**
      * The songs for a vibe: AudioMuse's sound search for [query] steered by the sound dials (or the AI's
      * concepts while no dial is set), re-ranked by the energy, tempo and familiar sliders (issue #339).
      */
@@ -551,7 +567,12 @@ class MixGenerator(private val graph: AppGraph) {
         val familiarity = if (tuning.familiar != 0) {
             graph.history.all().groupingBy { it.artist.lowercase() }.eachCount()
         } else emptyMap()
-        val ranked = rankVibe(hits, features, familiarity, tuning) { Random.nextDouble() * 0.05 }
+        // The mix's own sound dials go by each song's genres, as Siansa Beats hears them.
+        val genres = if (tuning.sounds.any { it.genre && it.value != 0 }) {
+            graph.beatsGenres.ofSongs(hits.map { it.id }).orEmpty()
+                .also { if (it.isEmpty()) AppLog.w("Vibe", "Siansa Beats didn't say the songs' genres, leaving the mix's sound dials out") }
+        } else emptyMap()
+        val ranked = rankVibe(hits, features, familiarity, tuning, genres) { Random.nextDouble() * 0.05 }
         val perArtist = HashMap<String, Int>()
         val picked = ranked.filter { hit ->
             val n = perArtist[hit.artist.lowercase()] ?: 0
@@ -560,7 +581,7 @@ class MixGenerator(private val graph: AppGraph) {
         AppLog.i(
             "Vibe",
             "Search \"$query\" · ${tuning.summary().ifEmpty { "no sliders moved" }} · ${hits.size} found, " +
-                "${features.size} with energy/tempo, ${picked.size} picked",
+                "${features.size} with energy/tempo, ${genres.size} with genres, ${picked.size} picked",
         )
         return spreadArtists(songsFor(picked, found)).ifEmpty { throw MixException(NOT_ON_THIS_SERVER) }
     }

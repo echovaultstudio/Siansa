@@ -38,8 +38,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -59,8 +57,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -70,8 +66,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.data.SavedVibe
 import app.siansa.log.AppLog
-import app.siansa.mix.SoundDial
+import app.siansa.mix.MixOffer
 import app.siansa.mix.VibeTuning
+import app.siansa.mix.addSound
+import app.siansa.mix.soundsToAdd
+import app.siansa.mix.vibeDials
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -220,7 +219,7 @@ fun DscvrScreen(nav: NavController) {
                             }
                             Icon(
                                 if (shaping) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                                if (shaping) "Hide the sliders" else "Show the sliders",
+                                if (shaping) "Hide Shape your sound" else "Show Shape your sound",
                             )
                         }
                         if (shaping) {
@@ -385,66 +384,8 @@ internal fun RenameVibeDialog(vibe: SavedVibe, onDismiss: () -> Unit, onRename: 
 
 /** Under "Shape your sound": what it's for while nothing is set, otherwise what is (issue #369). */
 internal fun shapeHint(tuning: VibeTuning): String =
-    if (tuning.isNeutral) "Optional. Only the sliders you move are used."
+    if (tuning.isNeutral) "Optional. Only what you move is used."
     else "Using: " + tuning.summary()
-
-/**
- * The tuning sliders (issue #339): energy, tempo, familiar ↔ niche and the sound dials, each with a tick at
- * every step. [onSettled] runs when a slider is let go, so a vibe page can recalculate then (it reads the
- * value [onChange] last gave it, which is already stored by then).
- */
-@Composable
-fun VibeSliders(tuning: VibeTuning, onChange: (VibeTuning) -> Unit, onSettled: () -> Unit = {}, onDark: Boolean = false) {
-    Column(verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-        StepSlider("Calmer", "More energy", tuning.energy, VibeTuning.SLIDER_MAX, onDark, "sliderEnergy",
-            onChange = { onChange(tuning.copy(energy = it)) }, onSettled = onSettled)
-        StepSlider("Slower", "Faster", tuning.tempo, VibeTuning.SLIDER_MAX, onDark, "sliderTempo",
-            onChange = { onChange(tuning.copy(tempo = it)) }, onSettled = onSettled)
-        StepSlider("Niche", "Familiar", tuning.familiar, VibeTuning.SLIDER_MAX, onDark, "sliderFamiliar",
-            onChange = { onChange(tuning.copy(familiar = it)) }, onSettled = onSettled)
-        tuning.sounds.forEachIndexed { i, dial ->
-            StepSlider("Less ${dial.term}", "More ${dial.term}", dial.value, VibeTuning.DIAL_MAX, onDark, "sliderSound",
-                onChange = { v -> onChange(tuning.copy(sounds = tuning.sounds.toMutableList().also { it[i] = SoundDial(dial.term, v) })) },
-                onSettled = onSettled)
-        }
-    }
-}
-
-/** One slider from −[max] to +[max] in whole steps, labelled at both ends, with a haptic tick per step. */
-@Composable
-private fun StepSlider(
-    low: String,
-    high: String,
-    value: Int,
-    max: Int,
-    onDark: Boolean,
-    tag: String,
-    onChange: (Int) -> Unit,
-    onSettled: () -> Unit,
-) {
-    val haptics = LocalHapticFeedback.current
-    val text = if (onDark) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
-    Column(Modifier.fillMaxWidth().testTag(tag)) {
-        Row(Modifier.fillMaxWidth()) {
-            Text(low, style = MaterialTheme.typography.labelMedium, color = text, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(high, style = MaterialTheme.typography.labelMedium, color = text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        Slider(
-            value = value.toFloat(),
-            onValueChange = { v ->
-                val step = Math.round(v).coerceIn(-max, max)
-                if (step != value) {
-                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onChange(step)
-                }
-            },
-            onValueChangeFinished = onSettled,
-            valueRange = -max.toFloat()..max.toFloat(),
-            steps = max * 2 - 1,
-            colors = SliderDefaults.colors(thumbColor = Accent, activeTrackColor = Accent),
-        )
-    }
-}
 
 /** A vibe from Dscvr: its songs, Save as playlist, Pin to Home, and the sliders to tune it again (issue #339). */
 @Composable
@@ -458,10 +399,23 @@ fun VibeScreen(nav: NavController, id: String) {
     val vibe = vibes?.firstOrNull { it.id == id }
     var tuning by remember(id) { mutableStateOf<VibeTuning?>(null) }
     var tuneOpen by rememberSaveable { mutableStateOf(false) }
+    // What this mix's own songs have to offer: its sounds for the dials, and each song's place on the pad.
+    var offer by remember(id) { mutableStateOf<MixOffer?>(null) }
+    val songIds = vibe?.songs?.map { it.id }
+    LaunchedEffect(songIds, tuneOpen) {
+        val v = vibe ?: return@LaunchedEffect
+        if (!tuneOpen || v.songs.isEmpty()) return@LaunchedEffect
+        val first = offer == null
+        val found = graph.generator.mixOffer(v.songs)
+        offer = found
+        // Dials moved before the mix's sounds came: they join them now. Later (tuned again), the dials stay as they are.
+        if (first) tuning?.let { tuning = vibeDials(it, v.steered, found.sounds) }
+    }
     var retuning by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var savedAs by rememberSaveable { mutableStateOf<String?>(null) }
-    val shown = tuning ?: vibe?.tuning ?: VibeTuning()
+    // The dials: the AI's own and the mix's sounds, never a fixed list (the owner, 11 Nov).
+    val shown = tuning ?: vibe?.let { vibeDials(it.tuning, it.steered, offer?.sounds.orEmpty()) } ?: VibeTuning()
     var menu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     if (renaming && vibe != null) {
@@ -473,7 +427,7 @@ fun VibeScreen(nav: NavController, id: String) {
 
     fun retune(with: VibeTuning) {
         val v = vibe ?: return
-        if (with == v.tuning) return
+        if (with.set == v.tuning.set) return  // the same dials set the same: nothing to search again
         retuning = true
         scope.launch {
             try {
@@ -558,15 +512,32 @@ fun VibeScreen(nav: NavController, id: String) {
                     }
                     Spacer(Modifier.weight(1f))
                     IconButton(onClick = { tuneOpen = !tuneOpen }, modifier = Modifier.testTag("vibeTune")) {
-                        Icon(Icons.Rounded.Tune, if (tuneOpen) "Hide the sliders" else "Tune this vibe")
+                        Icon(Icons.Rounded.Tune, if (tuneOpen) "Hide Shape your sound" else "Shape your sound")
                     }
                 }
                 if (tuneOpen) {
                     Box(Modifier.fillMaxWidth()) {
                         Column {
-                            // State is written as soon as a slider moves, so reading it when let go gets the last step.
-                            VibeSliders(shown, onChange = { tuning = it }, onSettled = { tuning?.let { retune(it) } })
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Shape your sound", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                TextButton(
+                                    enabled = !shown.isNeutral,
+                                    onClick = { shown.cleared().let { tuning = it; retune(it) } },
+                                    modifier = Modifier.testTag("vibeReset"),
+                                ) { Text("Reset") }
+                            }
+                            // State is written as soon as the dot or a dial moves, so reading it when let go gets the last step.
+                            VibeSliders(
+                                shown,
+                                onChange = { tuning = it },
+                                onSettled = { tuning?.let { retune(it) } },
+                                dots = offer?.dots.orEmpty(),
+                                soundsTitle = "Sounds in this mix",
+                                more = soundsToAdd(shown, offer?.sounds.orEmpty()),
+                                onAdd = { name -> tuning = addSound(shown, name) },
+                            )
                             if (retuning) {
+                                Spacer(Modifier.height(Space.Small))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     CircularProgressIndicator(Modifier.size(16.dp), color = Accent, strokeWidth = 2.dp) // spacing: exact
                                     Spacer(Modifier.width(Space.Small))
