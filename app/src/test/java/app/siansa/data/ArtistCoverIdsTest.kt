@@ -30,12 +30,9 @@ class ArtistCoverIdsTest {
         assertEquals("ar-abc", keptArtistCover("ar-abc", "ar-abc"))
     }
 
-    @Test fun anUnversionedArtistPictureIsAskedForAgainEachWeek() {
-        val week = 7L * 24 * 60 * 60 * 1000
-        val now = CoverVersions.cacheIdFor("ar-abc", 10 * week) { null }
-        assertEquals(now, CoverVersions.cacheIdFor("ar-abc", 10 * week + 1000) { null })
-        assertNotEquals(now, CoverVersions.cacheIdFor("ar-abc", 11 * week) { null })
-        // A versioned one changes with its version only.
-        assertEquals("ar-abc_19a2f3c", CoverVersions.cacheIdFor("ar-abc_19a2f3c", 11 * week) { null })
+    @Test fun anArtistPictureIsKeptUnderItsOwnId() {
+        // No weekly key any more: Navidrome's star is never kept (StandIns), so there's nothing to wait out.
+        assertEquals("ar-abc", CoverVersions.cacheIdFor("ar-abc") { null })
+        assertEquals("ar-abc_19a2f3c", CoverVersions.cacheIdFor("ar-abc_19a2f3c") { null })
     }
 }
