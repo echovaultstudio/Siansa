@@ -43,14 +43,15 @@ data class ConnectionState(
 
     /** Why the AI tools can't be used, in plain words, or null when they can. */
     fun aiProblem(settings: AppSettings): String? = when {
-        // Siansa Beats has the songs' sound but doesn't search by words yet: said as it is, not as a fault.
-        !settings.audioMuseReady && settings.beatsReady && BeatsSound.available ->
-            "Describing music in words still needs AudioMuse. Add it in Settings › Connections."
-        !settings.audioMuseReady -> "AudioMuse isn't set up. Add it in Settings › Connections."
+        // A Siansa Beats before 0.26 has the songs' sound but doesn't search by words: said as it is, not as a fault.
+        !settings.wordsReady && settings.beatsReady && BeatsSound.available ->
+            "Describing music in words needs Siansa Beats 0.26 or newer, or AudioMuse (Settings › Connections)."
+        !settings.wordsReady -> "AudioMuse isn't set up. Add it in Settings › Connections."
         !network -> "You're offline."
         // Its picks would mostly be songs that aren't on the phone.
         settings.downloadedOnly -> "Only downloaded music is on."
-        audioMuse == false -> "AudioMuse isn't answering."
+        // Siansa Beats searches by words itself (0.26): AudioMuse being away doesn't matter then.
+        audioMuse == false && !(settings.beatsReady && BeatsSound.answers(BeatsSound.WORDS)) -> "AudioMuse isn't answering."
         else -> null
     }
 

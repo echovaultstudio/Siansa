@@ -138,10 +138,14 @@ Beats first for:
 - Your sound (your sonic fingerprint) and the mixes made from it,
 - each song's tempo, key, moods and energy, which DJ mixes and Keep playing choose by.
 
+**From Siansa Beats 0.26, it also finds music from a description**, with the same models AudioMuse-AI uses: the
+mood radios (Chill, Energy, Focus…), "Describe what you want to hear" in Flow, vibes and their sliders, the daily
+mixes made from a description, cards made from a sound, and "Songs that sound like…" in Search.
+
 With Siansa Beats answering these, **AudioMuse-AI can be left out of Siansa's own settings**: its address can be
-empty and all of the above still work. Two things still need AudioMuse-AI set up in Siansa: the search by words
-(mixes from a description, vibes and their sliders, cards made from a sound), and the path through the lyrics.
-AudioMuse-AI itself keeps running next to Siansa Beats for now, as it's what listens to new songs.
+empty and all of the above still work. One thing still needs AudioMuse-AI set up in Siansa: the Song path through
+the lyrics' meaning. AudioMuse-AI itself keeps running next to Siansa Beats for now, as it's what listens to new
+songs.
 
 When Siansa Beats can't answer (a song whose sound it doesn't have yet) and AudioMuse-AI is set up in Siansa,
 AudioMuse-AI is asked, as before. Without Siansa Beats nothing changes.

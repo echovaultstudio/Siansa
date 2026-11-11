@@ -1,5 +1,6 @@
 package app.siansa.mix
 
+import app.siansa.net.wordsReady
 import app.siansa.net.soundReady
 import app.siansa.data.daysLabel
 
@@ -163,7 +164,7 @@ class MixGenerator(private val graph: AppGraph) {
         AppLog.i("Mix", "${selector.name}: \"${plan.title}\" · search \"${plan.query}\" · steer ${plan.steering.joinToString { (if (it.more) "+" else "-") + it.term }.ifEmpty { "none" }} · ai=${plan.ai}")
 
         // Without AudioMuse, the mix is picked from the music shown by genre (beta #25).
-        if (!settings.audioMuseReady) return fromLibrary(selector, plan, date, id, exclude, otherArtists, emptyList())
+        if (!settings.wordsReady) return fromLibrary(selector, plan, date, id, exclude, otherArtists, emptyList())
 
         val pool = LinkedHashMap<String, ClapHit>()
         graph.audioMuse.textSearch(plan.query, selector.length * 5, plan.steering).forEach { pool.putIfAbsent(it.id, it) }
@@ -476,7 +477,7 @@ class MixGenerator(private val graph: AppGraph) {
     suspend fun moodPlaylist(mood: String, size: Int = 50): MoodResult {
         val text = mood.trim()
         if (text.length < 3) throw MixException("Describe your mood in a few words")
-        if (!graph.settings.current.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
+        if (!graph.settings.current.wordsReady) throw MixException("Set up AudioMuse in Settings first")
         var plan = Plan(text.replaceFirstChar { it.uppercase() }, text, "From your description", ai = false)
         if (graph.settings.current.aiReady) {
             runCatching { aiMoodPlan(text) }
@@ -508,7 +509,7 @@ class MixGenerator(private val graph: AppGraph) {
      * set up, otherwise the words searched as they are. With no words, the sliders make the search ([tuning]).
      */
     suspend fun vibePlan(text: String, tuning: VibeTuning): VibePlan {
-        if (!graph.settings.current.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
+        if (!graph.settings.current.wordsReady) throw MixException("Set up AudioMuse in Settings first")
         val words = text.trim()
         if (words.isEmpty()) {
             val query = sliderQuery(tuning) ?: throw MixException("Describe your aura, or move a slider")

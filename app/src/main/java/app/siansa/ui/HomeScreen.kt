@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.wordsReady
 import app.siansa.net.soundReady
 import app.siansa.data.normalizeKey
 import app.siansa.mix.mixArtistRadios
@@ -145,7 +146,7 @@ fun HomeScreen(nav: NavController) {
     val aiProblem = rememberAiProblem()
     // Mixes aren't attempted (and tiles say why) only when AudioMuse is set up but can't be used; Today's mix
     // shows the reason in either case.
-    val aiDown = aiProblem.takeIf { homeSettings.audioMuseReady }
+    val aiDown = aiProblem.takeIf { homeSettings.wordsReady }
 
     fun build(selector: Selector?, force: Boolean, open: Boolean) {
         if (busySelector != null) return
@@ -221,7 +222,7 @@ fun HomeScreen(nav: NavController) {
     // Today's mix is made once a day; after that only when you tap refresh, also when the hour's vibe moves on
     // (beta testers #37). Showing other music in the source filter doesn't make it again (issue #486). AI mixes
     // need AudioMuse.
-    val aiMixes = MixRules.showsAiMixes(homeSettings.audioMuseReady)
+    val aiMixes = MixRules.showsAiMixes(homeSettings.wordsReady)
     LaunchedEffect(hour, aiMixes) {
         graph.mixes.all()
         graph.selectors.all()

@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.wordsReady
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.foundation.layout.Arrangement
@@ -90,7 +91,7 @@ fun CardEditorScreen(nav: NavController, id: String) {
     }
     var problem by remember { mutableStateOf<String?>(null) }
     var picking by remember { mutableStateOf(false) }
-    val audioMuseReady = graph.settings.current.audioMuseReady
+    val audioMuseReady = graph.settings.current.wordsReady
     val genres by loadState("card-genres") { if (graph.library.isSynced) graph.library.genres(40).map { it.name } else emptyList() }
     val labels by loadState("card-labels") { if (graph.library.isSynced) graph.library.labels(40) else emptyList() }
 
@@ -178,7 +179,7 @@ fun CardEditorScreen(nav: NavController, id: String) {
                     change(c.copy(size = v.toIntOrNull()?.coerceIn(0, PinnedCard.SIZE) ?: 0))
                 }
             } else if (c.source == CardSource.SOUND && c.contents == CardContents.SONGS) {
-                if (!audioMuseReady) Hint("Needs AudioMuse-AI, set up in Settings › Connections.")
+                if (!audioMuseReady) Hint("Needs Siansa Beats or AudioMuse-AI, set up in Settings › Connections.")
                 OutlinedTextField(c.sound, { change(c.copy(sound = it)) }, label = { Text("The sound") }, placeholder = { Text("rainy jazz piano") }, modifier = Modifier.fillMaxWidth().testTag("pinnedSound"))
             } else {
                 EditorHeading("Rules")

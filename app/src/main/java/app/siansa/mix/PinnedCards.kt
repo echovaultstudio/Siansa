@@ -153,7 +153,7 @@ fun pinnedCardProblem(card: PinnedCard, audioMuseReady: Boolean, thisYear: Int =
     card.contents.fromBooks && card.look != CardLook.COVER_ROWS -> "Books and episodes show as Cover rows."
     card.contents.fromBooks -> if (card.size !in 1..MAX_SIZE) "A card holds 1 to $MAX_SIZE." else null
     card.contents == CardContents.ALBUMS && card.source == CardSource.SOUND -> "Albums come from your library: pick From your library."
-    card.source == CardSource.SOUND && !audioMuseReady -> "Set up AudioMuse-AI in Settings › Connections to make a card by sound."
+    card.source == CardSource.SOUND && !audioMuseReady -> "Set up Siansa Beats or AudioMuse-AI in Settings › Connections to make a card by sound."
     card.source == CardSource.SOUND && card.sound.isBlank() -> "Describe the sound."
     card.contents == CardContents.ALBUMS && card.source == CardSource.RADIO -> "Albums come from your library: pick From your library."
     card.source == CardSource.RADIO && card.radio.isBlank() -> "Pick one of your favourite radios."

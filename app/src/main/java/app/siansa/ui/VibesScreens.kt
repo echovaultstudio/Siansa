@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.wordsReady
 import androidx.compose.ui.platform.testTag
 
 import androidx.compose.foundation.horizontalScroll
@@ -174,7 +175,7 @@ fun TodaysMixPanel() {
     // doesn't cancel it; the tile on Home shows the new one.
     fun tune(next: app.siansa.data.DailyMix) {
         set(next)
-        if (next.autoUpdate && settings.audioMuseReady) graph.scope.launch { runCatching { graph.generator.ensureCurrent(force = true) } }
+        if (next.autoUpdate && settings.wordsReady) graph.scope.launch { runCatching { graph.generator.ensureCurrent(force = true) } }
     }
     Card(Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Small).testTag("todaysMix")) {
         Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {

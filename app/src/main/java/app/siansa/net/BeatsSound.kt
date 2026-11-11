@@ -15,6 +15,9 @@ import app.siansa.data.AppSettings
 object BeatsSound {
     const val PREFIX = "/api/v1/audiomuse"
 
+    /** AudioMuse-AI's search by words, which Siansa Beats answers from 0.26. */
+    const val WORDS = "/api/clap/search"
+
     @Volatile
     var answers: Set<String> = emptySet()
         private set
@@ -45,7 +48,13 @@ object BeatsSound {
 
 /**
  * Whether what's found from how songs sound can be asked for: of AudioMuse-AI when it's set up, or of Siansa Beats
- * once it has the songs' sound. The search by words (mixes from a description, vibes, sound cards) still needs
- * AudioMuse-AI itself ([AppSettings.audioMuseReady]).
+ * once it has the songs' sound. The search by words is [wordsReady].
  */
 val AppSettings.soundReady: Boolean get() = audioMuseReady || (beatsReady && BeatsSound.available)
+
+/**
+ * Whether music can be found by describing it in words (mixes from a description, the mood radios, vibes and their
+ * sliders, cards made from a sound, the sound search): AudioMuse-AI does it, and Siansa Beats from 0.26, with the
+ * same models, once it has the songs' vectors for it.
+ */
+val AppSettings.wordsReady: Boolean get() = audioMuseReady || (beatsReady && BeatsSound.answers(BeatsSound.WORDS))

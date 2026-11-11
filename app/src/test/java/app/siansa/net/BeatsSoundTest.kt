@@ -46,7 +46,13 @@ class BeatsSoundTest {
             askedOfBeats += path to body
             if (beatsFails) throw ApiException("Siansa Beats doesn't know this song", 404)
             val answer: JsonElement = AppJson.parseToJsonElement(
-                if (path.contains("/api/alchemy")) """{"results":$song}""" else if (path.contains("/api/find_path")) """{"path":$song}""" else song,
+                when {
+                    path.contains("/api/clap/search") -> """{"query":"q","count":1,"results":[{"item_id":"s2","title":"Deep","author":"House Test","album":"Rooms","similarity":0.42}],"steering_warnings":["\"bagpipes\" is not a validated concept for this library"]}"""
+                    path.contains("/api/clap/concepts") -> """{"available":true,"max_terms":10,"categories":[{"category":"instrument","label":"Instrument","terms":[{"term":"piano","grounding":0.5},{"term":"choir","grounding":0.9}]}]}"""
+                    path.contains("/api/alchemy") -> """{"results":$song}"""
+                    path.contains("/api/find_path") -> """{"path":$song}"""
+                    else -> song
+                },
             )
             answer
         },
@@ -170,7 +176,7 @@ class BeatsSoundTest {
         assertEquals("You're offline.", ConnectionState(network = false).soundProblem(beatsOnly))
         assertEquals("Only downloaded music is on.", connection.soundProblem(beatsOnly.copy(downloadedOnly = true)))
         // The search by words is still AudioMuse-AI's, and says so plainly.
-        assertEquals("Describing music in words still needs AudioMuse. Add it in Settings › Connections.", connection.aiProblem(beatsOnly))
+        assertEquals("Describing music in words needs Siansa Beats 0.26 or newer, or AudioMuse (Settings › Connections).", connection.aiProblem(beatsOnly))
         assertEquals(null, connection.aiProblem(both))
         // Without Siansa Beats, as before.
         assertEquals("AudioMuse isn't answering.", ConnectionState(audioMuse = false).soundProblem(audioMuseOnly))
@@ -194,6 +200,36 @@ class BeatsSoundTest {
         } catch (e: ApiException) {
             assertEquals("Siansa Beats doesn't know this song", e.message)
         }
+        assertEquals(emptyList<String>(), askedOfAudioMuse)
+    }
+
+    /** Siansa Beats 0.26 searches by words itself, with AudioMuse-AI's models: mood radios, vibes, sound cards. */
+    @Test fun describingMusicInWordsIsAskedOfSiansaBeats() = runBlocking {
+        val withWords = everything + setOf("/api/clap/search", "/api/clap/concepts")
+        assertFalse(beatsOnly.wordsReady)
+        BeatsSound.heard(everything)
+        assertFalse("Siansa Beats 0.25: the sound, not the words", beatsOnly.wordsReady)
+        assertTrue(audioMuseOnly.wordsReady)
+        BeatsSound.heard(withWords)
+        assertTrue(beatsOnly.wordsReady)
+        val connection = ConnectionState(network = true, server = true, audioMuse = null)
+        assertEquals(null, connection.aiProblem(beatsOnly))
+        assertEquals(null, ConnectionState(audioMuse = false).aiProblem(both))  // AudioMuse-AI down: Siansa Beats answers
+
+        val api = api(beatsOnly)
+        val hits = api.textSearch("chill mellow grooves", 30, listOf(Steer("piano"), Steer("vocals", more = false, weight = 5)))
+        assertEquals(listOf("s2"), hits.map { it.id })
+        assertEquals(0.42, hits[0].similarity, 1e-9)
+        val (path, body) = askedOfBeats.single()
+        assertEquals("/api/v1/audiomuse/api/clap/search", path)
+        val sent = AppJson.parseToJsonElement(body!!) as JsonObject
+        assertEquals("\"chill mellow grooves\"", sent["query"].toString())
+        assertEquals("30", sent["limit"].toString())
+        assertTrue(sent["steering"].toString(), sent["steering"].toString().contains("\"direction\":\"less\"") && sent["steering"].toString().contains("\"weight\":5"))
+        assertFalse("AudioMuse-AI's own name for a server isn't sent to Siansa Beats", sent.containsKey("server"))
+        // The concepts the sliders and the AI's wording use, best understood first.
+        assertEquals(listOf("choir", "piano"), api.conceptCatalogue().categories.single().terms)
+        assertEquals(listOf("piano", "choir"), api.concepts())
         assertEquals(emptyList<String>(), askedOfAudioMuse)
     }
 }

@@ -277,7 +277,7 @@ class AudioMuseApi(
                 })
             }
         }.toString()
-        val root = execute { request("/api/clap/search").post(serverInBody(payload, server(emptyList())).toRequestBody(JSON_TYPE)).build() }
+        val root = sound("/api/clap/search", payload = payload) as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
         val hits = root.arr("results").mapNotNull { r ->
             val id = r.str("item_id") ?: return@mapNotNull null
             ClapHit(
@@ -424,7 +424,7 @@ class AudioMuseApi(
      */
     suspend fun conceptCatalogue(): ConceptCatalogue {
         catalogue?.let { return it }
-        val root = execute { request("/api/clap/concepts").get().build() }
+        val root = sound("/api/clap/concepts") as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
         return parseCatalogue(root).also { if (it.categories.isNotEmpty()) catalogue = it }
     }
 
@@ -446,7 +446,7 @@ class AudioMuseApi(
 
     /** Sound concepts this library's search understands well, to steer the AI's wording. */
     suspend fun concepts(): List<String> {
-        val root = execute { request("/api/clap/concepts").get().build() }
+        val root = sound("/api/clap/concepts") as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
         if (root.bool("available") == false) return emptyList()
         return root.arr("categories")
             .flatMap { category -> category.arr("terms").mapNotNull { it.str("term") } }
