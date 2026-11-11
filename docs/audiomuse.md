@@ -39,7 +39,7 @@ The AudioMuse-AI connection is the same for every user. The server name is kept 
 
 1. In AudioMuse-AI, open **Plugins › Repositories** and add:
    ```
-   https://raw.githubusercontent.com/echovaultstudio/siansa-audiomuse-plugin/main/manifest.json
+   https://raw.githubusercontent.com/echovaultstudio/siansa-beats/main/manifest.json
    ```
 2. Open the **Catalog** tab, install **Siansa Analysis**, and apply the restart.
 3. AudioMuse-AI checks for new versions by itself. Update from **Plugins** when one is offered. Your measurements

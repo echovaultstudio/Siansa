@@ -7,14 +7,14 @@
 #   plugins/SiansaBeats/siansa_beats/             the source, for reading
 #   dist/siansa_beats-<version>.zip               the code AudioMuse-AI downloads
 #
-#   audiomuse-plugin-beats/publish.sh ../siansa-audiomuse-plugin
+#   audiomuse-plugin-beats/publish.sh ../siansa-beats
 #
 # A version's zip is never replaced once published (installed copies check its checksum): bump the version in
 # plugin.json (a new entry at the top of "versions") for every change.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 target="$(cd "${1:?give the clone of the public plugin repository, on its dev branch}" && pwd)"
-raw="${2:-https://raw.githubusercontent.com/echovaultstudio/siansa-audiomuse-plugin/dev}"
+raw="${2:-https://raw.githubusercontent.com/echovaultstudio/siansa-beats/dev}"
 raw="${raw%/}"
 python3 - "$here" "$target" "$raw" <<'PY'
 import hashlib, io, json, os, shutil, sys, zipfile

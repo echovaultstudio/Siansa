@@ -1,7 +1,7 @@
 # Siansa Beats (dev)
 
 The AudioMuse-AI plugin for **Siansa Dev**, and the one plugin going forward: it does everything the Siansa plugin
-does, with each song's beat grid from **Siansa Beats** (Beat This!, in the siansa-audiomuse-plugin repository's
+does, with each song's beat grid from **Siansa Beats** (Beat This!, in the siansa-beats repository's
 `beats/`).
 
 - **Each song's loudness and fade ramps** are measured here (a scheduled tick every 15 minutes), and **similar albums
@@ -19,7 +19,7 @@ until then both measure new songs.
 ## Install
 
 1. In AudioMuse-AI, **Plugins › Repositories**, add the dev catalog:
-   `https://raw.githubusercontent.com/echovaultstudio/siansa-audiomuse-plugin/dev/manifest-dev.json`
+   `https://raw.githubusercontent.com/echovaultstudio/siansa-beats/dev/manifest-dev.json`
 2. **Catalog**: install **Siansa Beats (dev)**, then **Apply now (restart)**.
 3. Open its page: enter Siansa Beats' address (`http://<server>:8090`, and its password if `BEATS_PASSWORD` is
    set), **Save and test**.
@@ -28,5 +28,5 @@ To remove it, uninstall it in AudioMuse-AI: the Siansa plugin and what it measur
 
 ## Publish
 
-`audiomuse-plugin-beats/publish.sh ../siansa-audiomuse-plugin` with that clone on its `dev` branch, then commit
+`audiomuse-plugin-beats/publish.sh ../siansa-beats` with that clone on its `dev` branch, then commit
 and push there. Bump the version in `plugin.json` for every change.
