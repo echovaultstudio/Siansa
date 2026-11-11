@@ -129,32 +129,41 @@ class Similar(private val graph: AppGraph) {
     }
 
     /**
-     * The plugin's answer to [query]: from Siansa Beats when it's set up (it asks AudioMuse-AI for now, its v1
-     * `similar` paths), else, or when Siansa Beats can't answer, from the plugin on AudioMuse itself.
+     * The plugin's answer to [query], asked of AudioMuse-AI itself (the owner, 11 Nov): Siansa Beats only passes this
+     * question on to AudioMuse-AI for now, so going through it added a hop and nothing else. Siansa Beats is asked
+     * when AudioMuse-AI isn't set up in the app or can't answer, as it may hold a connection of its own ([askOrder]).
      */
     private suspend fun ask(query: String): JsonObject {
-        if (graph.settings.current.beatsReady) {
+        val settings = graph.settings.current
+        val order = askOrder(settings.audioMuseReady, settings.beatsReady)
+        if (order.isEmpty()) throw IllegalStateException("Set up AudioMuse in Settings › Connections first")
+        var failed: Exception? = null
+        for (from in order) {
             try {
-                (graph.beats.get(BeatsApi.fromPlugin(query)) as? JsonObject)?.let { return it }
+                val answer = when (from) {
+                    AskFrom.AUDIOMUSE -> graph.audioMuse.plugin(query)
+                    AskFrom.BEATS -> graph.beats.get(BeatsApi.fromPlugin(query))
+                }
+                (answer as? JsonObject)?.let { return it }
+                failed = failed ?: IllegalStateException("The Siansa plugin sent an unexpected answer")
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                AppLog.d("Similar", "Siansa Beats couldn't answer (${e.message}); asking the plugin")
+                AppLog.w("Similar", "${from.label} couldn't answer: ${e.message}")
+                failed = failed ?: e
             }
         }
-        if (!graph.settings.current.audioMuseReady) throw IllegalStateException("Set up AudioMuse in Settings › Connections first")
-        val answer = try {
-            graph.audioMuse.plugin(query)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            AppLog.w("Similar", "Siansa plugin: ${e.message}")
-            throw IllegalStateException(ProfileStore.friendly(e.message), e)
-        }
-        return answer as? JsonObject ?: throw IllegalStateException("The Siansa plugin sent an unexpected answer")
+        throw IllegalStateException(ProfileStore.friendly(failed?.message), failed)
     }
 
+    /** Who can be asked for similar albums and artists. */
+    enum class AskFrom(val label: String) { AUDIOMUSE("The Siansa plugin"), BEATS("Siansa Beats") }
+
     companion object {
+        /** Who is asked for similar albums and artists, in turn: AudioMuse-AI itself first, then Siansa Beats. */
+        fun askOrder(audioMuseReady: Boolean, beatsReady: Boolean): List<AskFrom> =
+            listOfNotNull(AskFrom.AUDIOMUSE.takeIf { audioMuseReady }, AskFrom.BEATS.takeIf { beatsReady })
+
         const val SONGS = 50
         /** How long a missing plugin is taken as still missing before asking again. */
         const val PLUGIN_RECHECK_MS = 60L * 60 * 1000

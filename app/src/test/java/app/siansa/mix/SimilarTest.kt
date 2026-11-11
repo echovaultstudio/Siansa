@@ -51,4 +51,12 @@ class SimilarTest {
         assertEquals(navidrome.take(1), SimilarPlugin.mergeArtists("Ann", emptyList(), navidrome.take(1)))
         assertEquals(2, SimilarPlugin.mergeArtists("Zed", plugin, navidrome, limit = 2).size)
     }
+
+    /** Similar albums and artists are asked of AudioMuse-AI itself; Siansa Beats only passes them on (the owner, 11 Nov). */
+    @Test fun audioMuseIsAskedFirstAndSiansaBeatsOnlyWhenItCant() {
+        assertEquals(listOf(Similar.AskFrom.AUDIOMUSE, Similar.AskFrom.BEATS), Similar.askOrder(audioMuseReady = true, beatsReady = true))
+        assertEquals(listOf(Similar.AskFrom.AUDIOMUSE), Similar.askOrder(audioMuseReady = true, beatsReady = false))
+        assertEquals(listOf(Similar.AskFrom.BEATS), Similar.askOrder(audioMuseReady = false, beatsReady = true))
+        assertEquals(emptyList<Similar.AskFrom>(), Similar.askOrder(audioMuseReady = false, beatsReady = false))
+    }
 }
