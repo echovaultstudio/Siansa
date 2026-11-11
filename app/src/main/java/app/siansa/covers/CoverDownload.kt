@@ -399,7 +399,7 @@ object CoverDownload {
                 if (kind != null && kind != AnimatedCovers.Kind.Still) break
                 if (CoverStore.has(id)) break
             }
-            val key = "cover:${CoverVersions.cacheId(id)}:$size"
+            val key = CoverCache.diskKey(id, size)
             if (disk.openSnapshot(key)?.use { true } == true) continue
             when (fetch(graph, disk, id, size, key)) {
                 null -> return Outcome.FAILED
@@ -424,6 +424,8 @@ object CoverDownload {
                 AppLog.w("Covers", "Cover $id ($size px): HTTP ${response.code}")
                 return@executeCancellable if (response.code == 404) false else null
             }
+            // The server's stand-in for a cover it doesn't have right now: nothing to keep (StandIns).
+            if (StandIns.isStandIn(response)) return@executeCancellable false
             val body = response.body ?: return@executeCancellable null
             val head = response.peekBody(32).bytes()
             val image = CoverStore.sniff(head)
@@ -441,6 +443,7 @@ object CoverDownload {
                 editor.abort()
                 throw e
             }
+            if (StandIns.isCoverArt(response.request.url.encodedPath)) response.header("ETag")?.let { CoverEtags.put(key, it) }
             true
         }
     }.onFailure {

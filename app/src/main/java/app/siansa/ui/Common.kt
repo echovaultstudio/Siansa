@@ -301,17 +301,21 @@ internal fun coverFallbackKeys(id: String, size: Int?): List<String> {
 /** The request [Cover] makes, so covers can be loaded ahead of time into the same cache entries. */
 fun coverRequest(context: android.content.Context, graph: app.siansa.AppGraph, id: String, size: Int?): ImageRequest {
     val px = coverServerPx(size)
+    // The server's stand-in, shown a while ago: asked for again now (StandIns).
+    app.siansa.covers.CoverCache.askAgain(SingletonImageLoader.get(context), id)
     val builder = ImageRequest.Builder(context).memoryCacheKey(coverMemoryKey(id, size))
     // A phone playlist's own picture, already on the phone.
     if (id.startsWith(LocalPlaylists.FILE_COVER)) builder.data(java.io.File(id.removePrefix(LocalPlaylists.FILE_COVER)))
-    else builder.data(graph.source.coverUrl(id, px)).diskCacheKey("cover:${app.siansa.covers.CoverVersions.cacheId(id)}:${px ?: "full"}")
+    else builder.data(graph.source.coverUrl(id, px)).diskCacheKey(app.siansa.covers.CoverCache.diskKey(id, px))
     // A fixed size lets the load start straight away instead of waiting for the layout.
     coverDecodePx(size)?.let { builder.size(it) }
     return builder.build()
 }
 
 /**
- * Album art from Navidrome. size = null would ask for the original file; screens use [LARGE_COVER] instead.
+ * Album art from the server, shown as the server sends it: a picture it has is kept on the phone; its stand-in for a
+ * picture it doesn't have right now is shown but never kept, and asked for again the next time it's needed
+ * (`StandIns`, the owner, 11 Nov). size = null would ask for the original file; screens use [LARGE_COVER] instead.
  * The cache key leaves out the per-session login token, so covers are reused from disk across app starts.
  * Always a still picture (the first frame of an animated cover); [BigCover] shows animations.
  *
@@ -335,7 +339,11 @@ fun Cover(
     val context = LocalContext.current
     val loader = SingletonImageLoader.get(context)
     val cached = remember(coverId, size) {
-        coverId?.let { loader.memoryCache?.get(MemoryCache.Key(coverMemoryKey(it, size)))?.image }
+        coverId?.let {
+            // The server's stand-in, shown a while ago, is dropped here, so the cover is asked for again.
+            app.siansa.covers.CoverCache.askAgain(loader, it)
+            loader.memoryCache?.get(MemoryCache.Key(coverMemoryKey(it, size)))?.image
+        }
     }
     // Not in memory at this size: show the same cover at another size that is, until this one is ready.
     val standIn = remember(coverId, size, cached) {

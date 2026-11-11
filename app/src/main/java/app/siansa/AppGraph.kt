@@ -29,6 +29,11 @@ import app.siansa.data.BookSpeeds
 import app.siansa.offline.BookDownloads
 import app.siansa.covers.CoverStore
 import app.siansa.covers.CoverVersions
+import app.siansa.data.QuietWrites
+import app.siansa.covers.CoverRefresh
+import app.siansa.covers.CoverCache
+import app.siansa.covers.CoverEtags
+import app.siansa.covers.StandIns
 import kotlinx.coroutines.runBlocking
 
 import android.app.Application
@@ -202,6 +207,17 @@ class AppGraph(val app: Application) {
         .connectionPool(ConnectionPool(6, 5, TimeUnit.MINUTES))
         // Animated covers Navidrome can't shrink: downloaded once, then answered from the phone.
         .addInterceptor(CoverStore.interceptor)
+        // The server's stand-in for a cover it doesn't have right now: its fingerprint is kept, so one kept on the
+        // phone before can be told from a real cover and removed (StandIns, CoverRefresh).
+        .addInterceptor { chain ->
+            val response = chain.proceed(chain.request())
+            if (StandIns.isStandIn(response)) {
+                runCatching { response.peekBody(StandIns.PEEK_BYTES).bytes() }.getOrNull()
+                    ?.takeIf { it.size < StandIns.PEEK_BYTES }
+                    ?.let(StandIns::learn)
+            }
+            response
+        }
         .addNetworkInterceptor { chain ->
             val response = chain.proceed(chain.request())
             // Big images are worth knowing about when playback struggles.
@@ -507,6 +523,74 @@ class AppGraph(val app: Application) {
     val similar = Similar(this)
     /** Fresh photos for Home's artist radios (beta report 95a30366). */
     val artistPhotos = ArtistPhotos(source, library)
+
+    // ---- Covers kept on the phone: the server's stand-ins never, changed ones fetched fresh (the owner, 11 Nov) ----
+
+    private val coverPrefs = app.getSharedPreferences("cover_refresh", android.content.Context.MODE_PRIVATE)
+
+    @Volatile
+    private var refreshCoversAfterSync = false
+
+    /**
+     * Sync all also checks the covers kept on the phone (CoverRefresh): after the library's sync when one was started
+     * ([afterSync]), so it reads the library as it is now; else straight away.
+     */
+    fun refreshCovers(afterSync: Boolean) {
+        if (afterSync) refreshCoversAfterSync = true
+        else scope.launch(CoroutineName("cover-refresh")) { runCoverRefresh(askServer = true) }
+    }
+
+    private suspend fun runCoverRefresh(askServer: Boolean) = runCatching {
+        CoverRefresh.run(app, this, askServer)
+    }.onFailure {
+        if (it is kotlinx.coroutines.CancellationException) throw it
+        AppLog.w("Covers", "Cover refresh failed: ${it.javaClass.simpleName}: ${it.message}")
+    }.getOrNull()
+
+    init {
+        StandIns.restore(coverPrefs.getStringSet("stand_ins", emptySet()).orEmpty())
+        StandIns.onLearned = { prints ->
+            AppLog.i("Covers", "The server sent a stand-in picture not seen before (${prints.size} known now)")
+            QuietWrites.save(coverPrefs) { putStringSet("stand_ins", prints.mapTo(HashSet()) { it.toString() }) }
+        }
+        // The server's version of each kept cover whose id has none, for Sync all to ask about.
+        val etags = app.getSharedPreferences("cover_etags", android.content.Context.MODE_PRIVATE)
+        scope.launch(Dispatchers.IO) {
+            CoverEtags.restore(etags.all.mapNotNull { (key, value) -> (value as? String)?.let { key to it } }.toMap())
+        }
+        CoverEtags.onChanged = { key, etag ->
+            QuietWrites.save(etags) { if (etag == null) remove(key) else putString(key, etag) }
+        }
+        // Emby's and Jellyfin's picture tags: an item seen with a new one has its kept covers fetched fresh.
+        val tags = File(app.filesDir, "cover-tags.txt")
+        CoverVersions.kept = { runCatching { tags.takeIf { it.exists() }?.readText() }.getOrNull() }
+        CoverVersions.onChanged = { id ->
+            AppLog.i("Covers", "Cover $id changed on the server: fetched fresh at its next showing")
+            runCatching { CoverCache.forget(coil3.SingletonImageLoader.get(app), id) }
+        }
+        scope.launch(CoroutineName("cover-tags")) {
+            library.version.collectLatest {
+                kotlinx.coroutines.delay(2_000)
+                CoverVersions.dump()?.let { text -> kotlinx.coroutines.withContext(Dispatchers.IO) { runCatching { tags.writeText(text) } } }
+            }
+        }
+        scope.launch(CoroutineName("cover-refresh")) {
+            sync.progress.map { it.phase }.distinctUntilChanged().collect { phase ->
+                if (!refreshCoversAfterSync || (phase != SyncPhase.DONE && phase != SyncPhase.FAILED)) return@collect
+                refreshCoversAfterSync = false
+                if (phase == SyncPhase.DONE) launch { runCoverRefresh(askServer = true) }
+            }
+        }
+        // Once after updating: the stand-ins earlier versions kept are removed, without asking the server anything.
+        if (!coverPrefs.getBoolean("stand_ins_removed", false)) {
+            scope.launch(CoroutineName("cover-clean-up")) {
+                kotlinx.coroutines.delay(20_000)
+                if (runCoverRefresh(askServer = false) != null) {
+                    QuietWrites.save(coverPrefs) { putBoolean("stand_ins_removed", true) }
+                }
+            }
+        }
+    }
     /** Roll the dice on Home (issue #347). */
     val dice = Dice(this)
     /** Your sonic fingerprint on Home (issue #216). */

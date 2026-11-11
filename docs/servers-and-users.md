@@ -59,7 +59,9 @@ library, play history and settings. A user can be on the same server or a differ
 - **Pick which libraries to show** (Navidrome's music folders, Emby's libraries).
 - **Only downloaded music**: hides everything that isn't on the phone. Handy on a flight.
 - **Sync** one server, or **Sync all** to sync every music library that's shown and Audiobookshelf at once. Each
-  server shows how its sync is going on one small line under its name, with a tick once it's done.
+  server shows how its sync is going on one small line under its name, with a tick once it's done. **Sync all**
+  also checks the covers kept on the phone: one that was missing is fetched fresh, and one that changed on the
+  server is replaced (see [Troubleshooting](troubleshooting.md#a-cover-is-missing-or-old)).
 
 Every server set up in **Settings › Connections** is listed, Audiobookshelf too (with how many books and podcasts it
 has after a sync). Audiobookshelf's books aren't hidden from here: Home's **Arrange** hides their rows.

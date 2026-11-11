@@ -41,7 +41,7 @@ fun rememberCoverColor(coverId: String?): Color {
             runCatching {
                 val builder = ImageRequest.Builder(context)
                 if (coverId.startsWith(LocalPlaylists.FILE_COVER)) builder.data(java.io.File(coverId.removePrefix(LocalPlaylists.FILE_COVER)))
-                else builder.data(graph.source.coverUrl(coverId, 300)).diskCacheKey("cover:${app.siansa.covers.CoverVersions.cacheId(coverId)}:300")
+                else builder.data(graph.source.coverUrl(coverId, 300)).diskCacheKey(app.siansa.covers.CoverCache.diskKey(coverId, 300))
                 val request = builder
                     .memoryCacheKey("cover:${app.siansa.covers.CoverVersions.cacheId(coverId)}:palette")
                     .allowHardware(false)
