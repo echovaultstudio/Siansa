@@ -19,7 +19,7 @@ import kotlin.math.abs
 enum class ContinuousMode(val label: String, val hint: String) {
     OFF("Off", "The music stops when the queue ends."),
     STEADY("Steady", "Adds songs like the last one in the queue, so the music carries on in the same style."),
-    DJ("DJ", "Adds songs like the last one and orders them for smooth changes: close tempo and keys that go together. Needs AudioMuse.");
+    DJ("DJ", "Adds songs like the last one and orders them for smooth changes: close tempo and keys that go together. Needs Siansa Beats.");
 
     companion object {
         fun parse(name: String?): ContinuousMode = entries.firstOrNull { it.name == name } ?: OFF
@@ -323,10 +323,11 @@ class ContinuousPlay(private val graph: AppGraph) {
      */
     private suspend fun djIds(last: Song, hits: List<app.siansa.net.ClapHit>, count: Int = TOP_UP, likeness: ((String) -> Double)? = null): List<String>? {
         if (!graph.settings.current.soundReady) {
-            AppLog.i("KeepPlaying", "DJ needs AudioMuse; adding in Steady order")
+            AppLog.i("KeepPlaying", "DJ needs Siansa Beats; adding in Steady order")
             return null
         }
-        val features = runCatching { graph.audioMuse.features(listOf(last.id) + hits.map { it.id }) }
+        // From Siansa Beats alone: a DJ mix never goes by AudioMuse's tempo (the owner, 11 Nov).
+        val features = runCatching { graph.audioMuse.features(listOf(last.id) + hits.map { it.id }, beatsOnly = true) }
             .onFailure { AppLog.w("KeepPlaying", "DJ couldn't read tempo and key: ${it.message}") }
             .getOrNull()
             ?.associateBy { it.id }

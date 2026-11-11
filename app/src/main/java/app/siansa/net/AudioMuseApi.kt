@@ -93,9 +93,19 @@ class AudioMuseApi(
      * [query] for a GET, [payload] (a JSON object) for a POST, about the songs [about]. When Siansa Beats fails and
      * AudioMuse is set up, AudioMuse is asked; without AudioMuse, Siansa Beats' reason is the answer.
      */
-    private suspend fun sound(path: String, query: List<Pair<String, String?>> = emptyList(), payload: String? = null, about: List<String> = emptyList()): JsonElement {
+    private suspend fun sound(
+        path: String,
+        query: List<Pair<String, String?>> = emptyList(),
+        payload: String? = null,
+        about: List<String> = emptyList(),
+        /** Siansa Beats' answer or none: AudioMuse isn't asked (a DJ mix's tempos are never AudioMuse's). */
+        beatsOnly: Boolean = false,
+    ): JsonElement {
         val s = settings()
         val asked = query.filter { it.second != null }
+        if (beatsOnly && !(beats != null && s.beatsReady && BeatsSound.answers(path))) {
+            throw ApiException("Siansa Beats doesn't have the songs' sound yet (it needs 0.25)")
+        }
         if (beats != null && s.beatsReady && BeatsSound.answers(path)) {
             val pathAndQuery = path + if (asked.isEmpty()) "" else "?" + asked.joinToString("&") { (k, v) ->
                 java.net.URLEncoder.encode(k, "UTF-8") + "=" + java.net.URLEncoder.encode(v, "UTF-8")
@@ -105,7 +115,7 @@ class AudioMuseApi(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (!s.audioMuseReady) throw e
+                if (beatsOnly || !s.audioMuseReady) throw e
                 AppLog.w("AudioMuse", "Siansa Beats couldn't answer $path (${e.message}); asking AudioMuse")
             }
         }
@@ -424,11 +434,12 @@ class AudioMuseApi(
      * AudioMuse's analysis of songs (tempo, key, moods, genres) from its read-only export for apps
      * (`/api/sync`), at most 500 at a time, without the large sound data (issue #216).
      */
-    suspend fun features(ids: List<String>): List<TrackFeatures> = syncBatches(ids.distinct()).flatMap { batch ->
+    suspend fun features(ids: List<String>, beatsOnly: Boolean = false): List<TrackFeatures> = syncBatches(ids.distinct()).flatMap { batch ->
         val root = sound(
             "/api/sync",
             listOf("ids" to batch.joinToString(","), "include_embeddings" to "false", "limit" to batch.size.toString()),
             about = batch,
+            beatsOnly = beatsOnly,
         ) as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
         root.arr("tracks").mapNotNull(::parseFeatures)
     }

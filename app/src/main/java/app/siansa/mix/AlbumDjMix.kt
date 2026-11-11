@@ -72,7 +72,8 @@ object AlbumDjMix {
         val lastFirst = songs.value.firstOrNull()?.takeIf { first -> album.any { it.id == first } }
         lastArrangedByFlow = false
         if (album.size < 3 || !graph.settings.current.soundReady) return album.shuffled()
-        val features = runCatching { graph.audioMuse.features(album.map { it.id }) }
+        // From Siansa Beats alone: a DJ mix never goes by AudioMuse's tempo (the owner, 11 Nov).
+        val features = runCatching { graph.audioMuse.features(album.map { it.id }, beatsOnly = true) }
             .onFailure { AppLog.w("AlbumMix", "Couldn't read tempo and key: ${it.message}; shuffled instead") }
             .getOrNull()?.associateBy { it.id } ?: return album.shuffled()
         lastArrangedByFlow = true

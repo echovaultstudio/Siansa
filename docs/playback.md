@@ -206,11 +206,14 @@ a short pull springs back. The mini player fades away as the player rises and co
 player opens and closes the same way.
 
 A **DJ mix** (from the play button, the DJ mix bar, Start a mix, an album's or playlist's Shuffle, or Keep playing in DJ
-mode) is only offered when everything it needs answers: **AudioMuse-AI**, which puts the songs in order by tempo, key and
-energy, and **Siansa Beats** behind its plugin, for the beat grids its blends follow. Siansa checks for them when
-AudioMuse answers, every half hour after that, and every two minutes while they don't. Until then the DJ choices are
-greyed out with the reason ("Needs AudioMuse", "Needs Siansa Beats"), an album's Shuffle is a plain shuffle, and Keep
-playing in DJ mode adds songs as Steady does. Steady radio, shuffle and crossfades work without either.
+mode) is only offered when **Siansa Beats** answers with everything it needs: the beat grids its blends follow, and
+each song's tempo, key and energy to put the songs in order (Siansa Beats 0.25 or newer, with the songs' sound taken
+over on its page). The tempo is always the one Siansa Beats finds from the song's beats; AudioMuse-AI's is never used
+for a DJ mix, and AudioMuse-AI on its own (or with the old Siansa plugin, which isn't kept up any more) doesn't make
+one possible. Siansa checks at the start, every half hour after that, and every two minutes while Siansa Beats
+doesn't answer. Until then the DJ choices are greyed out with the reason ("Needs Siansa Beats", "Needs Siansa Beats
+0.25"), an album's Shuffle is a plain shuffle, and Keep playing in DJ mode adds songs as Steady does. Steady radio,
+shuffle and crossfades work without it, with AudioMuse-AI or your server's similar songs as before.
 
 Slide a finger from the play button to start something from the song playing: **up** for a DJ mix, **down** for a
 Steady radio, **left** for its song path and **right** for songs that sound like it. Only the way you slide shows its

@@ -55,7 +55,7 @@ Without AudioMuse-AI, song radio uses Navidrome's similar songs, or Emby's Insta
 |---|---|
 | **Off** | The music stops when the queue ends. |
 | **Steady** | Adds songs like the last one in the queue, so the music carries on in the same style. |
-| **DJ** | Adds songs like the last one and orders them for smooth changes: close tempo and keys that go together, shaped as the mix is (see above). Needs AudioMuse-AI. |
+| **DJ** | Adds songs like the last one and orders them for smooth changes: close tempo and keys that go together, shaped as the mix is (see above). Needs Siansa Beats. |
 
 Songs already in the queue or played lately aren't added again. Songs Siansa added by itself are marked in the
 queue.

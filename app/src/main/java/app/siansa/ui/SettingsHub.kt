@@ -343,8 +343,9 @@ internal fun ContinuousChips(selected: ContinuousMode, onPick: (ContinuousMode) 
 /** The line under the keep playing choices; DJ says when it can't run (no AudioMuse or Siansa Beats), and songs come as in Steady. */
 internal fun continuousHint(mode: ContinuousMode, audioMuseReady: Boolean, djProblem: String? = null): String = when {
     mode != ContinuousMode.DJ -> mode.hint
-    !audioMuseReady -> "${mode.hint} AudioMuse isn't set up, so songs are added as in Steady."
-    djProblem == "Needs Siansa Beats" -> "${mode.hint} Siansa Beats isn't answering, so songs are added as in Steady."
+    !audioMuseReady -> "${mode.hint} Neither Siansa Beats nor AudioMuse is set up, so songs are added as in Steady."
+    djProblem == "Needs Siansa Beats" -> "${mode.hint} Siansa Beats isn't set up or isn't answering, so songs are added as in Steady."
+    djProblem == app.siansa.mix.DjReady.NEEDS_SOUND -> "${mode.hint} Siansa Beats doesn't have the songs' sound yet (it needs 0.25), so songs are added as in Steady."
     else -> mode.hint
 }
 

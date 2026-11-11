@@ -89,8 +89,8 @@ the phone:
 
 - **Your sound** and **Discover for you** among Your mixes on Home, made when you pick them.
 - **Radios** on Home: sound radios that play straight away.
-- **Similar songs** in a song's actions, and **Start a mix** with DJ blends. A DJ mix is offered only when AudioMuse and
-  Siansa Beats both answer, as on the phone; otherwise its choice is greyed out with the reason, and Steady still plays.
+- **Similar songs** in a song's actions, and **Start a mix** with DJ blends. A DJ mix is offered only when Siansa Beats
+  answers with the songs' sound, as on the phone; otherwise its choice is greyed out with the reason, and Steady still plays.
 - **Songs that sound like…** in Search: type or say a few words ("rainy sunday morning").
 - **Your sound** in the Library: the sound of your library.
 - **Song path** in Now playing and in a song's actions: from that song to another, through songs that sound in between.

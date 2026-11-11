@@ -8,27 +8,37 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A DJ mix only when its needs are met: AudioMuse answering and Siansa Beats behind its plugin (the owner, 10 Nov). */
+/**
+ * A DJ mix only when its needs are met (the owner, 10 Nov), and those are Siansa Beats alone (11 Nov): set up,
+ * answering, and with the songs' sound, so the tempos are Beat This!'s. AudioMuse-AI neither makes one possible nor
+ * is needed for one.
+ */
 class DjReadyTest {
-    private val withAudioMuse = AppSettings(audioMuseUrl = "http://192.168.1.10:8000")
-    private val answering = ConnectionState(network = true, server = true, audioMuse = true)
-
-    @Test fun withoutAudioMuseThereIsNoDjMix() {
-        assertEquals("Needs AudioMuse", DjReady.problem(AppSettings(), answering, true))
-    }
-
-    @Test fun audioMuseAwayOrOfflineMeansNotNow() {
-        assertEquals("Not available now", DjReady.problem(withAudioMuse, answering.copy(audioMuse = false), true))
-        assertEquals("Not available now", DjReady.problem(withAudioMuse, ConnectionState(network = false), true))
-    }
+    private val withBeats = AppSettings(beatsUrl = "http://192.168.1.10:8090")
+    private val withBoth = withBeats.copy(audioMuseUrl = "http://192.168.1.10:8000")
+    private val answering = ConnectionState(network = true, server = true, audioMuse = null)
 
     @Test fun withoutSiansaBeatsThereIsNoDjMix() {
-        assertEquals("Needs Siansa Beats", DjReady.problem(withAudioMuse, answering, false))
-        assertEquals("Checking…", DjReady.problem(withAudioMuse, answering, null))  // not yet: not offered until it's known
+        assertEquals("Needs Siansa Beats", DjReady.problem(AppSettings(), answering, true, beatsSound = true))
+        // AudioMuse-AI alone, even with the Siansa plugin answering, doesn't make one possible any more.
+        assertEquals("Needs Siansa Beats", DjReady.problem(AppSettings(audioMuseUrl = "http://192.168.1.10:8000"), answering.copy(audioMuse = true), true, beatsSound = true))
+        assertEquals("Needs Siansa Beats", DjReady.problem(withBeats, answering, false, beatsSound = true))
+        assertEquals("Checking…", DjReady.problem(withBeats, answering, null, beatsSound = true))  // not yet: not offered until it's known
     }
 
-    @Test fun everythingAnsweringMakesADjMixPossible() {
-        assertNull(DjReady.problem(withAudioMuse, answering, true))
+    @Test fun siansaBeatsNeedsTheSongsSound() {
+        // Before 0.25, or with nothing taken over yet: the order would have to go by AudioMuse-AI's tempos.
+        assertEquals("Needs Siansa Beats 0.25", DjReady.problem(withBoth, answering.copy(audioMuse = true), true, beatsSound = false))
+        assertTrue(DjReady.explain(DjReady.NEEDS_SOUND).contains("Setup › AudioMuse-AI"))
+    }
+
+    @Test fun offlineMeansNotNow() {
+        assertEquals("Not available now", DjReady.problem(withBeats, ConnectionState(network = false), true, beatsSound = true))
+    }
+
+    @Test fun audioMuseIsNotNeededAndItsBeingAwayDoesntMatter() {
+        assertNull(DjReady.problem(withBeats, answering, true, beatsSound = true))
+        assertNull(DjReady.problem(withBoth, answering.copy(audioMuse = false), true, beatsSound = true))
     }
 
     @Test fun checkedAgainSoonAfterANoAndRarelyAfterAYes() {

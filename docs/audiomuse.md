@@ -16,7 +16,7 @@ how it starts and ends, and similar albums and artists.
 | Search by sound, Flow | AudioMuse-AI (text search) |
 | Mood radios (Chill, Focus…), Wind down | AudioMuse-AI (text search) |
 | Song radio, similar songs | AudioMuse-AI, or Navidrome's sonic similarity, or (simpler) Navidrome's similar songs / Emby's Instant Mix |
-| Keep playing in DJ mode | AudioMuse-AI (tempo and key) |
+| Keep playing in DJ mode, DJ mixes | Siansa Beats (0.25 or newer; never AudioMuse-AI's tempo) |
 | Song path | AudioMuse-AI, or the AudioMuse-AI Navidrome plugin |
 | Your sound, sonic fingerprint | AudioMuse-AI |
 | Similar albums, similar artists ("Fans also like") | Siansa Analysis plugin |

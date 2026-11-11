@@ -175,4 +175,25 @@ class BeatsSoundTest {
         // Without Siansa Beats, as before.
         assertEquals("AudioMuse isn't answering.", ConnectionState(audioMuse = false).soundProblem(audioMuseOnly))
     }
+
+    /** The owner, 11 Nov: "only and always, don't use AudioMuse tempos": a DJ mix's song analysis is Siansa Beats' or none. */
+    @Test fun aDjMixNeverReadsAudioMusesTempos() = runBlocking {
+        // Siansa Beats without the songs' sound, AudioMuse-AI set up: not asked.
+        try {
+            api(both).features(listOf("s1"), beatsOnly = true)
+            fail("no error")
+        } catch (e: ApiException) {
+            assertTrue(e.message, e.message!!.contains("Siansa Beats doesn't have the songs' sound yet"))
+        }
+        // Siansa Beats failing: its reason, not AudioMuse-AI's answer.
+        BeatsSound.heard(everything)
+        beatsFails = true
+        try {
+            api(both).features(listOf("s1"), beatsOnly = true)
+            fail("no error")
+        } catch (e: ApiException) {
+            assertEquals("Siansa Beats doesn't know this song", e.message)
+        }
+        assertEquals(emptyList<String>(), askedOfAudioMuse)
+    }
 }

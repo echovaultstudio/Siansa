@@ -92,8 +92,8 @@ class EveryServerDeviceTest {
         val found = runBlocking { graph.source.search("Morning Tone") }
         assertTrue("$name: search finds Morning Tone", found.songs.any { it.title == "Morning Tone" })
 
-        // No AudioMuse: a DJ mix isn't offered.
-        assertEquals("$name: DJ mix without AudioMuse", "Needs AudioMuse", graph.djProblem())
+        // No Siansa Beats: a DJ mix isn't offered.
+        assertEquals("$name: DJ mix without Siansa Beats", "Needs Siansa Beats", graph.djProblem())
 
         // Songs play, in each format the library has (FLAC, MP3, AAC, Opus).
         val songs = runBlocking { graph.source.songsPage(0, 100) }
