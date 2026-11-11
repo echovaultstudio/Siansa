@@ -46,7 +46,7 @@ artist, so the app can open it on its own server.
 In AudioMuse-AI: Plugins › Repositories, add
 
 ```
-https://raw.githubusercontent.com/echovaultstudio/siansa-audiomuse-plugin/main/manifest.json
+https://raw.githubusercontent.com/echovaultstudio/siansa-beats/main/manifest.json
 ```
 
 then install Siansa Analysis from the Catalog tab and apply the restart. AudioMuse-AI checks the catalog for
@@ -71,7 +71,7 @@ The code lives in the Siansa repository (`audiomuse-plugin/`); the public reposi
 AudioMuse-AI installs from. To publish, add a new version at the top of `versions` in `plugin.json`, then:
 
 ```sh
-audiomuse-plugin/publish.sh ../siansa-audiomuse-plugin
+audiomuse-plugin/publish.sh ../siansa-beats
 ```
 
 and commit and push there. A published version's zip is never replaced, because installed copies check its
