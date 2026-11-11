@@ -16,7 +16,7 @@ import kotlin.random.Random
  * for as long as the queue is still the radio's: once you play something else, or add your own songs after it, it
  * stops adding. A song chosen on the genre's page plays first.
  *
- * The genre's songs are Siansa Beats' vote when it's there, the songs' genre tags otherwise ([songsOf]).
+ * The genre's songs are the ones Siansa Beats hears in it when it's there, the songs' genre tags otherwise ([songsOf]).
  */
 class GenreRadio(private val graph: AppGraph) {
     private class Session(val name: String, val ids: List<String>, val used: MutableSet<String>, var lastId: String) {
@@ -51,12 +51,12 @@ class GenreRadio(private val graph: AppGraph) {
         }
     }
 
-    /** Every song of genre [name] on the phone: Siansa Beats' vote, or the songs' genre tags. */
+    /** Every song of genre [name] on the phone: the ones Siansa Beats hears in it, or the songs' genre tags. */
     suspend fun songsOf(name: String): List<Song> = withContext(Dispatchers.IO) {
-        val voted = graph.genreVote.songIds(name, MOST_SONGS)?.let { ids ->
+        val heard = graph.beatsGenres.songIds(name, MOST_SONGS)?.let { ids ->
             graph.library.keepSyncedSongs(graph.library.songs(ids), "Genre").distinctBy { it.id }
         }
-        GenreVote.pick(name, voted) { graph.library.songsOfGenre(name, MOST_SONGS) }
+        BeatsGenres.pick(name, heard) { graph.library.songsOfGenre(name, MOST_SONGS) }
     }
 
     /**
@@ -106,8 +106,8 @@ class GenreRadio(private val graph: AppGraph) {
         const val PICKS = 30
         /** Songs left after the one playing when more are added. */
         const val WHEN_LEFT = 2
-        /** The most songs of a genre read for its page and its radio. */
-        const val MOST_SONGS = 5_000
+        /** The most songs of a genre read for its page and its radio: all of them, in any library there is. */
+        const val MOST_SONGS = 50_000
 
         /** [first] (when given), then random songs of [songs] to make [count]. */
         fun firstPicks(songs: List<Song>, first: Song?, count: Int, random: Random): List<Song> {

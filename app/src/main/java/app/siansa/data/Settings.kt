@@ -112,7 +112,7 @@ data class AppSettings(
     val audioMuseServer: String = "",
     /**
      * Siansa Beats (Siansa Dev, the owner, 10 Nov): the service that measures each song's loudness, fades, key and beat
-     * grid and votes the genres, asked directly at its address with its API key (or password). Empty: those come from
+     * grid and hears the genres, asked directly at its address with its API key (or password). Empty: those come from
      * the Siansa Beats (dev) plugin on AudioMuse when it's there, the songs' tags otherwise.
      */
     val beatsUrl: String = "",

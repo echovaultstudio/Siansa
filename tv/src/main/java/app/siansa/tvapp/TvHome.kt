@@ -176,7 +176,7 @@ fun TvHome() {
         if (next !== rows) rows = next
     }
     // Siansa Beats' genre list brought up to date now and then, as on the phone (Home reads the saved one).
-    LaunchedEffect(Unit) { if (graph.library.isSynced && graph.genreVote.stale()) graph.genreVote.refresh() }
+    LaunchedEffect(Unit) { if (graph.library.isSynced && graph.beatsGenres.stale()) graph.beatsGenres.refresh() }
     val play = rememberTvPlay()
     val nav = LocalNav.current
     // The phone's notices (issue #784): what needs you, what you're partway through, what's new; shown or hidden in

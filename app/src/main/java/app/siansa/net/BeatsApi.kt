@@ -14,7 +14,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * Siansa Beats' API for the app, version 1 (`/api/v1/…`, its beats/openapi.json): each song's loudness, fades, key and
- * beat grid, the genres by vote and their descriptions, and the bad blends marked in Siansa Dev. Asked directly at the
+ * beat grid, the genres it hears and their descriptions, and the bad blends marked in Siansa Dev. Asked directly at the
  * address in Settings › Connections, with its API key (or password) as `Authorization: Bearer`.
  *
  * Its paths are the Siansa Beats (dev) plugin's with `/api/v1/` for `/plugins/siansa_beats/api/` ([fromPlugin]), so the
@@ -107,7 +107,7 @@ class BeatsApi(private val http: OkHttpClient, private val settings: () -> AppSe
         val beatGrids: Int,
         /** Songs measured for loudness and fades. */
         val loudness: Int,
-        /** Whether it votes genres from the sound (its image has the style model). */
+        /** Whether it hears each song's genres (its image has the style model). */
         val genres: Boolean,
         /** AudioMuse-AI's paths it answers from the songs' sound (0.25, [BeatsSound]); empty before, or with none. */
         val sound: Set<String> = emptySet(),

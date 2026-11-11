@@ -12,18 +12,20 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * A genre radio's songs by Siansa Beats' vote (each song's sound first, its tags second), through the Siansa Beats
- * (dev) plugin on AudioMuse-AI. Without AudioMuse-AI, the plugin, Siansa Beats or its style model, [songIds] is null
- * and the radio plays by the songs' own genre tags, as it always did: Siansa works fully without any of them.
+ * The genres Siansa Beats hears in the library, and each one's songs (the owner, 11 Nov: straight from its analysis,
+ * no vote with the tags): a song is in every genre its sound scores enough for, and a genre gives all its songs.
+ * Search's genres, Home's "Your genres", a genre's page and its radio go by this. The songs' own genre tags are what
+ * an album's or an artist's page shows, and what all of these fall back to without Siansa Beats or its style model
+ * ([songIds] is null then): Siansa works fully without it.
  *
  * After [MISSES] failed requests in a row nothing is asked for [BACK_OFF_MS], so a missing service costs a request now
- * and then, while one slow answer doesn't turn the vote off for minutes.
+ * and then, while one slow answer doesn't turn the genres off for minutes.
  *
  * The library's genre list ([genres]) is saved on the phone ([saved]) when it comes, so the search page and Home show
  * it at once and keep showing it while Siansa Beats is slow or away; it's asked for again in the background ([refresh]).
  * Without AudioMuse set up, nothing saved is shown: the tags' genres are, as always.
  */
-class GenreVote(
+class BeatsGenres(
     private val ask: suspend (String) -> JsonElement,
     private val ready: () -> Boolean,
     private val now: () -> Long = System::currentTimeMillis,
@@ -45,7 +47,10 @@ class GenreVote(
         return true
     }
 
-    /** The ids of [name]'s songs by vote, at most [limit]; null when the vote can't be had (play by the tags). */
+    /**
+     * The ids of [name]'s songs by their sound, the ones that sound most like it first: all of them, or a random [limit]
+     * of them when there are more. Null when Siansa Beats can't be asked (the tags play).
+     */
     suspend fun songIds(name: String, limit: Int): List<String>? {
         if (!ready() || now() < backOffUntil) return null
         val answer = try {
@@ -54,14 +59,16 @@ class GenreVote(
             throw e
         } catch (e: Exception) {
             missed()
-            AppLog.i("Radio", "Genre radio $name: no vote from Siansa Beats (${e.message}), so by its tags")
+            AppLog.i("Radio", "Genre $name: no answer from Siansa Beats (${e.message}), so by the songs' tags")
             return null
         } ?: return null
         misses = 0
         val ids = (answer["ids"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content } ?: return null
         val styles = (answer["styles"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content?.substringAfter("---") }.orEmpty()
         val genres = (answer["genres"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty()
-        AppLog.i("Radio", "Genre radio $name: ${ids.size} songs by Siansa Beats' vote" +
+        val all = (answer["songs"] as? JsonPrimitive)?.content?.toIntOrNull()
+        AppLog.i("Radio", "Genre $name: ${ids.size} songs by their sound, from Siansa Beats" +
+            (all?.takeIf { it > ids.size }?.let { " (of $it)" }.orEmpty()) +
             (styles + genres).takeIf { it.isNotEmpty() }?.joinToString(prefix = " (", postfix = ")").orEmpty())
         return ids
     }
@@ -69,7 +76,7 @@ class GenreVote(
     @Volatile private var memory: SavedGenres? = null
 
     /**
-     * The library's genres by vote as last saved, most songs first (all of them, at once, from the phone): null when
+     * The library's genres by their sound as last saved, most songs first (all of them, at once, from the phone): null when
      * AudioMuse isn't set up or Siansa Beats has never given enough, so the tags' genres are shown.
      */
     fun saved(shown: Set<String> = emptySet()): List<Genre>? {
@@ -85,7 +92,7 @@ class GenreVote(
     }
 
     /**
-     * Asks Siansa Beats for every genre by vote (waiting at most [WAIT_MS]) and saves them: the new list, or null when
+     * Asks Siansa Beats for every genre it hears (waiting at most [WAIT_MS]) and saves them: the new list, or null when
      * none came (the saved one, or the tags, stay).
      */
     suspend fun refresh(shown: Set<String> = emptySet()): List<Genre>? {
@@ -111,7 +118,7 @@ class GenreVote(
         val kept = SavedGenres(now(), listed, items.mapNotNull { o -> genreOf(o)?.let { g -> librariesOf(o)?.let { g.name to it } } }.toMap())
         memory = kept
         runCatching { save(writeSaved(kept)) }.onFailure { AppLog.w("Search", "Genres: couldn't save the list: ${it.message}") }
-        AppLog.d("Search", "Genres: ${listed.size} by Siansa Beats' vote, saved")
+        AppLog.d("Search", "Genres: ${listed.size} from Siansa Beats (by the songs' sound), saved")
         return inLibraries(listed, kept.libraries, shown)
     }
 
@@ -210,29 +217,20 @@ class GenreVote(
             }.sortedByDescending { it.songCount }
         }
 
-        /** Fewer genres than this by vote (it has hardly started), and the search page shows the tags' genres. */
+        /** Fewer genres than this from Siansa Beats (it has hardly started), and the search page shows the tags' genres. */
         const val MIN_GENRES = 8
         const val BACK_OFF_MS = 10 * 60_000L
 
-        /** Fewer songs than this by vote (Siansa Beats hasn't heard many yet, or they aren't on the phone), and the tags play. */
-        const val MIN_VOTED = 30
-
         /**
-         * The songs a genre radio plays: those by vote when there are at least [MIN_VOTED] of them on the phone. With
-         * fewer, those tagged with the genre ([tagged]), as without Siansa Beats, unless the tags have fewer still: a
-         * genre that's only in the list by vote (Yé-Yé: 19 songs by their sound, no song tagged so) showed an empty page
-         * (the owner, 10 Nov), so the voted ones play then.
+         * A genre's songs: the ones Siansa Beats hears in it ([heard]), all of them, however few. The songs tagged with
+         * it ([tagged]) only when Siansa Beats can't be asked (null), or has none of it on the phone: a genre that's
+         * only a tag (opened from an album's page) is none of its styles.
          */
-        suspend fun pick(name: String, voted: List<Song>?, tagged: suspend () -> List<Song>): List<Song> {
-            if (voted != null && voted.size >= MIN_VOTED) return voted
+        suspend fun pick(name: String, heard: List<Song>?, tagged: suspend () -> List<Song>): List<Song> {
+            if (!heard.isNullOrEmpty()) return heard
             val byTags = tagged()
-            if (voted == null) return byTags
-            if (byTags.size >= voted.size) {
-                AppLog.i("Radio", "Genre radio $name: only ${voted.size} songs by vote on the phone, so its ${byTags.size} by tags")
-                return byTags
-            }
-            AppLog.i("Radio", "Genre radio $name: ${voted.size} songs by vote and ${byTags.size} by tags, so by vote")
-            return voted
+            if (heard != null) AppLog.i("Radio", "Genre $name: none by their sound on the phone, so its ${byTags.size} by tags")
+            return byTags
         }
     }
 }

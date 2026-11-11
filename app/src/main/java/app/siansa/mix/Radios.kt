@@ -53,11 +53,11 @@ class Radios(private val graph: AppGraph) {
 
     suspend fun genre(name: String): List<Song> {
         AppLog.i("Radio", "Genre radio $name")
-        // Siansa Beats' vote (each song's sound first, its tags second) when it's there; the songs' tags otherwise.
-        val voted = graph.genreVote.songIds(name, 300)?.let { ids ->
+        // The songs Siansa Beats hears in the genre when it's there (a random 300 of them); the songs' tags otherwise.
+        val heard = graph.beatsGenres.songIds(name, 300)?.let { ids ->
             graph.library.keepSyncedSongs(graph.library.songs(ids), "Genre radio").distinctBy { it.id }
         }
-        val songs = GenreVote.pick(name, voted) { graph.library.songsOfGenre(name, 300) }
+        val songs = BeatsGenres.pick(name, heard) { graph.library.songsOfGenre(name, 300) }
         if (songs.isEmpty()) throw MixException("No synced songs in $name")
         return varied(songs.shuffled(), 80)
     }

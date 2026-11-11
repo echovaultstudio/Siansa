@@ -11,14 +11,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The genres to browse (Search, Home's "Your genres" and its page of all): Siansa Beats' genres by vote as last saved
- * on the phone, or the songs' tags when there are none (no AudioMuse, no Siansa Beats, or it hasn't voted enough yet):
+ * The genres to browse (Search, Home's "Your genres" and its page of all): the genres Siansa Beats hears in the
+ * songs, as last saved on the phone, or the songs' tags when there are none (no Siansa Beats, or it hasn't heard enough yet):
  * Siansa works fully without Siansa Beats. Genres only in hidden libraries are left out. At most [limit].
  */
 suspend fun AppGraph.browseGenres(limit: Int): List<Genre> {
     if (!library.isSynced) return emptyList()
-    val voted = withContext(Dispatchers.IO) { genreVote.saved(shownLibraries()) }
-    return voted?.take(limit) ?: library.genres(limit)
+    val heard = withContext(Dispatchers.IO) { beatsGenres.saved(shownLibraries()) }
+    return heard?.take(limit) ?: library.genres(limit)
 }
 
 /**
@@ -31,12 +31,12 @@ fun rememberBrowseGenres(limit: Int): State<List<Genre>?> {
     val version by graph.library.version.collectAsStateWithLifecycle()
     return produceState<List<Genre>?>(initialValue = null, version, limit) {
         value = graph.browseGenres(limit)
-        if (graph.library.isSynced && graph.genreVote.stale()) graph.genreVote.refresh(graph.shownLibraries())?.let { value = it.take(limit) }
+        if (graph.library.isSynced && graph.beatsGenres.stale()) graph.beatsGenres.refresh(graph.shownLibraries())?.let { value = it.take(limit) }
     }
 }
 
 /**
  * The libraries whose songs are on the phone: those chosen to sync in Home's filter (empty: every library), so a genre
- * only in hidden libraries isn't offered ([app.siansa.mix.GenreVote.inLibraries]).
+ * only in hidden libraries isn't offered ([app.siansa.mix.BeatsGenres.inLibraries]).
  */
 fun AppGraph.shownLibraries(): Set<String> = settings.current.syncFolders

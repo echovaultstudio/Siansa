@@ -10,7 +10,7 @@ import app.siansa.playback.MiniFor
 import app.siansa.mix.Dice
 import app.siansa.mix.DjReady
 import app.siansa.mix.GenreRadio
-import app.siansa.mix.GenreVote
+import app.siansa.mix.BeatsGenres
 import app.siansa.data.ArtistPhotos
 import app.siansa.data.FavouriteRadios
 import app.siansa.data.audioMuseUserFor
@@ -332,10 +332,10 @@ class AppGraph(val app: Application) {
 
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
     val profiles = ProfileStore({ path -> siansaBeats(path) }, { settings.current }, beats = { beats.capabilities() })
-    /** Genre radios by Siansa Beats' vote, when it's there (Siansa Dev); by the songs' tags otherwise. */
-    val genreVote = GenreVote(
+    /** The genres Siansa Beats hears and their songs, when it's there; the songs' tags otherwise. */
+    val beatsGenres = BeatsGenres(
         { path -> siansaBeats(path) }, { settings.current.let { it.beatsReady || it.audioMuseReady } },
-        // The genre list by vote, saved so Search and Home show it at once (and while Siansa Beats is away).
+        // Its genre list (the file's name is from when they were voted with the tags), saved so Search and Home show it at once (and while Siansa Beats is away).
         load = { java.io.File(app.filesDir, "voted-genres.json").takeIf { it.exists() }?.readText() },
         save = { java.io.File(app.filesDir, "voted-genres.json").writeText(it) },
         // Each genre's description, kept so its page shows it at once, also while Siansa Beats is away.

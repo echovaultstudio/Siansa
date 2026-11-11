@@ -80,7 +80,7 @@ fun generatedCoverColors(route: String): Pair<Color, Color>? {
 }
 
 /**
- * A genre's page (the owner, 10 Nov): every song of it on the phone (Siansa Beats' vote, or the songs' genre tags), to
+ * A genre's page (the owner, 10 Nov): every song of it on the phone (the ones Siansa Beats hears in it, or the songs' genre tags), to
  * look through. Play, Shuffle or a song start the genre's radio: [GenreRadio.PICKS] songs at random (the song first),
  * and more of the genre as the queue comes to its end; never the whole genre in the queue, as some have thousands.
  */
@@ -135,9 +135,9 @@ private fun GenreScreenContent(nav: NavController, name: String) {
     val scope = rememberCoroutineScope()
     val colors = genreColors(name)
     val songs by loadState("genre-songs-$name") { graph.genreRadio.songsOf(name) }
-    val aboutState by loadState("genre-about-$name") { graph.genreVote.about(name) }
+    val aboutState by loadState("genre-about-$name") { graph.beatsGenres.about(name) }
     // The description kept on the phone shows at once (the owner, 10 Nov); the asking above only fills in a new one.
-    val keptAbout = remember(name) { graph.genreVote.keptAbout(name) }
+    val keptAbout = remember(name) { graph.beatsGenres.keptAbout(name) }
     val list = songs.valueOrNull()
     CollectionPage(
         nav = nav,

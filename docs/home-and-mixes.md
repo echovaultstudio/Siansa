@@ -65,7 +65,7 @@ The same cog has **Show its title**: turn it off and the section shows without t
 | **Recently played** | Albums you played lately, only from music the source filter shows. |
 | **Artist radios** | Artists you played lately, mixed with artists like them. |
 | **Recently added** | The newest albums on your server. |
-| **Your genres** | Genre radios from your library: the songs tagged with that genre. In Siansa Dev with Siansa Beats, the songs whose sound and tags vote them into it (a remix tagged with its album's genre, but sounding like trance, plays in Trance); without Siansa Beats, or until it has heard enough of them, the tags as always. |
+| **Your genres** | Genre radios from your library: the songs tagged with that genre. In Siansa Dev with Siansa Beats, every song that sounds like it, whatever its tags say (a remix tagged with its album's genre, but sounding like trance, plays in Trance); without Siansa Beats, or until it has heard enough of them, the tags as always. |
 | **Random picks** | A random selection to dig into. |
 
 ## Notices

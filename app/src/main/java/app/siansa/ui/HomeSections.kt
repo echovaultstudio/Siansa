@@ -155,7 +155,7 @@ private suspend fun loadSection(graph: AppGraph, section: HomeSection): List<Sec
             if (synced) graph.library.albums("newest").take(200)
             else graph.source.albums("newest", 200, 0).distinctBy { it.name + "|" + it.artist }
             ).map { SectionItem.AlbumItem(it, it.artist) }
-        // Siansa Beats' genres by vote as last saved, or the songs' tags: every one (Search's All genres opens this).
+        // The genres Siansa Beats hears, as last saved, or the songs' tags: every one (Search's All genres opens this).
         // A to Z (the owner, 10 Nov): the row on Home and Search's tiles are most songs first, the page of all is a list to look up.
         HomeSection.Genres -> (if (synced) graph.browseGenres(ALL_GENRES) else emptyList())
             .sortedBy { app.siansa.data.normalizeKey(it.name) }.map { SectionItem.GenreItem(it) }

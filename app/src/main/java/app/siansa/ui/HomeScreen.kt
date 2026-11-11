@@ -261,7 +261,7 @@ fun HomeScreen(nav: NavController) {
         if (graph.library.isSynced) graph.library.randomAlbums(20)
         else graph.source.albums("random", 20, 0).distinctBy { it.name + "|" + it.artist }
     }
-    // Siansa Beats' genres by vote as last saved, or the songs' tags (the same list as Search).
+    // The genres Siansa Beats hears, as last saved, or the songs' tags (the same list as Search).
     val genres by rememberBrowseGenres(12)
 
     // The Home tab tapped again: glide back to the top. From far down, jump most of the way first so it's quick.
