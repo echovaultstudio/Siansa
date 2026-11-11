@@ -46,4 +46,5 @@ from AudioMuse-AI's analysis of the songs closest to the sound of your most play
   for listenbrainz.org.
 - **Users**: turn a user off, and songs from their library aren't sent anywhere while you listen as you.
 
-Hearts (favourites) sync to your server and, if connected, to Last.fm.
+Hearts (favourites) sync to your server and, if connected, to Last.fm. With **Scrobble to Siansa Beats** on, they
+also go to Siansa Beats, which loves the song on Last.fm when it sends your listens on there.

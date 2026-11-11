@@ -73,6 +73,17 @@ class ScrobbleToBeatsTest {
         }
     }
 
+    @Test fun aHeartCarriesTheSongOnEveryServer() {
+        for (server in EveryServer.all) {
+            val song = Song(id = server.songId, title = "Kerala", artist = "Bonobo")
+            val body = AppJson.parseToJsonElement(BeatsListens.love("max", song, loved = true)) as JsonObject
+            assertEquals(server.name, mapOf("user" to JsonPrimitive("max"), "id" to JsonPrimitive(server.songId),
+                "artist" to JsonPrimitive("Bonobo"), "title" to JsonPrimitive("Kerala"), "loved" to JsonPrimitive(true)), body.toMap())
+        }
+        val off = AppJson.parseToJsonElement(BeatsListens.love("max", Song(id = "x", title = "T", artist = "A"), loved = false)) as JsonObject
+        assertEquals(JsonPrimitive(false), off["loved"])
+    }
+
     @Test fun whatASongDoesntSayIsLeftOut() {
         val bare = Song(id = "x", title = "Untitled", artist = "Someone")
         val listen = ((AppJson.parseToJsonElement(BeatsListens.listen("", bare, 5)) as JsonObject)["listens"] as JsonArray).single() as JsonObject

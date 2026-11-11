@@ -19,6 +19,7 @@ import kotlinx.serialization.json.putJsonArray
 object BeatsListens {
     const val PATH = "/api/v1/listens"
     const val NOW = "/api/v1/listens/now"
+    const val LOVES = "/api/v1/loves"
 
     /** The listener's name for Siansa Beats: the music server's user name (none with an API key alone). */
     fun listener(settings: AppSettings): String = settings.navidromeUser.trim()
@@ -36,6 +37,15 @@ object BeatsListens {
                 if (song.durationSec > 0) put("duration", song.durationSec)
             }
         }
+    }.toString()
+
+    /** A heart given ([loved]) or taken back, which Siansa Beats passes on to Last.fm. */
+    fun love(user: String, song: Song, loved: Boolean): String = buildJsonObject {
+        put("user", user)
+        put("id", song.id)
+        put("artist", song.artist)
+        put("title", song.title)
+        put("loved", loved)
     }.toString()
 
     /** What's playing now. */
