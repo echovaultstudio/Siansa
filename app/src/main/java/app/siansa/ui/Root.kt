@@ -390,13 +390,18 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
                             onDragEnd = {
                                 val moved = drag.value
                                 scope.launch {
-                                    val swipe = miniSwipe(moved, barWidth)
+                                    val swipe = miniSwipe(moved, barWidth, graph.player.hasNext(), graph.player.hasPrevious())
+                                    if (swipe == MiniSwipe.NONE && moved < -barWidth * 0.25f) {
+                                        AppLog.i("Player", "Mini player swiped for the next song, but there's none after this one")
+                                    }
                                     // A short buzz as the song changes (issue #763); the phone's touch-feedback setting decides
                                     // whether it's felt.
                                     if (swipe != MiniSwipe.NONE) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                     when (swipe) {
                                         MiniSwipe.NEXT -> { drag.animateTo(-barWidth.toFloat()); graph.player.next() }
                                         MiniSwipe.PREVIOUS -> { drag.animateTo(barWidth.toFloat()); graph.player.previousTrack() }
+                                        // The same song from its start: the bar comes back, as the song doesn't change.
+                                        MiniSwipe.RESTART -> { graph.player.previousTrack(); drag.animateTo(0f) }
                                         MiniSwipe.NONE -> drag.animateTo(0f)
                                     }
                                 }
@@ -513,11 +518,16 @@ private fun AskForNotifications() {
 }
 
 /** What a swipe on the mini player does (issue #310). */
-enum class MiniSwipe { NEXT, PREVIOUS, NONE }
+enum class MiniSwipe { NEXT, PREVIOUS, RESTART, NONE }
 
-/** A swipe of [moved] px on a bar [width] px wide: past a quarter left is the next song, right the one before. */
-fun miniSwipe(moved: Float, width: Int): MiniSwipe = when {
-    moved < -width * 0.25f -> MiniSwipe.NEXT
-    moved > width * 0.25f -> MiniSwipe.PREVIOUS
+/**
+ * A swipe of [moved] px on a bar [width] px wide: past a quarter left is the next song, right the one before. With no
+ * song after this one ([hasNext]), a swipe left springs back, as Now playing's cover does: the owner, 11 Nov, rolled the
+ * dice (one song), swiped, and the music stopped with the bar left empty. With none before ([hasPrevious]), a swipe
+ * right starts this song again and springs back.
+ */
+fun miniSwipe(moved: Float, width: Int, hasNext: Boolean = true, hasPrevious: Boolean = true): MiniSwipe = when {
+    moved < -width * 0.25f -> if (hasNext) MiniSwipe.NEXT else MiniSwipe.NONE
+    moved > width * 0.25f -> if (hasPrevious) MiniSwipe.PREVIOUS else MiniSwipe.RESTART
     else -> MiniSwipe.NONE
 }

@@ -347,6 +347,7 @@ class PlayerConnection(
     }
 
     fun hasNext(): Boolean = controller?.hasNextMediaItem() == true
+    fun hasPrevious(): Boolean = controller?.hasPreviousMediaItem() == true
 
     fun next() = withController { it.seekToNext() }
     fun previous() = withController { it.seekToPrevious() }
