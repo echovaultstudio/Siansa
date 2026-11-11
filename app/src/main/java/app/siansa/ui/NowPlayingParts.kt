@@ -192,8 +192,8 @@ fun PlayerMenu(
                     if (radioSeed != null) {
                         graph.songRadio.stop()
                         notify("Mix off")
-                    } else if (graph.connection.current.aiProblem(graph.settings.current) != null && graph.settings.current.audioMuseReady) {
-                        notify("AI backend is currently not available :( ${graph.connection.current.aiProblem(graph.settings.current)}")
+                    } else if (graph.connection.current.soundProblem(graph.settings.current) != null && graph.settings.current.soundReady) {
+                        notify("AI backend is currently not available :( ${graph.connection.current.soundProblem(graph.settings.current)}")
                     } else {
                         // Steady or DJ first (issue #337); the chooser starts the radio.
                         RadioChooser.ask(song)

@@ -925,7 +925,7 @@ internal fun Controls(
             onToggle = { graph.player.togglePlay() },
             onStop = { graph.player.stop() },
             onSlide = { onSlide?.invoke(it) },
-            unavailable = { slideUnavailable(it, settings, graph.connection.current.aiProblem(settings), djProblem) },
+            unavailable = { slideUnavailable(it, settings, graph.connection.current.soundProblem(settings), djProblem) },
             onSliding = { shown ->
                 sliding = shown?.way
                 onSlideLabel(shown?.let {
@@ -934,7 +934,7 @@ internal fun Controls(
                         SlideLabel(PlaySlide.DJ_MIX, it.way, it.armed, bar = DjBarView(places.spots, it.spot, places.starting, it.rise))
                     } else {
                         val slide = slides.of(it.way)
-                        SlideLabel(slide, it.way, it.armed, slideUnavailable(slide, settings, graph.connection.current.aiProblem(settings), djProblem))
+                        SlideLabel(slide, it.way, it.armed, slideUnavailable(slide, settings, graph.connection.current.soundProblem(settings), djProblem))
                     }
                 })
             },

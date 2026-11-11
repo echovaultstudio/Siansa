@@ -546,6 +546,6 @@ fun slideUnavailable(slide: PlaySlide, settings: app.siansa.data.AppSettings, ai
     }
     // A DJ mix only when its needs are met ([app.siansa.mix.DjReady]): AudioMuse and Siansa Beats answering.
     PlaySlide.DJ_MIX -> djProblem
-    PlaySlide.STEADY, PlaySlide.START_A_MIX -> if (settings.audioMuseReady && aiProblem != null) "Not available now" else null
+    PlaySlide.STEADY, PlaySlide.START_A_MIX -> if (settings.soundReady && aiProblem != null) "Not available now" else null
     PlaySlide.SONIC_MATCH, PlaySlide.NOTHING -> null
 }

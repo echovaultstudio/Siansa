@@ -152,4 +152,27 @@ class BeatsSoundTest {
         assertFalse(BeatsSound.answers("/api/clap/search"))
         assertEquals("/api/v1/audiomuse/api/sync?ids=a", BeatsSound.path("/api/sync?ids=a"))
     }
+
+    /** From the owner's log, 11 Nov: similar songs still came from Navidrome's AudioMuse-AI plugin. */
+    @Test fun similarSongsAreAskedOfSiansaBeatsBeforeTheMusicServersPlugin() {
+        assertEquals(app.siansa.mix.SonicRoute.BEATS, app.siansa.mix.sonicRoute(navidromeSonic = true, audioMuseReady = true, beatsSound = true))
+        assertEquals(app.siansa.mix.SonicRoute.BEATS, app.siansa.mix.sonicRoute(navidromeSonic = false, audioMuseReady = false, beatsSound = true))
+        assertEquals(app.siansa.mix.SonicRoute.NAVIDROME_SONIC, app.siansa.mix.sonicRoute(navidromeSonic = true, audioMuseReady = true))
+    }
+
+    /** From the same log: with AudioMuse-AI's address cleared, Song path and the mix slides said "not available". */
+    @Test fun theSoundFeaturesArentHeldBackByAudioMuseBeingOff() {
+        val connection = ConnectionState(network = true, server = true, audioMuse = null)
+        assertEquals("AudioMuse isn't set up. Add it in Settings › Connections.", connection.soundProblem(beatsOnly))
+        BeatsSound.heard(everything)
+        assertEquals(null, connection.soundProblem(beatsOnly))
+        assertEquals(null, ConnectionState(audioMuse = false).soundProblem(both))  // AudioMuse-AI down: Siansa Beats answers
+        assertEquals("You're offline.", ConnectionState(network = false).soundProblem(beatsOnly))
+        assertEquals("Only downloaded music is on.", connection.soundProblem(beatsOnly.copy(downloadedOnly = true)))
+        // The search by words is still AudioMuse-AI's, and says so plainly.
+        assertEquals("Describing music in words still needs AudioMuse. Add it in Settings › Connections.", connection.aiProblem(beatsOnly))
+        assertEquals(null, connection.aiProblem(both))
+        // Without Siansa Beats, as before.
+        assertEquals("AudioMuse isn't answering.", ConnectionState(audioMuse = false).soundProblem(audioMuseOnly))
+    }
 }
