@@ -110,7 +110,7 @@ fun ScrobblingScreen(nav: NavController) {
                         graph.settings.save(graph.settings.current.copy(scrobbleOffUsers = off))
                     }
                 }
-                Hint("Turn a user off and songs from their library aren't sent to your server, Last.fm or ListenBrainz, while you listen as you.")
+                Hint("Turn a user off and songs from their library aren't sent to your server, Siansa Beats, Last.fm or ListenBrainz, while you listen as you.")
                 }
                 HorizontalDivider()
             }

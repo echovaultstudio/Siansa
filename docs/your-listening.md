@@ -37,6 +37,7 @@ from AudioMuse-AI's analysis of the songs closest to the sound of your most play
   or plays count twice.
 - **Siansa Beats** (**Scrobble to Siansa Beats**; shown when Siansa Beats 0.29 or newer is set up in Settings ›
   Connections): keeps your listening history in Siansa Beats, under the name you sign in to your music server with.
+  A listen reaches it by the same rules as everywhere else: **When a song counts**, and **Users**.
   Its **Listening** page shows any month or year: your top songs, artists and albums, hours, when you listen. You
   can bring in an export of Koito or Last.fm there, and have it send your listens on to Last.fm; turn **Last.fm**
   off here then, or plays count twice.

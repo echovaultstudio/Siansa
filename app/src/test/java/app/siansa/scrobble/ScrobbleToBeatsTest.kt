@@ -55,6 +55,23 @@ class ScrobbleToBeatsTest {
         assertEquals(emptySet<String>(), scrobbleTargets(AppSettings(scrobbleNavidrome = false)))
     }
 
+    /** The owner, 11 Nov: Siansa Beats gets a listen by "When a song counts", as every other place does. */
+    @Test fun aListenCountsByTheAppsSettingWhereverItGoes() {
+        val song = 200_000L  // 3 min 20 s
+        assertFalse(listenCounts(song, 4_000, 50))  // the owner's log: 4 s of it
+        assertFalse(listenCounts(song, 99_000, 50))
+        assertTrue(listenCounts(song, 100_000, 50))
+        assertFalse(listenCounts(song, 100_000, 75))  // the setting is followed
+        assertTrue(listenCounts(song, 150_000, 75))
+        assertTrue(listenCounts(song, 50_000, 25))
+        assertTrue(listenCounts(600_000, 240_000, 90))  // four minutes always count
+        assertFalse(listenCounts(30_000, 30_000, 25))  // 30 seconds or shorter never
+        assertFalse(listenCounts(song, 9_000, 10))  // at least 10 seconds
+        // Siansa Beats is one of the places a counted listen goes, nothing more.
+        BeatsSound.heard(caps(takes).sound)
+        assertTrue(Scrobbler.BEATS in scrobbleTargets(AppSettings(beatsUrl = "http://beats:8090", scrobbleBeats = true)))
+    }
+
     @Test fun aListenCarriesTheServersOwnSongIdOnEveryServer() {
         for (server in EveryServer.all) {
             val song = Song(id = server.songId, title = "Kerala", artist = "Bonobo", album = "Migration", durationSec = 238)

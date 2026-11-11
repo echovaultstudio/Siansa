@@ -82,8 +82,9 @@ class Scrobbler(
         if (!scrobblesSong(song.id)) return
         val durationMs = song.durationSec * 1000L
         val percent = settings.current.scrobblePercent
-        val needed = scrobbleNeededMs(durationMs, percent)
-        if (durationMs in 1..30_000 || listenedMs < needed || listenedMs < 10_000) {
+        // One rule for every place a listen goes (the server, Siansa Beats, Last.fm, ListenBrainz): Settings ›
+        // Scrobbling › When a song counts.
+        if (!listenCounts(durationMs, listenedMs, percent)) {
             AppLog.i("Scrobble", "Not counted: ${song.title} (heard ${listenedMs / 1000}s of ${song.durationSec}s, needs $percent% or 4 min)")
             return
         }
@@ -171,6 +172,13 @@ val SCROBBLE_PERCENTS = listOf(25, 40, 50, 60, 75, 90)
  */
 fun scrobbleNeededMs(durationMs: Long, percent: Int): Long =
     minOf(durationMs * percent.coerceIn(10, 100) / 100, 240_000L)
+
+/**
+ * Whether a song of [durationMs] heard for [listenedMs] counts as a listen, by "When a song counts" ([percent]): the
+ * share of it, or four minutes, and at least 10 seconds; a song of 30 seconds or less never does.
+ */
+fun listenCounts(durationMs: Long, listenedMs: Long, percent: Int): Boolean =
+    durationMs !in 1..30_000 && listenedMs >= scrobbleNeededMs(durationMs, percent) && listenedMs >= 10_000
 
 /** Whether songs from [user]'s library are scrobbled, given the users set not to be (issue #356). */
 fun scrobblesFrom(user: Int, off: Set<Int>): Boolean = user !in off
